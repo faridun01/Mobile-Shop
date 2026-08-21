@@ -1,0 +1,1014 @@
+import React, { useState, useMemo } from 'react';
+import { useApp } from '../../context/AppContext';
+import { SupplierInvoice, Device } from '../../types';
+import {
+  Plus,
+  Trash2,
+  Scan,
+  AlertCircle,
+  CheckCircle2,
+  Truck,
+  Layers,
+  Store as StoreIcon,
+  DollarSign,
+  Search,
+  Calendar,
+  X,
+  ChevronRight,
+  ArrowLeft,
+  Package,
+  FileText,
+  Clock,
+  Eye,
+  Check
+} from 'lucide-react';
+
+interface PurchaseItemGroup {
+  id: string;
+  brand: string;
+  model: string;
+  storage: string;
+  color: string;
+  purchasePriceUsd: number;
+  imeis: string[];
+}
+
+export const PurchasePage: React.FC = () => {
+  const {
+    currentUser,
+    suppliers,
+    stores,
+    todayRate,
+    supplierInvoices,
+    devices,
+    createPurchase,
+    openScanner
+  } = useApp();
+
+  // Mode: 'list' (History of purchases) or 'form' (Register new purchase intake)
+  const [viewMode, setViewMode] = useState<'list' | 'form'>('list');
+
+  // List search & filters
+  const [searchQuery, setSearchQuery] = useState('');
+  const [periodFilter, setPeriodFilter] = useState<'TODAY' | 'MONTH' | 'ALL'>('ALL');
+  const [selectedSupplierFilter, setSelectedSupplierFilter] = useState<string>('all');
+  const [selectedInvoice, setSelectedInvoice] = useState<SupplierInvoice | null>(null);
+
+  // Form states
+  const [selectedSupplierId, setSelectedSupplierId] = useState<string>(suppliers[0]?.id || '');
+  const [invoiceNumber, setInvoiceNumber] = useState<string>(`INV-${Math.floor(100 + Math.random() * 900)}`);
+  const [purchaseDate, setPurchaseDate] = useState<string>(new Date().toISOString().split('T')[0]);
+  
+  // Destination mode
+  const [isStorePurchase, setIsStorePurchase] = useState<boolean>(false);
+  const [storeId, setStoreId] = useState<string>(stores[1]?.id || 'store-1');
+
+  // Groups of devices
+  const [groups, setGroups] = useState<PurchaseItemGroup[]>([
+    {
+      id: 'g-1',
+      brand: 'Apple',
+      model: 'iPhone 16 Pro',
+      storage: '256 GB',
+      color: 'Black Titanium',
+      purchasePriceUsd: 900,
+      imeis: ['']
+    }
+  ]);
+
+  const [statusMessage, setStatusMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [justSavedInvoice, setJustSavedInvoice] = useState<string | null>(null);
+
+  // Current rate
+  const rate = todayRate?.rate || 9.5;
+
+  // Filtered list of purchase invoices
+  const filteredInvoices = useMemo(() => {
+    const todayStr = new Date().toISOString().split('T')[0];
+    const currentMonthStr = todayStr.substring(0, 7);
+
+    return (supplierInvoices || []).filter((inv) => {
+      // 1. Period filter
+      const invDateStr = inv.date.split('T')[0];
+      if (periodFilter === 'TODAY' && invDateStr !== todayStr) {
+        return false;
+      }
+      if (periodFilter === 'MONTH' && !invDateStr.startsWith(currentMonthStr)) {
+        return false;
+      }
+
+      // 2. Supplier filter
+      if (selectedSupplierFilter !== 'all' && inv.supplierId !== selectedSupplierFilter) {
+        return false;
+      }
+
+      // 3. Search query (by invoice number, supplier name, or contained device IMEI/model)
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase().trim();
+        const matchesInvoiceNum = inv.invoiceNumber.toLowerCase().includes(q);
+        const matchesSupplier = inv.supplierName.toLowerCase().includes(q);
+        
+        // Match devices belonging to this invoice
+        const invoiceDevices = devices.filter(d => d.invoiceNumber === inv.invoiceNumber);
+        const matchesDevice = invoiceDevices.some(
+          d => d.imei.toLowerCase().includes(q) ||
+               d.model.toLowerCase().includes(q) ||
+               d.brand.toLowerCase().includes(q)
+        );
+
+        if (!matchesInvoiceNum && !matchesSupplier && !matchesDevice) {
+          return false;
+        }
+      }
+
+      return true;
+    }).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  }, [supplierInvoices, devices, periodFilter, selectedSupplierFilter, searchQuery]);
+
+  // Aggregate stats for invoices
+  const totalInvoicesCount = filteredInvoices.length;
+  const totalUnitsReceived = filteredInvoices.reduce((acc, inv) => acc + (inv.devicesCount || 0), 0);
+  const totalSumUsd = filteredInvoices.reduce((acc, inv) => acc + (inv.totalAmountUsd || 0), 0);
+  const totalDebtUsd = filteredInvoices.reduce((acc, inv) => acc + (inv.remainingAmountUsd || 0), 0);
+
+  // Scan finder to locate purchase
+  const handleScanFinder = () => {
+    openScanner((scannedCode) => {
+      const code = scannedCode.trim();
+      const matchedDevice = devices.find(d => d.imei === code || d.barcode === code);
+      if (matchedDevice && matchedDevice.invoiceNumber) {
+        const matchedInv = supplierInvoices.find(inv => inv.invoiceNumber === matchedDevice.invoiceNumber);
+        if (matchedInv) {
+          setSelectedInvoice(matchedInv);
+          return;
+        }
+      }
+
+      const directInv = supplierInvoices.find(inv => inv.invoiceNumber.toLowerCase() === code.toLowerCase());
+      if (directInv) {
+        setSelectedInvoice(directInv);
+      } else {
+        setSearchQuery(code);
+      }
+    });
+  };
+
+  // Form helpers
+  const handleAddGroup = () => {
+    setGroups(prev => [
+      ...prev,
+      {
+        id: `g-${Date.now()}`,
+        brand: 'Apple',
+        model: 'iPhone 16',
+        storage: '128 GB',
+        color: 'Black',
+        purchasePriceUsd: 700,
+        imeis: ['']
+      }
+    ]);
+  };
+
+  const handleRemoveGroup = (idx: number) => {
+    setGroups(prev => prev.filter((_, i) => i !== idx));
+  };
+
+  const handleUpdateGroup = (idx: number, field: keyof PurchaseItemGroup, value: any) => {
+    setGroups(prev => {
+      const next = [...prev];
+      next[idx] = { ...next[idx], [field]: value };
+      return next;
+    });
+  };
+
+  const handleAddImeiToGroup = (groupIdx: number) => {
+    setGroups(prev => {
+      const next = [...prev];
+      next[groupIdx].imeis.push('');
+      return next;
+    });
+  };
+
+  const handleRemoveImeiFromGroup = (groupIdx: number, imeiIdx: number) => {
+    setGroups(prev => {
+      const next = [...prev];
+      next[groupIdx].imeis = next[groupIdx].imeis.filter((_, i) => i !== imeiIdx);
+      if (next[groupIdx].imeis.length === 0) next[groupIdx].imeis = [''];
+      return next;
+    });
+  };
+
+  const handleUpdateImei = (groupIdx: number, imeiIdx: number, val: string) => {
+    setGroups(prev => {
+      const next = [...prev];
+      next[groupIdx].imeis[imeiIdx] = val.trim();
+      return next;
+    });
+  };
+
+  const handleScanImei = (groupIdx: number, imeiIdx: number) => {
+    openScanner((scannedCode) => {
+      handleUpdateImei(groupIdx, imeiIdx, scannedCode.trim());
+    });
+  };
+
+  // Quick batch paste IMEI helper
+  const handleBatchImeiPaste = (groupIdx: number, text: string) => {
+    const rawLines = text.split(/[\n,\s]+/).map(s => s.trim()).filter(Boolean);
+    if (rawLines.length > 0) {
+      setGroups(prev => {
+        const next = [...prev];
+        next[groupIdx].imeis = rawLines;
+        return next;
+      });
+    }
+  };
+
+  // Calculate totals for new intake form
+  const totalFormUnits = groups.reduce((acc, g) => acc + g.imeis.filter(i => i.trim().length > 0).length, 0);
+  const totalFormUsd = groups.reduce((acc, g) => {
+    const count = g.imeis.filter(i => i.trim().length > 0).length;
+    return acc + (count * g.purchasePriceUsd);
+  }, 0);
+
+  const handleSubmitPurchase = (e: React.FormEvent) => {
+    e.preventDefault();
+    setStatusMessage(null);
+
+    if (!selectedSupplierId) {
+      setStatusMessage({ type: 'error', text: 'Выберите поставщика' });
+      return;
+    }
+    if (!invoiceNumber.trim()) {
+      setStatusMessage({ type: 'error', text: 'Укажите номер накладной' });
+      return;
+    }
+
+    const cleanGroups = groups.map(g => ({
+      brand: g.brand.trim(),
+      model: g.model.trim(),
+      storage: g.storage.trim(),
+      color: g.color.trim(),
+      purchasePriceUsd: g.purchasePriceUsd,
+      imeis: g.imeis.filter(i => i.trim().length > 0)
+    })).filter(g => g.imeis.length > 0);
+
+    if (cleanGroups.length === 0) {
+      setStatusMessage({ type: 'error', text: 'Добавьте хотя бы один заполненный IMEI' });
+      return;
+    }
+
+    const res = createPurchase({
+      supplierId: selectedSupplierId,
+      invoiceNumber: invoiceNumber.trim(),
+      date: purchaseDate,
+      isStorePurchase,
+      storeId: isStorePurchase ? storeId : undefined,
+      groups: cleanGroups
+    });
+
+    if (res.success) {
+      const savedNum = invoiceNumber.trim();
+      setJustSavedInvoice(savedNum);
+
+      // Reset form with a fresh invoice number
+      setInvoiceNumber(`INV-${Math.floor(100 + Math.random() * 900)}`);
+      setGroups([
+        {
+          id: `g-${Date.now()}`,
+          brand: 'Apple',
+          model: 'iPhone 16 Pro',
+          storage: '256 GB',
+          color: 'Black Titanium',
+          purchasePriceUsd: 900,
+          imeis: ['']
+        }
+      ]);
+
+      // Automatically switch back to the list of purchases as requested!
+      setViewMode('list');
+      setStatusMessage({
+        type: 'success',
+        text: `Приход по накладной ${savedNum} успешно сохранен (${cleanGroups.reduce((a, b) => a + b.imeis.length, 0)} шт.)!`
+      });
+    } else {
+      setStatusMessage({ type: 'error', text: res.message || 'Ошибка сохранения прихода' });
+    }
+  };
+
+  if (currentUser?.role === 'SELLER') {
+    return (
+      <div className="p-8 text-center text-zinc-500">
+        <p className="text-sm font-medium">Доступ ограничен</p>
+        <p className="text-xs text-zinc-600 mt-1">Оформление и просмотр приходов разрешены только Администраторам и Партнерам</p>
+      </div>
+    );
+  }
+
+  // =========================================================================
+  // VIEW: HISTORY OF PURCHASES (ВСЕ ПРИХОДЫ)
+  // =========================================================================
+  if (viewMode === 'list') {
+    return (
+      <div className="flex-1 flex flex-col h-full overflow-hidden bg-[#0B0E14] text-slate-300">
+        {/* Top Header Bar */}
+        <div className="p-3 border-b border-slate-800 bg-[#0F1219] flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 shrink-0">
+          <div>
+            <h3 className="text-xs font-bold text-slate-100 flex items-center space-x-1.5 uppercase font-mono">
+              <Truck className="w-4 h-4 text-emerald-400" />
+              <span>ВСЕ ПРИХОДЫ (ИСТОРИЯ НАКЛАДНЫХ)</span>
+            </h3>
+            <p className="text-[11px] text-slate-400 mt-0.5">
+              Всего: {totalInvoicesCount} накладных • {totalUnitsReceived} шт. на сумму ${totalSumUsd.toLocaleString()}
+            </p>
+          </div>
+
+          <div className="flex items-center space-x-2">
+            <button
+              onClick={() => {
+                setStatusMessage(null);
+                setViewMode('form');
+              }}
+              className="flex items-center space-x-1.5 px-3.5 py-1.5 rounded bg-emerald-500 hover:bg-emerald-400 text-white font-bold text-xs shadow-md transition-colors font-mono"
+            >
+              <Plus className="w-4 h-4" />
+              <span>НОВЫЙ ПРИХОД</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Success toast after saving */}
+        {statusMessage && (
+          <div className={`px-4 py-2 border-b flex items-center justify-between text-xs font-mono ${
+            statusMessage.type === 'success'
+              ? 'bg-emerald-500/15 border-emerald-800/60 text-emerald-400'
+              : 'bg-rose-950/40 border-rose-800/60 text-rose-400'
+          }`}>
+            <div className="flex items-center space-x-2">
+              {statusMessage.type === 'success' ? <CheckCircle2 className="w-4 h-4" /> : <AlertCircle className="w-4 h-4" />}
+              <span>{statusMessage.text}</span>
+            </div>
+            <button onClick={() => setStatusMessage(null)} className="text-slate-400 hover:text-white">
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        )}
+
+        {/* Search & Filters Bar */}
+        <div className="p-2.5 border-b border-slate-800 bg-[#0F1219]/60 space-y-2 shrink-0">
+          <div className="flex space-x-2">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-2 w-3.5 h-3.5 text-slate-500" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Поиск: № накладной / поставщик / IMEI / модель..."
+                className="w-full rounded bg-[#0B0E14] border border-slate-800 pl-8 pr-8 py-1.5 text-xs font-mono text-slate-100 placeholder-slate-500 focus:border-emerald-500 focus:outline-none transition-colors"
+              />
+              {searchQuery && (
+                <button
+                  onClick={() => setSearchQuery('')}
+                  className="absolute right-2.5 top-2 text-slate-500 hover:text-slate-300"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+
+            <button
+              onClick={handleScanFinder}
+              className="flex items-center space-x-1.5 px-3 py-1.5 rounded bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 text-xs font-mono transition-colors shrink-0"
+              title="Сканировать IMEI или номер накладной"
+            >
+              <Scan className="w-3.5 h-3.5 text-emerald-400" />
+              <span className="hidden sm:inline">СКАНЕР</span>
+            </button>
+          </div>
+
+          {/* Period selector & Supplier Filter */}
+          <div className="flex flex-wrap items-center justify-between gap-2 text-xs font-mono">
+            <div className="flex items-center space-x-1.5 overflow-x-auto">
+              <button
+                onClick={() => setPeriodFilter('TODAY')}
+                className={`px-2.5 py-1 rounded text-[10px] font-mono uppercase tracking-wider transition-colors ${
+                  periodFilter === 'TODAY'
+                    ? 'bg-emerald-500 text-white font-bold shadow-[0_0_8px_rgba(16,185,129,0.5)]'
+                    : 'bg-slate-900 text-slate-400 hover:text-slate-200 hover:bg-slate-800 border border-slate-800'
+                }`}
+              >
+                СЕГОДНЯ
+              </button>
+              <button
+                onClick={() => setPeriodFilter('MONTH')}
+                className={`px-2.5 py-1 rounded text-[10px] font-mono uppercase tracking-wider transition-colors ${
+                  periodFilter === 'MONTH'
+                    ? 'bg-emerald-500 text-white font-bold shadow-[0_0_8px_rgba(16,185,129,0.5)]'
+                    : 'bg-slate-900 text-slate-400 hover:text-slate-200 hover:bg-slate-800 border border-slate-800'
+                }`}
+              >
+                ЭТОТ МЕСЯЦ
+              </button>
+              <button
+                onClick={() => setPeriodFilter('ALL')}
+                className={`px-2.5 py-1 rounded text-[10px] font-mono uppercase tracking-wider transition-colors ${
+                  periodFilter === 'ALL'
+                    ? 'bg-emerald-500 text-white font-bold shadow-[0_0_8px_rgba(16,185,129,0.5)]'
+                    : 'bg-slate-900 text-slate-400 hover:text-slate-200 hover:bg-slate-800 border border-slate-800'
+                }`}
+              >
+                ВСЕ ПРИХОДЫ
+              </button>
+            </div>
+
+            {/* Supplier selector filter */}
+            <div className="flex items-center space-x-1.5">
+              <span className="text-slate-400 text-[11px]">Поставщик:</span>
+              <select
+                value={selectedSupplierFilter}
+                onChange={(e) => setSelectedSupplierFilter(e.target.value)}
+                className="bg-slate-900 border border-slate-800 text-slate-200 text-xs rounded px-2.5 py-1 focus:outline-none focus:border-emerald-500"
+              >
+                <option value="all">Все поставщики</option>
+                {suppliers.map(s => (
+                  <option key={s.id} value={s.id}>{s.name}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+        </div>
+
+        {/* Invoices List / Table */}
+        <div className="flex-1 overflow-y-auto divide-y divide-slate-800 bg-[#0B0E14]">
+          {filteredInvoices.length === 0 ? (
+            <div className="p-12 text-center text-slate-500 font-mono">
+              <Package className="w-10 h-10 mx-auto mb-2 text-slate-600 opacity-50" />
+              <p className="text-xs">Приходы не найдены</p>
+              <p className="text-[11px] text-slate-600 mt-1">
+                Нажмите «Новый приход», чтобы зарегистрировать партию товара
+              </p>
+            </div>
+          ) : (
+            filteredInvoices.map((inv) => {
+              const isPaid = inv.status === 'PAID';
+              const isPartial = inv.status === 'PARTIALLY_PAID';
+              const isJustSaved = justSavedInvoice === inv.invoiceNumber;
+              const locationLabel = inv.isStorePurchase && inv.storeId
+                ? (stores.find(s => s.id === inv.storeId)?.name || 'Магазин')
+                : 'Главный склад';
+
+              return (
+                <div
+                  key={inv.id}
+                  onClick={() => setSelectedInvoice(inv)}
+                  className={`p-3 sm:p-3.5 hover:bg-slate-900/60 cursor-pointer transition-colors flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
+                    isJustSaved ? 'bg-emerald-500/15 border-l-4 border-l-blue-500' : ''
+                  }`}
+                >
+                  <div className="flex items-start space-x-3">
+                    <div className="p-2 rounded bg-slate-900 border border-slate-800 text-emerald-400 shrink-0 mt-0.5">
+                      <FileText className="w-4 h-4" />
+                    </div>
+
+                    <div>
+                      <div className="flex items-center space-x-2">
+                        <span className="font-mono text-xs font-bold text-slate-100">
+                          {inv.invoiceNumber}
+                        </span>
+                        <span className={`text-[10px] px-2 py-0.5 rounded font-mono font-medium ${
+                          isPaid ? 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30' :
+                          isPartial ? 'bg-amber-500/15 text-amber-300 border border-amber-500/30' :
+                          'bg-rose-500/15 text-rose-300 border border-rose-500/30'
+                        }`}>
+                          {isPaid ? 'Оплачена' : isPartial ? 'Частично' : 'Не оплачена'}
+                        </span>
+                        {(inv.totalAmountUsd === 0 || inv.invoiceNumber.includes('BONUS')) && (
+                          <span className="text-[10px] px-2 py-0.5 rounded font-mono font-medium bg-purple-500/20 text-purple-300 border border-purple-500/40">
+                            🎁 ПОДАРОК ($0)
+                          </span>
+                        )}
+                        {isJustSaved && (
+                          <span className="text-[9px] bg-emerald-500 text-white px-1.5 py-0.2 rounded font-bold uppercase">
+                            НОВОЕ
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-slate-400 mt-1 font-mono">
+                        <span className="text-slate-300 font-semibold flex items-center space-x-1">
+                          <Truck className="w-3 h-3 text-slate-500" />
+                          <span>{inv.supplierName}</span>
+                        </span>
+                        <span className="text-slate-500">•</span>
+                        <span>{inv.date}</span>
+                        <span className="text-slate-500">•</span>
+                        <span className="flex items-center space-x-1 text-slate-300">
+                          <StoreIcon className="w-3 h-3 text-slate-500" />
+                          <span>{locationLabel}</span>
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between sm:justify-end space-x-4 pl-11 sm:pl-0">
+                    <div className="text-left sm:text-right font-mono">
+                      <div className="text-xs font-bold text-slate-100">
+                        {inv.totalAmountUsd === 0 ? '$0 (БОНУС)' : `$${(inv.totalAmountUsd || 0).toLocaleString()}`}
+                        {inv.totalAmountUsd > 0 && (
+                          <span className="text-[10px] text-slate-400 font-normal ml-1">
+                            (~{Math.round((inv.totalAmountUsd || 0) * rate).toLocaleString()} TJS)
+                          </span>
+                        )}
+                      </div>
+                      <div className="text-[11px] text-slate-400 flex items-center sm:justify-end space-x-2 mt-0.5">
+                        <span className="text-emerald-400 font-bold">{inv.devicesCount || 0} шт.</span>
+                        {inv.remainingAmountUsd > 0 && (
+                          <span className="text-rose-400">Долг: ${inv.remainingAmountUsd.toLocaleString()}</span>
+                        )}
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      className="p-1.5 rounded bg-slate-900 text-slate-400 hover:text-white border border-slate-800 hover:border-slate-700"
+                      title="Подробнее"
+                    >
+                      <ChevronRight className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
+
+        {/* INVOICE DETAILS MODAL */}
+        {selectedInvoice && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-3 sm:p-4 backdrop-blur-xs">
+            <div className="w-full max-w-2xl rounded-xl bg-[#0F1219] border border-slate-800 shadow-2xl overflow-hidden flex flex-col max-h-[88vh]">
+              {/* Modal Header */}
+              <div className="p-3.5 sm:p-4 border-b border-slate-800 bg-[#0B0E14] flex items-center justify-between shrink-0 font-mono">
+                <div className="flex items-center space-x-2">
+                  <FileText className="w-4 h-4 text-emerald-400" />
+                  <div>
+                    <h3 className="text-xs font-bold text-slate-100 flex items-center space-x-2">
+                      <span>НАКЛАДНАЯ {selectedInvoice.invoiceNumber}</span>
+                      {(selectedInvoice.totalAmountUsd === 0 || selectedInvoice.invoiceNumber.includes('BONUS')) && (
+                        <span className="text-[10px] px-2 py-0.5 rounded bg-purple-500/20 text-purple-300 border border-purple-500/40 font-normal">
+                          🎯 Target Bonus ($0)
+                        </span>
+                      )}
+                    </h3>
+                    <p className="text-[11px] text-slate-400">
+                      Поставщик: {selectedInvoice.supplierName} • {selectedInvoice.date}
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  onClick={() => setSelectedInvoice(null)}
+                  className="p-1.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition-colors"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              {/* Financial Breakdown */}
+              <div className="p-3 bg-[#0B0E14]/80 border-b border-slate-800 grid grid-cols-3 gap-2 text-center text-xs font-mono">
+                <div className="bg-[#0F1219] p-2 rounded border border-slate-800">
+                  <span className="text-[10px] text-slate-400 block">СУММА НАКЛАДНОЙ</span>
+                  <strong className={selectedInvoice.totalAmountUsd === 0 ? "text-purple-300 font-bold" : "text-slate-100 font-bold"}>
+                    {selectedInvoice.totalAmountUsd === 0 ? '$0 (БОНУС)' : `$${(selectedInvoice.totalAmountUsd || 0).toLocaleString()}`}
+                  </strong>
+                </div>
+                <div className="bg-[#0F1219] p-2 rounded border border-slate-800">
+                  <span className="text-[10px] text-slate-400 block">ОПЛАЧЕНО</span>
+                  <strong className="text-emerald-400 font-bold">${(selectedInvoice.paidAmountUsd || 0).toLocaleString()}</strong>
+                </div>
+                <div className="bg-[#0F1219] p-2 rounded border border-slate-800">
+                  <span className="text-[10px] text-slate-400 block">ОСТАТОК ДОЛГА</span>
+                  <strong className="text-rose-400 font-bold">${(selectedInvoice.remainingAmountUsd || 0).toLocaleString()}</strong>
+                </div>
+              </div>
+
+              {/* Contained Devices List */}
+              {(() => {
+                const containedDevices = devices.filter(d => 
+                  d.invoiceNumber === selectedInvoice.invoiceNumber ||
+                  (selectedInvoice.invoiceNumber.includes('112') && d.invoiceNumber === 'INV-112-BONUS')
+                );
+
+                return (
+                  <>
+                    <div className="p-3 bg-[#0F1219] border-b border-slate-800 flex items-center justify-between text-xs font-mono font-bold text-slate-300 shrink-0">
+                      <span>Устройства в накладной</span>
+                      <span className="text-emerald-400">
+                        {containedDevices.length} шт.
+                      </span>
+                    </div>
+
+                    <div className="flex-1 overflow-y-auto p-3 space-y-2 bg-[#0B0E14] font-mono">
+                      {containedDevices.map((dev, idx) => (
+                        <div
+                          key={dev.id}
+                          className="p-2.5 rounded bg-[#0F1219] border border-slate-800 flex items-center justify-between text-xs"
+                        >
+                          <div>
+                            <div className="flex items-center space-x-2 flex-wrap gap-y-1">
+                              <span className="text-slate-400 text-[10px] font-bold">#{idx + 1}</span>
+                              <strong className="text-slate-100">{dev.brand} {dev.model}</strong>
+                              <span className="text-slate-400 text-[11px]">{dev.storage} • {dev.color}</span>
+                              {(dev.purchaseCostUsd === 0 || dev.isBonus) && (
+                                <span className="text-[10px] px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-300 border border-purple-500/40 font-medium">
+                                  🎁 ПОДАРОК ($0)
+                                </span>
+                              )}
+                            </div>
+                            <div className="text-[11px] text-slate-400 mt-1 flex items-center space-x-3">
+                              <span>IMEI: <strong className="text-slate-300">{dev.imei}</strong></span>
+                              <span>Локация: <strong className="text-slate-300">{dev.locationName}</strong></span>
+                            </div>
+                            {dev.bonusCampaign && (
+                              <p className="text-[10px] text-purple-400 mt-0.5">
+                                Акция: {dev.bonusCampaign}
+                              </p>
+                            )}
+                          </div>
+
+                          <div className="text-right shrink-0">
+                            <span className={`text-xs font-bold font-mono ${dev.purchaseCostUsd === 0 ? 'text-purple-300' : 'text-emerald-400'}`}>
+                              {dev.purchaseCostUsd === 0 ? '$0 (ПОДАРОК)' : `$${dev.purchaseCostUsd}`}
+                            </span>
+                            <span className={`block text-[10px] px-1.5 py-0.2 rounded font-bold mt-0.5 ${
+                              dev.status === 'SOLD' ? 'text-amber-400' : 'text-slate-400'
+                            }`}>
+                              {dev.status === 'SOLD' ? 'ПРОДАН' : 'НА СКЛАДЕ'}
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+
+                      {containedDevices.length === 0 && (
+                        <p className="text-xs text-slate-500 text-center py-6">
+                          Устройства для этой архивной накладной были оприходованы ранее
+                        </p>
+                      )}
+                    </div>
+                  </>
+                );
+              })()}
+
+              {/* Modal Footer */}
+              <div className="p-3 border-t border-slate-800 bg-[#0F1219] flex justify-end shrink-0">
+                <button
+                  onClick={() => setSelectedInvoice(null)}
+                  className="px-4 py-1.5 rounded bg-slate-800 hover:bg-slate-700 text-xs font-bold text-slate-200 transition-colors font-mono"
+                >
+                  ЗАКРЫТЬ
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // =========================================================================
+  // VIEW: NEW PURCHASE FORM (ФОРМА НОВОГО ПРИХОДА)
+  // =========================================================================
+  return (
+    <div className="flex-1 flex flex-col h-full overflow-y-auto bg-zinc-950 text-zinc-100 min-h-0">
+      <form onSubmit={handleSubmitPurchase} className="flex-1 flex flex-col min-h-full">
+        {/* Top Header with Back Button */}
+        <div className="p-3.5 sm:p-4 border-b border-zinc-800 bg-zinc-900/80 space-y-3 shrink-0">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setStatusMessage(null);
+                  setViewMode('list');
+                }}
+                className="flex items-center space-x-1 px-2.5 py-1 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300 hover:text-white text-xs font-mono font-bold transition-colors border border-zinc-700"
+              >
+                <ArrowLeft className="w-3.5 h-3.5" />
+                <span>СПИСОК ПРИХОДОВ</span>
+              </button>
+              <span className="text-zinc-500">/</span>
+              <h3 className="text-xs font-bold text-zinc-100 uppercase tracking-wider font-mono">
+                НОВЫЙ ПРИХОД ТОВАРОВ
+              </h3>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs font-mono">
+            <div>
+              <label className="block text-zinc-400 mb-1 font-medium">Поставщик</label>
+              <select
+                value={selectedSupplierId ?? ''}
+                onChange={(e) => setSelectedSupplierId(e.target.value)}
+                className="w-full rounded bg-zinc-950 border border-zinc-700 px-3 py-2 text-xs text-zinc-100 focus:border-emerald-500 focus:outline-none"
+              >
+                {suppliers.map(s => (
+                  <option key={s.id} value={s.id}>{s.name} (Долг: ${s.totalDebtUsd})</option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-zinc-400 mb-1 font-medium">Номер накладной</label>
+              <input
+                type="text"
+                required
+                value={invoiceNumber}
+                onChange={(e) => setInvoiceNumber(e.target.value)}
+                className="w-full rounded bg-zinc-950 border border-zinc-700 px-3 py-2 text-xs text-zinc-100 focus:border-emerald-500 focus:outline-none uppercase"
+                placeholder="INV-999"
+              />
+            </div>
+
+            <div>
+              <label className="block text-zinc-400 mb-1 font-medium">Дата прихода</label>
+              <input
+                type="date"
+                required
+                value={purchaseDate}
+                onChange={(e) => setPurchaseDate(e.target.value)}
+                className="w-full rounded bg-zinc-950 border border-zinc-700 px-3 py-2 text-xs text-zinc-100 focus:border-emerald-500 focus:outline-none"
+              />
+            </div>
+          </div>
+
+          {/* Destination location selector */}
+          <div className="pt-2 border-t border-zinc-800/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+            <div className="flex items-center space-x-4">
+              <label className="flex items-center space-x-2 cursor-pointer">
+                <input
+                  type="radio"
+                  name="dest"
+                  checked={!isStorePurchase}
+                  onChange={() => setIsStorePurchase(false)}
+                  className="text-emerald-500 focus:ring-blue-500"
+                />
+                <span className="text-zinc-300 font-medium">Приход на Главный склад</span>
+              </label>
+
+              <label className="flex items-center space-x-2 cursor-pointer">
+                <input
+                  type="radio"
+                  name="dest"
+                  checked={isStorePurchase}
+                  onChange={() => setIsStorePurchase(true)}
+                  className="text-emerald-500 focus:ring-blue-500"
+                />
+                <span className="text-zinc-300 font-medium">Прямой приход в магазин</span>
+              </label>
+            </div>
+
+            {isStorePurchase && (
+              <div className="flex items-center space-x-2">
+                <span className="text-zinc-400">Магазин:</span>
+                <select
+                  value={storeId}
+                  onChange={(e) => setStoreId(e.target.value)}
+                  className="rounded bg-zinc-950 border border-zinc-700 px-3 py-1 text-xs text-zinc-100 focus:border-emerald-500 focus:outline-none"
+                >
+                  {stores.filter(s => !s.isMainWarehouse).map(s => (
+                    <option key={s.id} value={s.id}>{s.name}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Groups list */}
+        <div className="flex-1 p-3.5 sm:p-4 space-y-4 bg-zinc-950 pb-8">
+          {groups.map((group, groupIdx) => (
+            <div
+              key={group.id}
+              className="rounded-lg border border-zinc-800 bg-zinc-900/90 p-3.5 sm:p-4 space-y-3 relative"
+            >
+              <div className="flex items-center justify-between border-b border-zinc-800 pb-2">
+                <span className="text-xs font-bold text-zinc-300 uppercase tracking-wider font-mono">
+                  Позиция #{groupIdx + 1}
+                </span>
+
+                {groups.length > 1 && (
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveGroup(groupIdx)}
+                    className="text-zinc-500 hover:text-rose-400 p-1 transition-colors"
+                    title="Удалить позицию"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
+
+              {/* Group Specs Form */}
+              <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5 text-xs font-mono">
+                <div>
+                  <label className="block text-zinc-400 mb-1">Бренд</label>
+                  <input
+                    type="text"
+                    required
+                    value={group.brand}
+                    onChange={(e) => handleUpdateGroup(groupIdx, 'brand', e.target.value)}
+                    className="w-full rounded bg-zinc-950 border border-zinc-700 px-2.5 py-1.5 text-xs text-zinc-100 focus:border-emerald-500 focus:outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-zinc-400 mb-1">Модель</label>
+                  <input
+                    type="text"
+                    required
+                    value={group.model}
+                    onChange={(e) => handleUpdateGroup(groupIdx, 'model', e.target.value)}
+                    className="w-full rounded bg-zinc-950 border border-zinc-700 px-2.5 py-1.5 text-xs text-zinc-100 focus:border-emerald-500 focus:outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-zinc-400 mb-1">Память</label>
+                  <input
+                    type="text"
+                    value={group.storage}
+                    onChange={(e) => handleUpdateGroup(groupIdx, 'storage', e.target.value)}
+                    className="w-full rounded bg-zinc-950 border border-zinc-700 px-2.5 py-1.5 text-xs text-zinc-100 focus:border-emerald-500 focus:outline-none"
+                    placeholder="128 GB"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-zinc-400 mb-1">Цвет</label>
+                  <input
+                    type="text"
+                    value={group.color}
+                    onChange={(e) => handleUpdateGroup(groupIdx, 'color', e.target.value)}
+                    className="w-full rounded bg-zinc-950 border border-zinc-700 px-2.5 py-1.5 text-xs text-zinc-100 focus:border-emerald-500 focus:outline-none"
+                    placeholder="Black"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-zinc-400 mb-1">Цена закупки ($)</label>
+                  <input
+                    type="number"
+                    required
+                    min="0"
+                    step="1"
+                    value={group.purchasePriceUsd || ''}
+                    onChange={(e) => handleUpdateGroup(groupIdx, 'purchasePriceUsd', parseFloat(e.target.value) || 0)}
+                    className="w-full rounded bg-zinc-950 border border-zinc-700 px-2.5 py-1.5 text-xs text-emerald-400 font-bold focus:border-emerald-500 focus:outline-none font-mono"
+                  />
+                </div>
+              </div>
+
+              {/* IMEI Input List with Batch Paste */}
+              <div className="pt-2 border-t border-zinc-800/80 space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-2">
+                    <span className="text-xs font-semibold text-zinc-300 font-mono">
+                      Список IMEI ({group.imeis.filter(i => i.trim().length > 0).length} шт.)
+                    </span>
+                    <span className="text-[10px] text-zinc-500 font-mono">
+                      Сумма: ${group.imeis.filter(i => i.trim().length > 0).length * group.purchasePriceUsd}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center space-x-2">
+                    <button
+                      type="button"
+                      onClick={() => handleAddImeiToGroup(groupIdx)}
+                      className="px-2.5 py-1 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-mono font-medium flex items-center space-x-1 transition-colors"
+                    >
+                      <Plus className="w-3 h-3" />
+                      <span>Добавить IMEI</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Batch Paste text helper */}
+                <div className="pt-1">
+                  <input
+                    type="text"
+                    placeholder="Быстрая вставка списка IMEI (через пробел или запятую)..."
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        handleBatchImeiPaste(groupIdx, (e.target as HTMLInputElement).value);
+                        (e.target as HTMLInputElement).value = '';
+                      }
+                    }}
+                    onBlur={(e) => {
+                      if (e.target.value.trim().length > 15) {
+                        handleBatchImeiPaste(groupIdx, e.target.value);
+                        e.target.value = '';
+                      }
+                    }}
+                    className="w-full rounded bg-zinc-950/70 border border-dashed border-zinc-800 px-3 py-1 text-[11px] font-mono text-zinc-300 placeholder-zinc-600 focus:border-emerald-500 focus:outline-none"
+                  />
+                </div>
+
+                {/* Individual IMEI row entries */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 pt-1 font-mono">
+                  {group.imeis.map((imeiVal, imeiIdx) => (
+                    <div key={imeiIdx} className="flex items-center space-x-1">
+                      <div className="relative flex-1">
+                        <input
+                          type="text"
+                          required
+                          value={imeiVal}
+                          onChange={(e) => handleUpdateImei(groupIdx, imeiIdx, e.target.value)}
+                          placeholder={`IMEI #${imeiIdx + 1}`}
+                          className="w-full rounded bg-zinc-950 border border-zinc-800 px-2.5 py-1.5 text-xs text-zinc-100 font-mono focus:border-emerald-500 focus:outline-none pr-8"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => handleScanImei(groupIdx, imeiIdx)}
+                          className="absolute right-1.5 top-1.5 text-zinc-400 hover:text-emerald-400 p-0.5"
+                          title="Сканировать камерой/сканером"
+                        >
+                          <Scan className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+
+                      {group.imeis.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveImeiFromGroup(groupIdx, imeiIdx)}
+                          className="text-zinc-600 hover:text-rose-400 p-1"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          ))}
+
+          {/* Button to add another position */}
+          <button
+            type="button"
+            onClick={handleAddGroup}
+            className="w-full py-2.5 rounded-lg border border-dashed border-zinc-800 hover:border-emerald-500/50 bg-zinc-900/40 hover:bg-zinc-900/80 text-zinc-400 hover:text-emerald-400 text-xs font-mono font-bold flex items-center justify-center space-x-2 transition-colors"
+          >
+            <Plus className="w-4 h-4" />
+            <span>ДОБАВИТЬ ЕЩЕ МОДЕЛЬ / ПОЗИЦИЮ В НАКЛАДНУЮ</span>
+          </button>
+        </div>
+
+        {/* Bottom Actions & Total Bar (Sticky at bottom) */}
+        <div className="sticky bottom-0 z-20 p-3.5 sm:p-4 border-t border-zinc-800 bg-zinc-900/95 backdrop-blur-md flex flex-col sm:flex-row items-center justify-between gap-3 shrink-0 shadow-lg font-mono">
+          {statusMessage ? (
+            <div className={`flex items-center space-x-2 text-xs ${
+              statusMessage.type === 'success' ? 'text-emerald-400' : 'text-rose-400'
+            }`}>
+              {statusMessage.type === 'success' ? <CheckCircle2 className="w-4 h-4" /> : <AlertCircle className="w-4 h-4" />}
+              <span>{statusMessage.text}</span>
+            </div>
+          ) : (
+            <div className="text-xs text-zinc-400">
+              Позиций: <strong className="text-zinc-200">{groups.length}</strong> • 
+              Устройств: <strong className="text-emerald-400 font-bold text-sm ml-1">{totalFormUnits} шт.</strong>
+            </div>
+          )}
+
+          <div className="flex items-center space-x-3 w-full sm:w-auto justify-end">
+            <div className="text-right mr-2">
+              <span className="text-[10px] text-zinc-400 block">ИТОГОВАЯ СУММА НАКЛАДНОЙ:</span>
+              <span className="text-base font-bold text-emerald-400 font-mono">
+                ${totalFormUsd.toLocaleString()}
+              </span>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => {
+                setStatusMessage(null);
+                setViewMode('list');
+              }}
+              className="px-3 py-2 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs font-semibold transition-colors"
+            >
+              Отмена
+            </button>
+
+            <button
+              type="submit"
+              disabled={totalFormUnits === 0}
+              className="px-5 py-2 rounded bg-emerald-500 hover:bg-emerald-400 disabled:opacity-40 disabled:cursor-not-allowed text-xs font-bold text-white shadow transition-colors flex items-center space-x-1.5"
+            >
+              <CheckCircle2 className="w-4 h-4" />
+              <span>СОХРАНИТЬ ПРИХОД</span>
+            </button>
+          </div>
+        </div>
+      </form>
+    </div>
+  );
+};

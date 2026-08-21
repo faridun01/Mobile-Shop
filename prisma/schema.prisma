@@ -1,0 +1,348 @@
+datasource db {
+  provider = "postgresql"
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum Role {
+  ADMIN
+  MANAGER
+  SELLER
+}
+
+enum DeviceStatus {
+  IN_STOCK
+  SOLD
+  REPAIR
+  TRANSFER
+  RETURNED
+}
+
+enum PaymentMethod {
+  CASH
+  CARD
+  MIXED
+}
+
+enum ExpenseCategory {
+  RENT
+  SALARY
+  UTILITIES
+  MARKETING
+  LOGISTICS
+  OFFICE
+  OTHER
+}
+
+enum OwnerTransactionType {
+  INVESTMENT
+  WITHDRAWAL
+  PROFIT_PAYOUT
+  REINVEST
+}
+
+enum TransferStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum RepairStatus {
+  RECEIVED
+  IN_PROGRESS
+  WAITING_FOR_PARTS
+  READY
+  DELIVERED
+  CANCELLED
+}
+
+enum BonusType {
+  FREE_DEVICES
+  CASH_DISCOUNT
+}
+
+model Store {
+  id        String   @id @default(uuid())
+  name      String
+  city      String?
+  address   String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  users             User[]
+  devices           Device[]           @relation("StoreDevices")
+  sales             Sale[]
+  repairs           RepairTicket[]
+  expenses          Expense[]
+  transfersSent     TransferRequest[]  @relation("FromStore")
+  transfersReceived TransferRequest[]  @relation("ToStore")
+
+  @@map("stores")
+}
+
+model User {
+  id        String   @id @default(uuid())
+  login     String   @unique
+  password  String   // Argon2 hashed
+  name      String
+  role      Role     @default(SELLER)
+  active    Boolean  @default(true)
+  storeId   String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  store        Store?         @relation(fields: [storeId], references: [id])
+  sales        Sale[]
+  repairs      RepairTicket[]
+  auditLogs    AuditLog[]
+
+  @@map("users")
+}
+
+model Device {
+  id               String       @id @default(uuid())
+  imei             String       @unique
+  imei2            String?
+  barcode          String?
+  brand            String
+  model            String
+  storage          String
+  color            String
+  status           DeviceStatus @default(IN_STOCK)
+  purchasePriceUsd Float
+  sellingPriceTjs  Float?
+  costBasisUsd     Float?
+  storeId          String
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+
+  store            Store             @relation("StoreDevices", fields: [storeId], references: [id])
+  saleItems        SaleItem[]
+  repairTickets    RepairTicket[]
+  transferItems    TransferItem[]
+
+  @@index([imei])
+  @@index([storeId, status])
+  @@index([status])
+  @@map("devices")
+}
+
+model Sale {
+  id                  String        @id @default(uuid())
+  receiptNumber       Int           @unique @default(autoincrement())
+  storeId             String
+  userId              String
+  totalAmountTjs      Float
+  cashAmountTjs       Float         @default(0)
+  cardAmountTjs       Float         @default(0)
+  paymentMethod       PaymentMethod
+  customerName        String?
+  exchangeTradeInImei String?
+  exchangeValueTjs    Float?
+  createdAt           DateTime      @default(now())
+
+  store     Store      @relation(fields: [storeId], references: [id])
+  user      User       @relation(fields: [userId], references: [id])
+  saleItems SaleItem[]
+
+  @@index([storeId, createdAt])
+  @@map("sales")
+}
+
+model SaleItem {
+  id           String @id @default(uuid())
+  saleId       String
+  deviceId     String
+  salePriceTjs Float
+
+  sale   Sale   @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  device Device @relation(fields: [deviceId], references: [id])
+
+  @@map("sale_items")
+}
+
+model Supplier {
+  id            String   @id @default(uuid())
+  name          String
+  phone         String?
+  contactPerson String?
+  balanceUsd    Float    @default(0)
+  createdAt     DateTime @default(now())
+
+  invoices SupplierInvoice[]
+  bonuses  SupplierBonus[]
+
+  @@map("suppliers")
+}
+
+model SupplierInvoice {
+  id            String   @id @default(uuid())
+  invoiceNumber String
+  supplierId    String
+  date          DateTime @default(now())
+  totalUsd      Float
+  paidUsd       Float    @default(0)
+
+  supplier Supplier       @relation(fields: [supplierId], references: [id])
+  groups   InvoiceGroup[]
+
+  @@map("supplier_invoices")
+}
+
+model InvoiceGroup {
+  id               String @id @default(uuid())
+  invoiceId        String
+  brand            String
+  model            String
+  storage          String
+  color            String
+  quantity         Int
+  purchasePriceUsd Float
+
+  invoice SupplierInvoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  @@map("invoice_groups")
+}
+
+model SupplierBonus {
+  id            String    @id @default(uuid())
+  supplierId    String
+  campaignTitle String
+  bonusType     BonusType
+  amountUsd     Float?
+  createdAt     DateTime  @default(now())
+
+  supplier Supplier @relation(fields: [supplierId], references: [id])
+
+  @@map("supplier_bonuses")
+}
+
+model TransferRequest {
+  id            String         @id @default(uuid())
+  fromStoreId   String
+  toStoreId     String
+  status        TransferStatus @default(PENDING)
+  rejectionNote String?
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  fromStore Store          @relation("FromStore", fields: [fromStoreId], references: [id])
+  toStore   Store          @relation("ToStore", fields: [toStoreId], references: [id])
+  items     TransferItem[]
+
+  @@map("transfer_requests")
+}
+
+model TransferItem {
+  id         String @id @default(uuid())
+  transferId String
+  deviceId   String
+
+  transfer TransferRequest @relation(fields: [transferId], references: [id], onDelete: Cascade)
+  device   Device          @relation(fields: [deviceId], references: [id])
+
+  @@map("transfer_items")
+}
+
+model RepairTicket {
+  id                 String       @id @default(uuid())
+  ticketNumber       Int          @unique @default(autoincrement())
+  storeId            String
+  userId             String
+  imei               String
+  brand              String
+  model              String
+  storage            String
+  color              String
+  customerName       String?
+  customerPhone      String?
+  problemDescription String
+  visualCondition    String
+  equipmentPackage   String
+  status             RepairStatus @default(RECEIVED)
+  costTjs            Float        @default(0)
+  deviceId           String?
+  comment            String?
+  createdAt          DateTime     @default(now())
+  updatedAt          DateTime     @updatedAt
+
+  store  Store   @relation(fields: [storeId], references: [id])
+  user   User    @relation(fields: [userId], references: [id])
+  device Device? @relation(fields: [deviceId], references: [id])
+
+  @@index([storeId, status])
+  @@map("repair_tickets")
+}
+
+model Expense {
+  id                   String          @id @default(uuid())
+  category             ExpenseCategory
+  amountTjs            Float
+  targetScope          String          @default("STORE") // STORE or BUSINESS
+  storeId              String?
+  comment              String?
+  paidFromCashRegister Boolean         @default(true)
+  createdAt            DateTime        @default(now())
+
+  store Store? @relation(fields: [storeId], references: [id])
+
+  @@map("expenses")
+}
+
+model Owner {
+  id            String   @id @default(uuid())
+  name          String
+  sharePercentage Float
+  capitalUsd    Float    @default(0)
+  earnedUsd     Float    @default(0)
+  withdrawnUsd  Float    @default(0)
+  createdAt     DateTime @default(now())
+
+  transactions OwnerTransaction[]
+
+  @@map("owners")
+}
+
+model OwnerTransaction {
+  id        String               @id @default(uuid())
+  ownerId   String
+  type      OwnerTransactionType
+  amountUsd Float
+  note      String?
+  createdAt DateTime             @default(now())
+
+  owner Owner @relation(fields: [ownerId], references: [id])
+
+  @@map("owner_transactions")
+}
+
+model LedgerEntry {
+  id            String   @id @default(uuid())
+  debitAccount  String
+  creditAccount String
+  amountUsd     Float?
+  amountTjs     Float?
+  exchangeRate  Float?
+  description   String
+  referenceId   String?
+  createdAt     DateTime @default(now())
+
+  @@index([createdAt])
+  @@map("ledger_entries")
+}
+
+model AuditLog {
+  id        String   @id @default(uuid())
+  userId    String?
+  action    String
+  details   String
+  ipAddress String?
+  createdAt DateTime @default(now())
+
+  user User? @relation(fields: [userId], references: [id])
+
+  @@index([createdAt])
+  @@map("audit_logs")
+}

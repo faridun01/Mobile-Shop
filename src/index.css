@@ -1,0 +1,336 @@
+@import "tailwindcss";
+
+@layer base {
+  html {
+    font-family: 'Roboto', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  body {
+    background-color: #222222;
+    color: #ffffff;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    transition: background-color 0.2s ease, color 0.2s ease;
+  }
+
+  /* Optimize touch controls for mobile */
+  button,
+  input,
+  select,
+  textarea {
+    touch-action: manipulation;
+  }
+
+  /* Simple, flat design overrides (ultra-minimal Loyverse POS UI) */
+  *,
+  ::before,
+  ::after {
+    box-shadow: none !important;
+    text-shadow: none !important;
+  }
+}
+
+/* Mobile Safe Area Bottom Padding */
+.safe-area-pb {
+  padding-bottom: max(0.5rem, env(safe-area-inset-bottom));
+}
+
+/* Custom Scrollbars */
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+
+::-webkit-scrollbar-track {
+  background: #222222;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #383838;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #4a4a4a;
+}
+
+/* Background overlay utility */
+.high-density-grid {
+  background-image: radial-gradient(#333333 1px, transparent 1px);
+  background-size: 16px 16px;
+}
+
+/* =========================================================================
+   LOYVERSE POS ERGONOMIC THEME SYSTEM (Light & Dark Modes)
+   ========================================================================= */
+
+/* LIGHT / NORMAL MODE (Обычный светлый режим — в стиле Loyverse POS) */
+[data-theme="light"],
+html.light,
+body.light {
+  color-scheme: light;
+}
+
+[data-theme="light"] body,
+html.light body {
+  background-color: #f8fafc !important;
+  color: #0f172a !important;
+}
+
+/* Custom Scrollbars in Light Mode */
+[data-theme="light"] ::-webkit-scrollbar-track {
+  background: #f1f5f9;
+}
+
+[data-theme="light"] ::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+}
+
+[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+[data-theme="light"] .high-density-grid {
+  background-image: radial-gradient(#e2e8f0 1px, transparent 1px);
+}
+
+/* Base Page Backgrounds in Light Mode -> Warm Slate #f8fafc */
+[data-theme="light"] .bg-\[\#0B0E14\],
+[data-theme="light"] .bg-\[\#0B0F17\],
+[data-theme="light"] .bg-zinc-950,
+[data-theme="light"] .bg-slate-950,
+[data-theme="light"] .bg-black {
+  background-color: #f8fafc !important;
+}
+
+/* Main Cards & Panels in Light Mode -> Pure Crisp White #ffffff */
+[data-theme="light"] .bg-\[\#0F1219\],
+[data-theme="light"] .bg-\[\#0F131D\],
+[data-theme="light"] .bg-\[\#0D1016\],
+[data-theme="light"] .bg-zinc-900,
+[data-theme="light"] .bg-slate-900,
+[data-theme="light"] .bg-zinc-900\/40,
+[data-theme="light"] .bg-zinc-900\/50,
+[data-theme="light"] .bg-zinc-900\/60,
+[data-theme="light"] .bg-zinc-900\/70,
+[data-theme="light"] .bg-zinc-900\/80,
+[data-theme="light"] .bg-zinc-900\/90,
+[data-theme="light"] .bg-slate-900\/40,
+[data-theme="light"] .bg-slate-900\/50,
+[data-theme="light"] .bg-slate-900\/60,
+[data-theme="light"] .bg-slate-900\/70,
+[data-theme="light"] .bg-slate-900\/80,
+[data-theme="light"] .bg-slate-900\/90,
+[data-theme="light"] .bg-\[\#0F1219\]\/60,
+[data-theme="light"] .bg-\[\#0F1219\]\/30,
+[data-theme="light"] .bg-\[\#0B0F17\]\/60,
+[data-theme="light"] .bg-\[\#0F131D\]\/95 {
+  background-color: #ffffff !important;
+}
+
+/* Secondary Panels / Input Containers in Light Mode -> Soft Slate #f1f5f9 */
+[data-theme="light"] .bg-slate-800,
+[data-theme="light"] .bg-zinc-800,
+[data-theme="light"] .bg-slate-800\/90,
+[data-theme="light"] .bg-slate-800\/80,
+[data-theme="light"] .bg-slate-800\/60,
+[data-theme="light"] .bg-slate-800\/50,
+[data-theme="light"] .bg-slate-800\/40,
+[data-theme="light"] .bg-slate-800\/30,
+[data-theme="light"] .bg-zinc-800\/50,
+[data-theme="light"] .bg-zinc-800\/40 {
+  background-color: #f1f5f9 !important;
+}
+
+/* Text Overrides in Light Mode */
+[data-theme="light"] .text-slate-100,
+[data-theme="light"] .text-slate-200,
+[data-theme="light"] .text-zinc-100,
+[data-theme="light"] .text-zinc-200,
+[data-theme="light"] .text-white {
+  color: #0f172a !important;
+}
+
+[data-theme="light"] .text-slate-300,
+[data-theme="light"] .text-slate-400,
+[data-theme="light"] .text-zinc-300,
+[data-theme="light"] .text-zinc-400 {
+  color: #334155 !important;
+}
+
+[data-theme="light"] .text-slate-500,
+[data-theme="light"] .text-slate-600,
+[data-theme="light"] .text-zinc-500 {
+  color: #64748b !important;
+}
+
+/* Border Overrides in Light Mode */
+[data-theme="light"] .border-slate-800,
+[data-theme="light"] .border-slate-700,
+[data-theme="light"] .border-slate-800\/80,
+[data-theme="light"] .border-zinc-800,
+[data-theme="light"] .border-zinc-700,
+[data-theme="light"] .border-slate-800\/60 {
+  border-color: #e2e8f0 !important;
+}
+
+/* Accent Green Color in Light Mode */
+[data-theme="light"] .text-emerald-400,
+[data-theme="light"] .text-emerald-300,
+[data-theme="light"] .text-\[\#22c55e\] {
+  color: #059669 !important;
+}
+
+[data-theme="light"] .bg-emerald-500,
+[data-theme="light"] .bg-emerald-600 {
+  background-color: #059669 !important;
+  color: #ffffff !important;
+}
+
+[data-theme="light"] .bg-emerald-500\/10,
+[data-theme="light"] .bg-emerald-500\/15,
+[data-theme="light"] .bg-emerald-500\/20 {
+  background-color: #ecfdf5 !important;
+  color: #059669 !important;
+}
+
+[data-theme="light"] .border-emerald-500,
+[data-theme="light"] .border-emerald-500\/30,
+[data-theme="light"] .border-emerald-500\/40,
+[data-theme="light"] .border-emerald-800 {
+  border-color: #10b981 !important;
+}
+
+/* Input elements in Light Mode */
+[data-theme="light"] input,
+[data-theme="light"] select,
+[data-theme="light"] textarea {
+  background-color: #ffffff !important;
+  border-color: #cbd5e1 !important;
+  color: #0f172a !important;
+}
+
+[data-theme="light"] input::placeholder,
+[data-theme="light"] textarea::placeholder {
+  color: #94a3b8 !important;
+}
+
+/* Hover States in Light Mode */
+[data-theme="light"] .hover\:bg-slate-800:hover,
+[data-theme="light"] .hover\:bg-slate-800\/80:hover,
+[data-theme="light"] .hover\:bg-slate-800\/60:hover,
+[data-theme="light"] .hover\:bg-slate-800\/50:hover,
+[data-theme="light"] .hover\:bg-slate-800\/40:hover,
+[data-theme="light"] .hover\:bg-slate-800\/30:hover,
+[data-theme="light"] .hover\:bg-zinc-800\/80:hover,
+[data-theme="light"] .hover\:bg-zinc-800:hover,
+[data-theme="light"] .hover\:bg-zinc-900:hover,
+[data-theme="light"] .hover\:bg-slate-900:hover,
+[data-theme="light"] .hover\:bg-slate-900\/60:hover,
+[data-theme="light"] .hover\:bg-\[\#0F131D\]:hover,
+[data-theme="light"] .hover\:bg-\[\#0F1219\]:hover,
+[data-theme="light"] .hover\:bg-\[\#0B0E14\]:hover,
+[data-theme="light"] .hover\:bg-\[\#0B0F17\]:hover,
+[data-theme="light"] .active\:bg-slate-900:active,
+[data-theme="light"] .active\:bg-\[\#0F131D\]:active {
+  background-color: #f1f5f9 !important;
+  color: #0f172a !important;
+}
+
+[data-theme="light"] .hover\:bg-slate-800:hover *,
+[data-theme="light"] .hover\:bg-zinc-900:hover *,
+[data-theme="light"] .hover\:bg-slate-900:hover *,
+[data-theme="light"] .hover\:bg-\[\#0F131D\]:hover *,
+[data-theme="light"] .hover\:bg-\[\#0F1219\]:hover * {
+  color: #0f172a !important;
+}
+
+/* Card Soft Shadow in Light Mode */
+[data-theme="light"] .shadow-2xl,
+[data-theme="light"] .shadow-xl,
+[data-theme="light"] .shadow-lg {
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.03) !important;
+}
+
+/* =========================================================================
+   DARK MODE UNIFIED LOYVERSE POS MINIMAL PALETTE (#222222 / #1c1c1c / #2a2a2a)
+   ========================================================================= */
+[data-theme="dark"] body,
+html:not([data-theme="light"]) body {
+  background-color: #222222 !important;
+  color: #ffffff !important;
+}
+
+[data-theme="dark"] .bg-\[\#0B0E14\],
+[data-theme="dark"] .bg-\[\#0B0F17\],
+[data-theme="dark"] .bg-\[\#0F1219\],
+[data-theme="dark"] .bg-\[\#0F131D\],
+[data-theme="dark"] .bg-\[\#0D1016\],
+[data-theme="dark"] .bg-zinc-950,
+[data-theme="dark"] .bg-slate-950,
+html:not([data-theme="light"]) .bg-\[\#0B0E14\],
+html:not([data-theme="light"]) .bg-\[\#0B0F17\],
+html:not([data-theme="light"]) .bg-\[\#0F1219\],
+html:not([data-theme="light"]) .bg-\[\#0F131D\],
+html:not([data-theme="light"]) .bg-\[\#0D1016\],
+html:not([data-theme="light"]) .bg-zinc-950,
+html:not([data-theme="light"]) .bg-slate-950 {
+  background-color: #222222 !important;
+}
+
+[data-theme="dark"] .bg-slate-900,
+[data-theme="dark"] .bg-zinc-900,
+html:not([data-theme="light"]) .bg-slate-900,
+html:not([data-theme="light"]) .bg-zinc-900 {
+  background-color: #2a2a2a !important;
+}
+
+[data-theme="dark"] .border-slate-800,
+[data-theme="dark"] .border-slate-700,
+[data-theme="dark"] .border-zinc-800,
+html:not([data-theme="light"]) .border-slate-800,
+html:not([data-theme="light"]) .border-slate-700,
+html:not([data-theme="light"]) .border-zinc-800 {
+  border-color: #383838 !important;
+}
+
+/* =========================================================================
+   LOYVERSE POS ULTRA-MINIMAL HOVER & SELECTION STYLING
+   ========================================================================= */
+
+/* Smooth transitions for interactive elements */
+button,
+a,
+select,
+[role="button"] {
+  transition: color 0.15s ease, background-color 0.15s ease, border-color 0.15s ease, opacity 0.15s ease;
+}
+
+/* Explicit micro-zoom scale effect ONLY for small standalone elements (pills/badges), never full-width rows */
+.hover-zoom:hover {
+  transform: scale(1.02);
+}
+
+/* Prevent horizontal scrollbars on body */
+body {
+  overflow-x: hidden;
+}
+
+/* Ensure selected states NEVER display heavy dark background hover blocks */
+.is-selected,
+.is-active,
+[data-selected="true"],
+[data-active="true"] {
+  background-color: transparent !important;
+  color: #22c55e !important;
+}
+
+[data-theme="light"] .is-selected,
+[data-theme="light"] .is-active,
+[data-theme="light"] [data-selected="true"],
+[data-theme="light"] [data-active="true"] {
+  background-color: transparent !important;
+  color: #059669 !important;
+}

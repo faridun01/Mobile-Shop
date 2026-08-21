@@ -1,0 +1,64 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database Container
+  db:
+    image: postgres:16-alpine
+    container_name: mobile_shop_db
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgrespassword
+      POSTGRES_DB: mobile_shop_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d mobile_shop_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - mobile_shop_net
+
+  # Main Application Container (Node.js API + Vite Frontend)
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: mobile_shop_app
+    restart: always
+    environment:
+      DATABASE_URL: "postgresql://postgres:postgrespassword@db:5432/mobile_shop_db?schema=public"
+      JWT_SECRET: "mobile-shop-super-secret-production-jwt-key"
+      NODE_ENV: "production"
+      PORT: "3000"
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - mobile_shop_net
+
+  # Nginx Reverse Proxy Container (Rate Limiting, SSL, Compression)
+  nginx:
+    image: nginx:alpine
+    container_name: mobile_shop_nginx
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - app
+    networks:
+      - mobile_shop_net
+
+volumes:
+  postgres_data:
+    driver: local
+
+networks:
+  mobile_shop_net:
+    driver: bridge
