@@ -15,6 +15,7 @@ import {
   Download
 } from 'lucide-react';
 import { exportInventoryReport } from '../../utils/exportReports';
+import { formatDeviceIdentifiers } from '../../utils/formatters';
 
 const STATUS_LABELS: Record<DeviceStatus, { text: string; bg: string; color: string; border: string }> = {
   MAIN_WAREHOUSE: { text: 'ГЛАВНЫЙ СКЛАД', bg: 'bg-slate-900', color: 'text-slate-300', border: 'border-slate-800' },
@@ -384,7 +385,10 @@ export const InventoryPage: React.FC = () => {
                                       <div className="flex items-center space-x-2 truncate">
                                         <span className="text-slate-300 font-medium">{dev.color}</span>
                                         <span className="text-slate-500">•</span>
-                                        <span className="text-slate-400 font-mono">IMEI: {dev.imei}</span>
+                                        <span className="text-slate-400 font-mono">
+                                          IMEI: {dev.imei}{dev.imei2 ? ` / ${dev.imei2}` : ''}
+                                          {dev.barcode ? <span className="text-amber-400/90 font-mono ml-1.5">• EAN: {dev.barcode}</span> : null}
+                                        </span>
                                       </div>
 
                                       <div className="flex items-center space-x-2 shrink-0">
@@ -451,7 +455,9 @@ export const InventoryPage: React.FC = () => {
                 </div>
                 <div className="col-span-2 pt-1 border-t border-slate-800/80">
                   <span className="text-slate-500 block text-[10px] uppercase">IMEI ИДЕНТИФИКАТОР:</span>
-                  <span className="text-xs font-bold text-slate-100 select-all tracking-wider break-all">{selectedDevice.imei}</span>
+                  <span className="text-xs font-bold text-slate-100 select-all tracking-wider break-all">
+                    {selectedDevice.imei} {selectedDevice.imei2 ? `| IMEI 2: ${selectedDevice.imei2}` : ''}
+                  </span>
                 </div>
                 {selectedDevice.serialNumber && (
                   <div>

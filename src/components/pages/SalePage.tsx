@@ -18,6 +18,7 @@ import {
   Store as StoreIcon,
   Plus
 } from 'lucide-react';
+import { formatDeviceIdentifiers, formatTjs, formatUsd } from '../../utils/formatters';
 
 interface CartItem {
   device: Device;
@@ -421,7 +422,8 @@ export const SalePage: React.FC = () => {
                 >
                   <div className="min-w-0 pr-2">
                     <p className="text-xs font-bold text-slate-100 group-hover:text-emerald-400 transition-colors">
-                      IMEI: {dev.imei}
+                      IMEI: {dev.imei}{dev.imei2 ? ` / ${dev.imei2}` : ''}
+                      {dev.barcode ? <span className="text-[10px] text-amber-400 font-normal block">EAN: {dev.barcode}</span> : null}
                     </p>
                     {dev.serialNumber && (
                       <p className="text-[10px] text-slate-400 mt-0.5">S/N: {dev.serialNumber}</p>
@@ -473,7 +475,8 @@ export const SalePage: React.FC = () => {
                           {item.device.storage} • {item.device.color}
                         </p>
                         <p className="text-[9px] font-mono text-slate-500 mt-0.5">
-                          IMEI: {item.device.imei}
+                          IMEI: {item.device.imei}{item.device.imei2 ? ` / ${item.device.imei2}` : ''}
+                          {item.device.barcode ? ` • EAN: ${item.device.barcode}` : ''}
                         </p>
                       </div>
 

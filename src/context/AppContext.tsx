@@ -1083,6 +1083,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       storage: string;
       color: string;
       purchasePriceUsd: number;
+      barcode?: string;
       imeis: string[];
     }[];
   }) => {
@@ -1105,11 +1106,25 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const targetStatus = isStorePurchase ? 'STORE_STOCK' : 'MAIN_WAREHOUSE';
 
     for (const group of groups) {
-      for (const imei of group.imeis) {
-        if (!imei.trim()) continue;
+      for (const rawImei of group.imeis) {
+        if (!rawImei.trim()) continue;
+        
+        let imei1 = rawImei.trim();
+        let imei2Parsed: string | undefined = undefined;
+
+        if (imei1.includes('/')) {
+          const parts = imei1.split('/').map(s => s.trim());
+          imei1 = parts[0];
+          imei2Parsed = parts[1] || undefined;
+        } else if (imei1.includes(',')) {
+          const parts = imei1.split(',').map(s => s.trim());
+          imei1 = parts[0];
+          imei2Parsed = parts[1] || undefined;
+        }
+
         // Check uniqueness
-        if (devices.some(d => d.imei === imei.trim())) {
-          return { success: false, message: `IMEI ${imei} уже зарегистрирован в базе данных!` };
+        if (devices.some(d => d.imei === imei1 || (d.imei2 && d.imei2 === imei1))) {
+          return { success: false, message: `IMEI ${imei1} уже зарегистрирован в базе данных!` };
         }
         totalDevicesCount++;
         totalUsd += group.purchasePriceUsd;
@@ -1117,7 +1132,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         const devId = `dev-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
         newDevices.push({
           id: devId,
-          imei: imei.trim(),
+          imei: imei1,
+          imei2: imei2Parsed,
+          barcode: group.barcode?.trim() || undefined,
           brand: group.brand,
           model: group.model,
           storage: group.storage,

@@ -471,7 +471,10 @@ export const TransferPage: React.FC = () => {
                                           <div className="truncate">
                                             <span className="text-slate-200 font-medium">{dev.color}</span>
                                             <span className="text-slate-500 mx-1.5">•</span>
-                                            <span className="text-slate-400 font-mono">IMEI: {dev.imei}</span>
+                                            <span className="text-slate-400 font-mono">
+                                              IMEI: {dev.imei}{dev.imei2 ? ` / ${dev.imei2}` : ''}
+                                              {dev.barcode ? <span className="text-amber-400/90 font-mono ml-1.5">• EAN: {dev.barcode}</span> : null}
+                                            </span>
                                           </div>
                                         </div>
 

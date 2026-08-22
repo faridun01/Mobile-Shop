@@ -30,6 +30,7 @@ interface PurchaseItemGroup {
   storage: string;
   color: string;
   purchasePriceUsd: number;
+  barcode?: string;
   imeis: string[];
 }
 
@@ -808,7 +809,7 @@ export const PurchasePage: React.FC = () => {
               </div>
 
               {/* Group Specs Form */}
-              <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5 text-xs font-mono">
+              <div className="grid grid-cols-2 sm:grid-cols-6 gap-2.5 text-xs font-mono">
                 <div>
                   <label className="block text-zinc-400 mb-1">Бренд</label>
                   <input
@@ -854,6 +855,17 @@ export const PurchasePage: React.FC = () => {
                 </div>
 
                 <div>
+                  <label className="block text-zinc-400 mb-1">Штрихкод (EAN)</label>
+                  <input
+                    type="text"
+                    value={group.barcode || ''}
+                    onChange={(e) => handleUpdateGroup(groupIdx, 'barcode', e.target.value)}
+                    className="w-full rounded bg-zinc-950 border border-zinc-700 px-2.5 py-1.5 text-xs text-amber-400 font-mono focus:border-emerald-500 focus:outline-none"
+                    placeholder="EAN-13 / UPC"
+                  />
+                </div>
+
+                <div>
                   <label className="block text-zinc-400 mb-1">Цена закупки ($)</label>
                   <input
                     type="number"
@@ -895,7 +907,7 @@ export const PurchasePage: React.FC = () => {
                 <div className="pt-1">
                   <input
                     type="text"
-                    placeholder="Быстрая вставка списка IMEI (через пробел или запятую)..."
+                    placeholder="Быстрая вставка списка IMEI (через пробел, запятую или Dual SIM: IMEI 1 / IMEI 2)..."
                     onKeyDown={(e) => {
                       if (e.key === 'Enter') {
                         e.preventDefault();

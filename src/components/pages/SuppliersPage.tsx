@@ -633,7 +633,7 @@ export const SuppliersPage: React.FC = () => {
                               )}
                             </div>
                             <div className="text-[11px] text-slate-400 mt-1 flex items-center space-x-3">
-                              <span>IMEI: <strong className="text-slate-300">{dev.imei}</strong></span>
+                              <span>IMEI: <strong className="text-slate-300">{dev.imei}{dev.imei2 ? ` / ${dev.imei2}` : ''}</strong></span>
                               <span>Локация: <strong className="text-slate-300">{dev.locationName}</strong></span>
                             </div>
                             {dev.bonusCampaign && (
