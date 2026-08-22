@@ -991,8 +991,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     );
 
     return { success: true };
-
-    return { success: true };
   };
 
   // 3. REFUND
@@ -1057,15 +1055,30 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return s;
     });
 
+    // Reverse owner accrued profit from the original sale
+    const refundUsd = +(refundAmountTjs / rate).toFixed(2);
+    const totalCostUsd = sale.items.reduce((acc, si) => acc + (si.costBasisUsd || 0), 0);
+    const originalProfitUsd = sale.totalUsd - totalCostUsd;
+    const updatedOwners = owners.map(o => {
+      const share = o.profitSharePercent / 100;
+      const profitPart = +(originalProfitUsd * share).toFixed(2);
+      return {
+        ...o,
+        totalAccruedProfitUsd: +(o.totalAccruedProfitUsd - profitPart).toFixed(2),
+        availableProfitUsd: +(o.availableProfitUsd - profitPart).toFixed(2)
+      };
+    });
+
     setSales(updatedSales);
     setDevices(updatedDevices);
     setStores(updatedStores);
+    setOwners(updatedOwners);
 
     addLedgerEntry(
       'REFUND',
       `Возврат по чеку #${sale.receiptNumber}: ${reason} (-${refundAmountTjs} TJS)`,
       -refundAmountTjs,
-      -(refundAmountTjs / rate).toFixed(2),
+      -refundUsd,
       sale.storeId,
       sale.id
     );
