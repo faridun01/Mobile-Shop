@@ -19,7 +19,7 @@ interface UIState {
 }
 
 export const useUIStore = create<UIState>((set) => ({
-  theme: (localStorage.getItem('ms_theme') as ThemeMode) || 'dark',
+  theme: (typeof localStorage !== 'undefined' ? (localStorage.getItem('ms_theme') as ThemeMode) : null) || 'dark',
   drawerOpen: false,
   selectedStoreId: 'all',
   isDailyRateModalOpen: false,
@@ -27,16 +27,24 @@ export const useUIStore = create<UIState>((set) => ({
   scannerCallback: null,
 
   setTheme: (theme) => {
-    localStorage.setItem('ms_theme', theme);
-    document.documentElement.setAttribute('data-theme', theme);
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem('ms_theme', theme);
+    }
+    if (typeof document !== 'undefined') {
+      document.documentElement.setAttribute('data-theme', theme);
+    }
     set({ theme });
   },
 
   toggleTheme: () =>
     set((state) => {
       const nextTheme = state.theme === 'dark' ? 'light' : 'dark';
-      localStorage.setItem('ms_theme', nextTheme);
-      document.documentElement.setAttribute('data-theme', nextTheme);
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem('ms_theme', nextTheme);
+      }
+      if (typeof document !== 'undefined') {
+        document.documentElement.setAttribute('data-theme', nextTheme);
+      }
       return { theme: nextTheme };
     }),
 

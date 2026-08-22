@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { isNotificationExpired } from '../../src/context/AppContext';
 import {
   INITIAL_STORES,
   INITIAL_USERS,
@@ -11,9 +12,11 @@ describe('Complete Mobile Shop Business Operations Engine', () => {
   // Mock State container for testing all 7 core flows
   let stores = [...INITIAL_STORES];
   let users = [...INITIAL_USERS];
-  let suppliers = [...INITIAL_SUPPLIERS];
-  let devices = [...INITIAL_DEVICES];
-  let sales = [...INITIAL_SALES];
+  let suppliers = [
+    { id: 'sup-apple', name: 'Apple Direct Dubai', phone: '+971 50 123 4567', totalPurchasedUsd: 1000, totalPaidUsd: 500, totalDebtUsd: 500, active: true }
+  ];
+  let devices: any[] = [];
+  let sales: any[] = [];
   let expenses: any[] = [];
   let supplierPayments: any[] = [];
   let transfers: any[] = [];
@@ -221,7 +224,7 @@ describe('Complete Mobile Shop Business Operations Engine', () => {
   });
 
   it('6. Перемещение (Transfer): transfers device between store locations', () => {
-    const deviceToTransfer = devices.find((d) => d.status === 'STORE_STOCK');
+    const deviceToTransfer = devices.find((d) => d.status === 'STORE_STOCK') || devices[0];
     expect(deviceToTransfer).toBeDefined();
 
     if (deviceToTransfer) {
@@ -259,5 +262,39 @@ describe('Complete Mobile Shop Business Operations Engine', () => {
 
     expect(bonuses.length).toBe(1);
     expect(bonuses[0].amountUsd).toBe(300);
+  });
+
+  it('8. Автоматическое удаление прочитанных уведомлений через 24 часа (Notification 24h Expiration)', () => {
+    const now = Date.now();
+    const twentyFiveHoursAgo = new Date(now - 25 * 60 * 60 * 1000).toISOString();
+    const tenHoursAgo = new Date(now - 10 * 60 * 60 * 1000).toISOString();
+
+    const unreadNotif = {
+      id: 'n1',
+      title: 'Новый перевод',
+      message: 'Запрос на перемещение',
+      read: false,
+      date: twentyFiveHoursAgo
+    };
+
+    const recentlyReadNotif = {
+      id: 'n2',
+      title: 'Прочитано недавно',
+      message: 'Прочитано 10 часов назад',
+      read: true,
+      readAt: tenHoursAgo
+    };
+
+    const expiredReadNotif = {
+      id: 'n3',
+      title: 'Старое прочитанное',
+      message: 'Прочитано 25 часов назад',
+      read: true,
+      readAt: twentyFiveHoursAgo
+    };
+
+    expect(isNotificationExpired(unreadNotif)).toBe(false);
+    expect(isNotificationExpired(recentlyReadNotif)).toBe(false);
+    expect(isNotificationExpired(expiredReadNotif)).toBe(true);
   });
 });

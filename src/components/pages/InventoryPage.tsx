@@ -224,19 +224,19 @@ export const InventoryPage: React.FC = () => {
         </div>
 
         {/* Row 3: Brands on their own dedicated row as requested */}
-        <div className="flex items-center space-x-1.5 overflow-x-auto pt-1 border-t border-slate-800/80 text-xs scrollbar-none">
-          <span className="text-[10px] text-slate-500 font-mono uppercase shrink-0 mr-1">Бренд:</span>
+        <div className="flex items-center space-x-2 overflow-x-auto pt-1 border-t border-slate-800/80 text-xs scrollbar-none">
           {brands.map((b) => (
             <button
               key={b}
+              type="button"
               onClick={() => setSelectedBrand(b)}
-              className={`px-2.5 py-0.5 rounded text-[10px] font-mono uppercase tracking-wider whitespace-nowrap transition-colors bg-transparent ${
+              className={`px-3 py-1 rounded-md border text-xs font-mono font-bold uppercase tracking-wider whitespace-nowrap transition-colors bg-transparent ${
                 selectedBrand === b
-                  ? 'text-[#22c55e] font-bold border border-[#22c55e]/50'
-                  : 'text-slate-400 hover:text-slate-200 border border-slate-800'
+                  ? 'border-[#22c55e] text-[#22c55e]'
+                  : 'border-slate-800 text-slate-400 hover:border-slate-700 hover:text-slate-200'
               }`}
             >
-              {b === 'ALL' ? 'Все' : b}
+              {b === 'ALL' ? 'ВСЕ БРЕНДЫ' : b}
             </button>
           ))}
         </div>

@@ -9,9 +9,11 @@ import { Device, Supplier, SupplierInvoice, Sale, TransferRequest, RepairTicket,
 
 describe('Real-Time End-to-End Business Lifecycle (Приход, Перемещение, Продажа, Возврат, Ремонт, Расходы)', () => {
   const stores = JSON.parse(JSON.stringify(INITIAL_STORES));
-  const suppliers: Supplier[] = JSON.parse(JSON.stringify(INITIAL_SUPPLIERS));
-  const devices: Device[] = JSON.parse(JSON.stringify(INITIAL_DEVICES));
-  const sales: Sale[] = JSON.parse(JSON.stringify(INITIAL_SALES));
+  const suppliers: Supplier[] = [
+    { id: 'sup-apple', name: 'Apple Direct Dubai', phone: '+971 50 123 4567', totalPurchasedUsd: 1000, totalPaidUsd: 1000, totalDebtUsd: 0, active: true }
+  ];
+  const devices: Device[] = [];
+  const sales: Sale[] = [];
   const invoices: SupplierInvoice[] = [];
   const transfers: TransferRequest[] = [];
   const repairs: RepairTicket[] = [];

@@ -119,7 +119,7 @@ export const Sidebar: React.FC = () => {
 
 
       {/* Nav List grouped */}
-      <nav className="flex-1 overflow-y-auto px-2.5 py-3 space-y-3.5">
+      <nav className="flex-1 overflow-y-auto scrollbar-none px-2.5 py-2.5 space-y-2.5">
         {NAV_GROUPS.map((group, gIdx) => {
           const visibleItems = group.items.filter(item => item.roles.includes(userRole));
           if (visibleItems.length === 0) return null;
@@ -168,42 +168,8 @@ export const Sidebar: React.FC = () => {
         })}
       </nav>
 
-      {/* Mini Status */}
-      <div className="p-2.5 mx-2.5 mb-2 rounded-xl bg-[#0B0F17] border border-slate-800/80 text-[10px] font-mono text-slate-400">
-        <div className="flex items-center justify-between">
-          <span className="text-slate-400">В НАЛИЧИИ: {devices.length} ШТ</span>
-          <span className="text-emerald-400 font-bold flex items-center">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 mr-1 animate-pulse" />
-            ONLINE
-          </span>
-        </div>
-      </div>
-
-      {/* Theme Switcher & Logout */}
-      <div className="p-2.5 border-t border-slate-800/80 bg-[#0B0F17] space-y-1.5">
-        <button
-          type="button"
-          onClick={toggleTheme}
-          className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-xl text-[11px] font-mono transition-colors border ${
-            theme === 'light'
-              ? 'bg-amber-50 border-amber-300 text-amber-900 hover:bg-amber-100'
-              : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-amber-400 hover:bg-slate-800'
-          }`}
-          title={theme === 'light' ? 'Переключить на темный режим' : 'Переключить на обычный режим'}
-        >
-          <div className="flex items-center space-x-2">
-            {theme === 'light' ? (
-              <Sun className="w-3.5 h-3.5 text-amber-600 shrink-0" />
-            ) : (
-              <Moon className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-            )}
-            <span className="truncate">{theme === 'light' ? 'Обычный' : 'Тёмный'}</span>
-          </div>
-          <span className="text-[9px] font-bold text-slate-500 uppercase">
-            {theme === 'light' ? 'LIGHT' : 'DARK'}
-          </span>
-        </button>
-
+      {/* Logout button */}
+      <div className="p-2.5 border-t border-slate-800/80 bg-[#0B0F17]">
         <button
           onClick={logout}
           className="w-full flex items-center justify-center space-x-2 rounded-xl bg-slate-900 hover:bg-rose-500/10 border border-slate-800 hover:border-rose-500/30 text-slate-400 hover:text-rose-400 py-1.5 text-xs font-medium transition-colors"

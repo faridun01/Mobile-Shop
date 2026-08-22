@@ -162,31 +162,34 @@ export const SalesHistoryPage: React.FC = () => {
         <div className="flex items-center justify-between gap-2 text-xs">
           <div className="flex items-center space-x-1.5 overflow-x-auto">
             <button
+              type="button"
               onClick={() => setPeriodFilter('TODAY')}
-              className={`px-2.5 py-1 rounded text-[10px] font-mono uppercase tracking-wider transition-colors ${
+              className={`px-3 py-1 rounded-md border text-xs font-mono font-bold uppercase tracking-wider transition-colors bg-transparent ${
                 periodFilter === 'TODAY'
-                  ? 'bg-emerald-500 text-white font-bold shadow-[0_0_8px_rgba(16,185,129,0.5)]'
-                  : 'bg-slate-900 text-slate-400 hover:text-slate-200 hover:bg-slate-800 border border-slate-800'
+                  ? 'border-[#22c55e] text-[#22c55e]'
+                  : 'border-slate-800 text-slate-400 hover:border-slate-700 hover:text-slate-200'
               }`}
             >
               СЕГОДНЯ
             </button>
             <button
+              type="button"
               onClick={() => setPeriodFilter('MONTH')}
-              className={`px-2.5 py-1 rounded text-[10px] font-mono uppercase tracking-wider transition-colors ${
+              className={`px-3 py-1 rounded-md border text-xs font-mono font-bold uppercase tracking-wider transition-colors bg-transparent ${
                 periodFilter === 'MONTH'
-                  ? 'bg-emerald-500 text-white font-bold shadow-[0_0_8px_rgba(16,185,129,0.5)]'
-                  : 'bg-slate-900 text-slate-400 hover:text-slate-200 hover:bg-slate-800 border border-slate-800'
+                  ? 'border-[#22c55e] text-[#22c55e]'
+                  : 'border-slate-800 text-slate-400 hover:border-slate-700 hover:text-slate-200'
               }`}
             >
               ЭТОТ МЕСЯЦ
             </button>
             <button
+              type="button"
               onClick={() => setPeriodFilter('ALL')}
-              className={`px-2.5 py-1 rounded text-[10px] font-mono uppercase tracking-wider transition-colors ${
+              className={`px-3 py-1 rounded-md border text-xs font-mono font-bold uppercase tracking-wider transition-colors bg-transparent ${
                 periodFilter === 'ALL'
-                  ? 'bg-emerald-500 text-white font-bold shadow-[0_0_8px_rgba(16,185,129,0.5)]'
-                  : 'bg-slate-900 text-slate-400 hover:text-slate-200 hover:bg-slate-800 border border-slate-800'
+                  ? 'border-[#22c55e] text-[#22c55e]'
+                  : 'border-slate-800 text-slate-400 hover:border-slate-700 hover:text-slate-200'
               }`}
             >
               ВСЕ ПРОДАЖИ

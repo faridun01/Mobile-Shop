@@ -209,6 +209,7 @@ interface AppContextType {
   updateUser: (user: User) => { success: boolean; message?: string };
   resetUserPassword: (userId: string, newPass: string) => { success: boolean; message?: string };
   toggleUserActive: (userId: string) => { success: boolean; message?: string };
+  deleteUser: (userId: string) => { success: boolean; message?: string };
 
   markNotificationRead: (id: string) => void;
   markNotificationAsRead: (id: string) => void;
@@ -220,6 +221,10 @@ interface AppContextType {
   updateStore: (storeId: string, name: string, address?: string) => { success: boolean; message?: string };
   deleteStore: (storeId: string) => { success: boolean; message?: string };
   resetToDemo: () => void;
+  switchToRealDataMode: () => void;
+  resetAllCashBalances: () => void;
+  resetAllOwnerCapital: () => void;
+  resetEntireSystemDataToZero: () => void;
   theme: ThemeMode;
   setTheme: (theme: ThemeMode) => void;
   toggleTheme: () => void;
@@ -263,6 +268,21 @@ function saveStorage(key: string, val: any) {
   } catch (e) {
     console.error('Error saving storage', key, e);
   }
+}
+
+const TWENTY_FOUR_HOURS_MS = 24 * 60 * 60 * 1000;
+
+export function isNotificationExpired(n: NotificationItem): boolean {
+  const isDone = Boolean(n.read || n.isRead || n.resolved);
+  if (!isDone) return false;
+
+  const actionTimeStr = n.resolvedAt || n.readAt || n.timestamp || n.date;
+  if (!actionTimeStr) return false;
+
+  const actionTime = new Date(actionTimeStr).getTime();
+  if (isNaN(actionTime)) return false;
+
+  return (Date.now() - actionTime) > TWENTY_FOUR_HOURS_MS;
 }
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -2100,6 +2120,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return { success: true };
   };
 
+  const deleteUser = (userId: string) => {
+    if (currentUser?.id === userId) {
+      return { success: false, message: 'Нельзя удалить собственный профиль во время активной сессии' };
+    }
+    const targetUser = users.find(u => u.id === userId);
+    if (!targetUser) return { success: false, message: 'Сотрудник не найден' };
+
+    const updated = users.filter(u => u.id !== userId);
+    setUsers(updated);
+    saveStorage(STORAGE_KEYS.USERS, updated);
+    addAuditLog('USER_DELETE', `Удален сотрудник: ${targetUser.name} (${targetUser.role})`);
+    return { success: true };
+  };
+
   // 11. NOTIFICATIONS
   const markNotificationRead = (id: string) => {
     setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true, isRead: true } : n));
@@ -2211,6 +2245,90 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     localStorage.clear();
   };
 
+  const resetAllCashBalances = () => {
+    setStores(prev => {
+      const updated = prev.map(s => ({ ...s, cashBalanceTjs: 0 }));
+      saveStorage(STORAGE_KEYS.STORES, updated);
+      return updated;
+    });
+    addAuditLog('CASH_REGISTER_RESET', 'Остатки наличных средств во всех кассах магазинов обнулены (0 TJS)');
+  };
+
+  const resetAllOwnerCapital = () => {
+    setOwners(prev => {
+      const updated = prev.map(o => ({
+        ...o,
+        capitalBalanceUsd: 0,
+        totalAccruedProfitUsd: 0,
+        totalPaidProfitUsd: 0,
+        totalReinvestedUsd: 0,
+        availableProfitUsd: 0
+      }));
+      saveStorage(STORAGE_KEYS.OWNERS, updated);
+      return updated;
+    });
+    setOwnerTransactions([]);
+    saveStorage(STORAGE_KEYS.OWNER_TXS, []);
+    addAuditLog('OWNERS_CAPITAL_RESET', 'Капитал и история операций всех партнеров обнулены ($0 USD / 0 TJS)');
+  };
+
+  const resetEntireSystemDataToZero = () => {
+    setDevices([]);
+    setSales([]);
+    setInvoices([]);
+    setSuppliers([]);
+    setTransfers([]);
+    setRepairs([]);
+    setBonuses([]);
+    setExpenses([]);
+    setOwnerTransactions([]);
+    setNotifications([]);
+    setLedger([]);
+    setStores(prev => {
+      const updated = prev.map(s => ({ ...s, cashBalanceTjs: 0 }));
+      saveStorage(STORAGE_KEYS.STORES, updated);
+      return updated;
+    });
+    setOwners(prev => {
+      const updated = prev.map(o => ({
+        ...o,
+        capitalBalanceUsd: 0,
+        totalAccruedProfitUsd: 0,
+        totalPaidProfitUsd: 0,
+        totalReinvestedUsd: 0,
+        availableProfitUsd: 0
+      }));
+      saveStorage(STORAGE_KEYS.OWNERS, updated);
+      return updated;
+    });
+    setAuditLogs([
+      {
+        id: `aud-zero-${Date.now()}`,
+        timestamp: new Date().toISOString(),
+        action: 'SYSTEM_ZERO_RESET',
+        userName: currentUser?.name || 'Администратор',
+        userRole: currentUser?.role || 'ADMIN',
+        details: 'Абсолютно все данные приложения, остатки касс и стоимость бизнеса обнулены (0 TJS / $0.00 USD).'
+      }
+    ]);
+
+    saveStorage(STORAGE_KEYS.DEVICES, []);
+    saveStorage(STORAGE_KEYS.SALES, []);
+    saveStorage(STORAGE_KEYS.INVOICES, []);
+    saveStorage(STORAGE_KEYS.SUPPLIERS, []);
+    saveStorage(STORAGE_KEYS.TRANSFERS, []);
+    saveStorage(STORAGE_KEYS.REPAIRS, []);
+    saveStorage(STORAGE_KEYS.BONUSES, []);
+    saveStorage(STORAGE_KEYS.EXPENSES, []);
+    saveStorage(STORAGE_KEYS.OWNER_TXS, []);
+    saveStorage(STORAGE_KEYS.NOTIFICATIONS, []);
+    saveStorage(STORAGE_KEYS.LEDGER, []);
+  };
+
+  const switchToRealDataMode = () => {
+    resetEntireSystemDataToZero();
+  };
+
   return (
     <AppContext.Provider
       value={{
@@ -2275,6 +2393,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         updateUser,
         resetUserPassword,
         toggleUserActive,
+        deleteUser,
         markNotificationRead,
         markNotificationAsRead,
         markAllNotificationsAsRead,
@@ -2283,6 +2402,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         updateStore,
         deleteStore,
         resetToDemo,
+        switchToRealDataMode,
+        resetAllCashBalances,
+        resetAllOwnerCapital,
+        resetEntireSystemDataToZero,
         theme,
         setTheme,
         toggleTheme

@@ -11,9 +11,15 @@ import { Device, Supplier, SupplierInvoice, Sale, TransferRequest, RepairTicket,
 
 describe('Deep System Audit & Financial Profitability Calculations', () => {
   const stores = JSON.parse(JSON.stringify(INITIAL_STORES));
-  const suppliers: Supplier[] = JSON.parse(JSON.stringify(INITIAL_SUPPLIERS));
-  const devices: Device[] = JSON.parse(JSON.stringify(INITIAL_DEVICES));
-  const sales: Sale[] = JSON.parse(JSON.stringify(INITIAL_SALES));
+  const suppliers: Supplier[] = [
+    { id: 'sup-apple', name: 'Apple Direct Dubai', phone: '+971 50 123 4567', totalPurchasedUsd: 1000, totalPaidUsd: 1000, totalDebtUsd: 0, active: true }
+  ];
+  const devices: Device[] = [
+    { id: 'dev-1', imei: '354891100100001', serialNumber: 'APL100001', barcode: '8803548911001', brand: 'Apple', model: 'iPhone 16 Pro', storage: '256 GB', color: 'Natural Titanium', status: 'STORE_STOCK', locationId: 'store-1', locationName: 'Магазин №1 (Рудаки)', supplierId: 'sup-apple', supplierName: 'Apple Direct Dubai', invoiceNumber: 'INV-101', purchaseCostUsd: 1000, costBasisUsd: 1000, createdAt: '2026-08-01T10:00:00Z', timeline: [] }
+  ];
+  const sales: Sale[] = [
+    { id: 'sale-1001', receiptNumber: 1001, date: '2026-08-01T14:00:00Z', storeId: 'store-1', storeName: 'Магазин №1 (Рудаки)', sellerId: 'user-farhod', sellerName: 'Farhod', customerName: 'Покупатель', items: [{ deviceId: 'dev-sold-1', imei: '354891100100999', brand: 'Apple', model: 'iPhone 16 Pro', storage: '256 GB', color: 'Natural Titanium', salePriceTjs: 10450, salePriceUsd: 1100, purchaseCostUsd: 1000, costBasisUsd: 1000, isBelowCost: false }], totalTjs: 10450, totalUsd: 1100, exchangeRate: 9.50, paymentMethod: 'CASH', cashAmountTjs: 10450, cardAmountTjs: 0, status: 'COMPLETED', hasBelowCostItem: false }
+  ];
   const expenses: Expense[] = JSON.parse(JSON.stringify(INITIAL_EXPENSES));
   const owners: Owner[] = JSON.parse(JSON.stringify(INITIAL_OWNERS));
 

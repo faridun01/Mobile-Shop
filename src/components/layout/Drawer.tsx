@@ -173,44 +173,20 @@ export const Drawer: React.FC = () => {
           })}
         </div>
 
-        {/* Footer Theme Switcher & Version info matching Loyverse POS screenshot (v.2.73.1) */}
-        <div className="p-3.5 border-t border-[#333842] bg-[#181a1f] space-y-2.5 shrink-0">
-          <div className="flex items-center justify-between">
-            <button
-              type="button"
-              onClick={toggleTheme}
-              className={`flex items-center space-x-2 px-3 py-1.5 rounded-lg text-xs font-mono transition-colors border ${
-                theme === 'light'
-                  ? 'bg-amber-100 border-amber-300 text-amber-900'
-                  : 'bg-[#262a33] border-[#333842] text-slate-300 hover:text-white'
-              }`}
-            >
-              {theme === 'light' ? (
-                <>
-                  <Sun className="w-3.5 h-3.5 text-amber-600" />
-                  <span>Светлый режим</span>
-                </>
-              ) : (
-                <>
-                  <Moon className="w-3.5 h-3.5 text-slate-400" />
-                  <span>Тёмный режим</span>
-                </>
-              )}
-            </button>
+        {/* Footer Logout & Version info */}
+        <div className="p-3.5 border-t border-[#333842] bg-[#181a1f] flex items-center justify-between shrink-0">
+          <button
+            onClick={() => {
+              setDrawerOpen(false);
+              logout();
+            }}
+            className="px-3 py-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 text-xs font-semibold transition-colors flex items-center space-x-1"
+          >
+            <LogOut className="w-3.5 h-3.5" />
+            <span>Выход</span>
+          </button>
 
-            <button
-              onClick={() => {
-                setDrawerOpen(false);
-                logout();
-              }}
-              className="px-3 py-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 text-xs font-semibold transition-colors flex items-center space-x-1"
-            >
-              <LogOut className="w-3.5 h-3.5" />
-              <span>Выход</span>
-            </button>
-          </div>
-
-          <p className="text-[11px] font-mono text-slate-500 pt-1">
+          <p className="text-[11px] font-mono text-slate-500">
             v.2.73.1
           </p>
         </div>

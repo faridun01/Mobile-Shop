@@ -42,7 +42,32 @@ export const RepairPage: React.FC = () => {
 
   const [activeTab, setActiveTab] = useState<'list' | 'create'>('list');
   const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState<string>('ACTIVE');
+  const [statusFilter, setStatusFilter] = useState<string>('ALL');
+  const [selectedMonth, setSelectedMonth] = useState<string>(() => new Date().toISOString().substring(0, 7));
+
+  // Extract available months from repair tickets
+  const availableMonths = React.useMemo(() => {
+    const monthsSet = new Set<string>();
+    const currentMonth = new Date().toISOString().substring(0, 7);
+    monthsSet.add(currentMonth);
+    repairs.forEach((r) => {
+      if (r.createdAt) {
+        monthsSet.add(r.createdAt.substring(0, 7));
+      }
+    });
+    return Array.from(monthsSet).sort().reverse();
+  }, [repairs]);
+
+  const formatMonthLabel = (ym: string) => {
+    try {
+      const [year, month] = ym.split('-');
+      const d = new Date(parseInt(year), parseInt(month) - 1, 1);
+      const name = d.toLocaleString('ru-RU', { month: 'long', year: 'numeric' });
+      return name.charAt(0).toUpperCase() + name.slice(1);
+    } catch (e) {
+      return ym;
+    }
+  };
 
   // Receipt Lookup State
   const [receiptQuery, setReceiptQuery] = useState('');
@@ -138,29 +163,47 @@ export const RepairPage: React.FC = () => {
     }
   };
 
-  // Filter repairs
-  const filteredRepairs = repairs.filter(r => {
-    if (currentUser?.role === 'SELLER' && r.storeId !== currentUser.storeId) {
-      return false;
-    }
-    if (statusFilter === 'ACTIVE' && r.status === 'ISSUED') {
-      return false;
-    }
-    if (statusFilter !== 'ALL' && statusFilter !== 'ACTIVE' && r.status !== statusFilter) {
-      return false;
-    }
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase().trim();
-      return (
-        (r.ticketNumber && r.ticketNumber.toString().includes(q)) ||
-        r.customerName?.toLowerCase().includes(q) ||
-        r.customerPhone?.toLowerCase().includes(q) ||
-        r.model?.toLowerCase().includes(q) ||
-        r.imei?.toLowerCase().includes(q)
-      );
-    }
-    return true;
-  });
+  // Monthly repairs for stats and listing
+  const monthlyRepairs = React.useMemo(() => {
+    return repairs.filter((r) => {
+      if (currentUser?.role === 'SELLER' && r.storeId !== currentUser.storeId) {
+        return false;
+      }
+      const ticketMonth = r.createdAt ? r.createdAt.substring(0, 7) : '';
+      return ticketMonth === selectedMonth;
+    });
+  }, [repairs, currentUser, selectedMonth]);
+
+  // Filter repairs by month, status, and search query
+  const filteredRepairs = React.useMemo(() => {
+    return monthlyRepairs.filter((r) => {
+      if (statusFilter === 'ACTIVE' && (r.status === 'ISSUED' || r.status === 'UNREPAIRABLE')) {
+        return false;
+      }
+      if (statusFilter === 'ISSUED' && r.status !== 'ISSUED') {
+        return false;
+      }
+      if (statusFilter !== 'ALL' && statusFilter !== 'ACTIVE' && statusFilter !== 'ISSUED' && r.status !== statusFilter) {
+        return false;
+      }
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase().trim();
+        const modelStr = r.deviceModel || r.model || '';
+        return (
+          (r.ticketNumber && r.ticketNumber.toString().includes(q)) ||
+          r.customerName?.toLowerCase().includes(q) ||
+          r.customerPhone?.toLowerCase().includes(q) ||
+          modelStr.toLowerCase().includes(q) ||
+          r.imei?.toLowerCase().includes(q)
+        );
+      }
+      return true;
+    });
+  }, [monthlyRepairs, statusFilter, searchQuery]);
+
+  // Monthly statistics
+  const monthlyCompletedCount = monthlyRepairs.filter((r) => r.status === 'ISSUED' || r.status === 'READY').length;
+  const monthlyTotalCostTjs = monthlyRepairs.reduce((acc, r) => acc + (r.finalCostTjs || r.estimatedCostTjs || 0), 0);
 
   const handleCreateTicket = (e: React.FormEvent) => {
     e.preventDefault();
@@ -191,7 +234,7 @@ export const RepairPage: React.FC = () => {
     if (res.success) {
       setStatusMessage({
         type: 'success',
-        text: `Квитанция #${res.ticketNumber} успешно оформлена! ${costVal > 0 ? `Расход на сумму ${costVal} TJS автоматически занесен в учет расходов.` : ''}`
+        text: `Квитанция #${res.ticketNumber} успешно оформлена! ${costVal > 0 ? `Расход на сумму ${costVal} TJS занесен в учет расходов (/expenses).` : ''}`
       });
       setCustomerName('');
       setCustomerPhone('');
@@ -223,7 +266,10 @@ export const RepairPage: React.FC = () => {
     if (res.success) {
       setIsIssueModalOpen(false);
       setSelectedTicket(null);
-      setStatusMessage({ type: 'success', text: `Устройство выдано клиенту по квитанции #${selectedTicket.ticketNumber}` });
+      setStatusMessage({
+        type: 'success',
+        text: `Устройство по квитанции #${selectedTicket.ticketNumber} выдан клиенту. Финальная стоимость (${finalVal} TJS) сохранена в Расходах (/expenses).`
+      });
     }
   };
 
@@ -256,7 +302,23 @@ export const RepairPage: React.FC = () => {
         </div>
 
         {activeTab === 'list' && (
-          <div className="flex items-center space-x-2 text-xs">
+          <div className="flex flex-wrap items-center gap-2 text-xs">
+            {/* MONTH FILTER SELECTOR */}
+            <div className="flex items-center space-x-1 bg-[#0B0E14] border border-emerald-500/40 rounded px-2 py-0.5">
+              <Clock className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+              <select
+                value={selectedMonth}
+                onChange={(e) => setSelectedMonth(e.target.value)}
+                className="bg-transparent text-emerald-400 text-xs font-mono font-bold focus:outline-none cursor-pointer"
+              >
+                {availableMonths.map((m) => (
+                  <option key={m} value={m} className="bg-[#0B0E14] text-slate-200">
+                    {formatMonthLabel(m)}
+                  </option>
+                ))}
+              </select>
+            </div>
+
             <div className="relative">
               <Search className="absolute left-2.5 top-2 w-3.5 h-3.5 text-slate-500" />
               <input
@@ -269,16 +331,16 @@ export const RepairPage: React.FC = () => {
             </div>
 
             <select
-              value={statusFilter ?? 'ACTIVE'}
+              value={statusFilter ?? 'ALL'}
               onChange={(e) => setStatusFilter(e.target.value)}
               className="bg-[#0B0E14] border border-slate-800 text-slate-200 text-xs font-mono rounded px-2.5 py-1 focus:outline-none focus:border-emerald-500"
             >
+              <option value="ALL">ВСЕ РЕМОНТЫ ЗА МЕСЯЦ</option>
               <option value="ACTIVE">АКТИВНЫЕ РЕМОНТЫ</option>
-              <option value="ALL">ВСЕ СТАТУСЫ</option>
+              <option value="ISSUED">ОТРЕМОНТИРОВАННЫЕ И ВЫДАННЫЕ</option>
               <option value="ACCEPTED">ПРИНЯТ</option>
               <option value="IN_PROGRESS">В РАБОТЕ</option>
               <option value="READY">ГОТОВ К ВЫДАЧЕ</option>
-              <option value="ISSUED">ВЫДАН</option>
             </select>
           </div>
         )}
@@ -439,35 +501,66 @@ export const RepairPage: React.FC = () => {
         ) : (
           /* List of Repairs */
           <div className="divide-y divide-slate-800/50">
+            {/* MONTHLY SUMMARY BANNER */}
+            <div className="p-3 bg-[#0F1219] border-b border-slate-800/80 flex flex-wrap items-center justify-between gap-2 text-xs font-mono">
+              <div className="flex items-center space-x-2">
+                <span className="text-slate-400">ПЕРИОД:</span>
+                <span className="font-bold text-emerald-400 uppercase tracking-wider">{formatMonthLabel(selectedMonth)}</span>
+              </div>
+              <div className="flex flex-wrap items-center gap-3 sm:gap-6 text-[11px]">
+                <span>
+                  Всего ремонтов: <strong className="text-slate-200">{monthlyRepairs.length}</strong>
+                </span>
+                <span>
+                  Отремонтировано / Готово: <strong className="text-emerald-400">{monthlyCompletedCount}</strong>
+                </span>
+                <span>
+                  Затраты (Расходы): <strong className="text-rose-400 font-bold">{monthlyTotalCostTjs.toLocaleString()} TJS</strong>
+                </span>
+              </div>
+            </div>
+
             {filteredRepairs.length === 0 ? (
               <div className="p-8 text-center text-slate-500 font-mono text-xs uppercase tracking-wider">
-                Квитанции на ремонт не найдены
+                Квитанции на ремонт за {formatMonthLabel(selectedMonth)} не найдены
               </div>
             ) : (
               filteredRepairs.map((ticket) => {
                 const conf = REPAIR_STATUS_CONFIG[ticket.status] || REPAIR_STATUS_CONFIG.ACCEPTED;
+                const costToShow = ticket.finalCostTjs || ticket.estimatedCostTjs || 0;
 
                 return (
                   <div key={ticket.id} className="p-3.5 hover:bg-slate-800/30 transition-colors space-y-2.5">
                     <div className="flex items-start justify-between">
                       <div>
                         <div className="flex items-center space-x-2">
-                          <span className="font-mono text-xs font-bold text-emerald-400">{ticket.ticketNumber}</span>
+                          <span className="font-mono text-xs font-bold text-emerald-400">Кв. #{ticket.ticketNumber}</span>
                           <span className={`text-[9px] px-1.5 py-0.2 rounded font-mono font-bold uppercase border ${conf.bg} ${conf.color} ${conf.border}`}>
                             {conf.label}
                           </span>
+                          <span className="text-[10px] text-slate-500 font-mono">
+                            {ticket.createdAt ? new Date(ticket.createdAt).toLocaleDateString('ru-RU') : ''}
+                          </span>
                         </div>
                         <h4 className="text-xs font-bold text-slate-200 mt-1">
-                          {ticket.deviceModel}
+                          {ticket.brand || ''} {ticket.deviceModel || ticket.model || 'Телефон'} {ticket.storage ? `(${ticket.storage})` : ''}
                         </h4>
+                        {ticket.imei && (
+                          <p className="text-[10px] font-mono text-slate-400 mt-0.5">
+                            IMEI: {ticket.imei}
+                          </p>
+                        )}
                         <p className="text-[11px] text-slate-400 mt-0.5">
-                          {ticket.issueDescription}
+                          {ticket.issueDescription || ticket.problemDescription}
                         </p>
                       </div>
 
                       <div className="text-right shrink-0 font-mono">
                         <span className="text-xs font-bold text-slate-100">
-                          {ticket.estimatedCostTjs} TJS
+                          {costToShow} TJS
+                        </span>
+                        <span className="block text-[9px] text-slate-500">
+                          Расход на ремонт
                         </span>
                         {ticket.prepaymentTjs > 0 && (
                           <span className="block text-[9px] text-emerald-400 font-bold">

@@ -379,6 +379,8 @@ export interface NotificationItem {
   read?: boolean;
   isRead?: boolean;
   resolved?: boolean;
+  readAt?: string;
+  resolvedAt?: string;
 }
 
 export interface AuditLogEntry {

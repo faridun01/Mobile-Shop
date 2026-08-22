@@ -1,6 +1,0 @@
-{
-  "name": "Mobile Shop",
-  "description": "Система автоматизации бизнеса по продаже мобильных телефонов: POS касса, склад, учет по IMEI, приход, перемещение, обмен, ремонт, поставщики, капитал и аудит.",
-  "requestFramePermissions": ["camera"],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
-}
