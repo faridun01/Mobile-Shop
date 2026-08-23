@@ -10,7 +10,7 @@ COPY package*.json ./
 COPY prisma ./prisma/
 COPY prisma.config.ts ./
 
-RUN npm ci
+RUN npm install
 
 # Copy full application source code
 COPY . .
@@ -42,6 +42,7 @@ COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/prisma ./prisma
 COPY --from=builder /app/prisma.config.ts ./prisma.config.ts
 COPY --from=builder /app/server ./server
+COPY --from=builder /app/docker-entrypoint.sh ./docker-entrypoint.sh
 
 # Expose Web Application Port
 EXPOSE 3000
@@ -49,4 +50,4 @@ EXPOSE 3000
 USER nodejs
 
 # Launch command
-CMD ["npm", "run", "preview"]
+ENTRYPOINT ["/bin/sh", "./docker-entrypoint.sh"]
