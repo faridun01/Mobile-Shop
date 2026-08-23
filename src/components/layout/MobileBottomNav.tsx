@@ -17,8 +17,7 @@ export const MobileBottomNav: React.FC = () => {
     activePage,
     setActivePage,
     setDrawerOpen,
-    notifications,
-    cart
+    notifications
   } = useApp();
 
   const userRole = currentUser?.role || 'SELLER';
@@ -30,7 +29,7 @@ export const MobileBottomNav: React.FC = () => {
       : { id: 'EXCHANGE', label: 'Обмен', icon: RefreshCw };
 
   const navButtons = [
-    { id: 'SALE' as PageId, label: 'Касса', icon: ShoppingBag, badge: cart?.length || 0 },
+    { id: 'SALE' as PageId, label: 'Касса', icon: ShoppingBag },
     { id: 'INVENTORY' as PageId, label: 'Склад', icon: Package },
     { id: 'SALES_HISTORY' as PageId, label: 'Продажи', icon: History },
     fourthItem

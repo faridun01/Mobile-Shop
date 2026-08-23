@@ -292,7 +292,7 @@ export const SuppliersPage: React.FC = () => {
           <div className="p-3.5 border-b border-zinc-800 bg-zinc-900 flex items-center justify-between shrink-0">
             <div className="flex items-center space-x-2">
               <Truck className="w-4 h-4 text-emerald-400" />
-              <h3 className="text-sm font-bold text-white truncate max-w-[200px]">
+              <h3 className="text-sm font-bold text-white truncate max-w-50">
                 {selectedSupplier.name}
               </h3>
             </div>

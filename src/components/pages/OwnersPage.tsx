@@ -118,7 +118,7 @@ export const OwnersPage: React.FC = () => {
       return;
     }
 
-    const res = updateOwnerProfitShares(payload);
+    const res = updateOwnerProfitShares(payload[0]?.sharePercent || 0, payload[1]?.sharePercent || 0);
     if (res.success) {
       setIsSharesModalOpen(false);
       setStatusMessage({
@@ -615,7 +615,7 @@ export const OwnersPage: React.FC = () => {
                         </div>
 
                         {tx.note && (
-                          <p className="text-xs text-slate-300 font-mono break-words">
+                          <p className="text-xs text-slate-300 font-mono wrap-break-word">
                             {tx.note}
                           </p>
                         )}

@@ -26,7 +26,6 @@ export const SettingsPage: React.FC = () => {
     currentUser,
     stores,
     todayRate,
-    rateHistory,
     setTodayExchangeRate,
     createStore,
     updateStore,
@@ -249,7 +248,7 @@ export const SettingsPage: React.FC = () => {
                   <div className="text-right text-xs">
                     <span className="text-[10px] text-slate-500 uppercase block">ОБНОВЛЕНИЕ</span>
                     <span className="text-slate-300 font-bold mt-0.5 block text-[11px]">
-                      {todayRate?.date} ({todayRate?.setByName || 'Админ'})
+                      {todayRate?.date} (Админ)
                     </span>
                   </div>
                 </div>

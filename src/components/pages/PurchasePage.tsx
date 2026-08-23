@@ -207,9 +207,26 @@ export const PurchasePage: React.FC = () => {
     });
   };
 
+  const getImeiPair = (value: string): [string, string] => {
+    const [imei1 = '', imei2 = ''] = value.split(/[\/,]/).map(part => part.trim());
+    return [imei1, imei2];
+  };
+
+  const handleUpdateImei2 = (groupIdx: number, imeiIdx: number, value: string) => {
+    const [imei1] = getImeiPair(groups[groupIdx].imeis[imeiIdx]);
+    const imei2 = value.trim();
+    handleUpdateImei(groupIdx, imeiIdx, imei2 ? `${imei1} / ${imei2}` : imei1);
+  };
+
   const handleScanImei = (groupIdx: number, imeiIdx: number) => {
     openScanner((scannedCode) => {
       handleUpdateImei(groupIdx, imeiIdx, scannedCode.trim());
+    });
+  };
+
+  const handleScanBarcode = (groupIdx: number) => {
+    openScanner((scannedCode) => {
+      handleUpdateGroup(groupIdx, 'barcode', scannedCode.trim());
     });
   };
 
@@ -251,6 +268,7 @@ export const PurchasePage: React.FC = () => {
       storage: g.storage.trim(),
       color: g.color.trim(),
       purchasePriceUsd: g.purchasePriceUsd,
+      barcode: g.barcode?.trim() || undefined,
       imeis: g.imeis.filter(i => i.trim().length > 0)
     })).filter(g => g.imeis.length > 0);
 
@@ -858,17 +876,6 @@ export const PurchasePage: React.FC = () => {
                 </div>
 
                 <div>
-                  <label className="block text-zinc-400 mb-1">Штрихкод (EAN)</label>
-                  <input
-                    type="text"
-                    value={group.barcode || ''}
-                    onChange={(e) => handleUpdateGroup(groupIdx, 'barcode', e.target.value)}
-                    className="w-full rounded bg-zinc-950 border border-zinc-700 px-2.5 py-1.5 text-xs text-amber-400 font-mono focus:border-emerald-500 focus:outline-none"
-                    placeholder="EAN-13 / UPC"
-                  />
-                </div>
-
-                <div>
                   <label className="block text-zinc-400 mb-1">Цена закупки ($)</label>
                   <input
                     type="number"
@@ -901,7 +908,7 @@ export const PurchasePage: React.FC = () => {
                       className="px-2.5 py-1 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-mono font-medium flex items-center space-x-1 transition-colors"
                     >
                       <Plus className="w-3 h-3" />
-                      <span>Добавить IMEI</span>
+                      <span>Добавить устройство</span>
                     </button>
                   </div>
                 </div>
@@ -928,40 +935,91 @@ export const PurchasePage: React.FC = () => {
                   />
                 </div>
 
-                {/* Individual IMEI row entries */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 pt-1 font-mono">
-                  {group.imeis.map((imeiVal, imeiIdx) => (
-                    <div key={imeiIdx} className="flex items-center space-x-1">
-                      <div className="relative flex-1">
-                        <input
-                          type="text"
-                          required
-                          value={imeiVal}
-                          onChange={(e) => handleUpdateImei(groupIdx, imeiIdx, e.target.value)}
-                          placeholder={`IMEI #${imeiIdx + 1}`}
-                          className="w-full rounded bg-zinc-950 border border-zinc-800 px-2.5 py-1.5 text-xs text-zinc-100 font-mono focus:border-emerald-500 focus:outline-none pr-8"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => handleScanImei(groupIdx, imeiIdx)}
-                          className="absolute right-1.5 top-1.5 text-zinc-400 hover:text-emerald-400 p-0.5"
-                          title="Сканировать камерой/сканером"
-                        >
-                          <Scan className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
+                <div className="space-y-2 pt-1 font-mono">
+                  {group.imeis.map((imeiVal, imeiIdx) => {
+                    const [imei1, imei2] = getImeiPair(imeiVal);
+                    return (
+                      <div key={imeiIdx} className="grid grid-cols-1 md:grid-cols-3 gap-2">
+                        <div>
+                          <label className="block text-zinc-400 mb-1">Штрихкод (EAN)</label>
+                          <div className="flex items-center gap-1.5">
+                            <input
+                              type="text"
+                              value={group.barcode || ''}
+                              onChange={(e) => handleUpdateGroup(groupIdx, 'barcode', e.target.value)}
+                              className="min-w-0 flex-1 rounded bg-zinc-950 border border-zinc-800 px-2.5 py-1.5 text-xs text-amber-400 font-mono focus:border-emerald-500 focus:outline-none"
+                              placeholder="EAN-13 / UPC"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => handleScanBarcode(groupIdx)}
+                              className="shrink-0 rounded bg-zinc-800 p-1.5 text-amber-400 hover:bg-zinc-700 hover:text-amber-300 transition-colors"
+                              title="Сканировать EAN"
+                              aria-label="Сканировать EAN"
+                            >
+                              <Scan className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </div>
 
-                      {group.imeis.length > 1 && (
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveImeiFromGroup(groupIdx, imeiIdx)}
-                          className="text-zinc-600 hover:text-rose-400 p-1"
-                        >
-                          <X className="w-3.5 h-3.5" />
-                        </button>
-                      )}
-                    </div>
-                  ))}
+                        <div>
+                          <label className="block text-zinc-400 mb-1">IMEI 1</label>
+                          <div className="relative">
+                            <input
+                              type="text"
+                              required
+                              value={imei1}
+                              onChange={(e) => handleUpdateImei(groupIdx, imeiIdx, `${e.target.value} / ${imei2}`.replace(/ \/ $/, ''))}
+                              placeholder="IMEI 1"
+                              className="w-full rounded bg-zinc-950 border border-zinc-800 px-2.5 py-1.5 text-xs text-zinc-100 font-mono focus:border-emerald-500 focus:outline-none pr-8"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => handleScanImei(groupIdx, imeiIdx)}
+                              className="absolute right-1.5 top-1.5 text-zinc-400 hover:text-emerald-400 p-0.5"
+                              title="Сканировать IMEI 1"
+                              aria-label="Сканировать IMEI 1"
+                            >
+                              <Scan className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </div>
+
+                        <div className="flex items-end gap-1">
+                          <div className="relative flex-1">
+                            <label className="block text-zinc-400 mb-1">IMEI 2 <span className="text-zinc-600">(необязательно)</span></label>
+                            <input
+                              type="text"
+                              value={imei2}
+                              onChange={(e) => handleUpdateImei2(groupIdx, imeiIdx, e.target.value)}
+                              placeholder="IMEI 2 (необязательно)"
+                              className="w-full rounded bg-zinc-950 border border-zinc-800 px-2.5 py-1.5 text-xs text-zinc-100 font-mono focus:border-emerald-500 focus:outline-none pr-8"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => openScanner((scannedCode) => handleUpdateImei2(groupIdx, imeiIdx, scannedCode))}
+                              className="absolute right-1.5 top-1.5 text-zinc-400 hover:text-emerald-400 p-0.5"
+                              title="Сканировать IMEI 2"
+                              aria-label="Сканировать IMEI 2"
+                            >
+                              <Scan className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                          {group.imeis.length > 1 && (
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveImeiFromGroup(groupIdx, imeiIdx)}
+                              className="text-zinc-600 hover:text-rose-400 p-1"
+                              title="Удалить устройство"
+                              aria-label="Удалить устройство"
+                            >
+                              <X className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             </div>

@@ -1,4 +1,5 @@
 import { prisma } from '../../prisma/prisma.service';
+import type { Prisma } from '@prisma/client';
 
 export interface CreateSaleInput {
   storeId: string;
@@ -23,7 +24,7 @@ export class SalesService {
    * 5. Record AuditLog entry.
    */
   public static async executeSale(input: CreateSaleInput) {
-    return prisma.$transaction(async (tx) => {
+    return prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       // 1. Fetch & Verify Device Availability
       const deviceIds = input.items.map((i) => i.deviceId);
       const devices = await tx.device.findMany({

@@ -126,6 +126,9 @@ export interface Device {
   supplierId?: string;
   supplierName?: string;
   invoiceNumber?: string;
+  purchaseInvoiceId?: string;
+  retailPriceTjs?: number;
+  receivedDate?: string;
   purchaseCostUsd: number;
   costBasisUsd: number; // Cost basis for calculating profit (could be exchange-in value or $0 for bonus)
   isBonus?: boolean;
@@ -228,6 +231,7 @@ export interface RepairTicket {
   intakeSeller: string;
   customerName?: string;
   customerPhone?: string;
+  prepaymentTjs?: number;
   problemDescription: string;
   issueDescription?: string;
   visualCondition: string;

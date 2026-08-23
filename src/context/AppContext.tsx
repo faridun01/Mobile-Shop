@@ -94,6 +94,7 @@ interface AppContextType {
   
   processExchange: (params: {
     originalSaleReceiptNumber: number;
+    originalSaleId?: string;
     returnedImei: string;
     exchangeInValueTjs: number;
     replacementDeviceId: string;
@@ -122,6 +123,7 @@ interface AppContextType {
       storage: string;
       color: string;
       purchasePriceUsd: number;
+      barcode?: string;
       imeis: string[];
     }[];
   }) => { success: boolean; message?: string };
@@ -168,6 +170,8 @@ interface AppContextType {
     visualCondition: string;
     equipmentPackage: string;
     comment?: string;
+    estimatedCostTjs?: number;
+    repairCostTjs?: number;
   }) => { success: boolean; ticketNumber?: number; message?: string };
 
   updateRepairStatus: (ticketId: string, newStatus: RepairStatus, note?: string, costTjs?: number) => { success: boolean; message?: string };
@@ -1511,8 +1515,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     color: string;
     saleReceiptNumber?: number;
     saleDate?: string;
-    customerName: string;
-    customerPhone: string;
+    customerName?: string;
+    customerPhone?: string;
     problemDescription: string;
     visualCondition?: string;
     equipmentPackage?: string;
@@ -1544,8 +1548,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       storeId: storeObj?.id || 'store-1',
       storeName: storeObj?.name || 'Магазин',
       intakeSeller: currentUser.name,
-      customerName: data.customerName,
-      customerPhone: data.customerPhone,
+      customerName: data.customerName || '',
+      customerPhone: data.customerPhone || '',
       problemDescription: data.problemDescription,
       visualCondition: data.visualCondition || 'Без видимых повреждений',
       equipmentPackage: data.equipmentPackage || 'Только телефон',
@@ -2170,7 +2174,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const setTodayExchangeRate = (newRate: number) => {
-    return setDailyRate(newRate);
+    setDailyRate(newRate);
+    return { success: true };
   };
 
   const createStore = (name: string, address?: string) => {

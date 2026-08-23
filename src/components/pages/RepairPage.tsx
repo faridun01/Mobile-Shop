@@ -36,8 +36,7 @@ export const RepairPage: React.FC = () => {
     sales,
     devices,
     createRepairTicket,
-    updateRepairStatus,
-    issueRepairTicket
+    updateRepairStatus
   } = useApp();
 
   const [activeTab, setActiveTab] = useState<'list' | 'create'>('list');
@@ -227,7 +226,6 @@ export const RepairPage: React.FC = () => {
       saleReceiptNumber,
       saleDate,
       problemDescription: issueDescription.trim(),
-      estimatedCostTjs: costVal,
       repairCostTjs: costVal
     });
 
@@ -562,9 +560,9 @@ export const RepairPage: React.FC = () => {
                         <span className="block text-[9px] text-slate-500">
                           Расход на ремонт
                         </span>
-                        {ticket.prepaymentTjs > 0 && (
+                        {(ticket.prepaymentTjs ?? 0) > 0 && (
                           <span className="block text-[9px] text-emerald-400 font-bold">
-                            Предоплата: {ticket.prepaymentTjs} TJS
+                            Предоплата: {ticket.prepaymentTjs ?? 0} TJS
                           </span>
                         )}
                       </div>
@@ -636,17 +634,17 @@ export const RepairPage: React.FC = () => {
                 />
               </div>
 
-              {selectedTicket.prepaymentTjs > 0 && (
+              {(selectedTicket.prepaymentTjs ?? 0) > 0 && (
                 <div className="flex justify-between text-slate-400 p-2 rounded bg-[#0B0E14] border border-slate-800">
                   <span className="text-[10px] uppercase">Учтена предоплата:</span>
-                  <span className="font-mono font-bold text-emerald-400">-{selectedTicket.prepaymentTjs} TJS</span>
+                  <span className="font-mono font-bold text-emerald-400">-{selectedTicket.prepaymentTjs ?? 0} TJS</span>
                 </div>
               )}
 
               <div className="flex justify-between text-xs font-bold pt-1">
                 <span className="uppercase text-slate-300">К доплате:</span>
                 <span className="font-mono text-sm text-emerald-400">
-                  {Math.max(0, (parseFloat(finalCostInput) || 0) - selectedTicket.prepaymentTjs)} TJS
+                  {Math.max(0, (parseFloat(finalCostInput) || 0) - (selectedTicket.prepaymentTjs ?? 0))} TJS
                 </span>
               </div>
 

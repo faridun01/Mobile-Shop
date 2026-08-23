@@ -57,7 +57,7 @@ export const TransferPage: React.FC = () => {
   const availableOriginDevices = useMemo(() => {
     return devices.filter(d => {
       if (d.locationId !== fromLocationId) return false;
-      const isAvailable = d.status === 'MAIN_WAREHOUSE' || d.status === 'STORE_STOCK' || d.status === 'IN_STOCK_AFTER_EXCHANGE' || d.status === 'IN_STOCK';
+      const isAvailable = d.status !== 'SOLD' && d.status !== 'IN_REPAIR' && d.status !== 'TRANSFER_PENDING';
       if (!isAvailable) return false;
       if (selectedDeviceIds.includes(d.id)) return false;
       if (searchQuery.trim()) {
@@ -747,12 +747,6 @@ export const TransferPage: React.FC = () => {
         </div>
       )}
 
-      {/* Optical / Laser Barcode Scanner Modal */}
-      <BarcodeScannerModal
-        isOpen={isScannerOpen}
-        onClose={() => setIsScannerOpen(false)}
-        onScan={handleScanSuccess}
-      />
     </div>
   );
 };

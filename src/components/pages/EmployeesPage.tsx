@@ -98,7 +98,7 @@ export const EmployeesPage: React.FC = () => {
     setPin(u.pin || '');
     setRole(u.role);
     setStoreId(u.storeId || stores[0]?.id || 'store-1');
-    setIsActive(u.isActive);
+    setIsActive(u.isActive ?? u.active);
     setIsModalOpen(true);
   };
 

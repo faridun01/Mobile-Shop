@@ -2,7 +2,7 @@
 set -e
 
 echo "Running Prisma Database Sync..."
-npx prisma db push --accept-data-loss || echo "Prisma db push warning"
+npx prisma db push --skip-generate || echo "Prisma db push warning"
 
 echo "Starting Application..."
-exec npm run preview
+exec npm run server

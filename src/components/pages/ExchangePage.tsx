@@ -208,7 +208,7 @@ export const ExchangePage: React.FC = () => {
     }
 
     const res = processExchange({
-      originalSaleReceiptNumber: selectedOldDevice.originalSaleId || receiptSearch,
+      originalSaleReceiptNumber: Number(selectedOldDevice.originalSaleId || receiptSearch),
       originalSaleId: selectedOldDevice.originalSaleId,
       returnedItem: {
         brand: selectedOldDevice.brand,
