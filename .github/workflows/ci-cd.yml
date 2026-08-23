@@ -95,6 +95,7 @@ jobs:
           context: .
           file: ./Dockerfile
           push: false
+          load: true
           tags: mobile-shop:scan
 
       - name: Run Trivy Vulnerability Scanner
