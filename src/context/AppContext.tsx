@@ -136,7 +136,7 @@ interface AppContextType {
 
   createSupplierBonus: (params: {
     supplierId: string;
-    campaignTitle: string;
+    campaignTitle?: string;
     bonusType: 'FREE_DEVICES' | 'CASH_DISCOUNT';
     amountUsd?: number;
     freeDevices?: {
@@ -323,7 +323,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     } catch (e) {
       console.error(e);
     }
-    return 'dark';
+    return 'light';
   });
 
   useEffect(() => {
@@ -1774,7 +1774,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     destinationLocationId
   }: {
     supplierId: string;
-    campaignTitle: string;
+    campaignTitle?: string;
     bonusType: 'FREE_DEVICES' | 'CASH_DISCOUNT';
     amountUsd?: number;
     freeDevices?: {
@@ -1793,12 +1793,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const locationObj = stores.find(s => s.id === targetLocation);
     const locationName = locationObj?.name || 'Главный склад';
 
+    const bonusTitle = campaignTitle?.trim() || `Бонус от ${supplierName}`;
+
     const newBonus: SupplierBonus = {
       id: `bon-${Date.now()}`,
       supplierId,
       supplierName,
-      campaignName: campaignTitle,
-      campaignTitle,
+      campaignName: bonusTitle,
+      campaignTitle: bonusTitle,
       bonusType,
       amountUsd,
       status: 'IN_STOCK',
@@ -1830,14 +1832,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         purchaseCostUsd: 0,
         costBasisUsd: d.costBasisUsd || 0,
         isBonus: true,
-        bonusCampaign: campaignTitle,
+        bonusCampaign: bonusTitle,
         createdAt: new Date().toISOString(),
         timeline: [
           {
             id: `t-${Date.now()}`,
             date: new Date().toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }),
             type: 'BONUS',
-            description: `Получен бонус по акции "${campaignTitle}" ($${d.costBasisUsd || 0})`,
+            description: `Получен бонус ($${d.costBasisUsd || 0})`,
             user: currentUser?.name || 'Администратор'
           }
         ]
@@ -1846,8 +1848,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setDevices(prev => [...newDevs, ...prev]);
     }
 
+    if (bonusType === 'CASH_DISCOUNT' && amountUsd && amountUsd > 0) {
+      setOwners(prev => prev.map(o => {
+        const share = o.profitSharePercent / 100;
+        const profitPart = +(amountUsd * share).toFixed(2);
+        return {
+          ...o,
+          totalAccruedProfitUsd: +(o.totalAccruedProfitUsd + profitPart).toFixed(2),
+          availableProfitUsd: +(o.availableProfitUsd + profitPart).toFixed(2)
+        };
+      }));
+    }
+
     setBonuses(prev => [newBonus, ...prev]);
-    addAuditLog('SUPPLIER_BONUS', `Зафиксирован бонус от ${supplierName}: ${campaignTitle}`);
+    addAuditLog('SUPPLIER_BONUS', `Зафиксирован денежный бонус от ${supplierName}${amountUsd ? `: +$${amountUsd} (100% в чистую прибыль учредителей)` : ''}`);
     return { success: true };
   };
 

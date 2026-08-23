@@ -29,7 +29,6 @@ export const BonusesPage: React.FC = () => {
   const [selectedBonus, setSelectedBonus] = useState<SupplierBonus | null>(null);
 
   const [supplierId, setSupplierId] = useState(suppliers[0]?.id || '');
-  const [campaignTitle, setCampaignTitle] = useState('');
   const [bonusType, setBonusType] = useState<'CASH_DISCOUNT' | 'FREE_DEVICES'>('FREE_DEVICES');
   const [amountUsd, setAmountUsd] = useState('');
   
@@ -39,8 +38,6 @@ export const BonusesPage: React.FC = () => {
   const [bonusStorage, setBonusStorage] = useState('128 GB');
   const [bonusColor, setBonusColor] = useState('Black');
   const [bonusImei, setBonusImei] = useState('');
-  const [bonusCostBasisMode, setBonusCostBasisMode] = useState<'ZERO' | 'CUSTOM'>('ZERO');
-  const [customCostBasisUsd, setCustomCostBasisUsd] = useState('0');
   const [destinationLocationId, setDestinationLocationId] = useState('main-warehouse');
 
   const [statusMessage, setStatusMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
@@ -120,11 +117,6 @@ export const BonusesPage: React.FC = () => {
     e.preventDefault();
     setStatusMessage(null);
 
-    if (!campaignTitle.trim()) {
-      setStatusMessage({ type: 'error', text: 'Укажите название бонусной акции' });
-      return;
-    }
-
     const freeDevices = bonusType === 'FREE_DEVICES' ? [
       {
         brand: bonusBrand,
@@ -132,13 +124,12 @@ export const BonusesPage: React.FC = () => {
         storage: bonusStorage,
         color: bonusColor,
         imei: bonusImei.trim() || `35${Math.floor(1000000000000 + Math.random() * 9000000000000)}`,
-        costBasisUsd: bonusCostBasisMode === 'ZERO' ? 0 : (parseFloat(customCostBasisUsd) || 0)
+        costBasisUsd: 0
       }
     ] : undefined;
 
     const res = createSupplierBonus({
       supplierId,
-      campaignTitle: campaignTitle.trim(),
       bonusType,
       amountUsd: bonusType === 'CASH_DISCOUNT' ? (parseFloat(amountUsd) || 0) : undefined,
       freeDevices,
@@ -147,11 +138,10 @@ export const BonusesPage: React.FC = () => {
 
     if (res.success) {
       setIsModalOpen(false);
-      setCampaignTitle('');
       setBonusImei('');
       setStatusMessage({
         type: 'success',
-        text: `Бонусная акция успешно сохранена и оприходована на склад`
+        text: `Бонус успешно сохранен и оприходован на склад`
       });
     } else {
       setStatusMessage({ type: 'error', text: res.message || 'Ошибка сохранения' });
@@ -205,7 +195,7 @@ export const BonusesPage: React.FC = () => {
             >
               <div className="space-y-1 min-w-0">
                 <div className="flex items-center space-x-2">
-                  <span className="text-xs font-semibold text-zinc-100">{bonus.campaignTitle || bonus.campaignName || 'Бонусная акция'}</span>
+                  <span className="text-xs font-semibold text-zinc-100">{bonus.campaignTitle || bonus.campaignName || `Бонус от ${bonus.supplierName}`}</span>
                   <span className={`text-[10px] px-2 py-0.5 rounded font-medium ${
                     bonus.bonusType === 'FREE_DEVICES' || bonus.deviceId
                       ? 'bg-amber-950 text-amber-400 border border-amber-800'
@@ -250,10 +240,15 @@ export const BonusesPage: React.FC = () => {
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-4 backdrop-blur-xs">
           <form onSubmit={handleCreateBonus} className="w-full max-w-md rounded-lg bg-zinc-900 border border-zinc-800 p-5 text-zinc-100 shadow-2xl space-y-4">
-            <h4 className="text-sm font-bold text-white mb-2 flex items-center space-x-2">
-              <Award className="w-4 h-4 text-amber-400" />
-              <span>Регистрация бонуса от поставщика</span>
-            </h4>
+            <div>
+              <h4 className="text-sm font-bold text-white flex items-center space-x-2">
+                <Award className="w-4 h-4 text-amber-400" />
+                <span>Регистрация бонуса от поставщика</span>
+              </h4>
+              <p className="text-[11px] text-emerald-400 font-semibold mt-0.5">
+                ★ 100% любого бонуса учитывается в чистую прибыль
+              </p>
+            </div>
 
             <div className="text-xs space-y-3">
               <div>
@@ -267,18 +262,6 @@ export const BonusesPage: React.FC = () => {
                     <option key={s.id} value={s.id}>{s.name}</option>
                   ))}
                 </select>
-              </div>
-
-              <div>
-                <label className="block text-zinc-400 mb-1">Название акции / кампании</label>
-                <input
-                  type="text"
-                  required
-                  value={campaignTitle ?? ''}
-                  onChange={(e) => setCampaignTitle(e.target.value)}
-                  placeholder="Купи 10 iPhone 16 — получи 1 бесплатно"
-                  className="w-full rounded bg-zinc-950 border border-zinc-700 px-3 py-2 text-zinc-100 focus:border-emerald-500 focus:outline-none"
-                />
               </div>
 
               <div>
@@ -348,33 +331,10 @@ export const BonusesPage: React.FC = () => {
                       placeholder="351234567890123"
                       className="w-full rounded bg-zinc-900 border border-zinc-700 px-2.5 py-1 text-xs font-mono"
                     />
-                  </div>
-
-                  <div className="pt-2 border-t border-zinc-800">
-                    <label className="block text-zinc-400 text-[10px] mb-1">Расчет себестоимости для чистой прибыли:</label>
-                    <select
-                      value={bonusCostBasisMode ?? 'ZERO'}
-                      onChange={(e) => setBonusCostBasisMode(e.target.value as any)}
-                      className="w-full rounded bg-zinc-900 border border-zinc-700 px-2 py-1 text-xs text-zinc-200"
-                    >
-                      <option value="ZERO">$0 (100% чистая выручка при продаже)</option>
-                      <option value="CUSTOM">Указать среднюю себестоимость партии</option>
-                    </select>
-
-                    {bonusCostBasisMode === 'CUSTOM' && (
-                      <input
-                        type="number"
-                        value={customCostBasisUsd ?? ''}
-                        onChange={(e) => setCustomCostBasisUsd(e.target.value)}
-                        placeholder="700"
-                        className="mt-1 w-full rounded bg-zinc-900 border border-zinc-700 px-2 py-1 text-xs font-mono text-emerald-400"
-                      />
-                    )}
-                  </div>
                 </div>
               ) : (
                 <div>
-                  <label className="block text-zinc-400 mb-1">Сумма бонуса ($ USD)</label>
+                  <label className="block text-zinc-400 mb-1">Сумма бонуса ($ USD) — <span className="text-emerald-400 font-bold">100% в чистую прибыль</span></label>
                   <input
                     type="number"
                     value={amountUsd ?? ''}
@@ -417,7 +377,7 @@ export const BonusesPage: React.FC = () => {
                 </div>
                 <div>
                   <h3 className="text-xs font-bold text-slate-100 uppercase">
-                    {selectedBonus.campaignTitle || selectedBonus.campaignName || 'БОНУСНАЯ АКЦИЯ'}
+                    {selectedBonus.campaignTitle || selectedBonus.campaignName || `БОНУС ОТ ${selectedBonus.supplierName.toUpperCase()}`}
                   </h3>
                   <p className="text-[11px] text-slate-400 mt-0.5">
                     Поставщик: <strong className="text-slate-200">{selectedBonus.supplierName}</strong> • {selectedBonus.date || selectedBonus.dateReceived || ''}

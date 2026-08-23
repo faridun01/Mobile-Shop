@@ -1,6 +1,7 @@
 import React, { lazy, Suspense } from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../stores/useAuthStore';
+import { PageId } from '../types';
 
 // Layouts & Modals
 import { TopBar } from '../components/layout/TopBar';
@@ -31,6 +32,25 @@ const AuditLogPage = lazy(() => import('../components/pages/AuditLogPage').then(
 const SettingsPage = lazy(() => import('../components/pages/SettingsPage').then(m => ({ default: m.SettingsPage })));
 const NotificationsPage = lazy(() => import('../components/pages/NotificationsPage').then(m => ({ default: m.NotificationsPage })));
 
+const PAGE_ROUTES: Record<string, string> = {
+  SALE: '/sale',
+  SALES_HISTORY: '/sales-history',
+  INVENTORY: '/inventory',
+  PURCHASE: '/purchase',
+  TRANSFER: '/transfer',
+  EXCHANGE: '/exchange',
+  REPAIR: '/repair',
+  SUPPLIERS: '/suppliers',
+  BONUSES: '/bonuses',
+  EXPENSES: '/expenses',
+  OWNERS: '/owners',
+  EMPLOYEES: '/employees',
+  REPORTS: '/reports',
+  AUDIT_LOG: '/audit-log',
+  SETTINGS: '/settings',
+  NOTIFICATIONS: '/notifications',
+};
+
 function LoadingFallback() {
   return (
     <div className="flex flex-1 h-full items-center justify-center bg-[#0B0F17] text-slate-400">
@@ -43,9 +63,20 @@ function LoadingFallback() {
 }
 
 function MainLayout() {
+  const location = useLocation();
   const { currentUser } = useAuthStore();
   const { isDailyRateModalOpen, setDailyRateModalOpen } = useUIStore();
-  const { isRateModalOpen } = useApp();
+  const { isRateModalOpen, activePage, setActivePage } = useApp();
+
+  React.useEffect(() => {
+    const matched = Object.entries(PAGE_ROUTES).find(([_, path]) => path === location.pathname);
+    if (matched) {
+      const pageId = matched[0] as PageId;
+      if (pageId !== activePage) {
+        setActivePage(pageId);
+      }
+    }
+  }, [location.pathname]);
 
   if (!currentUser) {
     return <Navigate to="/login" replace />;

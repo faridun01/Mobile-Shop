@@ -506,7 +506,7 @@ export const InventoryPage: React.FC = () => {
                   </div>
                   {selectedDevice.isBonus && (
                     <p className="text-[10px] text-amber-400 bg-amber-500/10 p-1.5 rounded border border-amber-500/30">
-                      БОНУСНАЯ КАМПАНИЯ: {selectedDevice.bonusCampaign || 'БОНУС ПОСТАВЩИКА'}
+                      БОНУС ПОСТАВЩИКА
                     </p>
                   )}
                 </div>

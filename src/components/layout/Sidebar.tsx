@@ -133,7 +133,7 @@ export const Sidebar: React.FC = () => {
                 {visibleItems.map(item => {
                   const Icon = item.icon;
                   const routePath = PAGE_ROUTES[item.id] || '/sale';
-                  const isActive = location.pathname === routePath || activePage === item.id;
+                  const isActive = location.pathname === routePath || (location.pathname === '/' && item.id === 'SALE');
                   const isNotif = item.id === 'NOTIFICATIONS';
 
                   return (

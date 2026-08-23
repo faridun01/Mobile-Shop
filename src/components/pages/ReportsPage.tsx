@@ -24,6 +24,7 @@ export const ReportsPage: React.FC = () => {
     repairs,
     suppliers,
     stores,
+    supplierBonuses,
     todayRate,
     resetAllCashBalances
   } = useApp();
@@ -101,8 +102,20 @@ export const ReportsPage: React.FC = () => {
     const expensesTjs = periodExpenses.reduce((acc, e) => acc + (e.amountTjs || 0), 0);
     const expensesUsd = +(expensesTjs / rate).toFixed(2);
 
-    // Net Profit in USD & TJS
-    const netProfitUsd = +(grossProfitUsd - expensesUsd).toFixed(2);
+    // Cash supplier bonuses in period count 100% towards Net Profit
+    const periodCashBonusesUsd = (supplierBonuses || [])
+      .filter(b => {
+        if (b.bonusType !== 'CASH_DISCOUNT' || !b.amountUsd) return false;
+        const bDate = b.dateReceived || b.date;
+        if (!bDate) return true;
+        if (period === 'TODAY') return bDate === todayStr;
+        if (period === 'MONTH') return bDate.startsWith(currentMonthStr);
+        return true;
+      })
+      .reduce((acc, b) => acc + (b.amountUsd || 0), 0);
+
+    // Net Profit in USD & TJS (Includes sales profit - expenses + 100% cash supplier bonuses)
+    const netProfitUsd = +(grossProfitUsd - expensesUsd + periodCashBonusesUsd).toFixed(2);
     const netProfitTjs = Math.round(netProfitUsd * rate);
 
     // Balance Sheet Assets & Liabilities in USD (store-aware)

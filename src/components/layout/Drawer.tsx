@@ -1,6 +1,26 @@
 import React from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useApp } from '../../context/AppContext';
 import { PageId } from '../../types';
+
+const PAGE_ROUTES: Record<string, string> = {
+  SALE: '/sale',
+  SALES_HISTORY: '/sales-history',
+  INVENTORY: '/inventory',
+  PURCHASE: '/purchase',
+  TRANSFER: '/transfer',
+  EXCHANGE: '/exchange',
+  REPAIR: '/repair',
+  SUPPLIERS: '/suppliers',
+  BONUSES: '/bonuses',
+  EXPENSES: '/expenses',
+  OWNERS: '/owners',
+  EMPLOYEES: '/employees',
+  REPORTS: '/reports',
+  AUDIT_LOG: '/audit-log',
+  SETTINGS: '/settings',
+  NOTIFICATIONS: '/notifications',
+};
 import {
   ShoppingBag,
   History,
@@ -76,6 +96,8 @@ const NAV_GROUPS: NavGroup[] = [
 ];
 
 export const Drawer: React.FC = () => {
+  const navigate = useNavigate();
+  const location = useLocation();
   const {
     currentUser,
     activePage,
@@ -139,7 +161,8 @@ export const Drawer: React.FC = () => {
                 
                 {visibleItems.map(item => {
                   const Icon = item.icon;
-                  const isActive = activePage === item.id;
+                  const routePath = PAGE_ROUTES[item.id] || '/sale';
+                  const isActive = location.pathname === routePath || (location.pathname === '/' && item.id === 'SALE');
                   const isNotif = item.id === 'NOTIFICATIONS';
 
                   return (
@@ -147,6 +170,7 @@ export const Drawer: React.FC = () => {
                       key={item.id}
                       onClick={() => {
                         setActivePage(item.id);
+                        navigate(routePath);
                         setDrawerOpen(false);
                       }}
                       className={`w-full flex items-center justify-between px-3.5 py-3 rounded-lg text-sm transition-colors bg-transparent ${

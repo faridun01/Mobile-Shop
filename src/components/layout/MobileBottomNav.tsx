@@ -1,4 +1,5 @@
 import React from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useApp } from '../../context/AppContext';
 import { PageId } from '../../types';
 import {
@@ -11,7 +12,28 @@ import {
   Sparkles
 } from 'lucide-react';
 
+const PAGE_ROUTES: Record<string, string> = {
+  SALE: '/sale',
+  SALES_HISTORY: '/sales-history',
+  INVENTORY: '/inventory',
+  PURCHASE: '/purchase',
+  TRANSFER: '/transfer',
+  EXCHANGE: '/exchange',
+  REPAIR: '/repair',
+  SUPPLIERS: '/suppliers',
+  BONUSES: '/bonuses',
+  EXPENSES: '/expenses',
+  OWNERS: '/owners',
+  EMPLOYEES: '/employees',
+  REPORTS: '/reports',
+  AUDIT_LOG: '/audit-log',
+  SETTINGS: '/settings',
+  NOTIFICATIONS: '/notifications',
+};
+
 export const MobileBottomNav: React.FC = () => {
+  const navigate = useNavigate();
+  const location = useLocation();
   const {
     currentUser,
     activePage,
@@ -39,13 +61,17 @@ export const MobileBottomNav: React.FC = () => {
     <div className="md:hidden sticky bottom-0 z-40 w-full bg-[#0F131D]/95 backdrop-blur-md border-t border-slate-800/80 px-2 py-1 flex items-center justify-around select-none safe-area-pb">
       {navButtons.map(item => {
         const Icon = item.icon;
-        const isActive = activePage === item.id;
+        const routePath = PAGE_ROUTES[item.id] || '/sale';
+        const isActive = location.pathname === routePath || (location.pathname === '/' && item.id === 'SALE');
         const badgeCount = 'badge' in item ? (item.badge as number) : 0;
 
         return (
           <button
             key={item.id}
-            onClick={() => setActivePage(item.id)}
+            onClick={() => {
+              setActivePage(item.id);
+              navigate(routePath);
+            }}
             className={`flex-1 py-1.5 px-1 flex flex-col items-center justify-center relative rounded-xl transition-all ${
               isActive
                 ? 'text-[#22c55e] font-bold'

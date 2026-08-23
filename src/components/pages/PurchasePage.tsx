@@ -652,7 +652,7 @@ export const PurchasePage: React.FC = () => {
                             </div>
                             {dev.bonusCampaign && (
                               <p className="text-[10px] text-purple-400 mt-0.5">
-                                Акция: {dev.bonusCampaign}
+                                {dev.bonusCampaign}
                               </p>
                             )}
                           </div>

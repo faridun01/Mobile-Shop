@@ -19,7 +19,7 @@ interface UIState {
 }
 
 export const useUIStore = create<UIState>((set) => ({
-  theme: (typeof localStorage !== 'undefined' ? (localStorage.getItem('ms_theme') as ThemeMode) : null) || 'dark',
+  theme: (typeof localStorage !== 'undefined' ? (localStorage.getItem('ms_theme') as ThemeMode) : null) || 'light',
   drawerOpen: false,
   selectedStoreId: 'all',
   isDailyRateModalOpen: false,
