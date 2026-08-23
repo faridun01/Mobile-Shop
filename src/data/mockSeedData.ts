@@ -51,7 +51,7 @@ export const INITIAL_STORES: Store[] = [
 export const INITIAL_USERS: User[] = [
   {
     id: 'user-admin',
-    name: 'Владелец 1 (Шариф)',
+    name: 'Далер',
     login: 'admin',
     passwordHash: 'admin123',
     role: 'ADMIN',
@@ -60,7 +60,7 @@ export const INITIAL_USERS: User[] = [
   },
   {
     id: 'user-partner',
-    name: 'Рустам (Партнер)',
+    name: 'Рустам',
     login: 'partner',
     passwordHash: 'partner123',
     role: 'PARTNER',
@@ -69,7 +69,7 @@ export const INITIAL_USERS: User[] = [
   },
   {
     id: 'user-ahmad',
-    name: 'Ahmad',
+    name: 'Ахмад',
     login: 'ahmad',
     passwordHash: 'seller123',
     role: 'SELLER',
@@ -80,7 +80,7 @@ export const INITIAL_USERS: User[] = [
   },
   {
     id: 'user-farhod',
-    name: 'Farhod',
+    name: 'Фарход',
     login: 'farhod',
     passwordHash: 'seller123',
     role: 'SELLER',
@@ -110,7 +110,7 @@ export const INITIAL_EXPENSES: Expense[] = [];
 export const INITIAL_OWNERS: Owner[] = [
   {
     id: 'owner-1',
-    name: 'Владелец 1 (Шариф)',
+    name: 'Далер',
     profitSharePercent: 60,
     capitalBalanceUsd: 0,
     totalAccruedProfitUsd: 0,
@@ -120,7 +120,7 @@ export const INITIAL_OWNERS: Owner[] = [
   },
   {
     id: 'owner-2',
-    name: 'Владелец 2 (Далер)',
+    name: 'Рустам',
     profitSharePercent: 40,
     capitalBalanceUsd: 0,
     totalAccruedProfitUsd: 0,

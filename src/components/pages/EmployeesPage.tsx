@@ -40,7 +40,6 @@ export const EmployeesPage: React.FC = () => {
   const [name, setName] = useState('');
   const [login, setLogin] = useState('');
   const [password, setPassword] = useState('');
-  const [pin, setPin] = useState('');
   const [role, setRole] = useState<Role>('SELLER');
   const [storeId, setStoreId] = useState<string>(stores[0]?.id || 'store-1');
   const [isActive, setIsActive] = useState(true);
@@ -69,11 +68,11 @@ export const EmployeesPage: React.FC = () => {
     }
   };
 
-  if (currentUser?.role === 'SELLER') {
+  if (currentUser?.role !== 'ADMIN') {
     return (
       <div className="p-8 text-center text-slate-500 font-mono text-xs">
         <p className="font-bold text-slate-400">ДОСТУП ОГРАНИЧЕН</p>
-        <p className="mt-1">Раздел управления персоналом доступен только Администратору</p>
+        <p className="mt-1">Раздел управления сотрудниками доступен только Администратору</p>
       </div>
     );
   }
@@ -83,7 +82,6 @@ export const EmployeesPage: React.FC = () => {
     setName('');
     setLogin('');
     setPassword('');
-    setPin('');
     setRole('SELLER');
     setStoreId(stores[0]?.id || 'store-1');
     setIsActive(true);
@@ -95,7 +93,6 @@ export const EmployeesPage: React.FC = () => {
     setName(u.name);
     setLogin(u.login);
     setPassword('');
-    setPin(u.pin || '');
     setRole(u.role);
     setStoreId(u.storeId || stores[0]?.id || 'store-1');
     setIsActive(u.isActive ?? u.active);
@@ -126,7 +123,6 @@ export const EmployeesPage: React.FC = () => {
         name: name.trim(),
         login: login.trim(),
         passwordHash: password.trim() ? password.trim() : editingUser.passwordHash,
-        pin: pin.trim() || undefined,
         role,
         storeId: role === 'SELLER' ? storeId : undefined,
         isActive
@@ -143,7 +139,6 @@ export const EmployeesPage: React.FC = () => {
         name: name.trim(),
         login: login.trim(),
         passwordHash: password.trim(),
-        pin: pin.trim() || undefined,
         role,
         storeId: role === 'SELLER' ? storeId : undefined,
         active: true
@@ -269,15 +264,6 @@ export const EmployeesPage: React.FC = () => {
                 </div>
 
                 <div className="flex items-center justify-between">
-                  <span className="text-[10px] text-slate-500 uppercase">ПИН-КОД:</span>
-                  {u.pin ? (
-                    <strong className="text-emerald-400 font-mono font-bold px-1.5 py-0.2 rounded bg-emerald-500/10 border border-emerald-500/20">{u.pin}</strong>
-                  ) : (
-                    <span className="text-slate-600 font-mono text-[11px]">—</span>
-                  )}
-                </div>
-
-                <div className="flex items-center justify-between">
                   <span className="text-[10px] text-slate-500 uppercase">ТОЧКА ПРОДАЖИ:</span>
                   <span className="text-slate-300 font-mono text-[11px] truncate max-w-[140px] text-right">
                     {u.storeName ? (
@@ -388,22 +374,10 @@ export const EmployeesPage: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-slate-400 text-[10px] uppercase mb-1">ПИН-КОД БЫСТРОГО ДОСТУПА (4-6 ЦИФР)</label>
-                <input
-                  type="password"
-                  maxLength={6}
-                  value={pin ?? ''}
-                  onChange={(e) => setPin(e.target.value)}
-                  placeholder="3333"
-                  className="w-full rounded-lg bg-[#0B0E14] border border-slate-800 px-3 py-2 text-slate-100 focus:border-emerald-500 focus:outline-none"
-                />
-              </div>
-
-              <div>
                 <label className="block text-slate-400 text-[10px] uppercase mb-1">РОЛЬ ДОСТУПА</label>
-                {editingUser && (editingUser.id === 'user-admin' || editingUser.name.includes('Шариф') || editingUser.name.includes('Владелец 1') || editingUser.login === 'admin') ? (
+                {editingUser && (editingUser.id === 'user-admin' || editingUser.login === 'admin') ? (
                   <div className="p-2.5 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs font-mono font-bold flex items-center justify-between">
-                    <span>АДМИНИСТРАТОР (ВЛАДЕЛЕЦ 1)</span>
+                    <span>ГЛАВНЫЙ АДМИНИСТРАТОР ({name || editingUser.name})</span>
                     <Shield className="w-4 h-4 text-emerald-400 shrink-0" />
                   </div>
                 ) : (

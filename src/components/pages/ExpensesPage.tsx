@@ -46,14 +46,15 @@ const CATEGORY_CONFIG: Record<string, { label: string; icon: any; colorClass: st
   'Другие': { label: 'Прочие расходы', icon: Tag, colorClass: 'text-slate-400', bgClass: 'bg-slate-800/60', borderClass: 'border-slate-700' }
 };
 
-const CATEGORY_FILTER_TABS = [
-  { id: 'ALL', label: 'ВСЕ РАСХОДЫ' },
-  { id: 'RENT', label: 'АРЕНДА' },
-  { id: 'SALARY', label: 'ЗАРПЛАТА' },
-  { id: 'UTILITIES', label: 'КОММУНАЛКА' },
-  { id: 'MARKETING', label: 'РЕКЛАМА' },
-  { id: 'REPAIR_PARTS', label: 'ЗАПЧАСТИ' },
-  { id: 'OTHER', label: 'ПРОЧИЕ' }
+const STANDARD_CATEGORIES = [
+  { id: 'RENT', label: 'Аренда помещения' },
+  { id: 'SALARY', label: 'Зарплата сотрудников' },
+  { id: 'UTILITIES', label: 'Коммуналка и интернет' },
+  { id: 'MARKETING', label: 'Реклама и маркетинг' },
+  { id: 'REPAIR_PARTS', label: 'Запчасти для ремонта' },
+  { id: 'TAXES', label: 'Налоги и сборы' },
+  { id: 'SUPPLIES', label: 'Расходные материалы' },
+  { id: 'OTHER', label: 'Прочие расходы' }
 ];
 
 export const ExpensesPage: React.FC = () => {
@@ -72,13 +73,29 @@ export const ExpensesPage: React.FC = () => {
   const [description, setDescription] = useState('');
   const [paidFromCashRegister, setPaidFromCashRegister] = useState(true);
 
+  // Search & Filter state
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategoryTab, setSelectedCategoryTab] = useState('ALL');
   const [selectedStoreFilter, setSelectedStoreFilter] = useState('ALL');
 
+  // Custom Categories state (persisted in localStorage)
+  const [customCategories, setCustomCategories] = useState<{ id: string; label: string }[]>(() => {
+    try {
+      const saved = localStorage.getItem('custom_expense_categories');
+      return saved ? JSON.parse(saved) : [];
+    } catch (e) {
+      return [];
+    }
+  });
+
+  // Modal for adding a new expense category
+  const [isAddCategoryModalOpen, setIsAddCategoryModalOpen] = useState(false);
+  const [newCategoryName, setNewCategoryName] = useState('');
+
   const [statusMessage, setStatusMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   const isSeller = currentUser?.role === 'SELLER';
+  const canAddCategory = currentUser?.role === 'ADMIN' || currentUser?.role === 'PARTNER';
 
   const handleAddExpense = (e: React.FormEvent) => {
     e.preventDefault();
@@ -108,6 +125,58 @@ export const ExpensesPage: React.FC = () => {
     }
   };
 
+  const handleAddCategorySubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const name = newCategoryName.trim();
+    if (!name) return;
+
+    const allExist = [...STANDARD_CATEGORIES, ...customCategories];
+    if (allExist.some(c => c.label.toLowerCase() === name.toLowerCase() || c.id.toLowerCase() === name.toLowerCase())) {
+      setStatusMessage({ type: 'error', text: `Категория "${name}" уже существует!` });
+      return;
+    }
+
+    const newCat = {
+      id: `CUSTOM_${Date.now()}`,
+      label: name
+    };
+
+    const updated = [...customCategories, newCat];
+    setCustomCategories(updated);
+    try {
+      localStorage.setItem('custom_expense_categories', JSON.stringify(updated));
+    } catch (err) {}
+
+    setSelectedCategoryTab(newCat.id);
+    setCategory(newCat.id as ExpenseCategory);
+    setIsAddCategoryModalOpen(false);
+    setNewCategoryName('');
+    setStatusMessage({ type: 'success', text: `Новая категория "${name}" успешно добавлена!` });
+  };
+
+  const getCategoryInfo = (catKey: string) => {
+    if (CATEGORY_CONFIG[catKey]) {
+      return CATEGORY_CONFIG[catKey];
+    }
+    const custom = customCategories.find(c => c.id === catKey || c.label === catKey);
+    if (custom) {
+      return {
+        label: custom.label,
+        icon: Tag,
+        colorClass: 'text-rose-400',
+        bgClass: 'bg-rose-500/10',
+        borderClass: 'border-rose-500/30'
+      };
+    }
+    return {
+      label: catKey || 'Прочие расходы',
+      icon: Tag,
+      colorClass: 'text-slate-400',
+      bgClass: 'bg-slate-800/60',
+      borderClass: 'border-slate-700'
+    };
+  };
+
   const rate = todayRate?.rate || 9.50;
 
   const filteredExpenses = useMemo(() => {
@@ -120,14 +189,26 @@ export const ExpensesPage: React.FC = () => {
       }
 
       if (selectedCategoryTab !== 'ALL') {
-        if (e.category !== selectedCategoryTab && !e.category?.toLowerCase().includes(selectedCategoryTab.toLowerCase())) {
+        const selectedCatObj = [...STANDARD_CATEGORIES, ...customCategories].find(c => c.id === selectedCategoryTab);
+        const targetId = selectedCategoryTab.toLowerCase();
+        const targetLabel = selectedCatObj ? selectedCatObj.label.toLowerCase() : targetId;
+
+        const expCat = (e.category || '').toLowerCase();
+        const configLabel = (CATEGORY_CONFIG[e.category]?.label || '').toLowerCase();
+
+        const matchesId = expCat === targetId;
+        const matchesLabel = expCat === targetLabel || expCat.includes(targetLabel) || targetLabel.includes(expCat);
+        const matchesConfig = configLabel === targetLabel || configLabel.includes(targetLabel);
+
+        if (!matchesId && !matchesLabel && !matchesConfig) {
           return false;
         }
       }
 
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase().trim();
-        const matchesCategory = (CATEGORY_CONFIG[e.category]?.label || e.category).toLowerCase().includes(q);
+        const info = getCategoryInfo(e.category);
+        const matchesCategory = info.label.toLowerCase().includes(q) || (e.category || '').toLowerCase().includes(q);
         const matchesComment = (e.comment || (e as any).description || '').toLowerCase().includes(q);
         const matchesUser = (e.createdByName || '').toLowerCase().includes(q);
         const matchesStore = (e.storeName || '').toLowerCase().includes(q);
@@ -140,7 +221,7 @@ export const ExpensesPage: React.FC = () => {
 
       return true;
     });
-  }, [expenses, isSeller, currentUser, selectedStoreFilter, selectedCategoryTab, searchQuery]);
+  }, [expenses, isSeller, currentUser, selectedStoreFilter, selectedCategoryTab, searchQuery, customCategories]);
 
   const totalExpensesTjs = useMemo(() => {
     return filteredExpenses.reduce((acc, e) => acc + (e.amountTjs || 0), 0);
@@ -215,8 +296,9 @@ export const ExpensesPage: React.FC = () => {
           </div>
         </div>
 
+        {/* Filter bar: Search, Store Selector, Compact Category Dropdown, + Add Category */}
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 pt-1 border-t border-slate-800/80">
-          <div className="flex items-center space-x-2 flex-1 max-w-md">
+          <div className="flex items-center space-x-2 flex-1 min-w-0">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-2.5 w-3.5 h-3.5 text-slate-500" />
               <input
@@ -250,21 +332,43 @@ export const ExpensesPage: React.FC = () => {
             )}
           </div>
 
-          <div className="flex items-center space-x-2 overflow-x-auto scrollbar-none">
-            {CATEGORY_FILTER_TABS.map((cat) => (
-              <button
-                key={cat.id}
-                type="button"
-                onClick={() => setSelectedCategoryTab(cat.id)}
-                className={`px-3 py-1 rounded-md border text-xs font-mono font-bold uppercase tracking-wider whitespace-nowrap transition-colors bg-transparent ${
-                  selectedCategoryTab === cat.id
-                    ? 'border-[#22c55e] text-[#22c55e]'
-                    : 'border-slate-800 text-slate-400 hover:border-slate-700 hover:text-slate-200'
-                }`}
+          {/* Compact Dropdown Category Filter + Add Category Button */}
+          <div className="flex items-center space-x-2 shrink-0">
+            <div className="flex items-center space-x-1.5 bg-[#0B0E14] border border-slate-800 rounded-md px-2.5 py-1.5">
+              <span className="text-[10px] text-slate-400 font-mono font-bold uppercase hidden sm:inline">КАТЕГОРИЯ:</span>
+              <select
+                value={selectedCategoryTab}
+                onChange={(e) => setSelectedCategoryTab(e.target.value)}
+                className="bg-transparent text-slate-100 text-xs font-mono font-bold focus:outline-none cursor-pointer"
               >
-                {cat.label}
+                <option value="ALL">ВСЕ РАСХОДЫ</option>
+                <option value="RENT">АРЕНДА</option>
+                <option value="SALARY">ЗАРПЛАТА</option>
+                <option value="UTILITIES">КОММУНАЛКА</option>
+                <option value="MARKETING">РЕКЛАМА</option>
+                <option value="REPAIR_PARTS">ЗАПЧАСТИ</option>
+                <option value="TAXES">НАЛОГИ</option>
+                <option value="SUPPLIES">МАТЕРИАЛЫ</option>
+                <option value="OTHER">ПРОЧИЕ</option>
+                {customCategories.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.label.toUpperCase()}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {canAddCategory && (
+              <button
+                type="button"
+                onClick={() => setIsAddCategoryModalOpen(true)}
+                className="px-2.5 py-1.5 rounded-md bg-slate-900 hover:bg-slate-800 text-xs font-mono font-bold text-rose-400 hover:text-rose-300 border border-slate-800 transition-colors shrink-0 flex items-center space-x-1"
+                title="Добавить новую категорию расхода (для Админа и Партнера)"
+              >
+                <Plus className="w-3.5 h-3.5 text-rose-400" />
+                <span className="hidden sm:inline">КАТЕГОРИЯ</span>
               </button>
-            ))}
+            )}
           </div>
         </div>
       </div>
@@ -275,9 +379,13 @@ export const ExpensesPage: React.FC = () => {
         }`}>
           {statusMessage.type === 'success' ? <CheckCircle2 className="w-4 h-4 shrink-0" /> : <AlertCircle className="w-4 h-4 shrink-0" />}
           <span>{statusMessage.text}</span>
+          <button onClick={() => setStatusMessage(null)} className="ml-auto text-slate-500 hover:text-slate-300">
+            <X className="w-3.5 h-3.5" />
+          </button>
         </div>
       )}
 
+      {/* Expenses Table/List */}
       <div className="flex-1 overflow-y-auto p-3 sm:p-4 bg-[#0B0E14] space-y-2.5">
         {filteredExpenses.length === 0 ? (
           <div className="p-12 text-center text-slate-500 text-xs font-mono space-y-2">
@@ -286,7 +394,7 @@ export const ExpensesPage: React.FC = () => {
           </div>
         ) : (
           filteredExpenses.map((exp) => {
-            const config = CATEGORY_CONFIG[exp.category] || CATEGORY_CONFIG.OTHER;
+            const config = getCategoryInfo(exp.category);
             const CategoryIcon = config.icon;
             const formattedDate = exp.date ? new Date(exp.date).toLocaleDateString('ru-RU') : '-';
             const costUsd = exp.amountUsd || +(exp.amountTjs / rate).toFixed(2);
@@ -348,6 +456,7 @@ export const ExpensesPage: React.FC = () => {
         )}
       </div>
 
+      {/* MODAL: Register New Expense */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-4 backdrop-blur-xs font-mono">
           <form onSubmit={handleAddExpense} className="w-full max-w-sm rounded-xl bg-[#0F1219] border border-slate-800 p-5 text-slate-200 shadow-2xl space-y-3.5">
@@ -367,7 +476,19 @@ export const ExpensesPage: React.FC = () => {
 
             <div className="text-xs space-y-3">
               <div>
-                <label className="block text-slate-400 text-[10px] uppercase mb-1">КАТЕГОРИЯ РАСХОДА *</label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-slate-400 text-[10px] uppercase font-bold">КАТЕГОРИЯ РАСХОДА *</label>
+                  {canAddCategory && (
+                    <button
+                      type="button"
+                      onClick={() => setIsAddCategoryModalOpen(true)}
+                      className="text-[10px] text-rose-400 hover:text-rose-300 font-bold flex items-center space-x-0.5"
+                    >
+                      <Plus className="w-3 h-3" />
+                      <span>Новая категория</span>
+                    </button>
+                  )}
+                </div>
                 <select
                   value={category ?? 'RENT'}
                   onChange={(e) => setCategory(e.target.value as any)}
@@ -381,11 +502,14 @@ export const ExpensesPage: React.FC = () => {
                   <option value="TAXES">Налоги и сборы</option>
                   <option value="SUPPLIES">Расходные материалы</option>
                   <option value="OTHER">Прочие расходы</option>
+                  {customCategories.map(c => (
+                    <option key={c.id} value={c.id}>{c.label}</option>
+                  ))}
                 </select>
               </div>
 
               <div>
-                <label className="block text-slate-400 text-[10px] uppercase mb-1">СУММА РАСХОДА (TJS) *</label>
+                <label className="block text-slate-400 text-[10px] uppercase mb-1 font-bold">СУММА РАСХОДА (TJS) *</label>
                 <div className="relative">
                   <input
                     type="number"
@@ -402,7 +526,7 @@ export const ExpensesPage: React.FC = () => {
 
               {!isSeller && (
                 <div>
-                  <label className="block text-slate-400 text-[10px] uppercase mb-1">ФИЛИАЛ / СКАД *</label>
+                  <label className="block text-slate-400 text-[10px] uppercase mb-1 font-bold">ФИЛИАЛ / СКЛАД *</label>
                   <select
                     value={storeId ?? ''}
                     onChange={(e) => setStoreId(e.target.value)}
@@ -416,7 +540,7 @@ export const ExpensesPage: React.FC = () => {
               )}
 
               <div>
-                <label className="block text-slate-400 text-[10px] uppercase mb-1">ОПИСАНИЕ / ОБОСНОВАНИЕ *</label>
+                <label className="block text-slate-400 text-[10px] uppercase mb-1 font-bold">ОПИСАНИЕ / ОБОСНОВАНИЕ *</label>
                 <input
                   type="text"
                   required
@@ -453,6 +577,55 @@ export const ExpensesPage: React.FC = () => {
                 className="flex-1 py-2 rounded bg-rose-600 hover:bg-rose-500 text-xs font-semibold text-white"
               >
                 Сохранить расход
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* MODAL: Add New Custom Expense Category */}
+      {isAddCategoryModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-4 backdrop-blur-xs font-mono">
+          <form onSubmit={handleAddCategorySubmit} className="w-full max-w-sm rounded-xl bg-[#0F1219] border border-slate-800 p-5 text-slate-200 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+              <h4 className="text-xs font-bold text-white uppercase tracking-wider flex items-center space-x-2">
+                <Plus className="w-4 h-4 text-rose-400" />
+                <span>НОВАЯ КАТЕГОРИЯ РАСХОДА</span>
+              </h4>
+              <button
+                type="button"
+                onClick={() => setIsAddCategoryModalOpen(false)}
+                className="text-slate-500 hover:text-slate-300"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div>
+              <label className="block text-slate-400 text-[10px] uppercase mb-1 font-bold">Название категории *</label>
+              <input
+                type="text"
+                required
+                value={newCategoryName}
+                onChange={(e) => setNewCategoryName(e.target.value)}
+                placeholder="Например: Логистика, Оборудование..."
+                className="w-full rounded-lg bg-[#0B0E14] border border-slate-800 px-3 py-2 text-slate-100 text-xs focus:border-rose-500 focus:outline-none"
+              />
+            </div>
+
+            <div className="flex space-x-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setIsAddCategoryModalOpen(false)}
+                className="flex-1 py-2 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 text-xs font-medium text-slate-300"
+              >
+                ОТМЕНА
+              </button>
+              <button
+                type="submit"
+                className="flex-1 py-2 rounded bg-rose-600 hover:bg-rose-500 text-xs font-semibold text-white"
+              >
+                Добавить
               </button>
             </div>
           </form>

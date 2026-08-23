@@ -29,7 +29,8 @@ export const ReportsPage: React.FC = () => {
     resetAllCashBalances
   } = useApp();
 
-  const [period, setPeriod] = useState<'TODAY' | 'MONTH' | 'ALL'>('MONTH');
+  const [period, setPeriod] = useState<'TODAY' | 'MONTH' | 'SPECIFIC_MONTH' | 'ALL'>('MONTH');
+  const [selectedMonth, setSelectedMonth] = useState<string>(new Date().toISOString().substring(0, 7));
   const [selectedStore, setSelectedStore] = useState<string>('all');
   const [statusMsg, setStatusMsg] = useState<string | null>(null);
 
@@ -46,6 +47,8 @@ export const ReportsPage: React.FC = () => {
       periodSales = periodSales.filter(s => s.date.startsWith(todayStr));
     } else if (period === 'MONTH') {
       periodSales = periodSales.filter(s => s.date.startsWith(currentMonthStr));
+    } else if (period === 'SPECIFIC_MONTH') {
+      periodSales = periodSales.filter(s => s.date.startsWith(selectedMonth));
     }
 
     if (selectedStore !== 'all') {
@@ -58,6 +61,8 @@ export const ReportsPage: React.FC = () => {
       periodExpenses = expenses.filter(e => e.date.startsWith(todayStr));
     } else if (period === 'MONTH') {
       periodExpenses = expenses.filter(e => e.date.startsWith(currentMonthStr));
+    } else if (period === 'SPECIFIC_MONTH') {
+      periodExpenses = expenses.filter(e => e.date.startsWith(selectedMonth));
     }
 
     if (selectedStore !== 'all') {
@@ -226,6 +231,25 @@ export const ReportsPage: React.FC = () => {
             >
               ЭТОТ МЕСЯЦ
             </button>
+            <div className="flex items-center space-x-1 pl-1 border-l border-slate-800">
+              <span className="text-[10px] text-slate-500 font-mono font-bold uppercase hidden md:inline">ВЫБОР МЕСЯЦА:</span>
+              <input
+                type="month"
+                value={selectedMonth}
+                onChange={(e) => {
+                  if (e.target.value) {
+                    setSelectedMonth(e.target.value);
+                    setPeriod('SPECIFIC_MONTH');
+                  }
+                }}
+                className={`px-2 py-0.5 rounded border text-xs font-mono font-bold transition-colors bg-[#0B0E14] focus:outline-none ${
+                  period === 'SPECIFIC_MONTH'
+                    ? 'border-[#22c55e] text-[#22c55e]'
+                    : 'border-slate-800 text-slate-400 hover:border-slate-700'
+                }`}
+                title="Выберите любой конкретный месяц для отчета"
+              />
+            </div>
             <button
               type="button"
               onClick={() => setPeriod('ALL')}

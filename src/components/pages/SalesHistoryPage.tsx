@@ -29,7 +29,8 @@ export const SalesHistoryPage: React.FC = () => {
     processRefund
   } = useApp();
 
-  const [periodFilter, setPeriodFilter] = useState<'TODAY' | 'MONTH' | 'ALL'>('TODAY');
+  const [periodFilter, setPeriodFilter] = useState<'TODAY' | 'MONTH' | 'SPECIFIC_MONTH' | 'ALL'>('TODAY');
+  const [selectedMonth, setSelectedMonth] = useState<string>(new Date().toISOString().substring(0, 7));
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedSale, setSelectedSale] = useState<Sale | null>(null);
 
@@ -56,6 +57,9 @@ export const SalesHistoryPage: React.FC = () => {
         return false;
       }
       if (periodFilter === 'MONTH' && !saleDateStr.startsWith(currentMonthStr)) {
+        return false;
+      }
+      if (periodFilter === 'SPECIFIC_MONTH' && !saleDateStr.startsWith(selectedMonth)) {
         return false;
       }
 
@@ -172,17 +176,23 @@ export const SalesHistoryPage: React.FC = () => {
             >
               СЕГОДНЯ
             </button>
-            <button
-              type="button"
-              onClick={() => setPeriodFilter('MONTH')}
-              className={`px-3 py-1 rounded-md border text-xs font-mono font-bold uppercase tracking-wider transition-colors bg-transparent ${
-                periodFilter === 'MONTH'
+            <input
+              type="month"
+              value={selectedMonth}
+              onChange={(e) => {
+                if (e.target.value) {
+                  setSelectedMonth(e.target.value);
+                  setPeriodFilter('SPECIFIC_MONTH');
+                }
+              }}
+              onClick={() => setPeriodFilter('SPECIFIC_MONTH')}
+              className={`px-3 py-1 rounded-md border text-xs font-mono font-bold transition-colors bg-[#0B0E14] focus:outline-none cursor-pointer ${
+                periodFilter === 'SPECIFIC_MONTH'
                   ? 'border-[#22c55e] text-[#22c55e]'
                   : 'border-slate-800 text-slate-400 hover:border-slate-700 hover:text-slate-200'
               }`}
-            >
-              ЭТОТ МЕСЯЦ
-            </button>
+              title="Выберите месяц"
+            />
             <button
               type="button"
               onClick={() => setPeriodFilter('ALL')}

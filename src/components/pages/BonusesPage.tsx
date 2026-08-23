@@ -331,6 +331,7 @@ export const BonusesPage: React.FC = () => {
                       placeholder="351234567890123"
                       className="w-full rounded bg-zinc-900 border border-zinc-700 px-2.5 py-1 text-xs font-mono"
                     />
+                  </div>
                 </div>
               ) : (
                 <div>

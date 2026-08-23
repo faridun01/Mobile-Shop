@@ -87,8 +87,8 @@ const NAV_GROUPS: NavGroup[] = [
     items: [
       { id: 'EMPLOYEES', label: 'Сотрудники', icon: UserCheck, roles: ['ADMIN'] },
       { id: 'AUDIT_LOG', label: 'Журнал аудита', icon: FileText, roles: ['ADMIN'] },
-      { id: 'NOTIFICATIONS', label: 'Уведомления', icon: Bell, roles: ['ADMIN', 'PARTNER', 'SELLER'] },
-      { id: 'SETTINGS', label: 'Настройки', icon: Settings, roles: ['ADMIN', 'PARTNER', 'SELLER'] },
+      { id: 'NOTIFICATIONS', label: 'Уведомления', icon: Bell, roles: ['ADMIN', 'PARTNER'] },
+      { id: 'SETTINGS', label: 'Настройки', icon: Settings, roles: ['ADMIN', 'PARTNER'] },
     ]
   }
 ];
@@ -167,6 +167,21 @@ export const Sidebar: React.FC = () => {
           );
         })}
       </nav>
+
+      {/* User profile info */}
+      <div className="p-2.5 border-t border-slate-800/80 bg-[#0B0F17] flex items-center justify-between">
+        <div className="flex items-center space-x-2.5 min-w-0">
+          <div className="w-7 h-7 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 font-bold text-xs flex items-center justify-center font-mono shrink-0">
+            {currentUser?.name ? currentUser.name.substring(0, 2).toUpperCase() : 'US'}
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="text-xs font-bold text-slate-200 truncate">{currentUser?.name || 'Пользователь'}</p>
+            <p className="text-[9px] text-slate-500 font-mono uppercase truncate">
+              {currentUser?.role === 'ADMIN' ? 'Администратор' : currentUser?.role === 'PARTNER' ? 'Партнер' : (currentUser?.storeName || 'Продавец')}
+            </p>
+          </div>
+        </div>
+      </div>
 
       {/* Logout button */}
       <div className="p-2.5 border-t border-slate-800/80 bg-[#0B0F17]">

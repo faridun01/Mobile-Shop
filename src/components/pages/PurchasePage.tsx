@@ -51,7 +51,8 @@ export const PurchasePage: React.FC = () => {
 
   // List search & filters
   const [searchQuery, setSearchQuery] = useState('');
-  const [periodFilter, setPeriodFilter] = useState<'TODAY' | 'MONTH' | 'ALL'>('ALL');
+  const [periodFilter, setPeriodFilter] = useState<'TODAY' | 'SPECIFIC_MONTH' | 'ALL'>('SPECIFIC_MONTH');
+  const [selectedMonth, setSelectedMonth] = useState<string>(new Date().toISOString().substring(0, 7));
   const [selectedSupplierFilter, setSelectedSupplierFilter] = useState<string>('all');
   const [selectedInvoice, setSelectedInvoice] = useState<SupplierInvoice | null>(null);
 
@@ -60,9 +61,9 @@ export const PurchasePage: React.FC = () => {
   const [invoiceNumber, setInvoiceNumber] = useState<string>(`INV-${Math.floor(100 + Math.random() * 900)}`);
   const [purchaseDate, setPurchaseDate] = useState<string>(new Date().toISOString().split('T')[0]);
   
-  // Destination mode
-  const [isStorePurchase, setIsStorePurchase] = useState<boolean>(false);
-  const [storeId, setStoreId] = useState<string>(stores[1]?.id || 'store-1');
+  // Destination mode (Main Warehouse intake is ADMIN ONLY)
+  const [isStorePurchase, setIsStorePurchase] = useState<boolean>(currentUser?.role !== 'ADMIN');
+  const [storeId, setStoreId] = useState<string>(stores.find(s => !s.isMainWarehouse)?.id || 'store-1');
 
   // Groups of devices
   const [groups, setGroups] = useState<PurchaseItemGroup[]>([
@@ -86,7 +87,6 @@ export const PurchasePage: React.FC = () => {
   // Filtered list of purchase invoices
   const filteredInvoices = useMemo(() => {
     const todayStr = new Date().toISOString().split('T')[0];
-    const currentMonthStr = todayStr.substring(0, 7);
 
     return (supplierInvoices || []).filter((inv) => {
       // 1. Period filter
@@ -94,7 +94,7 @@ export const PurchasePage: React.FC = () => {
       if (periodFilter === 'TODAY' && invDateStr !== todayStr) {
         return false;
       }
-      if (periodFilter === 'MONTH' && !invDateStr.startsWith(currentMonthStr)) {
+      if (periodFilter === 'SPECIFIC_MONTH' && !invDateStr.startsWith(selectedMonth)) {
         return false;
       }
 
@@ -261,6 +261,10 @@ export const PurchasePage: React.FC = () => {
       setStatusMessage({ type: 'error', text: 'Укажите номер накладной' });
       return;
     }
+    if (!isStorePurchase && currentUser?.role !== 'ADMIN') {
+      setStatusMessage({ type: 'error', text: 'Приход на Главный Склад разрешен только Администратору' });
+      return;
+    }
 
     const cleanGroups = groups.map(g => ({
       brand: g.brand.trim(),
@@ -419,17 +423,25 @@ export const PurchasePage: React.FC = () => {
               >
                 СЕГОДНЯ
               </button>
-              <button
-                type="button"
-                onClick={() => setPeriodFilter('MONTH')}
-                className={`px-3 py-1 rounded-md border text-xs font-mono font-bold uppercase tracking-wider transition-colors bg-transparent ${
-                  periodFilter === 'MONTH'
+
+              <input
+                type="month"
+                value={selectedMonth}
+                onChange={(e) => {
+                  if (e.target.value) {
+                    setSelectedMonth(e.target.value);
+                    setPeriodFilter('SPECIFIC_MONTH');
+                  }
+                }}
+                onClick={() => setPeriodFilter('SPECIFIC_MONTH')}
+                className={`px-3 py-1 rounded-md border text-xs font-mono font-bold transition-colors bg-[#0B0E14] focus:outline-none cursor-pointer ${
+                  periodFilter === 'SPECIFIC_MONTH'
                     ? 'border-[#22c55e] text-[#22c55e]'
                     : 'border-slate-800 text-slate-400 hover:border-slate-700 hover:text-slate-200'
                 }`}
-              >
-                ЭТОТ МЕСЯЦ
-              </button>
+                title="Выберите месяц"
+              />
+
               <button
                 type="button"
                 onClick={() => setPeriodFilter('ALL')}
@@ -765,16 +777,18 @@ export const PurchasePage: React.FC = () => {
           {/* Destination location selector */}
           <div className="pt-2 border-t border-zinc-800/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
             <div className="flex items-center space-x-4">
-              <label className="flex items-center space-x-2 cursor-pointer">
-                <input
-                  type="radio"
-                  name="dest"
-                  checked={!isStorePurchase}
-                  onChange={() => setIsStorePurchase(false)}
-                  className="text-emerald-500 focus:ring-blue-500"
-                />
-                <span className="text-zinc-300 font-medium">Приход на Главный склад</span>
-              </label>
+              {currentUser?.role === 'ADMIN' && (
+                <label className="flex items-center space-x-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="dest"
+                    checked={!isStorePurchase}
+                    onChange={() => setIsStorePurchase(false)}
+                    className="text-emerald-500 focus:ring-blue-500"
+                  />
+                  <span className="text-zinc-300 font-medium">Приход на Главный склад</span>
+                </label>
+              )}
 
               <label className="flex items-center space-x-2 cursor-pointer">
                 <input

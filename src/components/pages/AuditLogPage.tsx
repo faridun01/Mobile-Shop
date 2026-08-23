@@ -62,12 +62,12 @@ export const AuditLogPage: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [activeCategoryFilter, setActiveCategoryFilter] = useState('ALL');
 
-  if (currentUser?.role === 'SELLER') {
+  if (currentUser?.role !== 'ADMIN') {
     return (
       <div className="p-12 text-center text-slate-500 font-mono">
         <Lock className="w-10 h-10 mx-auto mb-2 text-slate-600" />
         <p className="text-sm font-bold text-slate-300">ДОСТУП ОГРАНИЧЕН</p>
-        <p className="text-xs text-slate-500 mt-1">Журнал безопасности доступен только Администратору и Партнерам</p>
+        <p className="text-xs text-slate-500 mt-1">Журнал безопасности доступен только Администратору</p>
       </div>
     );
   }

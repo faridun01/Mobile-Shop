@@ -1,5 +1,5 @@
 import React from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Navigate } from 'react-router-dom';
 import { useApp } from '../../context/AppContext';
 import {
   Bell,
@@ -41,6 +41,10 @@ export const NotificationsPage: React.FC = () => {
     markAllNotificationsAsRead,
     setActivePage
   } = useApp();
+
+  if (currentUser?.role === 'SELLER') {
+    return <Navigate to="/sale" replace />;
+  }
 
   // Filter notifications according to user role
   const visibleNotifications = notifications.filter(n => {

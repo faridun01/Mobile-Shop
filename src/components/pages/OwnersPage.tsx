@@ -25,12 +25,26 @@ export const OwnersPage: React.FC = () => {
   const {
     currentUser,
     owners,
+    users,
     ownerTransactions,
     todayRate,
     createOwnerTransaction,
     updateOwnerProfitShares,
     resetAllOwnerCapital
   } = useApp();
+
+  const getOwnerDisplayName = (owner: { id: string; name?: string }) => {
+    if (owner.id === 'owner-1') {
+      const adminUser = users.find(u => u.role === 'ADMIN' || u.id === 'user-admin' || u.login === 'admin');
+      if (adminUser) return adminUser.name;
+    }
+    if (owner.id === 'owner-2') {
+      const partnerUser = users.find(u => u.role === 'PARTNER' || u.id === 'user-partner' || u.login === 'partner');
+      if (partnerUser) return partnerUser.name;
+    }
+    const matched = users.find(u => u.id === owner.id || u.name === owner.name);
+    return matched ? matched.name : (owner.name || 'Партнер');
+  };
 
   const [isTxModalOpen, setIsTxModalOpen] = useState(false);
   const [isSharesModalOpen, setIsSharesModalOpen] = useState(false);
@@ -379,10 +393,10 @@ export const OwnersPage: React.FC = () => {
                     <div className="flex items-center justify-between">
                       <div className="flex items-center space-x-3">
                         <div className="w-10 h-10 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-center text-emerald-400 font-bold text-sm shadow-inner">
-                          {owner.name.substring(0, 2).toUpperCase()}
+                          {getOwnerDisplayName(owner).substring(0, 2).toUpperCase()}
                         </div>
                         <div>
-                          <h4 className="text-xs sm:text-sm font-bold text-slate-100">{owner.name}</h4>
+                          <h4 className="text-xs sm:text-sm font-bold text-slate-100">{getOwnerDisplayName(owner)}</h4>
                           <span className="text-[10px] text-slate-400">Соучредитель бизнеса</span>
                         </div>
                       </div>
@@ -521,7 +535,7 @@ export const OwnersPage: React.FC = () => {
               >
                 <option value="ALL">Все партнеры</option>
                 {owners.map(o => (
-                  <option key={o.id} value={o.id}>{o.name}</option>
+                  <option key={o.id} value={o.id}>{getOwnerDisplayName(o)}</option>
                 ))}
               </select>
             </div>
@@ -671,7 +685,7 @@ export const OwnersPage: React.FC = () => {
               {owners.map(owner => (
                 <div key={owner.id}>
                   <label className="block text-[10px] uppercase text-slate-400 mb-1">
-                    {owner.name} (%)
+                    {getOwnerDisplayName(owner)} (%)
                   </label>
                   <div className="relative">
                     <input
@@ -736,7 +750,7 @@ export const OwnersPage: React.FC = () => {
                   className="w-full rounded-lg bg-[#0B0E14] border border-slate-800 px-3 py-2 text-slate-100 text-xs focus:border-emerald-500 focus:outline-none"
                 >
                   {owners.map(o => (
-                    <option key={o.id} value={o.id}>{o.name} ({o.profitSharePercent ?? 0}% доли)</option>
+                    <option key={o.id} value={o.id}>{getOwnerDisplayName(o)} ({o.profitSharePercent ?? 0}% доли)</option>
                   ))}
                 </select>
               </div>

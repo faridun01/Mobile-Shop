@@ -39,7 +39,8 @@ export type ExpenseCategory =
   | 'Доставка'
   | 'Реклама'
   | 'Хозяйственные'
-  | 'Другие';
+  | 'Другие'
+  | (string & {});
 
 export type LedgerType = 
   | 'SALE'

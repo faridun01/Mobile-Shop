@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Navigate } from 'react-router-dom';
 import { useApp } from '../../context/AppContext';
 import { Store as StoreType } from '../../types';
 import {
@@ -55,13 +56,7 @@ export const SettingsPage: React.FC = () => {
   const [statusMessage, setStatusMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   if (currentUser?.role === 'SELLER') {
-    return (
-      <div className="p-12 text-center text-slate-500 font-mono">
-        <ShieldCheck className="w-10 h-10 mx-auto mb-2 text-slate-600" />
-        <p className="text-sm font-bold text-slate-300">ДОСТУП ОГРАНИЧЕН</p>
-        <p className="text-xs text-slate-500 mt-1">Настройки системы доступны только Администраторам и Партнерам</p>
-      </div>
-    );
+    return <Navigate to="/sale" replace />;
   }
 
   const handleAddStore = (e: React.FormEvent) => {
@@ -159,10 +154,7 @@ export const SettingsPage: React.FC = () => {
                   {/* Light mode */}
                   <button
                     type="button"
-                    onClick={() => {
-                      setTheme('light');
-                      setStatusMessage({ type: 'success', text: 'Установлен светлый режим интерфейса' });
-                    }}
+                    onClick={() => setTheme('light')}
                     className={`p-3 rounded-lg border text-left flex items-start space-x-2.5 transition-all ${
                       theme === 'light'
                         ? 'border-blue-500 bg-emerald-500/15 ring-1 ring-blue-500/50'
@@ -188,10 +180,7 @@ export const SettingsPage: React.FC = () => {
                   {/* Dark mode */}
                   <button
                     type="button"
-                    onClick={() => {
-                      setTheme('dark');
-                      setStatusMessage({ type: 'success', text: 'Установлен тёмный режим интерфейса' });
-                    }}
+                    onClick={() => setTheme('dark')}
                     className={`p-3 rounded-lg border text-left flex items-start space-x-2.5 transition-all ${
                       theme === 'dark'
                         ? 'border-blue-500 bg-emerald-500/15 ring-1 ring-blue-500/50'

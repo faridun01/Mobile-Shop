@@ -44,20 +44,8 @@ export const RepairPage: React.FC = () => {
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
   const [selectedMonth, setSelectedMonth] = useState<string>(() => new Date().toISOString().substring(0, 7));
 
-  // Extract available months from repair tickets
-  const availableMonths = React.useMemo(() => {
-    const monthsSet = new Set<string>();
-    const currentMonth = new Date().toISOString().substring(0, 7);
-    monthsSet.add(currentMonth);
-    repairs.forEach((r) => {
-      if (r.createdAt) {
-        monthsSet.add(r.createdAt.substring(0, 7));
-      }
-    });
-    return Array.from(monthsSet).sort().reverse();
-  }, [repairs]);
-
   const formatMonthLabel = (ym: string) => {
+    if (ym === 'ALL') return 'ВСЕ МЕСЯЦЫ';
     try {
       const [year, month] = ym.split('-');
       const d = new Date(parseInt(year), parseInt(month) - 1, 1);
@@ -167,6 +155,9 @@ export const RepairPage: React.FC = () => {
     return repairs.filter((r) => {
       if (currentUser?.role === 'SELLER' && r.storeId !== currentUser.storeId) {
         return false;
+      }
+      if (selectedMonth === 'ALL') {
+        return true;
       }
       const ticketMonth = r.createdAt ? r.createdAt.substring(0, 7) : '';
       return ticketMonth === selectedMonth;
@@ -301,20 +292,39 @@ export const RepairPage: React.FC = () => {
 
         {activeTab === 'list' && (
           <div className="flex flex-wrap items-center gap-2 text-xs">
-            {/* MONTH FILTER SELECTOR */}
-            <div className="flex items-center space-x-1 bg-[#0B0E14] border border-emerald-500/40 rounded px-2 py-0.5">
-              <Clock className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-              <select
-                value={selectedMonth}
-                onChange={(e) => setSelectedMonth(e.target.value)}
-                className="bg-transparent text-emerald-400 text-xs font-mono font-bold focus:outline-none cursor-pointer"
+            {/* DYNAMIC MONTH FILTER SELECTOR */}
+            <div className="flex items-center space-x-1.5">
+              <input
+                type="month"
+                value={selectedMonth === 'ALL' ? new Date().toISOString().substring(0, 7) : selectedMonth}
+                onChange={(e) => {
+                  if (e.target.value) {
+                    setSelectedMonth(e.target.value);
+                  }
+                }}
+                onClick={() => {
+                  if (selectedMonth === 'ALL') {
+                    setSelectedMonth(new Date().toISOString().substring(0, 7));
+                  }
+                }}
+                className={`px-3 py-1 rounded-md border text-xs font-mono font-bold transition-colors bg-[#0B0E14] focus:outline-none cursor-pointer ${
+                  selectedMonth !== 'ALL'
+                    ? 'border-[#22c55e] text-[#22c55e]'
+                    : 'border-slate-800 text-slate-400 hover:border-slate-700 hover:text-slate-200'
+                }`}
+                title="Динамический выбор месяца"
+              />
+              <button
+                type="button"
+                onClick={() => setSelectedMonth('ALL')}
+                className={`px-3 py-1 rounded-md border text-xs font-mono font-bold uppercase tracking-wider transition-colors bg-transparent ${
+                  selectedMonth === 'ALL'
+                    ? 'border-[#22c55e] text-[#22c55e]'
+                    : 'border-slate-800 text-slate-400 hover:border-slate-700 hover:text-slate-200'
+                }`}
               >
-                {availableMonths.map((m) => (
-                  <option key={m} value={m} className="bg-[#0B0E14] text-slate-200">
-                    {formatMonthLabel(m)}
-                  </option>
-                ))}
-              </select>
+                ВСЕ МЕСЯЦЫ
+              </button>
             </div>
 
             <div className="relative">

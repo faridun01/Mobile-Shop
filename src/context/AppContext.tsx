@@ -24,6 +24,7 @@ import {
   ExpenseCategory,
   ThemeMode
 } from '../types';
+import { useAuthStore } from '../stores/useAuthStore';
 import {
   INITIAL_RATE,
   INITIAL_STORES,
@@ -151,6 +152,7 @@ interface AppContextType {
   }) => { success: boolean; message?: string };
 
   createTransferRequest: (toLocationIdOrParams: string | { fromLocationId?: string; toLocationId: string; deviceIds: string[] }, deviceIds?: string[]) => { success: boolean; message?: string };
+  directTransfer: (fromLocationId: string, toLocationId: string, deviceIds: string[]) => { success: boolean; message?: string };
   approveTransfer: (transferId: string) => { success: boolean; message?: string };
   approveTransferRequest: (transferId: string) => { success: boolean; message?: string };
   rejectTransfer: (transferId: string, reason: string) => { success: boolean; message?: string };
@@ -167,8 +169,8 @@ interface AppContextType {
     customerName?: string;
     customerPhone?: string;
     problemDescription: string;
-    visualCondition: string;
-    equipmentPackage: string;
+    visualCondition?: string;
+    equipmentPackage?: string;
     comment?: string;
     estimatedCostTjs?: number;
     repairCostTjs?: number;
@@ -306,7 +308,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [repairs, setRepairs] = useState<RepairTicket[]>(() => loadStorage(STORAGE_KEYS.REPAIRS, INITIAL_REPAIRS));
   const [bonuses, setBonuses] = useState<SupplierBonus[]>(() => loadStorage(STORAGE_KEYS.BONUSES, INITIAL_BONUSES));
   const [expenses, setExpenses] = useState<Expense[]>(() => loadStorage(STORAGE_KEYS.EXPENSES, INITIAL_EXPENSES));
-  const [owners, setOwners] = useState<Owner[]>(() => loadStorage(STORAGE_KEYS.OWNERS, INITIAL_OWNERS));
+  const [owners, setOwners] = useState<Owner[]>(() => {
+    const storedOwners: Owner[] = loadStorage(STORAGE_KEYS.OWNERS, INITIAL_OWNERS);
+    const storedUsers: User[] = loadStorage(STORAGE_KEYS.USERS, INITIAL_USERS);
+    const adminUser = storedUsers.find(u => u.role === 'ADMIN' || u.id === 'user-admin' || u.login === 'admin');
+    const partnerUser = storedUsers.find(u => u.role === 'PARTNER' || u.id === 'user-partner' || u.login === 'partner');
+    return storedOwners.map(o => {
+      if (o.id === 'owner-1' && adminUser) return { ...o, name: adminUser.name };
+      if (o.id === 'owner-2' && partnerUser) return { ...o, name: partnerUser.name };
+      return o;
+    });
+  });
   const [ownerTransactions, setOwnerTransactions] = useState<OwnerTransaction[]>(() => loadStorage(STORAGE_KEYS.OWNER_TXS, INITIAL_OWNER_TRANSACTIONS));
   const [notifications, setNotifications] = useState<NotificationItem[]>(() => loadStorage(STORAGE_KEYS.NOTIFICATIONS, INITIAL_NOTIFICATIONS));
   const [auditLogs, setAuditLogs] = useState<AuditLogEntry[]>(() => loadStorage(STORAGE_KEYS.AUDIT, INITIAL_AUDIT_LOGS));
@@ -446,6 +458,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return { success: false, message: 'Аккаунт отключен администратором' };
     }
     setCurrentUser(found);
+    useAuthStore.getState().setAuth(found, `token-${Date.now()}`);
     if (found.role === 'SELLER' && found.storeId) {
       setSelectedStoreIdState(found.storeId);
     } else {
@@ -462,6 +475,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       addAuditLog('LOGOUT', `Пользователь ${currentUser.name} вышел из системы`);
     }
     setCurrentUser(null);
+    useAuthStore.getState().logout();
   };
 
   const setDailyRate = (rate: number) => {
@@ -778,6 +792,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         retailPriceTjs: exchangeInValueTjs,
         supplierName: 'Trade-In Клиент',
         receivedDate: new Date().toISOString().split('T')[0],
+        createdAt: new Date().toISOString(),
         timeline: [
           {
             id: `t-${Date.now()}`,
@@ -2130,7 +2145,36 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const updateUser = (userData: User) => {
     const storeObj = userData.storeId ? stores.find(s => s.id === userData.storeId) : undefined;
-    setUsers(prev => prev.map(u => u.id === userData.id ? { ...userData, storeName: storeObj?.name } : u));
+    const updatedUser = { ...userData, storeName: storeObj?.name };
+
+    setUsers(prev => {
+      const nextUsers = prev.map(u => u.id === userData.id ? updatedUser : u);
+      saveStorage(STORAGE_KEYS.USERS, nextUsers);
+      return nextUsers;
+    });
+
+    // Sync active logged-in user state immediately
+    if (currentUser?.id === userData.id || currentUser?.login === userData.login) {
+      setCurrentUser(updatedUser);
+      saveStorage(STORAGE_KEYS.USER, updatedUser);
+      useAuthStore.getState().setAuth(updatedUser, useAuthStore.getState().token || 'mock-jwt-token-session');
+    }
+
+    // Sync corresponding Owner name if user is ADMIN or PARTNER
+    setOwners(prev => {
+      const nextOwners = prev.map(o => {
+        if ((userData.id === 'user-admin' || userData.role === 'ADMIN') && o.id === 'owner-1') {
+          return { ...o, name: userData.name };
+        }
+        if ((userData.id === 'user-partner' || userData.role === 'PARTNER') && o.id === 'owner-2') {
+          return { ...o, name: userData.name };
+        }
+        return o;
+      });
+      saveStorage(STORAGE_KEYS.OWNERS, nextOwners);
+      return nextOwners;
+    });
+
     addAuditLog('USER_UPDATE', `Обновлены данные сотрудника: ${userData.name} (${userData.role})`);
     return { success: true };
   };
@@ -2305,6 +2349,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const resetEntireSystemDataToZero = () => {
+    localStorage.clear();
     setDevices([]);
     setSales([]);
     setInvoices([]);
