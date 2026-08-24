@@ -97,8 +97,21 @@ export const ReportsPage: React.FC = () => {
       });
     });
 
+    // Repair income (issued repairs in period)
+    let periodRepairs = repairs.filter(r => r.status === 'ISSUED');
+    if (period === 'TODAY') {
+      periodRepairs = periodRepairs.filter(r => r.createdAt.startsWith(todayStr) || (r.updatedAt && r.updatedAt.startsWith(todayStr)));
+    } else if (period === 'MONTH') {
+      periodRepairs = periodRepairs.filter(r => r.createdAt.startsWith(currentMonthStr) || (r.updatedAt && r.updatedAt.startsWith(currentMonthStr)));
+    } else if (period === 'SPECIFIC_MONTH') {
+      periodRepairs = periodRepairs.filter(r => r.createdAt.startsWith(selectedMonth) || (r.updatedAt && r.updatedAt.startsWith(selectedMonth)));
+    }
+    const repairIncomeTjs = periodRepairs.reduce((acc, r) => acc + (r.repairCostTjs || r.estimatedCostTjs || 0), 0);
+    const repairIncomeUsd = +(repairIncomeTjs / rate).toFixed(2);
+
     const grossProfitUsd = +(revenueUsd - cogsUsd).toFixed(2);
-    const revenueTjs = Math.round(revenueUsd * rate);
+    const totalRevenueUsd = +(revenueUsd + repairIncomeUsd).toFixed(2);
+    const revenueTjs = Math.round(totalRevenueUsd * rate);
     const cogsTjs = Math.round(cogsUsd * rate);
     const grossProfitTjs = Math.round(grossProfitUsd * rate);
     const grossMarginPercent = revenueUsd > 0 ? +((grossProfitUsd / revenueUsd) * 100).toFixed(1) : 0;
@@ -119,8 +132,8 @@ export const ReportsPage: React.FC = () => {
       })
       .reduce((acc, b) => acc + (b.amountUsd || 0), 0);
 
-    // Net Profit in USD & TJS (Includes sales profit - expenses + 100% cash supplier bonuses)
-    const netProfitUsd = +(grossProfitUsd - expensesUsd + periodCashBonusesUsd).toFixed(2);
+    // Net Profit in USD & TJS (Includes sales profit + repair income - expenses + 100% cash supplier bonuses)
+    const netProfitUsd = +(grossProfitUsd + repairIncomeUsd - expensesUsd + periodCashBonusesUsd).toFixed(2);
     const netProfitTjs = Math.round(netProfitUsd * rate);
 
     // Balance Sheet Assets & Liabilities in USD (store-aware)

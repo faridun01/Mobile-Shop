@@ -29,7 +29,7 @@ export const SalesHistoryPage: React.FC = () => {
     processRefund
   } = useApp();
 
-  const [periodFilter, setPeriodFilter] = useState<'TODAY' | 'MONTH' | 'SPECIFIC_MONTH' | 'ALL'>('TODAY');
+  const [periodFilter, setPeriodFilter] = useState<'TODAY' | 'MONTH' | 'SPECIFIC_MONTH' | 'ALL'>('SPECIFIC_MONTH');
   const [selectedMonth, setSelectedMonth] = useState<string>(new Date().toISOString().substring(0, 7));
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedSale, setSelectedSale] = useState<Sale | null>(null);
@@ -84,7 +84,7 @@ export const SalesHistoryPage: React.FC = () => {
 
       return true;
     });
-  }, [sales, currentUser, periodFilter, searchQuery]);
+  }, [sales, currentUser, periodFilter, selectedMonth, searchQuery]);
 
   // Scan handler to jump straight to sale
   const handleScanFinder = () => {

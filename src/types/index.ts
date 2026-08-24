@@ -150,7 +150,7 @@ export interface SaleItem {
   salePriceUsd: number;
   purchaseCostUsd: number;
   costBasisUsd: number;
-  isBelowCost: boolean;
+  isBelowCost?: boolean;
 }
 
 export interface ExchangeEvent {
@@ -185,12 +185,13 @@ export interface Sale {
   items: SaleItem[];
   totalTjs: number;
   totalUsd: number;
-  exchangeRate: number;
+  exchangeRate?: number;
   paymentMethod: PaymentMethod;
   cashAmountTjs: number;
   cardAmountTjs: number;
+  exchangeTradeInCreditTjs?: number;
   status: 'COMPLETED' | 'EXCHANGED' | 'REFUNDED';
-  hasBelowCostItem: boolean;
+  hasBelowCostItem?: boolean;
   exchangeEvents?: ExchangeEvent[];
   refundReason?: string;
   refundedAt?: string;
@@ -220,6 +221,8 @@ export interface RepairTicket {
   ticketNumber: number;
   deviceId?: string;
   imei: string;
+  imei2?: string;
+  barcode?: string;
   brand?: string;
   model?: string;
   deviceModel?: string;
@@ -248,6 +251,7 @@ export interface RepairTicket {
   createdAt: string;
   estimatedCostTjs?: number;
   finalCostTjs?: number;
+  repairCostTjs?: number;
 }
 
 export interface SupplierInvoice {
@@ -289,7 +293,8 @@ export interface Supplier {
   totalPurchasedUsd: number;
   totalPaidUsd: number;
   totalDebtUsd: number;
-  active: boolean;
+  active?: boolean;
+  createdAt?: string;
 }
 
 export interface SupplierBonus {
@@ -327,14 +332,16 @@ export interface Expense {
   date: string;
   category: ExpenseCategory;
   amountTjs: number;
-  exchangeRate: number;
-  amountUsd: number;
-  targetType: 'STORE' | 'BUSINESS';
+  exchangeRate?: number;
+  amountUsd?: number;
+  targetType?: 'STORE' | 'BUSINESS';
   storeId?: string;
   storeName?: string;
-  sourceAccount: string; // e.g. "Store #1 Cash", "Main Account"
-  comment: string;
+  sourceAccount?: string; // e.g. "Store #1 Cash", "Main Account"
+  comment?: string;
+  description?: string;
   createdByName: string;
+  paidFromCashRegister?: boolean;
 }
 
 export interface Owner {

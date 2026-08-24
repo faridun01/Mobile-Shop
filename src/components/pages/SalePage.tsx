@@ -73,7 +73,8 @@ export const SalePage: React.FC = () => {
   // Available devices in the chosen store
   const availableDevices = useMemo(() => {
     return devices.filter(d => {
-      if (d.status !== 'STORE_STOCK' && d.status !== 'IN_STOCK_AFTER_EXCHANGE') return false;
+      const isAvailableStatus = d.status === 'STORE_STOCK' || d.status === 'IN_STOCK_AFTER_EXCHANGE' || (isAdmin && d.status === 'MAIN_WAREHOUSE');
+      if (!isAvailableStatus) return false;
       if (effectiveStoreId && d.locationId !== effectiveStoreId) return false;
 
       if (searchQuery.trim()) {
@@ -95,7 +96,25 @@ export const SalePage: React.FC = () => {
 
       return true;
     });
-  }, [devices, effectiveStoreId, searchQuery, selectedBrand, cart]);
+  }, [devices, effectiveStoreId, searchQuery, selectedBrand, cart, isAdmin]);
+
+  // Brands list
+  const brands = useMemo(() => {
+    const set = new Set<string>();
+    devices.forEach(d => set.add(d.brand));
+    return ['ALL', ...Array.from(set)];
+  }, [devices]);
+
+  const addDeviceToCart = (device: Device) => {
+    const rate = todayRate?.rate || 9.50;
+    const baseCostUsd = (device.costBasisUsd && device.costBasisUsd > 0) 
+      ? device.costBasisUsd 
+      : (device.purchaseCostUsd > 0 ? device.purchaseCostUsd : 150);
+    const defaultPriceTjs = Math.round(baseCostUsd * rate * 1.08);
+
+    setCart(prev => [...prev, { device, salePriceTjs: defaultPriceTjs }]);
+    setActiveImeiSelector(null);
+  };
 
   // Group devices by model + storage + color
   const groupedVariants = useMemo(() => {
@@ -125,21 +144,6 @@ export const SalePage: React.FC = () => {
 
     return Object.values(groups);
   }, [availableDevices]);
-
-  // Brands list
-  const brands = useMemo(() => {
-    const set = new Set<string>();
-    devices.forEach(d => set.add(d.brand));
-    return ['ALL', ...Array.from(set)];
-  }, [devices]);
-
-  const addDeviceToCart = (device: Device) => {
-    const rate = todayRate?.rate || 9.50;
-    const defaultPriceTjs = Math.round(device.purchaseCostUsd * rate * 1.08);
-
-    setCart(prev => [...prev, { device, salePriceTjs: defaultPriceTjs }]);
-    setActiveImeiSelector(null);
-  };
 
   const handleSelectVariant = (variant: typeof groupedVariants[0]) => {
     if (variant.devices.length === 1) {

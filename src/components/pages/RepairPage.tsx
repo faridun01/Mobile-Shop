@@ -69,6 +69,8 @@ export const RepairPage: React.FC = () => {
   const [storage, setStorage] = useState('256 GB');
   const [color, setColor] = useState('Black');
   const [imei, setImei] = useState('');
+  const [imei2, setImei2] = useState('');
+  const [barcode, setBarcode] = useState('');
   const [issueDescription, setIssueDescription] = useState('');
   const [repairCostTjs, setRepairCostTjs] = useState('');
   const [estimatedCostTjs, setEstimatedCostTjs] = useState('');
@@ -442,13 +444,41 @@ export const RepairPage: React.FC = () => {
 
                 <div>
                   <label className="block text-[10px] uppercase text-slate-400 font-bold mb-1">
-                    IMEI / Серийный номер / Баркод
+                    Штрихкод / EAN <span className="text-rose-400">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={barcode ?? ''}
+                    onChange={(e) => setBarcode(e.target.value)}
+                    placeholder="690123456789"
+                    className="w-full rounded bg-[#0B0E14] border border-slate-800 px-3 py-1.5 text-xs font-mono text-amber-400 focus:border-emerald-500 focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                <div>
+                  <label className="block text-[10px] uppercase text-slate-400 font-bold mb-1">
+                    IMEI 1 <span className="text-rose-400">*</span>
                   </label>
                   <input
                     type="text"
                     value={imei ?? ''}
                     onChange={(e) => setImei(e.target.value)}
                     placeholder="351234567890123"
+                    className="w-full rounded bg-[#0B0E14] border border-slate-800 px-3 py-1.5 text-xs font-mono text-slate-100 focus:border-emerald-500 focus:outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[10px] uppercase text-slate-400 font-bold mb-1">
+                    IMEI 2 <span className="text-slate-500 font-normal font-sans">(опционально / по желанию)</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={imei2 ?? ''}
+                    onChange={(e) => setImei2(e.target.value)}
+                    placeholder="351234567890124 (по желанию)"
                     className="w-full rounded bg-[#0B0E14] border border-slate-800 px-3 py-1.5 text-xs font-mono text-slate-100 focus:border-emerald-500 focus:outline-none"
                   />
                 </div>

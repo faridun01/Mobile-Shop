@@ -1,4 +1,5 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import { useApp } from '../../context/AppContext';
 import {
   ArrowLeftRight,
@@ -22,6 +23,8 @@ import {
 import { BarcodeScannerModal } from '../common/BarcodeScannerModal';
 
 export const TransferPage: React.FC = () => {
+  const location = useLocation();
+
   const {
     currentUser,
     stores,
@@ -32,7 +35,18 @@ export const TransferPage: React.FC = () => {
     rejectTransferRequest
   } = useApp();
 
-  const [activeTab, setActiveTab] = useState<'create' | 'list'>('create');
+  const [activeTab, setActiveTab] = useState<'create' | 'list'>(() => {
+    if (location.state && (location.state as any).tab === 'list') return 'list';
+    const params = new URLSearchParams(location.search);
+    if (params.get('tab') === 'list') return 'list';
+    return 'create';
+  });
+
+  useEffect(() => {
+    if (location.state && (location.state as any).tab === 'list') {
+      setActiveTab('list');
+    }
+  }, [location.state]);
   const [fromLocationId, setFromLocationId] = useState<string>(
     currentUser?.role === 'SELLER' ? (currentUser.storeId || 'store-1') : 'main-warehouse'
   );

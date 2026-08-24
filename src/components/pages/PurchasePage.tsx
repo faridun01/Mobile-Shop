@@ -124,7 +124,7 @@ export const PurchasePage: React.FC = () => {
 
       return true;
     }).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-  }, [supplierInvoices, devices, periodFilter, selectedSupplierFilter, searchQuery]);
+  }, [supplierInvoices, devices, periodFilter, selectedMonth, selectedSupplierFilter, searchQuery]);
 
   // Aggregate stats for invoices
   const totalInvoicesCount = filteredInvoices.length;

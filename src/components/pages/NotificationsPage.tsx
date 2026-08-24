@@ -58,7 +58,12 @@ export const NotificationsPage: React.FC = () => {
     const target = n.linkPage || n.targetRoute || 'SALE';
     const route = PAGE_ROUTES[target] || '/sale';
     setActivePage(target as any);
-    navigate(route);
+
+    if (target === 'TRANSFER' || n.targetType === 'TRANSFER_REQUEST') {
+      navigate('/transfer', { state: { tab: 'list' } });
+    } else {
+      navigate(route);
+    }
   };
 
   const hasUnread = visibleNotifications.some(n => !(n.read ?? n.isRead));

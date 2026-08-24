@@ -1321,22 +1321,26 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return d;
     });
 
-    // Create Notification for Admin
-    const newNotif: NotificationItem = {
-      id: `notif-${Date.now()}`,
-      title: 'Запрос на перемещение',
-      message: `${currentUser.name} запросил перемещение ${targetDevs.length} устройств из ${newReq.fromLocationName} в ${newReq.toLocationName} (${trNumber})`,
-      date: new Date().toISOString(),
-      targetType: 'TRANSFER_REQUEST',
-      targetId: newReq.id,
-      targetRoute: 'TRANSFER',
-      read: false,
-      resolved: false
-    };
-
     setTransfers(prev => [newReq, ...prev]);
     setDevices(updatedDevices);
-    setNotifications(prev => [newNotif, ...prev]);
+
+    // Create Notification for Admin only when non-admin / seller creates transfer request
+    const isAdminOrPartner = currentUser.role === 'ADMIN' || currentUser.role === 'PARTNER';
+    if (!isAdminOrPartner) {
+      const newNotif: NotificationItem = {
+        id: `notif-${Date.now()}`,
+        title: 'Запрос на перемещение',
+        message: `${currentUser.name} запросил перемещение ${targetDevs.length} устройств из ${newReq.fromLocationName} в ${newReq.toLocationName} (${trNumber})`,
+        date: new Date().toISOString(),
+        targetType: 'TRANSFER_REQUEST',
+        targetId: newReq.id,
+        targetRoute: 'TRANSFER',
+        linkPage: 'TRANSFER',
+        read: false,
+        resolved: false
+      };
+      setNotifications(prev => [newNotif, ...prev]);
+    }
 
     addAuditLog(
       'TRANSFER_REQUEST',

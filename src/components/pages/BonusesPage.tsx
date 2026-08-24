@@ -22,8 +22,11 @@ export const BonusesPage: React.FC = () => {
     suppliers,
     stores,
     devices,
-    createSupplierBonus
+    createSupplierBonus,
+    todayRate
   } = useApp();
+
+  const rate = todayRate?.rate || 9.50;
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedBonus, setSelectedBonus] = useState<SupplierBonus | null>(null);
@@ -38,6 +41,8 @@ export const BonusesPage: React.FC = () => {
   const [bonusStorage, setBonusStorage] = useState('128 GB');
   const [bonusColor, setBonusColor] = useState('Black');
   const [bonusImei, setBonusImei] = useState('');
+  const [bonusImei2, setBonusImei2] = useState('');
+  const [bonusBarcode, setBonusBarcode] = useState('');
   const [destinationLocationId, setDestinationLocationId] = useState('main-warehouse');
 
   const [statusMessage, setStatusMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
@@ -124,6 +129,8 @@ export const BonusesPage: React.FC = () => {
         storage: bonusStorage,
         color: bonusColor,
         imei: bonusImei.trim() || `35${Math.floor(1000000000000 + Math.random() * 9000000000000)}`,
+        imei2: bonusImei2.trim() || undefined,
+        barcode: bonusBarcode.trim() || undefined,
         costBasisUsd: 0
       }
     ] : undefined;
@@ -139,6 +146,8 @@ export const BonusesPage: React.FC = () => {
     if (res.success) {
       setIsModalOpen(false);
       setBonusImei('');
+      setBonusImei2('');
+      setBonusBarcode('');
       setStatusMessage({
         type: 'success',
         text: `Бонус успешно сохранен и оприходован на склад`
@@ -221,13 +230,16 @@ export const BonusesPage: React.FC = () => {
               <div className="flex items-center space-x-3 text-right shrink-0">
                 <div>
                   {bonus.bonusType === 'CASH_DISCOUNT' ? (
-                    <span className="text-sm font-mono font-bold text-emerald-400">+${bonus.amountUsd}</span>
+                    <div>
+                      <span className="text-sm font-mono font-bold text-emerald-400 block">+${bonus.amountUsd} USD</span>
+                      <span className="text-[11px] font-mono text-emerald-300 font-bold block">≈ {Math.round((bonus.amountUsd || 0) * rate)} TJS</span>
+                    </div>
                   ) : (
                     <span className="text-xs font-mono font-semibold text-amber-400 block">
                       +{bonus.freeDevices?.length || 1} шт. бесплатно
                     </span>
                   )}
-                  <span className="text-[10px] text-zinc-500 block">Нажмите для просмотра</span>
+                  <span className="text-[10px] text-zinc-500 block mt-0.5">Нажмите для просмотра</span>
                 </div>
                 <ChevronRight className="w-4 h-4 text-zinc-500 group-hover:text-emerald-400 transition-colors" />
               </div>
@@ -322,27 +334,95 @@ export const BonusesPage: React.FC = () => {
                     />
                   </div>
 
-                  <div>
-                    <label className="block text-zinc-400 text-[10px] mb-0.5">IMEI подарочного аппарата</label>
-                    <input
-                      type="text"
-                      value={bonusImei ?? ''}
-                      onChange={(e) => setBonusImei(e.target.value)}
-                      placeholder="351234567890123"
-                      className="w-full rounded bg-zinc-900 border border-zinc-700 px-2.5 py-1 text-xs font-mono"
-                    />
+                  <div className="space-y-2 pt-1 border-t border-zinc-800">
+                    <div className="grid grid-cols-2 gap-2 font-mono text-xs">
+                      <div>
+                        <label className="block text-zinc-400 text-[10px] uppercase font-bold mb-0.5">
+                          Штрихкод / EAN <span className="text-rose-400">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          value={bonusBarcode ?? ''}
+                          onChange={(e) => setBonusBarcode(e.target.value)}
+                          placeholder="690123456789"
+                          className="w-full rounded bg-zinc-900 border border-zinc-700 px-2 py-1 text-xs text-amber-400 font-mono focus:border-emerald-500 focus:outline-none"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-zinc-400 text-[10px] uppercase font-bold mb-0.5">
+                          IMEI 1 <span className="text-rose-400">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          value={bonusImei ?? ''}
+                          onChange={(e) => setBonusImei(e.target.value)}
+                          placeholder="351234567890123"
+                          className="w-full rounded bg-zinc-900 border border-zinc-700 px-2 py-1 text-xs font-mono focus:border-emerald-500 focus:outline-none"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-zinc-400 text-[10px] uppercase font-bold mb-0.5">
+                        IMEI 2 <span className="text-zinc-500 font-normal font-sans">(опционально / по желанию)</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={bonusImei2 ?? ''}
+                        onChange={(e) => setBonusImei2(e.target.value)}
+                        placeholder="351234567890124 (по желанию)"
+                        className="w-full rounded bg-zinc-900 border border-zinc-700 px-2.5 py-1 text-xs font-mono focus:border-emerald-500 focus:outline-none"
+                      />
+                    </div>
                   </div>
                 </div>
               ) : (
-                <div>
-                  <label className="block text-zinc-400 mb-1">Сумма бонуса ($ USD) — <span className="text-emerald-400 font-bold">100% в чистую прибыль</span></label>
-                  <input
-                    type="number"
-                    value={amountUsd ?? ''}
-                    onChange={(e) => setAmountUsd(e.target.value)}
-                    placeholder="250"
-                    className="w-full rounded bg-zinc-950 border border-zinc-700 px-3 py-2 text-xs font-mono text-emerald-400 focus:border-emerald-500 focus:outline-none"
-                  />
+                <div className="space-y-2">
+                  <label className="block text-zinc-400 text-xs font-semibold">
+                    Сумма бонуса — <span className="text-emerald-400 font-bold">100% в чистую прибыль</span>
+                  </label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <span className="block text-[10px] text-zinc-400 mb-1 font-mono uppercase font-bold">В долларах ($ USD):</span>
+                      <div className="relative">
+                        <span className="absolute left-2.5 top-1.5 text-emerald-400 font-bold">$</span>
+                        <input
+                          type="number"
+                          value={amountUsd ?? ''}
+                          onChange={(e) => setAmountUsd(e.target.value)}
+                          placeholder="250"
+                          className="w-full rounded bg-zinc-950 border border-zinc-700 pl-7 pr-2.5 py-1 text-xs font-mono text-emerald-400 focus:border-emerald-500 focus:outline-none"
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <span className="block text-[10px] text-zinc-400 mb-1 font-mono uppercase font-bold">В сомони (TJS):</span>
+                      <div className="relative">
+                        <span className="absolute left-2 top-1.5 text-emerald-400 font-bold text-[11px]">SM</span>
+                        <input
+                          type="number"
+                          value={amountUsd ? Math.round((parseFloat(amountUsd) || 0) * rate) : ''}
+                          onChange={(e) => {
+                            const valTjs = parseFloat(e.target.value);
+                            if (!isNaN(valTjs)) {
+                              setAmountUsd((valTjs / rate).toFixed(2));
+                            } else {
+                              setAmountUsd('');
+                            }
+                          }}
+                          placeholder="2375"
+                          className="w-full rounded bg-zinc-950 border border-zinc-700 pl-8 pr-2.5 py-1 text-xs font-mono text-emerald-400 focus:border-emerald-500 focus:outline-none"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                  {amountUsd && parseFloat(amountUsd) > 0 && (
+                    <p className="text-[11px] text-emerald-400 font-bold font-mono bg-emerald-500/10 border border-emerald-500/20 p-2 rounded">
+                      ★ Конвертация по курсу {rate} TJS/USD: ${amountUsd} USD = {Math.round((parseFloat(amountUsd) || 0) * rate)} TJS (100% в чистую прибыль учредителей)
+                    </p>
+                  )}
                 </div>
               )}
             </div>

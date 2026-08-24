@@ -74,6 +74,8 @@ export const ExpensesPage: React.FC = () => {
   const [paidFromCashRegister, setPaidFromCashRegister] = useState(true);
 
   // Search & Filter state
+  const [periodFilter, setPeriodFilter] = useState<'TODAY' | 'SPECIFIC_MONTH' | 'ALL'>('SPECIFIC_MONTH');
+  const [selectedMonth, setSelectedMonth] = useState<string>(new Date().toISOString().substring(0, 7));
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategoryTab, setSelectedCategoryTab] = useState('ALL');
   const [selectedStoreFilter, setSelectedStoreFilter] = useState('ALL');
@@ -180,11 +182,22 @@ export const ExpensesPage: React.FC = () => {
   const rate = todayRate?.rate || 9.50;
 
   const filteredExpenses = useMemo(() => {
+    const todayStr = new Date().toISOString().split('T')[0];
+
     return expenses.filter(e => {
       if (isSeller && e.storeId !== currentUser.storeId) {
         return false;
       }
       if (selectedStoreFilter !== 'ALL' && e.storeId !== selectedStoreFilter) {
+        return false;
+      }
+
+      // Period filter
+      const expDateStr = (e.date || '').split('T')[0];
+      if (periodFilter === 'TODAY' && expDateStr !== todayStr) {
+        return false;
+      }
+      if (periodFilter === 'SPECIFIC_MONTH' && !expDateStr.startsWith(selectedMonth)) {
         return false;
       }
 
@@ -221,7 +234,7 @@ export const ExpensesPage: React.FC = () => {
 
       return true;
     });
-  }, [expenses, isSeller, currentUser, selectedStoreFilter, selectedCategoryTab, searchQuery, customCategories]);
+  }, [expenses, isSeller, currentUser, periodFilter, selectedMonth, selectedStoreFilter, selectedCategoryTab, searchQuery, customCategories]);
 
   const totalExpensesTjs = useMemo(() => {
     return filteredExpenses.reduce((acc, e) => acc + (e.amountTjs || 0), 0);
@@ -296,10 +309,10 @@ export const ExpensesPage: React.FC = () => {
           </div>
         </div>
 
-        {/* Filter bar: Search, Store Selector, Compact Category Dropdown, + Add Category */}
+        {/* Filter bar: Search, Period Filter, Store Selector, Compact Category Dropdown */}
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 pt-1 border-t border-slate-800/80">
-          <div className="flex items-center space-x-2 flex-1 min-w-0">
-            <div className="relative flex-1">
+          <div className="flex flex-wrap items-center gap-2 flex-1 min-w-0">
+            <div className="relative flex-1 min-w-[180px]">
               <Search className="absolute left-3 top-2.5 w-3.5 h-3.5 text-slate-500" />
               <input
                 type="text"
@@ -316,6 +329,51 @@ export const ExpensesPage: React.FC = () => {
                   <X className="w-3.5 h-3.5" />
                 </button>
               )}
+            </div>
+
+            {/* Period selector */}
+            <div className="flex items-center space-x-1 shrink-0">
+              <button
+                type="button"
+                onClick={() => setPeriodFilter('TODAY')}
+                className={`px-2.5 py-1.5 rounded-md border text-xs font-mono font-bold uppercase transition-colors bg-transparent ${
+                  periodFilter === 'TODAY'
+                    ? 'border-rose-500 text-rose-400'
+                    : 'border-slate-800 text-slate-400 hover:border-slate-700 hover:text-slate-200'
+                }`}
+              >
+                СЕГОДНЯ
+              </button>
+
+              <input
+                type="month"
+                value={selectedMonth}
+                onChange={(e) => {
+                  if (e.target.value) {
+                    setSelectedMonth(e.target.value);
+                    setPeriodFilter('SPECIFIC_MONTH');
+                  }
+                }}
+                onClick={() => setPeriodFilter('SPECIFIC_MONTH')}
+                className={`px-2.5 py-1.5 rounded-md border text-xs font-mono font-bold transition-colors bg-[#0B0E14] focus:outline-none cursor-pointer ${
+                  periodFilter === 'SPECIFIC_MONTH'
+                    ? 'border-rose-500 text-rose-400'
+                    : 'border-slate-800 text-slate-400 hover:border-slate-700 hover:text-slate-200'
+                }`}
+                title="Выберите месяц"
+              />
+
+              <button
+                type="button"
+                onClick={() => setPeriodFilter('ALL')}
+                className={`px-2.5 py-1.5 rounded-md border text-xs font-mono font-bold uppercase transition-colors bg-transparent ${
+                  periodFilter === 'ALL'
+                    ? 'border-rose-500 text-rose-400'
+                    : 'border-slate-800 text-slate-400 hover:border-slate-700 hover:text-slate-200'
+                }`}
+              >
+                ВСЕ РАСХОДЫ
+              </button>
             </div>
 
             {!isSeller && (
