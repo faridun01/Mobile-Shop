@@ -94,15 +94,24 @@ interface AppContextType {
   }) => { success: boolean; receiptNumber?: number; message?: string };
   
   processExchange: (params: {
-    originalSaleReceiptNumber: number;
+    originalSaleReceiptNumber?: number | string;
     originalSaleId?: string;
-    returnedImei: string;
-    exchangeInValueTjs: number;
+    returnedImei?: string;
+    returnedItem?: {
+      brand: string;
+      model: string;
+      storage: string;
+      color: string;
+      imei: string;
+      exchangeInValueTjs: number;
+    };
+    exchangeInValueTjs?: number;
     replacementDeviceId: string;
     newPriceTjs: number;
-    paymentMethod: PaymentMethod;
-    cashAmountTjs: number;
-    cardAmountTjs: number;
+    differenceTjs?: number;
+    paymentMethod?: PaymentMethod;
+    cashAmountTjs?: number;
+    cardAmountTjs?: number;
   }) => { success: boolean; message?: string };
 
   processRefund: (params: {

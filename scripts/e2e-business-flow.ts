@@ -21,7 +21,16 @@ async function executeFullBusinessFlow() {
     console.log('📌 STEP 1: Authorization as ADMIN');
     await page.goto('http://localhost:3000/login');
     await delay(600);
-    await page.getByRole('button', { name: /ADMIN/i }).click();
+    if (page.url().includes('/login')) {
+      const quickAdminBtn = page.locator('button').filter({ hasText: /Админ/i }).first();
+      if (await quickAdminBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
+        await quickAdminBtn.click();
+      } else {
+        await page.fill('input[type="text"]', 'admin');
+        await page.fill('input[type="password"]', 'admin123');
+        await page.getByRole('button', { name: /ВХОД/i }).click();
+      }
+    }
     await delay(800);
     console.log('  ✅ Authenticated as ADMIN successfully\n');
 
