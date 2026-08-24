@@ -405,7 +405,6 @@ export const INITIAL_SALES: Sale[] = [
     totalTjs: 10800,
     cashAmountTjs: 10800,
     cardAmountTjs: 0,
-    exchangeTradeInCreditTjs: 4500,
     status: 'COMPLETED',
     items: [
       {

@@ -65,6 +65,8 @@ export const InventoryPage: React.FC = () => {
         if ((d.purchaseCostUsd !== 0 && !d.isBonus) || d.status === 'SOLD') {
           return false;
         }
+      } else if (selectedStatus === 'ALL') {
+        if (d.status === 'SOLD') return false;
       } else if (selectedStatus !== 'ALL') {
         if (d.status !== selectedStatus) return false;
       }
@@ -308,12 +310,12 @@ export const InventoryPage: React.FC = () => {
                         [groupKey]: !prev[groupKey],
                       }))
                     }
-                    className="flex items-center justify-between p-3 cursor-pointer hover:bg-slate-900/80 transition-colors select-none"
+                    className="flex items-center justify-between p-3 cursor-pointer hover:bg-emerald-500/10 hover:border-emerald-500/30 transition-colors select-none group"
                   >
                     <div className="flex items-center space-x-2.5 min-w-0">
                       <Smartphone className="w-4 h-4 text-emerald-400 shrink-0" />
                       <div className="truncate">
-                        <h3 className="text-xs sm:text-sm font-bold text-slate-100 uppercase tracking-tight truncate">
+                        <h3 className="text-xs sm:text-sm font-bold text-slate-100 uppercase tracking-tight truncate group-hover:text-emerald-400 transition-colors">
                           {group.brand} {group.model}
                         </h3>
                         <p className="text-[10px] text-slate-500 truncate">
@@ -327,9 +329,9 @@ export const InventoryPage: React.FC = () => {
                         {group.devices.length} шт.
                       </span>
                       {isExpanded ? (
-                        <ChevronUp className="w-4 h-4 text-slate-400" />
+                        <ChevronUp className="w-4 h-4 text-slate-400 group-hover:text-emerald-400" />
                       ) : (
-                        <ChevronDown className="w-4 h-4 text-slate-400" />
+                        <ChevronDown className="w-4 h-4 text-slate-400 group-hover:text-emerald-400" />
                       )}
                     </div>
                   </div>
@@ -390,7 +392,7 @@ export const InventoryPage: React.FC = () => {
                                         e.stopPropagation();
                                         setSelectedDevice(dev);
                                       }}
-                                      className="py-1.5 px-2 hover:bg-slate-900/80 rounded flex items-center justify-between cursor-pointer transition-colors text-[11px]"
+                                      className="py-1.5 px-2 hover:bg-emerald-500/10 rounded flex items-center justify-between cursor-pointer transition-colors text-[11px] group"
                                     >
                                       <div className="flex items-center space-x-2 truncate">
                                         <span className="text-slate-300 font-medium">{dev.color}</span>

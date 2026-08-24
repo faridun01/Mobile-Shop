@@ -131,6 +131,9 @@ export function exportInventoryReport(devices: Device[], stores: Store[], rate: 
   const storeMap = new Map<string, string>();
   stores.forEach(s => storeMap.set(s.id, s.name));
 
+  // Exclude SOLD devices from inventory stock export (sold items belong to sales history)
+  const inStockDevices = devices.filter(dev => dev.status !== 'SOLD');
+
   const headers = [
     'Бренд',
     'Модель',
@@ -144,32 +147,22 @@ export function exportInventoryReport(devices: Device[], stores: Store[], rate: 
     'Статус',
     'Поставщик',
     'Себестоимость закупки ($)',
-    'Ориентировочная розница ($)',
-    'Ориентировочная розница (TJS)',
     'Дата прихода'
   ];
 
   const rows: string[][] = [];
   let totalUnits = 0;
   let totalCostBasisUsd = 0;
-  let totalRetailUsd = 0;
-  let totalRetailTjs = 0;
 
-  devices.forEach((dev) => {
+  inStockDevices.forEach((dev) => {
     totalUnits += 1;
     const costUsd = dev.costBasisUsd || dev.purchaseCostUsd || 0;
-    const retailUsd = Math.round(costUsd * 1.15); // standard estimated markup
-    const retailTjs = Math.round(retailUsd * rate);
-
     totalCostBasisUsd += costUsd;
-    totalRetailUsd += retailUsd;
-    totalRetailTjs += retailTjs;
 
     const locationName = storeMap.get(dev.locationId) || dev.locationName || dev.locationId;
     const statusText = 
       dev.status === 'MAIN_WAREHOUSE' ? 'Главный склад' :
       dev.status === 'STORE_STOCK' ? 'В наличии в магазине' :
-      dev.status === 'SOLD' ? 'Продан' :
       dev.status === 'IN_STOCK_AFTER_EXCHANGE' ? 'Склад (после обмена)' :
       dev.status === 'IN_REPAIR' ? 'В ремонте' : 'Транзит';
 
@@ -186,8 +179,6 @@ export function exportInventoryReport(devices: Device[], stores: Store[], rate: 
       escapeCsvField(statusText),
       escapeCsvField(dev.supplierName || '-'),
       escapeCsvField(costUsd.toFixed(2)),
-      escapeCsvField(retailUsd.toFixed(2)),
-      escapeCsvField(retailTjs.toFixed(2)),
       escapeCsvField(dev.createdAt ? dev.createdAt.split('T')[0] : '-')
     ]);
   });
@@ -205,10 +196,8 @@ export function exportInventoryReport(devices: Device[], stores: Store[], rate: 
     escapeCsvField(''),
     escapeCsvField(''),
     escapeCsvField(''),
-    escapeCsvField(`Всего: ${totalUnits} шт`),
+    escapeCsvField(`Всего позиций в остатке: ${totalUnits}`),
     escapeCsvField(totalCostBasisUsd.toFixed(2)),
-    escapeCsvField(totalRetailUsd.toFixed(2)),
-    escapeCsvField(totalRetailTjs.toFixed(2)),
     escapeCsvField('')
   ]);
 

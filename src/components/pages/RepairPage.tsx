@@ -113,7 +113,7 @@ export const RepairPage: React.FC = () => {
 
     // Search in sales history by receipt number or item imei/barcode
     const matchingSale = sales.find(
-      (s) => s.receiptNumber.toString() === q || s.items.some((item) => item.imei.toLowerCase() === q)
+      (s) => s.receiptNumber.toString() === q || s.items.some((item) => item.imei.toLowerCase() === q || item.imei2?.toLowerCase() === q)
     );
 
     if (matchingSale) {
@@ -124,6 +124,15 @@ export const RepairPage: React.FC = () => {
         setStorage(item.storage || '256 GB');
         setColor(item.color || 'Black');
         setImei(item.imei || '');
+        if (item.imei2) setImei2(item.imei2);
+
+        // Check devices DB for barcode and imei2
+        const devMatch = devices.find((d) => d.imei === item.imei || d.barcode === item.imei);
+        if (devMatch) {
+          if (devMatch.imei2) setImei2(devMatch.imei2);
+          if (devMatch.barcode) setBarcode(devMatch.barcode);
+        }
+
         setSaleReceiptNumber(matchingSale.receiptNumber);
         setSaleDate(matchingSale.date);
         if (matchingSale.customerName && !customerName) {
@@ -131,23 +140,25 @@ export const RepairPage: React.FC = () => {
         }
         setStatusMessage({
           type: 'success',
-          text: `Данные из Чека #${matchingSale.receiptNumber} загружены: ${item.brand} ${item.model} (${item.imei})`,
+          text: `Данные из Чека #${matchingSale.receiptNumber} загружены: ${item.brand} ${item.model} (IMEI 1: ${item.imei}${item.imei2 ? ` / IMEI 2: ${item.imei2}` : ''})`,
         });
         return;
       }
     }
 
     // Search in devices stock by imei or barcode
-    const matchingDev = devices.find((d) => d.imei.toLowerCase() === q || d.barcode?.toLowerCase() === q);
+    const matchingDev = devices.find((d) => d.imei.toLowerCase() === q || d.imei2?.toLowerCase() === q || d.barcode?.toLowerCase() === q);
     if (matchingDev) {
       setBrand(matchingDev.brand);
       setDeviceModel(matchingDev.model);
       setStorage(matchingDev.storage);
       setColor(matchingDev.color);
       setImei(matchingDev.imei);
+      if (matchingDev.imei2) setImei2(matchingDev.imei2);
+      if (matchingDev.barcode) setBarcode(matchingDev.barcode);
       setStatusMessage({
         type: 'success',
-        text: `Устройство найдено в системе: ${matchingDev.brand} ${matchingDev.model} (IMEI: ${matchingDev.imei})`,
+        text: `Устройство найдено в системе: ${matchingDev.brand} ${matchingDev.model} (IMEI 1: ${matchingDev.imei}${matchingDev.imei2 ? ` / IMEI 2: ${matchingDev.imei2}` : ''}${matchingDev.barcode ? ` | EAN: ${matchingDev.barcode}` : ''})`,
       });
     }
   };
@@ -186,7 +197,9 @@ export const RepairPage: React.FC = () => {
           r.customerName?.toLowerCase().includes(q) ||
           r.customerPhone?.toLowerCase().includes(q) ||
           modelStr.toLowerCase().includes(q) ||
-          r.imei?.toLowerCase().includes(q)
+          r.imei?.toLowerCase().includes(q) ||
+          r.imei2?.toLowerCase().includes(q) ||
+          r.barcode?.toLowerCase().includes(q)
         );
       }
       return true;
@@ -216,6 +229,8 @@ export const RepairPage: React.FC = () => {
       storage: storage.trim() || '256 GB',
       color: color.trim() || 'Black',
       imei: imei.trim() || `NO-IMEI-${Date.now()}`,
+      imei2: imei2.trim() || undefined,
+      barcode: barcode.trim() || undefined,
       saleReceiptNumber,
       saleDate,
       problemDescription: issueDescription.trim(),
@@ -231,6 +246,8 @@ export const RepairPage: React.FC = () => {
       setCustomerPhone('');
       setDeviceModel('');
       setImei('');
+      setImei2('');
+      setBarcode('');
       setIssueDescription('');
       setRepairCostTjs('');
       setEstimatedCostTjs('');

@@ -160,6 +160,8 @@ interface AppContextType {
 
   createRepairTicket: (params: {
     imei: string;
+    imei2?: string;
+    barcode?: string;
     brand: string;
     model: string;
     storage: string;
@@ -1528,6 +1530,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // 6. REPAIRS
   const createRepairTicket = (data: {
     imei: string;
+    imei2?: string;
+    barcode?: string;
     brand: string;
     model: string;
     storage: string;
@@ -1549,7 +1553,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const ticketNumber = maxTicket + 1;
     const ticketId = `rep-${Date.now()}`;
 
-    const matchingDev = devices.find(d => d.imei === data.imei.trim());
+    const matchingDev = devices.find(d => d.imei === data.imei.trim() || (data.barcode && d.barcode === data.barcode.trim()));
     const storeObj = currentUser.storeId ? stores.find(s => s.id === currentUser.storeId) : stores[1];
     const costTjs = data.repairCostTjs || data.estimatedCostTjs || 0;
 
@@ -1558,6 +1562,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       ticketNumber,
       deviceId: matchingDev?.id,
       imei: data.imei.trim(),
+      imei2: data.imei2?.trim() || matchingDev?.imei2,
+      barcode: data.barcode?.trim() || matchingDev?.barcode,
       brand: data.brand,
       model: data.model,
       storage: data.storage,

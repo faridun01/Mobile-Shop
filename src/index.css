@@ -230,6 +230,7 @@ html.light body {
 
 /* Hover States in Light Mode */
 [data-theme="light"] .hover\:bg-slate-800:hover,
+[data-theme="light"] .hover\:bg-slate-800\/90:hover,
 [data-theme="light"] .hover\:bg-slate-800\/80:hover,
 [data-theme="light"] .hover\:bg-slate-800\/60:hover,
 [data-theme="light"] .hover\:bg-slate-800\/50:hover,
@@ -239,23 +240,46 @@ html.light body {
 [data-theme="light"] .hover\:bg-zinc-800:hover,
 [data-theme="light"] .hover\:bg-zinc-900:hover,
 [data-theme="light"] .hover\:bg-slate-900:hover,
+[data-theme="light"] .hover\:bg-slate-900\/90:hover,
+[data-theme="light"] .hover\:bg-slate-900\/80:hover,
+[data-theme="light"] .hover\:bg-slate-900\/70:hover,
 [data-theme="light"] .hover\:bg-slate-900\/60:hover,
+[data-theme="light"] .hover\:bg-slate-900\/50:hover,
 [data-theme="light"] .hover\:bg-\[\#0F131D\]:hover,
 [data-theme="light"] .hover\:bg-\[\#0F1219\]:hover,
 [data-theme="light"] .hover\:bg-\[\#0B0E14\]:hover,
 [data-theme="light"] .hover\:bg-\[\#0B0F17\]:hover,
 [data-theme="light"] .active\:bg-slate-900:active,
 [data-theme="light"] .active\:bg-\[\#0F131D\]:active {
-  background-color: #f1f5f9 !important;
+  background-color: #e2e8f0 !important;
   color: #0f172a !important;
 }
 
 [data-theme="light"] .hover\:bg-slate-800:hover *,
+[data-theme="light"] .hover\:bg-slate-800\/90:hover *,
+[data-theme="light"] .hover\:bg-slate-800\/80:hover *,
+[data-theme="light"] .hover\:bg-slate-800\/60:hover *,
+[data-theme="light"] .hover\:bg-slate-800\/50:hover *,
+[data-theme="light"] .hover\:bg-zinc-800:hover *,
 [data-theme="light"] .hover\:bg-zinc-900:hover *,
 [data-theme="light"] .hover\:bg-slate-900:hover *,
+[data-theme="light"] .hover\:bg-slate-900\/90:hover *,
+[data-theme="light"] .hover\:bg-slate-900\/80:hover *,
+[data-theme="light"] .hover\:bg-slate-900\/70:hover *,
+[data-theme="light"] .hover\:bg-slate-900\/60:hover *,
+[data-theme="light"] .hover\:bg-slate-900\/50:hover *,
 [data-theme="light"] .hover\:bg-\[\#0F131D\]:hover *,
-[data-theme="light"] .hover\:bg-\[\#0F1219\]:hover * {
+[data-theme="light"] .hover\:bg-\[\#0F1219\]:hover *,
+[data-theme="light"] .hover\:bg-\[\#0B0E14\]:hover * {
   color: #0f172a !important;
+}
+
+[data-theme="light"] .hover\:bg-emerald-500\/10:hover {
+  background-color: #d1fae5 !important;
+  color: #047857 !important;
+}
+[data-theme="light"] .hover\:bg-emerald-500\/10:hover * {
+  color: #047857 !important;
 }
 
 /* Card Soft Shadow in Light Mode */

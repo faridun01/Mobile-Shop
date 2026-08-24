@@ -24,6 +24,7 @@ export const SalesHistoryPage: React.FC = () => {
   const {
     currentUser,
     sales,
+    stores,
     openScanner,
     setActivePage,
     processRefund
@@ -31,6 +32,7 @@ export const SalesHistoryPage: React.FC = () => {
 
   const [periodFilter, setPeriodFilter] = useState<'TODAY' | 'MONTH' | 'SPECIFIC_MONTH' | 'ALL'>('SPECIFIC_MONTH');
   const [selectedMonth, setSelectedMonth] = useState<string>(new Date().toISOString().substring(0, 7));
+  const [selectedStoreId, setSelectedStoreId] = useState<string>('ALL');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedSale, setSelectedSale] = useState<Sale | null>(null);
 
@@ -51,7 +53,12 @@ export const SalesHistoryPage: React.FC = () => {
         return false;
       }
 
-      // 2. Period Filter
+      // 2. Store Filter
+      if (selectedStoreId !== 'ALL' && sale.storeId !== selectedStoreId) {
+        return false;
+      }
+
+      // 3. Period Filter
       const saleDateStr = sale.date.split('T')[0];
       if (periodFilter === 'TODAY' && saleDateStr !== todayStr) {
         return false;
@@ -63,7 +70,7 @@ export const SalesHistoryPage: React.FC = () => {
         return false;
       }
 
-      // 3. Search Query
+      // 4. Search Query
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase().trim();
         const matchesReceipt = sale.receiptNumber.toString().includes(q);
@@ -84,7 +91,7 @@ export const SalesHistoryPage: React.FC = () => {
 
       return true;
     });
-  }, [sales, currentUser, periodFilter, selectedMonth, searchQuery]);
+  }, [sales, currentUser, periodFilter, selectedMonth, selectedStoreId, searchQuery]);
 
   // Scan handler to jump straight to sale
   const handleScanFinder = () => {
@@ -162,9 +169,9 @@ export const SalesHistoryPage: React.FC = () => {
           </button>
         </div>
 
-        {/* Period Selector & Export */}
-        <div className="flex items-center justify-between gap-2 text-xs">
-          <div className="flex items-center space-x-1.5 overflow-x-auto">
+        {/* Period & Store Selector & Export */}
+        <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+          <div className="flex flex-wrap items-center gap-1.5 overflow-x-auto">
             <button
               type="button"
               onClick={() => setPeriodFilter('TODAY')}
@@ -204,6 +211,25 @@ export const SalesHistoryPage: React.FC = () => {
             >
               ВСЕ ПРОДАЖИ
             </button>
+
+            {/* Store Filter Dropdown */}
+            {currentUser?.role !== 'SELLER' && (
+              <div className="flex items-center space-x-1 pl-2 border-l border-slate-800">
+                <StoreIcon className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                <select
+                  value={selectedStoreId}
+                  onChange={(e) => setSelectedStoreId(e.target.value)}
+                  className="bg-[#0B0E14] border border-slate-800 text-emerald-400 text-xs font-mono font-bold rounded px-2.5 py-1 focus:outline-none focus:border-emerald-500 cursor-pointer"
+                >
+                  <option value="ALL">★ ВСЕ МАГАЗИНЫ</option>
+                  {stores.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
           </div>
 
           {(currentUser?.role === 'ADMIN' || currentUser?.role === 'PARTNER') && (
