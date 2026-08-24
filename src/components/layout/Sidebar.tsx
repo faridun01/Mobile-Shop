@@ -58,7 +58,7 @@ const NAV_GROUPS: NavGroup[] = [
   {
     title: 'ОСНОВНОЕ',
     items: [
-      { id: 'SALE', label: 'Касса / Продажа', icon: ShoppingBag, roles: ['ADMIN', 'PARTNER', 'SELLER'] },
+      { id: 'SALE', label: 'POS Терминал', icon: ShoppingBag, roles: ['ADMIN', 'PARTNER', 'SELLER'] },
       { id: 'SALES_HISTORY', label: 'История продаж', icon: History, roles: ['ADMIN', 'PARTNER', 'SELLER'] },
       { id: 'EXCHANGE', label: 'Обмен Trade-In', icon: RefreshCw, roles: ['ADMIN', 'PARTNER', 'SELLER'] },
       { id: 'REPAIR', label: 'Сервис и Ремонт', icon: Wrench, roles: ['ADMIN', 'PARTNER', 'SELLER'] },
@@ -102,7 +102,7 @@ export const Sidebar: React.FC = () => {
   const unreadNotifs = notifications.filter(n => !n.read && !n.resolved).length;
 
   return (
-    <aside className="hidden md:flex flex-col w-60 border-r border-slate-800/80 bg-[#0F131D] text-slate-300 select-none shrink-0 h-screen sticky top-0">
+    <aside className="hidden lg:flex flex-col w-60 border-r border-slate-800/80 bg-[#0F131D] text-slate-300 select-none shrink-0 h-screen sticky top-0">
       {/* Brand Header */}
       <div className="h-13 flex items-center px-4 border-b border-slate-800/80 bg-[#0B0F17] justify-between">
         <div className="flex items-center space-x-2.5">

@@ -25,6 +25,7 @@ export type PaymentMethod = 'CASH' | 'CARD' | 'SPLIT';
 export type ExpenseCategory = 
   | 'RENT'
   | 'SALARY'
+  | 'EMPLOYEE_ADVANCE'
   | 'UTILITIES'
   | 'MARKETING'
   | 'TAXES'
@@ -33,6 +34,7 @@ export type ExpenseCategory =
   | 'OTHER'
   | 'Аренда'
   | 'Зарплата'
+  | 'Аванс сотрудника'
   | 'Коммунальные'
   | 'Ремонт'
   | 'Транспорт'
@@ -89,6 +91,8 @@ export interface User {
   active: boolean;
   isActive?: boolean;
   createdAt: string;
+  baseSalaryTjs?: number;
+  salesCommissionPercent?: number;
 }
 
 export interface Store {
@@ -196,6 +200,9 @@ export interface Sale {
   refundReason?: string;
   refundedAt?: string;
   refundedBy?: string;
+  penaltyFeeTjs?: number;
+  penaltyFeeUsd?: number;
+  actualRefundAmountTjs?: number;
 }
 
 export interface TransferRequest {
@@ -249,6 +256,7 @@ export interface RepairTicket {
     note?: string;
   }[];
   createdAt: string;
+  updatedAt?: string;
   estimatedCostTjs?: number;
   finalCostTjs?: number;
   repairCostTjs?: number;
@@ -342,6 +350,9 @@ export interface Expense {
   description?: string;
   createdByName: string;
   paidFromCashRegister?: boolean;
+  employeeId?: string;
+  employeeName?: string;
+  isEmployeeAdvance?: boolean;
 }
 
 export interface Owner {
@@ -409,6 +420,8 @@ export interface AuditLogEntry {
     exchangeRate?: number;
     purchaseCostUsd?: number;
     salePriceTjs?: number;
+    penaltyTjs?: number;
+    penaltyUsd?: number;
   };
   imei?: string;
   receiptNumber?: number;

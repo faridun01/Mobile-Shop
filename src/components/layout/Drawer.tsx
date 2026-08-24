@@ -60,7 +60,7 @@ const NAV_GROUPS: NavGroup[] = [
   {
     title: 'ОСНОВНЫЕ ОПЕРАЦИИ',
     items: [
-      { id: 'SALE', label: 'Касса / Продажа', icon: ShoppingBag, roles: ['ADMIN', 'PARTNER', 'SELLER'] },
+      { id: 'SALE', label: 'POS Терминал', icon: ShoppingBag, roles: ['ADMIN', 'PARTNER', 'SELLER'] },
       { id: 'SALES_HISTORY', label: 'История продаж', icon: History, roles: ['ADMIN', 'PARTNER', 'SELLER'] },
       { id: 'EXCHANGE', label: 'Обмен (Trade-In)', icon: RefreshCw, roles: ['ADMIN', 'PARTNER', 'SELLER'] },
       { id: 'REPAIR', label: 'Сервис и Ремонт', icon: Wrench, roles: ['ADMIN', 'PARTNER', 'SELLER'] },
@@ -105,9 +105,7 @@ export const Drawer: React.FC = () => {
     drawerOpen,
     setDrawerOpen,
     logout,
-    notifications,
-    theme,
-    toggleTheme
+    notifications
   } = useApp();
 
   if (!drawerOpen) return null;
@@ -116,49 +114,47 @@ export const Drawer: React.FC = () => {
   const unreadNotifs = notifications.filter(n => !n.read && !n.resolved).length;
 
   return (
-    <div className="fixed inset-0 z-50 flex md:hidden font-sans">
-      {/* Backdrop */}
-      <div
-        onClick={() => setDrawerOpen(false)}
-        className="fixed inset-0 bg-black/75 backdrop-blur-xs transition-opacity"
-      />
-
-      {/* Drawer panel matching Loyverse POS Mobile Drawer */}
-      <div className="relative flex w-80 max-w-[88vw] flex-1 flex-col bg-[#1e2229] border-r border-[#333842] text-white shadow-2xl safe-area-pb">
-        {/* Loyverse POS Style Header: Owner, POS 1, Mobile */}
-        <div className="p-5 border-b border-[#333842] bg-[#181a1f]">
-          <div className="flex items-start justify-between">
-            <div className="space-y-0.5">
-              <h2 className="text-xl font-bold text-white tracking-wide">
-                {currentUser?.name || 'Owner'}
-              </h2>
-              <p className="text-xs text-slate-300 font-medium">
-                {currentUser?.storeName || 'POS 1'}
-              </p>
-              <p className="text-xs text-slate-400 font-medium">
-                {currentUser?.role === 'ADMIN' ? 'Mobile Terminal' : (currentUser?.role || 'Mobile')}
-              </p>
-            </div>
-
-            <button
-              onClick={() => setDrawerOpen(false)}
-              className="p-1 rounded-lg text-slate-400 hover:text-white"
-            >
-              <X className="w-5 h-5" />
-            </button>
+    <div className="fixed inset-0 z-50 flex md:hidden flex-col bg-[#0B0E14] text-slate-100 font-mono w-full h-full overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+      {/* Top Bar Header */}
+      <div className="p-4 border-b border-slate-800 bg-[#0F1219] flex items-center justify-between shrink-0">
+        <div className="flex items-center space-x-3 min-w-0">
+          <div className="w-9 h-9 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 font-bold text-sm flex items-center justify-center font-mono shrink-0">
+            {currentUser?.name ? currentUser.name.substring(0, 2).toUpperCase() : 'US'}
+          </div>
+          <div className="min-w-0">
+            <h2 className="text-sm font-bold text-slate-100 truncate">
+              {currentUser?.name || 'Пользователь'}
+            </h2>
+            <p className="text-xs font-bold text-emerald-400 truncate">
+              {currentUser?.storeName || 'Магазин №1'}
+            </p>
           </div>
         </div>
 
-        {/* Categorized Loyverse POS Menu list */}
-        <div className="flex-1 overflow-y-auto py-2 px-2 space-y-3">
-          {NAV_GROUPS.map((group, gIdx) => {
-            const visibleItems = group.items.filter(item => item.roles.includes(userRole));
-            if (visibleItems.length === 0) return null;
+        <button
+          type="button"
+          onClick={() => setDrawerOpen(false)}
+          className="px-3 py-2 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 text-xs font-bold transition-all flex items-center space-x-1.5 active:scale-95"
+        >
+          <X className="w-4 h-4" />
+          <span>ЗАКРЫТЬ</span>
+        </button>
+      </div>
 
-            return (
-              <div key={gIdx} className="space-y-0.5">
-                {gIdx > 0 && <div className="my-2 border-t border-[#333842]/80" />}
-                
+      {/* Main Full-Screen Categorized Menu Options Grid */}
+      <div className="flex-1 overflow-y-auto p-4 space-y-4 pb-20">
+        {NAV_GROUPS.map((group, gIdx) => {
+          const visibleItems = group.items.filter(item => item.roles.includes(userRole));
+          if (visibleItems.length === 0) return null;
+
+          return (
+            <div key={gIdx} className="space-y-2">
+              <span className="text-xs font-bold text-slate-400 uppercase tracking-wider px-1 block flex items-center">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 mr-2 inline-block" />
+                {group.title}
+              </span>
+
+              <div className="grid grid-cols-2 gap-2.5">
                 {visibleItems.map(item => {
                   const Icon = item.icon;
                   const routePath = PAGE_ROUTES[item.id] || '/sale';
@@ -173,47 +169,52 @@ export const Drawer: React.FC = () => {
                         navigate(routePath);
                         setDrawerOpen(false);
                       }}
-                      className={`w-full flex items-center justify-between px-3.5 py-3 rounded-lg text-sm transition-colors bg-transparent ${
+                      className={`flex flex-col items-start justify-between p-3.5 rounded-xl border text-left transition-all active:scale-95 ${
                         isActive
-                          ? 'text-[#22c55e] font-semibold'
-                          : 'text-white hover:text-slate-200 font-medium'
+                          ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/40 shadow-[0_0_12px_rgba(16,185,129,0.2)]'
+                          : 'bg-[#0F1219] hover:bg-slate-900 text-slate-200 border-slate-800'
                       }`}
                     >
-                      <div className="flex items-center space-x-3.5 truncate">
-                        <Icon className={`w-5 h-5 shrink-0 ${isActive ? 'text-[#22c55e]' : 'text-white'}`} />
-                        <span className="truncate">{item.label}</span>
+                      <div className="flex items-center justify-between w-full mb-2">
+                        <div className={`p-2 rounded-lg ${isActive ? 'bg-emerald-500/20 text-emerald-400' : 'bg-slate-900 text-slate-300 border border-slate-800'}`}>
+                          <Icon className="w-5 h-5" />
+                        </div>
+                        {isNotif && unreadNotifs > 0 && (
+                          <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-rose-500 px-1.5 text-[10px] font-bold text-white shadow-[0_0_8px_rgba(244,63,94,0.7)]">
+                            {unreadNotifs}
+                          </span>
+                        )}
                       </div>
 
-                      {isNotif && unreadNotifs > 0 && (
-                        <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-rose-500 px-1.5 text-[10px] font-bold text-white shadow-[0_0_6px_rgba(244,63,94,0.7)]">
-                          {unreadNotifs}
-                        </span>
-                      )}
+                      <div>
+                        <span className="text-xs font-bold block text-slate-100 leading-tight">{item.label}</span>
+                        <span className="text-[10px] text-slate-500 block mt-0.5">Перейти →</span>
+                      </div>
                     </button>
                   );
                 })}
               </div>
-            );
-          })}
-        </div>
+            </div>
+          );
+        })}
+      </div>
 
-        {/* Footer Logout & Version info */}
-        <div className="p-3.5 border-t border-[#333842] bg-[#181a1f] flex items-center justify-between shrink-0">
-          <button
-            onClick={() => {
-              setDrawerOpen(false);
-              logout();
-            }}
-            className="px-3 py-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 text-xs font-semibold transition-colors flex items-center space-x-1"
-          >
-            <LogOut className="w-3.5 h-3.5" />
-            <span>Выход</span>
-          </button>
+      {/* Footer Exit Bar */}
+      <div className="p-3 border-t border-slate-800 bg-[#0F1219] flex items-center justify-between shrink-0 fixed bottom-0 left-0 right-0 z-50">
+        <button
+          onClick={() => {
+            setDrawerOpen(false);
+            logout();
+          }}
+          className="px-4 py-2 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 text-xs font-bold transition-all flex items-center space-x-2"
+        >
+          <LogOut className="w-4 h-4" />
+          <span>ВЫХОД ИЗ СИСТЕМЫ</span>
+        </button>
 
-          <p className="text-[11px] font-mono text-slate-500">
-            v.2.73.1
-          </p>
-        </div>
+        <span className="text-[11px] font-mono text-slate-500">
+          Mobile Shop POS v2.73
+        </span>
       </div>
     </div>
   );

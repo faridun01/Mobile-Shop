@@ -132,8 +132,20 @@ export const ReportsPage: React.FC = () => {
       })
       .reduce((acc, b) => acc + (b.amountUsd || 0), 0);
 
-    // Net Profit in USD & TJS (Includes sales profit + repair income - expenses + 100% cash supplier bonuses)
-    const netProfitUsd = +(grossProfitUsd + repairIncomeUsd - expensesUsd + periodCashBonusesUsd).toFixed(2);
+    // Refund penalties in period count 100% towards Net Profit
+    const periodRefundPenaltiesUsd = (sales || [])
+      .filter(s => {
+        if (s.status !== 'REFUNDED' || !s.penaltyFeeUsd) return false;
+        const rDate = (s.refundedAt || s.date || '').split('T')[0];
+        if (period === 'TODAY') return rDate === todayStr;
+        if (period === 'MONTH') return rDate.startsWith(currentMonthStr);
+        if (period === 'SPECIFIC_MONTH') return rDate.startsWith(selectedMonth);
+        return true;
+      })
+      .reduce((acc, s) => acc + (s.penaltyFeeUsd || 0), 0);
+
+    // Net Profit in USD & TJS (Includes sales profit + repair income - expenses + 100% cash supplier bonuses + 100% refund penalties)
+    const netProfitUsd = +(grossProfitUsd + repairIncomeUsd - expensesUsd + periodCashBonusesUsd + periodRefundPenaltiesUsd).toFixed(2);
     const netProfitTjs = Math.round(netProfitUsd * rate);
 
     // Balance Sheet Assets & Liabilities in USD (store-aware)

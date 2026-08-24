@@ -27,10 +27,13 @@ export const OwnersPage: React.FC = () => {
     owners,
     users,
     ownerTransactions,
+    sales,
+    expenses,
     todayRate,
     createOwnerTransaction,
     updateOwnerProfitShares,
-    resetAllOwnerCapital
+    resetAllOwnerCapital,
+    closeQuarterPeriod
   } = useApp();
 
   const getOwnerDisplayName = (owner: { id: string; name?: string }) => {
@@ -48,19 +51,25 @@ export const OwnersPage: React.FC = () => {
 
   const [isTxModalOpen, setIsTxModalOpen] = useState(false);
   const [isSharesModalOpen, setIsSharesModalOpen] = useState(false);
+  const [isQuarterModalOpen, setIsQuarterModalOpen] = useState(false);
+
+  // Quarter Report state
+  const [selectedQuarter, setSelectedQuarter] = useState<'Q1' | 'Q2' | 'Q3' | 'Q4'>('Q1');
+  const [selectedQuarterYear, setSelectedQuarterYear] = useState<number>(2026);
+  const [transferRemainingToCapital, setTransferRemainingToCapital] = useState(true);
 
   // Shares edit state
   const [sharesInput, setSharesInput] = useState<Record<string, string>>({});
 
   // Tx state
   const [selectedOwnerId, setSelectedOwnerId] = useState(owners[0]?.id || '');
-  const [txType, setTxType] = useState<'INVESTMENT' | 'WITHDRAWAL' | 'PROFIT_PAYOUT'>('PROFIT_PAYOUT');
+  const [txType, setTxType] = useState<'INVESTMENT' | 'WITHDRAWAL' | 'PROFIT_PAYOUT' | 'REINVEST'>('PROFIT_PAYOUT');
   const [amountUsd, setAmountUsd] = useState('');
   const [note, setNote] = useState('');
 
   // History filters & search
   const [searchQuery, setSearchQuery] = useState('');
-  const [typeFilter, setTypeFilter] = useState<'ALL' | 'PROFIT_PAYOUT' | 'INVESTMENT' | 'WITHDRAWAL'>('ALL');
+  const [typeFilter, setTypeFilter] = useState<'ALL' | 'PROFIT_PAYOUT' | 'INVESTMENT' | 'WITHDRAWAL' | 'REINVEST'>('ALL');
   const [selectedOwnerFilter, setSelectedOwnerFilter] = useState<string>('ALL');
 
   const [statusMessage, setStatusMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
@@ -86,7 +95,7 @@ export const OwnersPage: React.FC = () => {
     setIsSharesModalOpen(true);
   };
 
-  const openTxModalForOwner = (ownerId: string, defaultType: 'INVESTMENT' | 'PROFIT_PAYOUT' | 'WITHDRAWAL') => {
+  const openTxModalForOwner = (ownerId: string, defaultType: 'INVESTMENT' | 'PROFIT_PAYOUT' | 'WITHDRAWAL' | 'REINVEST') => {
     setSelectedOwnerId(ownerId);
     setTxType(defaultType);
     setAmountUsd('');
@@ -154,6 +163,18 @@ export const OwnersPage: React.FC = () => {
       return;
     }
 
+    const currentOwner = owners.find(o => o.id === selectedOwnerId);
+
+    if (txType === 'REINVEST' && currentOwner) {
+      if (val > (currentOwner.availableProfitUsd ?? 0)) {
+        setStatusMessage({
+          type: 'error',
+          text: `Сумма реинвестирования ($${val}) превышает доступный остаток к выплате ($${currentOwner.availableProfitUsd ?? 0})`
+        });
+        return;
+      }
+    }
+
     const res = createOwnerTransaction({
       ownerId: selectedOwnerId,
       type: txType,
@@ -165,12 +186,53 @@ export const OwnersPage: React.FC = () => {
       setIsTxModalOpen(false);
       setAmountUsd('');
       setNote('');
+      const typeText = txType === 'REINVEST' ? 'Реинвестирование из остатка к выплате' : txType === 'INVESTMENT' ? 'Вложение личного капитала' : txType === 'PROFIT_PAYOUT' ? 'Выплата прибыли' : 'Изъятие капитала';
       setStatusMessage({
         type: 'success',
-        text: `Операция на сумму $${val.toLocaleString()} успешно проведена`
+        text: `Операция «${typeText}» на сумму $${val.toLocaleString()} успешно проведена`
       });
     } else {
       setStatusMessage({ type: 'error', text: res.message || 'Ошибка транзакции' });
+    }
+  };
+
+  const handleExportQuarterlyReport = () => {
+    const headers = ['Партнер', 'Доля %', 'Начислено за квартал ($)', 'Выплачено дивидендов ($)', 'Реинвестировано ($)', 'Остаток к выплате ($)', 'Капитал на конец квартала ($)'];
+    const rows = owners.map(o => [
+      getOwnerDisplayName(o),
+      `${o.profitSharePercent || 0}%`,
+      o.totalAccruedProfitUsd || 0,
+      o.totalPaidProfitUsd || 0,
+      o.totalReinvestedUsd || 0,
+      o.availableProfitUsd || 0,
+      o.capitalBalanceUsd || 0
+    ]);
+    const csvContent = 'data:text/csv;charset=utf-8,\uFEFF'
+      + [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement('a');
+    link.setAttribute('href', encodedUri);
+    link.setAttribute('download', `Квартальный_отчет_${selectedQuarter}_${selectedQuarterYear}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const handleConfirmCloseQuarter = () => {
+    const quarterName = `${selectedQuarter} ${selectedQuarterYear}`;
+    const res = closeQuarterPeriod({
+      quarterName,
+      transferRemainingToCapital
+    });
+
+    if (res.success) {
+      setIsQuarterModalOpen(false);
+      setStatusMessage({
+        type: 'success',
+        text: `Финансовый период «Квартал ${quarterName}» официально закрыт. Сформирован квартальный отчет, показатели начислений обнулены для нового квартала.`
+      });
+    } else {
+      setStatusMessage({ type: 'error', text: res.message || 'Ошибка закрытия квартала' });
     }
   };
 
@@ -248,13 +310,14 @@ export const OwnersPage: React.FC = () => {
           <div className="flex items-center space-x-2">
             <button
               onClick={() => {
-                resetAllOwnerCapital();
-                setStatusMessage({ type: 'success', text: 'Капитал и история операций всех партнеров успешно обнулены ($0 USD)' });
+                setStatusMessage(null);
+                setIsQuarterModalOpen(true);
               }}
-              className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 text-amber-400 hover:text-amber-300 text-xs font-bold transition-colors"
-              title="Сбросить уставной капитал и выплаты всех партнеров до $0 USD"
+              className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-400 hover:text-amber-300 text-xs font-bold transition-colors"
+              title="Сформировать квартальный отчёт партнеров и закрыть финансовый период"
             >
-              <span>🧹 ОБНУЛИТЬ КАПИТАЛ</span>
+              <Briefcase className="w-3.5 h-3.5" />
+              <span>📊 КВАРТАЛЬНЫЙ ОТЧЕТ И ЗАКРЫТИЕ</span>
             </button>
 
             <button
@@ -450,7 +513,7 @@ export const OwnersPage: React.FC = () => {
                   </div>
 
                   {/* Available for Payout Banner */}
-                  <div className="p-3 rounded-lg bg-amber-950/20 border border-amber-900/40 flex items-center justify-between text-xs mt-2">
+                  <div className="p-3 rounded-lg bg-amber-950/20 border border-amber-900/40 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs mt-2">
                     <div>
                       <span className="text-slate-400 text-[10px] uppercase block">Остаток к выплате:</span>
                       <span className="font-bold text-amber-400 text-sm font-mono mt-0.5 block">
@@ -458,18 +521,25 @@ export const OwnersPage: React.FC = () => {
                       </span>
                     </div>
 
-                    <div className="flex items-center space-x-1.5">
+                    <div className="flex flex-wrap items-center gap-1.5">
                       <button
                         onClick={() => openTxModalForOwner(owner.id, 'INVESTMENT')}
-                        className="px-2.5 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-emerald-400 border border-slate-800 text-xs font-bold transition-colors"
-                        title="Пополнить капитал"
+                        className="px-2 py-1 rounded-lg bg-slate-900 hover:bg-slate-800 text-emerald-400 border border-slate-800 text-[11px] font-bold transition-colors"
+                        title="Внести новые личные средства в капитал"
                       >
-                        + ВЛОЖИТЬ
+                        + ЛИЧНЫЕ
+                      </button>
+                      <button
+                        onClick={() => openTxModalForOwner(owner.id, 'REINVEST')}
+                        className="px-2 py-1 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 text-[11px] font-bold transition-colors flex items-center space-x-1"
+                        title="Реинвестировать остаток к выплате в бизнес"
+                      >
+                        <span>🔄 ВЛОЖИТЬ ОСТАТОК</span>
                       </button>
                       <button
                         onClick={() => openTxModalForOwner(owner.id, 'PROFIT_PAYOUT')}
-                        className="px-2.5 py-1.5 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-800 text-xs font-bold transition-colors"
-                        title="Выплатить прибыль"
+                        className="px-2 py-1 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-800 text-[11px] font-bold transition-colors"
+                        title="Выплатить прибыль на руки"
                       >
                         ↑ ВЫПЛАТИТЬ
                       </button>
@@ -560,7 +630,17 @@ export const OwnersPage: React.FC = () => {
                     : 'border-slate-800 text-slate-400 hover:border-slate-700 hover:text-slate-200'
                   }`}
               >
-                ВНЕСЕНИЯ КАПИТАЛА
+                ЛИЧНЫЕ ВЛОЖЕНИЯ
+              </button>
+              <button
+                type="button"
+                onClick={() => setTypeFilter('REINVEST')}
+                className={`px-3 py-1 rounded-md border text-xs font-mono font-bold uppercase tracking-wider whitespace-nowrap transition-colors bg-transparent ${typeFilter === 'REINVEST'
+                    ? 'border-amber-400 text-amber-400'
+                    : 'border-slate-800 text-slate-400 hover:border-slate-700 hover:text-slate-200'
+                  }`}
+              >
+                РЕИНВЕСТИРОВАНИЕ
               </button>
               <button
                 type="button"
@@ -595,6 +675,7 @@ export const OwnersPage: React.FC = () => {
             ) : (
               filteredTransactions.map((tx) => {
                 const isDeposit = tx.type === 'INVESTMENT';
+                const isReinvest = tx.type === 'REINVEST';
                 const isPayout = tx.type === 'PROFIT_PAYOUT';
                 const isWithdrawal = tx.type === 'WITHDRAWAL';
                 const tjsVal = Math.round((tx.amountUsd || 0) * rate);
@@ -605,22 +686,27 @@ export const OwnersPage: React.FC = () => {
                     className="p-3.5 rounded-xl bg-[#0B0E14] border border-slate-800 hover:border-slate-700 transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-sm"
                   >
                     <div className="flex items-start space-x-3 min-w-0">
-                      <div className={`p-2.5 rounded-lg shrink-0 border ${isDeposit ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400' :
-                          isPayout ? 'bg-amber-500/10 border-amber-500/30 text-amber-400' :
-                            'bg-rose-500/10 border-rose-500/30 text-rose-400'
-                        }`}>
-                        {isDeposit ? <ArrowDownLeft className="w-4 h-4" /> :
-                          isPayout ? <ArrowUpRight className="w-4 h-4" /> :
-                            <Wallet className="w-4 h-4" />}
+                      <div className={`p-2.5 rounded-lg shrink-0 border ${
+                        isReinvest ? 'bg-amber-500/10 border-amber-500/30 text-amber-400' :
+                        isDeposit ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400' :
+                        isPayout ? 'bg-sky-500/10 border-sky-500/30 text-sky-400' :
+                        'bg-rose-500/10 border-rose-500/30 text-rose-400'
+                      }`}>
+                        {isReinvest ? <Coins className="w-4 h-4" /> :
+                         isDeposit ? <ArrowDownLeft className="w-4 h-4" /> :
+                         isPayout ? <ArrowUpRight className="w-4 h-4" /> :
+                         <Wallet className="w-4 h-4" />}
                       </div>
 
                       <div className="space-y-1 min-w-0">
                         <div className="flex flex-wrap items-center gap-2">
-                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded border uppercase tracking-wider ${isDeposit ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400' :
-                              isPayout ? 'bg-amber-500/10 border-amber-500/30 text-amber-400' :
-                                'bg-rose-500/10 border-rose-500/30 text-rose-400'
-                            }`}>
-                            {isDeposit ? 'ВНЕСЕНИЕ КАПИТАЛА' : isPayout ? 'ВЫПЛАТА ПРИБЫЛИ' : 'ВЫВОД КАПИТАЛА'}
+                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded border uppercase tracking-wider ${
+                            isReinvest ? 'bg-amber-500/10 border-amber-500/30 text-amber-400' :
+                            isDeposit ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400' :
+                            isPayout ? 'bg-sky-500/10 border-sky-500/30 text-sky-400' :
+                            'bg-rose-500/10 border-rose-500/30 text-rose-400'
+                          }`}>
+                            {isReinvest ? '🔄 РЕИНВЕСТИРОВАНИЕ' : isDeposit ? '📥 ВНЕСЕНИЕ КАПИТАЛА' : isPayout ? '📤 ВЫПЛАТА ПРИБЫЛИ' : '🏦 ВЫВОД КАПИТАЛА'}
                           </span>
 
                           <span className="text-xs font-bold text-slate-200">
@@ -762,11 +848,46 @@ export const OwnersPage: React.FC = () => {
                   onChange={(e) => setTxType(e.target.value as any)}
                   className="w-full rounded-lg bg-[#0B0E14] border border-slate-800 px-3 py-2 text-slate-100 text-xs focus:border-emerald-500 focus:outline-none"
                 >
-                  <option value="INVESTMENT">📥 Внесение капитала / Личное вложение средств ($)</option>
+                  <option value="INVESTMENT">📥 Внесение капитала (Личные внешние средства)</option>
+                  <option value="REINVEST">🔄 Реинвестирование в бизнес (Из Остатка к выплате)</option>
                   <option value="PROFIT_PAYOUT">📤 Выплата чистой прибыли / дивидендов ($)</option>
                   <option value="WITHDRAWAL">🏦 Изъятие / Вывод капитала ($)</option>
                 </select>
               </div>
+
+              {/* Helper box for INVESTMENT / REINVEST */}
+              {(() => {
+                const currentOwner = owners.find(o => o.id === selectedOwnerId);
+                const availProfit = currentOwner?.availableProfitUsd ?? 0;
+
+                if (txType === 'REINVEST' || txType === 'INVESTMENT') {
+                  return (
+                    <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/30 space-y-2 font-mono">
+                      <div className="flex items-center justify-between text-[11px]">
+                        <span className="text-slate-400">Остаток к выплате партнера:</span>
+                        <strong className="text-amber-400 font-bold">${availProfit.toLocaleString()} USD</strong>
+                      </div>
+
+                      {txType === 'REINVEST' && availProfit > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => setAmountUsd(availProfit.toString())}
+                          className="w-full py-1.5 px-2 rounded bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 font-mono text-[10px] font-bold border border-amber-500/40 flex items-center justify-center space-x-1 transition-colors"
+                        >
+                          <span>⚡ ВЛОЖИТЬ ВЕСЬ ОСТАТОК (${availProfit.toLocaleString()})</span>
+                        </button>
+                      )}
+
+                      <p className="text-[10px] text-slate-400 leading-snug">
+                        {txType === 'REINVEST'
+                          ? '★ Выбранный остаток к выплате будет зачислен в капитал бизнеса без выдачи наличных на руки.'
+                          : '★ Внесение дополнительных личных средств владельца.'}
+                      </p>
+                    </div>
+                  );
+                }
+                return null;
+              })()}
 
               <div>
                 <label className="block text-slate-400 text-[10px] uppercase mb-1">СУММА ($ USD) *</label>
@@ -812,6 +933,137 @@ export const OwnersPage: React.FC = () => {
               </button>
             </div>
           </form>
+        </div>
+      )}
+
+      {/* MODAL: Quarterly Report & Period Settlement */}
+      {isQuarterModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-4 backdrop-blur-xs font-mono">
+          <div className="w-full max-w-2xl rounded-xl bg-[#0F1219] border border-amber-500/40 p-5 text-slate-200 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+              <h4 className="text-xs sm:text-sm font-bold text-amber-400 uppercase tracking-wider flex items-center space-x-2">
+                <Briefcase className="w-4 h-4 text-amber-400" />
+                <span>📊 КВАРТАЛЬНЫЙ ОТЧЕТ И ЗАКРЫТИЕ ФИНАНСОВОГО ПЕРИОДА</span>
+              </h4>
+              <button type="button" onClick={() => setIsQuarterModalOpen(false)} className="text-slate-500 hover:text-slate-300">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Quarter & Year Selector Controls */}
+            <div className="grid grid-cols-2 gap-3 bg-[#0B0E14] p-3 rounded-lg border border-slate-800">
+              <div>
+                <label className="block text-[10px] text-slate-400 uppercase mb-1 font-bold">ОТЧЕТНЫЙ КВАРТАЛ *</label>
+                <select
+                  value={selectedQuarter}
+                  onChange={(e) => setSelectedQuarter(e.target.value as any)}
+                  className="w-full rounded-md bg-[#0F1219] border border-slate-800 px-3 py-1.5 text-xs text-amber-300 font-bold focus:border-amber-500 focus:outline-none"
+                >
+                  <option value="Q1">Q1 (1-й Квартал: Январь - Март)</option>
+                  <option value="Q2">Q2 (2-й Квартал: Апрель - Июнь)</option>
+                  <option value="Q3">Q3 (3-й Квартал: Июль - Сентябрь)</option>
+                  <option value="Q4">Q4 (4-й Квартал: Октябрь - Декабрь)</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-[10px] text-slate-400 uppercase mb-1 font-bold">ОТЧЕТНЫЙ ГОД *</label>
+                <select
+                  value={selectedQuarterYear}
+                  onChange={(e) => setSelectedQuarterYear(parseInt(e.target.value))}
+                  className="w-full rounded-md bg-[#0F1219] border border-slate-800 px-3 py-1.5 text-xs text-slate-100 font-bold focus:border-amber-500 focus:outline-none"
+                >
+                  <option value={2026}>2026 год</option>
+                  <option value={2025}>2025 год</option>
+                  <option value={2024}>2024 год</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Breakdown Table */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between text-xs">
+                <span className="font-bold text-slate-200 uppercase">Сводная ведомость по партнерам:</span>
+                <span className="text-[10px] text-slate-500 font-mono">Валюта отчета: USD ($)</span>
+              </div>
+
+              <div className="overflow-x-auto rounded-lg border border-slate-800 bg-[#0B0E14]">
+                <table className="w-full text-left text-xs font-mono">
+                  <thead className="bg-[#0F1219] text-[10px] text-slate-400 uppercase border-b border-slate-800">
+                    <tr>
+                      <th className="p-2.5">Партнер</th>
+                      <th className="p-2.5 text-center">Доля</th>
+                      <th className="p-2.5 text-right">Начислено ($)</th>
+                      <th className="p-2.5 text-right">Выплачено ($)</th>
+                      <th className="p-2.5 text-right">Реинвестировано ($)</th>
+                      <th className="p-2.5 text-right text-amber-400">Остаток ($)</th>
+                      <th className="p-2.5 text-right">Капитал ($)</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-800/60 text-[11px]">
+                    {owners.map(o => (
+                      <tr key={o.id} className="hover:bg-slate-900/40">
+                        <td className="p-2.5 font-bold text-slate-200">{getOwnerDisplayName(o)}</td>
+                        <td className="p-2.5 text-center text-slate-400">{o.profitSharePercent || 0}%</td>
+                        <td className="p-2.5 text-right font-semibold text-slate-100">${(o.totalAccruedProfitUsd || 0).toLocaleString()}</td>
+                        <td className="p-2.5 text-right text-sky-400">${(o.totalPaidProfitUsd || 0).toLocaleString()}</td>
+                        <td className="p-2.5 text-right text-emerald-400">${(o.totalReinvestedUsd || 0).toLocaleString()}</td>
+                        <td className="p-2.5 text-right font-bold text-amber-400">${(o.availableProfitUsd || 0).toLocaleString()}</td>
+                        <td className="p-2.5 text-right font-semibold text-slate-200">${(o.capitalBalanceUsd || 0).toLocaleString()}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  <tfoot className="bg-[#0F1219] font-bold border-t border-slate-800 text-[11px]">
+                    <tr>
+                      <td colSpan={2} className="p-2.5 uppercase text-slate-400">ИТОГО КВАРТАЛ:</td>
+                      <td className="p-2.5 text-right text-slate-100">${owners.reduce((sum, o) => sum + (o.totalAccruedProfitUsd || 0), 0).toLocaleString()}</td>
+                      <td className="p-2.5 text-right text-sky-400">${owners.reduce((sum, o) => sum + (o.totalPaidProfitUsd || 0), 0).toLocaleString()}</td>
+                      <td className="p-2.5 text-right text-emerald-400">${owners.reduce((sum, o) => sum + (o.totalReinvestedUsd || 0), 0).toLocaleString()}</td>
+                      <td className="p-2.5 text-right text-amber-400">${owners.reduce((sum, o) => sum + (o.availableProfitUsd || 0), 0).toLocaleString()}</td>
+                      <td className="p-2.5 text-right text-slate-100">${owners.reduce((sum, o) => sum + (o.capitalBalanceUsd || 0), 0).toLocaleString()}</td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            </div>
+
+            {/* Quarter Settlement Option Checkbox */}
+            <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/30 space-y-2">
+              <label className="flex items-start space-x-2.5 cursor-pointer text-slate-200 text-xs">
+                <input
+                  type="checkbox"
+                  checked={transferRemainingToCapital}
+                  onChange={(e) => setTransferRemainingToCapital(e.target.checked)}
+                  className="rounded bg-[#0B0E14] border-slate-700 text-amber-500 focus:ring-0 mt-0.5"
+                />
+                <div>
+                  <strong className="block text-amber-300">Автоматически реинвестировать невыплаченный остаток в капитал</strong>
+                  <span className="text-[10px] text-slate-400 block mt-0.5">
+                    При установке этой галочки все невыплаченные средства партнеров будут зачислены в их оборотный капитал бизнеса до обнуления периода.
+                  </span>
+                </div>
+              </label>
+            </div>
+
+            <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2 pt-2 border-t border-slate-800">
+              <button
+                type="button"
+                onClick={handleExportQuarterlyReport}
+                className="py-2.5 px-3 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 text-xs font-bold text-slate-200 flex items-center justify-center space-x-1.5 transition-colors"
+              >
+                <Download className="w-4 h-4 text-emerald-400" />
+                <span>СКАЧАТЬ ОТЧЕТ (CSV)</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={handleConfirmCloseQuarter}
+                className="flex-1 py-2.5 px-3 rounded-lg bg-amber-500 hover:bg-amber-400 text-xs font-bold uppercase text-slate-950 shadow-[0_0_12px_rgba(245,158,11,0.3)] transition-colors"
+              >
+                🧹 ЗАКРЫТЬ КВАРТАЛ И ОБНУЛИТЬ
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

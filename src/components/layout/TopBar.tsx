@@ -22,7 +22,7 @@ export const TopBar: React.FC = () => {
 
   const getPageTitle = () => {
     switch (activePage) {
-      case 'SALE': return 'Касса / Продажа';
+      case 'SALE': return 'POS Терминал';
       case 'SALES_HISTORY': return 'История продаж';
       case 'INVENTORY': return 'Склад товаров';
       case 'PURCHASE': return 'Приходы товара';
@@ -58,10 +58,12 @@ export const TopBar: React.FC = () => {
           <h1 className="text-xs sm:text-sm font-bold text-slate-100 truncate tracking-tight">
             {getPageTitle()}
           </h1>
-          <p className="text-[10px] text-slate-400 font-mono truncate flex items-center">
-            <Store className="w-2.5 h-2.5 mr-1 text-emerald-400 shrink-0 inline" />
-            <span className="truncate">{currentUser?.storeName || (currentUser?.role === 'ADMIN' ? 'Все филиалы' : 'Магазин')}</span>
-          </p>
+          {currentUser?.role !== 'SELLER' && (
+            <p className="text-[10px] text-slate-400 font-mono truncate flex items-center">
+              <Store className="w-2.5 h-2.5 mr-1 text-emerald-400 shrink-0 inline" />
+              <span className="truncate">{currentUser?.storeName || (currentUser?.role === 'ADMIN' ? 'Все филиалы' : 'Магазин')}</span>
+            </p>
+          )}
         </div>
       </div>
 

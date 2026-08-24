@@ -109,6 +109,7 @@ interface AppContextType {
     saleId: string;
     reason: string;
     refundAmountTjs: number;
+    penaltyFeeTjs?: number;
     paymentMethod: 'CASH' | 'CARD';
   }) => { success: boolean; message?: string };
 
@@ -198,6 +199,9 @@ interface AppContextType {
     comment?: string;
     description?: string;
     paidFromCashRegister?: boolean;
+    employeeId?: string;
+    employeeName?: string;
+    isEmployeeAdvance?: boolean;
   }) => { success: boolean; message?: string };
 
   createOwnerTransaction: (params: {
@@ -232,6 +236,7 @@ interface AppContextType {
   switchToRealDataMode: () => void;
   resetAllCashBalances: () => void;
   resetAllOwnerCapital: () => void;
+  closeQuarterPeriod: (params: { quarterName: string; transferRemainingToCapital: boolean }) => { success: boolean; message?: string };
   resetEntireSystemDataToZero: () => void;
   theme: ThemeMode;
   setTheme: (theme: ThemeMode) => void;
@@ -1019,11 +1024,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     saleId,
     reason,
     refundAmountTjs,
+    penaltyFeeTjs = 0,
     paymentMethod
   }: {
     saleId: string;
     reason: string;
     refundAmountTjs: number;
+    penaltyFeeTjs?: number;
     paymentMethod: 'CASH' | 'CARD';
   }) => {
     if (!currentUser || currentUser.role === 'SELLER') {
@@ -1033,6 +1040,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (!sale) return { success: false, message: 'Чек не найден' };
 
     const rate = todayRate?.rate || 9.50;
+    const penaltyUsd = +(penaltyFeeTjs / rate).toFixed(2);
+    const actualRefundTjs = Math.max(0, refundAmountTjs);
+    const actualRefundUsd = +(actualRefundTjs / rate).toFixed(2);
+
     const updatedSales = sales.map(s => {
       if (s.id === saleId) {
         return {
@@ -1040,13 +1051,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           status: 'REFUNDED' as const,
           refundReason: reason,
           refundedAt: new Date().toISOString(),
-          refundedBy: currentUser.name
+          refundedBy: currentUser.name,
+          penaltyFeeTjs,
+          penaltyFeeUsd: penaltyUsd,
+          actualRefundAmountTjs: actualRefundTjs
         };
       }
       return s;
     });
 
-    // Return sold devices to store stock
+    // Return sold devices to store stock at their original purchase cost basis
     const deviceIds = sale.items.map(i => i.deviceId);
     const updatedDevices = devices.map(d => {
       if (deviceIds.includes(d.id)) {
@@ -1059,7 +1073,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               id: `t-${Date.now()}`,
               date: new Date().toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }),
               type: 'REFUND',
-              description: `Возврат чека #${sale.receiptNumber}. Причина: ${reason}`,
+              description: `Возврат по чеку #${sale.receiptNumber}. Оприходован на склад по себестоимости закупки ($${d.costBasisUsd || d.purchaseCostUsd}). ${penaltyFeeTjs > 0 ? `Штраф за возврат: ${penaltyFeeTjs} TJS.` : ''}`,
               user: currentUser.name,
               storeName: sale.storeName
             }
@@ -1071,22 +1085,23 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     const updatedStores = stores.map(s => {
       if (s.id === sale.storeId && paymentMethod === 'CASH') {
-        return { ...s, cashBalanceTjs: s.cashBalanceTjs - refundAmountTjs };
+        return { ...s, cashBalanceTjs: s.cashBalanceTjs - actualRefundTjs };
       }
       return s;
     });
 
-    // Reverse owner accrued profit from the original sale
-    const refundUsd = +(refundAmountTjs / rate).toFixed(2);
+    // Reverse owner accrued profit from original sale, but 100% of penalty is net profit!
     const totalCostUsd = sale.items.reduce((acc, si) => acc + (si.costBasisUsd || 0), 0);
     const originalProfitUsd = sale.totalUsd - totalCostUsd;
+    const netProfitImpactUsd = -originalProfitUsd + penaltyUsd;
+
     const updatedOwners = owners.map(o => {
       const share = o.profitSharePercent / 100;
-      const profitPart = +(originalProfitUsd * share).toFixed(2);
+      const ownerProfitDeltaUsd = +(netProfitImpactUsd * share).toFixed(2);
       return {
         ...o,
-        totalAccruedProfitUsd: +(o.totalAccruedProfitUsd - profitPart).toFixed(2),
-        availableProfitUsd: +(o.availableProfitUsd - profitPart).toFixed(2)
+        totalAccruedProfitUsd: +(o.totalAccruedProfitUsd + ownerProfitDeltaUsd).toFixed(2),
+        availableProfitUsd: +(o.availableProfitUsd + ownerProfitDeltaUsd).toFixed(2)
       };
     });
 
@@ -1097,18 +1112,29 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     addLedgerEntry(
       'REFUND',
-      `Возврат по чеку #${sale.receiptNumber}: ${reason} (-${refundAmountTjs} TJS)`,
-      -refundAmountTjs,
-      -refundUsd,
+      `Возврат по чеку #${sale.receiptNumber}: ${reason} (-${actualRefundTjs} TJS)${penaltyFeeTjs > 0 ? ` [Штраф: +${penaltyFeeTjs} TJS]` : ''}`,
+      -actualRefundTjs,
+      -actualRefundUsd,
       sale.storeId,
       sale.id
     );
 
+    if (penaltyFeeTjs > 0) {
+      addLedgerEntry(
+        'SUPPLIER_BONUS',
+        `Штраф за возврат товара по чеку #${sale.receiptNumber} (+${penaltyFeeTjs} TJS - 100% в чистую прибыль)`,
+        penaltyFeeTjs,
+        penaltyUsd,
+        sale.storeId,
+        sale.id
+      );
+    }
+
     addAuditLog(
       'REFUND',
-      `Чек #${sale.receiptNumber}: Оформлен возврат на сумму ${refundAmountTjs} TJS. Причина: ${reason}`,
+      `Чек #${sale.receiptNumber}: Возврат на сумму ${actualRefundTjs} TJS. ${penaltyFeeTjs > 0 ? `Удержится штраф: ${penaltyFeeTjs} TJS (100% зачисляется в прибыль).` : ''} Причина: ${reason}`,
       {
-        financialDetails: { amountTjs: refundAmountTjs, amountUsd: +(refundAmountTjs / rate).toFixed(2) },
+        financialDetails: { amountTjs: actualRefundTjs, amountUsd: actualRefundUsd, penaltyTjs: penaltyFeeTjs, penaltyUsd },
         receiptNumber: sale.receiptNumber,
         targetId: sale.id
       }
@@ -1899,7 +1925,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     sourceAccount,
     comment,
     description,
-    paidFromCashRegister
+    paidFromCashRegister,
+    employeeId,
+    employeeName,
+    isEmployeeAdvance
   }: {
     category: ExpenseCategory;
     amountTjs: number;
@@ -1909,6 +1938,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     comment?: string;
     description?: string;
     paidFromCashRegister?: boolean;
+    employeeId?: string;
+    employeeName?: string;
+    isEmployeeAdvance?: boolean;
   }) => {
     if (!currentUser) return { success: false, message: 'Необходима авторизация' };
     const rate = todayRate?.rate || 9.50;
@@ -1917,6 +1949,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const resolvedComment = comment || description || 'Расход';
     const resolvedSource = sourceAccount || (paidFromCashRegister ? (storeObj ? `Касса ${storeObj.name}` : 'Касса') : 'Счет компании');
     const resolvedTargetType = targetType || (storeId ? 'STORE' : 'BUSINESS');
+
+    const targetEmployee = employeeId ? users.find(u => u.id === employeeId) : undefined;
+    const resolvedEmployeeName = employeeName || targetEmployee?.name;
+    const isAdvance = isEmployeeAdvance || category === 'EMPLOYEE_ADVANCE' || category === 'Аванс сотрудника';
 
     const newExpense: Expense = {
       id: `exp-${Date.now()}`,
@@ -1930,7 +1966,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       storeName: storeObj?.name,
       sourceAccount: resolvedSource,
       comment: resolvedComment,
-      createdByName: currentUser.name
+      description: resolvedComment,
+      createdByName: currentUser.name,
+      paidFromCashRegister: paidFromCashRegister ?? true,
+      employeeId: employeeId || undefined,
+      employeeName: resolvedEmployeeName || undefined,
+      isEmployeeAdvance: isAdvance
     };
 
     // Deduct from store cash if from store cash
@@ -2358,6 +2399,41 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     addAuditLog('OWNERS_CAPITAL_RESET', 'Капитал и история операций всех партнеров обнулены ($0 USD / 0 TJS)');
   };
 
+  const closeQuarterPeriod = ({
+    quarterName,
+    transferRemainingToCapital
+  }: {
+    quarterName: string;
+    transferRemainingToCapital: boolean;
+  }) => {
+    if (!currentUser || currentUser.role === 'SELLER') return { success: false, message: 'Нет прав' };
+
+    setOwners(prev => {
+      const updated = prev.map(o => {
+        const remaining = o.availableProfitUsd || 0;
+        const newCapital = transferRemainingToCapital ? o.capitalBalanceUsd + remaining : o.capitalBalanceUsd;
+        return {
+          ...o,
+          capitalBalanceUsd: newCapital,
+          totalAccruedProfitUsd: 0,
+          totalPaidProfitUsd: 0,
+          totalReinvestedUsd: transferRemainingToCapital ? o.totalReinvestedUsd + remaining : o.totalReinvestedUsd,
+          availableProfitUsd: transferRemainingToCapital ? 0 : o.availableProfitUsd
+        };
+      });
+      saveStorage(STORAGE_KEYS.OWNERS, updated);
+      return updated;
+    });
+
+    addAuditLog(
+      'QUARTER_CLOSE',
+      `Закрыт квартальный период (${quarterName}): сформирован отчет${transferRemainingToCapital ? ', остаток зачислен в капитал' : ''}, обнулены начисления квартала`,
+      {}
+    );
+
+    return { success: true };
+  };
+
   const resetEntireSystemDataToZero = () => {
     localStorage.clear();
     setDevices([]);
@@ -2492,6 +2568,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         switchToRealDataMode,
         resetAllCashBalances,
         resetAllOwnerCapital,
+        closeQuarterPeriod,
         resetEntireSystemDataToZero,
         theme,
         setTheme,

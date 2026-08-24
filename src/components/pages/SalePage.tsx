@@ -323,12 +323,25 @@ export const SalePage: React.FC = () => {
       {/* Product Catalog List */}
       <div className={`flex-1 overflow-y-auto divide-y divide-slate-800/50 bg-[#0B0E14] ${cart.length > 0 ? 'pb-32 md:pb-24' : 'pb-16 md:pb-4'}`}>
         {groupedVariants.length === 0 ? (
-          <div className="p-8 text-center text-slate-500">
-            <Smartphone className="w-8 h-8 mx-auto mb-2 opacity-25" />
-            <p className="text-xs font-mono uppercase tracking-wider">Товары не найдены</p>
-            <p className="text-[11px] text-slate-500 font-mono mt-1">
-              В наличии нет устройств по выбранному фильтру ({activeStoreName})
-            </p>
+          <div className="min-h-[50vh] flex flex-col items-center justify-center p-6 text-center text-slate-400 font-mono space-y-3">
+            <div className="w-14 h-14 rounded-2xl bg-slate-900 border border-slate-800 flex items-center justify-center text-slate-500 shadow-inner">
+              <Smartphone className="w-7 h-7" />
+            </div>
+            <div className="space-y-1">
+              <p className="text-xs font-bold uppercase tracking-wider text-slate-200">ТОВАРЫ НЕ НАЙДЕНЫ</p>
+              <p className="text-[11px] text-slate-400 max-w-xs leading-relaxed">
+                В наличии нет устройств по текущим фильтрам ({activeStoreName})
+              </p>
+            </div>
+            {selectedBrand !== 'ALL' && (
+              <button
+                type="button"
+                onClick={() => setSelectedBrand('ALL')}
+                className="px-3 py-1.5 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-xs font-bold transition-all"
+              >
+                Сбросить фильтр бренда
+              </button>
+            )}
           </div>
         ) : (
           groupedVariants.map((variant) => (

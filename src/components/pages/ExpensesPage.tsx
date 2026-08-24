@@ -29,6 +29,7 @@ import {
 const CATEGORY_CONFIG: Record<string, { label: string; icon: any; colorClass: string; bgClass: string; borderClass: string }> = {
   RENT: { label: 'Аренда помещения', icon: Home, colorClass: 'text-rose-400', bgClass: 'bg-rose-500/10', borderClass: 'border-rose-500/30' },
   SALARY: { label: 'Зарплата сотрудников', icon: UserCheck, colorClass: 'text-sky-400', bgClass: 'bg-sky-500/10', borderClass: 'border-sky-500/30' },
+  EMPLOYEE_ADVANCE: { label: 'Аванс / Подотчет сотрудника', icon: UserCheck, colorClass: 'text-amber-400', bgClass: 'bg-amber-500/10', borderClass: 'border-amber-500/30' },
   UTILITIES: { label: 'Коммуналка и интернет', icon: Zap, colorClass: 'text-amber-400', bgClass: 'bg-amber-500/10', borderClass: 'border-amber-500/30' },
   MARKETING: { label: 'Реклама и маркетинг', icon: Megaphone, colorClass: 'text-purple-400', bgClass: 'bg-purple-500/10', borderClass: 'border-purple-500/30' },
   TAXES: { label: 'Налоги и сборы', icon: Receipt, colorClass: 'text-teal-400', bgClass: 'bg-teal-500/10', borderClass: 'border-teal-500/30' },
@@ -39,6 +40,7 @@ const CATEGORY_CONFIG: Record<string, { label: string; icon: any; colorClass: st
   // Cyrillic fallbacks
   'Аренда': { label: 'Аренда помещения', icon: Home, colorClass: 'text-rose-400', bgClass: 'bg-rose-500/10', borderClass: 'border-rose-500/30' },
   'Зарплата': { label: 'Зарплата сотрудников', icon: UserCheck, colorClass: 'text-sky-400', bgClass: 'bg-sky-500/10', borderClass: 'border-sky-500/30' },
+  'Аванс сотрудника': { label: 'Аванс / Подотчет сотрудника', icon: UserCheck, colorClass: 'text-amber-400', bgClass: 'bg-amber-500/10', borderClass: 'border-amber-500/30' },
   'Коммунальные': { label: 'Коммуналка и интернет', icon: Zap, colorClass: 'text-amber-400', bgClass: 'bg-amber-500/10', borderClass: 'border-amber-500/30' },
   'Ремонт': { label: 'Ремонт и запчасти', icon: Wrench, colorClass: 'text-amber-400', bgClass: 'bg-amber-500/10', borderClass: 'border-amber-500/30' },
   'Транспорт': { label: 'Транспорт и доставка', icon: Package, colorClass: 'text-sky-400', bgClass: 'bg-sky-500/10', borderClass: 'border-sky-500/30' },
@@ -49,6 +51,7 @@ const CATEGORY_CONFIG: Record<string, { label: string; icon: any; colorClass: st
 const STANDARD_CATEGORIES = [
   { id: 'RENT', label: 'Аренда помещения' },
   { id: 'SALARY', label: 'Зарплата сотрудников' },
+  { id: 'EMPLOYEE_ADVANCE', label: 'Аванс / Подотчет сотрудника' },
   { id: 'UTILITIES', label: 'Коммуналка и интернет' },
   { id: 'MARKETING', label: 'Реклама и маркетинг' },
   { id: 'REPAIR_PARTS', label: 'Запчасти для ремонта' },
@@ -62,6 +65,7 @@ export const ExpensesPage: React.FC = () => {
     currentUser,
     expenses,
     stores,
+    users,
     todayRate,
     createExpense
   } = useApp();
@@ -70,6 +74,7 @@ export const ExpensesPage: React.FC = () => {
   const [category, setCategory] = useState<ExpenseCategory>('RENT');
   const [amountTjs, setAmountTjs] = useState('');
   const [storeId, setStoreId] = useState(stores[0]?.id || 'store-1');
+  const [selectedEmployeeId, setSelectedEmployeeId] = useState<string>('');
   const [description, setDescription] = useState('');
   const [paidFromCashRegister, setPaidFromCashRegister] = useState(true);
 
@@ -109,19 +114,25 @@ export const ExpensesPage: React.FC = () => {
       return;
     }
 
+    const selectedEmp = selectedEmployeeId ? users.find(u => u.id === selectedEmployeeId) : undefined;
+
     const res = createExpense({
       category,
       amountTjs: val,
       storeId: isSeller ? currentUser.storeId : storeId,
       description: description.trim(),
-      paidFromCashRegister
+      paidFromCashRegister,
+      employeeId: selectedEmployeeId || undefined,
+      employeeName: selectedEmp?.name,
+      isEmployeeAdvance: category === 'EMPLOYEE_ADVANCE' || category === 'Аванс сотрудника' || !!selectedEmployeeId
     });
 
     if (res.success) {
       setIsModalOpen(false);
       setAmountTjs('');
       setDescription('');
-      setStatusMessage({ type: 'success', text: `Расход на сумму ${val} TJS успешно проведен` });
+      setSelectedEmployeeId('');
+      setStatusMessage({ type: 'success', text: `Расход на сумму ${val} TJS успешно проведен ${selectedEmp ? `(зачислен сотруднику ${selectedEmp.name})` : ''}` });
     } else {
       setStatusMessage({ type: 'error', text: res.message || 'Ошибка проведения расхода' });
     }
@@ -478,6 +489,12 @@ export const ExpensesPage: React.FC = () => {
                           Списано из кассы
                         </span>
                       )}
+
+                      {exp.employeeName && (
+                        <span className="text-[9px] px-2 py-0.5 rounded bg-amber-500/15 text-amber-300 border border-amber-500/30 uppercase font-mono font-bold">
+                          Сотрудник: {exp.employeeName}
+                        </span>
+                      )}
                     </div>
 
                     <p className="text-xs font-mono font-semibold text-slate-200 leading-snug">
@@ -554,6 +571,7 @@ export const ExpensesPage: React.FC = () => {
                 >
                   <option value="RENT">Аренда помещения</option>
                   <option value="SALARY">Зарплата сотрудников</option>
+                  <option value="EMPLOYEE_ADVANCE">Аванс / Подотчет сотрудника</option>
                   <option value="UTILITIES">Коммуналка и интернет</option>
                   <option value="MARKETING">Реклама и маркетинг</option>
                   <option value="REPAIR_PARTS">Запчасти для ремонта</option>
@@ -565,6 +583,28 @@ export const ExpensesPage: React.FC = () => {
                   ))}
                 </select>
               </div>
+
+              {/* Employee selection for Advances or Salary */}
+              {(category === 'EMPLOYEE_ADVANCE' || category === 'SALARY' || category === 'Аванс сотрудника') && (
+                <div>
+                  <label className="block text-slate-400 text-[10px] uppercase mb-1 font-bold flex items-center justify-between">
+                    <span>СОТРУДНИК (ДЛЯ ВЫЧЕТА ИЗ ЗАРПЛАТЫ):</span>
+                    <span className="text-[9px] text-amber-400 font-normal">Удержать из ЗП</span>
+                  </label>
+                  <select
+                    value={selectedEmployeeId}
+                    onChange={(e) => setSelectedEmployeeId(e.target.value)}
+                    className="w-full rounded-lg bg-[#0B0E14] border border-amber-500/40 px-3 py-2 text-amber-300 font-bold focus:border-amber-500 focus:outline-none cursor-pointer"
+                  >
+                    <option value="">-- ВЫБЕРИТЕ СОТРУДНИКА --</option>
+                    {users.filter(u => u.isActive ?? u.active).map(u => (
+                      <option key={u.id} value={u.id}>
+                        {u.name} ({u.role === 'SELLER' ? (u.storeName || 'Продавец') : u.role})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
 
               <div>
                 <label className="block text-slate-400 text-[10px] uppercase mb-1 font-bold">СУММА РАСХОДА (TJS) *</label>

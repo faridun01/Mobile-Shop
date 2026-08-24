@@ -39,6 +39,7 @@ export const SalesHistoryPage: React.FC = () => {
   // Refund dialog state
   const [isRefundDialogOpen, setIsRefundDialogOpen] = useState(false);
   const [refundReason, setRefundReason] = useState('');
+  const [penaltyFeeTjs, setPenaltyFeeTjs] = useState<string>('0');
   const [refundMethod, setRefundMethod] = useState<'CASH' | 'CARD'>('CASH');
   const [refundError, setRefundError] = useState<string | null>(null);
 
@@ -117,10 +118,14 @@ export const SalesHistoryPage: React.FC = () => {
       return;
     }
 
+    const penaltyVal = Math.max(0, parseFloat(penaltyFeeTjs) || 0);
+    const actualRefundVal = Math.max(0, selectedSale.totalTjs - penaltyVal);
+
     const res = processRefund({
       saleId: selectedSale.id,
       reason: refundReason.trim(),
-      refundAmountTjs: selectedSale.totalTjs,
+      refundAmountTjs: actualRefundVal,
+      penaltyFeeTjs: penaltyVal,
       paymentMethod: refundMethod
     });
 
@@ -128,6 +133,7 @@ export const SalesHistoryPage: React.FC = () => {
       setIsRefundDialogOpen(false);
       setSelectedSale(null);
       setRefundReason('');
+      setPenaltyFeeTjs('0');
     } else {
       setRefundError(res.message || 'Ошибка возврата');
     }
@@ -483,6 +489,7 @@ export const SalesHistoryPage: React.FC = () => {
                   onClick={() => {
                     setRefundError(null);
                     setRefundReason('');
+                    setPenaltyFeeTjs('0');
                     setIsRefundDialogOpen(true);
                   }}
                   className="py-1.5 px-3 rounded bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 text-xs font-bold flex items-center justify-center space-x-1.5 col-span-2 sm:col-span-1 transition-colors"
@@ -499,18 +506,18 @@ export const SalesHistoryPage: React.FC = () => {
       {/* DIALOG: Refund confirmation */}
       {isRefundDialogOpen && selectedSale && (
         <div className="fixed inset-0 z-60 flex items-center justify-center bg-black/90 p-4 font-mono">
-          <div className="w-full max-w-sm rounded-lg bg-[#0F1219] border border-slate-800 p-5 text-slate-200 shadow-2xl">
+          <div className="w-full max-w-md rounded-lg bg-[#0F1219] border border-slate-800 p-5 text-slate-200 shadow-2xl">
             <h3 className="text-xs font-bold text-rose-400 flex items-center space-x-1.5 mb-2 uppercase tracking-wider">
               <RotateCcw className="w-4 h-4" />
               <span>ВОЗВРАТ ПО ЧЕКУ #{selectedSale.receiptNumber}</span>
             </h3>
             <p className="text-[11px] text-slate-400 mb-3 font-sans">
-              Товары будут возвращены на склад магазина, сумма {selectedSale.totalTjs} TJS будет возвращена покупателю.
+              Товары будут оприходованы на склад по своей исходной себестоимости закупки ($).
             </p>
 
             <div className="space-y-3 mb-4">
               <div>
-                <label className="block text-[10px] uppercase text-slate-500 mb-1">Причина возврата:</label>
+                <label className="block text-[10px] uppercase text-slate-500 mb-1 font-bold">Причина возврата *:</label>
                 <input
                   type="text"
                   value={refundReason}
@@ -521,11 +528,64 @@ export const SalesHistoryPage: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-[10px] uppercase text-slate-500 mb-1">Способ возврата денег:</label>
+                <label className="block text-[10px] uppercase text-slate-400 mb-1 font-bold flex items-center justify-between">
+                  <span>Удержать штраф за возврат (TJS):</span>
+                  <span className="text-[9px] text-amber-400 font-normal">100% В ЧИСТУЮ ПРИБЫЛЬ</span>
+                </label>
+                <div className="flex items-center space-x-1.5 mb-1.5">
+                  <input
+                    type="number"
+                    min="0"
+                    max={selectedSale.totalTjs}
+                    value={penaltyFeeTjs}
+                    onChange={(e) => setPenaltyFeeTjs(e.target.value)}
+                    placeholder="0 TJS"
+                    className="flex-1 rounded bg-[#0B0E14] border border-slate-800 px-3 py-1.5 text-xs font-mono text-amber-400 font-bold focus:border-amber-500 focus:outline-none"
+                  />
+                  {[0, 5, 10, 15, 20].map((pct) => (
+                    <button
+                      key={pct}
+                      type="button"
+                      onClick={() => setPenaltyFeeTjs(Math.round((selectedSale.totalTjs * pct) / 100).toString())}
+                      className="px-2 py-1 bg-slate-900 hover:bg-slate-800 border border-slate-800 text-[10px] font-mono font-bold text-slate-300 rounded transition-colors"
+                    >
+                      {pct}%
+                    </button>
+                  ))}
+                </div>
+
+                {/* Calculation Summary Box */}
+                <div className="p-2.5 rounded bg-[#0B0E14] border border-slate-800/80 space-y-1 text-[11px]">
+                  <div className="flex justify-between">
+                    <span className="text-slate-400">Сумма в чеке:</span>
+                    <span className="font-mono text-slate-200">{selectedSale.totalTjs.toLocaleString()} TJS</span>
+                  </div>
+                  <div className="flex justify-between font-bold">
+                    <span className="text-slate-300">Возврат покупателю:</span>
+                    <span className="font-mono text-emerald-400">
+                      {Math.max(0, selectedSale.totalTjs - (parseFloat(penaltyFeeTjs) || 0)).toLocaleString()} TJS
+                    </span>
+                  </div>
+                  {(parseFloat(penaltyFeeTjs) || 0) > 0 && (
+                    <div className="flex justify-between pt-1 border-t border-slate-800/80 font-bold">
+                      <span className="text-amber-400">Штраф за возврат:</span>
+                      <span className="font-mono text-amber-400">
+                        +{(parseFloat(penaltyFeeTjs) || 0).toLocaleString()} TJS
+                      </span>
+                    </div>
+                  )}
+                  <p className="text-[9px] text-slate-500 pt-1 italic font-sans">
+                    ★ Телефон возвращается в складской остаток по исходной себестоимости закупки.
+                  </p>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[10px] uppercase text-slate-500 mb-1 font-bold">Способ возврата денег:</label>
                 <select
                   value={refundMethod}
                   onChange={(e) => setRefundMethod(e.target.value as any)}
-                  className="w-full rounded bg-[#0B0E14] border border-slate-800 px-3 py-1.5 text-xs text-slate-100 focus:border-rose-500 focus:outline-none"
+                  className="w-full rounded bg-[#0B0E14] border border-slate-800 px-3 py-1.5 text-xs text-slate-100 focus:border-rose-500 focus:outline-none cursor-pointer"
                 >
                   <option value="CASH">Наличные из кассы</option>
                   <option value="CARD">Безналичный возврат</option>
@@ -534,7 +594,7 @@ export const SalesHistoryPage: React.FC = () => {
 
               {refundError && (
                 <p className="text-xs text-rose-400 flex items-center">
-                  <AlertCircle className="w-3.5 h-3.5 mr-1" />
+                  <AlertCircle className="w-3.5 h-3.5 mr-1 shrink-0" />
                   {refundError}
                 </p>
               )}
@@ -543,15 +603,15 @@ export const SalesHistoryPage: React.FC = () => {
             <div className="flex space-x-2">
               <button
                 onClick={() => setIsRefundDialogOpen(false)}
-                className="flex-1 py-1.5 rounded bg-slate-900 hover:bg-slate-800 border border-slate-800 text-xs font-bold text-slate-300"
+                className="flex-1 py-1.5 rounded bg-slate-900 hover:bg-slate-800 border border-slate-800 text-xs font-bold text-slate-300 transition-colors"
               >
                 ОТМЕНА
               </button>
               <button
                 onClick={handleExecuteRefund}
-                className="flex-1 py-1.5 rounded bg-rose-600 hover:bg-rose-500 text-xs font-bold text-white shadow-[0_0_10px_rgba(244,63,94,0.3)]"
+                className="flex-1 py-1.5 rounded bg-rose-600 hover:bg-rose-500 text-xs font-bold text-white shadow-[0_0_10px_rgba(244,63,94,0.3)] transition-colors"
               >
-                ПОДТВЕРДИТЬ
+                ПОДТВЕРДИТЬ ВОЗВРАТ
               </button>
             </div>
           </div>
