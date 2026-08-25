@@ -97,8 +97,8 @@ export const RepairPage: React.FC = () => {
     }
   }, [location.state]);
 
-  // Selected ticket modal / Issue modal
-  const [selectedTicket, setSelectedTicket] = useState<RepairTicket | null>(null);
+  const [selectedTicketId, setSelectedTicketId] = useState<string | null>(null);
+  const selectedTicket = repairs.find((r) => r.id === selectedTicketId) || null;
   const [isIssueModalOpen, setIsIssueModalOpen] = useState(false);
   const [finalCostInput, setFinalCostInput] = useState('');
   const [issuePaymentMethod, setIssuePaymentMethod] = useState<'CASH' | 'CARD'>('CASH');
@@ -260,7 +260,7 @@ export const RepairPage: React.FC = () => {
   };
 
   const handleOpenIssueModal = (ticket: RepairTicket) => {
-    setSelectedTicket(ticket);
+    setSelectedTicketId(ticket.id);
     setFinalCostInput((ticket.finalCostTjs || ticket.estimatedCostTjs || 0).toString());
     setIsIssueModalOpen(true);
   };
@@ -273,7 +273,7 @@ export const RepairPage: React.FC = () => {
 
     if (res.success) {
       setIsIssueModalOpen(false);
-      setSelectedTicket(null);
+      setSelectedTicketId(null);
       setStatusMessage({
         type: 'success',
         text: `Устройство по квитанции #${selectedTicket.ticketNumber} выдан клиенту. Финальная стоимость (${finalVal} TJS) сохранена в Расходах (/expenses).`

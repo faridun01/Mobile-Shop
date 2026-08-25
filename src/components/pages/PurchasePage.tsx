@@ -73,7 +73,8 @@ export const PurchasePage: React.FC = () => {
   const [periodFilter, setPeriodFilter] = useState<'TODAY' | 'SPECIFIC_MONTH' | 'ALL'>('SPECIFIC_MONTH');
   const [selectedMonth, setSelectedMonth] = useState<string>(new Date().toISOString().substring(0, 7));
   const [selectedSupplierFilter, setSelectedSupplierFilter] = useState<string>('all');
-  const [selectedInvoice, setSelectedInvoice] = useState<SupplierInvoice | null>(null);
+  const [selectedInvoiceId, setSelectedInvoiceId] = useState<string | null>(null);
+  const selectedInvoice = supplierInvoices.find((inv) => inv.id === selectedInvoiceId) || null;
 
   // Form states
   const [selectedSupplierId, setSelectedSupplierId] = useState<string>(suppliers[0]?.id || '');
@@ -181,14 +182,14 @@ export const PurchasePage: React.FC = () => {
       if (matchedDevice && matchedDevice.invoiceNumber) {
         const matchedInv = supplierInvoices.find(inv => inv.invoiceNumber === matchedDevice.invoiceNumber);
         if (matchedInv) {
-          setSelectedInvoice(matchedInv);
+          setSelectedInvoiceId(matchedInv.id);
           return;
         }
       }
 
       const directInv = supplierInvoices.find(inv => inv.invoiceNumber.toLowerCase() === code.toLowerCase());
       if (directInv) {
-        setSelectedInvoice(directInv);
+        setSelectedInvoiceId(directInv.id);
       } else {
         setSearchQuery(code);
       }
@@ -358,7 +359,13 @@ export const PurchasePage: React.FC = () => {
     }).filter(g => g.items.length > 0);
 
     if (cleanGroups.length === 0) {
-      setStatusMessage({ type: 'error', text: 'Добавьте хотя бы один заполненный IMEI' });
+      setStatusMessage({ type: 'error', text: 'Добавьте хотя бы одно устройство с заполненным IMEI' });
+      return;
+    }
+
+    const missingBarcode = cleanGroups.some(g => g.items.some(i => !i.barcode || i.barcode.trim().length === 0));
+    if (missingBarcode) {
+      setStatusMessage({ type: 'error', text: 'Укажите штрихкод (EAN/Баркод) для каждого добавляемого устройства' });
       return;
     }
 
@@ -575,7 +582,7 @@ export const PurchasePage: React.FC = () => {
               return (
                 <div
                   key={inv.id}
-                  onClick={() => setSelectedInvoice(inv)}
+                  onClick={() => setSelectedInvoiceId(inv.id)}
                   className={`p-3 sm:p-3.5 hover:bg-slate-900/60 cursor-pointer transition-colors flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
                     isJustSaved ? 'bg-emerald-500/15 border-l-4 border-l-blue-500' : ''
                   }`}
@@ -681,7 +688,7 @@ export const PurchasePage: React.FC = () => {
                 </div>
 
                 <button
-                  onClick={() => setSelectedInvoice(null)}
+                  onClick={() => setSelectedInvoiceId(null)}
                   className="p-1.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition-colors"
                 >
                   <X className="w-4 h-4" />
@@ -740,10 +747,10 @@ export const PurchasePage: React.FC = () => {
                                 </span>
                               )}
                             </div>
-                            <div className="text-[11px] text-slate-400 mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5">
+                            <div className="text-[11px] text-slate-400 mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 font-mono">
                               <span>IMEI 1: <strong className="text-slate-300">{dev.imei}</strong></span>
-                              {dev.imei2 && <span>IMEI 2: <strong className="text-slate-300">{dev.imei2}</strong></span>}
-                              {dev.barcode && <span className="text-amber-400 font-mono">EAN: {dev.barcode}</span>}
+                              <span>IMEI 2: <strong className={dev.imei2 ? "text-slate-300" : "text-slate-500 font-normal"}>{dev.imei2 || '—'}</strong></span>
+                              <span>Штрихкод (EAN): <strong className={dev.barcode ? "text-amber-400 font-mono" : "text-slate-500 font-normal"}>{dev.barcode || '—'}</strong></span>
                               <span>Локация: <strong className="text-slate-300">{dev.locationName}</strong></span>
                             </div>
                             {dev.bonusCampaign && (
@@ -779,7 +786,7 @@ export const PurchasePage: React.FC = () => {
               {/* Modal Footer */}
               <div className="p-3 border-t border-slate-800 bg-[#0F1219] flex justify-end shrink-0">
                 <button
-                  onClick={() => setSelectedInvoice(null)}
+                  onClick={() => setSelectedInvoiceId(null)}
                   className="px-4 py-1.5 rounded bg-slate-800 hover:bg-slate-700 text-xs font-bold text-slate-200 transition-colors font-mono"
                 >
                   ЗАКРЫТЬ
@@ -1039,14 +1046,15 @@ export const PurchasePage: React.FC = () => {
                     return (
                       <div key={itemIdx} className="grid grid-cols-1 md:grid-cols-3 gap-2">
                         <div>
-                          <label className="block text-zinc-400 mb-1">Штрихкод (EAN)</label>
+                          <label className="block text-zinc-400 mb-1">Штрихкод (EAN) <span className="text-rose-400">*</span></label>
                           <div className="flex items-center gap-1.5">
                             <input
                               type="text"
+                              required
                               value={item.barcode}
                               onChange={(e) => handleUpdateBarcode(groupIdx, itemIdx, e.target.value)}
                               className="min-w-0 flex-1 rounded bg-zinc-950 border border-zinc-800 px-2.5 py-1.5 text-xs text-amber-400 font-mono focus:border-emerald-500 focus:outline-none"
-                              placeholder="EAN-13 / UPC"
+                              placeholder="EAN-13 / UPC *"
                             />
                             <button
                               type="button"

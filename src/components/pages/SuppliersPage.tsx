@@ -36,8 +36,11 @@ export const SuppliersPage: React.FC = () => {
     paySupplier
   } = useApp();
 
-  const [selectedSupplier, setSelectedSupplier] = useState<Supplier | null>(null);
-  const [selectedInvoice, setSelectedInvoice] = useState<SupplierInvoice | null>(null);
+  const [selectedSupplierId, setSelectedSupplierId] = useState<string | null>(null);
+  const [selectedInvoiceId, setSelectedInvoiceId] = useState<string | null>(null);
+
+  const selectedSupplier = suppliers.find(s => s.id === selectedSupplierId) || null;
+  const selectedInvoice = supplierInvoices.find(inv => inv.id === selectedInvoiceId) || null;
   const [isPayModalOpen, setIsPayModalOpen] = useState(false);
   const [isAddSupplierOpen, setIsAddSupplierOpen] = useState(false);
 
@@ -63,7 +66,7 @@ export const SuppliersPage: React.FC = () => {
   }
 
   const handleOpenPay = (supplier: Supplier) => {
-    setSelectedSupplier(supplier);
+    setSelectedSupplierId(supplier.id);
     setPaymentAmountUsd(supplier.totalDebtUsd.toString());
     setPaymentNote(`Оплата поставщику ${supplier.name}`);
     setIsPayModalOpen(true);
@@ -86,10 +89,7 @@ export const SuppliersPage: React.FC = () => {
 
     if (res.success) {
       setIsPayModalOpen(false);
-      setStatusMessage({
-        type: 'success',
-        text: `Оплата $${amt} поставщику ${selectedSupplier.name} успешно проведена (погашение долгов по принципу FIFO)`
-      });
+      setStatusMessage(null);
     } else {
       setStatusMessage({ type: 'error', text: res.message || 'Ошибка оплаты' });
     }
@@ -109,7 +109,7 @@ export const SuppliersPage: React.FC = () => {
     setNewSupplierName('');
     setNewSupplierPhone('');
     setNewSupplierContact('');
-    setStatusMessage({ type: 'success', text: 'Поставщик успешно добавлен' });
+    setStatusMessage(null);
   };
 
   const totalAllDebt = suppliers.reduce((acc, s) => acc + s.totalDebtUsd, 0);
@@ -137,12 +137,15 @@ export const SuppliersPage: React.FC = () => {
         </button>
       </div>
 
-      {statusMessage && (
-        <div className={`mx-4 mt-3 p-2.5 rounded text-xs flex items-center space-x-2 shrink-0 ${
-          statusMessage.type === 'success' ? 'bg-emerald-500/15 text-emerald-300 border border-emerald-800' : 'bg-rose-950/50 text-rose-300 border border-rose-800'
-        }`}>
-          {statusMessage.type === 'success' ? <CheckCircle2 className="w-4 h-4" /> : <AlertCircle className="w-4 h-4" />}
-          <span>{statusMessage.text}</span>
+      {statusMessage && statusMessage.type === 'error' && (
+        <div className="mx-4 mt-3 p-2.5 rounded text-xs flex items-center justify-between shrink-0 bg-rose-950/50 text-rose-300 border border-rose-800">
+          <div className="flex items-center space-x-2">
+            <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
+            <span>{statusMessage.text}</span>
+          </div>
+          <button onClick={() => setStatusMessage(null)} className="text-rose-400 hover:text-white ml-2">
+            <X className="w-3.5 h-3.5" />
+          </button>
         </div>
       )}
 
@@ -161,7 +164,7 @@ export const SuppliersPage: React.FC = () => {
               return (
                 <button
                   key={s.id}
-                  onClick={() => setSelectedSupplier(s)}
+                  onClick={() => setSelectedSupplierId(s.id)}
                   className={`w-full text-left p-4 hover:bg-zinc-900 flex items-center justify-between transition-colors ${
                     isSelected ? 'bg-zinc-900 border-l-2 border-emerald-500' : ''
                   }`}
@@ -218,7 +221,7 @@ export const SuppliersPage: React.FC = () => {
                     <span>Погасить долг (FIFO)</span>
                   </button>
                   <button
-                    onClick={() => setSelectedSupplier(null)}
+                    onClick={() => setSelectedSupplierId(null)}
                     className="p-2 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-white"
                     title="Закрыть"
                   >
@@ -242,7 +245,7 @@ export const SuppliersPage: React.FC = () => {
                     return (
                       <div
                         key={inv.id}
-                        onClick={() => setSelectedInvoice(inv)}
+                        onClick={() => setSelectedInvoiceId(inv.id)}
                         className="p-4 hover:bg-zinc-900 cursor-pointer transition-colors flex items-center justify-between group"
                       >
                         <div>
@@ -309,7 +312,7 @@ export const SuppliersPage: React.FC = () => {
 
             <button
               type="button"
-              onClick={() => setSelectedSupplier(null)}
+              onClick={() => setSelectedSupplierId(null)}
               className="p-1.5 rounded-lg bg-zinc-800 text-zinc-300 hover:text-white hover:bg-zinc-700 transition-colors flex items-center justify-center border border-zinc-700"
               title="Закрыть окно"
             >
@@ -369,7 +372,7 @@ export const SuppliersPage: React.FC = () => {
                 return (
                   <div
                     key={inv.id}
-                    onClick={() => setSelectedInvoice(inv)}
+                    onClick={() => setSelectedInvoiceId(inv.id)}
                     className="p-3 hover:bg-zinc-900/80 active:bg-zinc-900 cursor-pointer transition-colors flex items-center justify-between group border-b border-zinc-800/60"
                   >
                     <div>
@@ -414,7 +417,7 @@ export const SuppliersPage: React.FC = () => {
           <div className="p-3 border-t border-zinc-800 bg-zinc-900 shrink-0">
             <button
               type="button"
-              onClick={() => setSelectedSupplier(null)}
+              onClick={() => setSelectedSupplierId(null)}
               className="w-full py-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-xs font-bold text-zinc-200 flex items-center justify-center space-x-1.5 transition-colors border border-zinc-700"
             >
               <X className="w-4 h-4" />
@@ -591,7 +594,7 @@ export const SuppliersPage: React.FC = () => {
               </div>
 
               <button
-                onClick={() => setSelectedInvoice(null)}
+                onClick={() => setSelectedInvoiceId(null)}
                 className="p-1.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition-colors"
               >
                 <X className="w-4 h-4" />
@@ -676,10 +679,10 @@ export const SuppliersPage: React.FC = () => {
                                 </span>
                               )}
                             </div>
-                            <div className="text-[11px] text-slate-400 mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5">
+                            <div className="text-[11px] text-slate-400 mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 font-mono">
                               <span>IMEI 1: <strong className="text-slate-300">{dev.imei}</strong></span>
-                              {dev.imei2 && <span>IMEI 2: <strong className="text-slate-300">{dev.imei2}</strong></span>}
-                              {dev.barcode && <span className="text-amber-400 font-mono">EAN: {dev.barcode}</span>}
+                              <span>IMEI 2: <strong className={dev.imei2 ? "text-slate-300" : "text-slate-500 font-normal"}>{dev.imei2 || '—'}</strong></span>
+                              <span>Штрихкод (EAN): <strong className={dev.barcode ? "text-amber-400 font-mono" : "text-slate-500 font-normal"}>{dev.barcode || '—'}</strong></span>
                               <span>Локация: <strong className="text-slate-300">{dev.locationName}</strong></span>
                             </div>
                             {dev.bonusCampaign && (
@@ -710,7 +713,7 @@ export const SuppliersPage: React.FC = () => {
             {/* Modal Footer */}
             <div className="p-3 bg-[#0B0E14] border-t border-slate-800 flex justify-end shrink-0">
               <button
-                onClick={() => setSelectedInvoice(null)}
+                onClick={() => setSelectedInvoiceId(null)}
                 className="px-4 py-1.5 rounded bg-slate-800 hover:bg-slate-700 text-xs font-mono font-bold text-slate-200 transition-colors"
               >
                 ЗАКРЫТЬ

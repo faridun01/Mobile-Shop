@@ -174,8 +174,8 @@ app.post('/api/purchases', authenticateJwt, requireRoles('ADMIN', 'PARTNER'), en
         });
       });
 
-      if (normalizedDevices.length === 0 || normalizedDevices.some((device) => !device.imei || !device.brand || !device.model)) {
-        throw new Error('Каждое устройство должно содержать IMEI, бренд и модель');
+      if (normalizedDevices.length === 0 || normalizedDevices.some((device) => !device.imei || !device.barcode || !device.brand || !device.model)) {
+        throw new Error('Каждое устройство должно содержать IMEI, штрихкод (EAN), бренд и модель');
       }
 
       const identifiers = normalizedDevices.flatMap((device) => [device.imei, device.imei2]).filter(Boolean);

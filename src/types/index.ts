@@ -146,6 +146,7 @@ export interface SaleItem {
   deviceId: string;
   imei: string;
   imei2?: string;
+  barcode?: string;
   brand: string;
   model: string;
   storage: string;

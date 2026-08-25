@@ -34,7 +34,8 @@ export const SalesHistoryPage: React.FC = () => {
   const [selectedMonth, setSelectedMonth] = useState<string>(new Date().toISOString().substring(0, 7));
   const [selectedStoreId, setSelectedStoreId] = useState<string>('ALL');
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedSale, setSelectedSale] = useState<Sale | null>(null);
+  const [selectedSaleId, setSelectedSaleId] = useState<string | null>(null);
+  const selectedSale = sales.find((s) => s.id === selectedSaleId) || null;
 
   // Refund dialog state
   const [isRefundDialogOpen, setIsRefundDialogOpen] = useState(false);
@@ -83,7 +84,8 @@ export const SalesHistoryPage: React.FC = () => {
             item.brand.toLowerCase().includes(q) ||
             item.model.toLowerCase().includes(q) ||
             item.imei.toLowerCase().includes(q) ||
-            (item.imei2 && item.imei2.toLowerCase().includes(q))
+            (item.imei2 && item.imei2.toLowerCase().includes(q)) ||
+            (item.barcode && item.barcode.toLowerCase().includes(q))
         );
 
         if (!matchesReceipt && !matchesSeller && !matchesStore && !matchesCustomer && !matchesItem) {
@@ -93,7 +95,7 @@ export const SalesHistoryPage: React.FC = () => {
 
       return true;
     });
-  }, [sales, currentUser, periodFilter, selectedMonth, selectedStoreId, searchQuery]);
+  }, [sales, currentUser, selectedStoreId, selectedMonth, periodFilter, searchQuery]);
 
   // Scan handler to jump straight to sale
   const handleScanFinder = () => {
@@ -101,11 +103,11 @@ export const SalesHistoryPage: React.FC = () => {
       const code = scannedCode.trim();
       const matched = sales.find(s =>
         s.receiptNumber.toString() === code ||
-        s.items.some(i => i.imei === code || i.imei2 === code)
+        s.items.some(i => i.imei === code || i.imei2 === code || i.barcode === code)
       );
 
       if (matched) {
-        setSelectedSale(matched);
+        setSelectedSaleId(matched.id);
       } else {
         setSearchQuery(code);
       }
@@ -132,7 +134,7 @@ export const SalesHistoryPage: React.FC = () => {
 
     if (res.success) {
       setIsRefundDialogOpen(false);
-      setSelectedSale(null);
+      setSelectedSaleId(null);
       setRefundReason('');
       setPenaltyFeeTjs('0');
     } else {
@@ -268,7 +270,7 @@ export const SalesHistoryPage: React.FC = () => {
             return (
               <button
                 key={sale.id}
-                onClick={() => setSelectedSale(sale)}
+                onClick={() => setSelectedSaleId(sale.id)}
                 className="w-full text-left px-3.5 py-2.5 hover:bg-slate-800/30 active:bg-slate-800/50 flex items-center justify-between transition-colors group"
               >
                 <div className="min-w-0 pr-3">
@@ -338,7 +340,7 @@ export const SalesHistoryPage: React.FC = () => {
                 </h3>
               </div>
               <button
-                onClick={() => setSelectedSale(null)}
+                onClick={() => setSelectedSaleId(null)}
                 className="p-1 rounded text-slate-400 hover:text-white hover:bg-slate-800"
               >
                 <X className="w-4 h-4" />
@@ -448,7 +450,7 @@ export const SalesHistoryPage: React.FC = () => {
                   const firstItem = selectedSale.items[0];
                   const saleReceiptNumber = selectedSale.receiptNumber;
                   const customerName = selectedSale.customerName;
-                  setSelectedSale(null);
+                  setSelectedSaleId(null);
                   setActivePage('EXCHANGE');
                   navigate('/exchange', {
                     state: {
@@ -469,7 +471,7 @@ export const SalesHistoryPage: React.FC = () => {
                   const firstItem = selectedSale.items[0];
                   const saleReceiptNumber = selectedSale.receiptNumber;
                   const customerName = selectedSale.customerName;
-                  setSelectedSale(null);
+                  setSelectedSaleId(null);
                   setActivePage('REPAIR');
                   navigate('/repair', {
                     state: {

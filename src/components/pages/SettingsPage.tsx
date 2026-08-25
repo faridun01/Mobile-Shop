@@ -34,12 +34,7 @@ export const SettingsPage: React.FC = () => {
     openDailyRateModal,
     theme,
     setTheme,
-    devices,
-    sales,
-    expenses,
-    switchToRealDataMode,
-    resetAllCashBalances,
-    resetToDemo
+    resetAllCashBalances
   } = useApp();
 
   const [newStoreName, setNewStoreName] = useState('');
@@ -50,8 +45,6 @@ export const SettingsPage: React.FC = () => {
   const [editName, setEditName] = useState('');
   const [editAddress, setEditAddress] = useState('');
   const [deletingStoreConfirm, setDeletingStoreConfirm] = useState<StoreType | null>(null);
-  const [isConfirmRealModeOpen, setIsConfirmRealModeOpen] = useState(false);
-  const [isConfirmDemoModeOpen, setIsConfirmDemoModeOpen] = useState(false);
 
   const [statusMessage, setStatusMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
@@ -330,58 +323,6 @@ export const SettingsPage: React.FC = () => {
               ))}
             </div>
           </div>
-
-          {/* Row 3: Real Data Mode & System Reset */}
-          <div className="p-4 rounded-xl bg-[#0B0E14] border border-slate-800 space-y-4">
-            <div className="flex items-center justify-between pb-2 border-b border-slate-800/80">
-              <div className="flex items-center space-x-2">
-                <ShieldCheck className="w-4 h-4 text-emerald-400" />
-                <h4 className="text-xs sm:text-sm font-bold text-slate-100 uppercase">РЕЖИМ УЧЕТА И ПОДКЛЮЧЕНИЕ РЕАЛЬНЫХ ДАННЫХ</h4>
-              </div>
-            </div>
-
-            <div className="p-4 rounded-xl bg-[#0F1219] border border-slate-800 space-y-3">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div>
-                  {devices.length === 0 && sales.length === 0 ? (
-                    <span className="text-xs font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 px-3 py-1 rounded-full uppercase flex items-center space-x-1.5">
-                      <CheckCircle2 className="w-3.5 h-3.5" />
-                      <span>РЕЖИМ РЕАЛЬНОГО УЧЕТА (LIVE DATA)</span>
-                    </span>
-                  ) : (
-                    <span className="text-xs font-bold text-sky-400 bg-sky-500/10 border border-sky-500/30 px-3 py-1 rounded-full uppercase flex items-center space-x-1.5">
-                      <Sparkles className="w-3.5 h-3.5" />
-                      <span>ДЕМОНСТРАЦИОННЫЙ РЕЖИМ (DEMO MODE)</span>
-                    </span>
-                  )}
-                  <p className="text-xs text-slate-300 mt-2 leading-relaxed">
-                    {devices.length === 0 && sales.length === 0
-                      ? 'Система 100% готова к реальной работе магазина. Тестовые примеры очищены, вы можете вносить настоящие инвойсы товаров и оформлять продажи.'
-                      : `Сейчас в системе находятся примеры демонстрационных данных: ${devices.length} устройств на складе, ${sales.length} чеков продаж и ${expenses.length} операционных расходов.`}
-                  </p>
-                </div>
-              </div>
-
-              <div className="pt-2 border-t border-slate-800/80 flex flex-wrap gap-2.5">
-                <button
-                  type="button"
-                  onClick={() => setIsConfirmRealModeOpen(true)}
-                  className="px-4 py-2 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs uppercase transition-colors shadow-[0_0_12px_rgba(16,185,129,0.3)] flex items-center space-x-2"
-                >
-                  <ShieldCheck className="w-4 h-4" />
-                  <span>ПОДКЛЮЧИТЬ РЕАЛЬНЫЕ ДАННЫЕ (ОЧИСТИТЬ ДЕМО)</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setIsConfirmDemoModeOpen(true)}
-                  className="px-3.5 py-2 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 text-xs font-bold uppercase transition-colors"
-                >
-                  <span>ЗАГРУЗИТЬ ДЕМО-ДАННЫЕ</span>
-                </button>
-              </div>
-            </div>
-          </div>
         </div>
       </div>
 
@@ -521,97 +462,6 @@ export const SettingsPage: React.FC = () => {
                 className="flex-1 py-2 rounded-lg bg-rose-500 hover:bg-rose-400 active:bg-rose-600 text-xs font-bold uppercase text-white shadow-lg shadow-rose-500/30 transition-colors"
               >
                 УДАЛИТЬ ФИЛИАЛ
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* MODAL: CONFIRM REAL DATA MODE */}
-      {isConfirmRealModeOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-4 backdrop-blur-xs font-mono">
-          <div className="w-full max-w-md rounded-xl bg-[#0F1219] border border-emerald-500/40 p-5 shadow-2xl space-y-4 text-slate-200">
-            <div className="flex items-center space-x-3 text-emerald-400 border-b border-slate-800 pb-3">
-              <div className="p-2 rounded-lg bg-emerald-500/20 text-emerald-400 shrink-0">
-                <ShieldCheck className="w-5 h-5" />
-              </div>
-              <div>
-                <h3 className="text-sm font-bold uppercase text-white">ПОДКЛЮЧЕНИЕ РЕАЛЬНЫХ ДАННЫХ</h3>
-                <p className="text-[11px] text-slate-400 mt-0.5">Очистка демо-записей для запуска розницы</p>
-              </div>
-            </div>
-
-            <div className="p-3 rounded-lg bg-[#0B0E14] border border-slate-800 text-xs space-y-2">
-              <p className="text-slate-200 font-semibold">
-                Вы действительно хотите <strong>очистить демонстрационные данные</strong> и перейти в режим реального учета?
-              </p>
-              <ul className="text-[11px] text-slate-400 space-y-1 list-disc pl-4 pt-1">
-                <li>Будут удалены тестовые устройства на складе, чеки продаж и расходы.</li>
-                <li><strong>Филиалы, сотрудники, курс валюты и уставной капитал будут сохранены.</strong></li>
-                <li>После очистки вы сможете вносить реальные поставки товаров и чеки.</li>
-              </ul>
-            </div>
-
-            <div className="flex space-x-2 pt-1">
-              <button
-                type="button"
-                onClick={() => setIsConfirmRealModeOpen(false)}
-                className="flex-1 py-2 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 text-xs font-bold text-slate-300 uppercase transition-colors"
-              >
-                ОТМЕНА
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  switchToRealDataMode();
-                  setIsConfirmRealModeOpen(false);
-                  setStatusMessage({ type: 'success', text: 'Активирован режим реального учета. Демо-данные успешно очищены.' });
-                }}
-                className="flex-1 py-2 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-xs font-bold uppercase text-slate-950 shadow-lg shadow-emerald-500/30 transition-colors"
-              >
-                ПОДКЛЮЧИТЬ РЕАЛЬНЫЕ ДАННЫЕ
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* MODAL: CONFIRM DEMO DATA RESTORE */}
-      {isConfirmDemoModeOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-4 backdrop-blur-xs font-mono">
-          <div className="w-full max-w-md rounded-xl bg-[#0F1219] border border-sky-500/40 p-5 shadow-2xl space-y-4 text-slate-200">
-            <div className="flex items-center space-x-3 text-sky-400 border-b border-slate-800 pb-3">
-              <div className="p-2 rounded-lg bg-sky-500/20 text-sky-400 shrink-0">
-                <Sparkles className="w-5 h-5" />
-              </div>
-              <div>
-                <h3 className="text-sm font-bold uppercase text-white">ЗАГРУЗКА ДЕМО-ДАННЫХ</h3>
-                <p className="text-[11px] text-slate-400 mt-0.5">Восстановление примерных записей</p>
-              </div>
-            </div>
-
-            <p className="text-xs text-slate-300">
-              Загрузить исходный комплект демонстрационных данных для тестирования системы?
-            </p>
-
-            <div className="flex space-x-2 pt-1">
-              <button
-                type="button"
-                onClick={() => setIsConfirmDemoModeOpen(false)}
-                className="flex-1 py-2 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 text-xs font-bold text-slate-300 uppercase transition-colors"
-              >
-                ОТМЕНА
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  resetToDemo();
-                  setIsConfirmDemoModeOpen(false);
-                  setStatusMessage({ type: 'success', text: 'Загружен комплект демонстрационных данных.' });
-                }}
-                className="flex-1 py-2 rounded-lg bg-sky-500 hover:bg-sky-400 text-xs font-bold uppercase text-slate-950 shadow-lg shadow-sky-500/30 transition-colors"
-              >
-                ЗАГРУЗИТЬ ДЕМО
               </button>
             </div>
           </div>

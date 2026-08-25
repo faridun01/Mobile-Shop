@@ -471,25 +471,39 @@ export const InventoryPage: React.FC = () => {
                     <span className="truncate">{selectedDevice.locationName}</span>
                   </span>
                 </div>
+
+                {/* IMEI 1 */}
                 <div className="col-span-2 pt-1 border-t border-slate-800/80">
-                  <span className="text-slate-500 block text-[10px] uppercase">IMEI ИДЕНТИФИКАТОР:</span>
+                  <span className="text-slate-500 block text-[10px] uppercase">IMEI 1 (ОСНОВНОЙ):</span>
                   <span className="text-xs font-bold text-slate-100 select-all tracking-wider break-all">
-                    {selectedDevice.imei} {selectedDevice.imei2 ? `| IMEI 2: ${selectedDevice.imei2}` : ''}
+                    {selectedDevice.imei}
                   </span>
                 </div>
+
+                {/* IMEI 2 */}
+                <div className="col-span-2 pt-1 border-t border-slate-800/80">
+                  <span className="text-slate-500 block text-[10px] uppercase">IMEI 2 (ВТОРОЙ СЛОТ):</span>
+                  <span className={`text-xs font-bold select-all tracking-wider break-all ${selectedDevice.imei2 ? 'text-slate-100' : 'text-slate-500 font-normal'}`}>
+                    {selectedDevice.imei2 || '— (не указан)'}
+                  </span>
+                </div>
+
+                {/* BARCODE / EAN */}
+                <div className="col-span-2 pt-1 border-t border-slate-800/80">
+                  <span className="text-slate-500 block text-[10px] uppercase">ШТРИХКОД / EAN (БАРКОД):</span>
+                  <span className={`text-xs font-bold select-all tracking-wider break-all ${selectedDevice.barcode ? 'text-amber-400 font-mono' : 'text-slate-500 font-normal'}`}>
+                    {selectedDevice.barcode || '— (не указан)'}
+                  </span>
+                </div>
+
                 {selectedDevice.serialNumber && (
-                  <div>
-                    <span className="text-slate-500 block text-[10px] uppercase">СЕРИЙНЫЙ НОМЕР:</span>
-                    <span className="text-slate-300 break-all">{selectedDevice.serialNumber}</span>
+                  <div className="col-span-2 pt-1 border-t border-slate-800/80">
+                    <span className="text-slate-500 block text-[10px] uppercase font-mono">СЕРИЙНЫЙ НОМЕР (S/N):</span>
+                    <span className="text-slate-300 break-all text-xs font-mono">{selectedDevice.serialNumber}</span>
                   </div>
                 )}
-                {selectedDevice.barcode && (
-                  <div>
-                    <span className="text-slate-500 block text-[10px] uppercase">ШТРИХКОД:</span>
-                    <span className="text-slate-300">{selectedDevice.barcode}</span>
-                  </div>
-                )}
-                <div>
+
+                <div className="col-span-2 pt-1 border-t border-slate-800/80">
                   <span className="text-slate-500 block text-[10px] uppercase">ТЕКУЩИЙ СТАТУС:</span>
                   <span className="font-bold text-slate-200">
                     {STATUS_LABELS[selectedDevice.status]?.text || selectedDevice.status}
