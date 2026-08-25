@@ -196,4 +196,117 @@ export class SuppliersService {
       return bonus;
     });
   }
+  public static async update(id: string, input: { name?: string; phone?: string; contactPerson?: string }) {
+    const data: any = {};
+    if (input.name !== undefined) data.name = input.name.trim();
+    if (input.phone !== undefined) data.phone = input.phone.trim() || null;
+    if (input.contactPerson !== undefined) data.contactPerson = input.contactPerson.trim() || null;
+
+    return prisma.supplier.update({
+      where: { id },
+      data,
+    });
+  }
+
+  public static async delete(id: string) {
+    return prisma.$transaction(async (tx) => {
+      const supplier = await tx.supplier.findUnique({ where: { id } });
+      if (!supplier) throw new Error('Поставщик не найден');
+
+      // Delete allocations, payments, bonus devices, bonuses, group items, devices, and invoices
+      const payments = await tx.supplierPayment.findMany({ where: { supplierId: id } });
+      const paymentIds = payments.map((p) => p.id);
+      if (paymentIds.length > 0) {
+        await tx.supplierPaymentAllocation.deleteMany({ where: { paymentId: { in: paymentIds } } });
+        await tx.supplierPayment.deleteMany({ where: { supplierId: id } });
+      }
+
+      const bonuses = await tx.supplierBonus.findMany({ where: { supplierId: id } });
+      const bonusIds = bonuses.map((b) => b.id);
+      if (bonusIds.length > 0) {
+        await tx.supplierBonusDevice.deleteMany({ where: { bonusId: { in: bonusIds } } });
+        await tx.supplierBonus.deleteMany({ where: { supplierId: id } });
+      }
+
+      const invoices = await tx.supplierInvoice.findMany({ where: { supplierId: id } });
+      const invoiceIds = invoices.map((i) => i.id);
+      if (invoiceIds.length > 0) {
+        await tx.invoiceGroup.deleteMany({ where: { invoiceId: { in: invoiceIds } } });
+      }
+
+      await tx.device.deleteMany({ where: { supplierId: id } });
+      await tx.supplierInvoice.deleteMany({ where: { supplierId: id } });
+      return tx.supplier.delete({ where: { id } });
+    });
+  }
+
+  public static async updateInvoice(id: string, input: { invoiceNumber?: string; date?: string; totalAmountUsd?: number }) {
+    return prisma.$transaction(async (tx) => {
+      const invoice = await tx.supplierInvoice.findUnique({ where: { id } });
+      if (!invoice) throw new Error('Накладная не найдена');
+
+      const data: any = {};
+      if (input.invoiceNumber !== undefined && input.invoiceNumber.trim()) {
+        data.invoiceNumber = input.invoiceNumber.trim();
+      }
+      if (input.date !== undefined) {
+        data.date = new Date(input.date);
+      }
+
+      if (input.totalAmountUsd !== undefined && Number(input.totalAmountUsd) >= 0) {
+        const oldTotal = invoice.totalAmountUsd;
+        const newTotal = Number(input.totalAmountUsd);
+        const diff = newTotal - oldTotal;
+
+        data.totalAmountUsd = newTotal;
+
+        if (diff !== 0) {
+          await tx.supplier.update({
+            where: { id: invoice.supplierId },
+            data: {
+              totalPurchasedUsd: { increment: diff },
+              totalDebtUsd: { increment: diff },
+            },
+          });
+        }
+      }
+
+      const updated = await tx.supplierInvoice.update({
+        where: { id },
+        data,
+      });
+
+      if (input.invoiceNumber && input.invoiceNumber.trim() !== invoice.invoiceNumber) {
+        await tx.device.updateMany({
+          where: { purchaseInvoiceId: id },
+          data: { invoiceNumber: input.invoiceNumber.trim() },
+        });
+      }
+
+      return updated;
+    });
+  }
+
+  public static async deleteInvoice(id: string) {
+    return prisma.$transaction(async (tx) => {
+      const invoice = await tx.supplierInvoice.findUnique({ where: { id } });
+      if (!invoice) throw new Error('Накладная не найдена');
+
+      const remainingDebtOnInvoice = invoice.totalAmountUsd - invoice.paidAmountUsd;
+
+      await tx.invoiceGroup.deleteMany({ where: { invoiceId: id } });
+      await tx.supplierPaymentAllocation.deleteMany({ where: { invoiceId: id } });
+      await tx.device.deleteMany({ where: { purchaseInvoiceId: id } });
+
+      await tx.supplier.update({
+        where: { id: invoice.supplierId },
+        data: {
+          totalPurchasedUsd: Math.max(0, (await tx.supplier.findUnique({ where: { id: invoice.supplierId } }))!.totalPurchasedUsd - invoice.totalAmountUsd),
+          totalDebtUsd: Math.max(0, (await tx.supplier.findUnique({ where: { id: invoice.supplierId } }))!.totalDebtUsd - remainingDebtOnInvoice),
+        },
+      });
+
+      return tx.supplierInvoice.delete({ where: { id } });
+    });
+  }
 }

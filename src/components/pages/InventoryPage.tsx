@@ -370,6 +370,11 @@ export const InventoryPage: React.FC = () => {
                                 >
                                   <span className="text-slate-300">{colorName}:</span>
                                   <span className="font-bold text-emerald-400">{colorDevs.length} шт.</span>
+                                  {colorDevs[0]?.barcode && (
+                                    <span className="text-amber-400 font-mono text-[10px] font-semibold">
+                                      EAN: {colorDevs[0].barcode}
+                                    </span>
+                                  )}
                                 </div>
                               ))}
                             </div>

@@ -78,4 +78,44 @@ export function registerSupplierRoutes(app: Express) {
       next(error);
     }
   });
+
+  app.put('/api/suppliers/:id', authenticateJwt, requireRoles('ADMIN', 'PARTNER'), async (req: AuthenticatedRequest, res, next) => {
+    try {
+      const supplier = await SuppliersService.update(req.params.id, req.body ?? {});
+      RealtimeSyncGateway.broadcast('INVENTORY_UPDATE', {});
+      res.json(supplier);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.delete('/api/suppliers/:id', authenticateJwt, requireRoles('ADMIN', 'PARTNER'), async (req: AuthenticatedRequest, res, next) => {
+    try {
+      const result = await SuppliersService.delete(req.params.id);
+      RealtimeSyncGateway.broadcast('INVENTORY_UPDATE', {});
+      res.json(result);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.put('/api/supplier-invoices/:id', authenticateJwt, requireRoles('ADMIN', 'PARTNER'), async (req: AuthenticatedRequest, res, next) => {
+    try {
+      const invoice = await SuppliersService.updateInvoice(req.params.id, req.body ?? {});
+      RealtimeSyncGateway.broadcast('INVENTORY_UPDATE', {});
+      res.json(invoice);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.delete('/api/supplier-invoices/:id', authenticateJwt, requireRoles('ADMIN', 'PARTNER'), async (req: AuthenticatedRequest, res, next) => {
+    try {
+      const result = await SuppliersService.deleteInvoice(req.params.id);
+      RealtimeSyncGateway.broadcast('INVENTORY_UPDATE', {});
+      res.json(result);
+    } catch (error) {
+      next(error);
+    }
+  });
 }

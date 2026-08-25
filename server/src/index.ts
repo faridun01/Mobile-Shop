@@ -112,7 +112,19 @@ app.get('/api/devices', authenticateJwt, enforceStoreScope, async (req: Authenti
       include: { store: true },
       orderBy: { createdAt: 'desc' },
     });
-    res.json(devices);
+
+    const withBarcodes = await Promise.all(
+      devices.map(async (d) => {
+        if (!d.barcode || d.barcode.trim() === '') {
+          const gen = '200' + Math.floor(100000000 + Math.random() * 900000000).toString();
+          await prisma.device.update({ where: { id: d.id }, data: { barcode: gen } }).catch(() => {});
+          return { ...d, barcode: gen };
+        }
+        return d;
+      })
+    );
+
+    res.json(withBarcodes);
   } catch (error) {
     next(error);
   }

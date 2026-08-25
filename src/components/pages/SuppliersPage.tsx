@@ -11,7 +11,9 @@ import {
   ChevronRight,
   X,
   CreditCard,
-  Building
+  Building,
+  Edit,
+  Trash2
 } from 'lucide-react';
 
 const formatDateStr = (dateVal?: string) => {
@@ -33,6 +35,10 @@ export const SuppliersPage: React.FC = () => {
     stores,
     todayRate,
     createSupplier,
+    updateSupplier,
+    deleteSupplier,
+    updateSupplierInvoice,
+    deleteSupplierInvoice,
     paySupplier
   } = useApp();
 
@@ -53,6 +59,20 @@ export const SuppliersPage: React.FC = () => {
   const [newSupplierName, setNewSupplierName] = useState('');
   const [newSupplierPhone, setNewSupplierPhone] = useState('');
   const [newSupplierContact, setNewSupplierContact] = useState('');
+
+  // Edit & Delete Supplier state
+  const [editingSupplier, setEditingSupplier] = useState<Supplier | null>(null);
+  const [editSupplierName, setEditSupplierName] = useState('');
+  const [editSupplierPhone, setEditSupplierPhone] = useState('');
+  const [editSupplierContact, setEditSupplierContact] = useState('');
+  const [deletingSupplier, setDeletingSupplier] = useState<Supplier | null>(null);
+
+  // Edit & Delete Invoice state
+  const [editingInvoice, setEditingInvoice] = useState<SupplierInvoice | null>(null);
+  const [editInvoiceNumber, setEditInvoiceNumber] = useState('');
+  const [editInvoiceDate, setEditInvoiceDate] = useState('');
+  const [editInvoiceAmount, setEditInvoiceAmount] = useState('');
+  const [deletingInvoice, setDeletingInvoice] = useState<SupplierInvoice | null>(null);
 
   const [statusMessage, setStatusMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
@@ -110,6 +130,80 @@ export const SuppliersPage: React.FC = () => {
     setNewSupplierPhone('');
     setNewSupplierContact('');
     setStatusMessage(null);
+  };
+
+  const handleStartEditSupplier = (sup: Supplier, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    setEditingSupplier(sup);
+    setEditSupplierName(sup.name);
+    setEditSupplierPhone(sup.phone || '');
+    setEditSupplierContact(sup.contactPerson || '');
+  };
+
+  const handleSaveEditSupplier = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingSupplier || !editSupplierName.trim()) return;
+    const res = await updateSupplier(editingSupplier.id, {
+      name: editSupplierName.trim(),
+      phone: editSupplierPhone.trim() || undefined,
+      contactPerson: editSupplierContact.trim() || undefined,
+    });
+    if (res.success) {
+      setEditingSupplier(null);
+    } else {
+      setStatusMessage({ type: 'error', text: res.message || 'Ошибка обновления поставщика' });
+    }
+  };
+
+  const handleConfirmDeleteSupplier = async () => {
+    if (!deletingSupplier) return;
+    const supId = deletingSupplier.id;
+    const res = await deleteSupplier(supId);
+    if (res.success) {
+      setDeletingSupplier(null);
+      if (selectedSupplierId === supId) {
+        setSelectedSupplierId(null);
+      }
+    } else {
+      setStatusMessage({ type: 'error', text: res.message || 'Ошибка удаления поставщика' });
+    }
+  };
+
+  const handleStartEditInvoice = (inv: SupplierInvoice, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    setEditingInvoice(inv);
+    setEditInvoiceNumber(inv.invoiceNumber);
+    setEditInvoiceDate(inv.date.split('T')[0]);
+    setEditInvoiceAmount(inv.totalAmountUsd.toString());
+  };
+
+  const handleSaveEditInvoice = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingInvoice || !editInvoiceNumber.trim()) return;
+    const res = await updateSupplierInvoice(editingInvoice.id, {
+      invoiceNumber: editInvoiceNumber.trim(),
+      date: editInvoiceDate,
+      totalAmountUsd: parseFloat(editInvoiceAmount) || 0,
+    });
+    if (res.success) {
+      setEditingInvoice(null);
+    } else {
+      setStatusMessage({ type: 'error', text: res.message || 'Ошибка обновления накладной' });
+    }
+  };
+
+  const handleConfirmDeleteInvoice = async () => {
+    if (!deletingInvoice) return;
+    const invId = deletingInvoice.id;
+    const res = await deleteSupplierInvoice(invId);
+    if (res.success) {
+      setDeletingInvoice(null);
+      if (selectedInvoiceId === invId) {
+        setSelectedInvoiceId(null);
+      }
+    } else {
+      setStatusMessage({ type: 'error', text: res.message || 'Ошибка удаления накладной' });
+    }
   };
 
   const totalAllDebt = suppliers.reduce((acc, s) => acc + s.totalDebtUsd, 0);
@@ -182,11 +276,32 @@ export const SuppliersPage: React.FC = () => {
                     )}
                   </div>
 
-                  <div className="text-right">
-                    <span className="text-xs font-mono font-bold text-rose-400">
-                      ${(s.totalDebtUsd ?? 0).toLocaleString()}
-                    </span>
-                    <span className="block text-[10px] text-zinc-500">Долг</span>
+                  <div className="flex items-center space-x-2">
+                    <div className="text-right">
+                      <span className="text-xs font-mono font-bold text-rose-400">
+                        ${(s.totalDebtUsd ?? 0).toLocaleString()}
+                      </span>
+                      <span className="block text-[10px] text-zinc-500">Долг</span>
+                    </div>
+
+                    <div className="flex items-center space-x-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <button
+                        type="button"
+                        onClick={(e) => handleStartEditSupplier(s, e)}
+                        className="p-1.5 rounded text-zinc-400 hover:text-emerald-400 hover:bg-zinc-800"
+                        title="Редактировать поставщика"
+                      >
+                        <Edit className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); setDeletingSupplier(s); }}
+                        className="p-1.5 rounded text-zinc-400 hover:text-rose-400 hover:bg-zinc-800"
+                        title="Удалить поставщика"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
                   </div>
                 </button>
               );
@@ -219,6 +334,20 @@ export const SuppliersPage: React.FC = () => {
                   >
                     <DollarSign className="w-4 h-4" />
                     <span>Погасить долг (FIFO)</span>
+                  </button>
+                  <button
+                    onClick={() => handleStartEditSupplier(selectedSupplier)}
+                    className="p-2 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300 hover:text-white transition-colors"
+                    title="Редактировать поставщика"
+                  >
+                    <Edit className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={() => setDeletingSupplier(selectedSupplier)}
+                    className="p-2 rounded bg-zinc-800 hover:bg-rose-950/80 text-zinc-400 hover:text-rose-400 border border-zinc-800 transition-colors"
+                    title="Удалить поставщика"
+                  >
+                    <Trash2 className="w-4 h-4" />
                   </button>
                   <button
                     onClick={() => setSelectedSupplierId(null)}
@@ -264,7 +393,7 @@ export const SuppliersPage: React.FC = () => {
                           </p>
                         </div>
 
-                        <div className="flex items-center space-x-3">
+                        <div className="flex items-center space-x-2">
                           <div className="text-right">
                             <p className="text-xs font-mono font-bold text-zinc-100">
                               Всего: ${(inv.totalAmountUsd ?? 0).toLocaleString()}
@@ -276,6 +405,22 @@ export const SuppliersPage: React.FC = () => {
                               Оплачено: ${(inv.paidAmountUsd ?? 0).toLocaleString()}
                             </p>
                           </div>
+                          <button
+                            type="button"
+                            onClick={(e) => handleStartEditInvoice(inv, e)}
+                            className="p-1.5 rounded bg-zinc-900 text-zinc-400 hover:text-emerald-400 border border-zinc-800 transition-colors"
+                            title="Редактировать накладную"
+                          >
+                            <Edit className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={(e) => { e.stopPropagation(); setDeletingInvoice(inv); }}
+                            className="p-1.5 rounded bg-zinc-900 text-zinc-400 hover:text-rose-400 border border-zinc-800 transition-colors"
+                            title="Удалить накладную"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
                           <button
                             type="button"
                             className="p-1.5 rounded bg-zinc-900 text-zinc-400 group-hover:text-white border border-zinc-800"
@@ -717,6 +862,188 @@ export const SuppliersPage: React.FC = () => {
                 className="px-4 py-1.5 rounded bg-slate-800 hover:bg-slate-700 text-xs font-mono font-bold text-slate-200 transition-colors"
               >
                 ЗАКРЫТЬ
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* MODAL: EDIT SUPPLIER */}
+      {editingSupplier && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-xs">
+          <div className="w-full max-w-sm rounded-lg bg-zinc-900 border border-zinc-800 p-5 shadow-xl text-zinc-100">
+            <div className="flex items-center justify-between border-b border-zinc-800 pb-3 mb-4">
+              <h3 className="text-sm font-bold text-white flex items-center space-x-2">
+                <Edit className="w-4 h-4 text-emerald-400" />
+                <span>Редактировать поставщика</span>
+              </h3>
+              <button onClick={() => setEditingSupplier(null)} className="text-zinc-400 hover:text-white">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <form onSubmit={handleSaveEditSupplier} className="space-y-3">
+              <div>
+                <label className="block text-xs text-zinc-400 mb-1">Название поставщика *</label>
+                <input
+                  type="text"
+                  required
+                  value={editSupplierName}
+                  onChange={(e) => setEditSupplierName(e.target.value)}
+                  className="w-full rounded bg-zinc-950 border border-zinc-800 px-3 py-1.5 text-xs text-zinc-100 focus:border-emerald-500 focus:outline-none"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-zinc-400 mb-1">Телефон</label>
+                <input
+                  type="text"
+                  value={editSupplierPhone}
+                  onChange={(e) => setEditSupplierPhone(e.target.value)}
+                  className="w-full rounded bg-zinc-950 border border-zinc-800 px-3 py-1.5 text-xs text-zinc-100 focus:border-emerald-500 focus:outline-none"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-zinc-400 mb-1">Контактное лицо</label>
+                <input
+                  type="text"
+                  value={editSupplierContact}
+                  onChange={(e) => setEditSupplierContact(e.target.value)}
+                  className="w-full rounded bg-zinc-950 border border-zinc-800 px-3 py-1.5 text-xs text-zinc-100 focus:border-emerald-500 focus:outline-none"
+                />
+              </div>
+              <div className="pt-2 flex items-center space-x-2">
+                <button
+                  type="button"
+                  onClick={() => setEditingSupplier(null)}
+                  className="flex-1 py-2 rounded bg-zinc-800 hover:bg-zinc-700 text-xs font-medium text-zinc-300"
+                >
+                  Отмена
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 py-2 rounded bg-emerald-500 hover:bg-emerald-400 text-xs font-semibold text-white"
+                >
+                  Сохранить
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: DELETE SUPPLIER CONFIRMATION */}
+      {deletingSupplier && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-4 backdrop-blur-xs">
+          <div className="w-full max-w-sm rounded-lg bg-zinc-900 border border-zinc-800 p-5 shadow-2xl text-zinc-100 space-y-4">
+            <div className="flex items-center space-x-3 text-rose-400">
+              <AlertCircle className="w-6 h-6 shrink-0" />
+              <h3 className="text-sm font-bold text-white">Удаление поставщика</h3>
+            </div>
+            <p className="text-xs text-zinc-300 leading-relaxed">
+              Вы действительно хотите удалить поставщика <strong className="text-white">«{deletingSupplier.name}»</strong>? Все связанные накладные, выплатные записи и поставленные устройства будут безвозвратно удалены.
+            </p>
+            <div className="flex items-center justify-end space-x-2 pt-2">
+              <button
+                onClick={() => setDeletingSupplier(null)}
+                className="px-4 py-2 rounded bg-zinc-800 hover:bg-zinc-700 text-xs font-medium text-zinc-300"
+              >
+                Отмена
+              </button>
+              <button
+                onClick={handleConfirmDeleteSupplier}
+                className="px-4 py-2 rounded bg-rose-600 hover:bg-rose-500 text-xs font-semibold text-white shadow"
+              >
+                Удалить поставщика
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: EDIT INVOICE */}
+      {editingInvoice && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-xs">
+          <div className="w-full max-w-sm rounded-lg bg-zinc-900 border border-zinc-800 p-5 shadow-xl text-zinc-100">
+            <div className="flex items-center justify-between border-b border-zinc-800 pb-3 mb-4">
+              <h3 className="text-sm font-bold text-white flex items-center space-x-2">
+                <Edit className="w-4 h-4 text-emerald-400" />
+                <span>Редактировать накладную</span>
+              </h3>
+              <button onClick={() => setEditingInvoice(null)} className="text-zinc-400 hover:text-white">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <form onSubmit={handleSaveEditInvoice} className="space-y-3">
+              <div>
+                <label className="block text-xs text-zinc-400 mb-1">Номер накладной *</label>
+                <input
+                  type="text"
+                  required
+                  value={editInvoiceNumber}
+                  onChange={(e) => setEditInvoiceNumber(e.target.value)}
+                  className="w-full rounded bg-zinc-950 border border-zinc-800 px-3 py-1.5 text-xs text-zinc-100 font-mono focus:border-emerald-500 focus:outline-none"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-zinc-400 mb-1">Дата накладной</label>
+                <input
+                  type="date"
+                  value={editInvoiceDate}
+                  onChange={(e) => setEditInvoiceDate(e.target.value)}
+                  className="w-full rounded bg-zinc-950 border border-zinc-800 px-3 py-1.5 text-xs text-zinc-100 font-mono focus:border-emerald-500 focus:outline-none"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-zinc-400 mb-1">Сумма накладной ($ USD)</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  value={editInvoiceAmount}
+                  onChange={(e) => setEditInvoiceAmount(e.target.value)}
+                  className="w-full rounded bg-zinc-950 border border-zinc-800 px-3 py-1.5 text-xs text-emerald-400 font-mono font-bold focus:border-emerald-500 focus:outline-none"
+                />
+              </div>
+              <div className="pt-2 flex items-center space-x-2">
+                <button
+                  type="button"
+                  onClick={() => setEditingInvoice(null)}
+                  className="flex-1 py-2 rounded bg-zinc-800 hover:bg-zinc-700 text-xs font-medium text-zinc-300"
+                >
+                  Отмена
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 py-2 rounded bg-emerald-500 hover:bg-emerald-400 text-xs font-semibold text-white"
+                >
+                  Сохранить
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: DELETE INVOICE CONFIRMATION */}
+      {deletingInvoice && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-4 backdrop-blur-xs">
+          <div className="w-full max-w-sm rounded-lg bg-zinc-900 border border-zinc-800 p-5 shadow-2xl text-zinc-100 space-y-4">
+            <div className="flex items-center space-x-3 text-rose-400">
+              <AlertCircle className="w-6 h-6 shrink-0" />
+              <h3 className="text-sm font-bold text-white">Удаление накладной</h3>
+            </div>
+            <p className="text-xs text-zinc-300 leading-relaxed">
+              Вы действительно хотите удалить накладную <strong className="text-white">#{deletingInvoice.invoiceNumber}</strong>? Все привязанные к этой накладной устройства и расчеты будут удалены из системы.
+            </p>
+            <div className="flex items-center justify-end space-x-2 pt-2">
+              <button
+                onClick={() => setDeletingInvoice(null)}
+                className="px-4 py-2 rounded bg-zinc-800 hover:bg-zinc-700 text-xs font-medium text-zinc-300"
+              >
+                Отмена
+              </button>
+              <button
+                onClick={handleConfirmDeleteInvoice}
+                className="px-4 py-2 rounded bg-rose-600 hover:bg-rose-500 text-xs font-semibold text-white shadow"
+              >
+                Удалить накладную
               </button>
             </div>
           </div>

@@ -146,6 +146,10 @@ interface AppContextType {
     phone?: string;
     contactPerson?: string;
   }) => Promise<{ success: boolean; message?: string }>;
+  updateSupplier: (id: string, data: { name?: string; phone?: string; contactPerson?: string }) => Promise<{ success: boolean; message?: string }>;
+  deleteSupplier: (id: string) => Promise<{ success: boolean; message?: string }>;
+  updateSupplierInvoice: (id: string, data: { invoiceNumber?: string; date?: string; totalAmountUsd?: number }) => Promise<{ success: boolean; message?: string }>;
+  deleteSupplierInvoice: (id: string) => Promise<{ success: boolean; message?: string }>;
 
   createSupplierBonus: (params: {
     supplierId: string;
@@ -654,6 +658,46 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
+  const updateSupplier: AppContextType['updateSupplier'] = async (id, data) => {
+    try {
+      await apiClient(`/suppliers/${id}`, { method: 'PUT', body: JSON.stringify(data) });
+      await refetchAll();
+      return { success: true };
+    } catch (err) {
+      return { success: false, message: errorMessage(err, 'Не удалось обновить поставщика') };
+    }
+  };
+
+  const deleteSupplier: AppContextType['deleteSupplier'] = async (id) => {
+    try {
+      await apiClient(`/suppliers/${id}`, { method: 'DELETE' });
+      await refetchAll();
+      return { success: true };
+    } catch (err) {
+      return { success: false, message: errorMessage(err, 'Не удалось удалить поставщика') };
+    }
+  };
+
+  const updateSupplierInvoice: AppContextType['updateSupplierInvoice'] = async (id, data) => {
+    try {
+      await apiClient(`/supplier-invoices/${id}`, { method: 'PUT', body: JSON.stringify(data) });
+      await refetchAll();
+      return { success: true };
+    } catch (err) {
+      return { success: false, message: errorMessage(err, 'Не удалось обновить накладную') };
+    }
+  };
+
+  const deleteSupplierInvoice: AppContextType['deleteSupplierInvoice'] = async (id) => {
+    try {
+      await apiClient(`/supplier-invoices/${id}`, { method: 'DELETE' });
+      await refetchAll();
+      return { success: true };
+    } catch (err) {
+      return { success: false, message: errorMessage(err, 'Не удалось удалить накладную') };
+    }
+  };
+
   const createSupplierBonus: AppContextType['createSupplierBonus'] = async ({ supplierId, campaignTitle, bonusType, amountUsd, freeDevices, destinationLocationId }) => {
     try {
       await apiClient('/supplier-bonuses', {
@@ -1068,6 +1112,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         processRefund,
         createPurchase,
         createSupplier,
+        updateSupplier,
+        deleteSupplier,
+        updateSupplierInvoice,
+        deleteSupplierInvoice,
         createSupplierBonus,
         createTransferRequest,
         directTransfer,

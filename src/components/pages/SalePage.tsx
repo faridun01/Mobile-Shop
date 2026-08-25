@@ -362,6 +362,11 @@ export const SalePage: React.FC = () => {
                 </p>
                 <p className="text-[11px] text-slate-400 font-mono mt-0.5">
                   {variant.storage} • {variant.color}
+                  {variant.devices[0]?.barcode && (
+                    <span className="text-amber-400 font-semibold ml-2">
+                      • EAN: {variant.devices[0].barcode}
+                    </span>
+                  )}
                 </p>
               </div>
 
