@@ -131,20 +131,25 @@ app.post('/api/purchases', authenticateJwt, requireRoles('ADMIN', 'PARTNER'), en
       const store = await transaction.store.findUnique({ where: { id: storeId } });
       if (!supplier || !store) throw new Error('Поставщик или магазин не найден');
 
+function generateFallbackBarcode(): string {
+  return '200' + Math.floor(100000000 + Math.random() * 900000000).toString();
+}
+
       const normalizedDevices = groups.flatMap((group: any) => {
         if (Array.isArray(group.items) && group.items.length > 0) {
           return group.items
             .filter((item: any) => item && typeof item.imei === 'string' && item.imei.trim().length > 0)
-            .map((item: any) => {
+            .map((item: any, idx: number) => {
               const [imei1, imei2] = String(item.imei).split(/[\/,]/).map((part) => part.trim());
               const explicitImei2 = typeof item.imei2 === 'string' && item.imei2.trim() ? item.imei2.trim() : null;
-              const bCode = typeof item.barcode === 'string' && item.barcode.trim()
-                ? item.barcode.trim()
-                : (typeof group.barcode === 'string' && group.barcode.trim() ? group.barcode.trim() : null);
+              const itemBarcode = typeof item.barcode === 'string' && item.barcode.trim() ? item.barcode.trim() : null;
+              const arrayBarcode = (Array.isArray(group.barcodes) && group.barcodes[idx] && typeof group.barcodes[idx] === 'string' && group.barcodes[idx].trim()) ? group.barcodes[idx].trim() : null;
+              const groupBarcode = typeof group.barcode === 'string' && group.barcode.trim() ? group.barcode.trim() : null;
+              const bCode = itemBarcode || arrayBarcode || groupBarcode || generateFallbackBarcode();
               return {
                 imei: imei1,
                 imei2: explicitImei2 || imei2 || null,
-                barcode: bCode || null,
+                barcode: bCode,
                 brand: String(group.brand || '').trim(),
                 model: String(group.model || '').trim(),
                 storage: String(group.storage || '').trim(),
@@ -160,11 +165,11 @@ app.post('/api/purchases', authenticateJwt, requireRoles('ADMIN', 'PARTNER'), en
           const [imei1, imei2] = imei.split(/[\/,]/).map((part) => part.trim());
           const bCode = (barcodes[idx] && typeof barcodes[idx] === 'string' && barcodes[idx].trim())
             ? barcodes[idx].trim()
-            : (typeof group.barcode === 'string' && group.barcode.trim() ? group.barcode.trim() : null);
+            : (typeof group.barcode === 'string' && group.barcode.trim() ? group.barcode.trim() : generateFallbackBarcode());
           return {
             imei: imei1,
             imei2: imei2 || null,
-            barcode: bCode || null,
+            barcode: bCode,
             brand: String(group.brand || '').trim(),
             model: String(group.model || '').trim(),
             storage: String(group.storage || '').trim(),
@@ -174,8 +179,8 @@ app.post('/api/purchases', authenticateJwt, requireRoles('ADMIN', 'PARTNER'), en
         });
       });
 
-      if (normalizedDevices.length === 0 || normalizedDevices.some((device) => !device.imei || !device.barcode || !device.brand || !device.model)) {
-        throw new Error('Каждое устройство должно содержать IMEI, штрихкод (EAN), бренд и модель');
+      if (normalizedDevices.length === 0 || normalizedDevices.some((device) => !device.imei || !device.brand || !device.model)) {
+        throw new Error('Каждое устройство должно содержать IMEI, бренд и модель');
       }
 
       const identifiers = normalizedDevices.flatMap((device) => [device.imei, device.imei2]).filter(Boolean);

@@ -483,13 +483,14 @@ export const TransferPage: React.FC = () => {
                                             {isSelected && <Check className="w-3 h-3" />}
                                           </span>
                                           <div className="truncate">
-                                            <span className="text-slate-200 font-medium">{dev.color}</span>
-                                            <span className="text-slate-500 mx-1.5">•</span>
-                                            <span className="text-slate-400 font-mono">
-                                              IMEI: {dev.imei}{dev.imei2 ? ` / ${dev.imei2}` : ''}
-                                              {dev.barcode ? <span className="text-amber-400/90 font-mono ml-1.5">• EAN: {dev.barcode}</span> : null}
-                                            </span>
-                                          </div>
+                                             <span className="text-slate-200 font-medium">{dev.color}</span>
+                                             <span className="text-slate-500 mx-1.5">•</span>
+                                             <span className="text-slate-400 font-mono">
+                                               IMEI 1: <strong className="text-slate-300">{dev.imei}</strong>
+                                               {dev.imei2 ? <span> • IMEI 2: <strong className="text-slate-300">{dev.imei2}</strong></span> : null}
+                                               <span> • EAN / Баркод: <strong className="text-amber-400">{dev.barcode || '—'}</strong></span>
+                                             </span>
+                                           </div>
                                         </div>
 
                                         <span

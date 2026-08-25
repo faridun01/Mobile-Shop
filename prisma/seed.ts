@@ -13,12 +13,25 @@ const USER_SEEDS = [
   { id: 'user-farhod', name: 'Фарход', login: 'farhod', password: 'seller123', role: 'SELLER' as const, storeId: 'store-siyoma' },
 ];
 
+const SUPPLIER_SEEDS = [
+  { id: 'sup-dubai', name: 'Dubai Mobile', phone: '+971 4 123 4567', contactPerson: 'Ахмед' },
+  { id: 'sup-china', name: 'China Tech', phone: '+86 20 8888 9999', contactPerson: 'Ли' },
+];
+
 async function main() {
   for (const store of STORE_SEEDS) {
     await prisma.store.upsert({
       where: { id: store.id },
       update: {},
       create: store,
+    });
+  }
+
+  for (const sup of SUPPLIER_SEEDS) {
+    await prisma.supplier.upsert({
+      where: { id: sup.id },
+      update: {},
+      create: sup,
     });
   }
 

@@ -444,9 +444,10 @@ export const SalePage: React.FC = () => {
                   className="w-full p-2.5 text-left rounded-lg bg-[#0B0E14] hover:bg-emerald-500/10 border border-slate-800 hover:border-emerald-500/40 flex items-center justify-between group transition-colors"
                 >
                   <div className="min-w-0 pr-2">
-                    <p className="text-xs font-bold text-slate-100 group-hover:text-emerald-400 transition-colors">
-                      IMEI: {dev.imei}{dev.imei2 ? ` / ${dev.imei2}` : ''}
-                      {dev.barcode ? <span className="text-[10px] text-amber-400 font-normal block">EAN: {dev.barcode}</span> : null}
+                    <p className="text-xs font-bold text-slate-100 group-hover:text-emerald-400 transition-colors font-mono">
+                      IMEI 1: <span className="text-slate-200">{dev.imei}</span>
+                      {dev.imei2 ? <span> • IMEI 2: <span className="text-slate-200">{dev.imei2}</span></span> : null}
+                      <span className="text-amber-400 font-bold block mt-0.5">EAN / Баркод: {dev.barcode || '—'}</span>
                     </p>
                     {dev.serialNumber && (
                       <p className="text-[10px] text-slate-400 mt-0.5">S/N: {dev.serialNumber}</p>
@@ -497,9 +498,10 @@ export const SalePage: React.FC = () => {
                         <p className="text-[10px] text-slate-400 font-mono">
                           {item.device.storage} • {item.device.color}
                         </p>
-                        <p className="text-[9px] font-mono text-slate-500 mt-0.5">
-                          IMEI: {item.device.imei}{item.device.imei2 ? ` / ${item.device.imei2}` : ''}
-                          {item.device.barcode ? ` • EAN: ${item.device.barcode}` : ''}
+                        <p className="text-[9px] font-mono text-slate-400 mt-0.5">
+                          IMEI 1: <strong className="text-slate-300">{item.device.imei}</strong>
+                          {item.device.imei2 ? <span> • IMEI 2: <strong className="text-slate-300">{item.device.imei2}</strong></span> : null}
+                          <span> • EAN / Баркод: <strong className="text-amber-400">{item.device.barcode || '—'}</strong></span>
                         </p>
                       </div>
 

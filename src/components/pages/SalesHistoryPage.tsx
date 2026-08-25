@@ -380,8 +380,10 @@ export const SalesHistoryPage: React.FC = () => {
                         <p className="text-[10px] text-slate-400">
                           {item.storage} • {item.color}
                         </p>
-                        <p className="text-[10px] font-mono text-slate-500 mt-0.5">
-                          IMEI: {item.imei}
+                        <p className="text-[10px] font-mono text-slate-400 mt-0.5">
+                          IMEI 1: <strong className="text-slate-300">{item.imei}</strong>
+                          {item.imei2 ? <span> • IMEI 2: <strong className="text-slate-300">{item.imei2}</strong></span> : null}
+                          <span> • EAN / Баркод: <strong className="text-amber-400">{item.barcode || '—'}</strong></span>
                         </p>
                       </div>
                       <div className="text-right font-mono">

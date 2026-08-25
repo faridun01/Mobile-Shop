@@ -85,10 +85,16 @@ export const PurchasePage: React.FC = () => {
   });
 
   useEffect(() => {
+    if (suppliers.length > 0 && (!selectedSupplierId || !suppliers.some(s => s.id === selectedSupplierId))) {
+      setSelectedSupplierId(suppliers[0].id);
+    }
+  }, [suppliers, selectedSupplierId]);
+
+  useEffect(() => {
     if (supplierInvoices) {
       setInvoiceNumber(`INV-${(supplierInvoices.length + 1).toString().padStart(4, '0')}`);
     }
-  }, [supplierInvoices?.length]);
+  }, [supplierInvoices]);
 
   // Suppliers now load asynchronously from the API, so they're typically still empty
   // at mount time — resync once they arrive (but never clobber a manual selection).
@@ -263,6 +269,20 @@ export const PurchasePage: React.FC = () => {
       const next = [...prev];
       const items = [...next[groupIdx].items];
       items[itemIdx] = { ...items[itemIdx], barcode: val };
+
+      // Auto-propagate and auto-increment barcode to subsequent empty items
+      let currentBarcode = val.trim();
+      for (let i = itemIdx + 1; i < items.length; i++) {
+        if (!items[i].barcode || items[i].barcode.trim() === '') {
+          if (currentBarcode) {
+            currentBarcode = incrementBarcode(currentBarcode);
+            items[i] = { ...items[i], barcode: currentBarcode };
+          }
+        } else {
+          break;
+        }
+      }
+
       next[groupIdx] = { ...next[groupIdx], items };
       return next;
     });
@@ -298,13 +318,13 @@ export const PurchasePage: React.FC = () => {
       setGroups(prev => {
         const next = [...prev];
         const currentItems = next[groupIdx].items;
-        let currentBarcode = currentItems[0]?.barcode || '';
+        let currentBarcode = currentItems[0]?.barcode?.trim() || '';
 
         const newItems: PurchaseItem[] = rawLines.map((imei, idx) => {
           if (idx === 0) {
             return { imei, barcode: currentBarcode };
           }
-          currentBarcode = incrementBarcode(currentBarcode);
+          currentBarcode = currentBarcode ? incrementBarcode(currentBarcode) : '';
           return { imei, barcode: currentBarcode };
         });
 
@@ -342,9 +362,18 @@ export const PurchasePage: React.FC = () => {
     }
 
     const cleanGroups = groups.map(g => {
+      let currentBCode = g.items[0]?.barcode?.trim() || ('200' + Math.floor(100000000 + Math.random() * 900000000).toString());
       const validItems = g.items
         .filter(i => i.imei.trim().length > 0)
-        .map(i => ({ imei: i.imei.trim(), barcode: i.barcode.trim() || undefined }));
+        .map((i, idx) => {
+          let itemBarcode = i.barcode.trim();
+          if (!itemBarcode) {
+            itemBarcode = idx === 0 ? currentBCode : (currentBCode = incrementBarcode(currentBCode));
+          } else {
+            currentBCode = itemBarcode;
+          }
+          return { imei: i.imei.trim(), barcode: itemBarcode };
+        });
 
       return {
         brand: g.brand.trim(),
@@ -360,12 +389,6 @@ export const PurchasePage: React.FC = () => {
 
     if (cleanGroups.length === 0) {
       setStatusMessage({ type: 'error', text: 'Добавьте хотя бы одно устройство с заполненным IMEI' });
-      return;
-    }
-
-    const missingBarcode = cleanGroups.some(g => g.items.some(i => !i.barcode || i.barcode.trim().length === 0));
-    if (missingBarcode) {
-      setStatusMessage({ type: 'error', text: 'Укажите штрихкод (EAN/Баркод) для каждого добавляемого устройства' });
       return;
     }
 

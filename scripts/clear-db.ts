@@ -35,6 +35,15 @@ async function clearTestData() {
     await tx.store.updateMany({
       data: { cashBalanceTjs: 0 },
     });
+
+    // 4. Re-create default suppliers if none exist
+    await tx.supplier.createMany({
+      data: [
+        { id: 'sup-dubai', name: 'Dubai Mobile', phone: '+971 4 123 4567', contactPerson: 'Ахмед' },
+        { id: 'sup-china', name: 'China Tech', phone: '+86 20 8888 9999', contactPerson: 'Ли' },
+      ],
+      skipDuplicates: true,
+    });
   });
 
   const remainingUsers = await prisma.user.count();
