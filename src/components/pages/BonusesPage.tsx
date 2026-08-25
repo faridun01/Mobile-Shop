@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import { SupplierBonus } from '../../types';
 import {
@@ -32,6 +32,13 @@ export const BonusesPage: React.FC = () => {
   const [selectedBonus, setSelectedBonus] = useState<SupplierBonus | null>(null);
 
   const [supplierId, setSupplierId] = useState(suppliers[0]?.id || '');
+
+  // Suppliers load asynchronously — resync once they arrive.
+  useEffect(() => {
+    if (!supplierId && suppliers.length > 0) {
+      setSupplierId(suppliers[0].id);
+    }
+  }, [suppliers, supplierId]);
   const [bonusType, setBonusType] = useState<'CASH_DISCOUNT' | 'FREE_DEVICES'>('FREE_DEVICES');
   const [amountUsd, setAmountUsd] = useState('');
   

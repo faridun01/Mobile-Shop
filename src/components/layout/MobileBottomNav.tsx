@@ -51,7 +51,7 @@ export const MobileBottomNav: React.FC = () => {
       : { id: 'EXCHANGE', label: 'Обмен', icon: RefreshCw };
 
   return (
-    <div className="lg:hidden fixed bottom-0 left-0 right-0 z-50 w-full bg-[#0F1219] border-t border-slate-800/90 px-2 pt-1.5 pb-4 flex items-center justify-around select-none shadow-[0_-5px_25px_rgba(0,0,0,0.9)] safe-area-pb font-mono">
+    <div className="md:hidden fixed bottom-0 left-0 right-0 z-50 w-full bg-[#0F1219] border-t border-slate-800/90 px-2 pt-1.5 pb-4 flex items-center justify-around select-none shadow-[0_-5px_25px_rgba(0,0,0,0.9)] safe-area-pb font-mono">
       {/* 1. Склад */}
       {(() => {
         const routePath = '/inventory';

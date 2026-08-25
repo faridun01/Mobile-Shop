@@ -375,6 +375,18 @@ export const RepairPage: React.FC = () => {
 
       {/* Main Content Area */}
       <div className="flex-1 overflow-y-auto bg-[#0B0E14] font-mono">
+        {statusMessage && (
+          <div
+            className={`mx-4 mt-3 p-2.5 rounded text-xs flex items-center space-x-1.5 font-mono ${
+              statusMessage.type === 'success'
+                ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                : 'bg-rose-500/10 text-rose-400 border border-rose-500/30'
+            }`}
+          >
+            <AlertCircle className="w-4 h-4 shrink-0" />
+            <span>{statusMessage.text}</span>
+          </div>
+        )}
         {activeTab === 'create' ? (
           <form onSubmit={handleCreateTicket} className="max-w-xl mx-auto p-4 space-y-4">
             <div className="border border-slate-800 rounded-lg bg-[#0F1219] p-5 space-y-4">
@@ -535,15 +547,6 @@ export const RepairPage: React.FC = () => {
                   Указанная сумма будет автоматически занесена в <strong className="text-slate-300">Учет расходов (/expenses)</strong> с привязкой к этой квитанции.
                 </p>
               </div>
-
-              {statusMessage && (
-                <div className={`p-2.5 rounded text-xs flex items-center space-x-1.5 font-mono ${
-                  statusMessage.type === 'success' ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'bg-rose-500/10 text-rose-400 border border-rose-500/30'
-                }`}>
-                  <AlertCircle className="w-4 h-4 shrink-0" />
-                  <span>{statusMessage.text}</span>
-                </div>
-              )}
 
               <button
                 type="submit"

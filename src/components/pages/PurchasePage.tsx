@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import { SupplierInvoice, Device } from '../../types';
 import {
@@ -58,6 +58,14 @@ export const PurchasePage: React.FC = () => {
 
   // Form states
   const [selectedSupplierId, setSelectedSupplierId] = useState<string>(suppliers[0]?.id || '');
+
+  // Suppliers now load asynchronously from the API, so they're typically still empty
+  // at mount time — resync once they arrive (but never clobber a manual selection).
+  useEffect(() => {
+    if (!selectedSupplierId && suppliers.length > 0) {
+      setSelectedSupplierId(suppliers[0].id);
+    }
+  }, [suppliers, selectedSupplierId]);
   const [invoiceNumber, setInvoiceNumber] = useState<string>(`INV-${Math.floor(100 + Math.random() * 900)}`);
   const [purchaseDate, setPurchaseDate] = useState<string>(new Date().toISOString().split('T')[0]);
   

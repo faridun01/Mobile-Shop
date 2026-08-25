@@ -40,9 +40,28 @@ jobs:
         run: npm run test
 
   e2e-tests:
-    name: Playwright E2E Business Flow Tests
+    name: Playwright Full-Stack E2E Tests (UI -> API -> Postgres)
     needs: quality-and-unit-tests
     runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: ci_password
+          POSTGRES_DB: mobile_shop_db
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d mobile_shop_db"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DATABASE_URL: postgresql://postgres:ci_password@localhost:5432/mobile_shop_db?schema=public
+      JWT_SECRET: ci-only-jwt-secret-not-for-prod
 
     steps:
       - name: Checkout Source Code
@@ -60,19 +79,27 @@ jobs:
       - name: Generate Prisma Client
         run: npx prisma generate
 
+      - name: Apply Prisma Migrations
+        run: npx prisma migrate deploy
+
+      - name: Seed Database
+        run: npx tsx prisma/seed.ts
+
       - name: Install Playwright Browsers
         run: npx playwright install --with-deps chromium
 
-      - name: Build Application
-        run: npm run build
-
-      - name: Start Production Preview Server
+      - name: Start API Server
         run: |
-          npm run preview &
+          npm run server &
+          npx wait-on http://localhost:3002/api/health --timeout 30000
+
+      - name: Start Frontend Dev Server
+        run: |
+          npm run dev &
           npx wait-on http://localhost:3000 --timeout 30000
 
-      - name: Run E2E Business Flow Verification
-        run: npx tsx scripts/e2e-business-flow.ts
+      - name: Run Playwright E2E Suite (full business flows, real DB)
+        run: npx playwright test
 
   security-scan:
     name: Security Audit & Vulnerability Scan

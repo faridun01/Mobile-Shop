@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import { ExpenseCategory } from '../../types';
 import { exportExpensesReport } from '../../utils/exportReports';
@@ -73,8 +73,15 @@ export const ExpensesPage: React.FC = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [category, setCategory] = useState<ExpenseCategory>('RENT');
   const [amountTjs, setAmountTjs] = useState('');
-  const [storeId, setStoreId] = useState(stores[0]?.id || 'store-1');
+  const [storeId, setStoreId] = useState(stores[0]?.id || '');
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<string>('');
+
+  // Stores load asynchronously — resync once they arrive.
+  useEffect(() => {
+    if (!storeId && stores.length > 0) {
+      setStoreId(stores[0].id);
+    }
+  }, [stores, storeId]);
   const [description, setDescription] = useState('');
   const [paidFromCashRegister, setPaidFromCashRegister] = useState(true);
 
@@ -252,6 +259,15 @@ export const ExpensesPage: React.FC = () => {
   }, [filteredExpenses]);
 
   const totalExpensesUsd = +(totalExpensesTjs / rate).toFixed(2);
+
+  if (isSeller) {
+    return (
+      <div className="p-8 text-center text-zinc-500">
+        <p className="text-sm font-medium">Доступ ограничен</p>
+        <p className="text-xs text-zinc-600 mt-1">Раздел расходов доступен только Администраторам и Партнерам</p>
+      </div>
+    );
+  }
 
   return (
     <div className="flex-1 flex flex-col h-full overflow-hidden bg-[#0B0E14] text-slate-300 font-mono">

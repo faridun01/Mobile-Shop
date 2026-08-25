@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import {
   Plus,
@@ -63,6 +63,13 @@ export const OwnersPage: React.FC = () => {
 
   // Tx state
   const [selectedOwnerId, setSelectedOwnerId] = useState(owners[0]?.id || '');
+
+  // Owners load asynchronously — resync once they arrive.
+  useEffect(() => {
+    if (!selectedOwnerId && owners.length > 0) {
+      setSelectedOwnerId(owners[0].id);
+    }
+  }, [owners, selectedOwnerId]);
   const [txType, setTxType] = useState<'INVESTMENT' | 'WITHDRAWAL' | 'PROFIT_PAYOUT' | 'REINVEST'>('PROFIT_PAYOUT');
   const [amountUsd, setAmountUsd] = useState('');
   const [note, setNote] = useState('');

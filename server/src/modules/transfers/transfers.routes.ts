@@ -4,9 +4,17 @@ import { prisma } from '../../prisma/prisma.service';
 import { TransfersService } from './transfers.service';
 
 export function registerTransferRoutes(app: Express) {
-  app.get('/api/transfers', authenticateJwt, async (_req, res, next) => {
+  app.get('/api/transfers', authenticateJwt, async (req: AuthenticatedRequest, res, next) => {
     try {
+      // SELLERs only see transfers touching their own store — cross-store transfer
+      // history is not something a store employee should be able to read.
+      const storeScope =
+        req.user!.role === 'SELLER' && req.user!.storeId
+          ? { OR: [{ fromStoreId: req.user!.storeId }, { toStoreId: req.user!.storeId }] }
+          : undefined;
+
       const transfers = await prisma.transferRequest.findMany({
+        where: storeScope,
         include: { items: true, fromStore: true, toStore: true },
         orderBy: { requestedAt: 'desc' },
       });
@@ -21,6 +29,13 @@ export function registerTransferRoutes(app: Express) {
       const { fromStoreId, toStoreId, deviceIds } = req.body ?? {};
       if (!fromStoreId || !toStoreId || !Array.isArray(deviceIds)) {
         res.status(400).json({ message: 'fromStoreId, toStoreId и deviceIds обязательны' });
+        return;
+      }
+      // SELLERs may only request transfers OUT of their own assigned store — the
+      // client-supplied fromStoreId cannot be trusted otherwise (a SELLER could
+      // otherwise move stock belonging to a store they have no rights over).
+      if (req.user!.role === 'SELLER' && fromStoreId !== req.user!.storeId) {
+        res.status(403).json({ error: 'Forbidden: you may only transfer from your own store' });
         return;
       }
       const transfer = await TransfersService.create({ fromStoreId, toStoreId, deviceIds, requestedByUserId: req.user!.userId });

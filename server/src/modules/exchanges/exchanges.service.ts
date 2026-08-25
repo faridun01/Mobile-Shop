@@ -29,8 +29,11 @@ export class ExchangesService {
       const sale = await tx.sale.findUnique({ where: { id: input.saleId }, include: { saleItems: true } });
       if (!sale) throw new Error('Продажа не найдена');
 
+      // The replacement device must come from the same store as the sale being
+      // exchanged — otherwise stock would silently teleport between stores with no
+      // transfer record at all.
       const replacementDevice = await tx.device.findFirst({
-        where: { id: input.replacementDeviceId, status: { in: ['STORE_STOCK', 'IN_STOCK_AFTER_EXCHANGE'] } },
+        where: { id: input.replacementDeviceId, storeId: sale.storeId, status: { in: ['STORE_STOCK', 'IN_STOCK_AFTER_EXCHANGE'] } },
       });
       if (!replacementDevice) throw new Error('Выбранный телефон на замену недоступен на складе');
 
@@ -44,22 +47,20 @@ export class ExchangesService {
       const cashAmountTjs = input.cashAmountTjs ?? (paymentMethod === 'CASH' ? diffTjs : 0);
       const cardAmountTjs = input.cardAmountTjs ?? (paymentMethod === 'CARD' ? diffTjs : 0);
 
-      // The customer's traded-in phone was never in our inventory — it enters as a brand-new
-      // Device row valued at the agreed trade-in price (its new cost basis).
-      const returnedDevice = await tx.device.create({
-        data: {
-          imei: input.returnedImei,
-          brand: input.returnedBrand,
-          model: input.returnedModel,
-          storage: input.returnedStorage ?? 'N/A',
-          color: input.returnedColor ?? 'N/A',
-          status: 'IN_STOCK_AFTER_EXCHANGE',
-          storeId: sale.storeId,
-          purchasePriceUsd: exchangeInValueUsd,
-          costBasisUsd: exchangeInValueUsd,
-          supplierName: 'Trade-In Клиент',
-          timeline: { create: [{ type: 'EXCHANGE_IN', description: 'Принят по программе Trade-In', userName: actor.name }] },
-        },
+      // This flow swaps one item within an existing sale for another — the "returned"
+      // device is the very device already sold in this sale (matchedItem.deviceId), not
+      // some unrelated personal phone the customer brings in. It comes back into stock
+      // at a new cost basis (the agreed trade-in value); its purchase history is untouched.
+      const returnDeviceGuard = await tx.device.updateMany({
+        where: { id: matchedItem.deviceId, status: 'SOLD' },
+        data: { status: 'IN_STOCK_AFTER_EXCHANGE', costBasisUsd: exchangeInValueUsd },
+      });
+      if (returnDeviceGuard.count !== 1) {
+        throw new Error('Возвращаемое устройство уже было обработано параллельно, повторите попытку');
+      }
+      const returnedDevice = await tx.device.findUniqueOrThrow({ where: { id: matchedItem.deviceId } });
+      await tx.deviceTimelineEvent.create({
+        data: { deviceId: returnedDevice.id, type: 'EXCHANGE_IN', description: 'Принят по программе Trade-In', userName: actor.name },
       });
 
       const soldResult = await tx.device.updateMany({

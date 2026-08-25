@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import { User, Role } from '../../types';
 import {
@@ -69,11 +69,18 @@ export const EmployeesPage: React.FC = () => {
   const [login, setLogin] = useState('');
   const [password, setPassword] = useState('');
   const [role, setRole] = useState<Role>('SELLER');
-  const [storeId, setStoreId] = useState<string>(stores[0]?.id || 'store-1');
+  const [storeId, setStoreId] = useState<string>(stores[0]?.id || '');
   const [isActive, setIsActive] = useState(true);
+
+  // Stores load asynchronously from the API — resync once they arrive rather than
+  // being permanently stuck on the empty initial value.
+  useEffect(() => {
+    if (!storeId && stores.length > 0) {
+      setStoreId(stores[0].id);
+    }
+  }, [stores, storeId]);
   const [baseSalaryTjs, setBaseSalaryTjs] = useState<string>('');
   const [salesCommissionPercent, setSalesCommissionPercent] = useState<string>('');
-  const [showPasswordMap, setShowPasswordMap] = useState<Record<string, boolean>>({});
 
   const [statusMessage, setStatusMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
@@ -113,7 +120,7 @@ export const EmployeesPage: React.FC = () => {
     setLogin('');
     setPassword('');
     setRole('SELLER');
-    setStoreId(stores[0]?.id || 'store-1');
+    setStoreId(stores[0]?.id || '');
     setIsActive(true);
     setBaseSalaryTjs('');
     setSalesCommissionPercent('');
@@ -126,15 +133,11 @@ export const EmployeesPage: React.FC = () => {
     setLogin(u.login);
     setPassword('');
     setRole(u.role);
-    setStoreId(u.storeId || stores[0]?.id || 'store-1');
+    setStoreId(u.storeId || stores[0]?.id || '');
     setIsActive(u.isActive ?? u.active);
     setBaseSalaryTjs(u.baseSalaryTjs?.toString() || '');
     setSalesCommissionPercent(u.salesCommissionPercent?.toString() || '');
     setIsModalOpen(true);
-  };
-
-  const togglePasswordShow = (userId: string) => {
-    setShowPasswordMap(prev => ({ ...prev, [userId]: !prev[userId] }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -347,7 +350,7 @@ export const EmployeesPage: React.FC = () => {
       )}
 
       {/* Users List Grid of Individual Cards */}
-      <div className="flex-1 overflow-y-auto p-3 sm:p-4 bg-[#0B0E14] grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5 sm:gap-4 items-start">
+      <div className="flex-1 overflow-y-auto p-3 sm:p-4 bg-[#0B0E14] grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 auto-rows-max gap-3.5 sm:gap-4 items-start">
         {users.map((u) => {
           const roleConf = ROLE_CONFIG[u.role] || ROLE_CONFIG.SELLER;
 
@@ -410,18 +413,7 @@ export const EmployeesPage: React.FC = () => {
 
                 <div className="flex items-center justify-between">
                   <span className="text-[10px] text-slate-500 uppercase">ПАРОЛЬ ВХОДА:</span>
-                  <div className="flex items-center space-x-1.5 font-mono">
-                    <strong className="text-slate-200 text-xs">
-                      {showPasswordMap[u.id] ? (u.passwordHash || '••••••••') : '••••••••'}
-                    </strong>
-                    <button
-                      type="button"
-                      onClick={() => togglePasswordShow(u.id)}
-                      className="text-[9px] text-emerald-400 hover:underline ml-1 font-bold"
-                    >
-                      {showPasswordMap[u.id] ? 'Скрыть' : 'Показать'}
-                    </button>
-                  </div>
+                  <strong className="text-slate-200 text-xs font-mono">••••••••</strong>
                 </div>
 
                 <div className="flex items-center justify-between">

@@ -1,0 +1,58 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: mobile_shop_db_staging
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: staging_pw_only
+      POSTGRES_DB: mobile_shop_db
+    ports:
+      - "55499:5432"
+    volumes:
+      - postgres_staging_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d mobile_shop_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - mobile_shop_staging_net
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: mobile-shop-staging:local
+    container_name: mobile_shop_app_staging
+    environment:
+      DATABASE_URL: "postgresql://postgres:staging_pw_only@db:5432/mobile_shop_db?schema=public"
+      JWT_SECRET: "staging-only-jwt-secret-not-for-prod"
+      NODE_ENV: "production"
+      PORT: "3000"
+    ports:
+      - "13099:3000"
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - mobile_shop_staging_net
+
+  nginx:
+    image: nginx:alpine
+    container_name: mobile_shop_nginx_staging
+    ports:
+      - "18091:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - app
+    networks:
+      - mobile_shop_staging_net
+
+volumes:
+  postgres_staging_data:
+    driver: local
+
+networks:
+  mobile_shop_staging_net:
+    driver: bridge

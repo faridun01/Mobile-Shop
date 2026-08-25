@@ -27,6 +27,7 @@ export default defineConfig(() => {
           name: 'Mobile Shop POS & ERP',
           short_name: 'Mobile Shop',
           description: 'Mobile Shop POS & ERP — Профессиональная система автоматизации и учета магазина электроники',
+          lang: 'ru',
           theme_color: '#0F1219',
           background_color: '#0B0E14',
           display: 'standalone',

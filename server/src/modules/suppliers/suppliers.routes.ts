@@ -5,7 +5,10 @@ import { SuppliersService } from './suppliers.service';
 import { RealtimeSyncGateway } from '../../websocket/websocket.gateway';
 
 export function registerSupplierRoutes(app: Express) {
-  app.get('/api/suppliers', authenticateJwt, async (_req, res, next) => {
+  // Suppliers/invoices/bonuses are ADMIN+PARTNER-only, matching Sidebar's declared
+  // access for the Suppliers/Bonuses pages — a SELLER has no legitimate need to read
+  // supplier debt/payment data and must not be able to via a direct API call.
+  app.get('/api/suppliers', authenticateJwt, requireRoles('ADMIN', 'PARTNER'), async (_req, res, next) => {
     try {
       res.json(await prisma.supplier.findMany({ orderBy: { name: 'asc' } }));
     } catch (error) {
@@ -13,7 +16,7 @@ export function registerSupplierRoutes(app: Express) {
     }
   });
 
-  app.get('/api/supplier-invoices', authenticateJwt, async (_req, res, next) => {
+  app.get('/api/supplier-invoices', authenticateJwt, requireRoles('ADMIN', 'PARTNER'), async (_req, res, next) => {
     try {
       const invoices = await prisma.supplierInvoice.findMany({ include: { groups: true, supplier: true }, orderBy: { date: 'desc' } });
       const withComputed = invoices.map((inv) => ({
@@ -27,7 +30,7 @@ export function registerSupplierRoutes(app: Express) {
     }
   });
 
-  app.get('/api/supplier-bonuses', authenticateJwt, async (_req, res, next) => {
+  app.get('/api/supplier-bonuses', authenticateJwt, requireRoles('ADMIN', 'PARTNER'), async (_req, res, next) => {
     try {
       res.json(await prisma.supplierBonus.findMany({ include: { freeDevices: true, supplier: true }, orderBy: { createdAt: 'desc' } }));
     } catch (error) {

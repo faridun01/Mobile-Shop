@@ -1,5 +1,6 @@
 import type { Express } from 'express';
 import { authenticateJwt, type AuthenticatedRequest } from '../../auth/auth.middleware';
+import { prisma } from '../../prisma/prisma.service';
 import { ExchangesService } from './exchanges.service';
 import { RealtimeSyncGateway } from '../../websocket/websocket.gateway';
 
@@ -10,6 +11,16 @@ export function registerExchangeRoutes(app: Express) {
       if (!body.saleId || !body.returnedImei || !body.replacementDeviceId || body.newPriceTjs == null || body.exchangeInValueTjs == null) {
         res.status(400).json({ message: 'saleId, returnedImei, replacementDeviceId, exchangeInValueTjs и newPriceTjs обязательны' });
         return;
+      }
+
+      // A SELLER may only process an exchange against a sale from their own store —
+      // otherwise they could move another store's replacement stock via a trade-in.
+      if (req.user!.role === 'SELLER') {
+        const sourceSale = await prisma.sale.findUnique({ where: { id: body.saleId } });
+        if (!sourceSale || sourceSale.storeId !== req.user!.storeId) {
+          res.status(403).json({ error: 'Forbidden: this sale belongs to another store' });
+          return;
+        }
       }
 
       const sale = await ExchangesService.process({ ...body, processedByUserId: req.user!.userId });

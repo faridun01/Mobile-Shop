@@ -97,20 +97,14 @@ export const ReportsPage: React.FC = () => {
       });
     });
 
-    // Repair income (issued repairs in period)
-    let periodRepairs = repairs.filter(r => r.status === 'ISSUED');
-    if (period === 'TODAY') {
-      periodRepairs = periodRepairs.filter(r => r.createdAt.startsWith(todayStr) || (r.updatedAt && r.updatedAt.startsWith(todayStr)));
-    } else if (period === 'MONTH') {
-      periodRepairs = periodRepairs.filter(r => r.createdAt.startsWith(currentMonthStr) || (r.updatedAt && r.updatedAt.startsWith(currentMonthStr)));
-    } else if (period === 'SPECIFIC_MONTH') {
-      periodRepairs = periodRepairs.filter(r => r.createdAt.startsWith(selectedMonth) || (r.updatedAt && r.updatedAt.startsWith(selectedMonth)));
-    }
-    const repairIncomeTjs = periodRepairs.reduce((acc, r) => acc + (r.repairCostTjs || r.estimatedCostTjs || 0), 0);
-    const repairIncomeUsd = +(repairIncomeTjs / rate).toFixed(2);
+    // Repair parts/labor cost is booked as a REPAIR_PARTS expense at intake (see
+    // RepairsService.create) and already flows through expensesUsd below. The
+    // system has no field for what a customer is charged for a repair — only that
+    // cost — so there is no separate repair "revenue" to add here; doing so
+    // previously double-counted the same TJS figure as both income and expense.
 
     const grossProfitUsd = +(revenueUsd - cogsUsd).toFixed(2);
-    const totalRevenueUsd = +(revenueUsd + repairIncomeUsd).toFixed(2);
+    const totalRevenueUsd = +revenueUsd.toFixed(2);
     const revenueTjs = Math.round(totalRevenueUsd * rate);
     const cogsTjs = Math.round(cogsUsd * rate);
     const grossProfitTjs = Math.round(grossProfitUsd * rate);
@@ -136,6 +130,7 @@ export const ReportsPage: React.FC = () => {
     const periodRefundPenaltiesUsd = (sales || [])
       .filter(s => {
         if (s.status !== 'REFUNDED' || !s.penaltyFeeUsd) return false;
+        if (selectedStore !== 'all' && s.storeId !== selectedStore) return false;
         const rDate = (s.refundedAt || s.date || '').split('T')[0];
         if (period === 'TODAY') return rDate === todayStr;
         if (period === 'MONTH') return rDate.startsWith(currentMonthStr);
@@ -144,8 +139,10 @@ export const ReportsPage: React.FC = () => {
       })
       .reduce((acc, s) => acc + (s.penaltyFeeUsd || 0), 0);
 
-    // Net Profit in USD & TJS (Includes sales profit + repair income - expenses + 100% cash supplier bonuses + 100% refund penalties)
-    const netProfitUsd = +(grossProfitUsd + repairIncomeUsd - expensesUsd + periodCashBonusesUsd + periodRefundPenaltiesUsd).toFixed(2);
+    // Net Profit in USD & TJS (sales gross profit - all expenses, including repair
+    // parts/labor which is already inside expensesUsd - + 100% cash supplier bonuses
+    // + 100% refund penalties).
+    const netProfitUsd = +(grossProfitUsd - expensesUsd + periodCashBonusesUsd + periodRefundPenaltiesUsd).toFixed(2);
     const netProfitTjs = Math.round(netProfitUsd * rate);
 
     // Balance Sheet Assets & Liabilities in USD (store-aware)

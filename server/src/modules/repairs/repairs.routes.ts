@@ -5,9 +5,11 @@ import { RepairsService } from './repairs.service';
 import { RealtimeSyncGateway } from '../../websocket/websocket.gateway';
 
 export function registerRepairRoutes(app: Express) {
-  app.get('/api/repairs', authenticateJwt, async (_req, res, next) => {
+  app.get('/api/repairs', authenticateJwt, async (req: AuthenticatedRequest, res, next) => {
     try {
+      const storeScope = req.user!.role === 'SELLER' && req.user!.storeId ? { storeId: req.user!.storeId } : undefined;
       const repairs = await prisma.repairTicket.findMany({
+        where: storeScope,
         include: { statusHistory: { orderBy: { updatedAt: 'asc' } }, store: true, user: true },
         orderBy: { createdAt: 'desc' },
       });
@@ -38,6 +40,14 @@ export function registerRepairRoutes(app: Express) {
       if (!status) {
         res.status(400).json({ message: 'status обязателен' });
         return;
+      }
+      // A SELLER may only update tickets belonging to their own store.
+      if (req.user!.role === 'SELLER') {
+        const existing = await prisma.repairTicket.findUnique({ where: { id: req.params.id } });
+        if (!existing || existing.storeId !== req.user!.storeId) {
+          res.status(403).json({ error: 'Forbidden: this repair ticket belongs to another store' });
+          return;
+        }
       }
       const ticket = await RepairsService.updateStatus(req.params.id, status, req.user!.userId, note, finalCostTjs);
       RealtimeSyncGateway.broadcast('REPAIR_UPDATED', { ticketId: ticket.id }, { storeIds: [ticket.storeId] });

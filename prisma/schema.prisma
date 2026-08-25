@@ -129,7 +129,11 @@ model User {
 model Device {
   id                String       @id @default(uuid())
   imei              String       @unique
-  imei2             String?
+  // A phone's second (dual-SIM) IMEI is a real hardware identifier and must never
+  // repeat across devices — nullable @unique gives Postgres a partial unique index
+  // that allows unlimited NULLs (most devices have no second slot) while rejecting
+  // any duplicate non-null value.
+  imei2             String?      @unique
   serialNumber      String?
   barcode           String?
   brand             String
@@ -160,7 +164,6 @@ model Device {
   transferItems   TransferItem[]
 
   @@index([imei])
-  @@index([imei2])
   @@index([storeId, status])
   @@index([status])
   @@map("devices")

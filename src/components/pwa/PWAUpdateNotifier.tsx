@@ -23,6 +23,17 @@ export const PWAUpdateNotifier: React.FC = () => {
       });
     }
 
+    // The new worker activates asynchronously after SKIP_WAITING is posted —
+    // reloading immediately (instead of waiting for this event) risks the
+    // reload being served by the still-controlling old worker.
+    let reloaded = false;
+    const handleControllerChange = () => {
+      if (reloaded) return;
+      reloaded = true;
+      window.location.reload();
+    };
+    navigator.serviceWorker?.addEventListener('controllerchange', handleControllerChange);
+
     // Online / Offline listeners
     const handleOnline = () => {
       setOffline(false);
@@ -39,6 +50,7 @@ export const PWAUpdateNotifier: React.FC = () => {
     window.addEventListener('offline', handleOffline);
 
     return () => {
+      navigator.serviceWorker?.removeEventListener('controllerchange', handleControllerChange);
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
     };
@@ -50,10 +62,9 @@ export const PWAUpdateNotifier: React.FC = () => {
         if (registration.waiting) {
           registration.waiting.postMessage({ type: 'SKIP_WAITING' });
         }
-        window.location.reload();
+        // Do not reload here — the controllerchange listener above reloads
+        // once the new worker actually takes control.
       });
-    } else {
-      window.location.reload();
     }
   };
 
