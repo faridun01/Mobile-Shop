@@ -137,12 +137,13 @@ app.post('/api/purchases', authenticateJwt, requireRoles('ADMIN', 'PARTNER'), en
             .filter((item: any) => item && typeof item.imei === 'string' && item.imei.trim().length > 0)
             .map((item: any) => {
               const [imei1, imei2] = String(item.imei).split(/[\/,]/).map((part) => part.trim());
+              const explicitImei2 = typeof item.imei2 === 'string' && item.imei2.trim() ? item.imei2.trim() : null;
               const bCode = typeof item.barcode === 'string' && item.barcode.trim()
                 ? item.barcode.trim()
                 : (typeof group.barcode === 'string' && group.barcode.trim() ? group.barcode.trim() : null);
               return {
                 imei: imei1,
-                imei2: imei2 || null,
+                imei2: explicitImei2 || imei2 || null,
                 barcode: bCode || null,
                 brand: String(group.brand || '').trim(),
                 model: String(group.model || '').trim(),
@@ -198,7 +199,9 @@ app.post('/api/purchases', authenticateJwt, requireRoles('ADMIN', 'PARTNER'), en
             create: groups.map((group: any) => ({
               brand: String(group.brand || '').trim(), model: String(group.model || '').trim(),
               storage: String(group.storage || '').trim(), color: String(group.color || '').trim(),
-              quantity: Array.isArray(group.imeis) ? group.imeis.filter(Boolean).length : 0,
+              quantity: Array.isArray(group.items)
+                ? group.items.filter((i: any) => i && typeof i.imei === 'string' && i.imei.trim().length > 0).length
+                : (Array.isArray(group.imeis) ? group.imeis.filter(Boolean).length : 0),
               purchasePriceUsd: Number(group.purchasePriceUsd) || 0,
             })),
           },

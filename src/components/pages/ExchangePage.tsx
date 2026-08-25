@@ -82,6 +82,8 @@ export const ExchangePage: React.FC = () => {
       const q = deviceSearchQuery.toLowerCase();
       return (
         d.imei.toLowerCase().includes(q) ||
+        (d.imei2 && d.imei2.toLowerCase().includes(q)) ||
+        (d.barcode && d.barcode.toLowerCase().includes(q)) ||
         d.brand.toLowerCase().includes(q) ||
         d.model.toLowerCase().includes(q) ||
         d.color.toLowerCase().includes(q)
@@ -96,7 +98,7 @@ export const ExchangePage: React.FC = () => {
     const cleanCode = q.replace('#', '');
     for (const s of sales) {
       const isReceiptMatch = s.receiptNumber.toString() === cleanCode || s.id === q;
-      const itm = s.items.find(i => i.imei === q || i.imei === cleanCode || isReceiptMatch);
+      const itm = s.items.find(i => i.imei === q || i.imei === cleanCode || (i.imei2 && (i.imei2 === q || i.imei2 === cleanCode)) || isReceiptMatch);
 
       if (itm) {
         // If searching by receipt or active item, use the current active item's updated sale price

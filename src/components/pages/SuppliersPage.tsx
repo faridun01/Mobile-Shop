@@ -14,6 +14,16 @@ import {
   Building
 } from 'lucide-react';
 
+const formatDateStr = (dateVal?: string) => {
+  if (!dateVal) return '-';
+  const clean = dateVal.split('T')[0];
+  const parts = clean.split('-');
+  if (parts.length === 3) {
+    return `${parts[2]}.${parts[1]}.${parts[0]}`;
+  }
+  return clean;
+};
+
 export const SuppliersPage: React.FC = () => {
   const {
     currentUser,
@@ -247,7 +257,7 @@ export const SuppliersPage: React.FC = () => {
                             </span>
                           </div>
                           <p className="text-[11px] text-zinc-500 mt-1">
-                            Дата: {inv.date} • Устройств: {inv.devicesCount ?? 0} шт.
+                            Дата: {formatDateStr(inv.date)} • Устройств: {inv.devicesCount ?? 0} шт.
                           </p>
                         </div>
 
@@ -357,10 +367,14 @@ export const SuppliersPage: React.FC = () => {
                 const isPartial = inv.status === 'PARTIALLY_PAID';
 
                 return (
-                  <div key={inv.id} className="p-3 hover:bg-zinc-900/50 flex items-center justify-between">
+                  <div
+                    key={inv.id}
+                    onClick={() => setSelectedInvoice(inv)}
+                    className="p-3 hover:bg-zinc-900/80 active:bg-zinc-900 cursor-pointer transition-colors flex items-center justify-between group border-b border-zinc-800/60"
+                  >
                     <div>
                       <div className="flex items-center space-x-2">
-                        <span className="font-mono text-xs font-bold text-zinc-200">{inv.invoiceNumber}</span>
+                        <span className="font-mono text-xs font-bold text-zinc-200 group-hover:text-emerald-400 transition-colors">{inv.invoiceNumber}</span>
                         <span className={`text-[10px] px-2 py-0.5 rounded font-mono font-medium ${
                           isPaid ? 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30' :
                           isPartial ? 'bg-amber-500/15 text-amber-300 border border-amber-500/30' :
@@ -370,17 +384,26 @@ export const SuppliersPage: React.FC = () => {
                         </span>
                       </div>
                       <p className="text-[11px] text-zinc-500 mt-0.5">
-                        {inv.date} • {inv.devicesCount ?? 0} устройств
+                        {formatDateStr(inv.date)} • {inv.devicesCount ?? 0} устройств
                       </p>
                     </div>
 
-                    <div className="text-right">
-                      <p className="text-xs font-mono font-bold text-zinc-200">
-                        ${(inv.totalAmountUsd ?? 0).toLocaleString()}
-                      </p>
-                      <p className="text-[11px] font-mono text-rose-400">
-                        Долг: ${(inv.remainingAmountUsd ?? 0).toLocaleString()}
-                      </p>
+                    <div className="flex items-center space-x-3">
+                      <div className="text-right">
+                        <p className="text-xs font-mono font-bold text-zinc-200">
+                          ${(inv.totalAmountUsd ?? 0).toLocaleString()}
+                        </p>
+                        <p className="text-[11px] font-mono text-rose-400">
+                          Долг: ${(inv.remainingAmountUsd ?? 0).toLocaleString()}
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        className="p-1 rounded bg-zinc-900 text-zinc-400 group-hover:text-white border border-zinc-800"
+                        title="Детали накладной"
+                      >
+                        <ChevronRight className="w-4 h-4" />
+                      </button>
                     </div>
                   </div>
                 );
@@ -562,7 +585,7 @@ export const SuppliersPage: React.FC = () => {
                     )}
                   </h3>
                   <p className="text-[11px] text-slate-400">
-                    Поставщик: {suppliers.find(s => s.id === selectedInvoice.supplierId)?.name || 'Поставщик'} • {selectedInvoice.date}
+                    Поставщик: {suppliers.find(s => s.id === selectedInvoice.supplierId)?.name || 'Поставщик'} • {formatDateStr(selectedInvoice.date)}
                   </p>
                 </div>
               </div>
@@ -592,6 +615,27 @@ export const SuppliersPage: React.FC = () => {
                 <strong className="text-rose-400 font-bold">${(selectedInvoice.remainingAmountUsd || 0).toLocaleString()}</strong>
               </div>
             </div>
+
+            {/* Invoice Groups (Summary of positions) */}
+            {selectedInvoice.groups && selectedInvoice.groups.length > 0 && (
+              <div className="p-3 bg-[#0B0E14] border-b border-slate-800 font-mono space-y-1.5 shrink-0">
+                <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Позиции по накладной:</span>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                  {selectedInvoice.groups.map((grp: any, gIdx: number) => (
+                    <div key={gIdx} className="p-2 rounded bg-[#0F1219] border border-slate-800 flex justify-between items-center">
+                      <div>
+                        <span className="font-bold text-slate-200">{grp.brand} {grp.model}</span>
+                        <span className="block text-[11px] text-slate-400">{grp.storage} • {grp.color}</span>
+                      </div>
+                      <div className="text-right">
+                        <span className="font-bold text-emerald-400">{grp.quantity} шт.</span>
+                        <span className="block text-[10px] text-slate-400">${grp.purchasePriceUsd} / шт.</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* Contained Devices List */}
             {(() => {
@@ -632,8 +676,10 @@ export const SuppliersPage: React.FC = () => {
                                 </span>
                               )}
                             </div>
-                            <div className="text-[11px] text-slate-400 mt-1 flex items-center space-x-3">
-                              <span>IMEI: <strong className="text-slate-300">{dev.imei}{dev.imei2 ? ` / ${dev.imei2}` : ''}</strong></span>
+                            <div className="text-[11px] text-slate-400 mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5">
+                              <span>IMEI 1: <strong className="text-slate-300">{dev.imei}</strong></span>
+                              {dev.imei2 && <span>IMEI 2: <strong className="text-slate-300">{dev.imei2}</strong></span>}
+                              {dev.barcode && <span className="text-amber-400 font-mono">EAN: {dev.barcode}</span>}
                               <span>Локация: <strong className="text-slate-300">{dev.locationName}</strong></span>
                             </div>
                             {dev.bonusCampaign && (

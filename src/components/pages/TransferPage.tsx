@@ -78,8 +78,10 @@ export const TransferPage: React.FC = () => {
         const q = searchQuery.toLowerCase();
         const matchesModel = `${d.brand} ${d.model}`.toLowerCase().includes(q);
         const matchesImei = d.imei.toLowerCase().includes(q);
+        const matchesImei2 = d.imei2?.toLowerCase().includes(q);
+        const matchesBarcode = d.barcode?.toLowerCase().includes(q);
         const matchesColor = d.color.toLowerCase().includes(q);
-        if (!matchesModel && !matchesImei && !matchesColor) return false;
+        if (!matchesModel && !matchesImei && !matchesImei2 && !matchesBarcode && !matchesColor) return false;
       }
       return true;
     });
@@ -107,7 +109,7 @@ export const TransferPage: React.FC = () => {
 
   const handleScanSuccess = (code: string) => {
     setIsScannerOpen(false);
-    const found = availableOriginDevices.find(d => d.imei === code || d.barcode === code);
+    const found = availableOriginDevices.find(d => d.imei === code || d.imei2 === code || d.barcode === code);
     if (found) {
       if (!selectedDeviceIds.includes(found.id)) {
         setSelectedDeviceIds(prev => [...prev, found.id]);

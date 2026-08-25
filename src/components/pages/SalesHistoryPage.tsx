@@ -82,7 +82,8 @@ export const SalesHistoryPage: React.FC = () => {
           item =>
             item.brand.toLowerCase().includes(q) ||
             item.model.toLowerCase().includes(q) ||
-            item.imei.toLowerCase().includes(q)
+            item.imei.toLowerCase().includes(q) ||
+            (item.imei2 && item.imei2.toLowerCase().includes(q))
         );
 
         if (!matchesReceipt && !matchesSeller && !matchesStore && !matchesCustomer && !matchesItem) {
@@ -100,7 +101,7 @@ export const SalesHistoryPage: React.FC = () => {
       const code = scannedCode.trim();
       const matched = sales.find(s =>
         s.receiptNumber.toString() === code ||
-        s.items.some(i => i.imei === code)
+        s.items.some(i => i.imei === code || i.imei2 === code)
       );
 
       if (matched) {

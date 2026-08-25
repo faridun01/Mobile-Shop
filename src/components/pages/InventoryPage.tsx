@@ -80,6 +80,7 @@ export const InventoryPage: React.FC = () => {
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase().trim();
         const matchesImei = d.imei.toLowerCase().includes(q);
+        const matchesImei2 = d.imei2?.toLowerCase().includes(q);
         const matchesSerial = d.serialNumber?.toLowerCase().includes(q);
         const matchesBarcode = d.barcode?.toLowerCase().includes(q);
         const matchesBrand = d.brand.toLowerCase().includes(q);
@@ -88,7 +89,7 @@ export const InventoryPage: React.FC = () => {
         const matchesStorage = d.storage.toLowerCase().includes(q);
         const matchesSupplier = d.supplierName?.toLowerCase().includes(q);
 
-        if (!matchesImei && !matchesSerial && !matchesBarcode && !matchesBrand && !matchesModel && !matchesColor && !matchesStorage && !matchesSupplier) {
+        if (!matchesImei && !matchesImei2 && !matchesSerial && !matchesBarcode && !matchesBrand && !matchesModel && !matchesColor && !matchesStorage && !matchesSupplier) {
           return false;
         }
       }
@@ -108,7 +109,7 @@ export const InventoryPage: React.FC = () => {
     openScanner((scannedCode) => {
       const code = scannedCode.trim();
       const match = devices.find(d => 
-        (d.imei === code || d.barcode === code || d.serialNumber === code) &&
+        (d.imei === code || d.imei2 === code || d.barcode === code || d.serialNumber === code) &&
         (!isSeller || d.locationId === currentUser?.storeId)
       );
 

@@ -22,7 +22,7 @@ import { formatDeviceIdentifiers, formatTjs, formatUsd } from '../../utils/forma
 
 interface CartItem {
   device: Device;
-  salePriceTjs: number;
+  salePriceTjs?: number;
 }
 
 export const SalePage: React.FC = () => {
@@ -106,13 +106,8 @@ export const SalePage: React.FC = () => {
   }, [devices]);
 
   const addDeviceToCart = (device: Device) => {
-    const rate = todayRate?.rate || 9.50;
-    const baseCostUsd = (device.costBasisUsd && device.costBasisUsd > 0) 
-      ? device.costBasisUsd 
-      : (device.purchaseCostUsd > 0 ? device.purchaseCostUsd : 150);
-    const defaultPriceTjs = Math.round(baseCostUsd * rate * 1.08);
-
-    setCart(prev => [...prev, { device, salePriceTjs: defaultPriceTjs }]);
+    // Price starts EMPTY by default as requested
+    setCart(prev => [...prev, { device, salePriceTjs: undefined }]);
     setActiveImeiSelector(null);
   };
 
@@ -157,10 +152,13 @@ export const SalePage: React.FC = () => {
     }
   };
 
-  const handleUpdatePrice = (index: number, newPrice: number) => {
+  const handleUpdatePrice = (index: number, newPrice?: number) => {
     setCart(prev => {
       const next = [...prev];
-      next[index] = { ...next[index], salePriceTjs: isNaN(newPrice) ? 0 : Math.max(0, newPrice) };
+      next[index] = {
+        ...next[index],
+        salePriceTjs: newPrice !== undefined && !isNaN(newPrice) && newPrice > 0 ? newPrice : undefined
+      };
       return next;
     });
   };
@@ -193,11 +191,13 @@ export const SalePage: React.FC = () => {
     });
   };
 
-  const totalTjs = cart.reduce((acc, item) => acc + item.salePriceTjs, 0);
+  const totalTjs = cart.reduce((acc, item) => acc + (item.salePriceTjs && item.salePriceTjs > 0 ? item.salePriceTjs : 0), 0);
+  const hasEmptyPrice = cart.some(item => item.salePriceTjs === undefined || item.salePriceTjs <= 0);
   const totalUsd = todayRate ? +(totalTjs / todayRate.rate).toFixed(2) : 0;
   const rate = todayRate?.rate || 9.50;
 
   const isItemBelowCost = (item: CartItem) => {
+    if (item.salePriceTjs === undefined || isNaN(item.salePriceTjs)) return false;
     const costTjs = item.device.costBasisUsd * rate;
     return item.salePriceTjs < costTjs;
   };
@@ -205,7 +205,7 @@ export const SalePage: React.FC = () => {
   const handleOpenCart = () => {
     if (cart.length === 0) return;
     setPaymentMethod('CASH');
-    setCashAmountInput(totalTjs.toString());
+    setCashAmountInput(totalTjs > 0 ? totalTjs.toString() : '');
     setCardAmountInput('0');
     setPaymentError(null);
     setIsCartOpen(true);
@@ -213,6 +213,12 @@ export const SalePage: React.FC = () => {
 
   const handleFinishPayment = async () => {
     setPaymentError(null);
+
+    const invalidItem = cart.find(ci => ci.salePriceTjs === undefined || ci.salePriceTjs <= 0);
+    if (invalidItem) {
+      setPaymentError(`Укажите цену продажи для устройства: ${invalidItem.device.brand} ${invalidItem.device.model}`);
+      return;
+    }
 
     let cashVal = 0;
     let cardVal = 0;
@@ -231,7 +237,7 @@ export const SalePage: React.FC = () => {
     }
 
     const res = await createSale({
-      items: cart,
+      items: cart.map(ci => ({ device: ci.device, salePriceTjs: ci.salePriceTjs! })),
       paymentMethod,
       cashAmountTjs: cashVal,
       cardAmountTjs: cardVal,
@@ -508,24 +514,37 @@ export const SalePage: React.FC = () => {
 
                     <div className="mt-2">
                       <label className="block text-[10px] font-mono uppercase text-slate-400 mb-0.5">
-                        Цена продажи (TJS):
+                        Цена продажи (TJS): <span className="text-amber-400 font-bold">*</span>
                       </label>
                       <div className="relative">
                         <input
                           type="number"
-                          min="0"
+                          min="1"
+                          placeholder="Укажите цену продажи..."
                           value={item.salePriceTjs !== undefined ? item.salePriceTjs : ''}
-                          onChange={(e) => handleUpdatePrice(idx, parseFloat(e.target.value))}
+                          onChange={(e) => {
+                            const val = parseFloat(e.target.value);
+                            handleUpdatePrice(idx, isNaN(val) ? undefined : val);
+                          }}
                           className={`w-full rounded bg-[#0F1219] px-2.5 py-1.5 text-xs font-mono font-bold focus:outline-none ${
-                            belowCost
-                              ? 'border border-rose-500 text-rose-300'
-                              : 'border border-slate-700 text-emerald-400 focus:border-emerald-500'
+                            item.salePriceTjs === undefined || item.salePriceTjs <= 0
+                              ? 'border border-amber-500/80 text-amber-300 placeholder-slate-500'
+                              : belowCost
+                                ? 'border border-rose-500 text-rose-300'
+                                : 'border border-slate-700 text-emerald-400 focus:border-emerald-500'
                           }`}
                         />
                         <span className="absolute right-2.5 top-1.5 text-[10px] font-mono font-bold text-slate-500">TJS</span>
                       </div>
 
-                      {belowCost && (
+                      {(item.salePriceTjs === undefined || item.salePriceTjs <= 0) && (
+                        <p className="mt-1 flex items-center text-[10px] font-mono text-amber-400 font-medium">
+                          <AlertTriangle className="w-3 h-3 mr-1 shrink-0" />
+                          <span>Обязательное поле: укажите цену продажи</span>
+                        </p>
+                      )}
+
+                      {belowCost && item.salePriceTjs !== undefined && item.salePriceTjs > 0 && (
                         <p className="mt-1 flex items-center text-[10px] font-mono text-rose-400">
                           <AlertTriangle className="w-3 h-3 mr-1 shrink-0" />
                           <span>⚠ Цена продажи ниже себестоимости</span>
@@ -642,10 +661,13 @@ export const SalePage: React.FC = () => {
 
               <button
                 onClick={handleFinishPayment}
-                className="w-full py-2.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 active:bg-emerald-600 text-xs font-mono font-bold uppercase tracking-wider text-white shadow-[0_0_12px_rgba(16,185,129,0.5)] transition-colors flex items-center justify-center space-x-1.5"
+                disabled={hasEmptyPrice || totalTjs <= 0}
+                className="w-full py-2.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 active:bg-emerald-600 disabled:opacity-40 disabled:cursor-not-allowed text-xs font-mono font-bold uppercase tracking-wider text-white shadow-[0_0_12px_rgba(16,185,129,0.5)] transition-colors flex items-center justify-center space-x-1.5"
               >
                 <CheckCircle2 className="w-4 h-4" />
-                <span>ЗАВЕРШИТЬ ПРОДАЖУ ({totalTjs.toLocaleString()} TJS)</span>
+                <span>
+                  {hasEmptyPrice ? 'УКАЖИТЕ ЦЕНУ ПРОДАЖИ' : `ЗАВЕРШИТЬ ПРОДАЖУ (${totalTjs.toLocaleString()} TJS)`}
+                </span>
               </button>
             </div>
           </div>

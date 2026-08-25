@@ -147,9 +147,13 @@ export const PurchasePage: React.FC = () => {
         const matchesSupplier = inv.supplierName.toLowerCase().includes(q);
         
         // Match devices belonging to this invoice
-        const invoiceDevices = devices.filter(d => d.invoiceNumber === inv.invoiceNumber);
+        const invoiceDevices = devices.filter(
+          d => d.invoiceNumber === inv.invoiceNumber || (inv.id && d.purchaseInvoiceId === inv.id)
+        );
         const matchesDevice = invoiceDevices.some(
           d => d.imei.toLowerCase().includes(q) ||
+               (d.imei2 && d.imei2.toLowerCase().includes(q)) ||
+               (d.barcode && d.barcode.toLowerCase().includes(q)) ||
                d.model.toLowerCase().includes(q) ||
                d.brand.toLowerCase().includes(q)
         );
@@ -173,7 +177,7 @@ export const PurchasePage: React.FC = () => {
   const handleScanFinder = () => {
     openScanner((scannedCode) => {
       const code = scannedCode.trim();
-      const matchedDevice = devices.find(d => d.imei === code || d.barcode === code);
+      const matchedDevice = devices.find(d => d.imei === code || d.imei2 === code || d.barcode === code);
       if (matchedDevice && matchedDevice.invoiceNumber) {
         const matchedInv = supplierInvoices.find(inv => inv.invoiceNumber === matchedDevice.invoiceNumber);
         if (matchedInv) {
@@ -706,6 +710,7 @@ export const PurchasePage: React.FC = () => {
               {(() => {
                 const containedDevices = devices.filter(d => 
                   d.invoiceNumber === selectedInvoice.invoiceNumber ||
+                  (selectedInvoice.id && d.purchaseInvoiceId === selectedInvoice.id) ||
                   (selectedInvoice.invoiceNumber.includes('112') && d.invoiceNumber === 'INV-112-BONUS')
                 );
 
@@ -735,8 +740,10 @@ export const PurchasePage: React.FC = () => {
                                 </span>
                               )}
                             </div>
-                            <div className="text-[11px] text-slate-400 mt-1 flex items-center space-x-3">
-                              <span>IMEI: <strong className="text-slate-300">{dev.imei}</strong></span>
+                            <div className="text-[11px] text-slate-400 mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5">
+                              <span>IMEI 1: <strong className="text-slate-300">{dev.imei}</strong></span>
+                              {dev.imei2 && <span>IMEI 2: <strong className="text-slate-300">{dev.imei2}</strong></span>}
+                              {dev.barcode && <span className="text-amber-400 font-mono">EAN: {dev.barcode}</span>}
                               <span>Локация: <strong className="text-slate-300">{dev.locationName}</strong></span>
                             </div>
                             {dev.bonusCampaign && (

@@ -262,6 +262,16 @@ export interface RepairTicket {
   repairCostTjs?: number;
 }
 
+export interface InvoiceGroup {
+  id?: string;
+  brand: string;
+  model: string;
+  storage: string;
+  color: string;
+  quantity: number;
+  purchasePriceUsd: number;
+}
+
 export interface SupplierInvoice {
   id: string;
   invoiceNumber: string;
@@ -275,6 +285,7 @@ export interface SupplierInvoice {
   devicesCount: number;
   isStorePurchase?: boolean;
   storeId?: string;
+  groups?: InvoiceGroup[];
 }
 
 export interface SupplierPayment {
