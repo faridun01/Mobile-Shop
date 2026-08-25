@@ -247,6 +247,19 @@ async function main() {
   }
 
   console.log(`Successfully seeded ${count} devices across all stores!`);
+
+  const todayStr = new Date().toISOString().split('T')[0];
+  const adminUser = await prisma.user.findFirst({ where: { role: 'ADMIN' } });
+  await prisma.exchangeRate.upsert({
+    where: { date: todayStr },
+    update: {},
+    create: {
+      date: todayStr,
+      rate: 9.50,
+      createdByUserId: adminUser?.id || 'user-admin',
+    },
+  });
+  console.log(`Seeded today's USD exchange rate (${todayStr}: 9.50 TJS).`);
 }
 
 main()

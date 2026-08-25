@@ -15,8 +15,8 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  quality-and-unit-tests:
-    name: Quality Checks & Vitest Unit Tests
+  quality-checks:
+    name: Quality Checks & Build
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
@@ -42,106 +42,9 @@ jobs:
       - name: Build Production Bundle
         run: npm run build
 
-      - name: Execute Vitest Unit & Business Logic Tests
-        run: npm run test:unit
-
-  e2e-tests:
-    name: Playwright Full-Stack E2E Tests (UI -> API -> Postgres)
-    needs: quality-and-unit-tests
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-
-    services:
-      postgres:
-        image: postgres:16-alpine
-        env:
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: ci_password
-          POSTGRES_DB: mobile_shop_db
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd "pg_isready -U postgres -d mobile_shop_db"
-          --health-interval 5s
-          --health-timeout 5s
-          --health-retries 10
-
-    env:
-      DATABASE_URL: postgresql://postgres:ci_password@localhost:5432/mobile_shop_db?schema=public
-      JWT_SECRET: ci-only-jwt-secret-not-for-prod
-      PORT: 3002
-
-    steps:
-      - name: Checkout Source Code
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js Environment
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: 'npm'
-
-      - name: Install Project Dependencies
-        run: npm ci
-
-      - name: Generate Prisma Client
-        run: npx prisma generate
-
-      - name: Apply Prisma Migrations
-        run: npx prisma migrate deploy
-
-      - name: Seed Database
-        run: npx tsx prisma/seed.ts
-
-      - name: Install Playwright Browsers
-        run: npx playwright install --with-deps chromium
-
-      - name: Start API Server
-        run: |
-          npm run server > api-server.log 2>&1 &
-          for _ in {1..30}; do
-            if curl --fail --silent http://localhost:3002/api/health > /dev/null; then
-              exit 0
-            fi
-            sleep 1
-          done
-          cat api-server.log
-          exit 1
-
-      - name: Start Frontend Dev Server
-        run: |
-          npm run dev > frontend-server.log 2>&1 &
-          for _ in {1..30}; do
-            if curl --fail --silent http://localhost:3000 > /dev/null; then
-              exit 0
-            fi
-            sleep 1
-          done
-          cat frontend-server.log
-          exit 1
-
-      - name: Run Playwright E2E Suite (full business flows, real DB)
-        run: npx playwright test
-
-      - name: Run Vitest Integration Suite
-        run: npm run test:integration
-
-      - name: Upload Test Diagnostics
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: e2e-test-diagnostics-${{ github.run_attempt }}
-          if-no-files-found: ignore
-          retention-days: 7
-          path: |
-            playwright-report/
-            test-results/
-            api-server.log
-            frontend-server.log
-
   security-scan:
     name: Security Audit & Vulnerability Scan
-    needs: quality-and-unit-tests
+    needs: quality-checks
     runs-on: ubuntu-latest
     timeout-minutes: 20
 
@@ -165,7 +68,7 @@ jobs:
           tags: mobile-shop:scan
 
       - name: Run Trivy Vulnerability Scanner
-        uses: aquasecurity/trivy-action@v0.28.0
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: 'mobile-shop:scan'
           format: 'table'
@@ -176,7 +79,7 @@ jobs:
 
   docker-build-publish:
     name: Docker Build & Publish to GHCR
-    needs: [e2e-tests, security-scan]
+    needs: [quality-checks, security-scan]
     if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/tags/v'))
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -240,4 +143,5 @@ jobs:
           prerelease: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
 

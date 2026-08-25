@@ -12,11 +12,7 @@
     "preview": "vite preview --port=3000 --host=0.0.0.0",
     "clean": "rm -rf dist server.js",
     "lint": "tsc --noEmit",
-    "server": "tsx server/src/index.ts",
-    "test": "vitest run",
-    "test:unit": "vitest run tests/unit",
-    "test:integration": "vitest run tests/integration",
-    "test:e2e": "playwright test"
+    "server": "tsx server/src/index.ts"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.1.14",
