@@ -9,6 +9,3 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 coverage
-tests
-vitest.config.ts
-playwright.config.ts

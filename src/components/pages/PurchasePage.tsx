@@ -23,6 +23,11 @@ import {
   Check
 } from 'lucide-react';
 
+interface PurchaseItem {
+  imei: string;
+  barcode: string;
+}
+
 interface PurchaseItemGroup {
   id: string;
   brand: string;
@@ -30,9 +35,23 @@ interface PurchaseItemGroup {
   storage: string;
   color: string;
   purchasePriceUsd: number;
-  barcode?: string;
-  imeis: string[];
+  items: PurchaseItem[];
 }
+
+const incrementBarcode = (barcode: string): string => {
+  if (!barcode || !barcode.trim()) return '';
+  const trimmed = barcode.trim();
+  const match = trimmed.match(/^(.*?)(\d+)$/);
+  if (!match) return trimmed;
+  const prefix = match[1];
+  const numStr = match[2];
+  try {
+    const nextNum = (BigInt(numStr) + 1n).toString().padStart(numStr.length, '0');
+    return prefix + nextNum;
+  } catch {
+    return trimmed;
+  }
+};
 
 export const PurchasePage: React.FC = () => {
   const {
@@ -82,7 +101,7 @@ export const PurchasePage: React.FC = () => {
       storage: '256 GB',
       color: 'Black Titanium',
       purchasePriceUsd: 900,
-      imeis: ['']
+      items: [{ imei: '', barcode: '' }]
     }
   ]);
 
@@ -173,7 +192,7 @@ export const PurchasePage: React.FC = () => {
         storage: '128 GB',
         color: 'Black',
         purchasePriceUsd: 700,
-        imeis: ['']
+        items: [{ imei: '', barcode: '' }]
       }
     ]);
   };
@@ -182,7 +201,7 @@ export const PurchasePage: React.FC = () => {
     setGroups(prev => prev.filter((_, i) => i !== idx));
   };
 
-  const handleUpdateGroup = (idx: number, field: keyof PurchaseItemGroup, value: any) => {
+  const handleUpdateGroup = (idx: number, field: keyof Omit<PurchaseItemGroup, 'items'>, value: any) => {
     setGroups(prev => {
       const next = [...prev];
       next[idx] = { ...next[idx], [field]: value };
@@ -193,48 +212,67 @@ export const PurchasePage: React.FC = () => {
   const handleAddImeiToGroup = (groupIdx: number) => {
     setGroups(prev => {
       const next = [...prev];
-      next[groupIdx].imeis.push('');
+      const items = [...next[groupIdx].items];
+      const lastItem = items[items.length - 1];
+      const nextBarcode = incrementBarcode(lastItem?.barcode || '');
+      items.push({ imei: '', barcode: nextBarcode });
+      next[groupIdx] = { ...next[groupIdx], items };
       return next;
     });
   };
 
-  const handleRemoveImeiFromGroup = (groupIdx: number, imeiIdx: number) => {
+  const handleRemoveImeiFromGroup = (groupIdx: number, itemIdx: number) => {
     setGroups(prev => {
       const next = [...prev];
-      next[groupIdx].imeis = next[groupIdx].imeis.filter((_, i) => i !== imeiIdx);
-      if (next[groupIdx].imeis.length === 0) next[groupIdx].imeis = [''];
+      const items = next[groupIdx].items.filter((_, i) => i !== itemIdx);
+      next[groupIdx] = {
+        ...next[groupIdx],
+        items: items.length > 0 ? items : [{ imei: '', barcode: '' }]
+      };
       return next;
     });
   };
 
-  const handleUpdateImei = (groupIdx: number, imeiIdx: number, val: string) => {
+  const handleUpdateImei = (groupIdx: number, itemIdx: number, val: string) => {
     setGroups(prev => {
       const next = [...prev];
-      next[groupIdx].imeis[imeiIdx] = val.trim();
+      const items = [...next[groupIdx].items];
+      items[itemIdx] = { ...items[itemIdx], imei: val };
+      next[groupIdx] = { ...next[groupIdx], items };
+      return next;
+    });
+  };
+
+  const handleUpdateBarcode = (groupIdx: number, itemIdx: number, val: string) => {
+    setGroups(prev => {
+      const next = [...prev];
+      const items = [...next[groupIdx].items];
+      items[itemIdx] = { ...items[itemIdx], barcode: val };
+      next[groupIdx] = { ...next[groupIdx], items };
       return next;
     });
   };
 
   const getImeiPair = (value: string): [string, string] => {
-    const [imei1 = '', imei2 = ''] = value.split(/[\/,]/).map(part => part.trim());
+    const [imei1 = '', imei2 = ''] = (value || '').split(/[\/,]/).map(part => part.trim());
     return [imei1, imei2];
   };
 
-  const handleUpdateImei2 = (groupIdx: number, imeiIdx: number, value: string) => {
-    const [imei1] = getImeiPair(groups[groupIdx].imeis[imeiIdx]);
+  const handleUpdateImei2 = (groupIdx: number, itemIdx: number, value: string) => {
+    const [imei1] = getImeiPair(groups[groupIdx].items[itemIdx]?.imei || '');
     const imei2 = value.trim();
-    handleUpdateImei(groupIdx, imeiIdx, imei2 ? `${imei1} / ${imei2}` : imei1);
+    handleUpdateImei(groupIdx, itemIdx, imei2 ? `${imei1} / ${imei2}` : imei1);
   };
 
-  const handleScanImei = (groupIdx: number, imeiIdx: number) => {
+  const handleScanImei = (groupIdx: number, itemIdx: number) => {
     openScanner((scannedCode) => {
-      handleUpdateImei(groupIdx, imeiIdx, scannedCode.trim());
+      handleUpdateImei(groupIdx, itemIdx, scannedCode.trim());
     });
   };
 
-  const handleScanBarcode = (groupIdx: number) => {
+  const handleScanBarcode = (groupIdx: number, itemIdx: number) => {
     openScanner((scannedCode) => {
-      handleUpdateGroup(groupIdx, 'barcode', scannedCode.trim());
+      handleUpdateBarcode(groupIdx, itemIdx, scannedCode.trim());
     });
   };
 
@@ -244,16 +282,30 @@ export const PurchasePage: React.FC = () => {
     if (rawLines.length > 0) {
       setGroups(prev => {
         const next = [...prev];
-        next[groupIdx].imeis = rawLines;
+        const currentItems = next[groupIdx].items;
+        let currentBarcode = currentItems[0]?.barcode || '';
+
+        const newItems: PurchaseItem[] = rawLines.map((imei, idx) => {
+          if (idx === 0) {
+            return { imei, barcode: currentBarcode };
+          }
+          currentBarcode = incrementBarcode(currentBarcode);
+          return { imei, barcode: currentBarcode };
+        });
+
+        next[groupIdx] = {
+          ...next[groupIdx],
+          items: newItems
+        };
         return next;
       });
     }
   };
 
   // Calculate totals for new intake form
-  const totalFormUnits = groups.reduce((acc, g) => acc + g.imeis.filter(i => i.trim().length > 0).length, 0);
+  const totalFormUnits = groups.reduce((acc, g) => acc + g.items.filter(i => i.imei.trim().length > 0).length, 0);
   const totalFormUsd = groups.reduce((acc, g) => {
-    const count = g.imeis.filter(i => i.trim().length > 0).length;
+    const count = g.items.filter(i => i.imei.trim().length > 0).length;
     return acc + (count * g.purchasePriceUsd);
   }, 0);
 
@@ -274,15 +326,22 @@ export const PurchasePage: React.FC = () => {
       return;
     }
 
-    const cleanGroups = groups.map(g => ({
-      brand: g.brand.trim(),
-      model: g.model.trim(),
-      storage: g.storage.trim(),
-      color: g.color.trim(),
-      purchasePriceUsd: g.purchasePriceUsd,
-      barcode: g.barcode?.trim() || undefined,
-      imeis: g.imeis.filter(i => i.trim().length > 0)
-    })).filter(g => g.imeis.length > 0);
+    const cleanGroups = groups.map(g => {
+      const validItems = g.items
+        .filter(i => i.imei.trim().length > 0)
+        .map(i => ({ imei: i.imei.trim(), barcode: i.barcode.trim() || undefined }));
+
+      return {
+        brand: g.brand.trim(),
+        model: g.model.trim(),
+        storage: g.storage.trim(),
+        color: g.color.trim(),
+        purchasePriceUsd: g.purchasePriceUsd,
+        items: validItems,
+        imeis: validItems.map(i => i.imei),
+        barcodes: validItems.map(i => i.barcode)
+      };
+    }).filter(g => g.items.length > 0);
 
     if (cleanGroups.length === 0) {
       setStatusMessage({ type: 'error', text: 'Добавьте хотя бы один заполненный IMEI' });
@@ -312,7 +371,7 @@ export const PurchasePage: React.FC = () => {
           storage: '256 GB',
           color: 'Black Titanium',
           purchasePriceUsd: 900,
-          imeis: ['']
+          items: [{ imei: '', barcode: '' }]
         }
       ]);
 
@@ -320,7 +379,7 @@ export const PurchasePage: React.FC = () => {
       setViewMode('list');
       setStatusMessage({
         type: 'success',
-        text: `Приход по накладной ${savedNum} успешно сохранен (${cleanGroups.reduce((a, b) => a + b.imeis.length, 0)} шт.)!`
+        text: `Приход по накладной ${savedNum} успешно сохранен (${cleanGroups.reduce((a, b) => a + b.items.length, 0)} шт.)!`
       });
     } else {
       setStatusMessage({ type: 'error', text: res.message || 'Ошибка сохранения прихода' });
@@ -916,10 +975,10 @@ export const PurchasePage: React.FC = () => {
                 <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-2">
                     <span className="text-xs font-semibold text-zinc-300 font-mono">
-                      Список IMEI ({group.imeis.filter(i => i.trim().length > 0).length} шт.)
+                      Список IMEI ({group.items.filter(i => i.imei.trim().length > 0).length} шт.)
                     </span>
                     <span className="text-[10px] text-zinc-500 font-mono">
-                      Сумма: ${group.imeis.filter(i => i.trim().length > 0).length * group.purchasePriceUsd}
+                      Сумма: ${group.items.filter(i => i.imei.trim().length > 0).length * group.purchasePriceUsd}
                     </span>
                   </div>
 
@@ -958,23 +1017,23 @@ export const PurchasePage: React.FC = () => {
                 </div>
 
                 <div className="space-y-2 pt-1 font-mono">
-                  {group.imeis.map((imeiVal, imeiIdx) => {
-                    const [imei1, imei2] = getImeiPair(imeiVal);
+                  {group.items.map((item, itemIdx) => {
+                    const [imei1, imei2] = getImeiPair(item.imei);
                     return (
-                      <div key={imeiIdx} className="grid grid-cols-1 md:grid-cols-3 gap-2">
+                      <div key={itemIdx} className="grid grid-cols-1 md:grid-cols-3 gap-2">
                         <div>
                           <label className="block text-zinc-400 mb-1">Штрихкод (EAN)</label>
                           <div className="flex items-center gap-1.5">
                             <input
                               type="text"
-                              value={group.barcode || ''}
-                              onChange={(e) => handleUpdateGroup(groupIdx, 'barcode', e.target.value)}
+                              value={item.barcode}
+                              onChange={(e) => handleUpdateBarcode(groupIdx, itemIdx, e.target.value)}
                               className="min-w-0 flex-1 rounded bg-zinc-950 border border-zinc-800 px-2.5 py-1.5 text-xs text-amber-400 font-mono focus:border-emerald-500 focus:outline-none"
                               placeholder="EAN-13 / UPC"
                             />
                             <button
                               type="button"
-                              onClick={() => handleScanBarcode(groupIdx)}
+                              onClick={() => handleScanBarcode(groupIdx, itemIdx)}
                               className="shrink-0 rounded bg-zinc-800 p-1.5 text-amber-400 hover:bg-zinc-700 hover:text-amber-300 transition-colors"
                               title="Сканировать EAN"
                               aria-label="Сканировать EAN"
@@ -991,13 +1050,13 @@ export const PurchasePage: React.FC = () => {
                               type="text"
                               required
                               value={imei1}
-                              onChange={(e) => handleUpdateImei(groupIdx, imeiIdx, `${e.target.value} / ${imei2}`.replace(/ \/ $/, ''))}
+                              onChange={(e) => handleUpdateImei(groupIdx, itemIdx, `${e.target.value} / ${imei2}`.replace(/ \/ $/, ''))}
                               placeholder="IMEI 1"
                               className="w-full rounded bg-zinc-950 border border-zinc-800 px-2.5 py-1.5 text-xs text-zinc-100 font-mono focus:border-emerald-500 focus:outline-none pr-8"
                             />
                             <button
                               type="button"
-                              onClick={() => handleScanImei(groupIdx, imeiIdx)}
+                              onClick={() => handleScanImei(groupIdx, itemIdx)}
                               className="absolute right-1.5 top-1.5 text-zinc-400 hover:text-emerald-400 p-0.5"
                               title="Сканировать IMEI 1"
                               aria-label="Сканировать IMEI 1"
@@ -1013,13 +1072,13 @@ export const PurchasePage: React.FC = () => {
                             <input
                               type="text"
                               value={imei2}
-                              onChange={(e) => handleUpdateImei2(groupIdx, imeiIdx, e.target.value)}
+                              onChange={(e) => handleUpdateImei2(groupIdx, itemIdx, e.target.value)}
                               placeholder="IMEI 2 (необязательно)"
                               className="w-full rounded bg-zinc-950 border border-zinc-800 px-2.5 py-1.5 text-xs text-zinc-100 font-mono focus:border-emerald-500 focus:outline-none pr-8"
                             />
                             <button
                               type="button"
-                              onClick={() => openScanner((scannedCode) => handleUpdateImei2(groupIdx, imeiIdx, scannedCode))}
+                              onClick={() => openScanner((scannedCode) => handleUpdateImei2(groupIdx, itemIdx, scannedCode))}
                               className="absolute right-1.5 top-1.5 text-zinc-400 hover:text-emerald-400 p-0.5"
                               title="Сканировать IMEI 2"
                               aria-label="Сканировать IMEI 2"
@@ -1027,10 +1086,10 @@ export const PurchasePage: React.FC = () => {
                               <Scan className="w-3.5 h-3.5" />
                             </button>
                           </div>
-                          {group.imeis.length > 1 && (
+                          {group.items.length > 1 && (
                             <button
                               type="button"
-                              onClick={() => handleRemoveImeiFromGroup(groupIdx, imeiIdx)}
+                              onClick={() => handleRemoveImeiFromGroup(groupIdx, itemIdx)}
                               className="text-zinc-600 hover:text-rose-400 p-1"
                               title="Удалить устройство"
                               aria-label="Удалить устройство"

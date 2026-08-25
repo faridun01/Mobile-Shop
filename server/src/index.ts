@@ -132,13 +132,38 @@ app.post('/api/purchases', authenticateJwt, requireRoles('ADMIN', 'PARTNER'), en
       if (!supplier || !store) throw new Error('Поставщик или магазин не найден');
 
       const normalizedDevices = groups.flatMap((group: any) => {
+        if (Array.isArray(group.items) && group.items.length > 0) {
+          return group.items
+            .filter((item: any) => item && typeof item.imei === 'string' && item.imei.trim().length > 0)
+            .map((item: any) => {
+              const [imei1, imei2] = String(item.imei).split(/[\/,]/).map((part) => part.trim());
+              const bCode = typeof item.barcode === 'string' && item.barcode.trim()
+                ? item.barcode.trim()
+                : (typeof group.barcode === 'string' && group.barcode.trim() ? group.barcode.trim() : null);
+              return {
+                imei: imei1,
+                imei2: imei2 || null,
+                barcode: bCode || null,
+                brand: String(group.brand || '').trim(),
+                model: String(group.model || '').trim(),
+                storage: String(group.storage || '').trim(),
+                color: String(group.color || '').trim(),
+                purchasePriceUsd: Number(group.purchasePriceUsd) || 0,
+              };
+            });
+        }
+
         const imeis = Array.isArray(group.imeis) ? group.imeis : [];
-        return imeis.filter((imei: unknown): imei is string => typeof imei === 'string' && imei.trim().length > 0).map((imei: string) => {
+        const barcodes = Array.isArray(group.barcodes) ? group.barcodes : [];
+        return imeis.filter((imei: unknown): imei is string => typeof imei === 'string' && imei.trim().length > 0).map((imei: string, idx: number) => {
           const [imei1, imei2] = imei.split(/[\/,]/).map((part) => part.trim());
+          const bCode = (barcodes[idx] && typeof barcodes[idx] === 'string' && barcodes[idx].trim())
+            ? barcodes[idx].trim()
+            : (typeof group.barcode === 'string' && group.barcode.trim() ? group.barcode.trim() : null);
           return {
             imei: imei1,
             imei2: imei2 || null,
-            barcode: typeof group.barcode === 'string' && group.barcode.trim() ? group.barcode.trim() : null,
+            barcode: bCode || null,
             brand: String(group.brand || '').trim(),
             model: String(group.model || '').trim(),
             storage: String(group.storage || '').trim(),
