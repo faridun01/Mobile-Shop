@@ -21,7 +21,9 @@ import {
   TrendingUp,
   CreditCard,
   Briefcase,
-  Download
+  Download,
+  Eye,
+  EyeOff
 } from 'lucide-react';
 
 const ROLE_CONFIG: Record<Role, { label: string; bg: string; color: string; border: string }> = {
@@ -68,6 +70,7 @@ export const EmployeesPage: React.FC = () => {
   const [name, setName] = useState('');
   const [login, setLogin] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [role, setRole] = useState<Role>('SELLER');
   const [storeId, setStoreId] = useState<string>(stores[0]?.id || '');
   const [isActive, setIsActive] = useState(true);
@@ -598,14 +601,24 @@ export const EmployeesPage: React.FC = () => {
                 <label className="block text-slate-400 text-[10px] uppercase mb-1">
                   {editingUser ? 'НОВЫЙ ПАРОЛЬ (Оставьте пустым, если не меняется)' : 'ПАРОЛЬ ДЛЯ ВХОДА *'}
                 </label>
-                <input
-                  type="password"
-                  required={!editingUser}
-                  value={password ?? ''}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder={editingUser ? '••••••••' : 'Пароль для входа в систему'}
-                  className="w-full rounded-lg bg-[#0B0E14] border border-slate-800 px-3 py-2 text-slate-100 focus:border-emerald-500 focus:outline-none"
-                />
+                <div className="relative">
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    required={!editingUser}
+                    value={password ?? ''}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder={editingUser ? '••••••••' : 'Пароль для входа в систему'}
+                    className="w-full rounded-lg bg-[#0B0E14] border border-slate-800 pl-3 pr-10 py-2 text-slate-100 focus:border-emerald-500 focus:outline-none"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute inset-y-0 right-0 flex items-center pr-3 text-slate-500 hover:text-slate-300"
+                    title={showPassword ? 'Скрыть пароль' : 'Показать пароль'}
+                  >
+                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
               </div>
 
               <div>
