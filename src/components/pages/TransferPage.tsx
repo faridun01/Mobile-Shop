@@ -647,28 +647,34 @@ export const TransferPage: React.FC = () => {
       </div>
 
       {/* MODAL: Review & Confirm Transfer */}
-      {isConfirmModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-4 backdrop-blur-xs">
-          <div className="w-full max-w-md rounded-xl bg-[#0F1219] border border-slate-800 p-5 text-slate-100 shadow-2xl space-y-4 font-mono">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-              <div className="flex items-center space-x-2">
-                <ArrowLeftRight className="w-4 h-4 text-emerald-400" />
-                <h4 className="text-sm font-bold uppercase text-white">ПОДТВЕРЖДЕНИЕ ПЕРЕМЕЩЕНИЯ</h4>
+      {isConfirmModalOpen && (() => {
+        const nextTransferNum = `TR-${((transfers?.length || 0) + 1).toString().padStart(4, '0')}`;
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-4 backdrop-blur-xs">
+            <div className="w-full max-w-md rounded-xl bg-[#0F1219] border border-slate-800 p-5 text-slate-100 shadow-2xl space-y-4 font-mono">
+              <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                <div className="flex items-center space-x-2">
+                  <ArrowLeftRight className="w-4 h-4 text-emerald-400" />
+                  <h4 className="text-sm font-bold uppercase text-white">НАКЛАДНАЯ ПЕРЕМЕЩЕНИЯ {nextTransferNum}</h4>
+                </div>
+                <button
+                  onClick={() => setIsConfirmModalOpen(false)}
+                  className="text-slate-400 hover:text-white"
+                >
+                  <X className="w-4 h-4" />
+                </button>
               </div>
-              <button
-                onClick={() => setIsConfirmModalOpen(false)}
-                className="text-slate-400 hover:text-white"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
 
-            {/* Route summary */}
-            <div className="p-3 bg-[#0B0E14] rounded-lg border border-slate-800 space-y-1 text-xs">
-              <div className="flex justify-between">
-                <span className="text-slate-400">Отправитель:</span>
-                <span className="font-bold text-slate-200">{fromStoreName}</span>
-              </div>
+              {/* Route summary */}
+              <div className="p-3 bg-[#0B0E14] rounded-lg border border-slate-800 space-y-1 text-xs">
+                <div className="flex justify-between">
+                  <span className="text-slate-400">№ Накладной:</span>
+                  <span className="font-bold text-amber-400">{nextTransferNum}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-400">Отправитель:</span>
+                  <span className="font-bold text-slate-200">{fromStoreName}</span>
+                </div>
               <div className="flex justify-between">
                 <span className="text-slate-400">Получатель:</span>
                 <span className="font-bold text-emerald-400">{toStoreName}</span>
@@ -724,7 +730,8 @@ export const TransferPage: React.FC = () => {
             </div>
           </div>
         </div>
-      )}
+        );
+      })()}
 
       {/* Reject reason modal */}
       {rejectingTransferId && (

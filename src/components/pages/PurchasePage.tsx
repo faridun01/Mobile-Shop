@@ -78,6 +78,17 @@ export const PurchasePage: React.FC = () => {
   // Form states
   const [selectedSupplierId, setSelectedSupplierId] = useState<string>(suppliers[0]?.id || '');
 
+  // Auto-generate sequential invoice number
+  const [invoiceNumber, setInvoiceNumber] = useState<string>(() => {
+    return `INV-${((supplierInvoices?.length || 0) + 1).toString().padStart(4, '0')}`;
+  });
+
+  useEffect(() => {
+    if (supplierInvoices) {
+      setInvoiceNumber(`INV-${(supplierInvoices.length + 1).toString().padStart(4, '0')}`);
+    }
+  }, [supplierInvoices?.length]);
+
   // Suppliers now load asynchronously from the API, so they're typically still empty
   // at mount time — resync once they arrive (but never clobber a manual selection).
   useEffect(() => {
@@ -85,7 +96,6 @@ export const PurchasePage: React.FC = () => {
       setSelectedSupplierId(suppliers[0].id);
     }
   }, [suppliers, selectedSupplierId]);
-  const [invoiceNumber, setInvoiceNumber] = useState<string>(`INV-${Math.floor(100 + Math.random() * 900)}`);
   const [purchaseDate, setPurchaseDate] = useState<string>(new Date().toISOString().split('T')[0]);
   
   // Destination mode (Main Warehouse intake is ADMIN ONLY)
