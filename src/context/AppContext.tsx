@@ -218,6 +218,8 @@ interface AppContextType {
     employeeName?: string;
     isEmployeeAdvance?: boolean;
   }) => Promise<{ success: boolean; message?: string }>;
+  updateExpense: (id: string, data: { category?: string; amountTjs?: number; storeId?: string; comment?: string; description?: string }) => Promise<{ success: boolean; message?: string }>;
+  deleteExpense: (id: string) => Promise<{ success: boolean; message?: string }>;
 
   createOwnerTransaction: (params: {
     ownerId: string;
@@ -833,6 +835,29 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
+  const updateExpense: AppContextType['updateExpense'] = async (id, data) => {
+    try {
+      await apiClient(`/expenses/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify(data),
+      });
+      await refetchAll();
+      return { success: true };
+    } catch (err) {
+      return { success: false, message: errorMessage(err, 'Не удалось обновить расход') };
+    }
+  };
+
+  const deleteExpense: AppContextType['deleteExpense'] = async (id) => {
+    try {
+      await apiClient(`/expenses/${id}`, { method: 'DELETE' });
+      await refetchAll();
+      return { success: true };
+    } catch (err) {
+      return { success: false, message: errorMessage(err, 'Не удалось удалить расход') };
+    }
+  };
+
   const ownerInvestment: AppContextType['ownerInvestment'] = async (ownerId, amountUsd, destination, note) => {
     try {
       await apiClient(`/owners/${ownerId}/investment`, { method: 'POST', body: JSON.stringify({ amountUsd, destination, note }) });
@@ -1129,6 +1154,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         updateRepairStatus,
         paySupplier,
         createExpense,
+        updateExpense,
+        deleteExpense,
         createOwnerTransaction,
         ownerInvestment,
         ownerCapitalWithdrawal,

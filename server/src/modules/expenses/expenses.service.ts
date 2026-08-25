@@ -91,3 +91,116 @@ export async function createExpense(tx: Prisma.TransactionClient, input: CreateE
 export async function createExpenseStandalone(input: CreateExpenseInput) {
   return prisma.$transaction((tx) => createExpense(tx, input));
 }
+
+export async function updateExpense(
+  id: string,
+  input: {
+    category?: string;
+    amountTjs?: number;
+    storeId?: string;
+    comment?: string;
+    description?: string;
+  },
+  actorId: string
+) {
+  return prisma.$transaction(async (tx) => {
+    const existing = await tx.expense.findUnique({ where: { id } });
+    if (!existing) throw new Error('Расход не найден');
+
+    const actor = await resolveActor(tx, actorId);
+    const rate = existing.exchangeRate || (await getRateForDate(new Date())) || 9.5;
+
+    const newAmountTjs = input.amountTjs !== undefined ? Number(input.amountTjs) : existing.amountTjs;
+    const newAmountUsd = Number((newAmountTjs / rate).toFixed(2));
+    const newCategory = input.category !== undefined ? input.category.trim() : existing.category;
+    const newStoreId = input.storeId !== undefined ? input.storeId : existing.storeId;
+    const newComment = input.comment !== undefined ? input.comment.trim() : existing.comment;
+    const newDescription = input.description !== undefined ? input.description.trim() : existing.description;
+
+    // Adjust store cash balance if amount or store changed
+    const diffTjs = newAmountTjs - existing.amountTjs;
+    if (existing.storeId && (existing.paidFromCashRegister || (existing.sourceAccount && existing.sourceAccount.toLowerCase().includes('касса')))) {
+      await tx.store.update({
+        where: { id: existing.storeId },
+        data: { cashBalanceTjs: { increment: existing.amountTjs } },
+      });
+    }
+    if (newStoreId && (existing.paidFromCashRegister || (existing.sourceAccount && existing.sourceAccount.toLowerCase().includes('касса')))) {
+      await tx.store.update({
+        where: { id: newStoreId },
+        data: { cashBalanceTjs: { decrement: newAmountTjs } },
+      });
+    }
+
+    const updated = await tx.expense.update({
+      where: { id },
+      data: {
+        category: newCategory,
+        amountTjs: newAmountTjs,
+        amountUsd: newAmountUsd,
+        storeId: newStoreId,
+        comment: newComment,
+        description: newDescription,
+      },
+    });
+
+    // Update corresponding ledger entries
+    await tx.ledgerEntry.updateMany({
+      where: { referenceId: id },
+      data: {
+        amountTjs: -newAmountTjs,
+        amountUsd: -newAmountUsd,
+        description: newComment || newDescription || `Расход: ${newCategory}`,
+        storeId: newStoreId,
+      },
+    });
+
+    await tx.auditLog.create({
+      data: {
+        userId: actor.id,
+        userName: actor.name,
+        userRole: actor.role,
+        action: 'EXPENSE_EDIT',
+        details: `Отредактирован расход [${newCategory}]: ${newAmountTjs} TJS ($${newAmountUsd})`,
+        financialDetails: { amountTjs: newAmountTjs, amountUsd: newAmountUsd },
+        targetId: id,
+      },
+    });
+
+    return updated;
+  });
+}
+
+export async function deleteExpense(id: string, actorId: string) {
+  return prisma.$transaction(async (tx) => {
+    const existing = await tx.expense.findUnique({ where: { id } });
+    if (!existing) throw new Error('Расход не найден');
+
+    const actor = await resolveActor(tx, actorId);
+
+    // Revert store cash balance
+    if (existing.storeId && (existing.paidFromCashRegister || (existing.sourceAccount && existing.sourceAccount.toLowerCase().includes('касса')))) {
+      await tx.store.update({
+        where: { id: existing.storeId },
+        data: { cashBalanceTjs: { increment: existing.amountTjs } },
+      });
+    }
+
+    // Delete corresponding ledger entries
+    await tx.ledgerEntry.deleteMany({ where: { referenceId: id } });
+
+    await tx.auditLog.create({
+      data: {
+        userId: actor.id,
+        userName: actor.name,
+        userRole: actor.role,
+        action: 'EXPENSE_DELETE',
+        details: `Удален расход [${existing.category}]: ${existing.amountTjs} TJS ($${existing.amountUsd})`,
+        financialDetails: { amountTjs: existing.amountTjs, amountUsd: existing.amountUsd },
+        targetId: id,
+      },
+    });
+
+    return tx.expense.delete({ where: { id } });
+  });
+}

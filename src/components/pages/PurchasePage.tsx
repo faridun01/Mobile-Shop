@@ -20,7 +20,8 @@ import {
   FileText,
   Clock,
   Eye,
-  Check
+  Check,
+  Edit2
 } from 'lucide-react';
 
 interface PurchaseItem {
@@ -62,8 +63,51 @@ export const PurchasePage: React.FC = () => {
     supplierInvoices,
     devices,
     createPurchase,
+    updateSupplierInvoice,
+    deleteSupplierInvoice,
     openScanner
   } = useApp();
+
+  // Edit Invoice Modal state
+  const [editingInvoiceModal, setEditingInvoiceModal] = useState<SupplierInvoice | null>(null);
+  const [editInvoiceNum, setEditInvoiceNum] = useState('');
+  const [editInvoiceDateStr, setEditInvoiceDateStr] = useState('');
+  const [editInvoiceAmountUsd, setEditInvoiceAmountUsd] = useState('');
+
+  const handleStartEditInvoiceModal = (inv: SupplierInvoice) => {
+    setEditingInvoiceModal(inv);
+    setEditInvoiceNum(inv.invoiceNumber);
+    setEditInvoiceDateStr(inv.date ? inv.date.split('T')[0] : '');
+    setEditInvoiceAmountUsd((inv.totalAmountUsd || 0).toString());
+  };
+
+  const handleSaveEditInvoiceModal = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingInvoiceModal) return;
+    const res = await updateSupplierInvoice(editingInvoiceModal.id, {
+      invoiceNumber: editInvoiceNum.trim(),
+      date: editInvoiceDateStr,
+      totalAmountUsd: parseFloat(editInvoiceAmountUsd) || 0,
+    });
+    if (res.success) {
+      setEditingInvoiceModal(null);
+      setSelectedInvoiceId(null);
+      setStatusMessage({ type: 'success', text: 'Накладная успешно обновлена!' });
+    } else {
+      setStatusMessage({ type: 'error', text: res.message || 'Ошибка обновления накладной' });
+    }
+  };
+
+  const handleDeleteInvoiceModal = async (id: string) => {
+    if (!window.confirm('Вы действительно хотите удалить эту накладную и все её незапроданные устройства?')) return;
+    const res = await deleteSupplierInvoice(id);
+    if (res.success) {
+      setSelectedInvoiceId(null);
+      setStatusMessage({ type: 'success', text: 'Накладная успешно удалена!' });
+    } else {
+      setStatusMessage({ type: 'error', text: res.message || 'Ошибка удаления накладной' });
+    }
+  };
 
   // Mode: 'list' (History of purchases) or 'form' (Register new purchase intake)
   const [viewMode, setViewMode] = useState<'list' | 'form'>('list');
@@ -710,12 +754,32 @@ export const PurchasePage: React.FC = () => {
                   </div>
                 </div>
 
-                <button
-                  onClick={() => setSelectedInvoiceId(null)}
-                  className="p-1.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition-colors"
-                >
-                  <X className="w-4 h-4" />
-                </button>
+                <div className="flex items-center space-x-2">
+                  {(currentUser?.role === 'ADMIN' || currentUser?.role === 'PARTNER') && (
+                    <>
+                      <button
+                        onClick={() => handleStartEditInvoiceModal(selectedInvoice)}
+                        className="p-1.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-emerald-400 transition-colors"
+                        title="Редактировать накладную"
+                      >
+                        <Edit2 className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => handleDeleteInvoiceModal(selectedInvoice.id)}
+                        className="p-1.5 rounded bg-slate-800 hover:bg-rose-500/20 text-slate-400 hover:text-rose-400 transition-colors"
+                        title="Удалить накладную"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </>
+                  )}
+                  <button
+                    onClick={() => setSelectedInvoiceId(null)}
+                    className="p-1.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition-colors"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
               </div>
 
               {/* Financial Breakdown */}
@@ -1211,6 +1275,78 @@ export const PurchasePage: React.FC = () => {
           </div>
         </div>
       </form>
+
+      {/* Edit Invoice Modal */}
+      {editingInvoiceModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-xs p-4 font-mono">
+          <div className="w-full max-w-md rounded-2xl bg-[#0F1219] border border-slate-800 p-5 text-slate-200 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+              <div className="flex items-center space-x-2">
+                <div className="p-2 rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
+                  <Edit2 className="w-4 h-4" />
+                </div>
+                <h3 className="text-sm font-bold text-slate-100 uppercase">РЕДАКТИРОВАТЬ НАКЛАДНУЮ</h3>
+              </div>
+              <button onClick={() => setEditingInvoiceModal(null)} className="p-1 rounded text-slate-400 hover:text-white">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveEditInvoiceModal} className="space-y-3 text-xs">
+              <div>
+                <label className="block text-slate-400 text-[10px] uppercase mb-1">НОМЕР НАКЛАДНОЙ</label>
+                <input
+                  type="text"
+                  required
+                  value={editInvoiceNum}
+                  onChange={(e) => setEditInvoiceNum(e.target.value)}
+                  className="w-full rounded bg-[#0B0E14] border border-slate-800 px-3 py-2 text-slate-100 font-bold focus:border-emerald-500 focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-slate-400 text-[10px] uppercase mb-1">ДАТА НАКЛАДНОЙ</label>
+                <input
+                  type="date"
+                  required
+                  value={editInvoiceDateStr}
+                  onChange={(e) => setEditInvoiceDateStr(e.target.value)}
+                  className="w-full rounded bg-[#0B0E14] border border-slate-800 px-3 py-2 text-slate-100 focus:border-emerald-500 focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-slate-400 text-[10px] uppercase mb-1">СУММА НАКЛАДНОЙ ($)</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  required
+                  min="0"
+                  value={editInvoiceAmountUsd}
+                  onChange={(e) => setEditInvoiceAmountUsd(e.target.value)}
+                  className="w-full rounded bg-[#0B0E14] border border-slate-800 px-3 py-2 text-emerald-400 font-bold focus:border-emerald-500 focus:outline-none font-mono"
+                />
+              </div>
+
+              <div className="flex space-x-2 pt-3 border-t border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setEditingInvoiceModal(null)}
+                  className="flex-1 py-2 rounded bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-400 font-bold"
+                >
+                  ОТМЕНА
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 py-2 rounded bg-emerald-500 hover:bg-emerald-400 text-white font-bold"
+                >
+                  СОХРАНИТЬ
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

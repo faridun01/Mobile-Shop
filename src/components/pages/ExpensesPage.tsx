@@ -23,7 +23,9 @@ import {
   Package,
   Store as StoreIcon,
   X,
-  Lock
+  Lock,
+  Edit2,
+  Trash2
 } from 'lucide-react';
 
 const CATEGORY_CONFIG: Record<string, { label: string; icon: any; colorClass: string; bgClass: string; borderClass: string }> = {
@@ -67,8 +69,58 @@ export const ExpensesPage: React.FC = () => {
     stores,
     users,
     todayRate,
-    createExpense
+    createExpense,
+    updateExpense,
+    deleteExpense
   } = useApp();
+
+  // Edit Expense state
+  const [editingExpense, setEditingExpense] = useState<any | null>(null);
+  const [editCategory, setEditCategory] = useState<ExpenseCategory>('RENT');
+  const [editAmountTjs, setEditAmountTjs] = useState('');
+  const [editStoreId, setEditStoreId] = useState('');
+  const [editDescription, setEditDescription] = useState('');
+
+  const handleStartEdit = (exp: any) => {
+    setEditingExpense(exp);
+    setEditCategory(exp.category);
+    setEditAmountTjs((exp.amountTjs || 0).toString());
+    setEditStoreId(exp.storeId || stores[0]?.id || '');
+    setEditDescription(exp.comment || exp.description || '');
+  };
+
+  const handleSaveEdit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingExpense) return;
+    const val = parseFloat(editAmountTjs) || 0;
+    if (val <= 0) {
+      setStatusMessage({ type: 'error', text: 'Укажите корректную сумму расхода' });
+      return;
+    }
+    const res = await updateExpense(editingExpense.id, {
+      category: editCategory,
+      amountTjs: val,
+      storeId: editStoreId,
+      comment: editDescription.trim(),
+      description: editDescription.trim()
+    });
+    if (res.success) {
+      setEditingExpense(null);
+      setStatusMessage({ type: 'success', text: 'Расход успешно обновлен!' });
+    } else {
+      setStatusMessage({ type: 'error', text: res.message || 'Ошибка обновления расхода' });
+    }
+  };
+
+  const handleDeleteExpense = async (id: string) => {
+    if (!window.confirm('Вы действительно хотите удалить этот расход? Средства вернутся в баланс кассы.')) return;
+    const res = await deleteExpense(id);
+    if (res.success) {
+      setStatusMessage({ type: 'success', text: 'Расход успешно удален!' });
+    } else {
+      setStatusMessage({ type: 'error', text: res.message || 'Ошибка удаления расхода' });
+    }
+  };
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [category, setCategory] = useState<ExpenseCategory>('RENT');
@@ -533,19 +585,137 @@ export const ExpensesPage: React.FC = () => {
                   </div>
                 </div>
 
-                <div className="text-right shrink-0 font-mono border-t sm:border-t-0 border-slate-800/60 pt-2 sm:pt-0">
-                  <span className="text-sm font-bold text-rose-400 block">
-                    -{(exp.amountTjs ?? 0).toLocaleString()} TJS
-                  </span>
-                  <span className="text-[10px] text-slate-500 block">
-                    ≈ -${costUsd.toLocaleString()} USD
-                  </span>
+                <div className="flex items-center justify-end space-x-3 shrink-0 font-mono border-t sm:border-t-0 border-slate-800/60 pt-2 sm:pt-0">
+                  <div className="text-right">
+                    <span className="text-sm font-bold text-rose-400 block">
+                      -{(exp.amountTjs ?? 0).toLocaleString()} TJS
+                    </span>
+                    <span className="text-[10px] text-slate-500 block">
+                      ≈ -${costUsd.toLocaleString()} USD
+                    </span>
+                  </div>
+                  {(currentUser?.role === 'ADMIN' || currentUser?.role === 'PARTNER') && (
+                    <div className="flex items-center space-x-1 pl-2 border-l border-slate-800">
+                      <button
+                        onClick={() => handleStartEdit(exp)}
+                        className="p-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-emerald-400 border border-slate-800 transition-colors"
+                        title="Редактировать расход"
+                      >
+                        <Edit2 className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        onClick={() => handleDeleteExpense(exp.id)}
+                        className="p-1.5 rounded-lg bg-slate-900 hover:bg-rose-500/10 text-slate-400 hover:text-rose-400 border border-slate-800 transition-colors"
+                        title="Удалить расход"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
             );
           })
         )}
       </div>
+
+      {/* Edit Expense Modal */}
+      {editingExpense && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-xs p-4 font-mono">
+          <div className="w-full max-w-md rounded-2xl bg-[#0F1219] border border-slate-800 p-5 text-slate-200 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+              <div className="flex items-center space-x-2">
+                <div className="p-2 rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
+                  <Edit2 className="w-4 h-4" />
+                </div>
+                <h3 className="text-sm font-bold text-slate-100 uppercase">РЕДАКТИРОВАТЬ РАСХОД</h3>
+              </div>
+              <button
+                onClick={() => setEditingExpense(null)}
+                className="p-1 rounded text-slate-400 hover:text-white"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveEdit} className="space-y-3.5 text-xs">
+              <div>
+                <label className="block text-slate-400 text-[10px] uppercase mb-1">КАТЕГОРИЯ РАСХОДА</label>
+                <select
+                  value={editCategory}
+                  onChange={(e) => setEditCategory(e.target.value as ExpenseCategory)}
+                  className="w-full rounded-lg bg-[#0B0E14] border border-slate-800 px-3 py-2 text-slate-100 font-bold focus:border-emerald-500 focus:outline-none"
+                >
+                  <option value="RENT">Аренда помещения</option>
+                  <option value="SALARY">Зарплата сотрудникам</option>
+                  <option value="UTILITIES">Коммунальные услуги</option>
+                  <option value="MARKETING">Реклама и Маркетинг</option>
+                  <option value="REPAIR_PARTS">Запчасти и сервис</option>
+                  <option value="TAXES">Налоги и сборы</option>
+                  <option value="SUPPLIES">Хозяйственные товары</option>
+                  <option value="OTHER">Прочие расходы</option>
+                  {customCategories.map(c => (
+                    <option key={c.id} value={c.id}>{c.label}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-slate-400 text-[10px] uppercase mb-1">СУММА РАСХОДА (TJS)</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  required
+                  min="0.01"
+                  value={editAmountTjs}
+                  onChange={(e) => setEditAmountTjs(e.target.value)}
+                  className="w-full rounded-lg bg-[#0B0E14] border border-slate-800 px-3 py-2 text-base font-bold text-rose-400 focus:border-emerald-500 focus:outline-none font-mono"
+                />
+              </div>
+
+              <div>
+                <label className="block text-slate-400 text-[10px] uppercase mb-1">ТОЧКА / ФИЛИАЛ</label>
+                <select
+                  value={editStoreId}
+                  onChange={(e) => setEditStoreId(e.target.value)}
+                  className="w-full rounded-lg bg-[#0B0E14] border border-slate-800 px-3 py-2 text-slate-100 focus:border-emerald-500 focus:outline-none"
+                >
+                  {stores.map(s => (
+                    <option key={s.id} value={s.id}>{s.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-slate-400 text-[10px] uppercase mb-1">ОПИСАНИЕ / ПРИМЕЧАНИЕ</label>
+                <input
+                  type="text"
+                  value={editDescription}
+                  onChange={(e) => setEditDescription(e.target.value)}
+                  placeholder="Примечание к расходу..."
+                  className="w-full rounded-lg bg-[#0B0E14] border border-slate-800 px-3 py-2 text-slate-100 focus:border-emerald-500 focus:outline-none"
+                />
+              </div>
+
+              <div className="flex space-x-2 pt-3 border-t border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setEditingExpense(null)}
+                  className="flex-1 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-400 font-bold"
+                >
+                  ОТМЕНА
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-white font-bold shadow-[0_0_12px_rgba(16,185,129,0.4)]"
+                >
+                  СОХРАНИТЬ
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* MODAL: Register New Expense */}
       {isModalOpen && (
