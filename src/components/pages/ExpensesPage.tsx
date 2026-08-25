@@ -251,7 +251,7 @@ export const ExpensesPage: React.FC = () => {
       }
 
       return true;
-    });
+    }).sort((a, b) => new Date(b.date || (b as any).createdAt || 0).getTime() - new Date(a.date || (a as any).createdAt || 0).getTime());
   }, [expenses, isSeller, currentUser, periodFilter, selectedMonth, selectedStoreFilter, selectedCategoryTab, searchQuery, customCategories]);
 
   const totalExpensesTjs = useMemo(() => {

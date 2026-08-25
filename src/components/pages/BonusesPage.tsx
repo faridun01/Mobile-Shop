@@ -203,7 +203,9 @@ export const BonusesPage: React.FC = () => {
             Нет активных бонусных кампаний
           </div>
         ) : (
-          supplierBonuses.map((bonus) => (
+          [...supplierBonuses]
+            .sort((a, b) => new Date(b.dateReceived || b.date || 0).getTime() - new Date(a.dateReceived || a.date || 0).getTime())
+            .map((bonus) => (
             <div
               key={bonus.id}
               onClick={() => setSelectedBonus(bonus)}

@@ -121,7 +121,7 @@ export const AuditLogPage: React.FC = () => {
       }
 
       return true;
-    });
+    }).sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
   }, [auditLogs, activeCategoryFilter, searchQuery]);
 
   return (

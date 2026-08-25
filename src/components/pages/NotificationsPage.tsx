@@ -51,7 +51,7 @@ export const NotificationsPage: React.FC = () => {
     if (n.targetRole && n.targetRole !== currentUser?.role) return false;
     if (n.targetUserId && n.targetUserId !== currentUser?.id) return false;
     return true;
-  });
+  }).sort((a, b) => new Date(b.date || b.timestamp || 0).getTime() - new Date(a.date || a.timestamp || 0).getTime());
 
   const handleNotificationClick = (n: typeof notifications[0]) => {
     markNotificationAsRead(n.id);

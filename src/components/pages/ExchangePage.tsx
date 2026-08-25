@@ -321,20 +321,24 @@ export const ExchangePage: React.FC = () => {
                 </div>
 
                 <div className="pt-2.5 border-t border-slate-800">
-                  <label className="block text-[10px] uppercase text-slate-400 mb-1 font-bold">
-                    ОЦЕНОЧНАЯ СТОИМОСТЬ ЗАЧЕТА (TJS):
-                  </label>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-[10px] uppercase text-sky-400 font-bold">
+                      ОЦЕНОЧНАЯ СТОИМОСТЬ ЗАЧЕТА (TJS):
+                    </label>
+                    <span className="text-[10px] text-sky-400 font-mono">Редактируемое поле</span>
+                  </div>
                   <div className="relative">
                     <input
                       type="number"
                       min="0"
-                      value={exchangeInValueTjs !== undefined ? exchangeInValueTjs : ''}
+                      value={exchangeInValueTjs !== 0 ? exchangeInValueTjs : ''}
                       onChange={(e) => setExchangeInValueTjs(parseFloat(e.target.value) || 0)}
-                      className="w-full rounded bg-[#0B0E14] border border-slate-800 px-3 py-1.5 text-xs font-mono font-bold text-emerald-400 focus:border-sky-500 focus:outline-none"
+                      placeholder="Введите оценочную стоимость..."
+                      className="w-full rounded-lg bg-[#0B0E14] border-2 border-sky-500/60 hover:border-sky-400 focus:border-sky-400 px-3 py-2 text-sm font-mono font-bold text-sky-300 placeholder-slate-600 focus:outline-none transition-colors shadow-inner"
                     />
-                    <span className="absolute right-3 top-1.5 text-[10px] text-slate-500">TJS</span>
+                    <span className="absolute right-3 top-2.5 text-xs text-sky-400 font-mono font-bold">TJS</span>
                   </div>
-                  <p className="text-[10px] text-slate-500 mt-1 font-sans">
+                  <p className="text-[10px] text-slate-400 mt-1 font-sans">
                     Сумма, которая будет зачтена в счет нового телефона и станет себестоимостью принятого устройства.
                   </p>
                 </div>
@@ -355,7 +359,10 @@ export const ExchangePage: React.FC = () => {
               <div className="p-4 rounded-lg bg-[#0F1219] border border-slate-800 space-y-3 relative font-mono">
                 <button
                   type="button"
-                  onClick={() => setReplacementDevice(null)}
+                  onClick={() => {
+                    setReplacementDevice(null);
+                    setNewPriceTjs(0);
+                  }}
                   className="absolute right-3 top-3 text-slate-500 hover:text-slate-300"
                 >
                   <X className="w-4 h-4" />
@@ -375,19 +382,28 @@ export const ExchangePage: React.FC = () => {
                 </div>
 
                 <div className="pt-2.5 border-t border-slate-800">
-                  <label className="block text-[10px] uppercase text-slate-400 mb-1 font-bold">
-                    НОВАЯ ЦЕНА ПРОДАЖИ (TJS):
-                  </label>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-[10px] uppercase text-emerald-400 font-bold">
+                      НОВАЯ ЦЕНА ПРОДАЖИ (TJS):
+                    </label>
+                    <span className="text-[10px] text-emerald-400 font-mono font-semibold bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/30">
+                      Открыто для ввода
+                    </span>
+                  </div>
                   <div className="relative">
                     <input
                       type="number"
                       min="0"
-                      value={newPriceTjs !== undefined ? newPriceTjs : ''}
+                      value={newPriceTjs !== 0 ? newPriceTjs : ''}
                       onChange={(e) => setNewPriceTjs(parseFloat(e.target.value) || 0)}
-                      className="w-full rounded bg-[#0B0E14] border border-slate-800 px-3 py-1.5 text-xs font-mono font-bold text-emerald-400 focus:border-emerald-500 focus:outline-none"
+                      placeholder="Введите новую цену продажи..."
+                      className="w-full rounded-lg bg-[#0B0E14] border-2 border-emerald-500/70 hover:border-emerald-400 focus:border-emerald-400 px-3 py-2 text-sm font-mono font-bold text-emerald-300 placeholder-slate-600 focus:outline-none transition-colors shadow-inner"
                     />
-                    <span className="absolute right-3 top-1.5 text-[10px] text-slate-500">TJS</span>
+                    <span className="absolute right-3 top-2.5 text-xs text-emerald-400 font-mono font-bold">TJS</span>
                   </div>
+                  <p className="text-[10px] text-slate-400 mt-1 font-sans">
+                    Введите цену, по которой выдается новое устройство. Продавец может вручную изменить её при обмене.
+                  </p>
                 </div>
               </div>
             ) : (

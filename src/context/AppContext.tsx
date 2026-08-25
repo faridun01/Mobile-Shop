@@ -374,17 +374,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const fetchSales = useCallback(async () => {
     const raw = await apiClient<any[]>('/sales');
-    setSales(raw.map((s) => mapSale(s, namesRef.current)));
+    setSales(raw.map((s) => mapSale(s, namesRef.current)).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
   }, []);
 
   const fetchTransfers = useCallback(async () => {
     const raw = await apiClient<any[]>('/transfers');
-    setTransfers(raw.map((t) => mapTransfer(t, namesRef.current)));
+    setTransfers(raw.map((t) => mapTransfer(t, namesRef.current)).sort((a, b) => new Date(b.requestedAt).getTime() - new Date(a.requestedAt).getTime()));
   }, []);
 
   const fetchRepairs = useCallback(async () => {
     const raw = await apiClient<any[]>('/repairs');
-    setRepairs(raw.map((r) => mapRepair(r, namesRef.current)));
+    setRepairs(raw.map((r) => mapRepair(r, namesRef.current)).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
   }, []);
 
   const fetchSuppliers = useCallback(async () => {
@@ -399,12 +399,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const fetchBonuses = useCallback(async () => {
     const raw = await apiClient<any[]>('/supplier-bonuses');
-    setBonuses(raw.map(mapSupplierBonus));
+    setBonuses(raw.map(mapSupplierBonus).sort((a, b) => new Date(b.dateReceived || b.date || 0).getTime() - new Date(a.dateReceived || a.date || 0).getTime()));
   }, []);
 
   const fetchExpenses = useCallback(async () => {
     const raw = await apiClient<any[]>('/expenses');
-    setExpenses(raw.map((e) => mapExpense(e, namesRef.current)));
+    setExpenses(raw.map((e) => mapExpense(e, namesRef.current)).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
   }, []);
 
   const fetchOwners = useCallback(async () => {
@@ -420,7 +420,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const fetchOwnerTransactions = useCallback(async () => {
     try {
       const raw = await apiClient<any[]>('/owner-transactions');
-      setOwnerTransactions(raw.map((t) => mapOwnerTransaction(t, ownerNamesRef.current, namesRef.current)));
+      setOwnerTransactions(raw.map((t) => mapOwnerTransaction(t, ownerNamesRef.current, namesRef.current)).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
     } catch {
       // ADMIN/PARTNER only
     }
@@ -428,13 +428,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const fetchNotifications = useCallback(async () => {
     const raw = await apiClient<any[]>('/notifications');
-    setNotifications(raw.map(mapNotification));
+    setNotifications(raw.map(mapNotification).sort((a, b) => new Date(b.date || b.timestamp || 0).getTime() - new Date(a.date || a.timestamp || 0).getTime()));
   }, []);
 
   const fetchAuditLogs = useCallback(async () => {
     try {
       const raw = await apiClient<any[]>('/audit-logs');
-      setAuditLogs(raw.map(mapAuditLog));
+      setAuditLogs(raw.map(mapAuditLog).sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()));
     } catch {
       // ADMIN only
     }

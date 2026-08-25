@@ -203,7 +203,7 @@ export const RepairPage: React.FC = () => {
         );
       }
       return true;
-    });
+    }).sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
   }, [monthlyRepairs, statusFilter, searchQuery]);
 
   // Monthly statistics

@@ -94,7 +94,7 @@ export const SalesHistoryPage: React.FC = () => {
       }
 
       return true;
-    });
+    }).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
   }, [sales, currentUser, selectedStoreId, selectedMonth, periodFilter, searchQuery]);
 
   // Scan handler to jump straight to sale

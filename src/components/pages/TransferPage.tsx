@@ -203,10 +203,10 @@ export const TransferPage: React.FC = () => {
 
   // Filter transfers for history
   const visibleTransfers = useMemo(() => {
-    if (isAdminOrPartner) return transfers;
-    return transfers.filter(
+    const list = isAdminOrPartner ? transfers : transfers.filter(
       t => t.fromLocationId === currentUser?.storeId || t.toLocationId === currentUser?.storeId
     );
+    return [...list].sort((a, b) => new Date(b.requestedAt).getTime() - new Date(a.requestedAt).getTime());
   }, [transfers, isAdminOrPartner, currentUser]);
 
   const pendingCount = visibleTransfers.filter(t => t.status === 'PENDING_APPROVAL').length;
