@@ -345,8 +345,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const checkRatePrompt = useCallback((rate: DailyRate | null) => {
     const todayStr = new Date().toISOString().split('T')[0];
-    if (!rate || rate.date !== todayStr) {
+    if (!rate || rate.date !== todayStr || !rate.rate || rate.rate <= 0) {
       setIsRateModalOpen(true);
+    } else {
+      setIsRateModalOpen(false);
     }
   }, []);
 
