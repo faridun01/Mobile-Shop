@@ -86,12 +86,12 @@ function MainLayout() {
   }
 
   return (
-    <div className="flex h-[100dvh] max-h-[100dvh] w-screen overflow-hidden bg-[#0B0F17] text-slate-200 antialiased selection:bg-blue-500 selection:text-white">
+    <div className="flex h-dvh max-h-dvh w-screen overflow-hidden bg-[#0B0F17] text-slate-200 antialiased selection:bg-blue-500 selection:text-white">
       <Drawer />
       <TabletNavRail />
       <Sidebar />
 
-      <div className="flex-1 flex flex-col min-w-0 h-[100dvh] max-h-[100dvh] overflow-hidden bg-[#0B0F17] relative">
+      <div className="flex-1 flex flex-col min-w-0 h-dvh max-h-dvh overflow-hidden bg-[#0B0F17] relative">
         <TopBar />
         <main className="flex-1 flex flex-col min-h-0 overflow-y-auto relative bg-[#0B0F17] pb-20 lg:pb-0">
           <Suspense fallback={<LoadingFallback />}>

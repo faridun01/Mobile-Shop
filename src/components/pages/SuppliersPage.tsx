@@ -59,7 +59,7 @@ export const SuppliersPage: React.FC = () => {
     setIsPayModalOpen(true);
   };
 
-  const handleExecutePayment = () => {
+  const handleExecutePayment = async () => {
     if (!selectedSupplier) return;
     const amt = parseFloat(paymentAmountUsd) || 0;
     if (amt <= 0) {
@@ -67,7 +67,7 @@ export const SuppliersPage: React.FC = () => {
       return;
     }
 
-    const res = paySupplier({
+    const res = await paySupplier({
       supplierId: selectedSupplier.id,
       amountUsd: amt,
       sourceAccountId,

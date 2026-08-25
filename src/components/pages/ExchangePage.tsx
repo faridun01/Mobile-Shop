@@ -136,16 +136,8 @@ export const ExchangePage: React.FC = () => {
         }
       }
     }
-    // If not found in sales history, allow manual intake
-    setSelectedOldDevice({
-      brand: 'Apple',
-      model: 'iPhone 15 Pro',
-      storage: '128 GB',
-      color: 'Black Titanium',
-      imei: q || '351234567890123',
-      originalPriceTjs: 6000
-    });
-    setExchangeInValueTjs(6000);
+    // Not found in sales history — do not fabricate a device; surface a clear error instead.
+    setStatusMessage({ type: 'error', text: `Продажа по номеру чека/IMEI "${q}" не найдена. Проверьте номер и попробуйте снова.` });
   };
 
   const handleScanOldDevice = () => {
@@ -183,7 +175,7 @@ export const ExchangePage: React.FC = () => {
     : 0;
   const isShortfall = differenceTjs > 0 && exchangePaymentMethod === 'CASH' && givenCashTjs !== '' && parsedGivenCash < differenceTjs;
 
-  const handleSubmitExchange = (e: React.FormEvent) => {
+  const handleSubmitExchange = async (e: React.FormEvent) => {
     e.preventDefault();
     setStatusMessage(null);
 
@@ -207,7 +199,7 @@ export const ExchangePage: React.FC = () => {
       return;
     }
 
-    const res = processExchange({
+    const res = await processExchange({
       originalSaleReceiptNumber: Number(selectedOldDevice.originalSaleId || receiptSearch),
       originalSaleId: selectedOldDevice.originalSaleId,
       returnedItem: {

@@ -9,46 +9,34 @@ interface AuthState {
   logout: () => void;
 }
 
+// No default-admin fallback: an unauthenticated visitor must see the login screen,
+// never a live session. Only a real, previously-issued token restores a session.
 const getInitialUser = (): User | null => {
   if (typeof window === 'undefined' || typeof localStorage === 'undefined') {
-    return {
-      id: 'user-admin',
-      login: 'admin',
-      name: 'Далер',
-      role: 'ADMIN',
-      active: true,
-      createdAt: '2026-01-01T08:00:00Z'
-    };
+    return null;
   }
   try {
     const savedUser = localStorage.getItem('ms_user');
-    if (savedUser) return JSON.parse(savedUser);
-
-    const savedUsers = localStorage.getItem('ms_users');
-    if (savedUsers) {
-      const usersList = JSON.parse(savedUsers);
-      const adminUser = usersList.find((u: any) => u.login === 'admin' || u.role === 'ADMIN');
-      if (adminUser) return adminUser;
-    }
+    const savedToken = localStorage.getItem('ms_jwt_token');
+    if (savedUser && savedToken) return JSON.parse(savedUser);
   } catch (e) {
     console.error(e);
   }
-  return {
-    id: 'user-admin',
-    login: 'admin',
-    name: 'Далер',
-    role: 'ADMIN',
-    active: true,
-    createdAt: '2026-01-01T08:00:00Z'
-  };
+  return null;
+};
+
+const getInitialToken = (): string | null => {
+  if (typeof window === 'undefined' || typeof localStorage === 'undefined') return null;
+  return localStorage.getItem('ms_jwt_token');
 };
 
 const initialUser = getInitialUser();
+const initialToken = initialUser ? getInitialToken() : null;
 
 export const useAuthStore = create<AuthState>((set) => ({
   currentUser: initialUser,
-  token: initialUser ? 'mock-jwt-token-session' : null,
-  isAuthenticated: !!initialUser,
+  token: initialToken,
+  isAuthenticated: !!initialUser && !!initialToken,
 
   setAuth: (user: User, token: string) => {
     localStorage.setItem('ms_jwt_token', token);

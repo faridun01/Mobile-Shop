@@ -1,0 +1,403 @@
+import type {
+  Device,
+  DeviceTimelineEvent,
+  Sale,
+  SaleItem,
+  ExchangeEvent,
+  Supplier,
+  SupplierInvoice,
+  SupplierBonus,
+  Expense,
+  Owner,
+  OwnerTransaction,
+  TransferRequest,
+  RepairTicket,
+  User,
+  Store,
+  NotificationItem,
+  AuditLogEntry,
+  LedgerEntry,
+  DailyRate,
+} from '../types';
+
+export type NameLookup = Map<string, string>;
+
+export function buildNameLookup(users: any[]): NameLookup {
+  return new Map(users.map((u) => [u.id, u.name]));
+}
+
+function mapTimeline(events: any[]): DeviceTimelineEvent[] {
+  return (events || []).map((e) => ({
+    id: e.id,
+    date: e.date,
+    type: e.type,
+    description: e.description,
+    user: e.userName,
+    storeName: e.storeName ?? undefined,
+    priceTjs: e.priceTjs ?? undefined,
+    priceUsd: e.priceUsd ?? undefined,
+  }));
+}
+
+export function mapDevice(d: any): Device {
+  return {
+    id: d.id,
+    imei: d.imei,
+    imei2: d.imei2 ?? undefined,
+    serialNumber: d.serialNumber ?? undefined,
+    barcode: d.barcode ?? undefined,
+    brand: d.brand,
+    model: d.model,
+    storage: d.storage,
+    color: d.color,
+    status: d.status,
+    locationId: d.storeId,
+    locationName: d.store?.name ?? '',
+    supplierId: d.supplierId ?? undefined,
+    supplierName: d.supplierName ?? undefined,
+    invoiceNumber: d.invoiceNumber ?? undefined,
+    purchaseInvoiceId: d.purchaseInvoiceId ?? undefined,
+    retailPriceTjs: d.retailPriceTjs ?? undefined,
+    receivedDate: d.receivedDate ?? undefined,
+    purchaseCostUsd: d.purchasePriceUsd,
+    costBasisUsd: d.costBasisUsd,
+    isBonus: d.isBonus ?? undefined,
+    bonusCampaign: d.bonusCampaign ?? undefined,
+    createdAt: d.createdAt,
+    timeline: mapTimeline(d.timeline),
+  };
+}
+
+function mapSaleItem(i: any): SaleItem {
+  return {
+    deviceId: i.deviceId,
+    imei: i.imei,
+    imei2: i.imei2 ?? undefined,
+    brand: i.brand,
+    model: i.model,
+    storage: i.storage,
+    color: i.color,
+    salePriceTjs: i.salePriceTjs,
+    salePriceUsd: i.salePriceUsd,
+    purchaseCostUsd: i.purchaseCostUsd,
+    costBasisUsd: i.costBasisUsd,
+    isBelowCost: i.isBelowCost,
+  };
+}
+
+function mapExchangeEvent(e: any, names: NameLookup): ExchangeEvent {
+  return {
+    id: e.id,
+    date: e.date,
+    returnedDeviceId: e.returnedDeviceId,
+    returnedImei: e.returnedImei,
+    returnedModel: e.returnedModel,
+    exchangeInValueTjs: e.exchangeInValueTjs,
+    exchangeInValueUsd: e.exchangeInValueUsd,
+    replacementDeviceId: e.replacementDeviceId,
+    replacementImei: e.replacementImei,
+    replacementModel: e.replacementModel,
+    newPriceTjs: e.newPriceTjs,
+    newPriceUsd: e.newPriceUsd,
+    differenceTjs: e.differenceTjs,
+    paymentMethod: e.paymentMethod ?? undefined,
+    cashAmountTjs: e.cashAmountTjs ?? undefined,
+    cardAmountTjs: e.cardAmountTjs ?? undefined,
+    processedBy: names.get(e.processedByUserId) || e.processedByUserId,
+  };
+}
+
+export function mapSale(s: any, names: NameLookup): Sale {
+  return {
+    id: s.id,
+    receiptNumber: s.receiptNumber,
+    date: s.createdAt,
+    storeId: s.storeId,
+    storeName: s.store?.name ?? '',
+    sellerId: s.userId,
+    sellerName: s.user?.name ?? names.get(s.userId) ?? '',
+    customerName: s.customerName ?? undefined,
+    items: (s.saleItems || []).map(mapSaleItem),
+    totalTjs: s.totalTjs,
+    totalUsd: s.totalUsd,
+    exchangeRate: s.exchangeRate ?? undefined,
+    paymentMethod: s.paymentMethod,
+    cashAmountTjs: s.cashAmountTjs,
+    cardAmountTjs: s.cardAmountTjs,
+    exchangeTradeInCreditTjs: s.exchangeTradeInCreditTjs ?? undefined,
+    status: s.status,
+    hasBelowCostItem: s.hasBelowCostItem,
+    exchangeEvents: (s.exchangeEvents || []).map((e: any) => mapExchangeEvent(e, names)),
+    refundReason: s.refundReason ?? undefined,
+    refundedAt: s.refundedAt ?? undefined,
+    refundedBy: s.refundedByUserId ? names.get(s.refundedByUserId) || s.refundedByUserId : undefined,
+    penaltyFeeTjs: s.penaltyFeeTjs ?? undefined,
+    penaltyFeeUsd: s.penaltyFeeUsd ?? undefined,
+    actualRefundAmountTjs: s.actualRefundAmountTjs ?? undefined,
+  };
+}
+
+export function mapTransfer(t: any, names: NameLookup): TransferRequest {
+  const items = t.items || [];
+  return {
+    id: t.id,
+    transferNumber: t.transferNumber,
+    fromLocationId: t.fromStoreId,
+    fromLocationName: t.fromStore?.name ?? '',
+    toLocationId: t.toStoreId,
+    toLocationName: t.toStore?.name ?? '',
+    deviceIds: items.map((i: any) => i.deviceId),
+    deviceImeis: items.map((i: any) => i.imei),
+    deviceModels: items.map((i: any) => i.model),
+    requestedBy: names.get(t.requestedByUserId) || t.requestedByUserId,
+    requestedAt: t.requestedAt,
+    status: t.status,
+    approvedBy: t.approvedByUserId ? names.get(t.approvedByUserId) || t.approvedByUserId : undefined,
+    approvedAt: t.approvedAt ?? undefined,
+    rejectedReason: t.rejectedReason ?? undefined,
+  };
+}
+
+export function mapRepair(r: any, names: NameLookup): RepairTicket {
+  return {
+    id: r.id,
+    ticketNumber: r.ticketNumber,
+    deviceId: r.deviceId ?? undefined,
+    imei: r.imei,
+    imei2: r.imei2 ?? undefined,
+    barcode: r.barcode ?? undefined,
+    brand: r.brand,
+    model: r.model,
+    deviceModel: r.model,
+    storage: r.storage ?? undefined,
+    color: r.color ?? undefined,
+    saleReceiptNumber: r.saleReceiptNumber ?? undefined,
+    saleDate: r.saleDate ?? undefined,
+    storeId: r.storeId,
+    storeName: r.store?.name ?? '',
+    intakeSeller: r.user?.name ?? names.get(r.userId) ?? '',
+    customerName: r.customerName ?? undefined,
+    customerPhone: r.customerPhone ?? undefined,
+    prepaymentTjs: r.prepaymentTjs ?? undefined,
+    problemDescription: r.problemDescription,
+    issueDescription: r.problemDescription,
+    visualCondition: r.visualCondition ?? '',
+    equipmentPackage: r.equipmentPackage ?? '',
+    comment: r.comment ?? undefined,
+    status: r.status,
+    statusHistory: (r.statusHistory || []).map((h: any) => ({
+      status: h.status,
+      updatedAt: h.updatedAt,
+      updatedBy: names.get(h.updatedByUserId) || h.updatedByUserId,
+      note: h.note ?? undefined,
+    })),
+    createdAt: r.createdAt,
+    updatedAt: r.updatedAt ?? undefined,
+    estimatedCostTjs: r.estimatedCostTjs ?? undefined,
+    finalCostTjs: r.finalCostTjs ?? undefined,
+    repairCostTjs: r.finalCostTjs ?? r.estimatedCostTjs ?? undefined,
+  };
+}
+
+export function mapSupplier(s: any): Supplier {
+  return {
+    id: s.id,
+    name: s.name,
+    phone: s.phone ?? undefined,
+    contactPerson: s.contactPerson ?? undefined,
+    totalPurchasedUsd: s.totalPurchasedUsd,
+    totalPaidUsd: s.totalPaidUsd,
+    totalDebtUsd: s.totalDebtUsd,
+    active: s.active,
+    createdAt: s.createdAt,
+  };
+}
+
+export function mapSupplierInvoice(inv: any): SupplierInvoice {
+  return {
+    id: inv.id,
+    invoiceNumber: inv.invoiceNumber,
+    supplierId: inv.supplierId,
+    supplierName: inv.supplier?.name ?? '',
+    date: inv.date,
+    totalAmountUsd: inv.totalAmountUsd,
+    paidAmountUsd: inv.paidAmountUsd,
+    remainingAmountUsd: inv.remainingAmountUsd,
+    status: inv.status,
+    devicesCount: inv.devicesCount,
+    isStorePurchase: inv.isStorePurchase ?? undefined,
+    storeId: inv.storeId ?? undefined,
+  };
+}
+
+export function mapSupplierBonus(b: any): SupplierBonus {
+  const first = (b.freeDevices || [])[0];
+  return {
+    id: b.id,
+    supplierId: b.supplierId,
+    supplierName: b.supplier?.name ?? '',
+    campaignName: b.campaignTitle ?? undefined,
+    campaignTitle: b.campaignTitle ?? undefined,
+    bonusType: b.bonusType,
+    amountUsd: b.amountUsd ?? undefined,
+    deviceId: first?.deviceId ?? undefined,
+    imei: first?.imei ?? undefined,
+    brand: first?.brand ?? undefined,
+    model: first?.model ?? undefined,
+    storage: first?.storage ?? undefined,
+    color: first?.color ?? undefined,
+    estimatedValueUsd: b.amountUsd ?? 0,
+    status: b.status ?? undefined,
+    dateReceived: b.dateReceived,
+    date: b.dateReceived,
+    freeDevices: (b.freeDevices || []).map((d: any) => ({
+      brand: d.brand,
+      model: d.model,
+      storage: d.storage,
+      color: d.color,
+      imei: d.imei,
+      costBasisUsd: d.costBasisUsd,
+    })),
+  };
+}
+
+export function mapExpense(e: any, names: NameLookup): Expense {
+  return {
+    id: e.id,
+    date: e.createdAt,
+    category: e.category,
+    amountTjs: e.amountTjs,
+    exchangeRate: e.exchangeRate ?? undefined,
+    amountUsd: e.amountUsd ?? undefined,
+    targetType: e.targetType,
+    storeId: e.storeId ?? undefined,
+    storeName: e.store?.name ?? undefined,
+    sourceAccount: e.sourceAccount ?? undefined,
+    comment: e.comment ?? undefined,
+    description: e.description ?? undefined,
+    createdByName: names.get(e.createdByUserId) || e.createdByUserId,
+    paidFromCashRegister: e.paidFromCashRegister,
+    employeeId: e.employeeId ?? undefined,
+    employeeName: e.employeeId ? names.get(e.employeeId) : undefined,
+    isEmployeeAdvance: e.isEmployeeAdvance,
+  };
+}
+
+export function mapOwner(o: any): Owner {
+  return {
+    id: o.id,
+    name: o.name,
+    profitSharePercent: o.profitSharePercent,
+    capitalBalanceUsd: o.capitalBalanceUsd,
+    totalAccruedProfitUsd: o.totalAccruedProfitUsd,
+    totalPaidProfitUsd: o.totalPaidProfitUsd,
+    totalReinvestedUsd: o.totalReinvestedUsd,
+    availableProfitUsd: o.availableProfitUsd,
+  };
+}
+
+export function mapOwnerTransaction(t: any, ownerNames: NameLookup, userNames: NameLookup): OwnerTransaction {
+  return {
+    id: t.id,
+    ownerId: t.ownerId,
+    ownerName: ownerNames.get(t.ownerId) || '',
+    type: t.type,
+    amountUsd: t.amountUsd,
+    date: t.createdAt,
+    sourceOrDestination: t.sourceOrDestination ?? '',
+    createdByName: userNames.get(t.createdByUserId) || t.createdByUserId,
+    note: t.note ?? undefined,
+  };
+}
+
+export function mapUser(u: any, storeNames: NameLookup): User {
+  return {
+    id: u.id,
+    name: u.name,
+    login: u.login,
+    role: u.role,
+    storeId: u.storeId ?? undefined,
+    storeName: u.storeId ? storeNames.get(u.storeId) : undefined,
+    active: u.active,
+    isActive: u.active,
+    createdAt: u.createdAt,
+    baseSalaryTjs: u.baseSalaryTjs ?? undefined,
+    salesCommissionPercent: u.salesCommissionPercent ?? undefined,
+  };
+}
+
+export function mapStore(s: any): Store {
+  return {
+    id: s.id,
+    name: s.name,
+    address: s.address ?? undefined,
+    isMainWarehouse: s.isMainWarehouse,
+    cashBalanceTjs: s.cashBalanceTjs,
+    active: s.active,
+  };
+}
+
+export function mapNotification(n: any): NotificationItem {
+  return {
+    id: n.id,
+    title: n.title,
+    message: n.message,
+    date: n.createdAt,
+    timestamp: n.createdAt,
+    targetType: n.targetType ?? undefined,
+    targetId: n.targetId ?? undefined,
+    targetRoute: n.targetRoute ?? undefined,
+    linkPage: n.targetRoute ?? undefined,
+    targetRole: n.targetRole ?? undefined,
+    targetUserId: n.targetUserId ?? undefined,
+    read: n.read,
+    isRead: n.read,
+    resolved: n.resolved,
+    readAt: n.readAt ?? undefined,
+    resolvedAt: n.resolvedAt ?? undefined,
+  };
+}
+
+export function mapAuditLog(a: any): AuditLogEntry {
+  return {
+    id: a.id,
+    timestamp: a.createdAt,
+    action: a.action,
+    userName: a.userName ?? 'Система',
+    userRole: a.userRole ?? 'ADMIN',
+    storeName: a.storeName ?? undefined,
+    details: a.details,
+    financialDetails: a.financialDetails ?? undefined,
+    imei: a.imei ?? undefined,
+    receiptNumber: a.receiptNumber ?? undefined,
+    targetId: a.targetId ?? undefined,
+  };
+}
+
+export function mapLedgerEntry(l: any): LedgerEntry {
+  return {
+    id: l.id,
+    timestamp: l.createdAt,
+    type: l.type,
+    description: l.description,
+    amountTjs: l.amountTjs ?? undefined,
+    amountUsd: l.amountUsd ?? undefined,
+    exchangeRate: l.exchangeRate ?? undefined,
+    storeId: l.storeId ?? undefined,
+    storeName: l.storeName ?? undefined,
+    referenceId: l.referenceId ?? undefined,
+    userName: l.userName ?? '',
+  };
+}
+
+export function mapDailyRate(r: any): DailyRate | null {
+  if (!r) return null;
+  return {
+    date: r.date,
+    rate: r.rate,
+    createdBy: r.createdByUserId,
+    createdAt: r.createdAt,
+    updatedBy: r.updatedByUserId ?? undefined,
+    updatedAt: r.updatedAt ?? undefined,
+  };
+}

@@ -28,23 +28,42 @@ import {
 } from 'lucide-react';
 
 const ACTION_CONFIG: Record<string, { label: string; icon: any; colorClass: string; borderClass: string; bgClass: string }> = {
-  SALE_CREATED: { label: 'ПРОДАЖА', icon: ShoppingCart, colorClass: 'text-emerald-400', borderClass: 'border-emerald-500/30', bgClass: 'bg-emerald-500/10' },
-  PURCHASE_INTAKE: { label: 'ПРИХОД ТОВАРА', icon: PackagePlus, colorClass: 'text-sky-400', borderClass: 'border-sky-500/30', bgClass: 'bg-sky-500/10' },
+  SALE: { label: 'ПРОДАЖА', icon: ShoppingCart, colorClass: 'text-emerald-400', borderClass: 'border-emerald-500/30', bgClass: 'bg-emerald-500/10' },
+  SALE_BELOW_COST: { label: 'ПРОДАЖА НИЖЕ СЕБЕСТОИМОСТИ', icon: ShoppingCart, colorClass: 'text-rose-400', borderClass: 'border-rose-500/30', bgClass: 'bg-rose-500/10' },
+  PURCHASE: { label: 'ПРИХОД ТОВАРА', icon: PackagePlus, colorClass: 'text-sky-400', borderClass: 'border-sky-500/30', bgClass: 'bg-sky-500/10' },
   TRANSFER_REQUEST: { label: 'ЗАПРОС ПЕРЕМЕЩЕНИЯ', icon: ArrowRightLeft, colorClass: 'text-purple-400', borderClass: 'border-purple-500/30', bgClass: 'bg-purple-500/10' },
-  TRANSFER_APPROVED: { label: 'ПЕРЕМЕЩЕНИЕ ПОДТВЕРЖДЕНО', icon: CheckCircle2, colorClass: 'text-emerald-400', borderClass: 'border-emerald-500/30', bgClass: 'bg-emerald-500/10' },
-  TRANSFER_REJECTED: { label: 'ПЕРЕМЕЩЕНИЕ ОТКЛОНЕНО', icon: XCircle, colorClass: 'text-rose-400', borderClass: 'border-rose-500/30', bgClass: 'bg-rose-500/10' },
-  EXCHANGE_PROCESSED: { label: 'ОБМЕН (TRADE-IN)', icon: Repeat, colorClass: 'text-amber-400', borderClass: 'border-amber-500/30', bgClass: 'bg-amber-500/10' },
-  REFUND_PROCESSED: { label: 'ВОЗВРАТ ТОВАРА', icon: RotateCcw, colorClass: 'text-rose-400', borderClass: 'border-rose-500/30', bgClass: 'bg-rose-500/10' },
+  TRANSFER_APPROVAL: { label: 'ПЕРЕМЕЩЕНИЕ ПОДТВЕРЖДЕНО', icon: CheckCircle2, colorClass: 'text-emerald-400', borderClass: 'border-emerald-500/30', bgClass: 'bg-emerald-500/10' },
+  TRANSFER_REJECT: { label: 'ПЕРЕМЕЩЕНИЕ ОТКЛОНЕНО', icon: XCircle, colorClass: 'text-rose-400', borderClass: 'border-rose-500/30', bgClass: 'bg-rose-500/10' },
+  TRANSFER: { label: 'ПРЯМОЕ ПЕРЕМЕЩЕНИЕ', icon: ArrowRightLeft, colorClass: 'text-purple-400', borderClass: 'border-purple-500/30', bgClass: 'bg-purple-500/10' },
+  EXCHANGE: { label: 'ОБМЕН (TRADE-IN)', icon: Repeat, colorClass: 'text-amber-400', borderClass: 'border-amber-500/30', bgClass: 'bg-amber-500/10' },
+  REFUND: { label: 'ВОЗВРАТ ТОВАРА', icon: RotateCcw, colorClass: 'text-rose-400', borderClass: 'border-rose-500/30', bgClass: 'bg-rose-500/10' },
   SUPPLIER_PAYMENT: { label: 'ВЫПЛАТА ПОСТАВЩИКУ', icon: Wallet, colorClass: 'text-teal-400', borderClass: 'border-teal-500/30', bgClass: 'bg-teal-500/10' },
-  EXPENSE_CREATED: { label: 'ОПЕРАЦИОННЫЙ РАСХОД', icon: Receipt, colorClass: 'text-rose-400', borderClass: 'border-rose-500/30', bgClass: 'bg-rose-500/10' },
-  DAILY_RATE_SET: { label: 'КУРС ВАЛЮТ', icon: DollarSign, colorClass: 'text-emerald-400', borderClass: 'border-emerald-500/30', bgClass: 'bg-emerald-500/10' },
+  SUPPLIER_CREATE: { label: 'ДОБАВЛЕН ПОСТАВЩИК', icon: Wallet, colorClass: 'text-teal-400', borderClass: 'border-teal-500/30', bgClass: 'bg-teal-500/10' },
+  SUPPLIER_BONUS: { label: 'БОНУС ОТ ПОСТАВЩИКА', icon: Wallet, colorClass: 'text-teal-400', borderClass: 'border-teal-500/30', bgClass: 'bg-teal-500/10' },
+  EXPENSE: { label: 'ОПЕРАЦИОННЫЙ РАСХОД', icon: Receipt, colorClass: 'text-rose-400', borderClass: 'border-rose-500/30', bgClass: 'bg-rose-500/10' },
+  RATE_SET: { label: 'КУРС ВАЛЮТ', icon: DollarSign, colorClass: 'text-emerald-400', borderClass: 'border-emerald-500/30', bgClass: 'bg-emerald-500/10' },
+  RATE_CHANGE: { label: 'КУРС ВАЛЮТ', icon: DollarSign, colorClass: 'text-emerald-400', borderClass: 'border-emerald-500/30', bgClass: 'bg-emerald-500/10' },
   USER_CREATE: { label: 'СОЗДАН СОТРУДНИК', icon: UserCheck, colorClass: 'text-indigo-400', borderClass: 'border-indigo-500/30', bgClass: 'bg-indigo-500/10' },
   USER_UPDATE: { label: 'ОБНОВЛЕН СОТРУДНИК', icon: UserCheck, colorClass: 'text-indigo-400', borderClass: 'border-indigo-500/30', bgClass: 'bg-indigo-500/10' },
   USER_DELETE: { label: 'УДАЛЕН СОТРУДНИК', icon: Trash2, colorClass: 'text-rose-400', borderClass: 'border-rose-500/30', bgClass: 'bg-rose-500/10' },
+  USER_STATUS_CHANGE: { label: 'СТАТУС СОТРУДНИКА ИЗМЕНЕН', icon: UserCheck, colorClass: 'text-indigo-400', borderClass: 'border-indigo-500/30', bgClass: 'bg-indigo-500/10' },
+  PASSWORD_RESET: { label: 'СБРОС ПАРОЛЯ', icon: UserCheck, colorClass: 'text-indigo-400', borderClass: 'border-indigo-500/30', bgClass: 'bg-indigo-500/10' },
   STORE_CREATE: { label: 'СОЗДАН ФИЛИАЛ', icon: StoreIcon, colorClass: 'text-sky-400', borderClass: 'border-sky-500/30', bgClass: 'bg-sky-500/10' },
+  STORE_UPDATE: { label: 'ОБНОВЛЕН ФИЛИАЛ', icon: StoreIcon, colorClass: 'text-sky-400', borderClass: 'border-sky-500/30', bgClass: 'bg-sky-500/10' },
   STORE_DELETE: { label: 'УДАЛЕН ФИЛИАЛ', icon: Trash2, colorClass: 'text-rose-400', borderClass: 'border-rose-500/30', bgClass: 'bg-rose-500/10' },
-  REPAIR_CREATE: { label: 'ПРИЕМ В РЕМОНТ', icon: Wrench, colorClass: 'text-amber-400', borderClass: 'border-amber-500/30', bgClass: 'bg-amber-500/10' },
-  REPAIR_UPDATE: { label: 'СТАТУС РЕМОНТА', icon: Wrench, colorClass: 'text-amber-400', borderClass: 'border-amber-500/30', bgClass: 'bg-amber-500/10' }
+  REPAIR_INTAKE: { label: 'ПРИЕМ В РЕМОНТ', icon: Wrench, colorClass: 'text-amber-400', borderClass: 'border-amber-500/30', bgClass: 'bg-amber-500/10' },
+  REPAIR_STATUS_CHANGE: { label: 'СТАТУС РЕМОНТА', icon: Wrench, colorClass: 'text-amber-400', borderClass: 'border-amber-500/30', bgClass: 'bg-amber-500/10' },
+  OWNER_INVESTMENT: { label: 'ИНВЕСТИЦИЯ ВЛАДЕЛЬЦА', icon: DollarSign, colorClass: 'text-emerald-400', borderClass: 'border-emerald-500/30', bgClass: 'bg-emerald-500/10' },
+  OWNER_WITHDRAWAL: { label: 'ИЗЪЯТИЕ КАПИТАЛА', icon: DollarSign, colorClass: 'text-rose-400', borderClass: 'border-rose-500/30', bgClass: 'bg-rose-500/10' },
+  PROFIT_PAYOUT: { label: 'ВЫПЛАТА ПРИБЫЛИ', icon: DollarSign, colorClass: 'text-emerald-400', borderClass: 'border-emerald-500/30', bgClass: 'bg-emerald-500/10' },
+  REINVEST: { label: 'РЕИНВЕСТИЦИЯ', icon: DollarSign, colorClass: 'text-emerald-400', borderClass: 'border-emerald-500/30', bgClass: 'bg-emerald-500/10' },
+  PROFIT_SHARE_CHANGE: { label: 'ИЗМЕНЕНЫ ДОЛИ', icon: DollarSign, colorClass: 'text-amber-400', borderClass: 'border-amber-500/30', bgClass: 'bg-amber-500/10' },
+  QUARTER_CLOSE: { label: 'ЗАКРЫТИЕ КВАРТАЛА', icon: CheckCircle2, colorClass: 'text-amber-400', borderClass: 'border-amber-500/30', bgClass: 'bg-amber-500/10' },
+  CASH_REGISTER_RESET: { label: 'СБРОС КАССЫ', icon: XCircle, colorClass: 'text-rose-400', borderClass: 'border-rose-500/30', bgClass: 'bg-rose-500/10' },
+  OWNERS_CAPITAL_RESET: { label: 'СБРОС КАПИТАЛА', icon: XCircle, colorClass: 'text-rose-400', borderClass: 'border-rose-500/30', bgClass: 'bg-rose-500/10' },
+  SYSTEM_ZERO_RESET: { label: 'СБРОС СИСТЕМЫ', icon: XCircle, colorClass: 'text-rose-400', borderClass: 'border-rose-500/30', bgClass: 'bg-rose-500/10' },
+  LOGIN: { label: 'ВХОД В СИСТЕМУ', icon: UserCheck, colorClass: 'text-slate-400', borderClass: 'border-slate-700', bgClass: 'bg-slate-800/40' },
+  LOGOUT: { label: 'ВЫХОД ИЗ СИСТЕМЫ', icon: UserCheck, colorClass: 'text-slate-400', borderClass: 'border-slate-700', bgClass: 'bg-slate-800/40' }
 };
 
 const FILTER_CATEGORIES = [
@@ -76,15 +95,15 @@ export const AuditLogPage: React.FC = () => {
     return auditLogs.filter((log) => {
       // Category filter
       if (activeCategoryFilter === 'SALES') {
-        if (!['SALE_CREATED', 'EXCHANGE_PROCESSED', 'REFUND_PROCESSED'].includes(log.action)) return false;
+        if (!['SALE', 'SALE_BELOW_COST', 'EXCHANGE', 'REFUND'].includes(log.action)) return false;
       } else if (activeCategoryFilter === 'PURCHASES') {
-        if (!['PURCHASE_INTAKE', 'SUPPLIER_PAYMENT'].includes(log.action)) return false;
+        if (!['PURCHASE', 'SUPPLIER_PAYMENT', 'SUPPLIER_CREATE', 'SUPPLIER_BONUS'].includes(log.action)) return false;
       } else if (activeCategoryFilter === 'TRANSFERS') {
-        if (!['TRANSFER_REQUEST', 'TRANSFER_APPROVED', 'TRANSFER_REJECTED'].includes(log.action)) return false;
+        if (!['TRANSFER_REQUEST', 'TRANSFER_APPROVAL', 'TRANSFER_REJECT', 'TRANSFER'].includes(log.action)) return false;
       } else if (activeCategoryFilter === 'EXPENSES') {
-        if (!['EXPENSE_CREATED', 'DAILY_RATE_SET'].includes(log.action)) return false;
+        if (!['EXPENSE', 'RATE_SET', 'RATE_CHANGE'].includes(log.action)) return false;
       } else if (activeCategoryFilter === 'USERS') {
-        if (!['USER_CREATE', 'USER_UPDATE', 'USER_DELETE', 'STORE_CREATE', 'STORE_DELETE'].includes(log.action)) return false;
+        if (!['USER_CREATE', 'USER_UPDATE', 'USER_DELETE', 'USER_STATUS_CHANGE', 'PASSWORD_RESET', 'STORE_CREATE', 'STORE_UPDATE', 'STORE_DELETE', 'LOGIN', 'LOGOUT'].includes(log.action)) return false;
       }
 
       // Text Search Query
@@ -223,7 +242,7 @@ export const AuditLogPage: React.FC = () => {
                       </div>
                     </div>
 
-                    <p className="text-xs font-mono text-slate-300 leading-relaxed break-words">
+                    <p className="text-xs font-mono text-slate-300 leading-relaxed wrap-break-word">
                       {log.details}
                     </p>
                   </div>

@@ -85,10 +85,10 @@ export const EmployeesPage: React.FC = () => {
     setDeletingUserConfirm(u);
   };
 
-  const handleConfirmDeleteUser = () => {
+  const handleConfirmDeleteUser = async () => {
     if (!deletingUserConfirm) return;
     const targetName = deletingUserConfirm.name;
-    const res = deleteUser(deletingUserConfirm.id);
+    const res = await deleteUser(deletingUserConfirm.id);
     setDeletingUserConfirm(null);
 
     if (res.success) {
@@ -137,7 +137,7 @@ export const EmployeesPage: React.FC = () => {
     setShowPasswordMap(prev => ({ ...prev, [userId]: !prev[userId] }));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setStatusMessage(null);
 
@@ -155,7 +155,7 @@ export const EmployeesPage: React.FC = () => {
     const commPct = parseFloat(salesCommissionPercent) || 0;
 
     if (editingUser) {
-      const res = updateUser({
+      const res = await updateUser({
         ...editingUser,
         name: name.trim(),
         login: login.trim(),
@@ -174,7 +174,7 @@ export const EmployeesPage: React.FC = () => {
         setStatusMessage({ type: 'error', text: res.message || 'Ошибка обновления' });
       }
     } else {
-      const res = createUser({
+      const res = await createUser({
         name: name.trim(),
         login: login.trim(),
         passwordHash: password.trim(),
@@ -194,7 +194,7 @@ export const EmployeesPage: React.FC = () => {
     }
   };
 
-  const handleIssueAdvance = (e: React.FormEvent) => {
+  const handleIssueAdvance = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!advanceIssueUser) return;
     const val = parseFloat(advanceAmountInput) || 0;
@@ -203,7 +203,7 @@ export const EmployeesPage: React.FC = () => {
       return;
     }
 
-    const res = createExpense({
+    const res = await createExpense({
       category: 'EMPLOYEE_ADVANCE',
       amountTjs: val,
       storeId: advanceIssueUser.storeId || stores[0]?.id,
@@ -224,7 +224,7 @@ export const EmployeesPage: React.FC = () => {
     }
   };
 
-  const handleExecuteSalaryPayout = (e: React.FormEvent) => {
+  const handleExecuteSalaryPayout = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!salaryPayoutUser) return;
     const grossVal = parseFloat(grossSalaryInput) || 0;
@@ -239,7 +239,7 @@ export const EmployeesPage: React.FC = () => {
     const advanceDeduction = deductAdvancesChecked ? totalAdvances : 0;
     const netPayout = Math.max(0, grossVal - advanceDeduction);
 
-    const res = createExpense({
+    const res = await createExpense({
       category: 'SALARY',
       amountTjs: netPayout > 0 ? netPayout : grossVal,
       storeId: salaryPayoutUser.storeId || stores[0]?.id,
@@ -426,7 +426,7 @@ export const EmployeesPage: React.FC = () => {
 
                 <div className="flex items-center justify-between">
                   <span className="text-[10px] text-slate-500 uppercase">ТОЧКА ПРОДАЖИ:</span>
-                  <span className="text-slate-300 font-mono text-[11px] truncate max-w-[140px] text-right">
+                  <span className="text-slate-300 font-mono text-[11px] truncate max-w-35 text-right">
                     {u.storeName ? (
                       <span className="text-emerald-400 font-medium flex items-center justify-end space-x-1">
                         <Store className="w-3 h-3 shrink-0" />
@@ -1140,7 +1140,7 @@ export const EmployeesPage: React.FC = () => {
                                     <span className="px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-300 border border-amber-500/30 text-[10px] font-bold">АВАНС</span>
                                   )}
                                 </td>
-                                <td className="p-2 text-slate-300 truncate max-w-[220px]">{e.description || e.comment || '-'}</td>
+                                <td className="p-2 text-slate-300 truncate max-w-55">{e.description || e.comment || '-'}</td>
                                 <td className={`p-2 text-right font-bold ${e.category === 'SALARY' ? 'text-emerald-400' : 'text-amber-400'}`}>
                                   {e.amountTjs.toLocaleString()} TJS
                                 </td>
@@ -1153,7 +1153,7 @@ export const EmployeesPage: React.FC = () => {
                                 <td className="p-2">
                                   <span className="px-1.5 py-0.5 rounded bg-sky-500/10 text-sky-300 border border-sky-500/30 text-[10px] font-bold">ПРОДАЖА #{s.receiptNumber}</span>
                                 </td>
-                                <td className="p-2 text-slate-300 truncate max-w-[220px]">
+                                <td className="p-2 text-slate-300 truncate max-w-55">
                                   {s.items.map(i => `${i.brand} ${i.model}`).join(', ')} ({s.customerName || 'Покупатель'})
                                 </td>
                                 <td className="p-2 text-right font-bold text-slate-100">

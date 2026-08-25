@@ -211,7 +211,7 @@ export const SalePage: React.FC = () => {
     setIsCartOpen(true);
   };
 
-  const handleFinishPayment = () => {
+  const handleFinishPayment = async () => {
     setPaymentError(null);
 
     let cashVal = 0;
@@ -230,7 +230,7 @@ export const SalePage: React.FC = () => {
       }
     }
 
-    const res = createSale({
+    const res = await createSale({
       items: cart,
       paymentMethod,
       cashAmountTjs: cashVal,

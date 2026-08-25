@@ -9,32 +9,51 @@ generator client {
 
 enum Role {
   ADMIN
-  MANAGER
+  PARTNER
   SELLER
 }
 
 enum DeviceStatus {
-  IN_STOCK
+  MAIN_WAREHOUSE
+  STORE_STOCK
   SOLD
-  REPAIR
-  TRANSFER
-  RETURNED
+  IN_STOCK_AFTER_EXCHANGE
+  IN_REPAIR
+  TRANSFER_PENDING
+}
+
+enum RepairStatus {
+  ACCEPTED
+  IN_PROGRESS
+  READY
+  ISSUED
+  DIAGNOSTICS
+  IN_REPAIR
+  DELIVERED
+  UNREPAIRABLE
+}
+
+enum TransferStatus {
+  PENDING_APPROVAL
+  APPROVED
+  REJECTED
 }
 
 enum PaymentMethod {
   CASH
   CARD
-  MIXED
+  SPLIT
 }
 
-enum ExpenseCategory {
-  RENT
-  SALARY
-  UTILITIES
-  MARKETING
-  LOGISTICS
-  OFFICE
-  OTHER
+enum SaleStatus {
+  COMPLETED
+  EXCHANGED
+  REFUNDED
+}
+
+enum BonusType {
+  FREE_DEVICES
+  CASH_DISCOUNT
 }
 
 enum OwnerTransactionType {
@@ -44,119 +63,173 @@ enum OwnerTransactionType {
   REINVEST
 }
 
-enum TransferStatus {
-  PENDING
-  APPROVED
-  REJECTED
-}
-
-enum RepairStatus {
-  RECEIVED
-  IN_PROGRESS
-  WAITING_FOR_PARTS
-  READY
-  DELIVERED
-  CANCELLED
-}
-
-enum BonusType {
-  FREE_DEVICES
-  CASH_DISCOUNT
+enum LedgerType {
+  SALE
+  CASH_SALE
+  CARD_SALE
+  PURCHASE
+  EXPENSE
+  SALARY
+  SUPPLIER_PAYMENT
+  OWNER_INVESTMENT
+  OWNER_CAPITAL_WITHDRAWAL
+  OWNER_PROFIT_PAYOUT
+  OWNER_REINVESTMENT
+  EXCHANGE_SETTLEMENT
+  SUPPLIER_BONUS
+  TRANSFER
+  REFUND
 }
 
 model Store {
-  id        String   @id @default(uuid())
-  name      String
-  city      String?
-  address   String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id              String   @id @default(uuid())
+  name            String
+  address         String?
+  isMainWarehouse Boolean  @default(false)
+  cashBalanceTjs  Float    @default(0)
+  active          Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
-  users             User[]
-  devices           Device[]           @relation("StoreDevices")
-  sales             Sale[]
-  repairs           RepairTicket[]
-  expenses          Expense[]
-  transfersSent     TransferRequest[]  @relation("FromStore")
-  transfersReceived TransferRequest[]  @relation("ToStore")
+  users            User[]
+  devices          Device[]
+  sales            Sale[]
+  repairs          RepairTicket[]
+  expenses         Expense[]
+  transfersFrom    TransferRequest[] @relation("FromStore")
+  transfersTo      TransferRequest[] @relation("ToStore")
+  purchaseInvoices SupplierInvoice[]
 
   @@map("stores")
 }
 
 model User {
-  id        String   @id @default(uuid())
-  login     String   @unique
-  password  String   // Argon2 hashed
-  name      String
-  role      Role     @default(SELLER)
-  active    Boolean  @default(true)
-  storeId   String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id                     String   @id @default(uuid())
+  login                  String   @unique
+  password               String
+  name                   String
+  role                   Role     @default(SELLER)
+  active                 Boolean  @default(true)
+  storeId                String?
+  baseSalaryTjs          Float?
+  salesCommissionPercent Float?
+  pin                    String?
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
 
-  store        Store?         @relation(fields: [storeId], references: [id])
-  sales        Sale[]
-  repairs      RepairTicket[]
-  auditLogs    AuditLog[]
+  store         Store?         @relation(fields: [storeId], references: [id])
+  sales         Sale[]
+  repairs       RepairTicket[]
+  auditLogs     AuditLog[]
+  notifications Notification[]
 
   @@map("users")
 }
 
 model Device {
-  id               String       @id @default(uuid())
-  imei             String       @unique
-  imei2            String?
-  barcode          String?
-  brand            String
-  model            String
-  storage          String
-  color            String
-  status           DeviceStatus @default(IN_STOCK)
-  purchasePriceUsd Float
-  sellingPriceTjs  Float?
-  costBasisUsd     Float?
-  storeId          String
-  createdAt        DateTime     @default(now())
-  updatedAt        DateTime     @updatedAt
+  id                String       @id @default(uuid())
+  imei              String       @unique
+  imei2             String?
+  serialNumber      String?
+  barcode           String?
+  brand             String
+  model             String
+  storage           String
+  color             String
+  status            DeviceStatus @default(MAIN_WAREHOUSE)
+  storeId           String
+  purchasePriceUsd  Float
+  costBasisUsd      Float
+  retailPriceTjs    Float?
+  receivedDate      DateTime?
+  isBonus           Boolean      @default(false)
+  bonusCampaign     String?
+  supplierId        String?
+  supplierName      String?
+  invoiceNumber     String?
+  purchaseInvoiceId String?
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
 
-  store            Store             @relation("StoreDevices", fields: [storeId], references: [id])
-  saleItems        SaleItem[]
-  repairTickets    RepairTicket[]
-  transferItems    TransferItem[]
+  store           Store                 @relation(fields: [storeId], references: [id])
+  supplier        Supplier?             @relation(fields: [supplierId], references: [id])
+  purchaseInvoice SupplierInvoice?      @relation(fields: [purchaseInvoiceId], references: [id])
+  timeline        DeviceTimelineEvent[]
+  saleItems       SaleItem[]
+  repairTickets   RepairTicket[]
+  transferItems   TransferItem[]
 
   @@index([imei])
+  @@index([imei2])
   @@index([storeId, status])
   @@index([status])
   @@map("devices")
 }
 
-model Sale {
-  id                  String        @id @default(uuid())
-  receiptNumber       Int           @unique @default(autoincrement())
-  storeId             String
-  userId              String
-  totalAmountTjs      Float
-  cashAmountTjs       Float         @default(0)
-  cardAmountTjs       Float         @default(0)
-  paymentMethod       PaymentMethod
-  customerName        String?
-  exchangeTradeInImei String?
-  exchangeValueTjs    Float?
-  createdAt           DateTime      @default(now())
+model DeviceTimelineEvent {
+  id          String   @id @default(uuid())
+  deviceId    String
+  date        DateTime @default(now())
+  type        String
+  description String
+  userName    String
+  storeName   String?
+  priceTjs    Float?
+  priceUsd    Float?
 
-  store     Store      @relation(fields: [storeId], references: [id])
-  user      User       @relation(fields: [userId], references: [id])
-  saleItems SaleItem[]
+  device Device @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+
+  @@index([deviceId])
+  @@map("device_timeline_events")
+}
+
+model Sale {
+  id                       String        @id @default(uuid())
+  receiptNumber            Int           @unique @default(autoincrement())
+  storeId                  String
+  userId                   String
+  customerName             String?
+  totalTjs                 Float
+  totalUsd                 Float
+  exchangeRate             Float?
+  paymentMethod            PaymentMethod
+  cashAmountTjs            Float         @default(0)
+  cardAmountTjs            Float         @default(0)
+  exchangeTradeInCreditTjs Float?
+  status                   SaleStatus    @default(COMPLETED)
+  hasBelowCostItem         Boolean       @default(false)
+  refundReason             String?
+  refundedAt               DateTime?
+  refundedByUserId         String?
+  penaltyFeeTjs            Float?
+  penaltyFeeUsd            Float?
+  actualRefundAmountTjs    Float?
+  createdAt                DateTime      @default(now())
+
+  store          Store           @relation(fields: [storeId], references: [id])
+  user           User            @relation(fields: [userId], references: [id])
+  saleItems      SaleItem[]
+  exchangeEvents ExchangeEvent[]
 
   @@index([storeId, createdAt])
   @@map("sales")
 }
 
 model SaleItem {
-  id           String @id @default(uuid())
-  saleId       String
-  deviceId     String
-  salePriceTjs Float
+  id              String  @id @default(uuid())
+  saleId          String
+  deviceId        String
+  brand           String
+  model           String
+  storage         String
+  color           String
+  imei            String
+  imei2           String?
+  salePriceTjs    Float
+  salePriceUsd    Float
+  purchaseCostUsd Float
+  costBasisUsd    Float
+  isBelowCost     Boolean @default(false)
 
   sale   Sale   @relation(fields: [saleId], references: [id], onDelete: Cascade)
   device Device @relation(fields: [deviceId], references: [id])
@@ -164,30 +237,66 @@ model SaleItem {
   @@map("sale_items")
 }
 
-model Supplier {
-  id            String   @id @default(uuid())
-  name          String
-  phone         String?
-  contactPerson String?
-  balanceUsd    Float    @default(0)
-  createdAt     DateTime @default(now())
+model ExchangeEvent {
+  id                  String         @id @default(uuid())
+  saleId              String
+  date                DateTime       @default(now())
+  returnedDeviceId    String
+  returnedImei        String
+  returnedModel       String
+  exchangeInValueTjs  Float
+  exchangeInValueUsd  Float
+  replacementDeviceId String
+  replacementImei     String
+  replacementModel    String
+  newPriceTjs         Float
+  newPriceUsd         Float
+  differenceTjs       Float
+  paymentMethod       PaymentMethod?
+  cashAmountTjs       Float?
+  cardAmountTjs       Float?
+  processedByUserId   String
 
+  sale Sale @relation(fields: [saleId], references: [id], onDelete: Cascade)
+
+  @@map("exchange_events")
+}
+
+model Supplier {
+  id                String   @id @default(uuid())
+  name              String
+  phone             String?
+  contactPerson     String?
+  totalPurchasedUsd Float    @default(0)
+  totalPaidUsd      Float    @default(0)
+  totalDebtUsd      Float    @default(0)
+  active            Boolean  @default(true)
+  createdAt         DateTime @default(now())
+
+  devices  Device[]
   invoices SupplierInvoice[]
   bonuses  SupplierBonus[]
+  payments SupplierPayment[]
 
   @@map("suppliers")
 }
 
 model SupplierInvoice {
-  id            String   @id @default(uuid())
-  invoiceNumber String
-  supplierId    String
-  date          DateTime @default(now())
-  totalUsd      Float
-  paidUsd       Float    @default(0)
+  id              String   @id @default(uuid())
+  invoiceNumber   String
+  supplierId      String
+  date            DateTime @default(now())
+  totalAmountUsd  Float
+  paidAmountUsd   Float    @default(0)
+  devicesCount    Int      @default(0)
+  isStorePurchase Boolean  @default(false)
+  storeId         String?
 
-  supplier Supplier       @relation(fields: [supplierId], references: [id])
-  groups   InvoiceGroup[]
+  supplier    Supplier                    @relation(fields: [supplierId], references: [id])
+  store       Store?                      @relation(fields: [storeId], references: [id])
+  groups      InvoiceGroup[]
+  devices     Device[]
+  allocations SupplierPaymentAllocation[]
 
   @@map("supplier_invoices")
 }
@@ -207,27 +316,77 @@ model InvoiceGroup {
   @@map("invoice_groups")
 }
 
+model SupplierPayment {
+  id              String   @id @default(uuid())
+  supplierId      String
+  amountUsd       Float
+  sourceAccount   String
+  storeId         String?
+  createdByUserId String
+  createdAt       DateTime @default(now())
+
+  supplier    Supplier                    @relation(fields: [supplierId], references: [id])
+  allocations SupplierPaymentAllocation[]
+
+  @@map("supplier_payments")
+}
+
+model SupplierPaymentAllocation {
+  id                 String @id @default(uuid())
+  paymentId          String
+  invoiceId          String
+  allocatedAmountUsd Float
+
+  payment SupplierPayment @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+  invoice SupplierInvoice @relation(fields: [invoiceId], references: [id])
+
+  @@map("supplier_payment_allocations")
+}
+
 model SupplierBonus {
   id            String    @id @default(uuid())
   supplierId    String
-  campaignTitle String
+  campaignTitle String?
   bonusType     BonusType
   amountUsd     Float?
+  status        String?
+  dateReceived  DateTime  @default(now())
   createdAt     DateTime  @default(now())
 
-  supplier Supplier @relation(fields: [supplierId], references: [id])
+  supplier    Supplier              @relation(fields: [supplierId], references: [id])
+  freeDevices SupplierBonusDevice[]
 
   @@map("supplier_bonuses")
 }
 
+model SupplierBonusDevice {
+  id           String  @id @default(uuid())
+  bonusId      String
+  deviceId     String?
+  brand        String
+  model        String
+  storage      String
+  color        String
+  imei         String
+  costBasisUsd Float
+
+  bonus SupplierBonus @relation(fields: [bonusId], references: [id], onDelete: Cascade)
+
+  @@map("supplier_bonus_devices")
+}
+
 model TransferRequest {
-  id            String         @id @default(uuid())
-  fromStoreId   String
-  toStoreId     String
-  status        TransferStatus @default(PENDING)
-  rejectionNote String?
-  createdAt     DateTime       @default(now())
-  updatedAt     DateTime       @updatedAt
+  id                String         @id @default(uuid())
+  transferNumber    String         @unique
+  fromStoreId       String
+  toStoreId         String
+  status            TransferStatus @default(PENDING_APPROVAL)
+  requestedByUserId String
+  requestedAt       DateTime       @default(now())
+  approvedByUserId  String?
+  approvedAt        DateTime?
+  rejectedReason    String?
+  updatedAt         DateTime       @updatedAt
 
   fromStore Store          @relation("FromStore", fields: [fromStoreId], references: [id])
   toStore   Store          @relation("ToStore", fields: [toStoreId], references: [id])
@@ -240,6 +399,8 @@ model TransferItem {
   id         String @id @default(uuid())
   transferId String
   deviceId   String
+  imei       String
+  model      String
 
   transfer TransferRequest @relation(fields: [transferId], references: [id], onDelete: Cascade)
   device   Device          @relation(fields: [deviceId], references: [id])
@@ -252,40 +413,67 @@ model RepairTicket {
   ticketNumber       Int          @unique @default(autoincrement())
   storeId            String
   userId             String
+  deviceId           String?
   imei               String
+  imei2              String?
+  barcode            String?
   brand              String
   model              String
-  storage            String
-  color              String
+  storage            String?
+  color              String?
+  saleReceiptNumber  Int?
+  saleDate           DateTime?
   customerName       String?
   customerPhone      String?
+  prepaymentTjs      Float?
   problemDescription String
-  visualCondition    String
-  equipmentPackage   String
-  status             RepairStatus @default(RECEIVED)
-  costTjs            Float        @default(0)
-  deviceId           String?
+  visualCondition    String?
+  equipmentPackage   String?
   comment            String?
+  status             RepairStatus @default(ACCEPTED)
+  estimatedCostTjs   Float?
+  finalCostTjs       Float?
   createdAt          DateTime     @default(now())
   updatedAt          DateTime     @updatedAt
 
-  store  Store   @relation(fields: [storeId], references: [id])
-  user   User    @relation(fields: [userId], references: [id])
-  device Device? @relation(fields: [deviceId], references: [id])
+  store         Store                 @relation(fields: [storeId], references: [id])
+  user          User                  @relation(fields: [userId], references: [id])
+  device        Device?               @relation(fields: [deviceId], references: [id])
+  statusHistory RepairStatusHistory[]
 
   @@index([storeId, status])
   @@map("repair_tickets")
 }
 
+model RepairStatusHistory {
+  id              String       @id @default(uuid())
+  ticketId        String
+  status          RepairStatus
+  updatedAt       DateTime     @default(now())
+  updatedByUserId String
+  note            String?
+
+  ticket RepairTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+
+  @@map("repair_status_history")
+}
+
 model Expense {
-  id                   String          @id @default(uuid())
-  category             ExpenseCategory
+  id                   String   @id @default(uuid())
+  category             String
   amountTjs            Float
-  targetScope          String          @default("STORE") // STORE or BUSINESS
+  amountUsd            Float?
+  exchangeRate         Float?
+  targetType           String   @default("STORE")
   storeId              String?
+  sourceAccount        String?
   comment              String?
-  paidFromCashRegister Boolean         @default(true)
-  createdAt            DateTime        @default(now())
+  description          String?
+  createdByUserId      String
+  paidFromCashRegister Boolean  @default(true)
+  employeeId           String?
+  isEmployeeAdvance    Boolean  @default(false)
+  createdAt            DateTime @default(now())
 
   store Store? @relation(fields: [storeId], references: [id])
 
@@ -293,13 +481,15 @@ model Expense {
 }
 
 model Owner {
-  id            String   @id @default(uuid())
-  name          String
-  sharePercentage Float
-  capitalUsd    Float    @default(0)
-  earnedUsd     Float    @default(0)
-  withdrawnUsd  Float    @default(0)
-  createdAt     DateTime @default(now())
+  id                    String   @id @default(uuid())
+  name                  String
+  profitSharePercent    Float
+  capitalBalanceUsd     Float    @default(0)
+  totalAccruedProfitUsd Float    @default(0)
+  totalPaidProfitUsd    Float    @default(0)
+  totalReinvestedUsd    Float    @default(0)
+  availableProfitUsd    Float    @default(0)
+  createdAt             DateTime @default(now())
 
   transactions OwnerTransaction[]
 
@@ -307,43 +497,98 @@ model Owner {
 }
 
 model OwnerTransaction {
-  id        String               @id @default(uuid())
-  ownerId   String
-  type      OwnerTransactionType
-  amountUsd Float
-  note      String?
-  createdAt DateTime             @default(now())
+  id                  String               @id @default(uuid())
+  ownerId             String
+  type                OwnerTransactionType
+  amountUsd           Float
+  sourceOrDestination String?
+  createdByUserId     String
+  note                String?
+  createdAt           DateTime             @default(now())
 
   owner Owner @relation(fields: [ownerId], references: [id])
 
   @@map("owner_transactions")
 }
 
-model LedgerEntry {
-  id            String   @id @default(uuid())
-  debitAccount  String
-  creditAccount String
-  amountUsd     Float?
-  amountTjs     Float?
-  exchangeRate  Float?
-  description   String
-  referenceId   String?
-  createdAt     DateTime @default(now())
+model QuarterClosure {
+  id             String   @id @default(uuid())
+  quarterName    String
+  closedByUserId String
+  snapshot       Json
+  closedAt       DateTime @default(now())
 
-  @@index([createdAt])
-  @@map("ledger_entries")
+  @@map("quarter_closures")
+}
+
+model ExchangeRate {
+  id              String    @id @default(uuid())
+  date            String    @unique
+  rate            Float
+  createdByUserId String
+  createdAt       DateTime  @default(now())
+  updatedByUserId String?
+  updatedAt       DateTime?
+
+  @@map("exchange_rates")
+}
+
+model Notification {
+  id           String    @id @default(uuid())
+  title        String
+  message      String
+  targetType   String?
+  targetId     String?
+  targetRoute  String?
+  targetRole   Role?
+  targetUserId String?
+  read         Boolean   @default(false)
+  resolved     Boolean   @default(false)
+  readAt       DateTime?
+  resolvedAt   DateTime?
+  createdAt    DateTime  @default(now())
+
+  user User? @relation(fields: [targetUserId], references: [id])
+
+  @@index([targetUserId, read])
+  @@index([targetRole, read])
+  @@map("notifications")
 }
 
 model AuditLog {
-  id        String   @id @default(uuid())
-  userId    String?
-  action    String
-  details   String
-  ipAddress String?
-  createdAt DateTime @default(now())
+  id               String   @id @default(uuid())
+  userId           String?
+  userName         String?
+  userRole         String?
+  storeName        String?
+  action           String
+  details          String
+  financialDetails Json?
+  imei             String?
+  receiptNumber    Int?
+  targetId         String?
+  ipAddress        String?
+  createdAt        DateTime @default(now())
 
   user User? @relation(fields: [userId], references: [id])
 
   @@index([createdAt])
   @@map("audit_logs")
+}
+
+model LedgerEntry {
+  id           String     @id @default(uuid())
+  type         LedgerType
+  description  String
+  amountTjs    Float?
+  amountUsd    Float?
+  exchangeRate Float?
+  storeId      String?
+  storeName    String?
+  userName     String?
+  referenceId  String?
+  createdAt    DateTime   @default(now())
+
+  @@index([createdAt])
+  @@map("ledger_entries")
 }

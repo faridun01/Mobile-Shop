@@ -118,7 +118,7 @@ export const BonusesPage: React.FC = () => {
     );
   }
 
-  const handleCreateBonus = (e: React.FormEvent) => {
+  const handleCreateBonus = async (e: React.FormEvent) => {
     e.preventDefault();
     setStatusMessage(null);
 
@@ -135,7 +135,7 @@ export const BonusesPage: React.FC = () => {
       }
     ] : undefined;
 
-    const res = createSupplierBonus({
+    const res = await createSupplierBonus({
       supplierId,
       bonusType,
       amountUsd: bonusType === 'CASH_DISCOUNT' ? (parseFloat(amountUsd) || 0) : undefined,

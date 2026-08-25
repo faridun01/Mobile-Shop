@@ -125,7 +125,7 @@ export const OwnersPage: React.FC = () => {
     });
   };
 
-  const handleSaveShares = (e: React.FormEvent) => {
+  const handleSaveShares = async (e: React.FormEvent) => {
     e.preventDefault();
     const payload = owners.map(o => ({
       ownerId: o.id,
@@ -141,7 +141,7 @@ export const OwnersPage: React.FC = () => {
       return;
     }
 
-    const res = updateOwnerProfitShares(payload[0]?.sharePercent || 0, payload[1]?.sharePercent || 0);
+    const res = await updateOwnerProfitShares(payload[0]?.sharePercent || 0, payload[1]?.sharePercent || 0);
     if (res.success) {
       setIsSharesModalOpen(false);
       setStatusMessage({
@@ -153,7 +153,7 @@ export const OwnersPage: React.FC = () => {
     }
   };
 
-  const handleCreateTx = (e: React.FormEvent) => {
+  const handleCreateTx = async (e: React.FormEvent) => {
     e.preventDefault();
     setStatusMessage(null);
 
@@ -175,7 +175,7 @@ export const OwnersPage: React.FC = () => {
       }
     }
 
-    const res = createOwnerTransaction({
+    const res = await createOwnerTransaction({
       ownerId: selectedOwnerId,
       type: txType,
       amountUsd: val,
@@ -218,9 +218,9 @@ export const OwnersPage: React.FC = () => {
     document.body.removeChild(link);
   };
 
-  const handleConfirmCloseQuarter = () => {
+  const handleConfirmCloseQuarter = async () => {
     const quarterName = `${selectedQuarter} ${selectedQuarterYear}`;
-    const res = closeQuarterPeriod({
+    const res = await closeQuarterPeriod({
       quarterName,
       transferRemainingToCapital
     });

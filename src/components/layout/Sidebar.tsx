@@ -79,7 +79,7 @@ const NAV_GROUPS: NavGroup[] = [
       { id: 'REPORTS', label: 'Финансовые отчёты', icon: BarChart3, roles: ['ADMIN', 'PARTNER'] },
       { id: 'EXPENSES', label: 'Расходы', icon: Wallet, roles: ['ADMIN', 'PARTNER'] },
       { id: 'BONUSES', label: 'Бонусы', icon: Gift, roles: ['ADMIN', 'PARTNER'] },
-      { id: 'OWNERS', label: 'Партнеры и капитал', icon: Users, roles: ['ADMIN'] },
+      { id: 'OWNERS', label: 'Партнеры и капитал', icon: Users, roles: ['ADMIN', 'PARTNER'] },
     ]
   },
   {

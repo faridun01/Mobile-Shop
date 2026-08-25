@@ -249,7 +249,7 @@ export const PurchasePage: React.FC = () => {
     return acc + (count * g.purchasePriceUsd);
   }, 0);
 
-  const handleSubmitPurchase = (e: React.FormEvent) => {
+  const handleSubmitPurchase = async (e: React.FormEvent) => {
     e.preventDefault();
     setStatusMessage(null);
 
@@ -281,7 +281,7 @@ export const PurchasePage: React.FC = () => {
       return;
     }
 
-    const res = createPurchase({
+    const res = await createPurchase({
       supplierId: selectedSupplierId,
       invoiceNumber: invoiceNumber.trim(),
       date: purchaseDate,

@@ -111,7 +111,7 @@ export const SalesHistoryPage: React.FC = () => {
     });
   };
 
-  const handleExecuteRefund = () => {
+  const handleExecuteRefund = async () => {
     if (!selectedSale) return;
     if (!refundReason.trim()) {
       setRefundError('Укажите причину возврата');
@@ -121,7 +121,7 @@ export const SalesHistoryPage: React.FC = () => {
     const penaltyVal = Math.max(0, parseFloat(penaltyFeeTjs) || 0);
     const actualRefundVal = Math.max(0, selectedSale.totalTjs - penaltyVal);
 
-    const res = processRefund({
+    const res = await processRefund({
       saleId: selectedSale.id,
       reason: refundReason.trim(),
       refundAmountTjs: actualRefundVal,
@@ -528,7 +528,7 @@ export const SalesHistoryPage: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-[10px] uppercase text-slate-400 mb-1 font-bold flex items-center justify-between">
+                <label className="block text-[10px] uppercase text-slate-400 mb-1 font-bold items-center justify-between">
                   <span>Удержать штраф за возврат (TJS):</span>
                   <span className="text-[9px] text-amber-400 font-normal">100% В ЧИСТУЮ ПРИБЫЛЬ</span>
                 </label>

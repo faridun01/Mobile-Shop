@@ -5,8 +5,21 @@ import { fileURLToPath } from 'node:url';
 import { prisma } from './prisma/prisma.service';
 import type { Prisma } from '@prisma/client';
 import { AuthService } from './auth/auth.service';
-import { authenticateJwt, type AuthenticatedRequest, enforceStoreScope, requireRoles } from './auth/auth.middleware';
+import { authenticateJwt, type AuthenticatedRequest, enforceBodyStoreScope, enforceStoreScope, requireRoles } from './auth/auth.middleware';
 import { SalesService } from './modules/sales/sales.service';
+import { RealtimeSyncGateway } from './websocket/websocket.gateway';
+import { registerTransferRoutes } from './modules/transfers/transfers.routes';
+import { registerRepairRoutes } from './modules/repairs/repairs.routes';
+import { registerRefundRoutes } from './modules/sales/refund.routes';
+import { registerExchangeRoutes } from './modules/exchanges/exchanges.routes';
+import { registerSupplierRoutes } from './modules/suppliers/suppliers.routes';
+import { registerExpenseRoutes } from './modules/expenses/expenses.routes';
+import { registerOwnerRoutes } from './modules/owners/owners.routes';
+import { registerUserRoutes } from './modules/users/users.routes';
+import { registerAuditLogRoutes } from './modules/audit/audit.routes';
+import { registerNotificationRoutes } from './modules/notifications/notifications.routes';
+import { registerExchangeRateRoutes } from './modules/exchange-rate/exchange-rate.routes';
+import { registerStoreRoutes } from './modules/stores/stores.routes';
 
 const app = express();
 const port = Number(process.env.PORT || 3000);
@@ -37,6 +50,17 @@ app.post('/api/auth/login', async (req, res, next) => {
     }
 
     const token = AuthService.generateToken({ userId: user.id, login: user.login, role: user.role, storeId: user.storeId });
+
+    await prisma.auditLog.create({
+      data: {
+        userId: user.id,
+        userName: user.name,
+        userRole: user.role,
+        action: 'LOGIN',
+        details: `Пользователь ${user.name} (${user.role}) вошел в систему`,
+      },
+    });
+
     res.json({
       token,
       user: {
@@ -50,6 +74,22 @@ app.post('/api/auth/login', async (req, res, next) => {
         createdAt: user.createdAt.toISOString(),
       },
     });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post('/api/auth/logout', authenticateJwt, async (req: AuthenticatedRequest, res, next) => {
+  try {
+    await prisma.auditLog.create({
+      data: {
+        userId: req.user!.userId,
+        userRole: req.user!.role,
+        action: 'LOGOUT',
+        details: 'Пользователь вышел из системы',
+      },
+    });
+    res.json({ success: true });
   } catch (error) {
     next(error);
   }
@@ -78,9 +118,9 @@ app.get('/api/devices', authenticateJwt, enforceStoreScope, async (req: Authenti
   }
 });
 
-app.post('/api/purchases', authenticateJwt, requireRoles('ADMIN', 'MANAGER'), async (req: AuthenticatedRequest, res, next) => {
+app.post('/api/purchases', authenticateJwt, requireRoles('ADMIN', 'PARTNER'), enforceBodyStoreScope, async (req: AuthenticatedRequest, res, next) => {
   try {
-    const { supplierId, invoiceNumber, date, storeId, groups } = req.body ?? {};
+    const { supplierId, invoiceNumber, date, storeId, isStorePurchase, groups } = req.body ?? {};
     if (!supplierId || !invoiceNumber || !storeId || !Array.isArray(groups) || groups.length === 0) {
       res.status(400).json({ message: 'supplierId, invoiceNumber, storeId и groups обязательны' });
       return;
@@ -114,16 +154,21 @@ app.post('/api/purchases', authenticateJwt, requireRoles('ADMIN', 'MANAGER'), as
 
       const identifiers = normalizedDevices.flatMap((device) => [device.imei, device.imei2]).filter(Boolean);
       if (new Set(identifiers).size !== identifiers.length) throw new Error('В запросе обнаружены дублирующиеся IMEI');
-      const existing = await transaction.device.findFirst({ where: { OR: identifiers.map((identifier) => ({ imei: identifier })) } });
+      const existing = await transaction.device.findFirst({
+        where: { OR: identifiers.flatMap((identifier) => [{ imei: identifier }, { imei2: identifier }]) },
+      });
       if (existing) throw new Error(`IMEI ${existing.imei} уже зарегистрирован`);
 
-      const totalUsd = normalizedDevices.reduce((sum, device) => sum + device.purchasePriceUsd, 0);
+      const totalAmountUsd = normalizedDevices.reduce((sum, device) => sum + device.purchasePriceUsd, 0);
       const invoice = await transaction.supplierInvoice.create({
         data: {
           invoiceNumber: String(invoiceNumber).trim(),
           supplierId,
           date: date ? new Date(date) : new Date(),
-          totalUsd,
+          totalAmountUsd,
+          devicesCount: normalizedDevices.length,
+          isStorePurchase: Boolean(isStorePurchase),
+          storeId,
           groups: {
             create: groups.map((group: any) => ({
               brand: String(group.brand || '').trim(), model: String(group.model || '').trim(),
@@ -135,38 +180,100 @@ app.post('/api/purchases', authenticateJwt, requireRoles('ADMIN', 'MANAGER'), as
         },
       });
 
+      const targetStatus = isStorePurchase ? ('STORE_STOCK' as const) : ('MAIN_WAREHOUSE' as const);
       const devices = await transaction.device.createManyAndReturn({
-        data: normalizedDevices.map((device) => ({ ...device, storeId, status: 'IN_STOCK' as const, costBasisUsd: device.purchasePriceUsd })),
+        data: normalizedDevices.map((device) => ({
+          ...device,
+          storeId,
+          status: targetStatus,
+          costBasisUsd: device.purchasePriceUsd,
+          supplierId,
+          supplierName: supplier.name,
+          invoiceNumber: invoice.invoiceNumber,
+          purchaseInvoiceId: invoice.id,
+        })),
       });
+
+      await transaction.supplier.update({
+        where: { id: supplierId },
+        data: { totalPurchasedUsd: { increment: totalAmountUsd }, totalDebtUsd: { increment: totalAmountUsd } },
+      });
+
+      await transaction.ledgerEntry.create({
+        data: {
+          type: 'PURCHASE',
+          description: `Приход по накладной ${invoice.invoiceNumber} (${supplier.name}): ${devices.length} устройств`,
+          amountUsd: totalAmountUsd,
+          storeId,
+          storeName: store.name,
+          referenceId: invoice.id,
+        },
+      });
+
+      await transaction.auditLog.create({
+        data: {
+          userId: req.user!.userId,
+          userRole: req.user!.role,
+          action: 'PURCHASE',
+          details: `Создан приход по накладной ${invoice.invoiceNumber} (${supplier.name}): ${devices.length} устройств, сумма $${totalAmountUsd}`,
+        },
+      });
+
       return { invoice, devices };
     });
 
+    RealtimeSyncGateway.broadcast('INVENTORY_UPDATE', { storeId }, { storeIds: [storeId] });
     res.status(201).json(result);
   } catch (error) {
     next(error);
   }
 });
 
-app.post('/api/sales', authenticateJwt, async (req: AuthenticatedRequest, res, next) => {
+app.post('/api/sales', authenticateJwt, enforceBodyStoreScope, async (req: AuthenticatedRequest, res, next) => {
   try {
     const sale = await SalesService.executeSale({ ...req.body, userId: req.user!.userId });
+    RealtimeSyncGateway.broadcast('SALE_COMPLETED', { saleId: sale.id, storeId: sale.storeId }, { storeIds: [sale.storeId] });
     res.status(201).json(sale);
   } catch (error) {
     next(error);
   }
 });
 
+registerRefundRoutes(app);
+registerTransferRoutes(app);
+registerRepairRoutes(app);
+registerExchangeRoutes(app);
+registerSupplierRoutes(app);
+registerExpenseRoutes(app);
+registerOwnerRoutes(app);
+registerUserRoutes(app);
+registerAuditLogRoutes(app);
+registerNotificationRoutes(app);
+registerExchangeRateRoutes(app);
+registerStoreRoutes(app);
+
 app.use(express.static(path.join(projectRoot, 'dist')));
 app.get('*', (_req, res) => res.sendFile(path.join(projectRoot, 'dist', 'index.html')));
 
-app.use((error: unknown, _req: Request, res: Response, _next: NextFunction) => {
-  const message = error instanceof Error ? error.message : 'Внутренняя ошибка сервера';
-  res.status(400).json({ message });
+app.use((error: any, _req: Request, res: Response, _next: NextFunction) => {
+  if (error && typeof error === 'object' && 'code' in error && error.code === 'P2002') {
+    res.status(409).json({ message: 'Запись с такими уникальными данными уже существует' });
+    return;
+  }
+
+  if (error instanceof Error) {
+    res.status(400).json({ message: error.message });
+    return;
+  }
+
+  res.status(500).json({ message: 'Внутренняя ошибка сервера' });
 });
 
 const server = app.listen(port, '0.0.0.0', () => {
   console.log(`Mobile Shop API listening on port ${port}`);
 });
+
+RealtimeSyncGateway.init(server);
 
 const shutdown = async () => {
   server.close();

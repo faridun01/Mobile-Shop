@@ -210,7 +210,7 @@ export const RepairPage: React.FC = () => {
   const monthlyCompletedCount = monthlyRepairs.filter((r) => r.status === 'ISSUED' || r.status === 'READY').length;
   const monthlyTotalCostTjs = monthlyRepairs.reduce((acc, r) => acc + (r.finalCostTjs || r.estimatedCostTjs || 0), 0);
 
-  const handleCreateTicket = (e: React.FormEvent) => {
+  const handleCreateTicket = async (e: React.FormEvent) => {
     e.preventDefault();
     setStatusMessage(null);
 
@@ -221,7 +221,7 @@ export const RepairPage: React.FC = () => {
 
     const costVal = parseFloat(repairCostTjs || estimatedCostTjs) || 0;
 
-    const res = createRepairTicket({
+    const res = await createRepairTicket({
       customerName: customerName.trim(),
       customerPhone: customerPhone.trim(),
       brand: brand.trim() || 'Apple',
@@ -265,11 +265,11 @@ export const RepairPage: React.FC = () => {
     setIsIssueModalOpen(true);
   };
 
-  const handleConfirmIssue = () => {
+  const handleConfirmIssue = async () => {
     if (!selectedTicket) return;
     const finalVal = parseFloat(finalCostInput) || selectedTicket.estimatedCostTjs || 0;
 
-    const res = updateRepairStatus(selectedTicket.id, 'ISSUED', 'Устройство выдано клиенту', finalVal);
+    const res = await updateRepairStatus(selectedTicket.id, 'ISSUED', 'Устройство выдано клиенту', finalVal);
 
     if (res.success) {
       setIsIssueModalOpen(false);
@@ -385,7 +385,7 @@ export const RepairPage: React.FC = () => {
 
               {/* RECEIPT / IMEI SEARCH BAR */}
               <div className="p-3 bg-[#0B0E14] rounded-lg border border-emerald-500/40 space-y-2">
-                <label className="block text-[10px] uppercase font-bold text-emerald-400 flex items-center space-x-1.5">
+                <label className="block text-[10px] uppercase font-bold text-emerald-400 items-center space-x-1.5">
                   <Search className="w-3.5 h-3.5" />
                   <span>ПОИСК ПО НОМЕРУ ЧЕКА ИЛИ IMEI / БАРКОДУ:</span>
                 </label>

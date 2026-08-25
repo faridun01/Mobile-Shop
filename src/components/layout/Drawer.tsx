@@ -105,13 +105,15 @@ export const Drawer: React.FC = () => {
     drawerOpen,
     setDrawerOpen,
     logout,
-    notifications
+    notifications,
+    stores
   } = useApp();
 
   if (!drawerOpen) return null;
 
   const userRole = currentUser?.role || 'SELLER';
   const unreadNotifs = notifications.filter(n => !n.read && !n.resolved).length;
+  const userStoreName = currentUser?.storeId ? (stores.find(s => s.id === currentUser.storeId)?.name || currentUser.storeName) : currentUser?.storeName;
 
   return (
     <div className="fixed inset-0 z-50 flex md:hidden flex-col bg-[#0B0E14] text-slate-100 font-mono w-full h-full overflow-hidden animate-in fade-in zoom-in-95 duration-150">
@@ -126,7 +128,7 @@ export const Drawer: React.FC = () => {
               {currentUser?.name || 'Пользователь'}
             </h2>
             <p className="text-xs font-bold text-emerald-400 truncate">
-              {currentUser?.storeName || 'Магазин №1'}
+              {userStoreName || 'Главный склад'}
             </p>
           </div>
         </div>

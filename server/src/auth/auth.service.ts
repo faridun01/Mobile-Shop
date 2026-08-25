@@ -4,12 +4,20 @@ import { prisma } from '../prisma/prisma.service';
 export interface JwtPayload {
   userId: string;
   login: string;
-  role: 'ADMIN' | 'MANAGER' | 'SELLER';
+  role: 'ADMIN' | 'PARTNER' | 'SELLER';
   storeId?: string | null;
 }
 
+function loadJwtSecret(): string {
+  const secret = process.env.JWT_SECRET;
+  if (!secret || secret.trim().length === 0) {
+    throw new Error('JWT_SECRET environment variable must be set (no insecure default is permitted)');
+  }
+  return secret;
+}
+
 export class AuthService {
-  private static JWT_SECRET = process.env.JWT_SECRET || 'antigravity-super-secret-key-change-in-prod';
+  private static JWT_SECRET = loadJwtSecret();
 
   // Secure Password Hashing using PBKDF2 (Native Node.js crypto module)
   public static async hashPassword(password: string): Promise<string> {
@@ -56,7 +64,11 @@ export class AuthService {
         .update(`${header}.${encodedPayload}`)
         .digest('base64url');
 
-      if (signature !== expectedSignature) return null;
+      const signatureBuffer = Buffer.from(signature);
+      const expectedBuffer = Buffer.from(expectedSignature);
+      if (signatureBuffer.length !== expectedBuffer.length || !crypto.timingSafeEqual(signatureBuffer, expectedBuffer)) {
+        return null;
+      }
 
       const payload: JwtPayload & { exp: number } = JSON.parse(Buffer.from(encodedPayload, 'base64url').toString('utf8'));
       if (payload.exp < Math.floor(Date.now() / 1000)) return null;

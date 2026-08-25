@@ -1,37 +1,33 @@
-import { useEffect } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
+import { useEffect, useRef } from 'react';
 
-export function useRealtimeSync() {
-  const queryClient = useQueryClient();
+/** Subscribes to the backend's authenticated WebSocket and invokes onEvent for every broadcast. */
+export function useRealtimeSync(token: string | null, onEvent: (type: string, payload: any) => void) {
+  const onEventRef = useRef(onEvent);
+  onEventRef.current = onEvent;
 
   useEffect(() => {
+    if (!token) return;
+
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsUrl = `${protocol}//${window.location.host}/ws`;
+    const wsUrl = `${protocol}//${window.location.host}/ws?token=${encodeURIComponent(token)}`;
 
     let socket: WebSocket | null = null;
-
     try {
       socket = new WebSocket(wsUrl);
-
       socket.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data);
-          console.log('[Realtime Sync Received]:', data.type);
-
-          // Refresh TanStack Query cache automatically on server broadcast
-          if (['INVENTORY_UPDATE', 'SALE_COMPLETED', 'TRANSFER_UPDATED', 'REPAIR_UPDATED'].includes(data.type)) {
-            queryClient.invalidateQueries();
-          }
+          onEventRef.current(data.type, data.payload);
         } catch (e) {
           console.error('[Realtime Sync Parse Error]:', e);
         }
       };
     } catch {
-      // Graceful fallback if WebSocket server is not connected
+      // Graceful fallback if the WebSocket server is unreachable
     }
 
     return () => {
       socket?.close();
     };
-  }, [queryClient]);
+  }, [token]);
 }

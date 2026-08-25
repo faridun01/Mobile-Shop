@@ -15,14 +15,14 @@ export const LoginPage: React.FC = () => {
     return <Navigate to="/sale" replace />;
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
     if (!loginInput.trim() || !passwordInput) {
       setError('Пожалуйста, введите логин и пароль');
       return;
     }
-    const res = login(loginInput.trim(), passwordInput);
+    const res = await login(loginInput.trim(), passwordInput);
     if (res.success) {
       navigate('/sale');
     } else {
@@ -30,10 +30,10 @@ export const LoginPage: React.FC = () => {
     }
   };
 
-  const handleQuickLogin = (u: string, p: string) => {
+  const handleQuickLogin = async (u: string, p: string) => {
     setLoginInput(u);
     setPasswordInput(p);
-    const res = login(u, p);
+    const res = await login(u, p);
     if (res.success) {
       navigate('/sale');
     } else {

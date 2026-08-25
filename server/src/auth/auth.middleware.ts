@@ -24,7 +24,7 @@ export function authenticateJwt(req: AuthenticatedRequest, res: Response, next: 
 }
 
 // Middleware for Role-Based Access Control (RBAC)
-export function requireRoles(...allowedRoles: Array<'ADMIN' | 'MANAGER' | 'SELLER'>) {
+export function requireRoles(...allowedRoles: Array<'ADMIN' | 'PARTNER' | 'SELLER'>) {
   return (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     if (!req.user) {
       return res.status(401).json({ error: 'Unauthorized' });
@@ -38,22 +38,41 @@ export function requireRoles(...allowedRoles: Array<'ADMIN' | 'MANAGER' | 'SELLE
   };
 }
 
-// Store Scope Injector: Ensures non-Admins can only access their assigned store_id
+// Store Scope Injector: Ensures SELLERs can only access their assigned store_id.
+// ADMIN and PARTNER oversee every store (owners/managers, not tied to one location).
 export function enforceStoreScope(req: AuthenticatedRequest, res: Response, next: NextFunction) {
   if (!req.user) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
 
-  // Admin can query any store or specify storeId query param
-  if (req.user.role === 'ADMIN') {
+  if (req.user.role !== 'SELLER') {
     return next();
   }
 
-  // Non-Admins are strictly forced to their assigned storeId
   if (!req.user.storeId) {
     return res.status(403).json({ error: 'Forbidden: User is not assigned to any store' });
   }
 
   req.query.storeId = req.user.storeId;
+  next();
+}
+
+// Store Scope Injector for write bodies: Ensures SELLERs can only create records
+// for their own assigned store, regardless of what storeId the client sent in the body.
+// ADMIN and PARTNER may write to any store.
+export function enforceBodyStoreScope(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+  if (!req.user) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
+  if (req.user.role !== 'SELLER') {
+    return next();
+  }
+
+  if (!req.user.storeId) {
+    return res.status(403).json({ error: 'Forbidden: User is not assigned to any store' });
+  }
+
+  req.body = { ...req.body, storeId: req.user.storeId };
   next();
 }

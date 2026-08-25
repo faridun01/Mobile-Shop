@@ -104,7 +104,7 @@ export const ExpensesPage: React.FC = () => {
   const isSeller = currentUser?.role === 'SELLER';
   const canAddCategory = currentUser?.role === 'ADMIN' || currentUser?.role === 'PARTNER';
 
-  const handleAddExpense = (e: React.FormEvent) => {
+  const handleAddExpense = async (e: React.FormEvent) => {
     e.preventDefault();
     setStatusMessage(null);
 
@@ -116,7 +116,7 @@ export const ExpensesPage: React.FC = () => {
 
     const selectedEmp = selectedEmployeeId ? users.find(u => u.id === selectedEmployeeId) : undefined;
 
-    const res = createExpense({
+    const res = await createExpense({
       category,
       amountTjs: val,
       storeId: isSeller ? currentUser.storeId : storeId,
@@ -323,7 +323,7 @@ export const ExpensesPage: React.FC = () => {
         {/* Filter bar: Search, Period Filter, Store Selector, Compact Category Dropdown */}
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 pt-1 border-t border-slate-800/80">
           <div className="flex flex-wrap items-center gap-2 flex-1 min-w-0">
-            <div className="relative flex-1 min-w-[180px]">
+            <div className="relative flex-1 min-w-45">
               <Search className="absolute left-3 top-2.5 w-3.5 h-3.5 text-slate-500" />
               <input
                 type="text"
@@ -587,7 +587,7 @@ export const ExpensesPage: React.FC = () => {
               {/* Employee selection for Advances or Salary */}
               {(category === 'EMPLOYEE_ADVANCE' || category === 'SALARY' || category === 'Аванс сотрудника') && (
                 <div>
-                  <label className="block text-slate-400 text-[10px] uppercase mb-1 font-bold flex items-center justify-between">
+                  <label className="block text-slate-400 text-[10px] uppercase mb-1 font-bold items-center justify-between">
                     <span>СОТРУДНИК (ДЛЯ ВЫЧЕТА ИЗ ЗАРПЛАТЫ):</span>
                     <span className="text-[9px] text-amber-400 font-normal">Удержать из ЗП</span>
                   </label>

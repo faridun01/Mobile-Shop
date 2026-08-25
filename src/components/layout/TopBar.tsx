@@ -15,10 +15,12 @@ export const TopBar: React.FC = () => {
     openScanner,
     openDailyRateModal,
     theme,
-    toggleTheme
+    toggleTheme,
+    stores
   } = useApp();
 
   const unreadNotifsCount = notifications.filter(n => !n.read && !n.resolved).length;
+  const userStoreName = currentUser?.storeId ? (stores.find(s => s.id === currentUser.storeId)?.name || currentUser.storeName) : currentUser?.storeName;
 
   const getPageTitle = () => {
     switch (activePage) {
@@ -61,7 +63,7 @@ export const TopBar: React.FC = () => {
           {currentUser?.role !== 'SELLER' && (
             <p className="text-[10px] text-slate-400 font-mono truncate flex items-center">
               <Store className="w-2.5 h-2.5 mr-1 text-emerald-400 shrink-0 inline" />
-              <span className="truncate">{currentUser?.storeName || (currentUser?.role === 'ADMIN' ? 'Все филиалы' : 'Магазин')}</span>
+              <span className="truncate">{userStoreName || (currentUser?.role === 'ADMIN' ? 'Все филиалы' : 'Главный склад')}</span>
             </p>
           )}
         </div>

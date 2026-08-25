@@ -132,14 +132,14 @@ export const TransferPage: React.FC = () => {
     setIsConfirmModalOpen(true);
   };
 
-  const handleSubmitTransfer = () => {
+  const handleSubmitTransfer = async () => {
     if (selectedDeviceIds.length === 0) return;
     if (fromLocationId === toLocationId) {
       setStatusMessage({ type: 'error', text: 'Склад отправки и назначения не могут совпадать' });
       return;
     }
 
-    const res = createTransferRequest({
+    const res = await createTransferRequest({
       fromLocationId,
       toLocationId,
       deviceIds: selectedDeviceIds
@@ -150,9 +150,7 @@ export const TransferPage: React.FC = () => {
       setSelectedDeviceIds([]);
       setStatusMessage({
         type: 'success',
-        text: isSeller
-          ? 'Запрос на перемещение успешно создан и ожидает подтверждения Администратора'
-          : 'Устройства успешно перемещены'
+        text: 'Товары успешно перемещены на новый склад! Администратор получил уведомление.'
       });
       setActiveTab('list');
     } else {
@@ -160,8 +158,8 @@ export const TransferPage: React.FC = () => {
     }
   };
 
-  const handleApprove = (transferId: string) => {
-    const res = approveTransferRequest(transferId);
+  const handleApprove = async (transferId: string) => {
+    const res = await approveTransferRequest(transferId);
     if (res.success) {
       setStatusMessage({ type: 'success', text: 'Перемещение успешно подтверждено! Товары зачислены на склад.' });
     } else {
@@ -169,9 +167,9 @@ export const TransferPage: React.FC = () => {
     }
   };
 
-  const handleRejectSubmit = () => {
+  const handleRejectSubmit = async () => {
     if (!rejectingTransferId) return;
-    const res = rejectTransferRequest(rejectingTransferId, rejectReasonInput || 'Отклонено администратором');
+    const res = await rejectTransferRequest(rejectingTransferId, rejectReasonInput || 'Отклонено администратором');
     if (res.success) {
       setStatusMessage({ type: 'success', text: 'Запрос на перемещение отклонен' });
     } else {
@@ -721,7 +719,7 @@ export const TransferPage: React.FC = () => {
                 className="flex-1 py-2.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 active:scale-95 text-xs font-bold text-white uppercase shadow-lg transition-all flex items-center justify-center space-x-1.5"
               >
                 <Send className="w-3.5 h-3.5" />
-                <span>{isSeller ? 'ОТПРАВИТЬ ЗАПРОС' : 'ПОДТВЕРДИТЬ'}</span>
+                <span>ПОДТВЕРДИТЬ ПЕРЕМЕЩЕНИЕ</span>
               </button>
             </div>
           </div>

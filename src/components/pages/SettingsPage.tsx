@@ -59,11 +59,11 @@ export const SettingsPage: React.FC = () => {
     return <Navigate to="/sale" replace />;
   }
 
-  const handleAddStore = (e: React.FormEvent) => {
+  const handleAddStore = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newStoreName.trim()) return;
 
-    const res = createStore(newStoreName.trim(), newStoreAddress.trim());
+    const res = await createStore(newStoreName.trim(), newStoreAddress.trim());
 
     if (res.success) {
       setIsAddStoreOpen(false);
@@ -81,11 +81,11 @@ export const SettingsPage: React.FC = () => {
     setEditAddress(store.address || '');
   };
 
-  const handleSaveEditStore = (e: React.FormEvent) => {
+  const handleSaveEditStore = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingStore) return;
 
-    const res = updateStore(editingStore.id, editName, editAddress);
+    const res = await updateStore(editingStore.id, editName, editAddress);
     if (res.success) {
       setEditingStore(null);
       setStatusMessage({ type: 'success', text: `Филиал «${editName}» успешно обновлен` });
@@ -102,10 +102,10 @@ export const SettingsPage: React.FC = () => {
     setDeletingStoreConfirm(store);
   };
 
-  const handleConfirmDeleteStore = () => {
+  const handleConfirmDeleteStore = async () => {
     if (!deletingStoreConfirm) return;
     const targetName = deletingStoreConfirm.name;
-    const res = deleteStore(deletingStoreConfirm.id);
+    const res = await deleteStore(deletingStoreConfirm.id);
     setDeletingStoreConfirm(null);
 
     if (res.success) {
@@ -344,12 +344,12 @@ export const SettingsPage: React.FC = () => {
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
                   {devices.length === 0 && sales.length === 0 ? (
-                    <span className="text-xs font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 px-3 py-1 rounded-full uppercase flex items-center space-x-1.5 inline-flex">
+                    <span className="text-xs font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 px-3 py-1 rounded-full uppercase flex items-center space-x-1.5">
                       <CheckCircle2 className="w-3.5 h-3.5" />
                       <span>РЕЖИМ РЕАЛЬНОГО УЧЕТА (LIVE DATA)</span>
                     </span>
                   ) : (
-                    <span className="text-xs font-bold text-sky-400 bg-sky-500/10 border border-sky-500/30 px-3 py-1 rounded-full uppercase flex items-center space-x-1.5 inline-flex">
+                    <span className="text-xs font-bold text-sky-400 bg-sky-500/10 border border-sky-500/30 px-3 py-1 rounded-full uppercase flex items-center space-x-1.5">
                       <Sparkles className="w-3.5 h-3.5" />
                       <span>ДЕМОНСТРАЦИОННЫЙ РЕЖИМ (DEMO MODE)</span>
                     </span>

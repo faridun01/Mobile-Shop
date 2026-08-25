@@ -33,15 +33,8 @@ export const INITIAL_STORES: Store[] = [
     active: true
   },
   {
-    id: 'store-1',
-    name: 'Магазин №1 (Рудаки)',
-    isMainWarehouse: false,
-    cashBalanceTjs: 0,
-    active: true
-  },
-  {
-    id: 'store-2',
-    name: 'Магазин №2 (Сомони)',
+    id: 'store-siyoma',
+    name: 'Сиёма',
     isMainWarehouse: false,
     cashBalanceTjs: 0,
     active: true
@@ -69,12 +62,12 @@ export const INITIAL_USERS: User[] = [
   },
   {
     id: 'user-ahmad',
-    name: 'Ахмад',
+    name: 'Ahmad',
     login: 'ahmad',
     passwordHash: 'seller123',
     role: 'SELLER',
-    storeId: 'store-2',
-    storeName: 'Магазин №2 (Сомони)',
+    storeId: 'store-siyoma',
+    storeName: 'Сиёма',
     active: true,
     createdAt: '2026-02-01T09:00:00Z'
   },
@@ -84,8 +77,8 @@ export const INITIAL_USERS: User[] = [
     login: 'farhod',
     passwordHash: 'seller123',
     role: 'SELLER',
-    storeId: 'store-1',
-    storeName: 'Магазин №1 (Рудаки)',
+    storeId: 'store-siyoma',
+    storeName: 'Сиёма',
     active: true,
     createdAt: '2026-02-01T09:00:00Z'
   }
@@ -176,7 +169,7 @@ export const INITIAL_DEVICES: Device[] = [
     barcode: '194253123456',
     status: 'STORE_STOCK',
     locationId: 'store-1',
-    locationName: 'Магазин №1 (Рудаки)',
+    locationName: 'Сиёма',
     supplierId: 'sup-1',
     supplierName: 'Apple Distributor Corp',
     invoiceNumber: 'INV-101',
@@ -185,7 +178,7 @@ export const INITIAL_DEVICES: Device[] = [
     createdAt: '2026-08-15T10:00:00Z',
     timeline: [
       { id: 't-1', date: '15.08 10:00', type: 'PURCHASE', description: 'Оприходован на главный склад по накладной INV-101 ($1200)', user: 'Далер', storeName: 'Главный склад' },
-      { id: 't-2', date: '17.08 14:20', type: 'TRANSFER', description: 'Перемещен на склад: Магазин №1 (Рудаки)', user: 'Далер', storeName: 'Магазин №1 (Рудаки)' }
+      { id: 't-2', date: '17.08 14:20', type: 'TRANSFER', description: 'Перемещен на склад: Сиёма', user: 'Далер', storeName: 'Сиёма' }
     ]
   },
   {
@@ -199,7 +192,7 @@ export const INITIAL_DEVICES: Device[] = [
     barcode: '194253123457',
     status: 'SOLD',
     locationId: 'store-1',
-    locationName: 'Магазин №1 (Рудаки)',
+    locationName: 'Сиёма',
     supplierId: 'sup-1',
     supplierName: 'Apple Distributor Corp',
     invoiceNumber: 'INV-101',
@@ -207,8 +200,8 @@ export const INITIAL_DEVICES: Device[] = [
     costBasisUsd: 980,
     createdAt: '2026-08-15T10:00:00Z',
     timeline: [
-      { id: 't-3', date: '15.08 10:00', type: 'PURCHASE', description: 'Оприходован по накладной INV-101 ($980)', user: 'Далер', storeName: 'Магазин №1 (Рудаки)' },
-      { id: 't-4', date: '21.08 16:45', type: 'SALE', description: 'Продан покупателю Алишер Р. за 10 800 TJS ($1136.84)', user: 'Фарход', storeName: 'Магазин №1 (Рудаки)' }
+      { id: 't-3', date: '15.08 10:00', type: 'PURCHASE', description: 'Оприходован по накладной INV-101 ($980)', user: 'Далер', storeName: 'Сиёма' },
+      { id: 't-4', date: '21.08 16:45', type: 'SALE', description: 'Продан покупателю Алишер Р. за 10 800 TJS ($1136.84)', user: 'Фарход', storeName: 'Сиёма' }
     ]
   },
   {
@@ -242,14 +235,14 @@ export const INITIAL_DEVICES: Device[] = [
     barcode: '194253776655',
     status: 'IN_STOCK_AFTER_EXCHANGE',
     locationId: 'store-1',
-    locationName: 'Магазин №1 (Рудаки)',
+    locationName: 'Сиёма',
     supplierId: 'sup-1',
     supplierName: 'Trade-In Клиент',
     purchaseCostUsd: 473.68,
     costBasisUsd: 473.68,
     createdAt: '2026-08-21T16:45:00Z',
     timeline: [
-      { id: 't-6', date: '21.08 16:45', type: 'EXCHANGE_IN', description: 'Принят по обмену (Trade-In). Оценка: 4 500 TJS ($473.68)', user: 'Фарход', storeName: 'Магазин №1 (Рудаки)' }
+      { id: 't-6', date: '21.08 16:45', type: 'EXCHANGE_IN', description: 'Принят по обмену (Trade-In). Оценка: 4 500 TJS ($473.68)', user: 'Фарход', storeName: 'Сиёма' }
     ]
   },
 
@@ -265,7 +258,7 @@ export const INITIAL_DEVICES: Device[] = [
     barcode: '880609123456',
     status: 'SOLD',
     locationId: 'store-2',
-    locationName: 'Магазин №2 (Сомони)',
+    locationName: 'Сиёма',
     supplierId: 'sup-2',
     supplierName: 'Samsung Global Asia',
     invoiceNumber: 'INV-102',
@@ -273,8 +266,8 @@ export const INITIAL_DEVICES: Device[] = [
     costBasisUsd: 1100,
     createdAt: '2026-08-18T11:30:00Z',
     timeline: [
-      { id: 't-7', date: '18.08 11:30', type: 'PURCHASE', description: 'Оприходован в Магазин №2 по накладной INV-102 ($1100)', user: 'Далер', storeName: 'Магазин №2 (Сомони)' },
-      { id: 't-8', date: '22.08 12:15', type: 'SALE', description: 'Продан за 11 900 TJS ($1252.63) по карте', user: 'Ахмад', storeName: 'Магазин №2 (Сомони)' }
+      { id: 't-7', date: '18.08 11:30', type: 'PURCHASE', description: 'Оприходован в Магазин №2 по накладной INV-102 ($1100)', user: 'Далер', storeName: 'Сиёма' },
+      { id: 't-8', date: '22.08 12:15', type: 'SALE', description: 'Продан за 11 900 TJS ($1252.63) по карте', user: 'Ахмад', storeName: 'Сиёма' }
     ]
   },
   {
@@ -287,7 +280,7 @@ export const INITIAL_DEVICES: Device[] = [
     barcode: '880609123457',
     status: 'STORE_STOCK',
     locationId: 'store-2',
-    locationName: 'Магазин №2 (Сомони)',
+    locationName: 'Сиёма',
     supplierId: 'sup-2',
     supplierName: 'Samsung Global Asia',
     invoiceNumber: 'INV-102',
@@ -296,7 +289,7 @@ export const INITIAL_DEVICES: Device[] = [
     createdAt: '2026-08-18T11:30:00Z',
     timeline: [
       { id: 't-9', date: '18.08 11:30', type: 'PURCHASE', description: 'Оприходован на главный склад по накладной INV-102 ($850)', user: 'Далер', storeName: 'Главный склад' },
-      { id: 't-10', date: '19.08 15:10', type: 'TRANSFER', description: 'Перемещен в Магазин №2 (Сомони)', user: 'Далер', storeName: 'Магазин №2 (Сомони)' }
+      { id: 't-10', date: '19.08 15:10', type: 'TRANSFER', description: 'Перемещен в Сиёма', user: 'Далер', storeName: 'Сиёма' }
     ]
   },
   {
@@ -309,7 +302,7 @@ export const INITIAL_DEVICES: Device[] = [
     barcode: '880609123458',
     status: 'STORE_STOCK',
     locationId: 'store-1',
-    locationName: 'Магазин №1 (Рудаки)',
+    locationName: 'Сиёма',
     supplierId: 'sup-2',
     supplierName: 'Samsung Global Asia',
     invoiceNumber: 'INV-102',
@@ -317,7 +310,7 @@ export const INITIAL_DEVICES: Device[] = [
     costBasisUsd: 380,
     createdAt: '2026-08-18T11:30:00Z',
     timeline: [
-      { id: 't-11', date: '18.08 11:30', type: 'PURCHASE', description: 'Оприходован по накладной INV-102 ($380)', user: 'Далер', storeName: 'Магазин №1 (Рудаки)' }
+      { id: 't-11', date: '18.08 11:30', type: 'PURCHASE', description: 'Оприходован по накладной INV-102 ($380)', user: 'Далер', storeName: 'Сиёма' }
     ]
   },
 
@@ -354,7 +347,7 @@ export const INITIAL_DEVICES: Device[] = [
     barcode: '690123456782',
     status: 'SOLD',
     locationId: 'store-2',
-    locationName: 'Магазин №2 (Сомони)',
+    locationName: 'Сиёма',
     supplierId: 'sup-3',
     supplierName: 'Xiaomi Tech Logistics',
     invoiceNumber: 'INV-103',
@@ -362,8 +355,8 @@ export const INITIAL_DEVICES: Device[] = [
     costBasisUsd: 320,
     createdAt: '2026-08-20T14:00:00Z',
     timeline: [
-      { id: 't-13', date: '20.08 14:00', type: 'PURCHASE', description: 'Оприходован в Магазин №2 по накладной INV-103 ($320)', user: 'Далер', storeName: 'Магазин №2 (Сомони)' },
-      { id: 't-14', date: '23.08 11:00', type: 'SALE', description: 'Продан за 3 700 TJS ($389.47)', user: 'Ахмад', storeName: 'Магазин №2 (Сомони)' }
+      { id: 't-13', date: '20.08 14:00', type: 'PURCHASE', description: 'Оприходован в Магазин №2 по накладной INV-103 ($320)', user: 'Далер', storeName: 'Сиёма' },
+      { id: 't-14', date: '23.08 11:00', type: 'SALE', description: 'Продан за 3 700 TJS ($389.47)', user: 'Ахмад', storeName: 'Сиёма' }
     ]
   },
   {
@@ -396,7 +389,7 @@ export const INITIAL_SALES: Sale[] = [
     receiptNumber: 1001,
     date: '2026-08-21T16:45:00Z',
     storeId: 'store-1',
-    storeName: 'Магазин №1 (Рудаки)',
+    storeName: 'Сиёма',
     sellerId: 'user-farhod',
     sellerName: 'Фарход',
     customerName: 'Алишер Рахимов',
@@ -426,7 +419,7 @@ export const INITIAL_SALES: Sale[] = [
     receiptNumber: 1002,
     date: '2026-08-22T12:15:00Z',
     storeId: 'store-2',
-    storeName: 'Магазин №2 (Сомони)',
+    storeName: 'Сиёма',
     sellerId: 'user-ahmad',
     sellerName: 'Ахмад',
     customerName: 'Зафар Каримов',
@@ -456,7 +449,7 @@ export const INITIAL_SALES: Sale[] = [
     receiptNumber: 1003,
     date: '2026-08-23T11:00:00Z',
     storeId: 'store-2',
-    storeName: 'Магазин №2 (Сомони)',
+    storeName: 'Сиёма',
     sellerId: 'user-ahmad',
     sellerName: 'Ахмад',
     customerName: 'Фаридун Саидов',
@@ -490,7 +483,7 @@ export const INITIAL_TRANSFERS: TransferRequest[] = [
     fromLocationId: 'main-warehouse',
     fromLocationName: 'Главный склад',
     toLocationId: 'store-1',
-    toLocationName: 'Магазин №1 (Рудаки)',
+    toLocationName: 'Сиёма',
     deviceIds: ['dev-apple-1'],
     deviceImeis: ['358901209876543'],
     deviceModels: ['Apple iPhone 16 Pro Max (512 GB / Natural Titanium)'],
@@ -506,7 +499,7 @@ export const INITIAL_TRANSFERS: TransferRequest[] = [
     fromLocationId: 'main-warehouse',
     fromLocationName: 'Главный склад',
     toLocationId: 'store-2',
-    toLocationName: 'Магазин №2 (Сомони)',
+    toLocationName: 'Сиёма',
     deviceIds: ['dev-samsung-2'],
     deviceImeis: ['354890123456783'],
     deviceModels: ['Samsung Galaxy S24+ (256 GB / Onyx Black)'],
@@ -529,7 +522,7 @@ export const INITIAL_REPAIRS: RepairTicket[] = [
     storage: '128 GB',
     color: 'Deep Purple',
     storeId: 'store-1',
-    storeName: 'Магазин №1 (Рудаки)',
+    storeName: 'Сиёма',
     intakeSeller: 'Фарход',
     customerName: 'Рустам Назаров',
     customerPhone: '+992 90 999 1122',
@@ -558,7 +551,7 @@ export const INITIAL_REPAIRS: RepairTicket[] = [
     storage: '256 GB',
     color: 'Phantom Black',
     storeId: 'store-2',
-    storeName: 'Магазин №2 (Сомони)',
+    storeName: 'Сиёма',
     intakeSeller: 'Ахмад',
     customerName: 'Бахром Шамсиев',
     customerPhone: '+992 91 777 3344',
@@ -618,7 +611,7 @@ export const INITIAL_EXPENSES: Expense[] = [
     category: 'RENT',
     amountTjs: 2500,
     storeId: 'store-1',
-    storeName: 'Магазин №1 (Рудаки)',
+    storeName: 'Сиёма',
     createdByName: 'Далер',
     description: 'Аренда помещения за август (Магазин №1)',
     paidFromCashRegister: true,
@@ -629,7 +622,7 @@ export const INITIAL_EXPENSES: Expense[] = [
     category: 'UTILITIES',
     amountTjs: 600,
     storeId: 'store-2',
-    storeName: 'Магазин №2 (Сомони)',
+    storeName: 'Сиёма',
     createdByName: 'Далер',
     description: 'Оплата электроэнергии и интернета (Магазин №2)',
     paidFromCashRegister: true,
@@ -640,7 +633,7 @@ export const INITIAL_EXPENSES: Expense[] = [
     category: 'REPAIR_PARTS',
     amountTjs: 650,
     storeId: 'store-1',
-    storeName: 'Магазин №1 (Рудаки)',
+    storeName: 'Сиёма',
     createdByName: 'Далер',
     description: 'Затраты на дисплейный модуль по квитанции ремонта #201',
     paidFromCashRegister: true,
