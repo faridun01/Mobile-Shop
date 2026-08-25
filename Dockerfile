@@ -20,6 +20,9 @@ RUN npx prisma generate
 # Build Vite Production Bundle
 RUN npm run build
 
+# Strip devDependencies now that the bundle and Prisma Client are generated
+RUN npm prune --omit=dev
+
 # ==========================================
 # STAGE 2: Production Lightweight Runner
 # ==========================================
@@ -34,13 +37,17 @@ ENV PORT=3000
 RUN addgroup -g 1001 -S nodejs && \
     adduser -S nodejs -u 1001
 
-# Copy build artifacts and dependencies from builder stage
+# Copy build artifacts and production-only dependencies from builder stage
 COPY --from=builder /app/package*.json ./
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/prisma ./prisma
 COPY --from=builder /app/server ./server
 COPY --from=builder /app/docker-entrypoint.sh ./docker-entrypoint.sh
+
+# Remove the bundled npm CLI (and its vendored deps) - unused at runtime,
+# since the entrypoint invokes prisma/tsx binaries directly
+RUN rm -rf /usr/local/lib/node_modules/npm /usr/local/bin/npm /usr/local/bin/npx /usr/local/bin/corepack
 
 # Expose Web Application Port
 EXPOSE 3000

@@ -2,7 +2,7 @@
 set -e
 
 echo "Applying Prisma migrations..."
-npx prisma migrate deploy
+./node_modules/.bin/prisma migrate deploy
 
 echo "Starting Application..."
-exec npm run server
+exec ./node_modules/.bin/tsx server/src/index.ts
