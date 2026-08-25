@@ -1,6 +1,11 @@
 {
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
+  "functions": {
+    "api/index.ts": {
+      "includeFiles": "node_modules/.prisma/client/**"
+    }
+  },
   "rewrites": [
     {
       "source": "/api/(.*)",

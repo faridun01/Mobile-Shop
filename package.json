@@ -8,7 +8,8 @@
   },
   "scripts": {
     "dev": "vite --port=3000 --host=0.0.0.0",
-    "build": "vite build",
+    "build": "npx prisma generate && vite build",
+    "postinstall": "prisma generate",
     "preview": "vite preview --port=3000 --host=0.0.0.0",
     "clean": "rm -rf dist server.js",
     "lint": "tsc --noEmit",
