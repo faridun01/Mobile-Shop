@@ -47,12 +47,32 @@ export const TransferPage: React.FC = () => {
       setActiveTab('list');
     }
   }, [location.state]);
-  const [fromLocationId, setFromLocationId] = useState<string>(
-    currentUser?.role === 'SELLER' ? (currentUser.storeId || 'store-1') : 'main-warehouse'
-  );
-  const [toLocationId, setToLocationId] = useState<string>(
-    currentUser?.role === 'SELLER' ? 'main-warehouse' : 'store-1'
-  );
+  const defaultNonWarehouseId = useMemo(() => {
+    return stores.find(s => !s.isMainWarehouse)?.id || stores[0]?.id || 'main-warehouse';
+  }, [stores]);
+
+  const [fromLocationId, setFromLocationId] = useState<string>(() => {
+    return currentUser?.role === 'SELLER' ? (currentUser.storeId || defaultNonWarehouseId) : 'main-warehouse';
+  });
+  const [toLocationId, setToLocationId] = useState<string>(() => {
+    return currentUser?.role === 'SELLER' ? 'main-warehouse' : defaultNonWarehouseId;
+  });
+
+  useEffect(() => {
+    if (stores.length > 0) {
+      const validFrom = stores.some(s => s.id === fromLocationId)
+        ? fromLocationId
+        : (currentUser?.role === 'SELLER' ? (currentUser.storeId || defaultNonWarehouseId) : 'main-warehouse');
+      if (validFrom !== fromLocationId) {
+        setFromLocationId(validFrom);
+      }
+
+      const availableTargets = stores.filter(s => s.id !== validFrom);
+      if (availableTargets.length > 0 && (!toLocationId || !availableTargets.some(s => s.id === toLocationId))) {
+        setToLocationId(availableTargets[0].id);
+      }
+    }
+  }, [stores, currentUser, fromLocationId, toLocationId, defaultNonWarehouseId]);
   const [selectedDeviceIds, setSelectedDeviceIds] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [isScannerOpen, setIsScannerOpen] = useState(false);

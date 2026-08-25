@@ -21,6 +21,15 @@ export class TransfersService {
 
     return prisma.$transaction(async (tx) => {
       const actor = await resolveActor(tx, input.requestedByUserId);
+      const fromStore = await tx.store.findUnique({ where: { id: input.fromStoreId } });
+      const toStore = await tx.store.findUnique({ where: { id: input.toStoreId } });
+      if (!fromStore || !toStore) {
+        throw new Error('Магазин отправления или назначения не найден в базе данных');
+      }
+      if (input.fromStoreId === input.toStoreId) {
+        throw new Error('Магазин отправления и назначения не могут совпадать');
+      }
+
       const sourceStatus = statusForStore(input.fromStoreId);
       const devices = await tx.device.findMany({
         where: { id: { in: input.deviceIds }, storeId: input.fromStoreId, status: sourceStatus },

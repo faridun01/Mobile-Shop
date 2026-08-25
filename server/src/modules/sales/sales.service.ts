@@ -43,11 +43,14 @@ export class SalesService {
     return prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       const deviceIds = input.items.map((i) => i.deviceId);
       const devices = await tx.device.findMany({
-        where: { id: { in: deviceIds }, storeId: input.storeId, status: { in: ['STORE_STOCK', 'IN_STOCK_AFTER_EXCHANGE'] } },
+        where: {
+          id: { in: deviceIds },
+          status: { in: ['MAIN_WAREHOUSE', 'STORE_STOCK', 'IN_STOCK_AFTER_EXCHANGE'] },
+        },
       });
 
       if (devices.length !== deviceIds.length) {
-        throw new Error('One or more selected devices are no longer in stock or invalid for this store.');
+        throw new Error('Одно или несколько выбранных устройств недоступны для продажи (уже продано, в ремонте или перемещается)');
       }
       const deviceById = new Map(devices.map((d) => [d.id, d]));
 

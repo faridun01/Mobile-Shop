@@ -16,7 +16,8 @@ import {
   X,
   ShoppingCart,
   Store as StoreIcon,
-  Plus
+  Plus,
+  Flame
 } from 'lucide-react';
 import { formatDeviceIdentifiers, formatTjs, formatUsd } from '../../utils/formatters';
 
@@ -57,16 +58,19 @@ export const SalePage: React.FC = () => {
   // Success receipt modal state
   const [completedReceiptNumber, setCompletedReceiptNumber] = useState<number | null>(null);
 
-  // Retail stores only (exclude main warehouse from selling points)
-  const retailStores = useMemo(() => stores.filter(s => !s.isMainWarehouse), [stores]);
+  const isAdmin = currentUser?.role === 'ADMIN' || currentUser?.role === 'PARTNER';
+
+  // Selectable stores (Admin/Partner can sell from any store or main warehouse)
+  const selectableStores = useMemo(() => {
+    return isAdmin ? stores : stores.filter(s => !s.isMainWarehouse);
+  }, [stores, isAdmin]);
 
   // Determine active selling store
-  const isAdmin = currentUser?.role === 'ADMIN' || currentUser?.role === 'PARTNER';
   const effectiveStoreId = currentUser?.role === 'SELLER'
     ? currentUser.storeId
-    : (retailStores.some(s => s.id === selectedStoreId)
+    : (selectableStores.some(s => s.id === selectedStoreId)
         ? selectedStoreId
-        : (retailStores[0]?.id || ''));
+        : (selectableStores[0]?.id || stores[0]?.id || ''));
 
   const activeStoreName = stores.find(s => s.id === effectiveStoreId)?.name || 'Магазин';
 
@@ -141,13 +145,19 @@ export const SalePage: React.FC = () => {
   }, [availableDevices]);
 
   const handleSelectVariant = (variant: typeof groupedVariants[0]) => {
-    if (variant.devices.length === 1) {
-      addDeviceToCart(variant.devices[0]);
+    const sortedDevices = [...variant.devices].sort((a, b) => {
+      const costA = a.purchaseCostUsd ?? a.costBasisUsd ?? 0;
+      const costB = b.purchaseCostUsd ?? b.costBasisUsd ?? 0;
+      return costB - costA;
+    });
+
+    if (sortedDevices.length === 1) {
+      addDeviceToCart(sortedDevices[0]);
     } else {
       setActiveImeiSelector({
         variantKey: variant.variantKey,
         variantName: `${variant.brand} ${variant.model} (${variant.storage} / ${variant.color})`,
-        devices: variant.devices
+        devices: sortedDevices
       });
     }
   };
@@ -270,7 +280,7 @@ export const SalePage: React.FC = () => {
               onChange={(e) => setSelectedStoreId(e.target.value)}
               className="bg-[#0B0E14] border border-slate-700 text-emerald-400 font-bold px-2 py-0.5 rounded focus:outline-none focus:border-emerald-500 text-xs"
             >
-              {retailStores.map(s => (
+              {selectableStores.map(s => (
                 <option key={s.id} value={s.id}>{s.name}</option>
               ))}
             </select>
@@ -350,36 +360,56 @@ export const SalePage: React.FC = () => {
             )}
           </div>
         ) : (
-          groupedVariants.map((variant) => (
-            <button
-              key={variant.variantKey}
-              onClick={() => handleSelectVariant(variant)}
-              className="w-full text-left px-3.5 py-3 hover:bg-slate-800/30 active:bg-slate-800/50 flex items-center justify-between transition-colors group"
-            >
-              <div className="min-w-0 pr-3">
-                <p className="text-xs sm:text-sm font-bold text-slate-100 group-hover:text-emerald-400 transition-colors truncate">
-                  {variant.brand} {variant.model}
-                </p>
-                <p className="text-[11px] text-slate-400 font-mono mt-0.5">
-                  {variant.storage} • {variant.color}
-                  {variant.devices[0]?.barcode && (
-                    <span className="text-amber-400 font-semibold ml-2">
-                      • EAN: {variant.devices[0].barcode}
-                    </span>
-                  )}
-                </p>
-              </div>
+          groupedVariants.map((variant) => {
+            const costs = variant.devices.map(d => d.purchaseCostUsd ?? d.costBasisUsd ?? 0);
+            const maxCost = Math.max(...costs);
+            const minCost = Math.min(...costs);
+            const hasCostVariance = maxCost > minCost;
 
-              <div className="text-right shrink-0 flex items-center space-x-2">
-                <span className="text-[11px] font-mono font-bold px-2 py-0.5 rounded-lg bg-slate-900 border border-slate-800 text-emerald-400">
-                  {variant.devices.length} шт.
-                </span>
-                <span className="p-1.5 rounded-lg bg-emerald-500/20 text-emerald-400 group-hover:bg-emerald-400 group-hover:text-white transition-colors">
-                  <Plus className="w-4 h-4" />
-                </span>
-              </div>
-            </button>
-          ))
+            return (
+              <button
+                key={variant.variantKey}
+                onClick={() => handleSelectVariant(variant)}
+                className="w-full text-left px-3.5 py-3 hover:bg-slate-800/30 active:bg-slate-800/50 flex items-center justify-between transition-colors group"
+              >
+                <div className="min-w-0 pr-3">
+                  <div className="flex items-center space-x-2 flex-wrap">
+                    <p className="text-xs sm:text-sm font-bold text-slate-100 group-hover:text-emerald-400 transition-colors truncate">
+                      {variant.brand} {variant.model}
+                    </p>
+                    {hasCostVariance && (
+                      <span className="text-[10px] px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40 font-bold flex items-center space-x-1">
+                        <Flame className="w-3 h-3 text-amber-400 animate-pulse" />
+                        <span>Разные партии: $${minCost}—$${maxCost}</span>
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-[11px] text-slate-400 font-mono mt-0.5">
+                    {variant.storage} • {variant.color}
+                    {variant.devices[0]?.barcode && (
+                      <span className="text-amber-400 font-semibold ml-2">
+                        • EAN: {variant.devices[0].barcode}
+                      </span>
+                    )}
+                  </p>
+                  {hasCostVariance && (
+                    <p className="text-[10px] text-amber-400 font-bold mt-0.5">
+                      🔥 Рекомендуется первым продать экземпляр за ${maxCost}
+                    </p>
+                  )}
+                </div>
+
+                <div className="text-right shrink-0 flex items-center space-x-2">
+                  <span className="text-[11px] font-mono font-bold px-2 py-0.5 rounded-lg bg-slate-900 border border-slate-800 text-emerald-400">
+                    {variant.devices.length} шт.
+                  </span>
+                  <span className="p-1.5 rounded-lg bg-emerald-500/20 text-emerald-400 group-hover:bg-emerald-400 group-hover:text-white transition-colors">
+                    <Plus className="w-4 h-4" />
+                  </span>
+                </div>
+              </button>
+            );
+          })
         )}
       </div>
 
@@ -423,46 +453,79 @@ export const SalePage: React.FC = () => {
 
       {/* MODAL: IMEI Selector for Multi-unit variants */}
       {activeImeiSelector && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-xs p-4 font-mono">
-          <div className="w-full max-w-md rounded-xl bg-[#0F1219] border border-slate-800 p-4 sm:p-5 shadow-2xl">
-            <div className="flex items-center justify-between mb-3 border-b border-slate-800 pb-2.5">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-xs p-4 font-mono">
+          <div className="w-full max-w-md rounded-xl bg-zinc-900 border border-zinc-800 p-4 sm:p-5 shadow-2xl text-zinc-100">
+            <div className="flex items-center justify-between mb-3 border-b border-zinc-800 pb-2.5">
               <div>
-                <h3 className="text-xs font-bold uppercase text-slate-100 flex items-center space-x-2">
+                <h3 className="text-xs font-bold uppercase text-white flex items-center space-x-2">
                   <Smartphone className="w-4 h-4 text-emerald-400" />
-                  <span>ВЫБЕРИТЕ IMEIУСТРОЙСТВА</span>
+                  <span>ВЫБЕРИТЕ IMEI УСТРОЙСТВА</span>
                 </h3>
-                <p className="text-[11px] text-slate-400 mt-0.5">{activeImeiSelector.variantName}</p>
+                <p className="text-[11px] text-zinc-400 mt-0.5">{activeImeiSelector.variantName}</p>
               </div>
               <button
                 onClick={() => setActiveImeiSelector(null)}
-                className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition-colors"
+                className="p-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-white transition-colors"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
-            <div className="space-y-2 max-h-72 overflow-y-auto">
-              {activeImeiSelector.devices.map((dev) => (
-                <button
-                  key={dev.id}
-                  onClick={() => addDeviceToCart(dev)}
-                  className="w-full p-2.5 text-left rounded-lg bg-[#0B0E14] hover:bg-emerald-500/10 border border-slate-800 hover:border-emerald-500/40 flex items-center justify-between group transition-colors"
-                >
-                  <div className="min-w-0 pr-2">
-                    <p className="text-xs font-bold text-slate-100 group-hover:text-emerald-400 transition-colors font-mono">
-                      IMEI 1: <span className="text-slate-200">{dev.imei}</span>
-                      {dev.imei2 ? <span> • IMEI 2: <span className="text-slate-200">{dev.imei2}</span></span> : null}
-                      <span className="text-amber-400 font-bold block mt-0.5">EAN / Баркод: {dev.barcode || '—'}</span>
-                    </p>
-                    {dev.serialNumber && (
-                      <p className="text-[10px] text-slate-400 mt-0.5">S/N: {dev.serialNumber}</p>
-                    )}
-                  </div>
-                  <span className="text-[10px] font-bold px-3 py-1 rounded bg-emerald-500 hover:bg-emerald-400 text-slate-950 uppercase shrink-0 transition-colors">
-                    ВЫБРАТЬ
-                  </span>
-                </button>
-              ))}
+            <div className="space-y-2.5 max-h-80 overflow-y-auto pr-1">
+              {(() => {
+                const sortedByCost = [...activeImeiSelector.devices].sort((a, b) => {
+                  const costA = a.purchaseCostUsd ?? a.costBasisUsd ?? 0;
+                  const costB = b.purchaseCostUsd ?? b.costBasisUsd ?? 0;
+                  return costB - costA;
+                });
+                const maxCost = Math.max(...sortedByCost.map(d => d.purchaseCostUsd ?? d.costBasisUsd ?? 0));
+                const minCost = Math.min(...sortedByCost.map(d => d.purchaseCostUsd ?? d.costBasisUsd ?? 0));
+                const hasCostVariance = maxCost > minCost;
+
+                return sortedByCost.map((dev) => {
+                  const devCost = dev.purchaseCostUsd ?? dev.costBasisUsd ?? 0;
+                  const isHighestCost = devCost === maxCost && maxCost > 0;
+
+                  return (
+                    <button
+                      key={dev.id}
+                      onClick={() => addDeviceToCart(dev)}
+                      className={`w-full p-3 text-left rounded-xl flex items-center justify-between group transition-all ${
+                        isHighestCost
+                          ? 'bg-amber-950/60 hover:bg-amber-950/80 border-2 border-amber-500 shadow-md shadow-amber-500/10'
+                          : 'bg-zinc-950 hover:bg-zinc-900 border border-zinc-800 hover:border-zinc-700'
+                      }`}
+                    >
+                      <div className="min-w-0 pr-2">
+                        {isHighestCost && (
+                          <div className="inline-flex items-center space-x-1.5 px-2.5 py-1 rounded-md bg-amber-500 text-zinc-950 text-[10px] font-extrabold mb-2 uppercase tracking-wider shadow">
+                            <Flame className="w-3.5 h-3.5 text-zinc-950 fill-zinc-950 animate-pulse" />
+                            <span>🔥 РЕКОМЕНДУЕТСЯ К ПРОДАЖЕ {hasCostVariance ? `(Дорогая закупка: $${devCost})` : `(Закупка: $${devCost})`}</span>
+                          </div>
+                        )}
+                        <p className="text-xs font-bold text-white font-mono">
+                          IMEI 1: <span className="text-zinc-200">{dev.imei}</span>
+                          {dev.imei2 ? <span> • IMEI 2: <span className="text-zinc-200">{dev.imei2}</span></span> : null}
+                        </p>
+                        <p className="text-amber-400 font-bold text-[11px] font-mono mt-1">
+                          EAN / Баркод: {dev.barcode || '—'}
+                        </p>
+                        <div className="flex items-center space-x-3 text-[10px] text-zinc-400 mt-1 font-mono">
+                          {dev.serialNumber && <span>S/N: {dev.serialNumber}</span>}
+                          <span>Закупка: <strong className={isHighestCost ? "text-amber-300 font-bold text-xs" : "text-zinc-300"}>${devCost}</strong></span>
+                        </div>
+                      </div>
+                      <span className={`text-[10px] font-extrabold px-3 py-1.5 rounded-lg uppercase shrink-0 transition-colors ${
+                        isHighestCost
+                          ? 'bg-amber-500 hover:bg-amber-400 text-zinc-950 shadow-md'
+                          : 'bg-emerald-500 hover:bg-emerald-400 text-zinc-950'
+                      }`}>
+                        {isHighestCost ? '⭐ ВЫБРАТЬ' : 'ВЫБРАТЬ'}
+                      </span>
+                    </button>
+                  );
+                });
+              })()}
             </div>
           </div>
         </div>
@@ -641,18 +704,48 @@ export const SalePage: React.FC = () => {
                       <span className="text-[10px] text-slate-400 block mb-0.5">НАЛИЧНЫЕ:</span>
                       <input
                         type="number"
+                        min="0"
+                        max={totalTjs}
                         value={cashAmountInput ?? ''}
-                        onChange={(e) => setCashAmountInput(e.target.value)}
-                        className="w-full rounded bg-[#0F1219] border border-slate-700 px-2 py-1 text-slate-100 focus:border-emerald-500 focus:outline-none"
+                        onChange={(e) => {
+                          const valStr = e.target.value;
+                          const raw = parseFloat(valStr);
+                          if (!isNaN(raw)) {
+                            const clamped = Math.min(totalTjs, Math.max(0, raw));
+                            const finalStr = raw > totalTjs ? totalTjs.toString() : valStr;
+                            setCashAmountInput(finalStr);
+                            const rem = Math.max(0, totalTjs - clamped);
+                            setCardAmountInput(Number(rem.toFixed(2)).toString());
+                          } else {
+                            setCashAmountInput(valStr);
+                            setCardAmountInput(totalTjs.toString());
+                          }
+                        }}
+                        className="w-full rounded bg-[#0F1219] border border-slate-700 px-2 py-1 text-slate-100 font-bold focus:border-emerald-500 focus:outline-none"
                       />
                     </div>
                     <div>
                       <span className="text-[10px] text-slate-400 block mb-0.5">КАРТА:</span>
                       <input
                         type="number"
+                        min="0"
+                        max={totalTjs}
                         value={cardAmountInput ?? ''}
-                        onChange={(e) => setCardAmountInput(e.target.value)}
-                        className="w-full rounded bg-[#0F1219] border border-slate-700 px-2 py-1 text-slate-100 focus:border-emerald-500 focus:outline-none"
+                        onChange={(e) => {
+                          const valStr = e.target.value;
+                          const raw = parseFloat(valStr);
+                          if (!isNaN(raw)) {
+                            const clamped = Math.min(totalTjs, Math.max(0, raw));
+                            const finalStr = raw > totalTjs ? totalTjs.toString() : valStr;
+                            setCardAmountInput(finalStr);
+                            const rem = Math.max(0, totalTjs - clamped);
+                            setCashAmountInput(Number(rem.toFixed(2)).toString());
+                          } else {
+                            setCardAmountInput(valStr);
+                            setCashAmountInput(totalTjs.toString());
+                          }
+                        }}
+                        className="w-full rounded bg-[#0F1219] border border-slate-700 px-2 py-1 text-slate-100 font-bold focus:border-emerald-500 focus:outline-none"
                       />
                     </div>
                   </div>
