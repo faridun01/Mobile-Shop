@@ -367,6 +367,7 @@ export const SuppliersPage: React.FC = () => {
               <div className="flex-1 overflow-y-auto divide-y divide-zinc-800/80 bg-zinc-950">
                 {supplierInvoices
                   .filter(inv => inv.supplierId === selectedSupplier.id)
+                  .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
                   .map((inv) => {
                     const isPaid = inv.status === 'PAID';
                     const isPartial = inv.status === 'PARTIALLY_PAID';
@@ -510,6 +511,7 @@ export const SuppliersPage: React.FC = () => {
           <div className="flex-1 overflow-y-auto divide-y divide-zinc-800/80 bg-zinc-950 p-1">
             {supplierInvoices
               .filter(inv => inv.supplierId === selectedSupplier.id)
+              .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
               .map((inv) => {
                 const isPaid = inv.status === 'PAID';
                 const isPartial = inv.status === 'PARTIALLY_PAID';

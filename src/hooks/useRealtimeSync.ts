@@ -8,8 +8,16 @@ export function useRealtimeSync(token: string | null, onEvent: (type: string, pa
   useEffect(() => {
     if (!token) return;
 
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsUrl = `${protocol}//${window.location.host}/ws?token=${encodeURIComponent(token)}`;
+    let wsUrl = '';
+    const customWsUrl = import.meta.env.VITE_WS_URL;
+
+    if (customWsUrl) {
+      const separator = customWsUrl.includes('?') ? '&' : '?';
+      wsUrl = `${customWsUrl}${separator}token=${encodeURIComponent(token)}`;
+    } else {
+      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      wsUrl = `${protocol}//${window.location.host}/ws?token=${encodeURIComponent(token)}`;
+    }
 
     let socket: WebSocket | null = null;
     try {

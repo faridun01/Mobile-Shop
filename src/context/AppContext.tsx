@@ -394,7 +394,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const fetchInvoices = useCallback(async () => {
     const raw = await apiClient<any[]>('/supplier-invoices');
-    setInvoices(raw.map(mapSupplierInvoice));
+    setInvoices(raw.map(mapSupplierInvoice).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
   }, []);
 
   const fetchBonuses = useCallback(async () => {

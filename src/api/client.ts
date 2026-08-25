@@ -1,6 +1,6 @@
 import { useAuthStore } from '../stores/useAuthStore';
 
-const API_BASE_URL = '/api';
+const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
 
 export async function apiClient<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
   const token = useAuthStore.getState().token;
@@ -11,7 +11,12 @@ export async function apiClient<T>(endpoint: string, options: RequestInit = {}):
     ...options.headers,
   };
 
-  const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+  const cleanEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
+  const url = API_BASE_URL.startsWith('http')
+    ? `${API_BASE_URL.replace(/\/$/, '')}${cleanEndpoint}`
+    : `${API_BASE_URL}${cleanEndpoint}`;
+
+  const response = await fetch(url, {
     ...options,
     headers,
   });
