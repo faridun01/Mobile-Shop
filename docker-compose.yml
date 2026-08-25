@@ -38,14 +38,13 @@ services:
     networks:
       - mobile_shop_net
 
-  # Nginx Reverse Proxy Container (Rate Limiting, SSL, Compression)
+  # Nginx Reverse Proxy Container (Rate Limiting and Compression)
   nginx:
     image: nginx:alpine
     container_name: mobile_shop_nginx
     restart: always
     ports:
       - "${HTTP_PORT:-8081}:80"
-      - "${HTTPS_PORT:-8443}:443"
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
     depends_on:

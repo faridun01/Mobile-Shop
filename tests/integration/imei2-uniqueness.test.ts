@@ -19,6 +19,15 @@ import { prisma } from '../../server/src/prisma/prisma.service';
  */
 
 const createdDeviceIds: string[] = [];
+const databaseConfigured = Boolean(process.env.DATABASE_URL?.trim());
+
+if (!databaseConfigured) {
+  // eslint-disable-next-line no-console
+  console.warn(
+    '[imei2-uniqueness.test.ts] Skipping: DATABASE_URL is not configured. ' +
+      'Configure a migrated and seeded Postgres database to run this suite.',
+  );
+}
 
 async function makeDevice(imei: string, imei2: string | null) {
   const store = await prisma.store.findFirst();
@@ -36,7 +45,7 @@ afterAll(async () => {
   }
 });
 
-describe('Device.imei2 database-level uniqueness', () => {
+describe.runIf(databaseConfigured)('Device.imei2 database-level uniqueness', () => {
   it('rejects a second device with a duplicate non-null imei2 at the DB layer', async () => {
     const sharedImei2 = `DBTEST-IMEI2-${Date.now()}`;
     await makeDevice(`DBTEST-A-${Date.now()}`, sharedImei2);

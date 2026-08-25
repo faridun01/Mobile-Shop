@@ -1,7 +1,7 @@
 # ==========================================
 # STAGE 1: Build Frontend and Server
 # ==========================================
-FROM node:20-alpine AS builder
+FROM node:22-alpine AS builder
 
 WORKDIR /app
 
@@ -9,7 +9,7 @@ WORKDIR /app
 COPY package*.json ./
 COPY prisma ./prisma/
 
-RUN npm install
+RUN npm ci
 
 # Copy full application source code
 COPY . .
@@ -23,7 +23,7 @@ RUN npm run build
 # ==========================================
 # STAGE 2: Production Lightweight Runner
 # ==========================================
-FROM node:20-alpine AS runner
+FROM node:22-alpine AS runner
 
 WORKDIR /app
 
