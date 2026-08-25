@@ -173,9 +173,11 @@ export const LoginPage: React.FC = () => {
                     className="p-2 rounded-lg bg-[#0B0E14] hover:bg-slate-800 border border-slate-800 text-slate-200 hover:text-emerald-400 text-left text-[11px] transition-all min-w-0 flex flex-col justify-between"
                   >
                     <span className="font-bold text-slate-100 uppercase block truncate">{u.name}</span>
-                    <span className="text-slate-500 text-[9px] block truncate mt-0.5">
-                      {u.role === 'ADMIN' ? 'Администратор' : u.role === 'PARTNER' ? 'Партнер' : (u.storeName || 'Продавец')}
-                    </span>
+                    {u.role === 'ADMIN' && (
+                      <span className="text-slate-500 text-[9px] block truncate mt-0.5">
+                        Администратор
+                      </span>
+                    )}
                   </button>
                 ))}
               </div>

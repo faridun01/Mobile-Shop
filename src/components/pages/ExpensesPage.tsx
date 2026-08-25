@@ -615,7 +615,7 @@ export const ExpensesPage: React.FC = () => {
                     <option value="">-- ВЫБЕРИТЕ СОТРУДНИКА --</option>
                     {users.filter(u => u.isActive ?? u.active).map(u => (
                       <option key={u.id} value={u.id}>
-                        {u.name} ({u.role === 'SELLER' ? (u.storeName || 'Продавец') : u.role})
+                        {u.name} {u.role === 'ADMIN' ? '(Администратор)' : ''}
                       </option>
                     ))}
                   </select>

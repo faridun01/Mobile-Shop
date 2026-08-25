@@ -176,9 +176,11 @@ export const Sidebar: React.FC = () => {
           </div>
           <div className="min-w-0 flex-1">
             <p className="text-xs font-bold text-slate-200 truncate">{currentUser?.name || 'Пользователь'}</p>
-            <p className="text-[9px] text-slate-500 font-mono uppercase truncate">
-              {currentUser?.role === 'ADMIN' ? 'Администратор' : currentUser?.role === 'PARTNER' ? 'Партнер' : (currentUser?.storeName || 'Продавец')}
-            </p>
+            {currentUser?.role === 'ADMIN' && (
+              <p className="text-[9px] text-slate-500 font-mono uppercase truncate">
+                Администратор
+              </p>
+            )}
           </div>
         </div>
       </div>
