@@ -10,8 +10,6 @@ interface DailyRateModalProps {
   onClose?: () => void;
 }
 
-const PRESET_RATES = [9.40, 9.50, 9.55, 9.60, 9.70];
-
 export const DailyRateModal: React.FC<DailyRateModalProps> = ({ isOpen, onClose }) => {
   const { todayRate, setDailyRate } = useApp();
   const todayStr = new Date().toISOString().split('T')[0];
@@ -85,29 +83,6 @@ export const DailyRateModal: React.FC<DailyRateModalProps> = ({ isOpen, onClose 
             <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs font-bold text-fg-subtle uppercase">TJS</span>
           </div>
         </FormField>
-
-        <div>
-          <span className="text-xs font-medium text-fg-muted block mb-1.5">Быстрый выбор:</span>
-          <div className="grid grid-cols-5 gap-1.5">
-            {PRESET_RATES.map((preset) => (
-              <button
-                key={preset}
-                type="button"
-                onClick={() => {
-                  setRateInput(preset.toString());
-                  setError(null);
-                }}
-                className={`h-9 text-xs font-semibold rounded-lg border transition-colors ${
-                  rateInput === preset.toString()
-                    ? 'bg-accent text-accent-fg border-accent'
-                    : 'bg-surface text-fg-muted border-border hover:text-fg'
-                }`}
-              >
-                {preset.toFixed(2)}
-              </button>
-            ))}
-          </div>
-        </div>
       </div>
     </Dialog>
   );
