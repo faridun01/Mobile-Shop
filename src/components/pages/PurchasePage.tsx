@@ -533,8 +533,8 @@ export const PurchasePage: React.FC = () => {
         )}
 
         {/* Search & Filters Bar */}
-        <div className="p-3 border-b border-border bg-bg space-y-2.5 shrink-0">
-          <div className="flex space-x-2">
+        <div className="p-3 border-b border-border bg-bg space-y-3 shrink-0">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-2.5 w-4 h-4 text-fg-subtle" />
               <input
@@ -542,12 +542,12 @@ export const PurchasePage: React.FC = () => {
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Поиск: № накладной / поставщик / IMEI / модель..."
-                className="w-full rounded-xl bg-surface border border-border pl-9 pr-9 py-2 text-xs text-fg placeholder-fg-subtle focus:border-accent focus:outline-none transition-colors"
+                className="w-full rounded-xl bg-surface border border-border pl-9 pr-8 py-2 text-xs text-fg placeholder-fg-subtle focus:border-accent focus:outline-none transition-colors"
               />
               {searchQuery && (
                 <button
                   onClick={() => setSearchQuery('')}
-                  className="absolute right-2.5 top-2 text-slate-500 hover:text-slate-300"
+                  className="absolute right-2.5 top-2.5 text-fg-subtle hover:text-fg"
                 >
                   <X className="w-3.5 h-3.5" />
                 </button>
@@ -556,27 +556,27 @@ export const PurchasePage: React.FC = () => {
 
             <button
               onClick={handleScanFinder}
-              className="flex items-center space-x-1.5 px-3 py-1.5 rounded bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 text-xs font-mono transition-colors shrink-0"
+              className="flex items-center space-x-1.5 px-3.5 py-2 rounded-xl bg-surface-raised hover:bg-surface border border-border text-accent text-xs font-bold transition-colors shrink-0"
               title="Сканировать IMEI или номер накладной"
             >
-              <Scan className="w-3.5 h-3.5 text-emerald-400" />
-              <span className="hidden sm:inline">СКАНЕР</span>
+              <Scan className="w-4 h-4" />
+              <span className="hidden sm:inline">СКАНИРОВАТЬ</span>
             </button>
           </div>
 
           {/* Period selector & Supplier Filter */}
-          <div className="flex flex-wrap items-center justify-between gap-2 text-xs font-mono">
+          <div className="flex flex-wrap items-center justify-between gap-2.5 text-xs">
             <div className="flex items-center space-x-1.5 overflow-x-auto">
               <button
                 type="button"
                 onClick={() => setPeriodFilter('TODAY')}
-                className={`px-3 py-1 rounded-md border text-xs font-mono font-bold uppercase tracking-wider transition-colors bg-transparent ${
+                className={`px-3 py-1.5 rounded-xl border text-xs font-bold uppercase transition-colors ${
                   periodFilter === 'TODAY'
-                    ? 'border-[#22c55e] text-[#22c55e]'
-                    : 'border-slate-800 text-slate-400 hover:border-slate-700 hover:text-slate-200'
+                    ? 'border-accent bg-accent/10 text-accent'
+                    : 'border-border bg-surface text-fg-muted hover:text-fg'
                 }`}
               >
-                СЕГОДНЯ
+                Сегодня
               </button>
 
               <input
@@ -589,10 +589,10 @@ export const PurchasePage: React.FC = () => {
                   }
                 }}
                 onClick={() => setPeriodFilter('SPECIFIC_MONTH')}
-                className={`px-3 py-1 rounded-md border text-xs font-mono font-bold transition-colors bg-[#0B0E14] focus:outline-none cursor-pointer ${
+                className={`px-3 py-1.5 rounded-xl border text-xs font-semibold transition-colors bg-surface focus:outline-none cursor-pointer ${
                   periodFilter === 'SPECIFIC_MONTH'
-                    ? 'border-[#22c55e] text-[#22c55e]'
-                    : 'border-slate-800 text-slate-400 hover:border-slate-700 hover:text-slate-200'
+                    ? 'border-accent text-accent font-bold'
+                    : 'border-border text-fg-muted hover:border-fg-subtle'
                 }`}
                 title="Выберите месяц"
               />
@@ -600,23 +600,23 @@ export const PurchasePage: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setPeriodFilter('ALL')}
-                className={`px-3 py-1 rounded-md border text-xs font-mono font-bold uppercase tracking-wider transition-colors bg-transparent ${
+                className={`px-3 py-1.5 rounded-xl border text-xs font-bold uppercase transition-colors ${
                   periodFilter === 'ALL'
-                    ? 'border-[#22c55e] text-[#22c55e]'
-                    : 'border-slate-800 text-slate-400 hover:border-slate-700 hover:text-slate-200'
+                    ? 'border-accent bg-accent/10 text-accent'
+                    : 'border-border bg-surface text-fg-muted hover:text-fg'
                 }`}
               >
-                ВСЕ ПРИХОДЫ
+                Все приходы
               </button>
             </div>
 
             {/* Supplier selector filter */}
-            <div className="flex items-center space-x-1.5">
-              <span className="text-slate-400 text-[11px]">Поставщик:</span>
+            <div className="flex items-center space-x-2">
+              <span className="text-fg-subtle text-xs font-medium">Поставщик:</span>
               <select
                 value={selectedSupplierFilter}
                 onChange={(e) => setSelectedSupplierFilter(e.target.value)}
-                className="bg-slate-900 border border-slate-800 text-slate-200 text-xs rounded px-2.5 py-1 focus:outline-none focus:border-emerald-500"
+                className="bg-surface border border-border text-fg text-xs font-semibold rounded-xl px-3 py-1.5 focus:outline-none focus:border-accent"
               >
                 <option value="all">Все поставщики</option>
                 {suppliers.map(s => (

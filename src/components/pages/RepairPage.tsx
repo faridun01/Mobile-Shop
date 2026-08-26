@@ -7,7 +7,8 @@ import {
   Search,
   AlertCircle,
   PackageCheck,
-  X
+  X,
+  FileText
 } from 'lucide-react';
 import { StatusBanner, StatusMessage } from '../ui/StatusBanner';
 
@@ -251,66 +252,76 @@ export const RepairPage: React.FC = () => {
     <div className="flex-1 flex flex-col h-full overflow-hidden bg-bg text-fg">
       <StatusBanner message={statusBanner} onDismiss={() => setStatusBanner(null)} />
 
-      {/* Header Tabs & Filters */}
-      <div className="p-3 border-b border-border bg-bg flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 shrink-0">
-        <div className="flex space-x-2">
+      {/* Row 1: Header Tabs Bar */}
+      <div className="p-3 border-b border-border bg-surface flex items-center justify-between shrink-0">
+        <div className="flex items-center space-x-1.5 bg-surface-raised p-1 rounded-xl border border-border">
           <button
             onClick={() => setActiveTab('list')}
-            className={`px-3.5 py-1.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-colors ${
+            className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all ${
               activeTab === 'list'
-                ? 'bg-accent/15 text-accent border border-accent/40'
-                : 'bg-surface text-fg-muted hover:text-fg border border-border'
+                ? 'bg-accent text-accent-fg shadow-xs'
+                : 'text-fg-muted hover:text-fg'
             }`}
           >
-            ЖУРНАЛ РЕМОНТОВ ({filteredRepairs.length})
+            Журнал ремонтов ({filteredRepairs.length})
           </button>
           <button
             onClick={() => setActiveTab('create')}
-            className={`px-3.5 py-1.5 rounded-xl text-xs font-bold uppercase tracking-wider flex items-center space-x-1.5 transition-colors ${
+            className={`px-3.5 py-1.5 rounded-lg text-xs font-bold flex items-center space-x-1.5 transition-all ${
               activeTab === 'create'
-                ? 'bg-accent/15 text-accent border border-accent/40'
-                : 'bg-surface text-fg-muted hover:text-fg border border-border'
+                ? 'bg-accent text-accent-fg shadow-xs'
+                : 'text-fg-muted hover:text-fg'
             }`}
           >
-            <Plus className="w-4 h-4" />
-            <span>ПРИЕМ В РЕМОНТ</span>
+            <Plus className="w-3.5 h-3.5" />
+            <span>Прием в ремонт</span>
           </button>
         </div>
 
-        {activeTab === 'list' && (
-          <div className="flex flex-wrap items-center gap-2 text-xs">
-            <input
-              type="month"
-              value={selectedMonth === 'ALL' ? new Date().toISOString().substring(0, 7) : selectedMonth}
-              onChange={(e) => e.target.value && setSelectedMonth(e.target.value)}
-              className={`px-3 py-1.5 rounded-xl border text-xs font-semibold transition-colors bg-surface focus:outline-none cursor-pointer ${
-                selectedMonth !== 'ALL'
-                  ? 'border-accent text-accent'
-                  : 'border-border text-fg-muted hover:border-fg-subtle'
-              }`}
-              title="Динамический выбор месяца"
-            />
-            <button
-              type="button"
-              onClick={() => setSelectedMonth('ALL')}
-              className={`px-3 py-1.5 rounded-xl border text-xs font-bold uppercase tracking-wider transition-colors ${
-                selectedMonth === 'ALL'
-                  ? 'border-accent bg-accent/10 text-accent'
-                  : 'border-border bg-surface text-fg-muted hover:text-fg'
-              }`}
-            >
-              ВСЕ МЕСЯЦЫ
-            </button>
+        <div className="hidden sm:flex items-center space-x-2 text-xs font-medium text-fg-muted">
+          <Wrench className="w-4 h-4 text-accent" />
+          <span>{currentStoreName}</span>
+        </div>
+      </div>
 
-            <div className="relative">
-              <Search className="absolute left-3 top-2.5 w-3.5 h-3.5 text-fg-subtle" />
+      {/* Row 2: Dedicated Filter & Search Bar */}
+      {activeTab === 'list' && (
+        <div className="p-3 border-b border-border bg-bg flex flex-col md:flex-row md:items-center justify-between gap-2.5 shrink-0">
+          <div className="relative w-full md:w-80 lg:w-96">
+            <Search className="absolute left-3 top-2.5 w-4 h-4 text-fg-subtle" />
+            <input
+              type="text"
+              value={searchQuery ?? ''}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Квитанция / ФИО / IMEI..."
+              className="w-full rounded-xl bg-surface border border-border pl-9 pr-3 py-2 text-xs text-fg placeholder-fg-subtle focus:border-accent focus:outline-none transition-colors"
+            />
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2 text-xs">
+            <div className="flex items-center space-x-1.5">
               <input
-                type="text"
-                value={searchQuery ?? ''}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Квитанция / ФИО / IMEI..."
-                className="rounded-xl bg-surface border border-border pl-9 pr-3 py-1.5 text-xs text-fg placeholder-fg-subtle focus:border-accent focus:outline-none transition-colors"
+                type="month"
+                value={selectedMonth === 'ALL' ? new Date().toISOString().substring(0, 7) : selectedMonth}
+                onChange={(e) => e.target.value && setSelectedMonth(e.target.value)}
+                className={`px-3 py-1.5 rounded-xl border text-xs font-medium transition-colors bg-surface focus:outline-none cursor-pointer ${
+                  selectedMonth !== 'ALL'
+                    ? 'border-accent text-accent font-bold'
+                    : 'border-border text-fg-muted hover:border-fg-subtle'
+                }`}
+                title="Динамический выбор месяца"
               />
+              <button
+                type="button"
+                onClick={() => setSelectedMonth('ALL')}
+                className={`px-3 py-1.5 rounded-xl border text-xs font-bold uppercase transition-colors ${
+                  selectedMonth === 'ALL'
+                    ? 'border-accent bg-accent/10 text-accent'
+                    : 'border-border bg-surface text-fg-muted hover:text-fg'
+                }`}
+              >
+                Все месяцы
+              </button>
             </div>
 
             <select
@@ -318,16 +329,16 @@ export const RepairPage: React.FC = () => {
               onChange={(e) => setStatusFilter(e.target.value)}
               className="bg-surface border border-border text-fg text-xs font-semibold rounded-xl px-3 py-1.5 focus:outline-none focus:border-accent"
             >
-              <option value="ALL">ВСЕ РЕМОНТЫ ЗА МЕСЯЦ</option>
-              <option value="ACTIVE">АКТИВНЫЕ РЕМОНТЫ</option>
-              <option value="ISSUED">ОТРЕМОНТИРОВАННЫЕ И ВЫДАННЫЕ</option>
-              <option value="ACCEPTED">ПРИНЯТ</option>
-              <option value="IN_PROGRESS">В РАБОТЕ</option>
-              <option value="READY">ГОТОВ К ВЫДАЧЕ</option>
+              <option value="ALL">Все ремонты за месяц</option>
+              <option value="ACTIVE">Активные ремонты</option>
+              <option value="ISSUED">Отремонтированные и выданные</option>
+              <option value="ACCEPTED">Принят</option>
+              <option value="IN_PROGRESS">В работе</option>
+              <option value="READY">Готов к выдаче</option>
             </select>
           </div>
-        )}
-      </div>
+        </div>
+      )}
 
       {/* Main Content Area */}
       <div className="flex-1 overflow-y-auto bg-bg p-3 sm:p-4">
@@ -504,14 +515,14 @@ export const RepairPage: React.FC = () => {
         ) : (
           <div className="space-y-3">
             {/* Summary Bar */}
-            <div className="p-3 bg-surface border border-border rounded-xl flex flex-wrap items-center justify-between gap-2 text-xs">
-              <div className="text-fg-muted">
-                ПЕРИОД: <strong className="text-accent uppercase">{selectedMonth === 'ALL' ? 'Все время' : selectedMonth}</strong>
+            <div className="p-3.5 bg-surface border border-border rounded-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs">
+              <div className="text-fg-muted font-medium">
+                ПЕРИОД: <strong className="text-accent uppercase font-bold">{selectedMonth === 'ALL' ? 'Все время' : selectedMonth}</strong>
               </div>
-              <div className="flex items-center space-x-4 text-xs">
-                <span>Всего ремонтов: <strong className="text-fg">{totalRepairsCount}</strong></span>
-                <span>Отремонтировано / Готово: <strong className="text-accent">{readyRepairsCount}</strong></span>
-                <span>Затраты (Расходы): <strong className="text-accent">{totalExpensesTjs.toLocaleString()} TJS</strong></span>
+              <div className="flex flex-wrap items-center gap-x-5 gap-y-1.5 text-xs">
+                <span>Всего ремонтов: <strong className="text-fg font-bold">{totalRepairsCount}</strong></span>
+                <span>Отремонтировано / Готово: <strong className="text-accent font-bold">{readyRepairsCount}</strong></span>
+                <span>Затраты (Расходы): <strong className="text-accent font-bold">{totalExpensesTjs.toLocaleString()} TJS</strong></span>
               </div>
             </div>
 
