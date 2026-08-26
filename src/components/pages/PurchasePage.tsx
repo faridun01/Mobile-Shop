@@ -537,18 +537,6 @@ export const PurchasePage: React.FC = () => {
           {/* Period selector & Supplier Filter */}
           <div className="flex flex-wrap items-center justify-between gap-2.5 text-xs">
             <div className="flex items-center space-x-1.5 overflow-x-auto">
-              <button
-                type="button"
-                onClick={() => setPeriodFilter('TODAY')}
-                className={`px-3 py-1.5 rounded-xl border text-xs font-bold uppercase transition-colors ${
-                  periodFilter === 'TODAY'
-                    ? 'border-accent bg-accent/10 text-accent'
-                    : 'border-border bg-surface text-fg-muted hover:text-fg'
-                }`}
-              >
-                Сегодня
-              </button>
-
               <input
                 type="month"
                 value={selectedMonth}
