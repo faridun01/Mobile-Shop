@@ -39,7 +39,15 @@ export const SalesHistoryPage: React.FC = () => {
   // Defaults to "today" — this is a same-shift lookup tool far more often than a monthly report.
   const [periodFilter, setPeriodFilter] = useState<'TODAY' | 'MONTH' | 'SPECIFIC_MONTH' | 'ALL'>('TODAY');
   const [selectedMonth, setSelectedMonth] = useState<string>(new Date().toISOString().substring(0, 7));
-  const [selectedStoreId, setSelectedStoreId] = useState<string>('ALL');
+
+  const retailStores = useMemo(() => stores.filter((s) => !s.isMainWarehouse && s.id !== 'store-main'), [stores]);
+
+  const [selectedStoreId, setSelectedStoreId] = useState<string>(() => {
+    if (currentUser?.storeId && currentUser.storeId !== 'store-main') {
+      return currentUser.storeId;
+    }
+    return retailStores[0]?.id || '';
+  });
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedSaleId, setSelectedSaleId] = useState<string | null>(null);
   const [dialogView, setDialogView] = useState<DialogView>('details');
@@ -50,13 +58,16 @@ export const SalesHistoryPage: React.FC = () => {
   const [refundMethod, setRefundMethod] = useState<'CASH' | 'CARD'>('CASH');
   const [status, setStatus] = useState<StatusMessage | null>(null);
 
+  const activeStoreId = selectedStoreId || retailStores[0]?.id || '';
+
   const filteredSales = useMemo(() => {
     const todayStr = new Date().toISOString().split('T')[0];
     const currentMonthStr = todayStr.substring(0, 7);
 
     return sales.filter((sale) => {
       if (currentUser?.role === 'SELLER' && sale.sellerId !== currentUser.id) return false;
-      if (selectedStoreId !== 'ALL' && sale.storeId !== selectedStoreId) return false;
+      if (sale.storeId === 'store-main') return false;
+      if (activeStoreId && sale.storeId !== activeStoreId) return false;
 
       const saleDateStr = sale.date.split('T')[0];
       if (periodFilter === 'TODAY' && saleDateStr !== todayStr) return false;
@@ -198,10 +209,9 @@ export const SalesHistoryPage: React.FC = () => {
               title="Выбрать конкретный месяц"
             />
 
-            {currentUser?.role !== 'SELLER' && (
-              <Select value={selectedStoreId} onChange={(e) => setSelectedStoreId(e.target.value)} className="h-9 py-0 w-auto">
-                <option value="ALL">Все магазины</option>
-                {stores.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+            {currentUser?.role !== 'SELLER' && retailStores.length > 0 && (
+              <Select value={activeStoreId} onChange={(e) => setSelectedStoreId(e.target.value)} className="h-9 py-0 w-auto">
+                {retailStores.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
               </Select>
             )}
           </div>
