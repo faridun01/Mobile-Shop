@@ -299,10 +299,6 @@ export const ExpensesPage: React.FC = () => {
               Расходы
             </h1>
           </div>
-          <div className="flex items-center gap-2 shrink-0">
-
-            <Button variant="danger" leftIcon={Plus} onClick={() => setIsModalOpen(true)}>Добавить</Button>
-          </div>
         </div>
 
         <div className="px-3 pb-3">
@@ -312,14 +308,17 @@ export const ExpensesPage: React.FC = () => {
                 <TrendingDown className="w-4 h-4" />
               </div>
               <div className="min-w-0">
-                <span className="text-xs text-fg-subtle block">Итого за период</span>
+                <span className="text-xs text-fg-subtle block">Итого за период ({filteredExpenses.length} запис.)</span>
                 <div className="flex items-baseline gap-1.5">
                   <span className="text-lg font-bold text-danger">-{totalExpensesTjs.toLocaleString()} TJS</span>
                   <span className="text-xs text-fg-subtle">≈ -${totalExpensesUsd.toLocaleString()}</span>
                 </div>
               </div>
             </div>
-            <span className="text-xs text-fg-subtle shrink-0">{filteredExpenses.length} запис.</span>
+
+            <Button variant="danger" leftIcon={Plus} onClick={() => setIsModalOpen(true)} className="shrink-0">
+              Добавить
+            </Button>
           </div>
         </div>
 
