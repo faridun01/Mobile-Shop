@@ -4,17 +4,14 @@ import {
   ShieldCheck,
   Search,
   Calendar,
-  Filter,
   X,
-  Clock,
-  User,
-  Activity,
-  CheckCircle2,
-  AlertTriangle,
-  FileText
+  ArrowUpDown,
+  ArrowDown,
+  ArrowUp
 } from 'lucide-react';
 
 type DateFilterMode = 'TODAY' | 'SPECIFIC' | 'ALL';
+type SortOrderMode = 'DESC' | 'ASC';
 
 const FILTER_CATEGORIES = [
   { id: 'ALL', label: 'Все категории' },
@@ -28,6 +25,25 @@ const FILTER_CATEGORIES = [
   { id: 'SYSTEM', label: 'Системные' },
 ];
 
+export const getLogCategory = (log: { action?: string; details?: string; category?: string }): string => {
+  if (log.category && log.category !== 'SYSTEM' && log.category !== 'OTHER') {
+    return log.category.toUpperCase();
+  }
+  const action = (log.action || '').toUpperCase();
+  const details = (log.details || '').toUpperCase();
+  const text = `${action} ${details}`;
+
+  if (text.includes('SALE') || text.includes('SELL') || text.includes('ПРОДАЖ') || text.includes('ПРОДАН')) return 'SALE';
+  if (text.includes('REFUND') || text.includes('RETURN') || text.includes('ВОЗВРАТ')) return 'REFUND';
+  if (text.includes('EXCHANGE') || text.includes('TRADE_IN') || text.includes('ОБМЕН') || text.includes('ТРЕЙД')) return 'EXCHANGE';
+  if (text.includes('PURCHASE') || text.includes('SUPPLIER') || text.includes('RECEIPT') || text.includes('ПРИХОД') || text.includes('ЗАКУПК')) return 'PURCHASE';
+  if (text.includes('TRANSFER') || text.includes('TRANSIT') || text.includes('ПЕРЕМЕЩЕН') || text.includes('ТРАНЗИТ')) return 'TRANSFER';
+  if (text.includes('REPAIR') || text.includes('РЕМОНТ')) return 'REPAIR';
+  if (text.includes('LOGIN') || text.includes('LOGOUT') || text.includes('AUTH') || text.includes('ВХОД') || text.includes('ВЫХОД') || text.includes('ПАРОЛЬ') || text.includes('USER_CREATE')) return 'AUTH';
+
+  return 'SYSTEM';
+};
+
 export const AuditLogPage: React.FC = () => {
   const { auditLogs } = useApp();
 
@@ -38,6 +54,7 @@ export const AuditLogPage: React.FC = () => {
 
   const [activeCategoryFilter, setActiveCategoryFilter] = useState<string>('ALL');
   const [searchQuery, setSearchQuery] = useState<string>('');
+  const [sortOrder, setSortOrder] = useState<SortOrderMode>('DESC');
 
   const filteredLogs = useMemo(() => {
     return auditLogs.filter((log) => {
@@ -50,7 +67,8 @@ export const AuditLogPage: React.FC = () => {
       }
 
       if (activeCategoryFilter !== 'ALL') {
-        if ((log as any).category !== activeCategoryFilter) return false;
+        const category = getLogCategory(log);
+        if (category !== activeCategoryFilter) return false;
       }
 
       if (searchQuery.trim()) {
@@ -65,8 +83,12 @@ export const AuditLogPage: React.FC = () => {
       }
 
       return true;
-    }).sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
-  }, [auditLogs, dateFilterMode, selectedDate, todayStr, activeCategoryFilter, searchQuery]);
+    }).sort((a, b) => {
+      const timeA = new Date(a.timestamp).getTime();
+      const timeB = new Date(b.timestamp).getTime();
+      return sortOrder === 'DESC' ? timeB - timeA : timeA - timeB;
+    });
+  }, [auditLogs, dateFilterMode, selectedDate, todayStr, activeCategoryFilter, searchQuery, sortOrder]);
 
   const getActionBadgeColor = (category: string) => {
     switch (category) {
@@ -89,18 +111,28 @@ export const AuditLogPage: React.FC = () => {
     }
   };
 
+  const getCategoryLabel = (category: string) => {
+    switch (category) {
+      case 'SALE': return 'ПРОДАЖА';
+      case 'REFUND': return 'ВОЗВРАТ';
+      case 'EXCHANGE': return 'ОБМЕН';
+      case 'PURCHASE': return 'ПРИХОД';
+      case 'TRANSFER': return 'ПЕРЕМЕЩЕНИЕ';
+      case 'REPAIR': return 'РЕМОНТ';
+      case 'AUTH': return 'АВТОРИЗАЦИЯ';
+      default: return 'СИСТЕМНОЕ';
+    }
+  };
+
   return (
     <div className="flex-1 flex flex-col h-full overflow-hidden bg-bg text-fg">
       {/* Header Bar */}
-      <div className="p-3.5 border-b border-border bg-surface flex flex-col md:flex-row md:items-center justify-between gap-3 shrink-0">
+      <div className="p-3.5 border-b border-border bg-surface flex items-center justify-between gap-3 shrink-0">
         <div>
           <h3 className="text-xs sm:text-sm font-bold text-fg flex items-center space-x-2 uppercase tracking-wide">
             <ShieldCheck className="w-4 h-4 text-accent" />
             <span>НЕИЗМЕНЯЕМЫЙ ЖУРНАЛ АУДИТА И БЕЗОПАСНОСТИ</span>
           </h3>
-          <p className="text-xs text-fg-muted mt-0.5">
-            Сквозная фиксация всех торговых операций, списываний, перемещений и прав доступа
-          </p>
         </div>
 
         <div className="flex items-center space-x-2">
@@ -110,11 +142,11 @@ export const AuditLogPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Row 2: Date Selector & Category Filter Bar */}
+      {/* Row 2: Date Selector, Sorting & Search Bar */}
       <div className="p-3 border-b border-border bg-bg space-y-3 shrink-0">
         <div className="flex flex-wrap items-center justify-between gap-2.5">
-          {/* Left: Date Selector */}
-          <div className="flex items-center space-x-2 text-xs">
+          {/* Left: Date Selector & Sort Toggle */}
+          <div className="flex flex-wrap items-center gap-2 text-xs">
             <span className="text-xs text-fg-subtle font-semibold uppercase">ПЕРИОД:</span>
 
             <button
@@ -158,6 +190,17 @@ export const AuditLogPage: React.FC = () => {
             >
               <span>За все время</span>
             </button>
+
+            {/* Sort Toggle Button */}
+            <button
+              type="button"
+              onClick={() => setSortOrder(prev => prev === 'DESC' ? 'ASC' : 'DESC')}
+              className="px-3 py-1.5 rounded-xl border border-border bg-surface hover:bg-surface-raised text-fg text-xs font-bold uppercase flex items-center space-x-1.5 transition-all ml-1"
+              title="Переключить порядок сортировки по дате"
+            >
+              {sortOrder === 'DESC' ? <ArrowDown className="w-3.5 h-3.5 text-accent" /> : <ArrowUp className="w-3.5 h-3.5 text-accent" />}
+              <span>{sortOrder === 'DESC' ? 'Сначала новые' : 'Сначала старые'}</span>
+            </button>
           </div>
 
           {/* Right: Search */}
@@ -188,9 +231,9 @@ export const AuditLogPage: React.FC = () => {
               key={cat.id}
               type="button"
               onClick={() => setActiveCategoryFilter(cat.id)}
-              className={`px-3 py-1 rounded-lg text-xs font-semibold whitespace-nowrap transition-colors ${
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold uppercase whitespace-nowrap transition-all ${
                 activeCategoryFilter === cat.id
-                  ? 'bg-accent text-accent-fg font-bold shadow-xs'
+                  ? 'bg-accent text-accent-fg shadow-xs scale-105'
                   : 'bg-surface hover:bg-surface-raised text-fg-muted border border-border'
               }`}
             >
@@ -203,13 +246,15 @@ export const AuditLogPage: React.FC = () => {
       {/* Main Table / Event List */}
       <div className="flex-1 overflow-y-auto bg-bg p-3 sm:p-4">
         {filteredLogs.length === 0 ? (
-          <div className="p-12 text-center text-fg-muted text-xs uppercase tracking-wider">
+          <div className="p-12 text-center text-fg-muted text-xs uppercase tracking-wider font-semibold">
             События аудита за выбранный период не найдены
           </div>
         ) : (
           <div className="space-y-2">
             {filteredLogs.map((log) => {
-              const badgeStyle = getActionBadgeColor((log as any).category || 'SYSTEM');
+              const catKey = getLogCategory(log);
+              const badgeStyle = getActionBadgeColor(catKey);
+              const catLabel = getCategoryLabel(catKey);
 
               return (
                 <div
@@ -217,8 +262,8 @@ export const AuditLogPage: React.FC = () => {
                   className="p-3.5 rounded-xl bg-surface border border-border flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 text-xs hover:border-fg-subtle transition-colors"
                 >
                   <div className="flex items-start space-x-3 min-w-0 flex-1">
-                    <span className={`px-2 py-0.5 rounded-md font-bold uppercase text-[10px] border shrink-0 mt-0.5 ${badgeStyle}`}>
-                      {(log as any).category || 'SYSTEM'}
+                    <span className={`px-2.5 py-1 rounded-lg font-bold uppercase text-[10px] border shrink-0 mt-0.5 tracking-wider ${badgeStyle}`}>
+                      {catLabel}
                     </span>
 
                     <div className="min-w-0 flex-1">
@@ -231,11 +276,11 @@ export const AuditLogPage: React.FC = () => {
 
                   <div className="flex items-center justify-between sm:justify-end space-x-4 text-xs shrink-0 border-t sm:border-t-0 border-border pt-2 sm:pt-0">
                     <div className="text-left sm:text-right">
-                      <span className="font-semibold text-fg block">{log.userName || 'Система'}</span>
-                      <span className="text-[10px] text-fg-subtle block">{log.userRole || 'SYSTEM'}</span>
+                      <span className="font-bold text-fg block">{log.userName || 'Система'}</span>
+                      <span className="text-[10px] text-fg-subtle uppercase block">{log.userRole || 'SYSTEM'}</span>
                     </div>
 
-                    <div className="text-right text-fg-subtle text-[11px]">
+                    <div className="text-right text-fg-subtle text-[11px] font-medium">
                       {new Date(log.timestamp).toLocaleString()}
                     </div>
                   </div>
