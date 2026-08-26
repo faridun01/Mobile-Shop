@@ -292,15 +292,6 @@ export const ExpensesPage: React.FC = () => {
       <StatusBanner message={status} onDismiss={() => setStatus(null)} />
 
       <div className="border-b border-border bg-bg shrink-0">
-        <div className="p-3 flex items-center justify-between gap-2">
-          <div className="min-w-0">
-            <h1 className="text-sm font-semibold text-fg flex items-center gap-2">
-              <Receipt className="w-4 h-4 text-danger" />
-              Расходы
-            </h1>
-          </div>
-        </div>
-
         <div className="px-3 pb-3">
           <div className="p-3 rounded-lg bg-surface border border-border flex items-center justify-between gap-3">
             <div className="flex items-center gap-3 min-w-0">

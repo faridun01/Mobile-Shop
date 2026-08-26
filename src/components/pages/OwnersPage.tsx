@@ -24,6 +24,8 @@ export const OwnersPage: React.FC = () => {
     currentUser,
     owners,
     users,
+    sales,
+    expenses,
     ownerTransactions,
     todayRate,
     createOwnerTransaction,
@@ -272,8 +274,33 @@ export const OwnersPage: React.FC = () => {
     }).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
   }, [ownerTransactions, typeFilter, selectedOwnerFilter, searchQuery]);
 
+  const businessNetProfitUsd = useMemo(() => {
+    let revenueUsd = 0;
+    let cogsUsd = 0;
+    (sales || []).forEach(s => {
+      if (s.status !== 'REFUNDED') {
+        revenueUsd += s.totalUsd || (s.totalTjs / rate);
+        (s.items || []).forEach(i => {
+          cogsUsd += (i as any).purchasePriceUsd || 0;
+        });
+      }
+    });
+    let expensesUsd = 0;
+    (expenses || []).forEach(e => {
+      expensesUsd += (e.amountTjs || 0) / rate;
+    });
+    const net = revenueUsd - cogsUsd - expensesUsd;
+    return Math.max(0, net);
+  }, [sales, expenses, rate]);
+
   const totalCapitalInvested = owners.reduce((acc, o) => acc + (o.capitalBalanceUsd ?? 0), 0);
-  const totalAccruedProfit = owners.reduce((acc, o) => acc + (o.totalAccruedProfitUsd ?? 0), 0);
+  const totalAccruedProfit = owners.reduce((acc, o) => {
+    const sharePct = o.profitSharePercent ?? 50;
+    const profit = o.totalAccruedProfitUsd && o.totalAccruedProfitUsd > 0
+      ? o.totalAccruedProfitUsd
+      : Math.round(businessNetProfitUsd * (sharePct / 100));
+    return acc + profit;
+  }, 0);
   const totalPayouts = owners.reduce((acc, o) => acc + (o.totalPaidProfitUsd ?? 0), 0);
   const totalAvailableProfit = owners.reduce((acc, o) => acc + (o.availableProfitUsd ?? 0), 0);
 
@@ -283,10 +310,9 @@ export const OwnersPage: React.FC = () => {
 
       {/* Row 1: Top Header Bar */}
       <div className="p-3 sm:p-3.5 border-b border-border bg-surface flex flex-wrap items-center justify-between gap-2 shrink-0">
-        <h3 className="text-xs sm:text-sm font-bold text-fg flex items-center space-x-2 uppercase tracking-wide shrink-0">
+        <div className="flex items-center space-x-2">
           <PieChart className="w-4 h-4 text-accent" />
-          <span>ПАРТНЕРЫ И КАПИТАЛ БИЗНЕСА</span>
-        </h3>
+        </div>
 
         <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none py-0.5 shrink-0">
           <button
@@ -469,20 +495,31 @@ export const OwnersPage: React.FC = () => {
                     </div>
 
                     {/* Profit Breakdown Grid */}
-                    <div className="grid grid-cols-2 gap-2 text-xs">
-                      <div className="p-2.5 rounded-xl bg-surface border border-border">
-                        <span className="text-fg-subtle block text-[10px] uppercase">Начислено прибыли</span>
-                        <span className="text-fg font-bold text-xs mt-0.5 block">
-                          ${(owner.totalAccruedProfitUsd ?? 0).toLocaleString()}
-                        </span>
-                      </div>
-                      <div className="p-2.5 rounded-xl bg-surface border border-border">
-                        <span className="text-fg-subtle block text-[10px] uppercase">Выплачено дивидендов</span>
-                        <span className="text-accent font-bold text-xs mt-0.5 block">
-                          ${(owner.totalPaidProfitUsd ?? 0).toLocaleString()}
-                        </span>
-                      </div>
-                    </div>
+                    {(() => {
+                      const sharePct = owner.profitSharePercent ?? 50;
+                      const ownerProfitUsd = owner.totalAccruedProfitUsd && owner.totalAccruedProfitUsd > 0
+                        ? owner.totalAccruedProfitUsd
+                        : Math.round(businessNetProfitUsd * (sharePct / 100));
+                      return (
+                        <div className="grid grid-cols-2 gap-2 text-xs">
+                          <div className="p-2.5 rounded-xl bg-surface border border-border">
+                            <span className="text-fg-subtle block text-[10px] uppercase">Чистая прибыль ({sharePct}%)</span>
+                            <span className="text-emerald-400 font-bold text-xs mt-0.5 block">
+                              ${ownerProfitUsd.toLocaleString()} USD
+                            </span>
+                            <span className="text-[10px] text-fg-muted block">
+                              ≈ {(Math.round(ownerProfitUsd * rate)).toLocaleString()} TJS
+                            </span>
+                          </div>
+                          <div className="p-2.5 rounded-xl bg-surface border border-border">
+                            <span className="text-fg-subtle block text-[10px] uppercase">Выплачено дивидендов</span>
+                            <span className="text-accent font-bold text-xs mt-0.5 block">
+                              ${(owner.totalPaidProfitUsd ?? 0).toLocaleString()} USD
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })()}
                   </div>
 
                   {/* Available for Payout Banner */}
