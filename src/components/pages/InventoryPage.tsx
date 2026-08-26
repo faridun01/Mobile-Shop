@@ -171,22 +171,11 @@ export const InventoryPage: React.FC = () => {
           </Select>
         </div>
 
-        {/* Row 3: Brands, Grouping & Found count */}
+        {/* Row 3: Brands & Found count */}
         <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none py-0.5 shrink-0">
           <Select value={selectedBrand} onChange={(e) => setSelectedBrand(e.target.value)} className="h-8 py-0 px-2 text-[11px] w-auto shrink-0">
             {brands.map(b => <option key={b.value} value={b.value}>{b.label}</option>)}
           </Select>
-
-          <button
-            type="button"
-            onClick={() => setGroupByModel(v => !v)}
-            className={`h-8 px-2.5 rounded-lg border text-[11px] font-semibold flex items-center gap-1 shrink-0 whitespace-nowrap transition-colors ${
-              groupByModel ? 'border-accent bg-accent/10 text-accent' : 'border-border bg-surface-raised text-fg-muted hover:text-fg'
-            }`}
-          >
-            {groupByModel ? <Layers className="w-3.5 h-3.5" /> : <List className="w-3.5 h-3.5" />}
-            <span>Группировать</span>
-          </button>
 
           <span className="text-[11px] text-fg-subtle ml-auto shrink-0 whitespace-nowrap pl-2">
             Найдено: <strong className="text-accent font-bold">{filteredDevices.length}</strong>
