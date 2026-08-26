@@ -129,10 +129,9 @@ export const AuditLogPage: React.FC = () => {
       {/* Header Bar */}
       <div className="p-3.5 border-b border-border bg-surface flex items-center justify-between gap-3 shrink-0">
         <div>
-          <h3 className="text-xs sm:text-sm font-bold text-fg flex items-center space-x-2 uppercase tracking-wide">
+          <div className="flex items-center space-x-2">
             <ShieldCheck className="w-4 h-4 text-accent" />
-            <span>НЕИЗМЕНЯЕМЫЙ ЖУРНАЛ АУДИТА И БЕЗОПАСНОСТИ</span>
-          </h3>
+          </div>
         </div>
 
         <div className="flex items-center space-x-2">
