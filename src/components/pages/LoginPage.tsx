@@ -144,7 +144,10 @@ export const LoginPage: React.FC = () => {
                   <button
                     key={u.id}
                     type="button"
-                    onClick={() => handleQuickLogin(u.login, u.passwordHash || 'admin123')}
+                    onClick={() => {
+                      const quickPass = u.role === 'ADMIN' ? 'admin123' : u.role === 'PARTNER' ? 'partner123' : 'seller123';
+                      handleQuickLogin(u.login, quickPass);
+                    }}
                     className="p-2 rounded-lg bg-[#0B0E14] hover:bg-slate-800 border border-slate-800 text-slate-200 hover:text-emerald-400 text-left text-[11px] transition-all min-w-0 flex flex-col justify-between"
                   >
                     <span className="font-bold text-slate-100 uppercase block truncate">{u.name}</span>

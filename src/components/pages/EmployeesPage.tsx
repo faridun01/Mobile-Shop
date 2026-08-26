@@ -42,6 +42,7 @@ export const EmployeesPage: React.FC = () => {
     todayRate,
     createUser,
     updateUser,
+    resetUserPassword,
     deleteUser,
     createExpense
   } = useApp();
@@ -161,6 +162,10 @@ export const EmployeesPage: React.FC = () => {
     const commPct = parseFloat(salesCommissionPercent) || 0;
 
     if (editingUser) {
+      if (password.trim().length > 0) {
+        await resetUserPassword(editingUser.id, password.trim());
+      }
+
       const res = await updateUser({
         ...editingUser,
         name: name.trim(),
