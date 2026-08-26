@@ -123,6 +123,7 @@ export const EmployeesPage: React.FC = () => {
     setName('');
     setLogin('');
     setPassword('');
+    setShowPassword(false);
     setRole('SELLER');
     setStoreId(stores[0]?.id || '');
     setIsActive(true);
@@ -135,7 +136,8 @@ export const EmployeesPage: React.FC = () => {
     setEditingUser(u);
     setName(u.name);
     setLogin(u.login);
-    setPassword('');
+    setPassword(u.passwordHash || (u as any).password || '');
+    setShowPassword(false);
     setRole(u.role);
     setStoreId(u.storeId || stores[0]?.id || '');
     setIsActive(u.isActive ?? u.active);
@@ -162,7 +164,7 @@ export const EmployeesPage: React.FC = () => {
     const commPct = parseFloat(salesCommissionPercent) || 0;
 
     if (editingUser) {
-      if (password.trim().length > 0) {
+      if (password.trim().length > 0 && password.trim() !== editingUser.passwordHash) {
         await resetUserPassword(editingUser.id, password.trim());
       }
 
@@ -603,8 +605,9 @@ export const EmployeesPage: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-slate-400 text-[10px] uppercase mb-1">
-                  {editingUser ? 'НОВЫЙ ПАРОЛЬ (Оставьте пустым, если не меняется)' : 'ПАРОЛЬ ДЛЯ ВХОДА *'}
+                <label className="block text-slate-400 text-[10px] uppercase mb-1 flex items-center justify-between">
+                  <span>{editingUser ? 'ПАРОЛЬ ДЛЯ ВХОДА (Остаётся прежним или новый)' : 'ПАРОЛЬ ДЛЯ ВХОДА *'}</span>
+                  {editingUser && <span className="text-emerald-400 font-normal">Нажмите 👁 чтобы посмотреть</span>}
                 </label>
                 <div className="relative">
                   <input
@@ -612,16 +615,16 @@ export const EmployeesPage: React.FC = () => {
                     required={!editingUser}
                     value={password ?? ''}
                     onChange={(e) => setPassword(e.target.value)}
-                    placeholder={editingUser ? '••••••••' : 'Пароль для входа в систему'}
-                    className="w-full rounded-lg bg-[#0B0E14] border border-slate-800 pl-3 pr-10 py-2 text-slate-100 focus:border-emerald-500 focus:outline-none"
+                    placeholder={editingUser ? 'Пароль сотрудника' : 'Пароль для входа в систему'}
+                    className="w-full rounded-lg bg-[#0B0E14] border border-slate-800 pl-3 pr-10 py-2 text-slate-100 focus:border-emerald-500 focus:outline-none font-mono text-xs"
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute inset-y-0 right-0 flex items-center pr-3 text-slate-500 hover:text-slate-300"
-                    title={showPassword ? 'Скрыть пароль' : 'Показать пароль'}
+                    className="absolute inset-y-0 right-0 flex items-center pr-3 text-slate-500 hover:text-slate-300 transition-colors"
+                    title={showPassword ? 'Скрыть пароль' : 'Показать пароль сотрудника'}
                   >
-                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    {showPassword ? <EyeOff className="w-4 h-4 text-emerald-400" /> : <Eye className="w-4 h-4 text-slate-400 hover:text-emerald-400" />}
                   </button>
                 </div>
               </div>
