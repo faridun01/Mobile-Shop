@@ -137,7 +137,7 @@ export const LoginPage: React.FC = () => {
           {users.length > 0 && (
             <div className="pt-3 border-t border-slate-800">
               <p className="text-[10px] font-mono text-slate-400 uppercase tracking-wider mb-2">
-                БЫСТРЫЙ ВХОД ПО ПОЛЬЗОВАТЕЛЯМ:
+                БЫСТРЫЙ ВХОД (ПО ДЕФОЛТНЫМ ПАРОЛЯМ):
               </p>
               <div className="grid grid-cols-2 gap-1.5 text-xs font-mono">
                 {users.map(u => (
@@ -159,6 +159,9 @@ export const LoginPage: React.FC = () => {
                   </button>
                 ))}
               </div>
+              <p className="text-[9px] font-mono text-slate-500 mt-2 text-center">
+                * При изменении пароля администратором вводите новый пароль вручную в поля выше.
+              </p>
             </div>
           )}
         </div>
