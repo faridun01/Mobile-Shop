@@ -188,7 +188,6 @@ export const SalesHistoryPage: React.FC = () => {
               options={[
                 { value: 'TODAY', label: 'Сегодня' },
                 { value: 'MONTH', label: 'Этот месяц' },
-                { value: 'ALL', label: 'Все' },
               ]}
               value={periodFilter === 'SPECIFIC_MONTH' ? '' : periodFilter}
               onChange={(v) => setPeriodFilter(v as typeof periodFilter)}
