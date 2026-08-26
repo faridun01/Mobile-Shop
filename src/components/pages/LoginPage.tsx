@@ -56,7 +56,7 @@ export const LoginPage: React.FC = () => {
 
         {/* Login form card */}
         <div className="bg-[#0F1219] border border-slate-800 rounded-xl p-5 shadow-2xl space-y-4">
-          <div className="flex items-center justify-end pb-3 border-b border-slate-800 text-[10px] font-mono text-slate-400">
+          <div className="flex items-center justify-center pb-3 border-b border-slate-800 text-[10px] font-mono text-slate-400">
             <span className="text-emerald-400 font-bold uppercase tracking-wider flex items-center space-x-1">
               <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
               <span>ЗАЩИЩЕНО</span>
@@ -129,7 +129,7 @@ export const LoginPage: React.FC = () => {
         </div>
 
         <p className="text-center text-[10px] font-mono text-slate-600 mt-4 uppercase tracking-widest">
-          АУДИТ ВХОДА ВКЛЮЧЕН // MOBILE SHOP OS 2026
+          MOBILE SHOP OS 2026
         </p>
       </div>
     </div>
