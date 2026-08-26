@@ -184,11 +184,7 @@ export const InventoryPage: React.FC = () => {
             Найдено: <strong className="text-accent">{filteredDevices.length}</strong>
           </span>
 
-          {!isSeller && (
-            <Button variant="secondary" size="md" leftIcon={Download} onClick={() => exportInventoryReport(filteredDevices, stores)} className="h-9 px-3">
-              <span className="hidden sm:inline">Экспорт</span>
-            </Button>
-          )}
+
         </div>
 
         <FilterPillGroup options={brands} value={selectedBrand} onChange={setSelectedBrand} scrollable />

@@ -298,9 +298,7 @@ export const ExpensesPage: React.FC = () => {
             </h1>
           </div>
           <div className="flex items-center gap-2 shrink-0">
-            <Button variant="secondary" leftIcon={Download} onClick={() => exportExpensesReport(filteredExpenses, rate)} className="h-9 px-3">
-              <span className="hidden sm:inline">CSV</span>
-            </Button>
+
             <Button variant="danger" leftIcon={Plus} onClick={() => setIsModalOpen(true)}>Добавить</Button>
           </div>
         </div>

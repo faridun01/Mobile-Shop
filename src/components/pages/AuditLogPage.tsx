@@ -159,14 +159,7 @@ export const AuditLogPage: React.FC = () => {
               {filteredLogs.length} событий
             </span>
 
-            <button
-              onClick={() => exportAuditLogsReport(filteredLogs)}
-              className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs transition-colors shadow-[0_0_10px_rgba(16,185,129,0.3)] shrink-0"
-              title="Скачать весь журнал в CSV"
-            >
-              <Download className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">ЭКСПОРТ (CSV)</span>
-            </button>
+
           </div>
         </div>
 

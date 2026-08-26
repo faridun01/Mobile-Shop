@@ -571,16 +571,7 @@ export const OwnersPage: React.FC = () => {
               </span>
             </div>
 
-            {filteredTransactions.length > 0 && (
-              <button
-                onClick={handleExportTransactions}
-                className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-200 text-xs font-bold transition-colors shrink-0"
-                title="Скачать историю в CSV"
-              >
-                <Download className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">ЭКСПОРТ (CSV)</span>
-              </button>
-            )}
+
           </div>
 
           {/* Controls Bar: Search & Filters */}
@@ -1053,14 +1044,7 @@ export const OwnersPage: React.FC = () => {
             </div>
 
             <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2 pt-2 border-t border-slate-800">
-              <button
-                type="button"
-                onClick={handleExportQuarterlyReport}
-                className="py-2.5 px-3 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 text-xs font-bold text-slate-200 flex items-center justify-center space-x-1.5 transition-colors"
-              >
-                <Download className="w-4 h-4 text-emerald-400" />
-                <span>СКАЧАТЬ ОТЧЕТ (CSV)</span>
-              </button>
+
 
               <button
                 type="button"

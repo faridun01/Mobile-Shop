@@ -206,11 +206,7 @@ export const SalesHistoryPage: React.FC = () => {
             )}
           </div>
 
-          {(currentUser?.role === 'ADMIN' || currentUser?.role === 'PARTNER') && (
-            <Button variant="secondary" size="md" leftIcon={Download} onClick={() => exportSalesReport(filteredSales)} className="h-9 px-3">
-              <span className="hidden sm:inline">Экспорт CSV</span>
-            </Button>
-          )}
+
         </div>
       </div>
 

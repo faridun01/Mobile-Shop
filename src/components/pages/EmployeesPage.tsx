@@ -1282,14 +1282,7 @@ export const EmployeesPage: React.FC = () => {
             </div>
 
             <div className="flex justify-between items-center pt-2 border-t border-slate-800">
-              <button
-                type="button"
-                onClick={handleExportPayrollReport}
-                className="py-2.5 px-3 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 text-xs font-bold text-slate-200 flex items-center justify-center space-x-1.5 transition-colors"
-              >
-                <Download className="w-4 h-4 text-emerald-400" />
-                <span>СКАЧАТЬ ВЕДОМОСТЬ (CSV)</span>
-              </button>
+
 
               <button
                 type="button"
