@@ -76,12 +76,13 @@ export const ReportsPage: React.FC = () => {
     const modelCounts: Record<string, { count: number; revenueUsd: number; cogsUsd: number; profitUsd: number }> = {};
 
     periodSales.forEach(sale => {
-      revenueUsd += sale.totalUsd || 0;
+      const saleRate = sale.exchangeRate || rate;
+      revenueUsd += sale.totalUsd || +(sale.totalTjs / saleRate).toFixed(2);
 
       sale.items.forEach(item => {
         unitsSold++;
         const itemCostUsd = item.costBasisUsd || item.purchaseCostUsd || 0;
-        const itemPriceUsd = item.salePriceUsd || +(item.salePriceTjs / rate).toFixed(2);
+        const itemPriceUsd = item.salePriceUsd || +(item.salePriceTjs / saleRate).toFixed(2);
         const itemProfitUsd = +(itemPriceUsd - itemCostUsd).toFixed(2);
 
         cogsUsd += itemCostUsd;
@@ -96,12 +97,6 @@ export const ReportsPage: React.FC = () => {
         modelCounts[modelKey].profitUsd += itemProfitUsd;
       });
     });
-
-    // Repair parts/labor cost is booked as a REPAIR_PARTS expense at intake (see
-    // RepairsService.create) and already flows through expensesUsd below. The
-    // system has no field for what a customer is charged for a repair — only that
-    // cost — so there is no separate repair "revenue" to add here; doing so
-    // previously double-counted the same TJS figure as both income and expense.
 
     const grossProfitUsd = +(revenueUsd - cogsUsd).toFixed(2);
     const totalRevenueUsd = +revenueUsd.toFixed(2);
@@ -223,9 +218,6 @@ export const ReportsPage: React.FC = () => {
             <BarChart3 className="w-4 h-4 text-emerald-400" />
             <span>ФИНАНСОВЫЙ И БАЛАНСОВЫЙ ОТЧЕТ ($ USD / TJS)</span>
           </h3>
-          <p className="text-[11px] text-slate-500 mt-0.5">
-            Расчет показателей в долларах США по курсу {rate} TJS / USD
-          </p>
         </div>
 
         <div className="flex flex-wrap items-center gap-2 text-xs">
