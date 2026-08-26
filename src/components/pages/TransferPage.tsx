@@ -175,11 +175,6 @@ export const TransferPage: React.FC = () => {
             <ArrowLeftRight className="w-4 h-4 text-accent" />
             <span>ПЕРЕМЕЩЕНИЕ И ТРАНЗИТ</span>
           </h3>
-          <p className="text-xs text-fg-muted mt-0.5">
-            {isSeller
-              ? 'Формирование запросов на перемещение между складами'
-              : 'Управление передачей устройств между филиалами и центральным складом'}
-          </p>
         </div>
       </div>
 
