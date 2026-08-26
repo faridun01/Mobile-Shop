@@ -325,9 +325,6 @@ export const EmployeesPage: React.FC = () => {
             <Users className="w-4 h-4 text-emerald-400" />
             <span>Сотрудники и оклады</span>
           </h3>
-          <p className="text-[11px] text-slate-500 mt-0.5">
-            Управление персоналом, окладами, финансовой историей выплат и отчетами
-          </p>
         </div>
 
         <div className="flex items-center space-x-2">
