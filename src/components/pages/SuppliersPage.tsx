@@ -217,9 +217,6 @@ export const SuppliersPage: React.FC = () => {
             <Truck className="w-4 h-4 text-accent" />
             <span>ПОСТАВЩИКИ И НАКЛАДНЫЕ</span>
           </h3>
-          <p className="text-xs text-fg-muted mt-0.5">
-            Общий текущий долг перед поставщиками: <strong className="text-danger font-bold">${totalAllDebt.toLocaleString()}</strong>
-          </p>
         </div>
 
         <button
