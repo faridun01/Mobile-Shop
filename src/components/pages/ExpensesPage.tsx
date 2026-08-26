@@ -337,7 +337,8 @@ export const ExpensesPage: React.FC = () => {
         </div>
 
         {filtersOpen && (
-          <div className="px-3 pb-3 space-y-2 border-t border-border pt-3">
+          <div className="px-3 pb-3 space-y-2.5 border-t border-border pt-3">
+            {/* Row 1: Period Buttons + Month Picker on the right when active */}
             <div className="flex items-center gap-2 overflow-x-auto py-0.5 shrink-0">
               <FilterPillGroup
                 options={[{ value: 'TODAY', label: 'Сегодня' }, { value: 'SPECIFIC_MONTH', label: 'Месяц' }]}
@@ -353,7 +354,10 @@ export const ExpensesPage: React.FC = () => {
                   className="h-9 px-3 rounded-xl border border-accent bg-surface text-xs font-semibold text-accent focus:outline-none shrink-0 cursor-pointer"
                 />
               )}
+            </div>
 
+            {/* Row 2: Branch Select, Category Select & Add Category Button */}
+            <div className="flex items-center gap-2 overflow-x-auto py-0.5 shrink-0">
               {!isSeller && (
                 <Select value={selectedStoreFilter} onChange={(e) => setSelectedStoreFilter(e.target.value)} className="h-9 py-0 text-xs w-auto shrink-0">
                   <option value="ALL">Все филиалы</option>
