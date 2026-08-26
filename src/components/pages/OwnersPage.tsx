@@ -324,8 +324,9 @@ export const OwnersPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Row 2: Top Summary KPI Cards Bar */}
-      <div className="p-3 sm:p-4 border-b border-border bg-bg shrink-0">
+      {/* Scrollable Main Content Container */}
+      <div className="flex-1 overflow-y-auto p-3 sm:p-4 space-y-4 bg-bg">
+        {/* KPI Cards Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
           {/* Card 1: Total Capital */}
           <div className="p-3.5 rounded-xl bg-surface border border-border flex items-start justify-between">
@@ -403,10 +404,7 @@ export const OwnersPage: React.FC = () => {
             </div>
           </div>
         </div>
-      </div>
 
-      {/* Main Container */}
-      <div className="flex-1 overflow-y-auto p-3.5 sm:p-4 space-y-4 bg-bg">
         {/* Section 1: Owners Cards (2-Column Grid) */}
         <div className="p-4 rounded-xl bg-surface border border-border space-y-3.5 shadow-xs">
           <div className="flex items-center justify-between pb-2 border-b border-border">
