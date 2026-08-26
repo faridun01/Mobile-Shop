@@ -211,28 +211,25 @@ export const SuppliersPage: React.FC = () => {
   return (
     <div className="flex-1 flex flex-col h-full overflow-hidden bg-bg text-fg">
       {/* Top Header */}
-      <div className="p-3 sm:p-4 border-b border-border bg-surface shrink-0">
+      <div className="p-3 sm:p-4 border-b border-border bg-surface flex items-center justify-between gap-3 shrink-0">
         <div>
-          <div className="flex flex-wrap items-center gap-2">
-            <h3 className="text-xs sm:text-sm font-bold text-fg uppercase tracking-wide flex items-center space-x-1.5">
-              <Truck className="w-4 h-4 text-accent" />
-              <span>ПОСТАВЩИКИ И НАКЛАДНЫЕ</span>
-            </h3>
-
-            <button
-              onClick={() => setIsAddSupplierOpen(true)}
-              className="px-2.5 py-1 rounded-lg bg-accent hover:bg-accent-strong text-[11px] font-bold text-accent-fg flex items-center space-x-1 transition-colors shrink-0 shadow-xs"
-              title="Добавить поставщика"
-            >
-              <Plus className="w-3.5 h-3.5" />
-              <span>ДОБАВИТЬ ПОСТАВЩИКА</span>
-            </button>
-          </div>
-
+          <h3 className="text-xs sm:text-sm font-bold text-fg uppercase tracking-wide flex items-center space-x-1.5">
+            <Truck className="w-4 h-4 text-accent" />
+            <span>ПОСТАВЩИКИ И НАКЛАДНЫЕ</span>
+          </h3>
           <p className="text-xs text-fg-muted mt-0.5">
             Общий текущий долг перед поставщиками: <strong className="text-danger font-bold">${totalAllDebt.toLocaleString()}</strong>
           </p>
         </div>
+
+        <button
+          onClick={() => setIsAddSupplierOpen(true)}
+          className="px-3 py-1.5 rounded-xl bg-accent hover:bg-accent-strong text-xs font-bold text-accent-fg flex items-center space-x-1.5 shrink-0 transition-colors shadow-xs"
+          title="Добавить поставщика"
+        >
+          <Plus className="w-3.5 h-3.5" />
+          <span>ДОБАВИТЬ ПОСТАВЩИКА</span>
+        </button>
       </div>
 
       {statusMessage && statusMessage.type === 'error' && (
