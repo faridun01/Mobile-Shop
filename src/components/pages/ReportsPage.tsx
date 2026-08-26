@@ -216,7 +216,7 @@ export const ReportsPage: React.FC = () => {
         <div>
           <h3 className="text-xs font-bold text-slate-100 flex items-center space-x-1.5 uppercase">
             <BarChart3 className="w-4 h-4 text-emerald-400" />
-            <span>ФИНАНСОВЫЙ И БАЛАНСОВЫЙ ОТЧЕТ ($ USD / TJS)</span>
+            <span>ФИНАНСОВЫЙ И БАЛАНСОВЫЙ ОТЧЕТ</span>
           </h3>
         </div>
 
