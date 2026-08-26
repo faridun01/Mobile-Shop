@@ -489,51 +489,8 @@ export const PurchasePage: React.FC = () => {
   if (viewMode === 'list') {
     return (
       <div className="flex-1 flex flex-col h-full overflow-hidden bg-bg text-fg">
-        {/* Top Header Bar */}
-        <div className="p-3 border-b border-border bg-surface flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 shrink-0">
-          <div>
-            <h3 className="text-xs sm:text-sm font-bold text-fg flex items-center space-x-1.5 uppercase tracking-wide">
-              <Truck className="w-4 h-4 text-accent" />
-              <span>ВСЕ ПРИХОДЫ (ИСТОРИЯ НАКЛАДНЫХ)</span>
-            </h3>
-            <p className="text-xs text-fg-muted mt-0.5">
-              Всего: {totalInvoicesCount} накладных • {totalUnitsReceived} шт. на сумму ${totalSumUsd.toLocaleString()}
-            </p>
-          </div>
-
-          <div className="flex items-center space-x-2">
-            <button
-              onClick={() => {
-                setStatusMessage(null);
-                setViewMode('form');
-              }}
-              className="flex items-center space-x-1.5 px-4 py-2 rounded-xl bg-accent hover:bg-accent-strong active:scale-95 text-accent-fg font-bold text-xs transition-colors shadow-xs"
-            >
-              <Plus className="w-4 h-4" />
-              <span>НОВЫЙ ПРИХОД</span>
-            </button>
-          </div>
-        </div>
-
-        {/* Success toast after saving */}
-        {statusMessage && (
-          <div className={`px-4 py-2 border-b flex items-center justify-between text-xs font-mono ${
-            statusMessage.type === 'success'
-              ? 'bg-emerald-500/15 border-emerald-800/60 text-emerald-400'
-              : 'bg-rose-950/40 border-rose-800/60 text-rose-400'
-          }`}>
-            <div className="flex items-center space-x-2">
-              {statusMessage.type === 'success' ? <CheckCircle2 className="w-4 h-4" /> : <AlertCircle className="w-4 h-4" />}
-              <span>{statusMessage.text}</span>
-            </div>
-            <button onClick={() => setStatusMessage(null)} className="text-slate-400 hover:text-white">
-              <X className="w-4 h-4" />
-            </button>
-          </div>
-        )}
-
         {/* Search & Filters Bar */}
-        <div className="p-3 border-b border-border bg-bg space-y-3 shrink-0">
+        <div className="p-3 border-b border-border bg-surface space-y-3 shrink-0">
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-2.5 w-4 h-4 text-fg-subtle" />
@@ -542,7 +499,7 @@ export const PurchasePage: React.FC = () => {
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Поиск: № накладной / поставщик / IMEI / модель..."
-                className="w-full rounded-xl bg-surface border border-border pl-9 pr-8 py-2 text-xs text-fg placeholder-fg-subtle focus:border-accent focus:outline-none transition-colors"
+                className="w-full rounded-xl bg-surface-raised border border-border pl-9 pr-8 py-2 text-xs text-fg placeholder-fg-subtle focus:border-accent focus:outline-none transition-colors"
               />
               {searchQuery && (
                 <button
@@ -554,14 +511,27 @@ export const PurchasePage: React.FC = () => {
               )}
             </div>
 
-            <button
-              onClick={handleScanFinder}
-              className="flex items-center space-x-1.5 px-3.5 py-2 rounded-xl bg-surface-raised hover:bg-surface border border-border text-accent text-xs font-bold transition-colors shrink-0"
-              title="Сканировать IMEI или номер накладной"
-            >
-              <Scan className="w-4 h-4" />
-              <span className="hidden sm:inline">СКАНИРОВАТЬ</span>
-            </button>
+            <div className="flex items-center space-x-2 shrink-0">
+              <button
+                onClick={handleScanFinder}
+                className="flex items-center space-x-1.5 px-3.5 py-2 rounded-xl bg-surface-raised hover:bg-surface border border-border text-accent text-xs font-bold transition-colors"
+                title="Сканировать IMEI или номер накладной"
+              >
+                <Scan className="w-4 h-4" />
+                <span className="hidden sm:inline">СКАНИРОВАТЬ</span>
+              </button>
+
+              <button
+                onClick={() => {
+                  setStatusMessage(null);
+                  setViewMode('form');
+                }}
+                className="flex items-center space-x-1.5 px-4 py-2 rounded-xl bg-accent hover:bg-accent-strong active:scale-95 text-accent-fg font-bold text-xs transition-colors shadow-xs"
+              >
+                <Plus className="w-4 h-4" />
+                <span>НОВЫЙ ПРИХОД</span>
+              </button>
+            </div>
           </div>
 
           {/* Period selector & Supplier Filter */}
