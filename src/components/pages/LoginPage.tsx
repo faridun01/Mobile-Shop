@@ -43,31 +43,6 @@ export const LoginPage: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-[#0B0E14] flex flex-col items-center justify-center p-4 text-slate-300 selection:bg-emerald-500 selection:text-black relative font-mono">
-      {/* Top right theme switcher */}
-      <div className="absolute top-4 right-4 z-20">
-        <button
-          type="button"
-          onClick={toggleTheme}
-          className={`p-2 rounded-lg border flex items-center space-x-1.5 text-xs font-mono transition-all shadow-md ${
-            theme === 'light'
-              ? 'bg-amber-100 border-amber-300 text-amber-900 hover:bg-amber-200'
-              : 'bg-slate-900 border-slate-800 text-slate-300 hover:text-amber-400 hover:bg-slate-800'
-          }`}
-          title={theme === 'light' ? 'Переключить на тёмную тему' : 'Переключить на светлую тему'}
-        >
-          {theme === 'light' ? (
-            <>
-              <Sun className="w-4 h-4 text-amber-600" />
-              <span className="font-bold">СВЕТЛАЯ ТЕМА</span>
-            </>
-          ) : (
-            <>
-              <Moon className="w-4 h-4 text-slate-400" />
-              <span className="font-bold">ТЁМНАЯ ТЕМА</span>
-            </>
-          )}
-        </button>
-      </div>
 
       <div className="w-full max-w-sm">
         {/* Brand header */}
