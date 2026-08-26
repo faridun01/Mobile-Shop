@@ -165,22 +165,17 @@ export const BonusesPage: React.FC = () => {
   };
 
   return (
-    <div className="flex-1 flex flex-col h-full overflow-hidden bg-bg text-fg font-mono">
+    <div className="flex-1 flex flex-col h-full overflow-hidden bg-bg text-fg">
       {/* Header */}
-      <div className="p-4 border-b border-zinc-800 bg-zinc-900/60 flex items-center justify-between shrink-0">
-        <div>
-          <h3 className="text-sm font-bold text-zinc-100 flex items-center space-x-2">
-            <Gift className="w-4 h-4 text-amber-400" />
-            <span>Бонусы и промо-программы поставщиков</span>
-          </h3>
-          <p className="text-xs text-zinc-400 mt-0.5">
-            Учет подарочных телефонов ($0 закупка) и ретро-бонусов от поставщиков
-          </p>
-        </div>
+      <div className="p-3 sm:p-4 border-b border-border bg-surface flex items-center justify-between gap-3 shrink-0">
+        <h3 className="text-xs sm:text-sm font-bold text-fg uppercase tracking-wide flex items-center space-x-1.5">
+          <Gift className="w-4 h-4 text-amber-400" />
+          <span>БОНУСЫ И ПРОМО-ПРОГРАММЫ ПОСТАВЩИКОВ</span>
+        </h3>
 
         <button
           onClick={() => setIsModalOpen(true)}
-          className="px-3 py-1.5 rounded bg-emerald-500 hover:bg-emerald-400 text-xs font-semibold text-white flex items-center space-x-1.5"
+          className="px-3 py-1.5 rounded-xl bg-accent hover:bg-accent-strong text-xs font-bold text-accent-fg flex items-center space-x-1.5 shrink-0 transition-colors shadow-xs"
         >
           <Plus className="w-4 h-4" />
           <span>Зафиксировать бонус</span>
