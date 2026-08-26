@@ -570,7 +570,6 @@ export const PurchasePage: React.FC = () => {
 
             {/* Supplier selector filter */}
             <div className="flex items-center space-x-2">
-              <span className="text-fg-subtle text-xs font-medium">Поставщик:</span>
               <select
                 value={selectedSupplierFilter}
                 onChange={(e) => setSelectedSupplierFilter(e.target.value)}
