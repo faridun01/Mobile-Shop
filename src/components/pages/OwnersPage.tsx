@@ -12,14 +12,12 @@ import {
   Wallet,
   User,
   Search,
-  Download,
   Briefcase,
   TrendingUp,
   CreditCard,
-  Building,
-  Coins,
-  Receipt
+  Coins
 } from 'lucide-react';
+import { StatusBanner, StatusMessage } from '../ui/StatusBanner';
 
 export const OwnersPage: React.FC = () => {
   const {
@@ -27,12 +25,9 @@ export const OwnersPage: React.FC = () => {
     owners,
     users,
     ownerTransactions,
-    sales,
-    expenses,
     todayRate,
     createOwnerTransaction,
     updateOwnerProfitShares,
-    resetAllOwnerCapital,
     closeQuarterPeriod
   } = useApp();
 
@@ -70,6 +65,7 @@ export const OwnersPage: React.FC = () => {
       setSelectedOwnerId(owners[0].id);
     }
   }, [owners, selectedOwnerId]);
+
   const [txType, setTxType] = useState<'INVESTMENT' | 'WITHDRAWAL' | 'PROFIT_PAYOUT' | 'REINVEST'>('PROFIT_PAYOUT');
   const [amountUsd, setAmountUsd] = useState('');
   const [note, setNote] = useState('');
@@ -79,15 +75,15 @@ export const OwnersPage: React.FC = () => {
   const [typeFilter, setTypeFilter] = useState<'ALL' | 'PROFIT_PAYOUT' | 'INVESTMENT' | 'WITHDRAWAL' | 'REINVEST'>('ALL');
   const [selectedOwnerFilter, setSelectedOwnerFilter] = useState<string>('ALL');
 
-  const [statusMessage, setStatusMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [statusBanner, setStatusBanner] = useState<StatusMessage | null>(null);
 
   const rate = todayRate?.rate || 9.5;
 
   if (currentUser?.role === 'SELLER') {
     return (
-      <div className="p-8 text-center text-slate-500 font-mono text-xs">
-        <p className="font-bold text-slate-300">ДОСТУП ОГРАНИЧЕН</p>
-        <p className="mt-1">Раздел собственников доступен только администраторам и партнерам</p>
+      <div className="p-8 text-center text-fg-muted text-xs">
+        <p className="font-bold text-fg uppercase">Доступ ограничен</p>
+        <p className="mt-1 text-fg-subtle">Раздел собственников доступен только администраторам и партнерам</p>
       </div>
     );
   }
@@ -98,7 +94,7 @@ export const OwnersPage: React.FC = () => {
       init[o.id] = (o.profitSharePercent ?? 0).toString();
     });
     setSharesInput(init);
-    setStatusMessage(null);
+    setStatusBanner(null);
     setIsSharesModalOpen(true);
   };
 
@@ -107,7 +103,7 @@ export const OwnersPage: React.FC = () => {
     setTxType(defaultType);
     setAmountUsd('');
     setNote('');
-    setStatusMessage(null);
+    setStatusBanner(null);
     setIsTxModalOpen(true);
   };
 
@@ -115,7 +111,6 @@ export const OwnersPage: React.FC = () => {
     setSharesInput(prev => {
       const nextState = { ...prev, [changedOwnerId]: valueStr };
 
-      // If there are 2 owners, automatically fill the other partner's share to total 100%
       if (owners.length === 2) {
         const otherOwner = owners.find(o => o.id !== changedOwnerId);
         if (otherOwner) {
@@ -141,8 +136,8 @@ export const OwnersPage: React.FC = () => {
 
     const total = payload.reduce((acc, p) => acc + p.sharePercent, 0);
     if (Math.abs(total - 100) > 0.01) {
-      setStatusMessage({
-        type: 'error',
+      setStatusBanner({
+        tone: 'error',
         text: `Сумма долей должна быть строго 100% (сейчас ${total}%)`
       });
       return;
@@ -151,22 +146,22 @@ export const OwnersPage: React.FC = () => {
     const res = await updateOwnerProfitShares(payload[0]?.sharePercent || 0, payload[1]?.sharePercent || 0);
     if (res.success) {
       setIsSharesModalOpen(false);
-      setStatusMessage({
-        type: 'success',
+      setStatusBanner({
+        tone: 'success',
         text: 'Доли партнеров успешно обновлены'
       });
     } else {
-      setStatusMessage({ type: 'error', text: res.message || 'Ошибка сохранения долей' });
+      setStatusBanner({ tone: 'error', text: res.message || 'Ошибка сохранения долей' });
     }
   };
 
   const handleCreateTx = async (e: React.FormEvent) => {
     e.preventDefault();
-    setStatusMessage(null);
+    setStatusBanner(null);
 
     const val = parseFloat(amountUsd) || 0;
     if (val <= 0) {
-      setStatusMessage({ type: 'error', text: 'Укажите корректную сумму ($ USD)' });
+      setStatusBanner({ tone: 'error', text: 'Укажите корректную сумму ($ USD)' });
       return;
     }
 
@@ -174,8 +169,8 @@ export const OwnersPage: React.FC = () => {
 
     if (txType === 'REINVEST' && currentOwner) {
       if (val > (currentOwner.availableProfitUsd ?? 0)) {
-        setStatusMessage({
-          type: 'error',
+        setStatusBanner({
+          tone: 'error',
           text: `Сумма реинвестирования ($${val}) превышает доступный остаток к выплате ($${currentOwner.availableProfitUsd ?? 0})`
         });
         return;
@@ -194,35 +189,13 @@ export const OwnersPage: React.FC = () => {
       setAmountUsd('');
       setNote('');
       const typeText = txType === 'REINVEST' ? 'Реинвестирование из остатка к выплате' : txType === 'INVESTMENT' ? 'Вложение личного капитала' : txType === 'PROFIT_PAYOUT' ? 'Выплата прибыли' : 'Изъятие капитала';
-      setStatusMessage({
-        type: 'success',
+      setStatusBanner({
+        tone: 'success',
         text: `Операция «${typeText}» на сумму $${val.toLocaleString()} успешно проведена`
       });
     } else {
-      setStatusMessage({ type: 'error', text: res.message || 'Ошибка транзакции' });
+      setStatusBanner({ tone: 'error', text: res.message || 'Ошибка транзакции' });
     }
-  };
-
-  const handleExportQuarterlyReport = () => {
-    const headers = ['Партнер', 'Доля %', 'Начислено за квартал ($)', 'Выплачено дивидендов ($)', 'Реинвестировано ($)', 'Остаток к выплате ($)', 'Капитал на конец квартала ($)'];
-    const rows = owners.map(o => [
-      getOwnerDisplayName(o),
-      `${o.profitSharePercent || 0}%`,
-      o.totalAccruedProfitUsd || 0,
-      o.totalPaidProfitUsd || 0,
-      o.totalReinvestedUsd || 0,
-      o.availableProfitUsd || 0,
-      o.capitalBalanceUsd || 0
-    ]);
-    const csvContent = 'data:text/csv;charset=utf-8,\uFEFF'
-      + [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement('a');
-    link.setAttribute('href', encodedUri);
-    link.setAttribute('download', `Квартальный_отчет_${selectedQuarter}_${selectedQuarterYear}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
   };
 
   const handleConfirmCloseQuarter = async () => {
@@ -234,27 +207,24 @@ export const OwnersPage: React.FC = () => {
 
     if (res.success) {
       setIsQuarterModalOpen(false);
-      setStatusMessage({
-        type: 'success',
-        text: `Финансовый период «Квартал ${quarterName}» официально закрыт. Сформирован квартальный отчет, показатели начислений обнулены для нового квартала.`
+      setStatusBanner({
+        tone: 'success',
+        text: `Финансовый период «Квартал ${quarterName}» официально закрыт.`
       });
     } else {
-      setStatusMessage({ type: 'error', text: res.message || 'Ошибка закрытия квартала' });
+      setStatusBanner({ tone: 'error', text: res.message || 'Ошибка закрытия квартала' });
     }
   };
 
   // Filtered transactions
   const filteredTransactions = useMemo(() => {
     return ownerTransactions.filter((tx) => {
-      // Type filter
       if (typeFilter !== 'ALL' && tx.type !== typeFilter) {
         return false;
       }
-      // Owner filter
       if (selectedOwnerFilter !== 'ALL' && tx.ownerId !== selectedOwnerFilter) {
         return false;
       }
-      // Search query
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase().trim();
         const matchesOwner = (tx.ownerName || '').toLowerCase().includes(q);
@@ -274,180 +244,144 @@ export const OwnersPage: React.FC = () => {
   const totalPayouts = owners.reduce((acc, o) => acc + (o.totalPaidProfitUsd ?? 0), 0);
   const totalAvailableProfit = owners.reduce((acc, o) => acc + (o.availableProfitUsd ?? 0), 0);
 
-  // Helper to export transactions to CSV
-  const handleExportTransactions = () => {
-    if (filteredTransactions.length === 0) return;
-    const headers = ['ID', 'Дата и время', 'Партнер', 'Тип операции', 'Сумма ($)', 'Сумма (TJS)', 'Основание', 'Оператор'];
-    const rows = filteredTransactions.map(tx => [
-      tx.id,
-      tx.date,
-      tx.ownerName,
-      tx.type === 'INVESTMENT' ? 'Внесение капитала' : tx.type === 'PROFIT_PAYOUT' ? 'Выплата прибыли' : 'Вывод капитала',
-      tx.amountUsd,
-      Math.round(tx.amountUsd * rate),
-      `"${(tx.note || '').replace(/"/g, '""')}"`,
-      tx.createdByName || 'Администратор'
-    ]);
-
-    const csvContent = '\uFEFF' + [headers.join(','), ...rows.map(r => r.join(','))].join('\r\n');
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `История_операций_партнеры_${new Date().toISOString().split('T')[0]}.csv`;
-    link.click();
-    URL.revokeObjectURL(url);
-  };
-
   return (
-    <div className="flex-1 flex flex-col h-full overflow-hidden bg-bg text-fg font-mono">
-      {/* Header Bar */}
-      <div className="p-3.5 border-b border-slate-800 bg-[#0F1219] space-y-3 shrink-0">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h3 className="text-xs sm:text-sm font-bold text-slate-100 flex items-center space-x-2 uppercase">
-              <PieChart className="w-4 h-4 text-emerald-400" />
-              <span>ПАРТНЕРЫ И КАПИТАЛ БИЗНЕСА</span>
-            </h3>
-            <p className="text-[11px] text-slate-400 mt-0.5 font-sans">
-              Учет уставных вложений, распределения долей прибыли и выплат дивидендов учредителям
-            </p>
-          </div>
+    <div className="flex-1 flex flex-col h-full overflow-hidden bg-bg text-fg">
+      <StatusBanner message={statusBanner} onDismiss={() => setStatusBanner(null)} />
 
-          <div className="flex items-center space-x-2">
-            <button
-              onClick={() => {
-                setStatusMessage(null);
-                setIsQuarterModalOpen(true);
-              }}
-              className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-400 hover:text-amber-300 text-xs font-bold transition-colors"
-              title="Сформировать квартальный отчёт партнеров и закрыть финансовый период"
-            >
-              <Briefcase className="w-3.5 h-3.5" />
-              <span>📊 КВАРТАЛЬНЫЙ ОТЧЕТ И ЗАКРЫТИЕ</span>
-            </button>
-
-            <button
-              onClick={openSharesModal}
-              className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-200 text-xs font-bold transition-colors"
-            >
-              <Percent className="w-3.5 h-3.5 text-emerald-400" />
-              <span className="hidden sm:inline">ДОЛИ ПАРТНЕРОВ</span>
-            </button>
-
-            <button
-              onClick={() => openTxModalForOwner(owners[0]?.id || '', 'PROFIT_PAYOUT')}
-              className="px-3.5 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-xs font-bold text-slate-950 uppercase tracking-wider flex items-center space-x-1.5 transition-colors shadow-[0_0_12px_rgba(16,185,129,0.4)] shrink-0"
-            >
-              <Plus className="w-4 h-4" />
-              <span>ПРОВЕСТИ ОПЕРАЦИЮ</span>
-            </button>
-          </div>
+      {/* Row 1: Top Header Bar */}
+      <div className="p-3 sm:p-4 border-b border-border bg-surface flex flex-col md:flex-row md:items-center justify-between gap-3 shrink-0">
+        <div>
+          <h3 className="text-xs sm:text-sm font-bold text-fg flex items-center space-x-2 uppercase tracking-wide">
+            <PieChart className="w-4 h-4 text-accent" />
+            <span>ПАРТНЕРЫ И КАПИТАЛ БИЗНЕСА</span>
+          </h3>
+          <p className="text-xs text-fg-muted mt-0.5">
+            Учет уставных вложений, распределения долей прибыли и выплат дивидендов учредителям
+          </p>
         </div>
 
-        {/* 4 High-Tech Top Summary KPI Cards */}
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            onClick={() => {
+              setStatusBanner(null);
+              setIsQuarterModalOpen(true);
+            }}
+            className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-500 text-xs font-bold transition-colors"
+            title="Сформировать квартальный отчёт партнеров и закрыть финансовый период"
+          >
+            <Briefcase className="w-3.5 h-3.5" />
+            <span>Квартальный отчет</span>
+          </button>
+
+          <button
+            onClick={openSharesModal}
+            className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-surface-raised hover:bg-surface border border-border text-fg text-xs font-bold transition-colors"
+          >
+            <Percent className="w-3.5 h-3.5 text-accent" />
+            <span>Доли партнеров</span>
+          </button>
+
+          <button
+            onClick={() => openTxModalForOwner(owners[0]?.id || '', 'PROFIT_PAYOUT')}
+            className="px-4 py-2 rounded-xl bg-accent hover:bg-accent-strong active:scale-95 text-xs font-bold text-accent-fg uppercase tracking-wider flex items-center space-x-1.5 transition-colors shadow-xs shrink-0"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Провести операцию</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Row 2: Top Summary KPI Cards Bar */}
+      <div className="p-3 sm:p-4 border-b border-border bg-bg shrink-0">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
           {/* Card 1: Total Capital */}
-          <div className="p-3.5 rounded-xl bg-[#0B0E14] border border-slate-800 flex items-start justify-between">
+          <div className="p-3.5 rounded-xl bg-surface border border-border flex items-start justify-between">
             <div>
-              <span className="text-[10px] text-slate-400 uppercase block">ОБЩИЙ ВЛОЖЕННЫЙ КАПИТАЛ</span>
-              <div className="flex items-baseline space-x-2 mt-1">
-                <span className="text-xl font-bold text-slate-100">
+              <span className="text-[10px] text-fg-subtle uppercase block font-semibold">Общий вложенный капитал</span>
+              <div className="flex items-baseline space-x-1.5 mt-1">
+                <span className="text-xl font-bold text-fg">
                   ${totalCapitalInvested.toLocaleString()}
                 </span>
-                <span className="text-xs text-slate-400 font-mono">USD</span>
+                <span className="text-xs text-fg-subtle font-medium">USD</span>
               </div>
-              <span className="text-[10px] text-slate-500 font-mono block mt-1">
+              <span className="text-[10px] text-fg-muted block mt-0.5">
                 ≈ {(Math.round(totalCapitalInvested * rate)).toLocaleString()} TJS
               </span>
             </div>
-            <div className="p-2 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 shrink-0">
+            <div className="p-2 rounded-xl bg-accent/10 border border-accent/20 text-accent shrink-0">
               <Briefcase className="w-4 h-4" />
             </div>
           </div>
 
           {/* Card 2: Accrued Profit */}
-          <div className="p-3.5 rounded-xl bg-[#0B0E14] border border-slate-800 flex items-start justify-between">
+          <div className="p-3.5 rounded-xl bg-surface border border-border flex items-start justify-between">
             <div>
-              <span className="text-[10px] text-slate-400 uppercase block">НАЧИСЛЕННОЙ ПРИБЫЛИ</span>
-              <div className="flex items-baseline space-x-2 mt-1">
-                <span className="text-xl font-bold text-slate-100">
+              <span className="text-[10px] text-fg-subtle uppercase block font-semibold">Начислено прибыли</span>
+              <div className="flex items-baseline space-x-1.5 mt-1">
+                <span className="text-xl font-bold text-fg">
                   ${totalAccruedProfit.toLocaleString()}
                 </span>
-                <span className="text-xs text-slate-400 font-mono">USD</span>
+                <span className="text-xs text-fg-subtle font-medium">USD</span>
               </div>
-              <span className="text-[10px] text-slate-500 font-mono block mt-1">
+              <span className="text-[10px] text-fg-muted block mt-0.5">
                 ≈ {(Math.round(totalAccruedProfit * rate)).toLocaleString()} TJS
               </span>
             </div>
-            <div className="p-2 rounded-lg bg-blue-500/10 border border-blue-500/20 text-blue-400 shrink-0">
+            <div className="p-2 rounded-xl bg-info/10 border border-info/20 text-info shrink-0">
               <TrendingUp className="w-4 h-4" />
             </div>
           </div>
 
           {/* Card 3: Paid Profit */}
-          <div className="p-3.5 rounded-xl bg-[#0B0E14] border border-slate-800 flex items-start justify-between">
+          <div className="p-3.5 rounded-xl bg-surface border border-border flex items-start justify-between">
             <div>
-              <span className="text-[10px] text-slate-400 uppercase block">ВЫПЛАЧЕНО ДИВИДЕНДОВ</span>
-              <div className="flex items-baseline space-x-2 mt-1">
-                <span className="text-xl font-bold text-emerald-400">
+              <span className="text-[10px] text-fg-subtle uppercase block font-semibold">Выплачено дивидендов</span>
+              <div className="flex items-baseline space-x-1.5 mt-1">
+                <span className="text-xl font-bold text-accent">
                   ${totalPayouts.toLocaleString()}
                 </span>
-                <span className="text-xs text-slate-400 font-mono">USD</span>
+                <span className="text-xs text-fg-subtle font-medium">USD</span>
               </div>
-              <span className="text-[10px] text-slate-500 font-mono block mt-1">
+              <span className="text-[10px] text-fg-muted block mt-0.5">
                 ≈ {(Math.round(totalPayouts * rate)).toLocaleString()} TJS
               </span>
             </div>
-            <div className="p-2 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 shrink-0">
+            <div className="p-2 rounded-xl bg-accent/10 border border-accent/20 text-accent shrink-0">
               <Coins className="w-4 h-4" />
             </div>
           </div>
 
           {/* Card 4: Available Profit */}
-          <div className="p-3.5 rounded-xl bg-[#0B0E14] border border-slate-800 flex items-start justify-between">
+          <div className="p-3.5 rounded-xl bg-surface border border-border flex items-start justify-between">
             <div>
-              <span className="text-[10px] text-slate-400 uppercase block">К ВЫПЛАТЕ ПАРТНЕРАМ</span>
-              <div className="flex items-baseline space-x-2 mt-1">
-                <span className="text-xl font-bold text-amber-400">
+              <span className="text-[10px] text-fg-subtle uppercase block font-semibold">К выплате партнерам</span>
+              <div className="flex items-baseline space-x-1.5 mt-1">
+                <span className="text-xl font-bold text-warning">
                   ${totalAvailableProfit.toLocaleString()}
                 </span>
-                <span className="text-xs text-slate-400 font-mono">USD</span>
+                <span className="text-xs text-fg-subtle font-medium">USD</span>
               </div>
-              <span className="text-[10px] text-slate-500 font-mono block mt-1">
+              <span className="text-[10px] text-fg-muted block mt-0.5">
                 ≈ {(Math.round(totalAvailableProfit * rate)).toLocaleString()} TJS
               </span>
             </div>
-            <div className="p-2 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-400 shrink-0">
+            <div className="p-2 rounded-xl bg-warning/10 border border-warning/20 text-warning shrink-0">
               <Wallet className="w-4 h-4" />
             </div>
           </div>
         </div>
       </div>
 
-      {statusMessage && (
-        <div className={`mx-3 sm:mx-4 mt-3 p-2.5 rounded-lg text-xs font-mono flex items-center justify-between shrink-0 ${statusMessage.type === 'success' ? 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30' : 'bg-rose-950/60 text-rose-300 border border-rose-800'
-          }`}>
-          <div className="flex items-center space-x-2 min-w-0">
-            {statusMessage.type === 'success' ? <CheckCircle2 className="w-4 h-4 shrink-0" /> : <AlertCircle className="w-4 h-4 shrink-0" />}
-            <span className="truncate">{statusMessage.text}</span>
-          </div>
-          <button onClick={() => setStatusMessage(null)} className="text-slate-400 hover:text-white ml-2">
-            <X className="w-3.5 h-3.5" />
-          </button>
-        </div>
-      )}
-
       {/* Main Container */}
-      <div className="flex-1 overflow-y-auto p-3.5 sm:p-4 space-y-4 bg-[#0B0E14]">
-        {/* Section 1: Owners Cards (Side by Side 2-Column Grid) */}
-        <div className="p-4 rounded-xl bg-[#0F1219] border border-slate-800 space-y-3.5 shadow-sm">
-          <div className="flex items-center justify-between pb-2 border-b border-slate-800/80">
-            <span className="text-xs font-bold text-slate-100 uppercase tracking-wider flex items-center space-x-2">
-              <Briefcase className="w-4 h-4 text-emerald-400" />
+      <div className="flex-1 overflow-y-auto p-3.5 sm:p-4 space-y-4 bg-bg">
+        {/* Section 1: Owners Cards (2-Column Grid) */}
+        <div className="p-4 rounded-xl bg-surface border border-border space-y-3.5 shadow-xs">
+          <div className="flex items-center justify-between pb-2 border-b border-border">
+            <span className="text-xs font-bold text-fg uppercase tracking-wider flex items-center space-x-2">
+              <Briefcase className="w-4 h-4 text-accent" />
               <span>СОБСТВЕННИКИ И ВЛОЖЕНИЯ ({owners.length})</span>
             </span>
-            <span className="text-[10px] text-slate-400 font-mono">2 учредителя бизнеса</span>
+            <span className="text-xs text-fg-subtle">2 учредителя бизнеса</span>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -456,47 +390,47 @@ export const OwnersPage: React.FC = () => {
               return (
                 <div
                   key={owner.id}
-                  className="p-4 rounded-xl bg-[#0B0E14] border border-slate-800 hover:border-slate-700 transition-all space-y-3.5 flex flex-col justify-between"
+                  className="p-4 rounded-xl bg-surface-raised border border-border hover:border-fg-subtle transition-all space-y-3.5 flex flex-col justify-between"
                 >
                   <div className="space-y-3">
                     {/* Header of Partner Card */}
                     <div className="flex items-center justify-between">
                       <div className="flex items-center space-x-3">
-                        <div className="w-10 h-10 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-center text-emerald-400 font-bold text-sm shadow-inner">
+                        <div className="w-10 h-10 rounded-xl bg-surface border border-border flex items-center justify-center text-accent font-bold text-sm shadow-xs">
                           {getOwnerDisplayName(owner).substring(0, 2).toUpperCase()}
                         </div>
                         <div>
-                          <h4 className="text-xs sm:text-sm font-bold text-slate-100">{getOwnerDisplayName(owner)}</h4>
-                          <span className="text-[10px] text-slate-400">Соучредитель бизнеса</span>
+                          <h4 className="text-xs sm:text-sm font-bold text-fg">{getOwnerDisplayName(owner)}</h4>
+                          <span className="text-xs text-fg-subtle">Соучредитель бизнеса</span>
                         </div>
                       </div>
 
                       <div className="text-right">
-                        <span className="inline-block px-2.5 py-1 rounded-lg bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 text-xs font-bold">
+                        <span className="inline-block px-2.5 py-1 rounded-lg bg-accent/15 border border-accent/30 text-accent text-xs font-bold">
                           {owner.profitSharePercent ?? 0}% ДОЛИ
                         </span>
                       </div>
                     </div>
 
                     {/* Share Progress Bar */}
-                    <div className="w-full bg-slate-900 h-2 rounded-full overflow-hidden p-0.5 border border-slate-800">
+                    <div className="w-full bg-surface h-2 rounded-full overflow-hidden p-0.5 border border-border">
                       <div
-                        className="bg-emerald-500 h-full rounded-full transition-all duration-500 shadow-[0_0_8px_rgba(16,185,129,0.6)]"
+                        className="bg-accent h-full rounded-full transition-all duration-500"
                         style={{ width: `${Math.min(100, Math.max(0, owner.profitSharePercent || 0))}%` }}
                       />
                     </div>
 
-                    {/* Prominent Capital Investment Display */}
-                    <div className="p-3 rounded-lg bg-[#0F1219] border border-emerald-500/30 space-y-1">
-                      <div className="flex items-center justify-between text-[10px] text-slate-400 uppercase">
+                    {/* Capital Investment Display */}
+                    <div className="p-3 rounded-xl bg-surface border border-border space-y-1">
+                      <div className="flex items-center justify-between text-[10px] text-fg-subtle uppercase">
                         <span>ЛИЧНО ВЛОЖЕНО В ОБОРОТ (КАПИТАЛ):</span>
-                        <span className="text-emerald-400 font-bold">ВЛОЖЕНИЕ</span>
+                        <span className="text-accent font-bold">ВЛОЖЕНИЕ</span>
                       </div>
                       <div className="flex items-baseline justify-between">
-                        <span className="font-mono text-lg text-slate-100 font-bold">
+                        <span className="text-base sm:text-lg text-fg font-bold">
                           ${(owner.capitalBalanceUsd ?? 0).toLocaleString()} USD
                         </span>
-                        <span className="font-mono text-xs text-slate-400">
+                        <span className="text-xs text-fg-subtle">
                           ≈ {capitalTjs.toLocaleString()} TJS
                         </span>
                       </div>
@@ -504,15 +438,15 @@ export const OwnersPage: React.FC = () => {
 
                     {/* Profit Breakdown Grid */}
                     <div className="grid grid-cols-2 gap-2 text-xs">
-                      <div className="p-2.5 rounded-lg bg-[#0F1219] border border-slate-800">
-                        <span className="text-slate-500 block text-[10px] uppercase">Начислено прибыли</span>
-                        <span className="font-mono text-slate-200 font-bold text-xs mt-0.5 block">
+                      <div className="p-2.5 rounded-xl bg-surface border border-border">
+                        <span className="text-fg-subtle block text-[10px] uppercase">Начислено прибыли</span>
+                        <span className="text-fg font-bold text-xs mt-0.5 block">
                           ${(owner.totalAccruedProfitUsd ?? 0).toLocaleString()}
                         </span>
                       </div>
-                      <div className="p-2.5 rounded-lg bg-[#0F1219] border border-slate-800">
-                        <span className="text-slate-500 block text-[10px] uppercase">Выплачено дивидендов</span>
-                        <span className="font-mono text-emerald-400 font-bold text-xs mt-0.5 block">
+                      <div className="p-2.5 rounded-xl bg-surface border border-border">
+                        <span className="text-fg-subtle block text-[10px] uppercase">Выплачено дивидендов</span>
+                        <span className="text-accent font-bold text-xs mt-0.5 block">
                           ${(owner.totalPaidProfitUsd ?? 0).toLocaleString()}
                         </span>
                       </div>
@@ -520,10 +454,10 @@ export const OwnersPage: React.FC = () => {
                   </div>
 
                   {/* Available for Payout Banner */}
-                  <div className="p-3 rounded-lg bg-amber-950/20 border border-amber-900/40 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs mt-2">
+                  <div className="p-3 rounded-xl bg-warning/10 border border-warning/30 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs mt-2">
                     <div>
-                      <span className="text-slate-400 text-[10px] uppercase block">Остаток к выплате:</span>
-                      <span className="font-bold text-amber-400 text-sm font-mono mt-0.5 block">
+                      <span className="text-fg-subtle text-[10px] uppercase block">Остаток к выплате:</span>
+                      <span className="font-bold text-warning text-sm mt-0.5 block">
                         ${(owner.availableProfitUsd ?? 0).toLocaleString()} USD
                       </span>
                     </div>
@@ -531,21 +465,21 @@ export const OwnersPage: React.FC = () => {
                     <div className="flex flex-wrap items-center gap-1.5">
                       <button
                         onClick={() => openTxModalForOwner(owner.id, 'INVESTMENT')}
-                        className="px-2 py-1 rounded-lg bg-slate-900 hover:bg-slate-800 text-emerald-400 border border-slate-800 text-[11px] font-bold transition-colors"
+                        className="px-2.5 py-1 rounded-lg bg-surface hover:bg-surface-raised text-accent border border-border text-xs font-bold transition-colors"
                         title="Внести новые личные средства в капитал"
                       >
                         + ЛИЧНЫЕ
                       </button>
                       <button
                         onClick={() => openTxModalForOwner(owner.id, 'REINVEST')}
-                        className="px-2 py-1 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 text-[11px] font-bold transition-colors flex items-center space-x-1"
+                        className="px-2.5 py-1 rounded-lg bg-warning/20 hover:bg-warning/30 text-warning border border-warning/40 text-xs font-bold transition-colors flex items-center space-x-1"
                         title="Реинвестировать остаток к выплате в бизнес"
                       >
                         <span>🔄 ВЛОЖИТЬ ОСТАТОК</span>
                       </button>
                       <button
                         onClick={() => openTxModalForOwner(owner.id, 'PROFIT_PAYOUT')}
-                        className="px-2 py-1 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-800 text-[11px] font-bold transition-colors"
+                        className="px-2.5 py-1 rounded-lg bg-accent/20 hover:bg-accent/30 text-accent border border-accent/30 text-xs font-bold transition-colors"
                         title="Выплатить прибыль на руки"
                       >
                         ↑ ВЫПЛАТИТЬ
@@ -559,37 +493,35 @@ export const OwnersPage: React.FC = () => {
         </div>
 
         {/* Section 2: Full Width Transactions Feed */}
-        <div className="p-4 rounded-xl bg-[#0F1219] border border-slate-800 space-y-3.5 shadow-sm">
-          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800/80 pb-3">
+        <div className="p-4 rounded-xl bg-surface border border-border space-y-3.5 shadow-xs">
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border pb-3">
             <div className="flex items-center space-x-2">
-              <CreditCard className="w-4 h-4 text-emerald-400" />
-              <span className="font-bold text-xs text-slate-100 uppercase">
+              <CreditCard className="w-4 h-4 text-accent" />
+              <span className="font-bold text-xs text-fg uppercase tracking-wide">
                 ИСТОРИЯ ФИНАНСОВЫХ ОПЕРАЦИЙ
               </span>
-              <span className="text-[10px] px-2.5 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 font-bold">
+              <span className="text-[10px] px-2.5 py-0.5 rounded-full bg-accent/15 border border-accent/30 text-accent font-bold">
                 {filteredTransactions.length} событий
               </span>
             </div>
-
-
           </div>
 
           {/* Controls Bar: Search & Filters */}
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5">
-            <div className="flex items-center space-x-2 flex-1 max-w-md">
-              <div className="relative flex-1">
-                <Search className="absolute left-3 top-2.5 w-3.5 h-3.5 text-slate-500" />
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-2.5">
+            <div className="flex flex-wrap items-center gap-2 flex-1">
+              <div className="relative w-full sm:w-64 md:w-80">
+                <Search className="absolute left-3 top-2.5 w-4 h-4 text-fg-subtle" />
                 <input
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder="Поиск по партнеру / примечанию / сумме..."
-                  className="w-full rounded-md bg-[#0B0E14] border border-slate-800 pl-8 pr-8 py-1.5 text-xs text-slate-100 placeholder-slate-500 focus:border-emerald-500 focus:outline-none transition-colors"
+                  className="w-full rounded-xl bg-surface-raised border border-border pl-9 pr-8 py-1.5 text-xs text-fg placeholder-fg-subtle focus:border-accent focus:outline-none transition-colors"
                 />
                 {searchQuery && (
                   <button
                     onClick={() => setSearchQuery('')}
-                    className="absolute right-2.5 top-2 text-slate-500 hover:text-slate-300"
+                    className="absolute right-2.5 top-2.5 text-fg-subtle hover:text-fg"
                   >
                     <X className="w-3.5 h-3.5" />
                   </button>
@@ -599,7 +531,7 @@ export const OwnersPage: React.FC = () => {
               <select
                 value={selectedOwnerFilter}
                 onChange={(e) => setSelectedOwnerFilter(e.target.value)}
-                className="bg-[#0B0E14] border border-slate-800 text-slate-200 text-xs rounded-md px-2.5 py-1.5 focus:outline-none focus:border-emerald-500 shrink-0"
+                className="bg-surface-raised border border-border text-fg text-xs font-semibold rounded-xl px-3 py-1.5 focus:outline-none focus:border-accent shrink-0"
               >
                 <option value="ALL">Все партнеры</option>
                 {owners.map(o => (
@@ -608,57 +540,62 @@ export const OwnersPage: React.FC = () => {
               </select>
             </div>
 
-            {/* Photo-Style Pill Filter Buttons */}
-            <div className="flex items-center space-x-2 overflow-x-auto scrollbar-none">
+            {/* Category Filter Pills */}
+            <div className="flex items-center space-x-1.5 overflow-x-auto scrollbar-none shrink-0">
               <button
                 type="button"
                 onClick={() => setTypeFilter('ALL')}
-                className={`px-3 py-1 rounded-md border text-xs font-mono font-bold uppercase tracking-wider whitespace-nowrap transition-colors bg-transparent ${typeFilter === 'ALL'
-                    ? 'border-[#22c55e] text-[#22c55e]'
-                    : 'border-slate-800 text-slate-400 hover:border-slate-700 hover:text-slate-200'
-                  }`}
+                className={`px-3 py-1.5 rounded-xl border text-xs font-bold uppercase whitespace-nowrap transition-colors ${
+                  typeFilter === 'ALL'
+                    ? 'border-accent bg-accent/10 text-accent'
+                    : 'border-border bg-surface-raised text-fg-muted hover:text-fg'
+                }`}
               >
-                ВСЕ ОПЕРАЦИИ
+                Все операции
               </button>
               <button
                 type="button"
                 onClick={() => setTypeFilter('INVESTMENT')}
-                className={`px-3 py-1 rounded-md border text-xs font-mono font-bold uppercase tracking-wider whitespace-nowrap transition-colors bg-transparent ${typeFilter === 'INVESTMENT'
-                    ? 'border-[#22c55e] text-[#22c55e]'
-                    : 'border-slate-800 text-slate-400 hover:border-slate-700 hover:text-slate-200'
-                  }`}
+                className={`px-3 py-1.5 rounded-xl border text-xs font-bold uppercase whitespace-nowrap transition-colors ${
+                  typeFilter === 'INVESTMENT'
+                    ? 'border-accent bg-accent/10 text-accent'
+                    : 'border-border bg-surface-raised text-fg-muted hover:text-fg'
+                }`}
               >
-                ЛИЧНЫЕ ВЛОЖЕНИЯ
+                Личные вложения
               </button>
               <button
                 type="button"
                 onClick={() => setTypeFilter('REINVEST')}
-                className={`px-3 py-1 rounded-md border text-xs font-mono font-bold uppercase tracking-wider whitespace-nowrap transition-colors bg-transparent ${typeFilter === 'REINVEST'
-                    ? 'border-amber-400 text-amber-400'
-                    : 'border-slate-800 text-slate-400 hover:border-slate-700 hover:text-slate-200'
-                  }`}
+                className={`px-3 py-1.5 rounded-xl border text-xs font-bold uppercase whitespace-nowrap transition-colors ${
+                  typeFilter === 'REINVEST'
+                    ? 'border-warning bg-warning/10 text-warning'
+                    : 'border-border bg-surface-raised text-fg-muted hover:text-fg'
+                }`}
               >
-                РЕИНВЕСТИРОВАНИЕ
+                Реинвестирование
               </button>
               <button
                 type="button"
                 onClick={() => setTypeFilter('PROFIT_PAYOUT')}
-                className={`px-3 py-1 rounded-md border text-xs font-mono font-bold uppercase tracking-wider whitespace-nowrap transition-colors bg-transparent ${typeFilter === 'PROFIT_PAYOUT'
-                    ? 'border-[#22c55e] text-[#22c55e]'
-                    : 'border-slate-800 text-slate-400 hover:border-slate-700 hover:text-slate-200'
-                  }`}
+                className={`px-3 py-1.5 rounded-xl border text-xs font-bold uppercase whitespace-nowrap transition-colors ${
+                  typeFilter === 'PROFIT_PAYOUT'
+                    ? 'border-accent bg-accent/10 text-accent'
+                    : 'border-border bg-surface-raised text-fg-muted hover:text-fg'
+                }`}
               >
-                ВЫПЛАТЫ ПРИБЫЛИ
+                Выплаты прибыли
               </button>
               <button
                 type="button"
                 onClick={() => setTypeFilter('WITHDRAWAL')}
-                className={`px-3 py-1 rounded-md border text-xs font-mono font-bold uppercase tracking-wider whitespace-nowrap transition-colors bg-transparent ${typeFilter === 'WITHDRAWAL'
-                    ? 'border-[#22c55e] text-[#22c55e]'
-                    : 'border-slate-800 text-slate-400 hover:border-slate-700 hover:text-slate-200'
-                  }`}
+                className={`px-3 py-1.5 rounded-xl border text-xs font-bold uppercase whitespace-nowrap transition-colors ${
+                  typeFilter === 'WITHDRAWAL'
+                    ? 'border-danger bg-danger/10 text-danger'
+                    : 'border-border bg-surface-raised text-fg-muted hover:text-fg'
+                }`}
               >
-                ВЫВОД КАПИТАЛА
+                Вывод капитала
               </button>
             </div>
           </div>
@@ -666,8 +603,8 @@ export const OwnersPage: React.FC = () => {
           {/* Transactions Feed List */}
           <div className="space-y-2.5 pt-1">
             {filteredTransactions.length === 0 ? (
-              <div className="p-12 text-center text-slate-500 text-xs space-y-2">
-                <CreditCard className="w-8 h-8 mx-auto opacity-20 text-slate-400" />
+              <div className="p-12 text-center text-fg-muted text-xs space-y-2">
+                <CreditCard className="w-8 h-8 mx-auto opacity-30 text-fg-subtle" />
                 <p className="uppercase font-bold tracking-wider">История транзакций пуста</p>
               </div>
             ) : (
@@ -675,63 +612,61 @@ export const OwnersPage: React.FC = () => {
                 const isDeposit = tx.type === 'INVESTMENT';
                 const isReinvest = tx.type === 'REINVEST';
                 const isPayout = tx.type === 'PROFIT_PAYOUT';
-                const isWithdrawal = tx.type === 'WITHDRAWAL';
                 const tjsVal = Math.round((tx.amountUsd || 0) * rate);
 
                 return (
                   <div
                     key={tx.id}
-                    className="p-3.5 rounded-xl bg-[#0B0E14] border border-slate-800 hover:border-slate-700 transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-sm"
+                    className="p-3.5 rounded-xl bg-surface-raised border border-border hover:border-fg-subtle transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs"
                   >
                     <div className="flex items-start space-x-3 min-w-0">
-                      <div className={`p-2.5 rounded-lg shrink-0 border ${
-                        isReinvest ? 'bg-amber-500/10 border-amber-500/30 text-amber-400' :
-                        isDeposit ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400' :
-                        isPayout ? 'bg-sky-500/10 border-sky-500/30 text-sky-400' :
-                        'bg-rose-500/10 border-rose-500/30 text-rose-400'
+                      <div className={`p-2.5 rounded-xl shrink-0 border ${
+                        isReinvest ? 'bg-warning/10 border-warning/30 text-warning' :
+                        isDeposit ? 'bg-accent/10 border-accent/30 text-accent' :
+                        isPayout ? 'bg-info/10 border-info/30 text-info' :
+                        'bg-danger/10 border-danger/30 text-danger'
                       }`}>
                         {isReinvest ? <Coins className="w-4 h-4" /> :
                          isDeposit ? <ArrowDownLeft className="w-4 h-4" /> :
                          isPayout ? <ArrowUpRight className="w-4 h-4" /> :
-                         <Wallet className="w-4 h-4" />}
+                         <Wallet className="w-4 h-4 text-danger" />}
                       </div>
 
                       <div className="space-y-1 min-w-0">
                         <div className="flex flex-wrap items-center gap-2">
-                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded border uppercase tracking-wider ${
-                            isReinvest ? 'bg-amber-500/10 border-amber-500/30 text-amber-400' :
-                            isDeposit ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400' :
-                            isPayout ? 'bg-sky-500/10 border-sky-500/30 text-sky-400' :
-                            'bg-rose-500/10 border-rose-500/30 text-rose-400'
+                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md border uppercase tracking-wider ${
+                            isReinvest ? 'bg-warning/10 border-warning/30 text-warning' :
+                            isDeposit ? 'bg-accent/10 border-accent/30 text-accent' :
+                            isPayout ? 'bg-info/10 border-info/30 text-info' :
+                            'bg-danger/10 border-danger/30 text-danger'
                           }`}>
                             {isReinvest ? '🔄 РЕИНВЕСТИРОВАНИЕ' : isDeposit ? '📥 ВНЕСЕНИЕ КАПИТАЛА' : isPayout ? '📤 ВЫПЛАТА ПРИБЫЛИ' : '🏦 ВЫВОД КАПИТАЛА'}
                           </span>
 
-                          <span className="text-xs font-bold text-slate-200">
+                          <span className="text-xs font-bold text-fg">
                             {tx.ownerName}
                           </span>
                         </div>
 
                         {tx.note && (
-                          <p className="text-xs text-slate-300 font-mono wrap-break-word">
+                          <p className="text-xs text-fg-muted wrap-break-word">
                             {tx.note}
                           </p>
                         )}
 
-                        <div className="flex items-center space-x-2 text-[10px] text-slate-500 font-mono">
+                        <div className="flex items-center space-x-2 text-[10px] text-fg-subtle">
                           <span>{tx.date}</span>
                           <span>•</span>
-                          <span>Провел: <strong className="text-slate-400">{tx.createdByName || 'Администратор'}</strong></span>
+                          <span>Провел: <strong className="text-fg font-semibold">{tx.createdByName || 'Администратор'}</strong></span>
                         </div>
                       </div>
                     </div>
 
-                    <div className="text-right shrink-0 font-mono border-t sm:border-t-0 border-slate-800/60 pt-2 sm:pt-0">
-                      <span className={`text-sm font-bold block ${isDeposit ? 'text-emerald-400' : 'text-amber-400'
-                        }`}>
+                    <div className="text-right shrink-0 border-t sm:border-t-0 border-border pt-2 sm:pt-0">
+                      <span className={`text-sm font-bold block ${isDeposit ? 'text-accent' : 'text-warning'}`}>
                         {isDeposit ? '+' : '-'}${tx.amountUsd?.toLocaleString()} USD
                       </span>
-                      <span className="text-[10px] text-slate-500 block">
+                      <span className="text-[10px] text-fg-subtle block">
                         ≈ {isDeposit ? '+' : '-'}{tjsVal.toLocaleString()} TJS
                       </span>
                     </div>
@@ -745,30 +680,30 @@ export const OwnersPage: React.FC = () => {
 
       {/* MODAL: Edit Shares Percent */}
       {isSharesModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-4 backdrop-blur-xs font-mono">
-          <form onSubmit={handleSaveShares} className="w-full max-w-sm rounded-xl bg-[#0F1219] border border-slate-800 p-5 text-slate-200 shadow-2xl space-y-3.5">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
-              <h4 className="text-xs font-bold text-white uppercase tracking-wider flex items-center space-x-2">
-                <Percent className="w-4 h-4 text-emerald-400" />
-                <span>ДОЛИ ПАРТНЕРОВВ БИЗНЕСЕ</span>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-xs">
+          <form onSubmit={handleSaveShares} className="w-full max-w-sm rounded-2xl bg-surface border border-border p-5 text-fg shadow-2xl space-y-4 text-xs">
+            <div className="flex items-center justify-between pb-3 border-b border-border">
+              <h4 className="text-sm font-bold text-fg uppercase tracking-wide flex items-center space-x-2">
+                <Percent className="w-4 h-4 text-accent" />
+                <span>ДОЛИ ПАРТНЕРОВ В БИЗНЕСЕ</span>
               </h4>
               <button
                 type="button"
                 onClick={() => setIsSharesModalOpen(false)}
-                className="text-slate-500 hover:text-slate-300"
+                className="text-fg-subtle hover:text-fg"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
-            <p className="text-[11px] text-slate-400">
+            <p className="text-xs text-fg-muted">
               Укажите процент доли каждого партнера. Сумма должна составлять строго 100%.
             </p>
 
-            <div className="space-y-2.5">
+            <div className="space-y-3">
               {owners.map(owner => (
                 <div key={owner.id}>
-                  <label className="block text-[10px] uppercase text-slate-400 mb-1">
+                  <label className="block text-[11px] uppercase font-semibold text-fg-subtle mb-1">
                     {getOwnerDisplayName(owner)} (%)
                   </label>
                   <div className="relative">
@@ -780,27 +715,27 @@ export const OwnersPage: React.FC = () => {
                       required
                       value={sharesInput[owner.id] ?? ''}
                       onChange={(e) => handleShareInputChange(owner.id, e.target.value)}
-                      className="w-full rounded-lg bg-[#0B0E14] border border-slate-800 px-3 py-2 text-xs text-emerald-400 font-bold focus:border-emerald-500 focus:outline-none"
+                      className="w-full rounded-xl bg-surface-raised border border-border px-3 py-2 text-xs text-accent font-bold focus:border-accent focus:outline-none pr-8"
                     />
-                    <span className="absolute right-3 top-2 text-slate-500 font-bold">%</span>
+                    <span className="absolute right-3 top-2.5 text-fg-subtle font-bold">%</span>
                   </div>
                 </div>
               ))}
             </div>
 
-            <div className="flex space-x-2 pt-2 border-t border-slate-800">
+            <div className="flex space-x-2 pt-2 border-t border-border">
               <button
                 type="button"
                 onClick={() => setIsSharesModalOpen(false)}
-                className="flex-1 py-2 rounded-lg bg-slate-900 hover:bg-slate-800 text-xs font-medium text-slate-300 border border-slate-800"
+                className="flex-1 py-2.5 rounded-xl bg-surface-raised hover:bg-surface text-xs font-bold text-fg-muted border border-border uppercase"
               >
-                ОТМЕНА
+                Отмена
               </button>
               <button
                 type="submit"
-                className="flex-1 py-2 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-xs font-bold text-slate-950 uppercase"
+                className="flex-1 py-2.5 rounded-xl bg-accent hover:bg-accent-strong text-xs font-bold text-accent-fg uppercase"
               >
-                СОХРАНИТЬ
+                Сохранить
               </button>
             </div>
           </form>
@@ -809,29 +744,29 @@ export const OwnersPage: React.FC = () => {
 
       {/* MODAL: Capital Transaction */}
       {isTxModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-4 backdrop-blur-xs font-mono">
-          <form onSubmit={handleCreateTx} className="w-full max-w-sm rounded-xl bg-[#0F1219] border border-slate-800 p-5 text-slate-200 shadow-2xl space-y-3.5">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
-              <h4 className="text-xs font-bold text-white uppercase flex items-center space-x-2">
-                <CreditCard className="w-4 h-4 text-emerald-400" />
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-xs">
+          <form onSubmit={handleCreateTx} className="w-full max-w-sm rounded-2xl bg-surface border border-border p-5 text-fg shadow-2xl space-y-4 text-xs">
+            <div className="flex items-center justify-between pb-3 border-b border-border">
+              <h4 className="text-sm font-bold text-fg uppercase flex items-center space-x-2">
+                <CreditCard className="w-4 h-4 text-accent" />
                 <span>ОПЕРАЦИЯ С КАПИТАЛОМ</span>
               </h4>
               <button
                 type="button"
                 onClick={() => setIsTxModalOpen(false)}
-                className="text-slate-500 hover:text-slate-300"
+                className="text-fg-subtle hover:text-fg"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
-            <div className="text-xs space-y-3">
+            <div className="space-y-3">
               <div>
-                <label className="block text-slate-400 text-[10px] uppercase mb-1">ПАРТНЕР *</label>
+                <label className="block text-fg-subtle text-[11px] uppercase mb-1 font-semibold">ПАРТНЕР *</label>
                 <select
                   value={selectedOwnerId ?? ''}
                   onChange={(e) => setSelectedOwnerId(e.target.value)}
-                  className="w-full rounded-lg bg-[#0B0E14] border border-slate-800 px-3 py-2 text-slate-100 text-xs focus:border-emerald-500 focus:outline-none"
+                  className="w-full rounded-xl bg-surface-raised border border-border px-3 py-2 text-fg text-xs font-semibold focus:border-accent focus:outline-none"
                 >
                   {owners.map(o => (
                     <option key={o.id} value={o.id}>{getOwnerDisplayName(o)} ({o.profitSharePercent ?? 0}% доли)</option>
@@ -840,11 +775,11 @@ export const OwnersPage: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-slate-400 text-[10px] uppercase mb-1">ТИП ОПЕРАЦИИ *</label>
+                <label className="block text-fg-subtle text-[11px] uppercase mb-1 font-semibold">ТИП ОПЕРАЦИИ *</label>
                 <select
                   value={txType ?? 'PROFIT_PAYOUT'}
                   onChange={(e) => setTxType(e.target.value as any)}
-                  className="w-full rounded-lg bg-[#0B0E14] border border-slate-800 px-3 py-2 text-slate-100 text-xs focus:border-emerald-500 focus:outline-none"
+                  className="w-full rounded-xl bg-surface-raised border border-border px-3 py-2 text-fg text-xs font-semibold focus:border-accent focus:outline-none"
                 >
                   <option value="INVESTMENT">📥 Внесение капитала (Личные внешние средства)</option>
                   <option value="REINVEST">🔄 Реинвестирование в бизнес (Из Остатка к выплате)</option>
@@ -860,23 +795,23 @@ export const OwnersPage: React.FC = () => {
 
                 if (txType === 'REINVEST' || txType === 'INVESTMENT') {
                   return (
-                    <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/30 space-y-2 font-mono">
-                      <div className="flex items-center justify-between text-[11px]">
-                        <span className="text-slate-400">Остаток к выплате партнера:</span>
-                        <strong className="text-amber-400 font-bold">${availProfit.toLocaleString()} USD</strong>
+                    <div className="p-3 rounded-xl bg-warning/10 border border-warning/30 space-y-2 text-xs">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-fg-muted">Остаток к выплате партнера:</span>
+                        <strong className="text-warning font-bold">${availProfit.toLocaleString()} USD</strong>
                       </div>
 
                       {txType === 'REINVEST' && availProfit > 0 && (
                         <button
                           type="button"
                           onClick={() => setAmountUsd(availProfit.toString())}
-                          className="w-full py-1.5 px-2 rounded bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 font-mono text-[10px] font-bold border border-amber-500/40 flex items-center justify-center space-x-1 transition-colors"
+                          className="w-full py-1.5 px-2 rounded-lg bg-warning/20 hover:bg-warning/30 text-warning text-xs font-bold border border-warning/40 flex items-center justify-center space-x-1 transition-colors"
                         >
                           <span>⚡ ВЛОЖИТЬ ВЕСЬ ОСТАТОК (${availProfit.toLocaleString()})</span>
                         </button>
                       )}
 
-                      <p className="text-[10px] text-slate-400 leading-snug">
+                      <p className="text-[11px] text-fg-subtle leading-snug">
                         {txType === 'REINVEST'
                           ? '★ Выбранный остаток к выплате будет зачислен в капитал бизнеса без выдачи наличных на руки.'
                           : '★ Внесение дополнительных личных средств владельца.'}
@@ -888,7 +823,7 @@ export const OwnersPage: React.FC = () => {
               })()}
 
               <div>
-                <label className="block text-slate-400 text-[10px] uppercase mb-1">СУММА ($ USD) *</label>
+                <label className="block text-fg-subtle text-[11px] uppercase mb-1 font-semibold">СУММА ($ USD) *</label>
                 <div className="relative">
                   <input
                     type="number"
@@ -897,37 +832,37 @@ export const OwnersPage: React.FC = () => {
                     value={amountUsd ?? ''}
                     onChange={(e) => setAmountUsd(e.target.value)}
                     placeholder="1000"
-                    className="w-full rounded-lg bg-[#0B0E14] border border-slate-800 px-3 py-2 text-emerald-400 text-xs font-bold focus:border-emerald-500 focus:outline-none pr-8"
+                    className="w-full rounded-xl bg-surface-raised border border-border px-3 py-2 text-accent text-xs font-bold focus:border-accent focus:outline-none pr-8"
                   />
-                  <span className="absolute right-3 top-2 text-slate-500 font-bold">$</span>
+                  <span className="absolute right-3 top-2.5 text-fg-subtle font-bold">$</span>
                 </div>
               </div>
 
               <div>
-                <label className="block text-slate-400 text-[10px] uppercase mb-1">ОСНОВАНИЕ / ПРИМЕЧАНИЕ</label>
+                <label className="block text-fg-subtle text-[11px] uppercase mb-1 font-semibold">ОСНОВАНИЕ / ПРИМЕЧАНИЕ</label>
                 <input
                   type="text"
                   value={note ?? ''}
                   onChange={(e) => setNote(e.target.value)}
                   placeholder="Дополнительное вложение в оборот"
-                  className="w-full rounded-lg bg-[#0B0E14] border border-slate-800 px-3 py-2 text-slate-100 text-xs focus:border-emerald-500 focus:outline-none"
+                  className="w-full rounded-xl bg-surface-raised border border-border px-3 py-2 text-fg text-xs focus:border-accent focus:outline-none"
                 />
               </div>
             </div>
 
-            <div className="flex space-x-2 pt-2 border-t border-slate-800">
+            <div className="flex space-x-2 pt-2 border-t border-border">
               <button
                 type="button"
                 onClick={() => setIsTxModalOpen(false)}
-                className="flex-1 py-2.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-xs font-medium text-slate-300 border border-slate-800"
+                className="flex-1 py-2.5 rounded-xl bg-surface-raised hover:bg-surface text-xs font-bold text-fg-muted border border-border uppercase"
               >
-                ОТМЕНА
+                Отмена
               </button>
               <button
                 type="submit"
-                className="flex-1 py-2.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-xs font-bold text-white uppercase"
+                className="flex-1 py-2.5 rounded-xl bg-accent hover:bg-accent-strong text-xs font-bold text-accent-fg uppercase"
               >
-                ПРОВЕСТИ
+                Провести
               </button>
             </div>
           </form>
@@ -936,26 +871,26 @@ export const OwnersPage: React.FC = () => {
 
       {/* MODAL: Quarterly Report & Period Settlement */}
       {isQuarterModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-4 backdrop-blur-xs font-mono">
-          <div className="w-full max-w-2xl rounded-xl bg-[#0F1219] border border-amber-500/40 p-5 text-slate-200 shadow-2xl space-y-4">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
-              <h4 className="text-xs sm:text-sm font-bold text-amber-400 uppercase tracking-wider flex items-center space-x-2">
-                <Briefcase className="w-4 h-4 text-amber-400" />
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-xs">
+          <div className="w-full max-w-2xl rounded-2xl bg-surface border border-warning/40 p-5 text-fg shadow-2xl space-y-4 text-xs">
+            <div className="flex items-center justify-between pb-3 border-b border-border">
+              <h4 className="text-sm font-bold text-warning uppercase tracking-wide flex items-center space-x-2">
+                <Briefcase className="w-4 h-4 text-warning" />
                 <span>📊 КВАРТАЛЬНЫЙ ОТЧЕТ И ЗАКРЫТИЕ ФИНАНСОВОГО ПЕРИОДА</span>
               </h4>
-              <button type="button" onClick={() => setIsQuarterModalOpen(false)} className="text-slate-500 hover:text-slate-300">
+              <button type="button" onClick={() => setIsQuarterModalOpen(false)} className="text-fg-subtle hover:text-fg">
                 <X className="w-4 h-4" />
               </button>
             </div>
 
             {/* Quarter & Year Selector Controls */}
-            <div className="grid grid-cols-2 gap-3 bg-[#0B0E14] p-3 rounded-lg border border-slate-800">
+            <div className="grid grid-cols-2 gap-3 bg-surface-raised p-3 rounded-xl border border-border">
               <div>
-                <label className="block text-[10px] text-slate-400 uppercase mb-1 font-bold">ОТЧЕТНЫЙ КВАРТАЛ *</label>
+                <label className="block text-[11px] text-fg-subtle uppercase mb-1 font-bold">ОТЧЕТНЫЙ КВАРТАЛ *</label>
                 <select
                   value={selectedQuarter}
                   onChange={(e) => setSelectedQuarter(e.target.value as any)}
-                  className="w-full rounded-md bg-[#0F1219] border border-slate-800 px-3 py-1.5 text-xs text-amber-300 font-bold focus:border-amber-500 focus:outline-none"
+                  className="w-full rounded-xl bg-surface border border-border px-3 py-2 text-xs text-warning font-bold focus:border-warning focus:outline-none"
                 >
                   <option value="Q1">Q1 (1-й Квартал: Январь - Март)</option>
                   <option value="Q2">Q2 (2-й Квартал: Апрель - Июнь)</option>
@@ -965,11 +900,11 @@ export const OwnersPage: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-[10px] text-slate-400 uppercase mb-1 font-bold">ОТЧЕТНЫЙ ГОД *</label>
+                <label className="block text-[11px] text-fg-subtle uppercase mb-1 font-bold">ОТЧЕТНЫЙ ГОД *</label>
                 <select
                   value={selectedQuarterYear}
                   onChange={(e) => setSelectedQuarterYear(parseInt(e.target.value))}
-                  className="w-full rounded-md bg-[#0F1219] border border-slate-800 px-3 py-1.5 text-xs text-slate-100 font-bold focus:border-amber-500 focus:outline-none"
+                  className="w-full rounded-xl bg-surface border border-border px-3 py-2 text-xs text-fg font-bold focus:border-warning focus:outline-none"
                 >
                   <option value={2026}>2026 год</option>
                   <option value={2025}>2025 год</option>
@@ -981,44 +916,44 @@ export const OwnersPage: React.FC = () => {
             {/* Breakdown Table */}
             <div className="space-y-2">
               <div className="flex items-center justify-between text-xs">
-                <span className="font-bold text-slate-200 uppercase">Сводная ведомость по партнерам:</span>
-                <span className="text-[10px] text-slate-500 font-mono">Валюта отчета: USD ($)</span>
+                <span className="font-bold text-fg uppercase">Сводная ведомость по партнерам:</span>
+                <span className="text-[11px] text-fg-subtle">Валюта отчета: USD ($)</span>
               </div>
 
-              <div className="overflow-x-auto rounded-lg border border-slate-800 bg-[#0B0E14]">
-                <table className="w-full text-left text-xs font-mono">
-                  <thead className="bg-[#0F1219] text-[10px] text-slate-400 uppercase border-b border-slate-800">
+              <div className="overflow-x-auto rounded-xl border border-border bg-surface-raised">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-surface text-[10px] text-fg-subtle uppercase border-b border-border">
                     <tr>
                       <th className="p-2.5">Партнер</th>
                       <th className="p-2.5 text-center">Доля</th>
                       <th className="p-2.5 text-right">Начислено ($)</th>
                       <th className="p-2.5 text-right">Выплачено ($)</th>
                       <th className="p-2.5 text-right">Реинвестировано ($)</th>
-                      <th className="p-2.5 text-right text-amber-400">Остаток ($)</th>
+                      <th className="p-2.5 text-right text-warning">Остаток ($)</th>
                       <th className="p-2.5 text-right">Капитал ($)</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-800/60 text-[11px]">
+                  <tbody className="divide-y divide-border text-xs">
                     {owners.map(o => (
-                      <tr key={o.id} className="hover:bg-slate-900/40">
-                        <td className="p-2.5 font-bold text-slate-200">{getOwnerDisplayName(o)}</td>
-                        <td className="p-2.5 text-center text-slate-400">{o.profitSharePercent || 0}%</td>
-                        <td className="p-2.5 text-right font-semibold text-slate-100">${(o.totalAccruedProfitUsd || 0).toLocaleString()}</td>
-                        <td className="p-2.5 text-right text-sky-400">${(o.totalPaidProfitUsd || 0).toLocaleString()}</td>
-                        <td className="p-2.5 text-right text-emerald-400">${(o.totalReinvestedUsd || 0).toLocaleString()}</td>
-                        <td className="p-2.5 text-right font-bold text-amber-400">${(o.availableProfitUsd || 0).toLocaleString()}</td>
-                        <td className="p-2.5 text-right font-semibold text-slate-200">${(o.capitalBalanceUsd || 0).toLocaleString()}</td>
+                      <tr key={o.id} className="hover:bg-surface/50">
+                        <td className="p-2.5 font-bold text-fg">{getOwnerDisplayName(o)}</td>
+                        <td className="p-2.5 text-center text-fg-subtle">{o.profitSharePercent || 0}%</td>
+                        <td className="p-2.5 text-right font-semibold text-fg">${(o.totalAccruedProfitUsd || 0).toLocaleString()}</td>
+                        <td className="p-2.5 text-right text-info">${(o.totalPaidProfitUsd || 0).toLocaleString()}</td>
+                        <td className="p-2.5 text-right text-accent">${(o.totalReinvestedUsd || 0).toLocaleString()}</td>
+                        <td className="p-2.5 text-right font-bold text-warning">${(o.availableProfitUsd || 0).toLocaleString()}</td>
+                        <td className="p-2.5 text-right font-semibold text-fg">${(o.capitalBalanceUsd || 0).toLocaleString()}</td>
                       </tr>
                     ))}
                   </tbody>
-                  <tfoot className="bg-[#0F1219] font-bold border-t border-slate-800 text-[11px]">
+                  <tfoot className="bg-surface font-bold border-t border-border text-xs">
                     <tr>
-                      <td colSpan={2} className="p-2.5 uppercase text-slate-400">ИТОГО КВАРТАЛ:</td>
-                      <td className="p-2.5 text-right text-slate-100">${owners.reduce((sum, o) => sum + (o.totalAccruedProfitUsd || 0), 0).toLocaleString()}</td>
-                      <td className="p-2.5 text-right text-sky-400">${owners.reduce((sum, o) => sum + (o.totalPaidProfitUsd || 0), 0).toLocaleString()}</td>
-                      <td className="p-2.5 text-right text-emerald-400">${owners.reduce((sum, o) => sum + (o.totalReinvestedUsd || 0), 0).toLocaleString()}</td>
-                      <td className="p-2.5 text-right text-amber-400">${owners.reduce((sum, o) => sum + (o.availableProfitUsd || 0), 0).toLocaleString()}</td>
-                      <td className="p-2.5 text-right text-slate-100">${owners.reduce((sum, o) => sum + (o.capitalBalanceUsd || 0), 0).toLocaleString()}</td>
+                      <td colSpan={2} className="p-2.5 uppercase text-fg-subtle">ИТОГО КВАРТАЛ:</td>
+                      <td className="p-2.5 text-right text-fg">${owners.reduce((sum, o) => sum + (o.totalAccruedProfitUsd || 0), 0).toLocaleString()}</td>
+                      <td className="p-2.5 text-right text-info">${owners.reduce((sum, o) => sum + (o.totalPaidProfitUsd || 0), 0).toLocaleString()}</td>
+                      <td className="p-2.5 text-right text-accent">${owners.reduce((sum, o) => sum + (o.totalReinvestedUsd || 0), 0).toLocaleString()}</td>
+                      <td className="p-2.5 text-right text-warning">${owners.reduce((sum, o) => sum + (o.availableProfitUsd || 0), 0).toLocaleString()}</td>
+                      <td className="p-2.5 text-right text-fg">${owners.reduce((sum, o) => sum + (o.capitalBalanceUsd || 0), 0).toLocaleString()}</td>
                     </tr>
                   </tfoot>
                 </table>
@@ -1026,30 +961,35 @@ export const OwnersPage: React.FC = () => {
             </div>
 
             {/* Quarter Settlement Option Checkbox */}
-            <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/30 space-y-2">
-              <label className="flex items-start space-x-2.5 cursor-pointer text-slate-200 text-xs">
+            <div className="p-3 rounded-xl bg-warning/10 border border-warning/30 space-y-2">
+              <label className="flex items-start space-x-2.5 cursor-pointer text-fg text-xs">
                 <input
                   type="checkbox"
                   checked={transferRemainingToCapital}
                   onChange={(e) => setTransferRemainingToCapital(e.target.checked)}
-                  className="rounded bg-[#0B0E14] border-slate-700 text-amber-500 focus:ring-0 mt-0.5"
+                  className="rounded bg-surface border-border text-warning focus:ring-0 mt-0.5"
                 />
                 <div>
-                  <strong className="block text-amber-300">Автоматически реинвестировать невыплаченный остаток в капитал</strong>
-                  <span className="text-[10px] text-slate-400 block mt-0.5">
+                  <strong className="block text-warning">Автоматически реинвестировать невыплаченный остаток в капитал</strong>
+                  <span className="text-[11px] text-fg-subtle block mt-0.5">
                     При установке этой галочки все невыплаченные средства партнеров будут зачислены в их оборотный капитал бизнеса до обнуления периода.
                   </span>
                 </div>
               </label>
             </div>
 
-            <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2 pt-2 border-t border-slate-800">
-
-
+            <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2 pt-2 border-t border-border">
+              <button
+                type="button"
+                onClick={() => setIsQuarterModalOpen(false)}
+                className="flex-1 py-2.5 px-3 rounded-xl bg-surface-raised hover:bg-surface text-xs font-bold text-fg-muted border border-border uppercase"
+              >
+                Отмена
+              </button>
               <button
                 type="button"
                 onClick={handleConfirmCloseQuarter}
-                className="flex-1 py-2.5 px-3 rounded-lg bg-amber-500 hover:bg-amber-400 text-xs font-bold uppercase text-slate-950 shadow-[0_0_12px_rgba(245,158,11,0.3)] transition-colors"
+                className="flex-1 py-2.5 px-3 rounded-xl bg-warning hover:bg-warning/90 text-xs font-bold uppercase text-black shadow-xs transition-colors"
               >
                 🧹 ЗАКРЫТЬ КВАРТАЛ И ОБНУЛИТЬ
               </button>
