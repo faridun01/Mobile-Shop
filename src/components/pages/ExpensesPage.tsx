@@ -339,9 +339,8 @@ export const ExpensesPage: React.FC = () => {
         </div>
 
         {filtersOpen && (
-          <div className="px-3 pb-3 space-y-2.5 border-t border-border pt-3">
-            {/* Row 1: Period Buttons + Month Picker on the right when active */}
-            <div className="flex items-center gap-2 overflow-x-auto py-0.5 shrink-0">
+          <div className="px-3 pb-3 border-t border-border pt-2.5">
+            <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none py-0.5 shrink-0">
               <FilterPillGroup
                 options={[{ value: 'TODAY', label: 'Сегодня' }, { value: 'SPECIFIC_MONTH', label: 'Месяц' }]}
                 value={periodFilter}
@@ -353,27 +352,24 @@ export const ExpensesPage: React.FC = () => {
                   type="month"
                   value={selectedMonth}
                   onChange={(e) => e.target.value && setSelectedMonth(e.target.value)}
-                  className="h-9 px-3 rounded-xl border border-accent bg-surface text-xs font-semibold text-accent focus:outline-none shrink-0 cursor-pointer"
+                  className="h-8 px-2 rounded-lg border border-accent bg-surface text-[11px] font-semibold text-accent focus:outline-none shrink-0 cursor-pointer"
                 />
               )}
-            </div>
 
-            {/* Row 2: Branch Select, Category Select & Add Category Button */}
-            <div className="flex items-center gap-2 overflow-x-auto py-0.5 shrink-0">
               {!isSeller && (
-                <Select value={selectedStoreFilter} onChange={(e) => setSelectedStoreFilter(e.target.value)} className="h-9 py-0 text-xs w-auto shrink-0">
+                <Select value={selectedStoreFilter} onChange={(e) => setSelectedStoreFilter(e.target.value)} className="h-8 py-0 px-2 text-[11px] w-auto shrink-0">
                   <option value="ALL">Все филиалы</option>
                   {retailStores.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
                 </Select>
               )}
 
-              <Select value={selectedCategoryTab} onChange={(e) => setSelectedCategoryTab(e.target.value)} className="h-9 py-0 text-xs w-auto shrink-0">
+              <Select value={selectedCategoryTab} onChange={(e) => setSelectedCategoryTab(e.target.value)} className="h-8 py-0 px-2 text-[11px] w-auto shrink-0">
                 <option value="ALL">Все категории</option>
                 {allCategoryOptions.map(c => <option key={c.id} value={c.id}>{c.label}</option>)}
               </Select>
 
               {canAddCategory && (
-                <Button variant="secondary" size="md" leftIcon={Plus} className="h-9 px-3 text-xs shrink-0 whitespace-nowrap" onClick={() => setIsAddCategoryModalOpen(true)}>
+                <Button variant="secondary" size="md" leftIcon={Plus} className="h-8 px-2.5 text-[11px] shrink-0 whitespace-nowrap" onClick={() => setIsAddCategoryModalOpen(true)}>
                   Категория
                 </Button>
               )}
