@@ -52,12 +52,11 @@ export const LoginPage: React.FC = () => {
 
         {/* Login form card */}
         <div className="bg-[#0F1219] border border-slate-800 rounded-xl p-5 shadow-2xl space-y-4">
-          <div className="flex items-center justify-between pb-3 border-b border-slate-800 text-[10px] font-mono text-slate-400">
-            <span className="flex items-center space-x-1">
+          <div className="flex items-center justify-end pb-3 border-b border-slate-800 text-[10px] font-mono text-slate-400">
+            <span className="text-emerald-400 font-bold uppercase tracking-wider flex items-center space-x-1">
               <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
-              <span>ТЕРМИНАЛ №01</span>
+              <span>ЗАЩИЩЕНО</span>
             </span>
-            <span className="text-emerald-400 font-bold uppercase tracking-wider">ЗАЩИЩЕНО</span>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-3.5">
