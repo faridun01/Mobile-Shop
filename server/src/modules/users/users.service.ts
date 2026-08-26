@@ -58,14 +58,34 @@ export class UsersService {
 
   public static async update(
     userId: string,
-    input: { name?: string; role?: 'ADMIN' | 'PARTNER' | 'SELLER'; storeId?: string | null; baseSalaryTjs?: number; salesCommissionPercent?: number },
+    input: {
+      login?: string;
+      password?: string;
+      name?: string;
+      role?: 'ADMIN' | 'PARTNER' | 'SELLER';
+      storeId?: string | null;
+      baseSalaryTjs?: number;
+      salesCommissionPercent?: number;
+    },
     updatedByUserId: string,
   ) {
     return prisma.$transaction(async (tx) => {
       const actor = await resolveActor(tx, updatedByUserId);
-      const user = await tx.user.update({ where: { id: userId }, data: input, select: SAFE_SELECT });
+      const data: any = {};
+      if (input.login && input.login.trim()) data.login = input.login.trim();
+      if (input.name && input.name.trim()) data.name = input.name.trim();
+      if (input.role) data.role = input.role;
+      if (input.storeId !== undefined) data.storeId = input.storeId;
+      if (input.baseSalaryTjs !== undefined) data.baseSalaryTjs = input.baseSalaryTjs;
+      if (input.salesCommissionPercent !== undefined) data.salesCommissionPercent = input.salesCommissionPercent;
+
+      if (input.password && input.password.trim().length > 0) {
+        data.password = await AuthService.hashPassword(input.password.trim());
+      }
+
+      const user = await tx.user.update({ where: { id: userId }, data, select: SAFE_SELECT });
       await tx.auditLog.create({
-        data: { userId: actor.id, userName: actor.name, userRole: actor.role, action: 'USER_UPDATE', details: `Обновлены данные сотрудника: ${user.name} (${user.role})`, targetId: user.id },
+        data: { userId: actor.id, userName: actor.name, userRole: actor.role, action: 'USER_UPDATE', details: `Обновлены данные сотрудника: ${user.name} (${user.role})${input.password ? ' (пароль изменен)' : ''}`, targetId: user.id },
       });
       return user;
     });

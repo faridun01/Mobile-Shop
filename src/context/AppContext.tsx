@@ -960,6 +960,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const updated = await apiClient<any>(`/users/${userData.id}`, {
         method: 'PATCH',
         body: JSON.stringify({
+          login: userData.login,
+          password: userData.passwordHash && userData.passwordHash.trim() ? userData.passwordHash.trim() : undefined,
           name: userData.name,
           role: userData.role,
           storeId: userData.storeId ?? null,
