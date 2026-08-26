@@ -437,7 +437,7 @@ export const SalesHistoryPage: React.FC = () => {
 
             <div>
               <label className="block text-xs font-medium text-fg-muted mb-1">Способ возврата денег</label>
-              <Select value={refundMethod} onChange={(e) => setRefundMethod(e.target.value as 'CASH' | 'CARD')}>
+              <Select value={refundMethod} onChange={(e) => setRefundMethod(e.target.value as 'CASH' | 'CARD')} className="w-full">
                 <option value="CASH">Наличные из кассы</option>
                 <option value="CARD">Безналичный возврат</option>
               </Select>
