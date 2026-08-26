@@ -1,20 +1,14 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
-import { ExpenseCategory } from '../../types';
+import { Expense, ExpenseCategory } from '../../types';
 import { exportExpensesReport } from '../../utils/exportReports';
 import {
   Receipt,
   Plus,
-  DollarSign,
   TrendingDown,
-  Building,
   Calendar,
-  AlertCircle,
-  CheckCircle2,
   Tag,
-  Search,
   Download,
-  Wallet,
   Home,
   UserCheck,
   Zap,
@@ -22,34 +16,27 @@ import {
   Wrench,
   Package,
   Store as StoreIcon,
-  X,
-  Lock,
   Edit2,
-  Trash2
+  Trash2,
+  SlidersHorizontal
 } from 'lucide-react';
+import { SearchBar } from '../ui/SearchBar';
+import { FilterPillGroup } from '../ui/FilterPillGroup';
+import { Select, ToggleRow } from '../ui/Input';
+import { FormField } from '../ui/FormField';
+import { Button } from '../ui/Button';
+import { IconButton } from '../ui/IconButton';
+import { Badge } from '../ui/Badge';
+import { EmptyState } from '../ui/EmptyState';
+import { LoadingState } from '../ui/Skeleton';
+import { Dialog } from '../ui/Dialog';
+import { ConfirmDialog } from '../ui/ConfirmDialog';
+import { RestrictedAccess } from '../ui/RestrictedAccess';
+import { StatusBanner, StatusMessage } from '../ui/StatusBanner';
 
-const CATEGORY_CONFIG: Record<string, { label: string; icon: any; colorClass: string; bgClass: string; borderClass: string }> = {
-  RENT: { label: 'Аренда помещения', icon: Home, colorClass: 'text-rose-400', bgClass: 'bg-rose-500/10', borderClass: 'border-rose-500/30' },
-  SALARY: { label: 'Зарплата сотрудников', icon: UserCheck, colorClass: 'text-sky-400', bgClass: 'bg-sky-500/10', borderClass: 'border-sky-500/30' },
-  EMPLOYEE_ADVANCE: { label: 'Аванс / Подотчет сотрудника', icon: UserCheck, colorClass: 'text-amber-400', bgClass: 'bg-amber-500/10', borderClass: 'border-amber-500/30' },
-  UTILITIES: { label: 'Коммуналка и интернет', icon: Zap, colorClass: 'text-amber-400', bgClass: 'bg-amber-500/10', borderClass: 'border-amber-500/30' },
-  MARKETING: { label: 'Реклама и маркетинг', icon: Megaphone, colorClass: 'text-purple-400', bgClass: 'bg-purple-500/10', borderClass: 'border-purple-500/30' },
-  TAXES: { label: 'Налоги и сборы', icon: Receipt, colorClass: 'text-teal-400', bgClass: 'bg-teal-500/10', borderClass: 'border-teal-500/30' },
-  SUPPLIES: { label: 'Расходные материалы', icon: Package, colorClass: 'text-indigo-400', bgClass: 'bg-indigo-500/10', borderClass: 'border-indigo-500/30' },
-  REPAIR_PARTS: { label: 'Запчасти для ремонта', icon: Wrench, colorClass: 'text-amber-400', bgClass: 'bg-amber-500/10', borderClass: 'border-amber-500/30' },
-  OTHER: { label: 'Прочие расходы', icon: Tag, colorClass: 'text-slate-400', bgClass: 'bg-slate-800/60', borderClass: 'border-slate-700' },
-
-  // Cyrillic fallbacks
-  'Аренда': { label: 'Аренда помещения', icon: Home, colorClass: 'text-rose-400', bgClass: 'bg-rose-500/10', borderClass: 'border-rose-500/30' },
-  'Зарплата': { label: 'Зарплата сотрудников', icon: UserCheck, colorClass: 'text-sky-400', bgClass: 'bg-sky-500/10', borderClass: 'border-sky-500/30' },
-  'Аванс сотрудника': { label: 'Аванс / Подотчет сотрудника', icon: UserCheck, colorClass: 'text-amber-400', bgClass: 'bg-amber-500/10', borderClass: 'border-amber-500/30' },
-  'Коммунальные': { label: 'Коммуналка и интернет', icon: Zap, colorClass: 'text-amber-400', bgClass: 'bg-amber-500/10', borderClass: 'border-amber-500/30' },
-  'Ремонт': { label: 'Ремонт и запчасти', icon: Wrench, colorClass: 'text-amber-400', bgClass: 'bg-amber-500/10', borderClass: 'border-amber-500/30' },
-  'Транспорт': { label: 'Транспорт и доставка', icon: Package, colorClass: 'text-sky-400', bgClass: 'bg-sky-500/10', borderClass: 'border-sky-500/30' },
-  'Реклама': { label: 'Реклама и маркетинг', icon: Megaphone, colorClass: 'text-purple-400', bgClass: 'bg-purple-500/10', borderClass: 'border-purple-500/30' },
-  'Другие': { label: 'Прочие расходы', icon: Tag, colorClass: 'text-slate-400', bgClass: 'bg-slate-800/60', borderClass: 'border-slate-700' }
-};
-
+// Single source of truth for expense categories — the old filter dropdown and the
+// create/edit modals each maintained their own separate option list, which had drifted
+// out of sync (e.g. EMPLOYEE_ADVANCE was creatable but not filterable).
 const STANDARD_CATEGORIES = [
   { id: 'RENT', label: 'Аренда помещения' },
   { id: 'SALARY', label: 'Зарплата сотрудников' },
@@ -59,29 +46,93 @@ const STANDARD_CATEGORIES = [
   { id: 'REPAIR_PARTS', label: 'Запчасти для ремонта' },
   { id: 'TAXES', label: 'Налоги и сборы' },
   { id: 'SUPPLIES', label: 'Расходные материалы' },
-  { id: 'OTHER', label: 'Прочие расходы' }
+  { id: 'OTHER', label: 'Прочие расходы' },
 ];
 
-export const ExpensesPage: React.FC = () => {
-  const {
-    currentUser,
-    expenses,
-    stores,
-    users,
-    todayRate,
-    createExpense,
-    updateExpense,
-    deleteExpense
-  } = useApp();
+const CATEGORY_ICONS: Record<string, React.ElementType> = {
+  RENT: Home, 'Аренда': Home,
+  SALARY: UserCheck, EMPLOYEE_ADVANCE: UserCheck, 'Зарплата': UserCheck, 'Аванс сотрудника': UserCheck,
+  UTILITIES: Zap, 'Коммунальные': Zap,
+  MARKETING: Megaphone, 'Реклама': Megaphone,
+  TAXES: Receipt,
+  SUPPLIES: Package, 'Хозяйственные': Package, 'Транспорт': Package, 'Доставка': Package,
+  REPAIR_PARTS: Wrench, 'Ремонт': Wrench,
+  OTHER: Tag, 'Другие': Tag,
+};
 
-  // Edit Expense state
-  const [editingExpense, setEditingExpense] = useState<any | null>(null);
+const LEGACY_LABELS: Record<string, string> = {
+  'Аренда': 'Аренда помещения',
+  'Зарплата': 'Зарплата сотрудников',
+  'Аванс сотрудника': 'Аванс / Подотчет сотрудника',
+  'Коммунальные': 'Коммуналка и интернет',
+  'Ремонт': 'Ремонт и запчасти',
+  'Транспорт': 'Транспорт и доставка',
+  'Реклама': 'Реклама и маркетинг',
+  'Хозяйственные': 'Хозяйственные товары',
+  'Другие': 'Прочие расходы',
+};
+
+type CustomCategory = { id: string; label: string };
+
+function getCategoryLabel(key: string, customCategories: CustomCategory[]): string {
+  const std = STANDARD_CATEGORIES.find(c => c.id === key);
+  if (std) return std.label;
+  const custom = customCategories.find(c => c.id === key || c.label === key);
+  if (custom) return custom.label;
+  return LEGACY_LABELS[key] || key || 'Прочие расходы';
+}
+
+function getCategoryIcon(key: string): React.ElementType {
+  return CATEGORY_ICONS[key] || Tag;
+}
+
+export const ExpensesPage: React.FC = () => {
+  const { currentUser, expenses, stores, users, todayRate, createExpense, updateExpense, deleteExpense, isInitialLoading } = useApp();
+
+  const isSeller = currentUser?.role === 'SELLER';
+  const canAddCategory = currentUser?.role === 'ADMIN' || currentUser?.role === 'PARTNER';
+
+  const [status, setStatus] = useState<StatusMessage | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
   const [editCategory, setEditCategory] = useState<ExpenseCategory>('RENT');
   const [editAmountTjs, setEditAmountTjs] = useState('');
   const [editStoreId, setEditStoreId] = useState('');
   const [editDescription, setEditDescription] = useState('');
 
-  const handleStartEdit = (exp: any) => {
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [category, setCategory] = useState<ExpenseCategory>('RENT');
+  const [amountTjs, setAmountTjs] = useState('');
+  const [storeId, setStoreId] = useState(stores[0]?.id || '');
+  const [selectedEmployeeId, setSelectedEmployeeId] = useState<string>('');
+  const [description, setDescription] = useState('');
+  const [paidFromCashRegister, setPaidFromCashRegister] = useState(true);
+
+  useEffect(() => {
+    if (!storeId && stores.length > 0) setStoreId(stores[0].id);
+  }, [stores, storeId]);
+
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [periodFilter, setPeriodFilter] = useState<'TODAY' | 'SPECIFIC_MONTH' | 'ALL'>('SPECIFIC_MONTH');
+  const [selectedMonth, setSelectedMonth] = useState<string>(new Date().toISOString().substring(0, 7));
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedCategoryTab, setSelectedCategoryTab] = useState('ALL');
+  const [selectedStoreFilter, setSelectedStoreFilter] = useState('ALL');
+
+  const [customCategories, setCustomCategories] = useState<CustomCategory[]>(() => {
+    try {
+      const saved = localStorage.getItem('custom_expense_categories');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  const [isAddCategoryModalOpen, setIsAddCategoryModalOpen] = useState(false);
+  const [newCategoryName, setNewCategoryName] = useState('');
+
+  const handleStartEdit = (exp: Expense) => {
     setEditingExpense(exp);
     setEditCategory(exp.category);
     setEditAmountTjs((exp.amountTjs || 0).toString());
@@ -94,7 +145,7 @@ export const ExpensesPage: React.FC = () => {
     if (!editingExpense) return;
     const val = parseFloat(editAmountTjs) || 0;
     if (val <= 0) {
-      setStatusMessage({ type: 'error', text: 'Укажите корректную сумму расхода' });
+      setStatus({ tone: 'error', text: 'Укажите корректную сумму расхода' });
       return;
     }
     const res = await updateExpense(editingExpense.id, {
@@ -102,74 +153,34 @@ export const ExpensesPage: React.FC = () => {
       amountTjs: val,
       storeId: editStoreId,
       comment: editDescription.trim(),
-      description: editDescription.trim()
+      description: editDescription.trim(),
     });
     if (res.success) {
       setEditingExpense(null);
-      setStatusMessage({ type: 'success', text: 'Расход успешно обновлен!' });
+      setStatus({ tone: 'success', text: 'Расход успешно обновлён' });
     } else {
-      setStatusMessage({ type: 'error', text: res.message || 'Ошибка обновления расхода' });
+      setStatus({ tone: 'error', text: res.message || 'Ошибка обновления расхода' });
     }
   };
 
-  const handleDeleteExpense = async (id: string) => {
-    if (!window.confirm('Вы действительно хотите удалить этот расход? Средства вернутся в баланс кассы.')) return;
-    const res = await deleteExpense(id);
+  const handleConfirmDelete = async () => {
+    if (!deletingId) return;
+    const res = await deleteExpense(deletingId);
+    setDeletingId(null);
     if (res.success) {
-      setStatusMessage({ type: 'success', text: 'Расход успешно удален!' });
+      setStatus({ tone: 'success', text: 'Расход удалён, средства возвращены в баланс кассы' });
     } else {
-      setStatusMessage({ type: 'error', text: res.message || 'Ошибка удаления расхода' });
+      setStatus({ tone: 'error', text: res.message || 'Ошибка удаления расхода' });
     }
   };
-
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [category, setCategory] = useState<ExpenseCategory>('RENT');
-  const [amountTjs, setAmountTjs] = useState('');
-  const [storeId, setStoreId] = useState(stores[0]?.id || '');
-  const [selectedEmployeeId, setSelectedEmployeeId] = useState<string>('');
-
-  // Stores load asynchronously — resync once they arrive.
-  useEffect(() => {
-    if (!storeId && stores.length > 0) {
-      setStoreId(stores[0].id);
-    }
-  }, [stores, storeId]);
-  const [description, setDescription] = useState('');
-  const [paidFromCashRegister, setPaidFromCashRegister] = useState(true);
-
-  // Search & Filter state
-  const [periodFilter, setPeriodFilter] = useState<'TODAY' | 'SPECIFIC_MONTH' | 'ALL'>('SPECIFIC_MONTH');
-  const [selectedMonth, setSelectedMonth] = useState<string>(new Date().toISOString().substring(0, 7));
-  const [searchQuery, setSearchQuery] = useState('');
-  const [selectedCategoryTab, setSelectedCategoryTab] = useState('ALL');
-  const [selectedStoreFilter, setSelectedStoreFilter] = useState('ALL');
-
-  // Custom Categories state (persisted in localStorage)
-  const [customCategories, setCustomCategories] = useState<{ id: string; label: string }[]>(() => {
-    try {
-      const saved = localStorage.getItem('custom_expense_categories');
-      return saved ? JSON.parse(saved) : [];
-    } catch (e) {
-      return [];
-    }
-  });
-
-  // Modal for adding a new expense category
-  const [isAddCategoryModalOpen, setIsAddCategoryModalOpen] = useState(false);
-  const [newCategoryName, setNewCategoryName] = useState('');
-
-  const [statusMessage, setStatusMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
-
-  const isSeller = currentUser?.role === 'SELLER';
-  const canAddCategory = currentUser?.role === 'ADMIN' || currentUser?.role === 'PARTNER';
 
   const handleAddExpense = async (e: React.FormEvent) => {
     e.preventDefault();
-    setStatusMessage(null);
+    setStatus(null);
 
     const val = parseFloat(amountTjs) || 0;
     if (val <= 0) {
-      setStatusMessage({ type: 'error', text: 'Укажите положительную сумму расхода' });
+      setStatus({ tone: 'error', text: 'Укажите положительную сумму расхода' });
       return;
     }
 
@@ -183,7 +194,7 @@ export const ExpensesPage: React.FC = () => {
       paidFromCashRegister,
       employeeId: selectedEmployeeId || undefined,
       employeeName: selectedEmp?.name,
-      isEmployeeAdvance: category === 'EMPLOYEE_ADVANCE' || category === 'Аванс сотрудника' || !!selectedEmployeeId
+      isEmployeeAdvance: category === 'EMPLOYEE_ADVANCE' || !!selectedEmployeeId,
     });
 
     if (res.success) {
@@ -191,9 +202,9 @@ export const ExpensesPage: React.FC = () => {
       setAmountTjs('');
       setDescription('');
       setSelectedEmployeeId('');
-      setStatusMessage({ type: 'success', text: `Расход на сумму ${val} TJS успешно проведен ${selectedEmp ? `(зачислен сотруднику ${selectedEmp.name})` : ''}` });
+      setStatus({ tone: 'success', text: `Расход на сумму ${val} TJS проведён${selectedEmp ? ` (зачислен сотруднику ${selectedEmp.name})` : ''}` });
     } else {
-      setStatusMessage({ type: 'error', text: res.message || 'Ошибка проведения расхода' });
+      setStatus({ tone: 'error', text: res.message || 'Ошибка проведения расхода' });
     }
   };
 
@@ -204,49 +215,20 @@ export const ExpensesPage: React.FC = () => {
 
     const allExist = [...STANDARD_CATEGORIES, ...customCategories];
     if (allExist.some(c => c.label.toLowerCase() === name.toLowerCase() || c.id.toLowerCase() === name.toLowerCase())) {
-      setStatusMessage({ type: 'error', text: `Категория "${name}" уже существует!` });
+      setStatus({ tone: 'error', text: `Категория "${name}" уже существует` });
       return;
     }
 
-    const newCat = {
-      id: `CUSTOM_${Date.now()}`,
-      label: name
-    };
-
+    const newCat = { id: `CUSTOM_${Date.now()}`, label: name };
     const updated = [...customCategories, newCat];
     setCustomCategories(updated);
-    try {
-      localStorage.setItem('custom_expense_categories', JSON.stringify(updated));
-    } catch (err) {}
+    try { localStorage.setItem('custom_expense_categories', JSON.stringify(updated)); } catch {}
 
     setSelectedCategoryTab(newCat.id);
     setCategory(newCat.id as ExpenseCategory);
     setIsAddCategoryModalOpen(false);
     setNewCategoryName('');
-    setStatusMessage({ type: 'success', text: `Новая категория "${name}" успешно добавлена!` });
-  };
-
-  const getCategoryInfo = (catKey: string) => {
-    if (CATEGORY_CONFIG[catKey]) {
-      return CATEGORY_CONFIG[catKey];
-    }
-    const custom = customCategories.find(c => c.id === catKey || c.label === catKey);
-    if (custom) {
-      return {
-        label: custom.label,
-        icon: Tag,
-        colorClass: 'text-rose-400',
-        bgClass: 'bg-rose-500/10',
-        borderClass: 'border-rose-500/30'
-      };
-    }
-    return {
-      label: catKey || 'Прочие расходы',
-      icon: Tag,
-      colorClass: 'text-slate-400',
-      bgClass: 'bg-slate-800/60',
-      borderClass: 'border-slate-700'
-    };
+    setStatus({ tone: 'success', text: `Новая категория "${name}" добавлена` });
   };
 
   const rate = todayRate?.rate || 9.50;
@@ -255,666 +237,338 @@ export const ExpensesPage: React.FC = () => {
     const todayStr = new Date().toISOString().split('T')[0];
 
     return expenses.filter(e => {
-      if (isSeller && e.storeId !== currentUser.storeId) {
-        return false;
-      }
-      if (selectedStoreFilter !== 'ALL' && e.storeId !== selectedStoreFilter) {
-        return false;
-      }
+      if (isSeller && e.storeId !== currentUser.storeId) return false;
+      if (selectedStoreFilter !== 'ALL' && e.storeId !== selectedStoreFilter) return false;
 
-      // Period filter
       const expDateStr = (e.date || '').split('T')[0];
-      if (periodFilter === 'TODAY' && expDateStr !== todayStr) {
-        return false;
-      }
-      if (periodFilter === 'SPECIFIC_MONTH' && !expDateStr.startsWith(selectedMonth)) {
-        return false;
-      }
+      if (periodFilter === 'TODAY' && expDateStr !== todayStr) return false;
+      if (periodFilter === 'SPECIFIC_MONTH' && !expDateStr.startsWith(selectedMonth)) return false;
 
       if (selectedCategoryTab !== 'ALL') {
-        const selectedCatObj = [...STANDARD_CATEGORIES, ...customCategories].find(c => c.id === selectedCategoryTab);
-        const targetId = selectedCategoryTab.toLowerCase();
-        const targetLabel = selectedCatObj ? selectedCatObj.label.toLowerCase() : targetId;
-
+        const targetLabel = getCategoryLabel(selectedCategoryTab, customCategories).toLowerCase();
         const expCat = (e.category || '').toLowerCase();
-        const configLabel = (CATEGORY_CONFIG[e.category]?.label || '').toLowerCase();
+        const expLabel = getCategoryLabel(e.category, customCategories).toLowerCase();
 
-        const matchesId = expCat === targetId;
-        const matchesLabel = expCat === targetLabel || expCat.includes(targetLabel) || targetLabel.includes(expCat);
-        const matchesConfig = configLabel === targetLabel || configLabel.includes(targetLabel);
-
-        if (!matchesId && !matchesLabel && !matchesConfig) {
-          return false;
-        }
+        const matchesId = expCat === selectedCategoryTab.toLowerCase();
+        const matchesLabel = expLabel === targetLabel || expCat.includes(targetLabel) || targetLabel.includes(expCat);
+        if (!matchesId && !matchesLabel) return false;
       }
 
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase().trim();
-        const info = getCategoryInfo(e.category);
-        const matchesCategory = info.label.toLowerCase().includes(q) || (e.category || '').toLowerCase().includes(q);
-        const matchesComment = (e.comment || (e as any).description || '').toLowerCase().includes(q);
-        const matchesUser = (e.createdByName || '').toLowerCase().includes(q);
-        const matchesStore = (e.storeName || '').toLowerCase().includes(q);
-        const matchesAmount = e.amountTjs.toString().includes(q);
-
-        if (!matchesCategory && !matchesComment && !matchesUser && !matchesStore && !matchesAmount) {
-          return false;
-        }
+        const label = getCategoryLabel(e.category, customCategories).toLowerCase();
+        const matches =
+          label.includes(q) ||
+          (e.category || '').toLowerCase().includes(q) ||
+          (e.comment || e.description || '').toLowerCase().includes(q) ||
+          (e.createdByName || '').toLowerCase().includes(q) ||
+          (e.storeName || '').toLowerCase().includes(q) ||
+          e.amountTjs.toString().includes(q);
+        if (!matches) return false;
       }
 
       return true;
-    }).sort((a, b) => new Date(b.date || (b as any).createdAt || 0).getTime() - new Date(a.date || (a as any).createdAt || 0).getTime());
+    }).sort((a, b) => new Date(b.date || 0).getTime() - new Date(a.date || 0).getTime());
   }, [expenses, isSeller, currentUser, periodFilter, selectedMonth, selectedStoreFilter, selectedCategoryTab, searchQuery, customCategories]);
 
-  const totalExpensesTjs = useMemo(() => {
-    return filteredExpenses.reduce((acc, e) => acc + (e.amountTjs || 0), 0);
-  }, [filteredExpenses]);
-
+  const totalExpensesTjs = useMemo(() => filteredExpenses.reduce((acc, e) => acc + (e.amountTjs || 0), 0), [filteredExpenses]);
   const totalExpensesUsd = +(totalExpensesTjs / rate).toFixed(2);
+
+  const allCategoryOptions = [...STANDARD_CATEGORIES, ...customCategories];
+  const hasActiveFilters = periodFilter !== 'SPECIFIC_MONTH' || selectedStoreFilter !== 'ALL' || selectedCategoryTab !== 'ALL';
 
   if (isSeller) {
     return (
-      <div className="p-8 text-center text-zinc-500">
-        <p className="text-sm font-medium">Доступ ограничен</p>
-        <p className="text-xs text-zinc-600 mt-1">Раздел расходов доступен только Администраторам и Партнерам</p>
+      <div className="flex-1 flex flex-col bg-bg">
+        <RestrictedAccess message="Раздел расходов доступен только администраторам и партнёрам." />
       </div>
     );
   }
 
   return (
-    <div className="flex-1 flex flex-col h-full overflow-hidden bg-[#0B0E14] text-slate-300 font-mono">
-      <div className="p-3.5 border-b border-slate-800 bg-[#0F1219] space-y-3 shrink-0">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h3 className="text-xs sm:text-sm font-bold text-slate-100 flex items-center space-x-2 uppercase">
-              <Receipt className="w-4 h-4 text-rose-400" />
-              <span>ЖУРНАЛ ОПЕРАЦИОННЫХ РАСХОДОВ</span>
-            </h3>
-            <p className="text-[11px] text-slate-400 mt-0.5 font-sans">
-              Учет арендных платежей, зарплат персоналу, коммунальных услуг и закупки материалов
-            </p>
+    <div className="flex-1 flex flex-col h-full overflow-hidden bg-bg text-fg">
+      <StatusBanner message={status} onDismiss={() => setStatus(null)} />
+
+      <div className="border-b border-border bg-bg shrink-0">
+        <div className="p-3 flex items-center justify-between gap-2">
+          <div className="min-w-0">
+            <h1 className="text-sm font-semibold text-fg flex items-center gap-2">
+              <Receipt className="w-4 h-4 text-danger" />
+              Расходы
+            </h1>
           </div>
-
-          <div className="flex items-center space-x-2">
-            <button
-              onClick={() => exportExpensesReport(filteredExpenses, rate)}
-              className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-200 text-xs font-bold transition-colors"
-              title="Скачать отфильтрованный отчет по расходам в CSV"
-            >
-              <Download className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">ЭКСПОРТ (CSV)</span>
-            </button>
-
-            <button
-              onClick={() => setIsModalOpen(true)}
-              className="px-3.5 py-2 rounded-xl bg-rose-500 hover:bg-rose-400 text-xs font-bold text-white uppercase tracking-wider flex items-center space-x-1.5 transition-colors shadow-[0_0_12px_rgba(244,63,94,0.3)] shrink-0"
-            >
-              <Plus className="w-4 h-4" />
-              <span>ЗАРЕГИСТРИРОВАТЬ РАСХОД</span>
-            </button>
+          <div className="flex items-center gap-2 shrink-0">
+            <Button variant="secondary" leftIcon={Download} onClick={() => exportExpensesReport(filteredExpenses, rate)} className="h-9 px-3">
+              <span className="hidden sm:inline">CSV</span>
+            </Button>
+            <Button variant="danger" leftIcon={Plus} onClick={() => setIsModalOpen(true)}>Добавить</Button>
           </div>
         </div>
 
-        <div className="p-3 rounded-lg bg-[#0B0E14] border border-slate-800 flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center space-x-3">
-            <div className="p-2 rounded-md bg-rose-500/10 border border-rose-500/20 text-rose-400">
-              <TrendingDown className="w-5 h-5" />
-            </div>
-            <div>
-              <span className="text-[10px] text-slate-400 uppercase block">ИТОГО РАСХОДОВ ЗА ПЕРИОД</span>
-              <div className="flex items-baseline space-x-2 mt-0.5">
-                <span className="text-xl font-bold text-rose-400">
-                  -{totalExpensesTjs.toLocaleString()} TJS
-                </span>
-                <span className="text-xs text-slate-400 font-mono">
-                  (≈ -${totalExpensesUsd.toLocaleString()})
-                </span>
+        <div className="px-3 pb-3">
+          <div className="p-3 rounded-lg bg-surface border border-border flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="p-2 rounded-lg bg-danger/10 text-danger shrink-0">
+                <TrendingDown className="w-4 h-4" />
+              </div>
+              <div className="min-w-0">
+                <span className="text-xs text-fg-subtle block">Итого за период</span>
+                <div className="flex items-baseline gap-1.5">
+                  <span className="text-lg font-bold text-danger">-{totalExpensesTjs.toLocaleString()} TJS</span>
+                  <span className="text-xs text-fg-subtle">≈ -${totalExpensesUsd.toLocaleString()}</span>
+                </div>
               </div>
             </div>
-          </div>
-
-          <div className="flex items-center space-x-4 text-xs">
-            <div className="text-right">
-              <span className="text-[10px] text-slate-500 uppercase block">ЗАПИСЕЙ В ЖУРНАЛЕ</span>
-              <strong className="text-slate-200 font-bold">{filteredExpenses.length} шт.</strong>
-            </div>
-
-            {!isSeller && (
-              <div className="text-right">
-                <span className="text-[10px] text-slate-500 uppercase block">КУРС УЧЕТА</span>
-                <strong className="text-emerald-400 font-bold">{rate} TJS / $</strong>
-              </div>
-            )}
+            <span className="text-xs text-fg-subtle shrink-0">{filteredExpenses.length} запис.</span>
           </div>
         </div>
 
-        {/* Filter bar: Search, Period Filter, Store Selector, Compact Category Dropdown */}
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 pt-1 border-t border-slate-800/80">
-          <div className="flex flex-wrap items-center gap-2 flex-1 min-w-0">
-            <div className="relative flex-1 min-w-45">
-              <Search className="absolute left-3 top-2.5 w-3.5 h-3.5 text-slate-500" />
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Поиск по расходу / назначению / автору..."
-                className="w-full rounded-md bg-[#0B0E14] border border-slate-800 pl-8 pr-8 py-1.5 text-xs font-mono text-slate-100 placeholder-slate-500 focus:border-rose-500 focus:outline-none transition-colors"
-              />
-              {searchQuery && (
-                <button
-                  onClick={() => setSearchQuery('')}
-                  className="absolute right-2.5 top-2 text-slate-500 hover:text-slate-300"
-                >
-                  <X className="w-3.5 h-3.5" />
-                </button>
-              )}
-            </div>
+        <div className="px-3 pb-3 flex items-center gap-2">
+          <SearchBar value={searchQuery} onChange={setSearchQuery} placeholder="Поиск по расходу / автору..." className="flex-1" />
+          <button
+            type="button"
+            onClick={() => setFiltersOpen(v => !v)}
+            className={`relative h-11 px-3 rounded-lg border text-xs font-semibold flex items-center gap-1.5 shrink-0 transition-colors ${
+              filtersOpen ? 'border-accent bg-accent/10 text-accent' : 'border-border text-fg-muted'
+            }`}
+          >
+            <SlidersHorizontal className="w-4 h-4" />
+            <span className="hidden sm:inline">Фильтры</span>
+            {hasActiveFilters && !filtersOpen && <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-accent" />}
+          </button>
+        </div>
 
-            {/* Period selector */}
-            <div className="flex items-center space-x-1 shrink-0">
-              <button
-                type="button"
-                onClick={() => setPeriodFilter('TODAY')}
-                className={`px-2.5 py-1.5 rounded-md border text-xs font-mono font-bold uppercase transition-colors bg-transparent ${
-                  periodFilter === 'TODAY'
-                    ? 'border-rose-500 text-rose-400'
-                    : 'border-slate-800 text-slate-400 hover:border-slate-700 hover:text-slate-200'
-                }`}
-              >
-                СЕГОДНЯ
-              </button>
-
+        {filtersOpen && (
+          <div className="px-3 pb-3 space-y-2.5 border-t border-border pt-3">
+            <FilterPillGroup
+              options={[{ value: 'TODAY', label: 'Сегодня' }, { value: 'SPECIFIC_MONTH', label: 'Месяц' }, { value: 'ALL', label: 'Все' }]}
+              value={periodFilter}
+              onChange={(v) => setPeriodFilter(v as typeof periodFilter)}
+            />
+            {periodFilter === 'SPECIFIC_MONTH' && (
               <input
                 type="month"
                 value={selectedMonth}
-                onChange={(e) => {
-                  if (e.target.value) {
-                    setSelectedMonth(e.target.value);
-                    setPeriodFilter('SPECIFIC_MONTH');
-                  }
-                }}
-                onClick={() => setPeriodFilter('SPECIFIC_MONTH')}
-                className={`px-2.5 py-1.5 rounded-md border text-xs font-mono font-bold transition-colors bg-[#0B0E14] focus:outline-none cursor-pointer ${
-                  periodFilter === 'SPECIFIC_MONTH'
-                    ? 'border-rose-500 text-rose-400'
-                    : 'border-slate-800 text-slate-400 hover:border-slate-700 hover:text-slate-200'
-                }`}
-                title="Выберите месяц"
+                onChange={(e) => e.target.value && setSelectedMonth(e.target.value)}
+                className="h-9 px-3 rounded-lg border border-border bg-surface text-xs font-semibold text-fg-muted focus:outline-none focus:border-accent"
               />
-
-              <button
-                type="button"
-                onClick={() => setPeriodFilter('ALL')}
-                className={`px-2.5 py-1.5 rounded-md border text-xs font-mono font-bold uppercase transition-colors bg-transparent ${
-                  periodFilter === 'ALL'
-                    ? 'border-rose-500 text-rose-400'
-                    : 'border-slate-800 text-slate-400 hover:border-slate-700 hover:text-slate-200'
-                }`}
-              >
-                ВСЕ РАСХОДЫ
-              </button>
-            </div>
-
-            {!isSeller && (
-              <select
-                value={selectedStoreFilter}
-                onChange={(e) => setSelectedStoreFilter(e.target.value)}
-                className="bg-[#0B0E14] border border-slate-800 text-slate-200 text-xs font-mono rounded px-2.5 py-1.5 focus:outline-none focus:border-rose-500 shrink-0"
-              >
-                <option value="ALL">Все филиалы</option>
-                {stores.map(s => (
-                  <option key={s.id} value={s.id}>{s.name}</option>
-                ))}
-              </select>
             )}
-          </div>
-
-          {/* Compact Dropdown Category Filter + Add Category Button */}
-          <div className="flex items-center space-x-2 shrink-0">
-            <div className="flex items-center space-x-1.5 bg-[#0B0E14] border border-slate-800 rounded-md px-2.5 py-1.5">
-              <span className="text-[10px] text-slate-400 font-mono font-bold uppercase hidden sm:inline">КАТЕГОРИЯ:</span>
-              <select
-                value={selectedCategoryTab}
-                onChange={(e) => setSelectedCategoryTab(e.target.value)}
-                className="bg-transparent text-slate-100 text-xs font-mono font-bold focus:outline-none cursor-pointer"
-              >
-                <option value="ALL">ВСЕ РАСХОДЫ</option>
-                <option value="RENT">АРЕНДА</option>
-                <option value="SALARY">ЗАРПЛАТА</option>
-                <option value="UTILITIES">КОММУНАЛКА</option>
-                <option value="MARKETING">РЕКЛАМА</option>
-                <option value="REPAIR_PARTS">ЗАПЧАСТИ</option>
-                <option value="TAXES">НАЛОГИ</option>
-                <option value="SUPPLIES">МАТЕРИАЛЫ</option>
-                <option value="OTHER">ПРОЧИЕ</option>
-                {customCategories.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.label.toUpperCase()}
-                  </option>
-                ))}
-              </select>
+            <div className="flex flex-wrap gap-2">
+              {!isSeller && (
+                <Select value={selectedStoreFilter} onChange={(e) => setSelectedStoreFilter(e.target.value)} className="h-9 py-0">
+                  <option value="ALL">Все филиалы</option>
+                  {stores.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                </Select>
+              )}
+              <Select value={selectedCategoryTab} onChange={(e) => setSelectedCategoryTab(e.target.value)} className="h-9 py-0">
+                <option value="ALL">Все категории</option>
+                {allCategoryOptions.map(c => <option key={c.id} value={c.id}>{c.label}</option>)}
+              </Select>
+              {canAddCategory && (
+                <Button variant="secondary" size="md" leftIcon={Plus} className="h-9 px-3" onClick={() => setIsAddCategoryModalOpen(true)}>
+                  Категория
+                </Button>
+              )}
             </div>
-
-            {canAddCategory && (
-              <button
-                type="button"
-                onClick={() => setIsAddCategoryModalOpen(true)}
-                className="px-2.5 py-1.5 rounded-md bg-slate-900 hover:bg-slate-800 text-xs font-mono font-bold text-rose-400 hover:text-rose-300 border border-slate-800 transition-colors shrink-0 flex items-center space-x-1"
-                title="Добавить новую категорию расхода (для Админа и Партнера)"
-              >
-                <Plus className="w-3.5 h-3.5 text-rose-400" />
-                <span className="hidden sm:inline">КАТЕГОРИЯ</span>
-              </button>
-            )}
           </div>
-        </div>
-      </div>
-
-      {statusMessage && (
-        <div className={`mx-3 sm:mx-4 mt-3 p-2.5 rounded-lg text-xs font-mono flex items-center space-x-2 shrink-0 ${
-          statusMessage.type === 'success' ? 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30' : 'bg-rose-950/60 text-rose-300 border border-rose-800'
-        }`}>
-          {statusMessage.type === 'success' ? <CheckCircle2 className="w-4 h-4 shrink-0" /> : <AlertCircle className="w-4 h-4 shrink-0" />}
-          <span>{statusMessage.text}</span>
-          <button onClick={() => setStatusMessage(null)} className="ml-auto text-slate-500 hover:text-slate-300">
-            <X className="w-3.5 h-3.5" />
-          </button>
-        </div>
-      )}
-
-      {/* Expenses Table/List */}
-      <div className="flex-1 overflow-y-auto p-3 sm:p-4 bg-[#0B0E14] space-y-2.5">
-        {filteredExpenses.length === 0 ? (
-          <div className="p-12 text-center text-slate-500 text-xs font-mono space-y-2">
-            <Receipt className="w-8 h-8 mx-auto opacity-20 text-slate-400" />
-            <p className="uppercase font-bold tracking-wider">Операционные расходы не найдены</p>
-          </div>
-        ) : (
-          filteredExpenses.map((exp) => {
-            const config = getCategoryInfo(exp.category);
-            const CategoryIcon = config.icon;
-            const formattedDate = exp.date ? new Date(exp.date).toLocaleDateString('ru-RU') : '-';
-            const costUsd = exp.amountUsd || +(exp.amountTjs / rate).toFixed(2);
-
-            return (
-              <div
-                key={exp.id}
-                className="p-3.5 rounded-xl bg-[#0F1219] border border-slate-800/90 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-sm"
-              >
-                <div className="flex items-start space-x-3 min-w-0">
-                  <div className={`p-2.5 rounded-lg shrink-0 border ${config.bgClass} ${config.borderClass} ${config.colorClass}`}>
-                    <CategoryIcon className="w-4 h-4" />
-                  </div>
-
-                  <div className="space-y-1 min-w-0">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded border uppercase tracking-wider ${config.bgClass} ${config.colorClass} ${config.borderClass}`}>
-                        {config.label}
-                      </span>
-
-                      {exp.sourceAccount?.toLowerCase().includes('касса') && (
-                        <span className="text-[9px] px-1.5 py-0.5 rounded bg-slate-900 text-slate-400 border border-slate-800 uppercase font-mono">
-                          Списано из кассы
-                        </span>
-                      )}
-
-                      {exp.employeeName && (
-                        <span className="text-[9px] px-2 py-0.5 rounded bg-amber-500/15 text-amber-300 border border-amber-500/30 uppercase font-mono font-bold">
-                          Сотрудник: {exp.employeeName}
-                        </span>
-                      )}
-                    </div>
-
-                    <p className="text-xs font-mono font-semibold text-slate-200 leading-snug">
-                      {exp.comment || (exp as any).description || 'Операционный расход'}
-                    </p>
-
-                    <div className="flex flex-wrap items-center gap-2 text-[10px] text-slate-500 font-mono pt-0.5">
-                      <span className="flex items-center space-x-1">
-                        <StoreIcon className="w-3 h-3 text-slate-400" />
-                        <span className="text-slate-300">{exp.storeName || 'Магазин'}</span>
-                      </span>
-                      <span>•</span>
-                      <span className="flex items-center space-x-1">
-                        <Calendar className="w-3 h-3 text-slate-400" />
-                        <span>{formattedDate}</span>
-                      </span>
-                      <span>•</span>
-                      <span>Списал: <strong className="text-slate-300">{exp.createdByName || 'Администратор'}</strong></span>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-end space-x-3 shrink-0 font-mono border-t sm:border-t-0 border-slate-800/60 pt-2 sm:pt-0">
-                  <div className="text-right">
-                    <span className="text-sm font-bold text-rose-400 block">
-                      -{(exp.amountTjs ?? 0).toLocaleString()} TJS
-                    </span>
-                    <span className="text-[10px] text-slate-500 block">
-                      ≈ -${costUsd.toLocaleString()} USD
-                    </span>
-                  </div>
-                  {(currentUser?.role === 'ADMIN' || currentUser?.role === 'PARTNER') && (
-                    <div className="flex items-center space-x-1 pl-2 border-l border-slate-800">
-                      <button
-                        onClick={() => handleStartEdit(exp)}
-                        className="p-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-emerald-400 border border-slate-800 transition-colors"
-                        title="Редактировать расход"
-                      >
-                        <Edit2 className="w-3.5 h-3.5" />
-                      </button>
-                      <button
-                        onClick={() => handleDeleteExpense(exp.id)}
-                        className="p-1.5 rounded-lg bg-slate-900 hover:bg-rose-500/10 text-slate-400 hover:text-rose-400 border border-slate-800 transition-colors"
-                        title="Удалить расход"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  )}
-                </div>
-              </div>
-            );
-          })
         )}
       </div>
 
-      {/* Edit Expense Modal */}
-      {editingExpense && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-xs p-4 font-mono">
-          <div className="w-full max-w-md rounded-2xl bg-[#0F1219] border border-slate-800 p-5 text-slate-200 shadow-2xl space-y-4">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
-              <div className="flex items-center space-x-2">
-                <div className="p-2 rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
-                  <Edit2 className="w-4 h-4" />
+      <div className="flex-1 overflow-y-auto">
+        {isInitialLoading ? (
+          <LoadingState label="Загрузка расходов…" />
+        ) : filteredExpenses.length === 0 ? (
+          <EmptyState icon={Receipt} title="Операционные расходы не найдены" />
+        ) : (
+          <div className="divide-y divide-border">
+            {filteredExpenses.map((exp) => {
+              const Icon = getCategoryIcon(exp.category);
+              const label = getCategoryLabel(exp.category, customCategories);
+              const formattedDate = exp.date ? new Date(exp.date).toLocaleDateString('ru-RU') : '—';
+              const costUsd = exp.amountUsd || +(exp.amountTjs / rate).toFixed(2);
+
+              return (
+                <div key={exp.id} className="p-4 flex items-start gap-3">
+                  <div className="p-2 rounded-lg bg-surface-raised text-fg-muted shrink-0">
+                    <Icon className="w-4 h-4" />
+                  </div>
+
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <span className="text-sm font-semibold text-fg">{label}</span>
+                      {exp.sourceAccount?.toLowerCase().includes('касса') && <Badge tone="neutral">Из кассы</Badge>}
+                      {exp.employeeName && <Badge tone="accent">{exp.employeeName}</Badge>}
+                    </div>
+                    <p className="text-sm text-fg-muted mt-0.5">{exp.comment || exp.description || 'Операционный расход'}</p>
+                    <div className="flex flex-wrap items-center gap-1.5 text-xs text-fg-subtle mt-1">
+                      <StoreIcon className="w-3 h-3" />
+                      <span>{exp.storeName || 'Магазин'}</span>
+                      <span>·</span>
+                      <Calendar className="w-3 h-3" />
+                      <span>{formattedDate}</span>
+                      <span>·</span>
+                      <span>{exp.createdByName || 'Администратор'}</span>
+                    </div>
+                  </div>
+
+                  <div className="text-right shrink-0">
+                    <p className="text-sm font-semibold text-danger">-{(exp.amountTjs ?? 0).toLocaleString()} TJS</p>
+                    <p className="text-xs text-fg-subtle">≈ -${costUsd.toLocaleString()}</p>
+                    {(currentUser?.role === 'ADMIN' || currentUser?.role === 'PARTNER') && (
+                      <div className="flex items-center gap-1 mt-1.5 justify-end">
+                        <IconButton icon={Edit2} size="sm" aria-label="Редактировать расход" onClick={() => handleStartEdit(exp)} />
+                        <IconButton icon={Trash2} tone="danger" size="sm" aria-label="Удалить расход" onClick={() => setDeletingId(exp.id)} />
+                      </div>
+                    )}
+                  </div>
                 </div>
-                <h3 className="text-sm font-bold text-slate-100 uppercase">РЕДАКТИРОВАТЬ РАСХОД</h3>
-              </div>
-              <button
-                onClick={() => setEditingExpense(null)}
-                className="p-1 rounded text-slate-400 hover:text-white"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            <form onSubmit={handleSaveEdit} className="space-y-3.5 text-xs">
-              <div>
-                <label className="block text-slate-400 text-[10px] uppercase mb-1">КАТЕГОРИЯ РАСХОДА</label>
-                <select
-                  value={editCategory}
-                  onChange={(e) => setEditCategory(e.target.value as ExpenseCategory)}
-                  className="w-full rounded-lg bg-[#0B0E14] border border-slate-800 px-3 py-2 text-slate-100 font-bold focus:border-emerald-500 focus:outline-none"
-                >
-                  <option value="RENT">Аренда помещения</option>
-                  <option value="SALARY">Зарплата сотрудникам</option>
-                  <option value="UTILITIES">Коммунальные услуги</option>
-                  <option value="MARKETING">Реклама и Маркетинг</option>
-                  <option value="REPAIR_PARTS">Запчасти и сервис</option>
-                  <option value="TAXES">Налоги и сборы</option>
-                  <option value="SUPPLIES">Хозяйственные товары</option>
-                  <option value="OTHER">Прочие расходы</option>
-                  {customCategories.map(c => (
-                    <option key={c.id} value={c.id}>{c.label}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-slate-400 text-[10px] uppercase mb-1">СУММА РАСХОДА (TJS)</label>
-                <input
-                  type="number"
-                  step="0.01"
-                  required
-                  min="0.01"
-                  value={editAmountTjs}
-                  onChange={(e) => setEditAmountTjs(e.target.value)}
-                  className="w-full rounded-lg bg-[#0B0E14] border border-slate-800 px-3 py-2 text-base font-bold text-rose-400 focus:border-emerald-500 focus:outline-none font-mono"
-                />
-              </div>
-
-              <div>
-                <label className="block text-slate-400 text-[10px] uppercase mb-1">ТОЧКА / ФИЛИАЛ</label>
-                <select
-                  value={editStoreId}
-                  onChange={(e) => setEditStoreId(e.target.value)}
-                  className="w-full rounded-lg bg-[#0B0E14] border border-slate-800 px-3 py-2 text-slate-100 focus:border-emerald-500 focus:outline-none"
-                >
-                  {stores.map(s => (
-                    <option key={s.id} value={s.id}>{s.name}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-slate-400 text-[10px] uppercase mb-1">ОПИСАНИЕ / ПРИМЕЧАНИЕ</label>
-                <input
-                  type="text"
-                  value={editDescription}
-                  onChange={(e) => setEditDescription(e.target.value)}
-                  placeholder="Примечание к расходу..."
-                  className="w-full rounded-lg bg-[#0B0E14] border border-slate-800 px-3 py-2 text-slate-100 focus:border-emerald-500 focus:outline-none"
-                />
-              </div>
-
-              <div className="flex space-x-2 pt-3 border-t border-slate-800">
-                <button
-                  type="button"
-                  onClick={() => setEditingExpense(null)}
-                  className="flex-1 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-400 font-bold"
-                >
-                  ОТМЕНА
-                </button>
-                <button
-                  type="submit"
-                  className="flex-1 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-white font-bold shadow-[0_0_12px_rgba(16,185,129,0.4)]"
-                >
-                  СОХРАНИТЬ
-                </button>
-              </div>
-            </form>
+              );
+            })}
           </div>
-        </div>
-      )}
+        )}
+      </div>
 
-      {/* MODAL: Register New Expense */}
-      {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-4 backdrop-blur-xs font-mono">
-          <form onSubmit={handleAddExpense} className="w-full max-w-sm rounded-xl bg-[#0F1219] border border-slate-800 p-5 text-slate-200 shadow-2xl space-y-3.5">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
-              <h4 className="text-xs font-bold text-white uppercase tracking-wider flex items-center space-x-2">
-                <Receipt className="w-4 h-4 text-rose-400" />
-                <span>РЕГИСТРАЦИЯ РАСХОДА</span>
-              </h4>
-              <button
-                type="button"
-                onClick={() => setIsModalOpen(false)}
-                className="text-slate-500 hover:text-slate-300"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
+      <ConfirmDialog
+        open={!!deletingId}
+        title="Удалить расход?"
+        message="Средства вернутся в баланс кассы. Это действие нельзя отменить."
+        confirmLabel="Удалить"
+        onConfirm={handleConfirmDelete}
+        onCancel={() => setDeletingId(null)}
+      />
 
-            <div className="text-xs space-y-3">
-              <div>
-                <div className="flex items-center justify-between mb-1">
-                  <label className="block text-slate-400 text-[10px] uppercase font-bold">КАТЕГОРИЯ РАСХОДА *</label>
-                  {canAddCategory && (
-                    <button
-                      type="button"
-                      onClick={() => setIsAddCategoryModalOpen(true)}
-                      className="text-[10px] text-rose-400 hover:text-rose-300 font-bold flex items-center space-x-0.5"
-                    >
-                      <Plus className="w-3 h-3" />
-                      <span>Новая категория</span>
-                    </button>
-                  )}
-                </div>
-                <select
-                  value={category ?? 'RENT'}
-                  onChange={(e) => setCategory(e.target.value as any)}
-                  className="w-full rounded-lg bg-[#0B0E14] border border-slate-800 px-3 py-2 text-slate-100 focus:border-rose-500 focus:outline-none"
-                >
-                  <option value="RENT">Аренда помещения</option>
-                  <option value="SALARY">Зарплата сотрудников</option>
-                  <option value="EMPLOYEE_ADVANCE">Аванс / Подотчет сотрудника</option>
-                  <option value="UTILITIES">Коммуналка и интернет</option>
-                  <option value="MARKETING">Реклама и маркетинг</option>
-                  <option value="REPAIR_PARTS">Запчасти для ремонта</option>
-                  <option value="TAXES">Налоги и сборы</option>
-                  <option value="SUPPLIES">Расходные материалы</option>
-                  <option value="OTHER">Прочие расходы</option>
-                  {customCategories.map(c => (
-                    <option key={c.id} value={c.id}>{c.label}</option>
-                  ))}
-                </select>
-              </div>
+      <Dialog
+        open={!!editingExpense}
+        onClose={() => setEditingExpense(null)}
+        title="Редактировать расход"
+        footer={
+          <>
+            <Button variant="secondary" fullWidth onClick={() => setEditingExpense(null)}>Отмена</Button>
+            <Button variant="primary" fullWidth type="submit" form="edit-expense-form">Сохранить</Button>
+          </>
+        }
+      >
+        <form id="edit-expense-form" onSubmit={handleSaveEdit} className="space-y-3.5">
+          <FormField label="Категория расхода">
+            <Select value={editCategory} onChange={(e) => setEditCategory(e.target.value as ExpenseCategory)} className="w-full">
+              {allCategoryOptions.map(c => <option key={c.id} value={c.id}>{c.label}</option>)}
+            </Select>
+          </FormField>
+          <FormField label="Сумма расхода (TJS)" required>
+            <input
+              type="number" step="0.01" required min="0.01"
+              value={editAmountTjs} onChange={(e) => setEditAmountTjs(e.target.value)}
+              className="w-full h-11 rounded-lg bg-bg border border-border px-3 text-sm font-semibold text-danger focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent"
+            />
+          </FormField>
+          <FormField label="Точка / филиал">
+            <Select value={editStoreId} onChange={(e) => setEditStoreId(e.target.value)} className="w-full">
+              {stores.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+            </Select>
+          </FormField>
+          <FormField label="Описание / примечание">
+            <input
+              type="text" value={editDescription} onChange={(e) => setEditDescription(e.target.value)}
+              placeholder="Примечание к расходу..."
+              className="w-full h-11 rounded-lg bg-bg border border-border px-3 text-sm text-fg focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent"
+            />
+          </FormField>
+        </form>
+      </Dialog>
 
-              {/* Employee selection for Advances or Salary */}
-              {(category === 'EMPLOYEE_ADVANCE' || category === 'SALARY' || category === 'Аванс сотрудника') && (
-                <div>
-                  <label className="block text-slate-400 text-[10px] uppercase mb-1 font-bold items-center justify-between">
-                    <span>СОТРУДНИК (ДЛЯ ВЫЧЕТА ИЗ ЗАРПЛАТЫ):</span>
-                    <span className="text-[9px] text-amber-400 font-normal">Удержать из ЗП</span>
-                  </label>
-                  <select
-                    value={selectedEmployeeId}
-                    onChange={(e) => setSelectedEmployeeId(e.target.value)}
-                    className="w-full rounded-lg bg-[#0B0E14] border border-amber-500/40 px-3 py-2 text-amber-300 font-bold focus:border-amber-500 focus:outline-none cursor-pointer"
-                  >
-                    <option value="">-- ВЫБЕРИТЕ СОТРУДНИКА --</option>
-                    {users.filter(u => u.isActive ?? u.active).map(u => (
-                      <option key={u.id} value={u.id}>
-                        {u.name} {u.role === 'ADMIN' ? '(Администратор)' : ''}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+      <Dialog
+        open={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        title="Регистрация расхода"
+        footer={
+          <>
+            <Button variant="secondary" fullWidth onClick={() => setIsModalOpen(false)}>Отмена</Button>
+            <Button variant="danger" fullWidth type="submit" form="add-expense-form">Сохранить расход</Button>
+          </>
+        }
+      >
+        <form id="add-expense-form" onSubmit={handleAddExpense} className="space-y-3.5">
+          <FormField label="Категория расхода" required>
+            <div className="flex items-center gap-2">
+              <Select value={category} onChange={(e) => setCategory(e.target.value as ExpenseCategory)} className="w-full">
+                {allCategoryOptions.map(c => <option key={c.id} value={c.id}>{c.label}</option>)}
+              </Select>
+              {canAddCategory && (
+                <Button type="button" variant="secondary" size="md" leftIcon={Plus} onClick={() => setIsAddCategoryModalOpen(true)} className="shrink-0 px-3">
+                  Новая
+                </Button>
               )}
-
-              <div>
-                <label className="block text-slate-400 text-[10px] uppercase mb-1 font-bold">СУММА РАСХОДА (TJS) *</label>
-                <div className="relative">
-                  <input
-                    type="number"
-                    min="1"
-                    required
-                    value={amountTjs ?? ''}
-                    onChange={(e) => setAmountTjs(e.target.value)}
-                    placeholder="500"
-                    className="w-full rounded-lg bg-[#0B0E14] border border-slate-800 px-3 py-2 font-mono text-rose-400 text-sm font-bold focus:border-rose-500 focus:outline-none"
-                  />
-                  <span className="absolute right-3 top-2.5 text-slate-500 text-xs">TJS</span>
-                </div>
-              </div>
-
-              {!isSeller && (
-                <div>
-                  <label className="block text-slate-400 text-[10px] uppercase mb-1 font-bold">ФИЛИАЛ / СКЛАД *</label>
-                  <select
-                    value={storeId ?? ''}
-                    onChange={(e) => setStoreId(e.target.value)}
-                    className="w-full rounded-lg bg-[#0B0E14] border border-slate-800 px-3 py-2 text-slate-100 focus:border-rose-500 focus:outline-none"
-                  >
-                    {stores.map(s => (
-                      <option key={s.id} value={s.id}>{s.name}</option>
-                    ))}
-                  </select>
-                </div>
-              )}
-
-              <div>
-                <label className="block text-slate-400 text-[10px] uppercase mb-1 font-bold">ОПИСАНИЕ / ОБОСНОВАНИЕ *</label>
-                <input
-                  type="text"
-                  required
-                  value={description ?? ''}
-                  onChange={(e) => setDescription(e.target.value)}
-                  placeholder="Оплата аренды за текущий месяц"
-                  className="w-full rounded-lg bg-[#0B0E14] border border-slate-800 px-3 py-2 text-slate-100 focus:border-rose-500 focus:outline-none"
-                />
-              </div>
-
-              <div className="pt-2 border-t border-slate-800">
-                <label className="flex items-center space-x-2 cursor-pointer text-slate-300">
-                  <input
-                    type="checkbox"
-                    checked={paidFromCashRegister}
-                    onChange={(e) => setPaidFromCashRegister(e.target.checked)}
-                    className="rounded bg-[#0B0E14] border-slate-700 text-rose-500 focus:ring-0"
-                  />
-                  <span>Списать сумму из наличной кассы</span>
-                </label>
-              </div>
             </div>
+          </FormField>
 
-            <div className="flex space-x-2 pt-2">
-              <button
-                type="button"
-                onClick={() => setIsModalOpen(false)}
-                className="flex-1 py-2 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 text-xs font-medium text-slate-300"
-              >
-                ОТМЕНА
-              </button>
-              <button
-                type="submit"
-                className="flex-1 py-2 rounded bg-rose-600 hover:bg-rose-500 text-xs font-semibold text-white"
-              >
-                Сохранить расход
-              </button>
-            </div>
-          </form>
-        </div>
-      )}
+          {(category === 'EMPLOYEE_ADVANCE' || category === 'SALARY') && (
+            <FormField label="Сотрудник (для удержания из ЗП)">
+              <Select value={selectedEmployeeId} onChange={(e) => setSelectedEmployeeId(e.target.value)} className="w-full">
+                <option value="">— Выберите сотрудника —</option>
+                {users.filter(u => u.isActive ?? u.active).map(u => (
+                  <option key={u.id} value={u.id}>{u.name}{u.role === 'ADMIN' ? ' (Администратор)' : ''}</option>
+                ))}
+              </Select>
+            </FormField>
+          )}
 
-      {/* MODAL: Add New Custom Expense Category */}
-      {isAddCategoryModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-4 backdrop-blur-xs font-mono">
-          <form onSubmit={handleAddCategorySubmit} className="w-full max-w-sm rounded-xl bg-[#0F1219] border border-slate-800 p-5 text-slate-200 shadow-2xl space-y-4">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
-              <h4 className="text-xs font-bold text-white uppercase tracking-wider flex items-center space-x-2">
-                <Plus className="w-4 h-4 text-rose-400" />
-                <span>НОВАЯ КАТЕГОРИЯ РАСХОДА</span>
-              </h4>
-              <button
-                type="button"
-                onClick={() => setIsAddCategoryModalOpen(false)}
-                className="text-slate-500 hover:text-slate-300"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            <div>
-              <label className="block text-slate-400 text-[10px] uppercase mb-1 font-bold">Название категории *</label>
+          <FormField label="Сумма расхода (TJS)" required>
+            <div className="relative">
               <input
-                type="text"
-                required
-                value={newCategoryName}
-                onChange={(e) => setNewCategoryName(e.target.value)}
-                placeholder="Например: Логистика, Оборудование..."
-                className="w-full rounded-lg bg-[#0B0E14] border border-slate-800 px-3 py-2 text-slate-100 text-xs focus:border-rose-500 focus:outline-none"
+                type="number" min="1" required value={amountTjs} onChange={(e) => setAmountTjs(e.target.value)}
+                placeholder="500"
+                className="w-full h-11 rounded-lg bg-bg border border-border px-3 pr-12 text-sm font-semibold text-danger focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent"
               />
+              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-fg-subtle">TJS</span>
             </div>
+          </FormField>
 
-            <div className="flex space-x-2 pt-2">
-              <button
-                type="button"
-                onClick={() => setIsAddCategoryModalOpen(false)}
-                className="flex-1 py-2 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 text-xs font-medium text-slate-300"
-              >
-                ОТМЕНА
-              </button>
-              <button
-                type="submit"
-                className="flex-1 py-2 rounded bg-rose-600 hover:bg-rose-500 text-xs font-semibold text-white"
-              >
-                Добавить
-              </button>
-            </div>
-          </form>
-        </div>
-      )}
+          {!isSeller && (
+            <FormField label="Филиал / склад" required>
+              <Select value={storeId} onChange={(e) => setStoreId(e.target.value)} className="w-full">
+                {stores.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+              </Select>
+            </FormField>
+          )}
+
+          <FormField label="Описание / обоснование" required>
+            <input
+              type="text" required value={description} onChange={(e) => setDescription(e.target.value)}
+              placeholder="Оплата аренды за текущий месяц"
+              className="w-full h-11 rounded-lg bg-bg border border-border px-3 text-sm text-fg focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent"
+            />
+          </FormField>
+
+          <ToggleRow
+            checked={paidFromCashRegister}
+            onChange={setPaidFromCashRegister}
+            label="Списать сумму из наличной кассы"
+          />
+        </form>
+      </Dialog>
+
+      <Dialog
+        open={isAddCategoryModalOpen}
+        onClose={() => setIsAddCategoryModalOpen(false)}
+        title="Новая категория расхода"
+        maxWidth="sm"
+        footer={
+          <>
+            <Button variant="secondary" fullWidth onClick={() => setIsAddCategoryModalOpen(false)}>Отмена</Button>
+            <Button variant="danger" fullWidth type="submit" form="add-category-form">Добавить</Button>
+          </>
+        }
+      >
+        <form id="add-category-form" onSubmit={handleAddCategorySubmit}>
+          <FormField label="Название категории" required>
+            <input
+              type="text" required value={newCategoryName} onChange={(e) => setNewCategoryName(e.target.value)}
+              placeholder="Например: Логистика, Оборудование..."
+              className="w-full h-11 rounded-lg bg-bg border border-border px-3 text-sm text-fg focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent"
+            />
+          </FormField>
+        </form>
+      </Dialog>
     </div>
   );
 };
