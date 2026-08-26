@@ -351,19 +351,19 @@ export const ExpensesPage: React.FC = () => {
                 className="h-9 px-3 rounded-lg border border-border bg-surface text-xs font-semibold text-fg-muted focus:outline-none focus:border-accent"
               />
             )}
-            <div className="flex flex-wrap gap-2">
+            <div className="flex items-center gap-2 overflow-x-auto py-0.5 shrink-0">
               {!isSeller && (
-                <Select value={selectedStoreFilter} onChange={(e) => setSelectedStoreFilter(e.target.value)} className="h-9 py-0">
+                <Select value={selectedStoreFilter} onChange={(e) => setSelectedStoreFilter(e.target.value)} className="h-9 py-0 text-xs w-auto shrink-0">
                   <option value="ALL">Все филиалы</option>
                   {stores.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
                 </Select>
               )}
-              <Select value={selectedCategoryTab} onChange={(e) => setSelectedCategoryTab(e.target.value)} className="h-9 py-0">
+              <Select value={selectedCategoryTab} onChange={(e) => setSelectedCategoryTab(e.target.value)} className="h-9 py-0 text-xs w-auto shrink-0">
                 <option value="ALL">Все категории</option>
                 {allCategoryOptions.map(c => <option key={c.id} value={c.id}>{c.label}</option>)}
               </Select>
               {canAddCategory && (
-                <Button variant="secondary" size="md" leftIcon={Plus} className="h-9 px-3" onClick={() => setIsAddCategoryModalOpen(true)}>
+                <Button variant="secondary" size="md" leftIcon={Plus} className="h-9 px-3 text-xs shrink-0 whitespace-nowrap" onClick={() => setIsAddCategoryModalOpen(true)}>
                   Категория
                 </Button>
               )}
