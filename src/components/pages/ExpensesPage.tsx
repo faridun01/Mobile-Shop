@@ -339,7 +339,7 @@ export const ExpensesPage: React.FC = () => {
         {filtersOpen && (
           <div className="px-3 pb-3 space-y-2.5 border-t border-border pt-3">
             <FilterPillGroup
-              options={[{ value: 'TODAY', label: 'Сегодня' }, { value: 'SPECIFIC_MONTH', label: 'Месяц' }, { value: 'ALL', label: 'Все' }]}
+              options={[{ value: 'TODAY', label: 'Сегодня' }, { value: 'SPECIFIC_MONTH', label: 'Месяц' }]}
               value={periodFilter}
               onChange={(v) => setPeriodFilter(v as typeof periodFilter)}
             />
