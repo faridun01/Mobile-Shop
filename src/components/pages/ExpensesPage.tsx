@@ -92,6 +92,8 @@ export const ExpensesPage: React.FC = () => {
   const isSeller = currentUser?.role === 'SELLER';
   const canAddCategory = currentUser?.role === 'ADMIN' || currentUser?.role === 'PARTNER';
 
+  const retailStores = useMemo(() => stores.filter(s => !s.isMainWarehouse && s.id !== 'store-main'), [stores]);
+
   const [status, setStatus] = useState<StatusMessage | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
@@ -104,14 +106,14 @@ export const ExpensesPage: React.FC = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [category, setCategory] = useState<ExpenseCategory>('RENT');
   const [amountTjs, setAmountTjs] = useState('');
-  const [storeId, setStoreId] = useState(stores[0]?.id || '');
+  const [storeId, setStoreId] = useState(retailStores[0]?.id || stores[0]?.id || '');
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<string>('');
   const [description, setDescription] = useState('');
   const [paidFromCashRegister, setPaidFromCashRegister] = useState(true);
 
   useEffect(() => {
-    if (!storeId && stores.length > 0) setStoreId(stores[0].id);
-  }, [stores, storeId]);
+    if (!storeId && retailStores.length > 0) setStoreId(retailStores[0].id);
+  }, [retailStores, storeId]);
 
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [periodFilter, setPeriodFilter] = useState<'TODAY' | 'SPECIFIC_MONTH' | 'ALL'>('SPECIFIC_MONTH');
@@ -361,7 +363,7 @@ export const ExpensesPage: React.FC = () => {
               {!isSeller && (
                 <Select value={selectedStoreFilter} onChange={(e) => setSelectedStoreFilter(e.target.value)} className="h-9 py-0 text-xs w-auto shrink-0">
                   <option value="ALL">Все филиалы</option>
-                  {stores.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                  {retailStores.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
                 </Select>
               )}
 
@@ -469,7 +471,7 @@ export const ExpensesPage: React.FC = () => {
           </FormField>
           <FormField label="Точка / филиал">
             <Select value={editStoreId} onChange={(e) => setEditStoreId(e.target.value)} className="w-full">
-              {stores.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+              {retailStores.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
             </Select>
           </FormField>
           <FormField label="Описание / примечание">
@@ -532,7 +534,7 @@ export const ExpensesPage: React.FC = () => {
           {!isSeller && (
             <FormField label="Филиал / склад" required>
               <Select value={storeId} onChange={(e) => setStoreId(e.target.value)} className="w-full">
-                {stores.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                {retailStores.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
               </Select>
             </FormField>
           )}
