@@ -147,20 +147,21 @@ export const InventoryPage: React.FC = () => {
       <div className="p-2.5 sm:p-3 border-b border-border bg-surface space-y-2 shrink-0">
         <SearchBar value={searchQuery} onChange={setSearchQuery} onScan={handleScanDevice} placeholder="Поиск по IMEI / штрихкоду / модели..." />
 
-        <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none py-0.5 shrink-0">
+        {/* Row 2: "Все склады" and "В наличии" in one single row */}
+        <div className="flex items-center gap-2">
           {!isSeller ? (
-            <Select value={effectiveStoreId} onChange={(e) => setSelectedStoreId(e.target.value)} className="h-8 py-0 px-2 text-[11px] w-auto shrink-0">
+            <Select value={effectiveStoreId} onChange={(e) => setSelectedStoreId(e.target.value)} className="h-9 py-0 px-2.5 text-xs flex-1 min-w-0">
               <option value="all">Все склады</option>
               {stores.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
             </Select>
           ) : (
-            <span className="flex items-center gap-1 h-8 px-2.5 rounded-lg border border-border bg-surface-raised text-[11px] font-medium text-fg-muted shrink-0 whitespace-nowrap">
-              <Store className="w-3.5 h-3.5 text-accent" />
-              {currentUser?.storeName || 'Мой магазин'}
+            <span className="flex items-center gap-1.5 h-9 px-3 rounded-lg border border-border bg-surface-raised text-xs font-medium text-fg-muted flex-1 min-w-0 truncate">
+              <Store className="w-3.5 h-3.5 text-accent shrink-0" />
+              <span className="truncate">{currentUser?.storeName || 'Мой магазин'}</span>
             </span>
           )}
 
-          <Select value={selectedStatus} onChange={(e) => setSelectedStatus(e.target.value)} className="h-8 py-0 px-2 text-[11px] w-auto shrink-0">
+          <Select value={selectedStatus} onChange={(e) => setSelectedStatus(e.target.value)} className="h-9 py-0 px-2.5 text-xs flex-1 min-w-0">
             <option value="IN_STOCK">В наличии</option>
             <option value="GIFTS">Подарочные ($0)</option>
             <option value="ALL">Все статусы</option>
@@ -168,7 +169,10 @@ export const InventoryPage: React.FC = () => {
             <option value="IN_REPAIR">В ремонте</option>
             <option value="TRANSFER_PENDING">В транзите</option>
           </Select>
+        </div>
 
+        {/* Row 3: Brands, Grouping & Found count */}
+        <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none py-0.5 shrink-0">
           <Select value={selectedBrand} onChange={(e) => setSelectedBrand(e.target.value)} className="h-8 py-0 px-2 text-[11px] w-auto shrink-0">
             {brands.map(b => <option key={b.value} value={b.value}>{b.label}</option>)}
           </Select>
