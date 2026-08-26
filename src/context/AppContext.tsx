@@ -392,18 +392,30 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, []);
 
   const fetchSuppliers = useCallback(async () => {
-    const raw = await apiClient<any[]>('/suppliers');
-    setSuppliers(raw.map(mapSupplier));
+    try {
+      const raw = await apiClient<any[]>('/suppliers');
+      setSuppliers(raw.map(mapSupplier));
+    } catch {
+      // ADMIN/PARTNER only — leave empty for SELLER users
+    }
   }, []);
 
   const fetchInvoices = useCallback(async () => {
-    const raw = await apiClient<any[]>('/supplier-invoices');
-    setInvoices(raw.map(mapSupplierInvoice).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
+    try {
+      const raw = await apiClient<any[]>('/supplier-invoices');
+      setInvoices(raw.map(mapSupplierInvoice).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
+    } catch {
+      // ADMIN/PARTNER only — leave empty for SELLER users
+    }
   }, []);
 
   const fetchBonuses = useCallback(async () => {
-    const raw = await apiClient<any[]>('/supplier-bonuses');
-    setBonuses(raw.map(mapSupplierBonus).sort((a, b) => new Date(b.dateReceived || b.date || 0).getTime() - new Date(a.dateReceived || a.date || 0).getTime()));
+    try {
+      const raw = await apiClient<any[]>('/supplier-bonuses');
+      setBonuses(raw.map(mapSupplierBonus).sort((a, b) => new Date(b.dateReceived || b.date || 0).getTime() - new Date(a.dateReceived || a.date || 0).getTime()));
+    } catch {
+      // ADMIN/PARTNER only — leave empty for SELLER users
+    }
   }, []);
 
   const fetchExpenses = useCallback(async () => {
