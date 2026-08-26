@@ -337,31 +337,35 @@ export const ExpensesPage: React.FC = () => {
         </div>
 
         {filtersOpen && (
-          <div className="px-3 pb-3 space-y-2.5 border-t border-border pt-3">
-            <FilterPillGroup
-              options={[{ value: 'TODAY', label: 'Сегодня' }, { value: 'SPECIFIC_MONTH', label: 'Месяц' }]}
-              value={periodFilter}
-              onChange={(v) => setPeriodFilter(v as typeof periodFilter)}
-            />
-            {periodFilter === 'SPECIFIC_MONTH' && (
-              <input
-                type="month"
-                value={selectedMonth}
-                onChange={(e) => e.target.value && setSelectedMonth(e.target.value)}
-                className="h-9 px-3 rounded-lg border border-border bg-surface text-xs font-semibold text-fg-muted focus:outline-none focus:border-accent"
-              />
-            )}
+          <div className="px-3 pb-3 space-y-2 border-t border-border pt-3">
             <div className="flex items-center gap-2 overflow-x-auto py-0.5 shrink-0">
+              <FilterPillGroup
+                options={[{ value: 'TODAY', label: 'Сегодня' }, { value: 'SPECIFIC_MONTH', label: 'Месяц' }]}
+                value={periodFilter}
+                onChange={(v) => setPeriodFilter(v as typeof periodFilter)}
+              />
+
+              {periodFilter === 'SPECIFIC_MONTH' && (
+                <input
+                  type="month"
+                  value={selectedMonth}
+                  onChange={(e) => e.target.value && setSelectedMonth(e.target.value)}
+                  className="h-9 px-3 rounded-xl border border-accent bg-surface text-xs font-semibold text-accent focus:outline-none shrink-0 cursor-pointer"
+                />
+              )}
+
               {!isSeller && (
                 <Select value={selectedStoreFilter} onChange={(e) => setSelectedStoreFilter(e.target.value)} className="h-9 py-0 text-xs w-auto shrink-0">
                   <option value="ALL">Все филиалы</option>
                   {stores.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
                 </Select>
               )}
+
               <Select value={selectedCategoryTab} onChange={(e) => setSelectedCategoryTab(e.target.value)} className="h-9 py-0 text-xs w-auto shrink-0">
                 <option value="ALL">Все категории</option>
                 {allCategoryOptions.map(c => <option key={c.id} value={c.id}>{c.label}</option>)}
               </Select>
+
               {canAddCategory && (
                 <Button variant="secondary" size="md" leftIcon={Plus} className="h-9 px-3 text-xs shrink-0 whitespace-nowrap" onClick={() => setIsAddCategoryModalOpen(true)}>
                   Категория
