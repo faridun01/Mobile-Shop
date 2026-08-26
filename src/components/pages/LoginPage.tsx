@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
 import { useNavigate, Navigate } from 'react-router-dom';
 import { useApp } from '../../context/AppContext';
-import { Smartphone, Lock, User, AlertCircle, ArrowRight, Sun, Moon, Eye, EyeOff, ShieldCheck } from 'lucide-react';
+import { Smartphone, Lock, User, AlertCircle, ArrowRight, Eye, EyeOff, ShieldCheck } from 'lucide-react';
 
 export const LoginPage: React.FC = () => {
   const navigate = useNavigate();
-  const { currentUser, login, users, theme, toggleTheme } = useApp();
+  const { currentUser, login } = useApp();
   const [loginInput, setLoginInput] = useState('');
   const [passwordInput, setPasswordInput] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -30,16 +30,7 @@ export const LoginPage: React.FC = () => {
     }
   };
 
-  const handleQuickLogin = async (u: string, p: string) => {
-    setLoginInput(u);
-    setPasswordInput(p);
-    const res = await login(u, p);
-    if (res.success) {
-      navigate('/sale');
-    } else {
-      setError(res.message || 'Ошибка входа');
-    }
-  };
+
 
   return (
     <div className="min-h-screen bg-[#0B0E14] flex flex-col items-center justify-center p-4 text-slate-300 selection:bg-emerald-500 selection:text-black relative font-mono">
@@ -132,38 +123,6 @@ export const LoginPage: React.FC = () => {
               <ArrowRight className="w-4 h-4" />
             </button>
           </form>
-
-          {/* Quick login helper */}
-          {users.length > 0 && (
-            <div className="pt-3 border-t border-slate-800">
-              <p className="text-[10px] font-mono text-slate-400 uppercase tracking-wider mb-2">
-                БЫСТРЫЙ ВХОД (ПО ДЕФОЛТНЫМ ПАРОЛЯМ):
-              </p>
-              <div className="grid grid-cols-2 gap-1.5 text-xs font-mono">
-                {users.map(u => (
-                  <button
-                    key={u.id}
-                    type="button"
-                    onClick={() => {
-                      const quickPass = u.role === 'ADMIN' ? 'admin123' : u.role === 'PARTNER' ? 'partner123' : 'seller123';
-                      handleQuickLogin(u.login, quickPass);
-                    }}
-                    className="p-2 rounded-lg bg-[#0B0E14] hover:bg-slate-800 border border-slate-800 text-slate-200 hover:text-emerald-400 text-left text-[11px] transition-all min-w-0 flex flex-col justify-between"
-                  >
-                    <span className="font-bold text-slate-100 uppercase block truncate">{u.name}</span>
-                    {u.role === 'ADMIN' && (
-                      <span className="text-slate-500 text-[9px] block truncate mt-0.5">
-                        Администратор
-                      </span>
-                    )}
-                  </button>
-                ))}
-              </div>
-              <p className="text-[9px] font-mono text-slate-500 mt-2 text-center">
-                * При изменении пароля администратором вводите новый пароль вручную в поля выше.
-              </p>
-            </div>
-          )}
         </div>
 
         <p className="text-center text-[10px] font-mono text-slate-600 mt-4 uppercase tracking-widest">
