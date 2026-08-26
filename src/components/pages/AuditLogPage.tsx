@@ -24,7 +24,8 @@ import {
   Clock,
   User as UserIcon,
   Lock,
-  X
+  X,
+  Calendar
 } from 'lucide-react';
 
 const ACTION_CONFIG: Record<string, { label: string; icon: any; colorClass: string; borderClass: string; bgClass: string }> = {
@@ -78,6 +79,9 @@ const FILTER_CATEGORIES = [
 export const AuditLogPage: React.FC = () => {
   const { currentUser, auditLogs } = useApp();
 
+  const todayStr = new Date().toISOString().split('T')[0];
+  const [dateFilterMode, setDateFilterMode] = useState<'TODAY' | 'SPECIFIC' | 'ALL'>('TODAY');
+  const [selectedDate, setSelectedDate] = useState<string>(todayStr);
   const [searchQuery, setSearchQuery] = useState('');
   const [activeCategoryFilter, setActiveCategoryFilter] = useState('ALL');
 
@@ -93,6 +97,17 @@ export const AuditLogPage: React.FC = () => {
 
   const filteredLogs = useMemo(() => {
     return auditLogs.filter((log) => {
+      // Date filter (Default: TODAY)
+      if (dateFilterMode === 'TODAY') {
+        const logDate = new Date(log.timestamp).toISOString().split('T')[0];
+        if (logDate !== todayStr) return false;
+      } else if (dateFilterMode === 'SPECIFIC') {
+        if (selectedDate) {
+          const logDate = new Date(log.timestamp).toISOString().split('T')[0];
+          if (logDate !== selectedDate) return false;
+        }
+      }
+
       // Category filter
       if (activeCategoryFilter === 'SALES') {
         if (!['SALE', 'SALE_BELOW_COST', 'EXCHANGE', 'REFUND'].includes(log.action)) return false;
@@ -122,7 +137,7 @@ export const AuditLogPage: React.FC = () => {
 
       return true;
     }).sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
-  }, [auditLogs, activeCategoryFilter, searchQuery]);
+  }, [auditLogs, dateFilterMode, selectedDate, todayStr, activeCategoryFilter, searchQuery]);
 
   return (
     <div className="flex-1 flex flex-col h-full overflow-hidden bg-[#0B0E14] text-slate-300 font-mono">
@@ -155,7 +170,56 @@ export const AuditLogPage: React.FC = () => {
           </div>
         </div>
 
-        {/* Row 2: Search & Photo-Style Category Pill Buttons */}
+        {/* Row 2: Date Selector (Default: Today, with Date Picker & All Time options) */}
+        <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-slate-800/80">
+          <span className="text-[10px] text-slate-400 font-mono font-bold uppercase tracking-wider mr-1">
+            ПЕРИОД:
+          </span>
+
+          <button
+            type="button"
+            onClick={() => setDateFilterMode('TODAY')}
+            className={`px-2.5 py-1 rounded-md border text-xs font-mono font-bold uppercase tracking-wider flex items-center space-x-1.5 transition-all ${
+              dateFilterMode === 'TODAY'
+                ? 'border-[#22c55e] text-[#22c55e] bg-emerald-500/10 shadow-[0_0_8px_rgba(16,185,129,0.2)]'
+                : 'border-slate-800 text-slate-400 hover:border-slate-700 hover:text-slate-200 bg-[#0B0E14]'
+            }`}
+          >
+            <Calendar className="w-3.5 h-3.5" />
+            <span>СЕГОДНЯ</span>
+          </button>
+
+          <div className={`flex items-center space-x-1.5 rounded-md border px-2.5 py-1 text-xs transition-all ${
+            dateFilterMode === 'SPECIFIC'
+              ? 'border-[#22c55e] bg-emerald-500/10 text-[#22c55e]'
+              : 'border-slate-800 bg-[#0B0E14] text-slate-400'
+          }`}>
+            <span className="text-[10px] uppercase font-mono font-bold">ВЫБОР ДАТЫ:</span>
+            <input
+              type="date"
+              value={selectedDate}
+              onChange={(e) => {
+                setSelectedDate(e.target.value);
+                setDateFilterMode('SPECIFIC');
+              }}
+              className="bg-transparent text-slate-100 text-xs font-mono font-bold focus:outline-none cursor-pointer"
+            />
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setDateFilterMode('ALL')}
+            className={`px-2.5 py-1 rounded-md border text-xs font-mono font-bold uppercase tracking-wider transition-all ${
+              dateFilterMode === 'ALL'
+                ? 'border-[#22c55e] text-[#22c55e] bg-emerald-500/10 shadow-[0_0_8px_rgba(16,185,129,0.2)]'
+                : 'border-slate-800 text-slate-400 hover:border-slate-700 hover:text-slate-200 bg-[#0B0E14]'
+            }`}
+          >
+            <span>ЗА ВСЕ ВРЕМЯ</span>
+          </button>
+        </div>
+
+        {/* Row 3: Search & Photo-Style Category Pill Buttons */}
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 pt-1 border-t border-slate-800/80">
           <div className="relative flex-1 max-w-md">
             <Search className="absolute left-3 top-2.5 w-3.5 h-3.5 text-slate-500" />
