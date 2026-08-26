@@ -491,9 +491,9 @@ export const PurchasePage: React.FC = () => {
       <div className="flex-1 flex flex-col h-full overflow-hidden bg-bg text-fg">
         {/* Search & Filters Bar */}
         <div className="p-3 border-b border-border bg-surface space-y-3 shrink-0">
-          <div className="flex flex-wrap items-center gap-2.5">
+          <div className="flex items-center gap-2">
             {/* Compact Search Bar with Scanner inside right corner */}
-            <div className="relative w-full sm:w-72 md:w-80">
+            <div className="relative flex-1 min-w-0">
               <Search className="absolute left-3 top-2.5 w-4 h-4 text-fg-subtle" />
               <input
                 type="text"
@@ -527,7 +527,7 @@ export const PurchasePage: React.FC = () => {
                 setStatusMessage(null);
                 setViewMode('form');
               }}
-              className="px-4 py-2 rounded-xl bg-accent hover:bg-accent-strong active:scale-95 text-accent-fg font-bold text-xs flex items-center space-x-1.5 transition-colors shadow-xs"
+              className="shrink-0 px-3.5 py-2 rounded-xl bg-accent hover:bg-accent-strong active:scale-95 text-accent-fg font-bold text-xs flex items-center space-x-1.5 transition-colors shadow-xs whitespace-nowrap"
             >
               <Plus className="w-4 h-4" />
               <span>НОВЫЙ ПРИХОД</span>
