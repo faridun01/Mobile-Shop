@@ -63,20 +63,20 @@ export const SalePage: React.FC = () => {
   const isAdmin = currentUser?.role === 'ADMIN' || currentUser?.role === 'PARTNER';
 
   const selectableStores = useMemo(() => {
-    return isAdmin ? stores : stores.filter(s => !s.isMainWarehouse);
-  }, [stores, isAdmin]);
+    return stores.filter(s => !s.isMainWarehouse && s.id !== 'store-main');
+  }, [stores]);
 
   const effectiveStoreId = currentUser?.role === 'SELLER'
     ? currentUser.storeId
     : (selectableStores.some(s => s.id === selectedStoreId)
         ? selectedStoreId
-        : (selectableStores[0]?.id || stores[0]?.id || ''));
+        : (selectableStores[0]?.id || ''));
 
   const activeStoreName = stores.find(s => s.id === effectiveStoreId)?.name || 'Магазин';
 
   const availableDevices = useMemo(() => {
     return devices.filter(d => {
-      const isAvailableStatus = d.status === 'STORE_STOCK' || d.status === 'IN_STOCK_AFTER_EXCHANGE' || (isAdmin && d.status === 'MAIN_WAREHOUSE');
+      const isAvailableStatus = d.status === 'STORE_STOCK' || d.status === 'IN_STOCK_AFTER_EXCHANGE';
       if (!isAvailableStatus) return false;
       if (effectiveStoreId && d.locationId !== effectiveStoreId) return false;
 
@@ -99,7 +99,7 @@ export const SalePage: React.FC = () => {
 
       return true;
     });
-  }, [devices, effectiveStoreId, searchQuery, selectedBrand, cart, isAdmin]);
+  }, [devices, effectiveStoreId, searchQuery, selectedBrand, cart]);
 
   const brands = useMemo(() => {
     const set = new Set<string>();

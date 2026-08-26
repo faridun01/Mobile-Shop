@@ -488,15 +488,15 @@ export const PurchasePage: React.FC = () => {
   // =========================================================================
   if (viewMode === 'list') {
     return (
-      <div className="flex-1 flex flex-col h-full overflow-hidden bg-[#0B0E14] text-slate-300">
+      <div className="flex-1 flex flex-col h-full overflow-hidden bg-bg text-fg">
         {/* Top Header Bar */}
-        <div className="p-3 border-b border-slate-800 bg-[#0F1219] flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 shrink-0">
+        <div className="p-3 border-b border-border bg-surface flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 shrink-0">
           <div>
-            <h3 className="text-xs font-bold text-slate-100 flex items-center space-x-1.5 uppercase font-mono">
-              <Truck className="w-4 h-4 text-emerald-400" />
+            <h3 className="text-xs sm:text-sm font-bold text-fg flex items-center space-x-1.5 uppercase tracking-wide">
+              <Truck className="w-4 h-4 text-accent" />
               <span>ВСЕ ПРИХОДЫ (ИСТОРИЯ НАКЛАДНЫХ)</span>
             </h3>
-            <p className="text-[11px] text-slate-400 mt-0.5">
+            <p className="text-xs text-fg-muted mt-0.5">
               Всего: {totalInvoicesCount} накладных • {totalUnitsReceived} шт. на сумму ${totalSumUsd.toLocaleString()}
             </p>
           </div>
@@ -507,7 +507,7 @@ export const PurchasePage: React.FC = () => {
                 setStatusMessage(null);
                 setViewMode('form');
               }}
-              className="flex items-center space-x-1.5 px-3.5 py-1.5 rounded bg-emerald-500 hover:bg-emerald-400 text-white font-bold text-xs shadow-md transition-colors font-mono"
+              className="flex items-center space-x-1.5 px-4 py-2 rounded-xl bg-accent hover:bg-accent-strong active:scale-95 text-accent-fg font-bold text-xs transition-colors shadow-xs"
             >
               <Plus className="w-4 h-4" />
               <span>НОВЫЙ ПРИХОД</span>
@@ -533,16 +533,16 @@ export const PurchasePage: React.FC = () => {
         )}
 
         {/* Search & Filters Bar */}
-        <div className="p-2.5 border-b border-slate-800 bg-[#0F1219]/60 space-y-2 shrink-0">
+        <div className="p-3 border-b border-border bg-bg space-y-2.5 shrink-0">
           <div className="flex space-x-2">
             <div className="relative flex-1">
-              <Search className="absolute left-3 top-2 w-3.5 h-3.5 text-slate-500" />
+              <Search className="absolute left-3 top-2.5 w-4 h-4 text-fg-subtle" />
               <input
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Поиск: № накладной / поставщик / IMEI / модель..."
-                className="w-full rounded bg-[#0B0E14] border border-slate-800 pl-8 pr-8 py-1.5 text-xs font-mono text-slate-100 placeholder-slate-500 focus:border-emerald-500 focus:outline-none transition-colors"
+                className="w-full rounded-xl bg-surface border border-border pl-9 pr-9 py-2 text-xs text-fg placeholder-fg-subtle focus:border-accent focus:outline-none transition-colors"
               />
               {searchQuery && (
                 <button
@@ -890,7 +890,7 @@ export const PurchasePage: React.FC = () => {
   // VIEW: NEW PURCHASE FORM (ФОРМА НОВОГО ПРИХОДА)
   // =========================================================================
   return (
-    <div className="flex-1 flex flex-col h-full overflow-y-auto bg-zinc-950 text-zinc-100 min-h-0">
+    <div className="flex-1 flex flex-col h-full overflow-y-auto bg-bg text-fg min-h-0">
       <form onSubmit={handleSubmitPurchase} className="flex-1 flex flex-col min-h-full">
         {/* Top Header with Back Button */}
         <div className="p-3.5 sm:p-4 border-b border-zinc-800 bg-zinc-900/80 space-y-3 shrink-0">

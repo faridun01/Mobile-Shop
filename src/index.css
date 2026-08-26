@@ -50,8 +50,8 @@
   }
 
   body {
-    background-color: #222222;
-    color: #ffffff;
+    background-color: #0B0E14;
+    color: #F1F5F9;
     font-feature-settings: "cv02", "cv03", "cv04", "cv11";
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
@@ -344,36 +344,36 @@ html.light body {
 }
 
 /* =========================================================================
-   DARK MODE UNIFIED LOYVERSE POS MINIMAL PALETTE (#222222 / #1c1c1c / #2a2a2a)
+   DARK MODE UNIFIED LOYVERSE POS MINIMAL PALETTE (#0B0E14 / #0F1219 / #161B26)
    ========================================================================= */
 [data-theme="dark"] body,
 html:not([data-theme="light"]) body {
-  background-color: #222222 !important;
-  color: #ffffff !important;
+  background-color: #0B0E14 !important;
+  color: #F1F5F9 !important;
 }
 
 [data-theme="dark"] .bg-\[\#0B0E14\],
 [data-theme="dark"] .bg-\[\#0B0F17\],
-[data-theme="dark"] .bg-\[\#0F1219\],
-[data-theme="dark"] .bg-\[\#0F131D\],
-[data-theme="dark"] .bg-\[\#0D1016\],
 [data-theme="dark"] .bg-zinc-950,
 [data-theme="dark"] .bg-slate-950,
 html:not([data-theme="light"]) .bg-\[\#0B0E14\],
 html:not([data-theme="light"]) .bg-\[\#0B0F17\],
+html:not([data-theme="light"]) .bg-zinc-950,
+html:not([data-theme="light"]) .bg-slate-950 {
+  background-color: #0B0E14 !important;
+}
+
+[data-theme="dark"] .bg-\[\#0F1219\],
+[data-theme="dark"] .bg-\[\#0F131D\],
+[data-theme="dark"] .bg-\[\#0D1016\],
+[data-theme="dark"] .bg-slate-900,
+[data-theme="dark"] .bg-zinc-900,
 html:not([data-theme="light"]) .bg-\[\#0F1219\],
 html:not([data-theme="light"]) .bg-\[\#0F131D\],
 html:not([data-theme="light"]) .bg-\[\#0D1016\],
-html:not([data-theme="light"]) .bg-zinc-950,
-html:not([data-theme="light"]) .bg-slate-950 {
-  background-color: #222222 !important;
-}
-
-[data-theme="dark"] .bg-slate-900,
-[data-theme="dark"] .bg-zinc-900,
 html:not([data-theme="light"]) .bg-slate-900,
 html:not([data-theme="light"]) .bg-zinc-900 {
-  background-color: #2a2a2a !important;
+  background-color: #0F1219 !important;
 }
 
 [data-theme="dark"] .border-slate-800,
@@ -382,7 +382,7 @@ html:not([data-theme="light"]) .bg-zinc-900 {
 html:not([data-theme="light"]) .border-slate-800,
 html:not([data-theme="light"]) .border-slate-700,
 html:not([data-theme="light"]) .border-zinc-800 {
-  border-color: #383838 !important;
+  border-color: #1E293B !important;
 }
 
 /* =========================================================================

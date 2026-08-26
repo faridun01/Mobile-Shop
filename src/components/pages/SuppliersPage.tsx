@@ -209,25 +209,25 @@ export const SuppliersPage: React.FC = () => {
   const totalAllDebt = suppliers.reduce((acc, s) => acc + s.totalDebtUsd, 0);
 
   return (
-    <div className="flex-1 flex flex-col h-[calc(100vh-3.5rem)] overflow-hidden bg-zinc-950 text-zinc-100">
+    <div className="flex-1 flex flex-col h-full overflow-hidden bg-bg text-fg">
       {/* Top Header */}
-      <div className="p-4 border-b border-zinc-800 bg-zinc-900/60 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shrink-0">
+      <div className="p-3 sm:p-4 border-b border-border bg-surface flex flex-col sm:flex-row sm:items-center justify-between gap-3 shrink-0">
         <div>
-          <h3 className="text-sm font-bold text-zinc-100 flex items-center space-x-2">
-            <Truck className="w-4 h-4 text-emerald-400" />
-            <span>Поставщики и накладные</span>
+          <h3 className="text-xs sm:text-sm font-bold text-fg uppercase tracking-wide flex items-center space-x-2">
+            <Truck className="w-4 h-4 text-accent" />
+            <span>ПОСТАВЩИКИ И НАКЛАДНЫЕ</span>
           </h3>
-          <p className="text-xs text-zinc-400 mt-0.5">
-            Общий текущий долг перед поставщиками: <strong className="text-rose-400 font-mono">${totalAllDebt.toLocaleString()}</strong>
+          <p className="text-xs text-fg-muted mt-0.5">
+            Общий текущий долг перед поставщиками: <strong className="text-danger font-bold">${totalAllDebt.toLocaleString()}</strong>
           </p>
         </div>
 
         <button
           onClick={() => setIsAddSupplierOpen(true)}
-          className="px-3 py-1.5 rounded bg-emerald-500 hover:bg-emerald-400 text-xs font-semibold text-white flex items-center space-x-1.5 self-start sm:self-auto"
+          className="px-4 py-2 rounded-xl bg-accent hover:bg-accent-strong text-xs font-bold text-accent-fg flex items-center space-x-1.5 self-start sm:self-auto transition-colors"
         >
           <Plus className="w-4 h-4" />
-          <span>Добавить поставщика</span>
+          <span>ДОБАВИТЬ ПОСТАВЩИКА</span>
         </button>
       </div>
 
@@ -244,14 +244,14 @@ export const SuppliersPage: React.FC = () => {
       )}
 
       {/* Main Split Grid for Desktop & List for Mobile */}
-      <div className="flex-1 grid grid-cols-1 lg:grid-cols-3 divide-y lg:divide-y-0 lg:divide-x divide-zinc-800 overflow-hidden">
+      <div className="flex-1 grid grid-cols-1 lg:grid-cols-3 divide-y lg:divide-y-0 lg:divide-x divide-border overflow-hidden">
         {/* Left Column: Suppliers list */}
-        <div className="lg:col-span-1 flex flex-col overflow-hidden bg-zinc-900/40">
-          <div className="p-3 border-b border-zinc-800 bg-zinc-900/60 font-semibold text-xs text-zinc-300">
+        <div className="lg:col-span-1 flex flex-col overflow-hidden bg-surface">
+          <div className="p-3 border-b border-border bg-surface-raised font-bold text-xs text-fg uppercase tracking-wide">
             Список контрагентов ({suppliers.length})
           </div>
 
-          <div className="flex-1 overflow-y-auto divide-y divide-zinc-800/80 bg-zinc-950">
+          <div className="flex-1 overflow-y-auto divide-y divide-border bg-bg">
             {suppliers.map((s) => {
               const isSelected = selectedSupplier?.id === s.id;
 
@@ -259,8 +259,8 @@ export const SuppliersPage: React.FC = () => {
                 <button
                   key={s.id}
                   onClick={() => setSelectedSupplierId(s.id)}
-                  className={`w-full text-left p-4 hover:bg-zinc-900 flex items-center justify-between transition-colors ${
-                    isSelected ? 'bg-zinc-900 border-l-2 border-emerald-500' : ''
+                  className={`w-full text-left p-3.5 hover:bg-surface-raised flex items-center justify-between transition-colors ${
+                    isSelected ? 'bg-accent/10 border-l-4 border-accent font-semibold' : ''
                   }`}
                 >
                   <div>

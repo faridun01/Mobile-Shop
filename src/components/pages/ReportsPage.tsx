@@ -210,7 +210,7 @@ export const ReportsPage: React.FC = () => {
   }
 
   return (
-    <div className="flex-1 flex flex-col h-full overflow-hidden bg-[#0B0E14] text-slate-300 font-mono">
+    <div className="flex-1 flex flex-col h-full overflow-hidden bg-bg text-fg font-mono">
       {/* Top Filter Bar */}
       <div className="p-3 border-b border-slate-800 bg-[#0F1219] flex flex-col lg:flex-row lg:items-center justify-between gap-2.5 shrink-0">
         <div>

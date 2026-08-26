@@ -315,7 +315,7 @@ export const EmployeesPage: React.FC = () => {
   };
 
   return (
-    <div className="flex-1 flex flex-col h-full overflow-hidden bg-[#0B0E14] text-slate-300 font-mono">
+    <div className="flex-1 flex flex-col h-full overflow-hidden bg-bg text-fg font-mono">
       {/* Header Bar */}
       <div className="p-3.5 border-b border-slate-800 bg-[#0F1219] flex items-center justify-between shrink-0">
         <div>

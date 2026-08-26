@@ -1,22 +1,15 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '../../context/AppContext';
-import { Menu, Bell, Scan, DollarSign, Sun, Moon, Store } from 'lucide-react';
-import { IconButton } from '../ui/IconButton';
+import { Bell, Store } from 'lucide-react';
 
 export const TopBar: React.FC = () => {
   const navigate = useNavigate();
   const {
     currentUser,
-    todayRate,
     notifications,
     activePage,
     setActivePage,
-    setDrawerOpen,
-    openScanner,
-    openDailyRateModal,
-    theme,
-    toggleTheme,
     stores
   } = useApp();
 
@@ -47,12 +40,10 @@ export const TopBar: React.FC = () => {
 
   return (
     <header className="sticky top-0 z-30 flex h-14 w-full items-center justify-between border-b border-border bg-surface px-3 md:px-4 select-none shrink-0">
-      {/* Left: Mobile Title + Store Badge */}
+      {/* Left: Page Title + Store Subtitle */}
       <div className="flex items-center gap-2.5 min-w-0">
-        <IconButton icon={Menu} aria-label="Меню" onClick={() => setDrawerOpen(true)} className="md:hidden" />
-
         <div className="min-w-0">
-          <h1 className="text-sm font-semibold text-fg truncate tracking-tight">
+          <h1 className="text-sm md:text-base font-bold text-fg truncate tracking-tight">
             {getPageTitle()}
           </h1>
           {currentUser?.role !== 'SELLER' && (
@@ -64,31 +55,8 @@ export const TopBar: React.FC = () => {
         </div>
       </div>
 
-      {/* Right: Exchange Rate + Scanner + Notifications + Theme */}
+      {/* Right: Notifications ONLY */}
       <div className="flex items-center gap-1.5 shrink-0">
-        <button
-          onClick={openDailyRateModal}
-          className="flex items-center gap-1.5 h-9 px-2.5 rounded-lg bg-surface-raised hover:border-fg-subtle border border-border text-fg text-xs font-semibold transition-colors"
-          title="Курс доллара (нажмите для редактирования)"
-        >
-          <DollarSign className="w-3.5 h-3.5 text-fg-subtle" />
-          <span>$1 = {todayRate ? todayRate.rate.toFixed(2) : '9.50'}</span>
-        </button>
-
-        <IconButton
-          icon={theme === 'light' ? Sun : Moon}
-          aria-label={theme === 'light' ? 'Переключить на тёмный режим' : 'Переключить на светлый режим'}
-          onClick={toggleTheme}
-          size="sm"
-        />
-
-        <IconButton
-          icon={Scan}
-          aria-label="Сканер штрих-кода / IMEI"
-          size="sm"
-          onClick={() => openScanner(() => setActivePage('INVENTORY'))}
-        />
-
         <button
           onClick={() => {
             if (activePage === 'NOTIFICATIONS') {
@@ -100,10 +68,10 @@ export const TopBar: React.FC = () => {
             }
           }}
           aria-label={activePage === 'NOTIFICATIONS' ? 'Закрыть уведомления' : 'Уведомления'}
-          className={`relative inline-flex items-center justify-center w-9 h-9 rounded-lg transition-colors active:scale-95 ${
+          className={`relative inline-flex items-center justify-center w-9 h-9 rounded-lg transition-colors active:scale-95 border ${
             activePage === 'NOTIFICATIONS'
-              ? 'bg-accent/15 text-accent'
-              : 'text-fg-muted hover:text-fg hover:bg-surface-raised'
+              ? 'bg-accent/15 text-accent border-accent/40'
+              : 'text-fg-muted hover:text-fg hover:bg-surface-raised border-border'
           }`}
         >
           <Bell className="w-4 h-4" />

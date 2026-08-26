@@ -20,7 +20,8 @@ import {
   Settings,
   Bell,
   LogOut,
-  X
+  X,
+  ChevronRight
 } from 'lucide-react';
 
 const PAGE_ROUTES: Record<string, string> = {
@@ -112,13 +113,14 @@ export const Drawer: React.FC = () => {
 
   return (
     <div className="fixed inset-0 z-50 flex md:hidden flex-col bg-bg text-fg w-full h-full overflow-hidden">
+      {/* Header */}
       <div className="p-4 border-b border-border bg-surface flex items-center justify-between shrink-0">
         <div className="flex items-center gap-3 min-w-0">
-          <div className="w-10 h-10 rounded-lg bg-accent/10 border border-accent/30 text-accent font-bold text-sm flex items-center justify-center shrink-0">
+          <div className="w-10 h-10 rounded-xl bg-accent/10 border border-accent/30 text-accent font-bold text-sm flex items-center justify-center shrink-0">
             {currentUser?.name ? currentUser.name.substring(0, 2).toUpperCase() : 'US'}
           </div>
           <div className="min-w-0">
-            <h2 className="text-sm font-semibold text-fg truncate">
+            <h2 className="text-sm font-bold text-fg truncate">
               {currentUser?.name || 'Пользователь'}
             </h2>
             <p className="text-xs font-medium text-accent truncate">
@@ -131,24 +133,25 @@ export const Drawer: React.FC = () => {
           type="button"
           onClick={() => setDrawerOpen(false)}
           aria-label="Закрыть меню"
-          className="w-11 h-11 flex items-center justify-center rounded-lg bg-surface-raised text-fg-muted hover:text-fg border border-border transition-colors"
+          className="w-10 h-10 flex items-center justify-center rounded-xl bg-surface-raised text-fg-muted hover:text-fg border border-border transition-colors"
         >
           <X className="w-5 h-5" />
         </button>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-4 space-y-5 pb-24">
+      {/* Vertical List of Menu Items */}
+      <div className="flex-1 overflow-y-auto p-4 space-y-6 pb-24">
         {NAV_GROUPS.map((group, gIdx) => {
           const visibleItems = group.items.filter(item => item.roles.includes(userRole));
           if (visibleItems.length === 0) return null;
 
           return (
             <div key={gIdx} className="space-y-2">
-              <span className="text-xs font-semibold text-fg-subtle uppercase tracking-wide px-1 block">
+              <span className="text-[11px] font-bold text-fg-subtle uppercase tracking-wider px-1 block">
                 {group.title}
               </span>
 
-              <div className="grid grid-cols-2 gap-2">
+              <div className="space-y-1.5">
                 {visibleItems.map(item => {
                   const Icon = item.icon;
                   const routePath = PAGE_ROUTES[item.id] || '/sale';
@@ -163,19 +166,29 @@ export const Drawer: React.FC = () => {
                         navigate(routePath);
                         setDrawerOpen(false);
                       }}
-                      className={`flex flex-col items-start justify-between min-h-18 p-3 rounded-lg border text-left transition-colors active:scale-[0.98] ${
-                        isActive ? 'bg-accent/10 text-accent border-accent/40' : 'bg-surface hover:bg-surface-raised text-fg border-border'
+                      className={`w-full flex items-center justify-between px-3.5 py-3 rounded-xl border text-left transition-all active:scale-[0.99] ${
+                        isActive
+                          ? 'bg-accent/10 text-accent border-accent/40 font-semibold shadow-xs'
+                          : 'bg-surface hover:bg-surface-raised text-fg border-border/80'
                       }`}
                     >
-                      <div className="flex items-center justify-between w-full mb-2">
-                        <Icon className={`w-4.5 h-4.5 ${isActive ? 'text-accent' : 'text-fg-subtle'}`} />
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className={`p-2 rounded-lg shrink-0 ${
+                          isActive ? 'bg-accent/20 text-accent' : 'bg-surface-raised text-fg-subtle border border-border'
+                        }`}>
+                          <Icon className="w-4.5 h-4.5" />
+                        </div>
+                        <span className="text-xs md:text-sm font-medium truncate">{item.label}</span>
+                      </div>
+
+                      <div className="flex items-center gap-2 shrink-0">
                         {isNotif && unreadNotifs > 0 && (
                           <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-danger px-1.5 text-[10px] font-bold text-white">
                             {unreadNotifs}
                           </span>
                         )}
+                        <ChevronRight className={`w-4 h-4 ${isActive ? 'text-accent' : 'text-fg-subtle/50'}`} />
                       </div>
-                      <span className="text-xs font-semibold leading-tight">{item.label}</span>
                     </button>
                   );
                 })}
@@ -183,21 +196,41 @@ export const Drawer: React.FC = () => {
             </div>
           );
         })}
+
+        {/* Logout item at the end of the mobile menu list */}
+        <div className="pt-2">
+          <button
+            onClick={() => {
+              setDrawerOpen(false);
+              logout();
+            }}
+            className="w-full flex items-center justify-between px-3.5 py-3.5 rounded-xl border text-left bg-danger/10 hover:bg-danger/15 text-danger border-danger/30 font-semibold transition-all active:scale-[0.99]"
+          >
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="p-2 rounded-lg bg-danger/15 text-danger shrink-0 border border-danger/20">
+                <LogOut className="w-4.5 h-4.5" />
+              </div>
+              <span className="text-xs md:text-sm font-bold truncate">Выйти из системы</span>
+            </div>
+            <ChevronRight className="w-4 h-4 text-danger/60 shrink-0" />
+          </button>
+        </div>
       </div>
 
+      {/* Footer */}
       <div className="p-3 border-t border-border bg-surface flex items-center justify-between shrink-0 fixed bottom-0 left-0 right-0 z-50 safe-area-pb">
         <button
           onClick={() => {
             setDrawerOpen(false);
             logout();
           }}
-          className="h-11 px-4 rounded-lg bg-danger/10 hover:bg-danger/15 text-danger border border-danger/30 text-xs font-semibold transition-colors flex items-center gap-2"
+          className="h-11 px-4 rounded-xl bg-danger/10 hover:bg-danger/15 text-danger border border-danger/30 text-xs font-semibold transition-colors flex items-center gap-2"
         >
           <LogOut className="w-4 h-4" />
           <span>Выход из системы</span>
         </button>
 
-        <span className="text-[11px] text-fg-subtle">
+        <span className="text-[11px] text-fg-subtle font-mono">
           Mobile Shop POS
         </span>
       </div>

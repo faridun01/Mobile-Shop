@@ -63,7 +63,7 @@ export const ToggleRow: React.FC<ToggleRowProps> = ({ checked, onChange, label, 
       <span
         className={cn(
           'absolute top-0.5 w-5 h-5 rounded-full bg-white transition-transform flex items-center justify-center',
-          checked ? 'translate-x-[22px]' : 'translate-x-0.5'
+          checked ? 'translate-x-5.5' : 'translate-x-0.5'
         )}
       >
         {checked && <Check className="w-3 h-3 text-accent" />}

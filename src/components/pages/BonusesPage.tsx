@@ -165,7 +165,7 @@ export const BonusesPage: React.FC = () => {
   };
 
   return (
-    <div className="flex-1 flex flex-col h-[calc(100vh-3.5rem)] overflow-hidden bg-zinc-950 text-zinc-100 font-mono">
+    <div className="flex-1 flex flex-col h-full overflow-hidden bg-bg text-fg font-mono">
       {/* Header */}
       <div className="p-4 border-b border-zinc-800 bg-zinc-900/60 flex items-center justify-between shrink-0">
         <div>
