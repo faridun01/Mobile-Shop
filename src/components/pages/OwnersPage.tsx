@@ -31,17 +31,50 @@ export const OwnersPage: React.FC = () => {
     closeQuarterPeriod
   } = useApp();
 
-  const getOwnerDisplayName = (owner: { id: string; name?: string }) => {
-    if (owner.id === 'owner-1') {
-      const adminUser = users.find(u => u.role === 'ADMIN' || u.id === 'user-admin' || u.login === 'admin');
-      if (adminUser) return adminUser.name;
+  const displayOwners = useMemo(() => {
+    if (owners.length >= 2) return owners;
+    const adminUser = users.find(u => u.role === 'ADMIN' || u.id === 'user-admin' || u.login === 'admin');
+    const partnerUser = users.find(u => u.role === 'PARTNER' || u.id === 'user-partner' || u.login === 'partner');
+
+    const o1 = owners[0] || {
+      id: adminUser?.id || 'owner-1',
+      name: adminUser?.name || 'Администратор',
+      profitSharePercent: 50,
+      capitalBalanceUsd: 0,
+      totalAccruedProfitUsd: 0,
+      totalPaidProfitUsd: 0,
+      totalReinvestedUsd: 0,
+      availableProfitUsd: 0
+    };
+    const o2 = owners[1] || {
+      id: partnerUser?.id || 'owner-2',
+      name: partnerUser?.name || 'Партнер',
+      profitSharePercent: 50,
+      capitalBalanceUsd: 0,
+      totalAccruedProfitUsd: 0,
+      totalPaidProfitUsd: 0,
+      totalReinvestedUsd: 0,
+      availableProfitUsd: 0
+    };
+    return [o1, o2];
+  }, [owners, users]);
+
+  const getOwnerDetails = (owner: { id: string; name?: string }, index: number) => {
+    const adminUser = users.find(u => u.role === 'ADMIN' || u.id === 'user-admin' || u.login === 'admin');
+    const partnerUser = users.find(u => u.role === 'PARTNER' || u.id === 'user-partner' || u.login === 'partner');
+
+    if (owner.id === 'owner-1' || owner.id === adminUser?.id || index === 0) {
+      return {
+        name: adminUser?.name || owner.name || 'Администратор',
+        roleTag: 'АДМИНИСТРАТОР',
+        roleSub: 'Главный администратор & Владелец бизнеса'
+      };
     }
-    if (owner.id === 'owner-2') {
-      const partnerUser = users.find(u => u.role === 'PARTNER' || u.id === 'user-partner' || u.login === 'partner');
-      if (partnerUser) return partnerUser.name;
-    }
-    const matched = users.find(u => u.id === owner.id || u.name === owner.name);
-    return matched ? matched.name : (owner.name || 'Партнер');
+    return {
+      name: partnerUser?.name || owner.name || 'Партнер',
+      roleTag: 'ПАРТНЕР',
+      roleSub: 'Партнер & Соучредитель бизнеса'
+    };
   };
 
   const [isTxModalOpen, setIsTxModalOpen] = useState(false);
@@ -385,7 +418,8 @@ export const OwnersPage: React.FC = () => {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {owners.map((owner) => {
+            {displayOwners.map((owner, idx) => {
+              const info = getOwnerDetails(owner, idx);
               const capitalTjs = Math.round((owner.capitalBalanceUsd ?? 0) * rate);
               return (
                 <div
@@ -396,16 +430,21 @@ export const OwnersPage: React.FC = () => {
                     {/* Header of Partner Card */}
                     <div className="flex items-center justify-between">
                       <div className="flex items-center space-x-3">
-                        <div className="w-10 h-10 rounded-xl bg-surface border border-border flex items-center justify-center text-accent font-bold text-sm shadow-xs">
-                          {getOwnerDisplayName(owner).substring(0, 2).toUpperCase()}
+                        <div className="w-10 h-10 rounded-xl bg-surface border border-border flex items-center justify-center text-accent font-bold text-sm shadow-xs shrink-0">
+                          {info.name.substring(0, 2).toUpperCase()}
                         </div>
                         <div>
-                          <h4 className="text-xs sm:text-sm font-bold text-fg">{getOwnerDisplayName(owner)}</h4>
-                          <span className="text-xs text-fg-subtle">Соучредитель бизнеса</span>
+                          <div className="flex items-center space-x-2 flex-wrap gap-y-1">
+                            <h4 className="text-xs sm:text-sm font-bold text-fg">{info.name}</h4>
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-accent/15 border border-accent/30 text-accent uppercase tracking-wider">
+                              {info.roleTag}
+                            </span>
+                          </div>
+                          <span className="text-xs text-fg-subtle block mt-0.5">{info.roleSub}</span>
                         </div>
                       </div>
 
-                      <div className="text-right">
+                      <div className="text-right shrink-0">
                         <span className="inline-block px-2.5 py-1 rounded-lg bg-accent/15 border border-accent/30 text-accent text-xs font-bold">
                           {owner.profitSharePercent ?? 0}% ДОЛИ
                         </span>
@@ -534,8 +573,8 @@ export const OwnersPage: React.FC = () => {
                 className="bg-surface-raised border border-border text-fg text-xs font-semibold rounded-xl px-3 py-1.5 focus:outline-none focus:border-accent shrink-0"
               >
                 <option value="ALL">Все партнеры</option>
-                {owners.map(o => (
-                  <option key={o.id} value={o.id}>{getOwnerDisplayName(o)}</option>
+                {displayOwners.map((o, idx) => (
+                  <option key={o.id} value={o.id}>{getOwnerDetails(o, idx).name}</option>
                 ))}
               </select>
             </div>
@@ -701,10 +740,10 @@ export const OwnersPage: React.FC = () => {
             </p>
 
             <div className="space-y-3">
-              {owners.map(owner => (
+              {displayOwners.map((owner, idx) => (
                 <div key={owner.id}>
                   <label className="block text-[11px] uppercase font-semibold text-fg-subtle mb-1">
-                    {getOwnerDisplayName(owner)} (%)
+                    {getOwnerDetails(owner, idx).name} (%)
                   </label>
                   <div className="relative">
                     <input
@@ -768,8 +807,8 @@ export const OwnersPage: React.FC = () => {
                   onChange={(e) => setSelectedOwnerId(e.target.value)}
                   className="w-full rounded-xl bg-surface-raised border border-border px-3 py-2 text-fg text-xs font-semibold focus:border-accent focus:outline-none"
                 >
-                  {owners.map(o => (
-                    <option key={o.id} value={o.id}>{getOwnerDisplayName(o)} ({o.profitSharePercent ?? 0}% доли)</option>
+                  {displayOwners.map((o, idx) => (
+                    <option key={o.id} value={o.id}>{getOwnerDetails(o, idx).name} ({o.profitSharePercent ?? 0}% доли)</option>
                   ))}
                 </select>
               </div>
@@ -934,9 +973,9 @@ export const OwnersPage: React.FC = () => {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border text-xs">
-                    {owners.map(o => (
+                    {displayOwners.map((o, idx) => (
                       <tr key={o.id} className="hover:bg-surface/50">
-                        <td className="p-2.5 font-bold text-fg">{getOwnerDisplayName(o)}</td>
+                        <td className="p-2.5 font-bold text-fg">{getOwnerDetails(o, idx).name}</td>
                         <td className="p-2.5 text-center text-fg-subtle">{o.profitSharePercent || 0}%</td>
                         <td className="p-2.5 text-right font-semibold text-fg">${(o.totalAccruedProfitUsd || 0).toLocaleString()}</td>
                         <td className="p-2.5 text-right text-info">${(o.totalPaidProfitUsd || 0).toLocaleString()}</td>
@@ -949,11 +988,11 @@ export const OwnersPage: React.FC = () => {
                   <tfoot className="bg-surface font-bold border-t border-border text-xs">
                     <tr>
                       <td colSpan={2} className="p-2.5 uppercase text-fg-subtle">ИТОГО КВАРТАЛ:</td>
-                      <td className="p-2.5 text-right text-fg">${owners.reduce((sum, o) => sum + (o.totalAccruedProfitUsd || 0), 0).toLocaleString()}</td>
-                      <td className="p-2.5 text-right text-info">${owners.reduce((sum, o) => sum + (o.totalPaidProfitUsd || 0), 0).toLocaleString()}</td>
-                      <td className="p-2.5 text-right text-accent">${owners.reduce((sum, o) => sum + (o.totalReinvestedUsd || 0), 0).toLocaleString()}</td>
-                      <td className="p-2.5 text-right text-warning">${owners.reduce((sum, o) => sum + (o.availableProfitUsd || 0), 0).toLocaleString()}</td>
-                      <td className="p-2.5 text-right text-fg">${owners.reduce((sum, o) => sum + (o.capitalBalanceUsd || 0), 0).toLocaleString()}</td>
+                      <td className="p-2.5 text-right text-fg">${displayOwners.reduce((sum, o) => sum + (o.totalAccruedProfitUsd || 0), 0).toLocaleString()}</td>
+                      <td className="p-2.5 text-right text-info">${displayOwners.reduce((sum, o) => sum + (o.totalPaidProfitUsd || 0), 0).toLocaleString()}</td>
+                      <td className="p-2.5 text-right text-accent">${displayOwners.reduce((sum, o) => sum + (o.totalReinvestedUsd || 0), 0).toLocaleString()}</td>
+                      <td className="p-2.5 text-right text-warning">${displayOwners.reduce((sum, o) => sum + (o.availableProfitUsd || 0), 0).toLocaleString()}</td>
+                      <td className="p-2.5 text-right text-fg">${displayOwners.reduce((sum, o) => sum + (o.capitalBalanceUsd || 0), 0).toLocaleString()}</td>
                     </tr>
                   </tfoot>
                 </table>
