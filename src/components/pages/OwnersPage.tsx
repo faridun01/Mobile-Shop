@@ -282,24 +282,19 @@ export const OwnersPage: React.FC = () => {
       <StatusBanner message={statusBanner} onDismiss={() => setStatusBanner(null)} />
 
       {/* Row 1: Top Header Bar */}
-      <div className="p-3 sm:p-4 border-b border-border bg-surface flex flex-col md:flex-row md:items-center justify-between gap-3 shrink-0">
-        <div>
-          <h3 className="text-xs sm:text-sm font-bold text-fg flex items-center space-x-2 uppercase tracking-wide">
-            <PieChart className="w-4 h-4 text-accent" />
-            <span>ПАРТНЕРЫ И КАПИТАЛ БИЗНЕСА</span>
-          </h3>
-          <p className="text-xs text-fg-muted mt-0.5">
-            Учет уставных вложений, распределения долей прибыли и выплат дивидендов учредителям
-          </p>
-        </div>
+      <div className="p-3 sm:p-3.5 border-b border-border bg-surface flex flex-wrap items-center justify-between gap-2 shrink-0">
+        <h3 className="text-xs sm:text-sm font-bold text-fg flex items-center space-x-2 uppercase tracking-wide shrink-0">
+          <PieChart className="w-4 h-4 text-accent" />
+          <span>ПАРТНЕРЫ И КАПИТАЛ БИЗНЕСА</span>
+        </h3>
 
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none py-0.5 shrink-0">
           <button
             onClick={() => {
               setStatusBanner(null);
               setIsQuarterModalOpen(true);
             }}
-            className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-500 text-xs font-bold transition-colors"
+            className="flex items-center space-x-1 px-2.5 py-1.5 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-500 text-[11px] font-bold transition-colors whitespace-nowrap shrink-0"
             title="Сформировать квартальный отчёт партнеров и закрыть финансовый период"
           >
             <Briefcase className="w-3.5 h-3.5" />
@@ -308,17 +303,17 @@ export const OwnersPage: React.FC = () => {
 
           <button
             onClick={openSharesModal}
-            className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-surface-raised hover:bg-surface border border-border text-fg text-xs font-bold transition-colors"
+            className="flex items-center space-x-1 px-2.5 py-1.5 rounded-xl bg-surface-raised hover:bg-surface border border-border text-fg text-[11px] font-bold transition-colors whitespace-nowrap shrink-0"
           >
             <Percent className="w-3.5 h-3.5 text-accent" />
             <span>Доли партнеров</span>
           </button>
 
           <button
-            onClick={() => openTxModalForOwner(owners[0]?.id || '', 'PROFIT_PAYOUT')}
-            className="px-4 py-2 rounded-xl bg-accent hover:bg-accent-strong active:scale-95 text-xs font-bold text-accent-fg uppercase tracking-wider flex items-center space-x-1.5 transition-colors shadow-xs shrink-0"
+            onClick={() => openTxModalForOwner(displayOwners[0]?.id || '', 'PROFIT_PAYOUT')}
+            className="px-3 py-1.5 rounded-xl bg-accent hover:bg-accent-strong active:scale-95 text-[11px] font-bold text-accent-fg uppercase tracking-wider flex items-center space-x-1 transition-colors shadow-xs shrink-0 whitespace-nowrap"
           >
-            <Plus className="w-4 h-4" />
+            <Plus className="w-3.5 h-3.5" />
             <span>Провести операцию</span>
           </button>
         </div>
