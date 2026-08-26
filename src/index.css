@@ -75,6 +75,17 @@
   }
 }
 
+/* Hide native number-input spin buttons app-wide — they overlap unit-suffix labels (e.g. "TJS") on every price field */
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+input[type="number"] {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
 /* Mobile Safe Area Bottom Padding */
 .safe-area-pb {
   padding-bottom: max(0.5rem, env(safe-area-inset-bottom));

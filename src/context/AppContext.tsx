@@ -69,6 +69,7 @@ interface AppContextType {
   notifications: NotificationItem[];
   auditLogs: AuditLogEntry[];
   ledger: LedgerEntry[];
+  isInitialLoading: boolean;
 
   // UI states
   isRateModalOpen: boolean;
@@ -306,6 +307,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [auditLogs, setAuditLogs] = useState<AuditLogEntry[]>([]);
   const [ledger, setLedger] = useState<LedgerEntry[]>([]);
+  const [isInitialLoading, setIsInitialLoading] = useState(true);
 
   const [isRateModalOpen, setIsRateModalOpen] = useState(false);
   const [isScannerOpen, setIsScannerOpen] = useState(false);
@@ -486,10 +488,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // Load everything once a session exists (fresh login, or a restored session on page reload)
   useEffect(() => {
     if (!authToken || !authUser) return;
+    setIsInitialLoading(true);
     refetchAll()
       .then(() => fetchExchangeRate())
       .then((rate) => checkRatePrompt(rate))
-      .catch((e) => console.error('Initial data load failed', e));
+      .catch((e) => console.error('Initial data load failed', e))
+      .finally(() => setIsInitialLoading(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authToken, authUser?.id]);
 
@@ -1134,6 +1138,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         notifications,
         auditLogs,
         ledger,
+        isInitialLoading,
         isRateModalOpen,
         isScannerOpen,
         scannerCallback,
