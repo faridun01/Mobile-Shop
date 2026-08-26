@@ -302,26 +302,11 @@ export const RepairPage: React.FC = () => {
             <div className="flex items-center space-x-1.5">
               <input
                 type="month"
-                value={selectedMonth === 'ALL' ? new Date().toISOString().substring(0, 7) : selectedMonth}
+                value={selectedMonth}
                 onChange={(e) => e.target.value && setSelectedMonth(e.target.value)}
-                className={`px-3 py-1.5 rounded-xl border text-xs font-medium transition-colors bg-surface focus:outline-none cursor-pointer ${
-                  selectedMonth !== 'ALL'
-                    ? 'border-accent text-accent font-bold'
-                    : 'border-border text-fg-muted hover:border-fg-subtle'
-                }`}
+                className="px-3 py-1.5 rounded-xl border border-border text-fg text-xs font-semibold transition-colors bg-surface focus:outline-none focus:border-accent cursor-pointer"
                 title="Динамический выбор месяца"
               />
-              <button
-                type="button"
-                onClick={() => setSelectedMonth('ALL')}
-                className={`px-3 py-1.5 rounded-xl border text-xs font-bold uppercase transition-colors ${
-                  selectedMonth === 'ALL'
-                    ? 'border-accent bg-accent/10 text-accent'
-                    : 'border-border bg-surface text-fg-muted hover:text-fg'
-                }`}
-              >
-                Все месяцы
-              </button>
             </div>
 
             <select
