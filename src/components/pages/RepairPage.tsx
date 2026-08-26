@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import { RepairTicket, RepairStatus } from '../../types';
 import {
@@ -49,11 +49,37 @@ export const RepairPage: React.FC = () => {
   const [statusMessage, setStatusMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [statusBanner, setStatusBanner] = useState<StatusMessage | null>(null);
 
-  const effectiveStoreId = currentUser?.storeId || '';
-  const currentStoreName = stores.find(s => s.id === effectiveStoreId)?.name || currentUser?.storeName || 'Главный склад';
+  // Retail stores only (Exclude Main Warehouse)
+  const retailStores = useMemo(() => {
+    return stores.filter(s => !s.isMainWarehouse && s.id !== 'store-main');
+  }, [stores]);
+
+  const [selectedStoreId, setSelectedStoreId] = useState<string>('ALL');
+  const [createTicketStoreId, setCreateTicketStoreId] = useState<string>('');
+
+  useEffect(() => {
+    if (!createTicketStoreId && retailStores.length > 0) {
+      setCreateTicketStoreId(retailStores[0].id);
+    }
+  }, [retailStores, createTicketStoreId]);
+
+  const isSeller = currentUser?.role === 'SELLER';
+  const effectiveStoreId = isSeller ? (currentUser?.storeId || retailStores[0]?.id || '') : selectedStoreId;
+
+  const currentStoreName = isSeller
+    ? (currentUser?.storeName || retailStores.find(s => s.id === currentUser?.storeId)?.name || 'Магазин')
+    : (selectedStoreId === 'ALL' ? 'Все филиалы (Розница)' : retailStores.find(s => s.id === selectedStoreId)?.name || 'Магазин');
 
   const filteredRepairs = useMemo(() => {
     return (repairs || []).filter((t: RepairTicket) => {
+      // Exclude Main Warehouse from repairs
+      if (t.storeId === 'store-main') return false;
+
+      // Filter by retail store
+      if (effectiveStoreId && effectiveStoreId !== 'ALL') {
+        if (t.storeId && t.storeId !== effectiveStoreId) return false;
+      }
+
       // Month filter
       if (selectedMonth !== 'ALL' && t.createdAt) {
         const ticketMonth = t.createdAt.substring(0, 7);
@@ -85,7 +111,7 @@ export const RepairPage: React.FC = () => {
 
       return true;
     }).sort((a: RepairTicket, b: RepairTicket) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-  }, [repairs, selectedMonth, statusFilter, searchQuery]);
+  }, [repairs, effectiveStoreId, selectedMonth, statusFilter, searchQuery]);
 
   // Statistics for selected month
   const totalRepairsCount = filteredRepairs.length;
@@ -299,6 +325,19 @@ export const RepairPage: React.FC = () => {
           </div>
 
           <div className="flex flex-wrap items-center gap-2 text-xs">
+            {!isSeller && (
+              <select
+                value={selectedStoreId}
+                onChange={(e) => setSelectedStoreId(e.target.value)}
+                className="bg-surface border border-border text-fg text-xs font-semibold rounded-xl px-3 py-1.5 focus:outline-none focus:border-accent"
+              >
+                <option value="ALL">Все магазины (Розница)</option>
+                {retailStores.map(s => (
+                  <option key={s.id} value={s.id}>{s.name}</option>
+                ))}
+              </select>
+            )}
+
             <div className="flex items-center space-x-1.5">
               <input
                 type="month"
@@ -378,6 +417,21 @@ export const RepairPage: React.FC = () => {
                   </button>
                 </div>
               </div>
+
+              {!isSeller && (
+                <div>
+                  <label className="block text-fg-subtle mb-1 text-[11px] uppercase font-bold">Торговая точка (Где было продано / принято) *</label>
+                  <select
+                    value={createTicketStoreId}
+                    onChange={(e) => setCreateTicketStoreId(e.target.value)}
+                    className="w-full rounded-xl bg-surface-raised border border-border px-3 py-2 text-fg text-xs font-semibold focus:border-accent focus:outline-none"
+                  >
+                    {retailStores.map(s => (
+                      <option key={s.id} value={s.id}>{s.name}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
                 <div>
