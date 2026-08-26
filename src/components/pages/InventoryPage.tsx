@@ -144,23 +144,23 @@ export const InventoryPage: React.FC = () => {
 
   return (
     <div className="flex-1 flex flex-col h-full overflow-hidden bg-bg text-fg">
-      <div className="p-3 border-b border-border bg-bg space-y-2.5 shrink-0">
+      <div className="p-2.5 sm:p-3 border-b border-border bg-surface space-y-2 shrink-0">
         <SearchBar value={searchQuery} onChange={setSearchQuery} onScan={handleScanDevice} placeholder="Поиск по IMEI / штрихкоду / модели..." />
 
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none py-0.5 shrink-0">
           {!isSeller ? (
-            <Select value={effectiveStoreId} onChange={(e) => setSelectedStoreId(e.target.value)} className="h-9 py-0 w-auto">
+            <Select value={effectiveStoreId} onChange={(e) => setSelectedStoreId(e.target.value)} className="h-8 py-0 px-2 text-[11px] w-auto shrink-0">
               <option value="all">Все склады</option>
               {stores.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
             </Select>
           ) : (
-            <span className="flex items-center gap-1.5 h-9 px-3 rounded-lg border border-border bg-surface text-xs font-medium text-fg-muted">
+            <span className="flex items-center gap-1 h-8 px-2.5 rounded-lg border border-border bg-surface-raised text-[11px] font-medium text-fg-muted shrink-0 whitespace-nowrap">
               <Store className="w-3.5 h-3.5 text-accent" />
               {currentUser?.storeName || 'Мой магазин'}
             </span>
           )}
 
-          <Select value={selectedStatus} onChange={(e) => setSelectedStatus(e.target.value)} className="h-9 py-0 w-auto">
+          <Select value={selectedStatus} onChange={(e) => setSelectedStatus(e.target.value)} className="h-8 py-0 px-2 text-[11px] w-auto shrink-0">
             <option value="IN_STOCK">В наличии</option>
             <option value="GIFTS">Подарочные ($0)</option>
             <option value="ALL">Все статусы</option>
@@ -169,25 +169,25 @@ export const InventoryPage: React.FC = () => {
             <option value="TRANSFER_PENDING">В транзите</option>
           </Select>
 
+          <Select value={selectedBrand} onChange={(e) => setSelectedBrand(e.target.value)} className="h-8 py-0 px-2 text-[11px] w-auto shrink-0">
+            {brands.map(b => <option key={b.value} value={b.value}>{b.label}</option>)}
+          </Select>
+
           <button
             type="button"
             onClick={() => setGroupByModel(v => !v)}
-            className={`h-9 px-3 rounded-lg border text-xs font-semibold flex items-center gap-1.5 transition-colors ${
-              groupByModel ? 'border-accent bg-accent/10 text-accent' : 'border-border text-fg-muted'
+            className={`h-8 px-2.5 rounded-lg border text-[11px] font-semibold flex items-center gap-1 shrink-0 whitespace-nowrap transition-colors ${
+              groupByModel ? 'border-accent bg-accent/10 text-accent' : 'border-border bg-surface-raised text-fg-muted hover:text-fg'
             }`}
           >
             {groupByModel ? <Layers className="w-3.5 h-3.5" /> : <List className="w-3.5 h-3.5" />}
-            Группировать
+            <span>Группировать</span>
           </button>
 
-          <span className="text-xs text-fg-subtle ml-auto">
-            Найдено: <strong className="text-accent">{filteredDevices.length}</strong>
+          <span className="text-[11px] text-fg-subtle ml-auto shrink-0 whitespace-nowrap pl-2">
+            Найдено: <strong className="text-accent font-bold">{filteredDevices.length}</strong>
           </span>
-
-
         </div>
-
-        <FilterPillGroup options={brands} value={selectedBrand} onChange={setSelectedBrand} scrollable />
       </div>
 
       <div className="flex-1 overflow-y-auto">
