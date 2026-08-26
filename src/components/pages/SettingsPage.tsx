@@ -113,10 +113,9 @@ export const SettingsPage: React.FC = () => {
     <div className="flex-1 flex flex-col h-full overflow-hidden bg-bg text-fg">
       {/* Header */}
       <div className="p-3 sm:p-4 border-b border-border bg-surface flex items-center justify-between shrink-0">
-        <h3 className="text-xs sm:text-sm font-bold uppercase text-fg flex items-center space-x-2">
+        <div className="flex items-center space-x-2">
           <SettingsIcon className="w-4 h-4 text-accent" />
-          <span>НАСТРОЙКИ СИСТЕМЫ</span>
-        </h3>
+        </div>
       </div>
 
       {statusMessage && (
