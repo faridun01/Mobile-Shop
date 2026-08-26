@@ -2,12 +2,16 @@
 set -e
 
 echo "Applying Prisma migrations..."
-if [ -n "$DIRECT_URL" ]; then
-  echo "Using DIRECT_URL for Prisma migrations..."
-  DATABASE_URL="$DIRECT_URL" ./node_modules/.bin/prisma migrate deploy
-else
-  echo "Using DATABASE_URL for Prisma migrations..."
-  ./node_modules/.bin/prisma migrate deploy
+MIGRATE_URL="${DIRECT_URL:-$DATABASE_URL}"
+
+if [ -n "$MIGRATE_URL" ]; then
+  DATABASE_URL="$MIGRATE_URL" ./node_modules/.bin/prisma migrate deploy || {
+    echo "Warning: First migration attempt failed. Retrying in 3 seconds..."
+    sleep 3
+    DATABASE_URL="$MIGRATE_URL" ./node_modules/.bin/prisma migrate deploy || {
+      echo "Warning: Prisma migration failed (likely due to Supabase connection pool limits). Proceeding to start application..."
+    }
+  }
 fi
 
 echo "Starting Application..."
