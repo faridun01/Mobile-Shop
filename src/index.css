@@ -1,5 +1,48 @@
 @import "tailwindcss";
 
+/* =========================================================================
+   DESIGN SYSTEM TOKENS (new — used by src/components/ui/* and redesigned
+   pages). Legacy pages not yet migrated keep using the literal Tailwind
+   classes overridden further below; this block does not touch those.
+
+   Values resolve through CSS custom properties so a single source of truth
+   drives both themes — no per-class light/dark overrides needed for any
+   component built against these tokens.
+   ========================================================================= */
+@theme {
+  --color-bg: #0B0E14;
+  --color-surface: #0F1219;
+  --color-surface-raised: #161B26;
+  --color-border: #1E293B;
+  --color-fg: #F1F5F9;
+  --color-fg-muted: #94A3B8;
+  --color-fg-subtle: #64748B;
+  --color-accent: #22C55E;
+  --color-accent-strong: #16A34A;
+  --color-accent-fg: #052E1A;
+  --color-success: #22C55E;
+  --color-warning: #F59E0B;
+  --color-danger: #F43F5E;
+  --color-info: #38BDF8;
+}
+
+[data-theme="light"] {
+  --color-bg: #F8FAFC;
+  --color-surface: #FFFFFF;
+  --color-surface-raised: #FFFFFF;
+  --color-border: #E2E8F0;
+  --color-fg: #0F172A;
+  --color-fg-muted: #334155;
+  --color-fg-subtle: #64748B;
+  --color-accent: #059669;
+  --color-accent-strong: #047857;
+  --color-accent-fg: #FFFFFF;
+  --color-success: #059669;
+  --color-warning: #D97706;
+  --color-danger: #E11D48;
+  --color-info: #0284C7;
+}
+
 @layer base {
   html {
     font-family: 'Roboto', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;

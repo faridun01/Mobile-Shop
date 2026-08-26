@@ -2,6 +2,26 @@ import React from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useApp } from '../../context/AppContext';
 import { PageId } from '../../types';
+import {
+  ShoppingBag,
+  History,
+  Package,
+  PlusCircle,
+  ArrowLeftRight,
+  RefreshCw,
+  Wrench,
+  Truck,
+  Gift,
+  Wallet,
+  Users,
+  UserCheck,
+  BarChart3,
+  FileText,
+  Settings,
+  Bell,
+  LogOut,
+  X
+} from 'lucide-react';
 
 const PAGE_ROUTES: Record<string, string> = {
   SALE: '/sale',
@@ -21,30 +41,6 @@ const PAGE_ROUTES: Record<string, string> = {
   SETTINGS: '/settings',
   NOTIFICATIONS: '/notifications',
 };
-import {
-  ShoppingBag,
-  History,
-  Package,
-  PlusCircle,
-  ArrowLeftRight,
-  RefreshCw,
-  Wrench,
-  Truck,
-  Gift,
-  Wallet,
-  Users,
-  UserCheck,
-  BarChart3,
-  FileText,
-  Settings,
-  Bell,
-  LogOut,
-  X,
-  Store,
-  Sun,
-  Moon,
-  ChevronRight
-} from 'lucide-react';
 
 interface NavGroup {
   title: string;
@@ -58,34 +54,34 @@ interface NavGroup {
 
 const NAV_GROUPS: NavGroup[] = [
   {
-    title: 'ОСНОВНЫЕ ОПЕРАЦИИ',
+    title: 'Основные операции',
     items: [
       { id: 'SALE', label: 'POS Терминал', icon: ShoppingBag, roles: ['ADMIN', 'PARTNER', 'SELLER'] },
       { id: 'SALES_HISTORY', label: 'История продаж', icon: History, roles: ['ADMIN', 'PARTNER', 'SELLER'] },
       { id: 'EXCHANGE', label: 'Обмен (Trade-In)', icon: RefreshCw, roles: ['ADMIN', 'PARTNER', 'SELLER'] },
-      { id: 'REPAIR', label: 'Сервис и Ремонт', icon: Wrench, roles: ['ADMIN', 'PARTNER', 'SELLER'] },
+      { id: 'REPAIR', label: 'Сервис и ремонт', icon: Wrench, roles: ['ADMIN', 'PARTNER', 'SELLER'] },
     ]
   },
   {
-    title: 'СКЛАД И ЛОГИСТИКА',
+    title: 'Склад и логистика',
     items: [
       { id: 'INVENTORY', label: 'Склад товаров', icon: Package, roles: ['ADMIN', 'PARTNER', 'SELLER'] },
-      { id: 'PURCHASE', label: 'Приходы (Партии)', icon: PlusCircle, roles: ['ADMIN', 'PARTNER'] },
+      { id: 'PURCHASE', label: 'Приходы (партии)', icon: PlusCircle, roles: ['ADMIN', 'PARTNER'] },
       { id: 'TRANSFER', label: 'Перемещение', icon: ArrowLeftRight, roles: ['ADMIN', 'PARTNER', 'SELLER'] },
       { id: 'SUPPLIERS', label: 'Поставщики', icon: Truck, roles: ['ADMIN', 'PARTNER'] },
     ]
   },
   {
-    title: 'ФИНАНСЫ И УЧЕТ',
+    title: 'Финансы и учёт',
     items: [
-      { id: 'REPORTS', label: 'Финансовые отчёты ($)', icon: BarChart3, roles: ['ADMIN', 'PARTNER'] },
+      { id: 'REPORTS', label: 'Финансовые отчёты', icon: BarChart3, roles: ['ADMIN', 'PARTNER'] },
       { id: 'EXPENSES', label: 'Расходы магазина', icon: Wallet, roles: ['ADMIN', 'PARTNER'] },
       { id: 'BONUSES', label: 'Бонусы продавцов', icon: Gift, roles: ['ADMIN', 'PARTNER'] },
       { id: 'OWNERS', label: 'Партнеры и капитал', icon: Users, roles: ['ADMIN'] },
     ]
   },
   {
-    title: 'СИСТЕМА И ДОСТУП',
+    title: 'Система и доступ',
     items: [
       { id: 'EMPLOYEES', label: 'Сотрудники', icon: UserCheck, roles: ['ADMIN'] },
       { id: 'AUDIT_LOG', label: 'Журнал аудита', icon: FileText, roles: ['ADMIN'] },
@@ -100,7 +96,6 @@ export const Drawer: React.FC = () => {
   const location = useLocation();
   const {
     currentUser,
-    activePage,
     setActivePage,
     drawerOpen,
     setDrawerOpen,
@@ -116,18 +111,17 @@ export const Drawer: React.FC = () => {
   const userStoreName = currentUser?.storeId ? (stores.find(s => s.id === currentUser.storeId)?.name || currentUser.storeName) : currentUser?.storeName;
 
   return (
-    <div className="fixed inset-0 z-50 flex md:hidden flex-col bg-[#0B0E14] text-slate-100 font-mono w-full h-full overflow-hidden animate-in fade-in zoom-in-95 duration-150">
-      {/* Top Bar Header */}
-      <div className="p-4 border-b border-slate-800 bg-[#0F1219] flex items-center justify-between shrink-0">
-        <div className="flex items-center space-x-3 min-w-0">
-          <div className="w-9 h-9 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 font-bold text-sm flex items-center justify-center font-mono shrink-0">
+    <div className="fixed inset-0 z-50 flex md:hidden flex-col bg-bg text-fg w-full h-full overflow-hidden">
+      <div className="p-4 border-b border-border bg-surface flex items-center justify-between shrink-0">
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="w-10 h-10 rounded-lg bg-accent/10 border border-accent/30 text-accent font-bold text-sm flex items-center justify-center shrink-0">
             {currentUser?.name ? currentUser.name.substring(0, 2).toUpperCase() : 'US'}
           </div>
           <div className="min-w-0">
-            <h2 className="text-sm font-bold text-slate-100 truncate">
+            <h2 className="text-sm font-semibold text-fg truncate">
               {currentUser?.name || 'Пользователь'}
             </h2>
-            <p className="text-xs font-bold text-emerald-400 truncate">
+            <p className="text-xs font-medium text-accent truncate">
               {userStoreName || 'Главный склад'}
             </p>
           </div>
@@ -136,27 +130,25 @@ export const Drawer: React.FC = () => {
         <button
           type="button"
           onClick={() => setDrawerOpen(false)}
-          className="px-3 py-2 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 text-xs font-bold transition-all flex items-center space-x-1.5 active:scale-95"
+          aria-label="Закрыть меню"
+          className="w-11 h-11 flex items-center justify-center rounded-lg bg-surface-raised text-fg-muted hover:text-fg border border-border transition-colors"
         >
-          <X className="w-4 h-4" />
-          <span>ЗАКРЫТЬ</span>
+          <X className="w-5 h-5" />
         </button>
       </div>
 
-      {/* Main Full-Screen Categorized Menu Options Grid */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4 pb-20">
+      <div className="flex-1 overflow-y-auto p-4 space-y-5 pb-24">
         {NAV_GROUPS.map((group, gIdx) => {
           const visibleItems = group.items.filter(item => item.roles.includes(userRole));
           if (visibleItems.length === 0) return null;
 
           return (
             <div key={gIdx} className="space-y-2">
-              <span className="text-xs font-bold text-slate-400 uppercase tracking-wider px-1 block flex items-center">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 mr-2 inline-block" />
+              <span className="text-xs font-semibold text-fg-subtle uppercase tracking-wide px-1 block">
                 {group.title}
               </span>
 
-              <div className="grid grid-cols-2 gap-2.5">
+              <div className="grid grid-cols-2 gap-2">
                 {visibleItems.map(item => {
                   const Icon = item.icon;
                   const routePath = PAGE_ROUTES[item.id] || '/sale';
@@ -171,27 +163,19 @@ export const Drawer: React.FC = () => {
                         navigate(routePath);
                         setDrawerOpen(false);
                       }}
-                      className={`flex flex-col items-start justify-between p-3.5 rounded-xl border text-left transition-all active:scale-95 ${
-                        isActive
-                          ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/40 shadow-[0_0_12px_rgba(16,185,129,0.2)]'
-                          : 'bg-[#0F1219] hover:bg-slate-900 text-slate-200 border-slate-800'
+                      className={`flex flex-col items-start justify-between min-h-18 p-3 rounded-lg border text-left transition-colors active:scale-[0.98] ${
+                        isActive ? 'bg-accent/10 text-accent border-accent/40' : 'bg-surface hover:bg-surface-raised text-fg border-border'
                       }`}
                     >
                       <div className="flex items-center justify-between w-full mb-2">
-                        <div className={`p-2 rounded-lg ${isActive ? 'bg-emerald-500/20 text-emerald-400' : 'bg-slate-900 text-slate-300 border border-slate-800'}`}>
-                          <Icon className="w-5 h-5" />
-                        </div>
+                        <Icon className={`w-4.5 h-4.5 ${isActive ? 'text-accent' : 'text-fg-subtle'}`} />
                         {isNotif && unreadNotifs > 0 && (
-                          <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-rose-500 px-1.5 text-[10px] font-bold text-white shadow-[0_0_8px_rgba(244,63,94,0.7)]">
+                          <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-danger px-1.5 text-[10px] font-bold text-white">
                             {unreadNotifs}
                           </span>
                         )}
                       </div>
-
-                      <div>
-                        <span className="text-xs font-bold block text-slate-100 leading-tight">{item.label}</span>
-                        <span className="text-[10px] text-slate-500 block mt-0.5">Перейти →</span>
-                      </div>
+                      <span className="text-xs font-semibold leading-tight">{item.label}</span>
                     </button>
                   );
                 })}
@@ -201,21 +185,20 @@ export const Drawer: React.FC = () => {
         })}
       </div>
 
-      {/* Footer Exit Bar */}
-      <div className="p-3 border-t border-slate-800 bg-[#0F1219] flex items-center justify-between shrink-0 fixed bottom-0 left-0 right-0 z-50">
+      <div className="p-3 border-t border-border bg-surface flex items-center justify-between shrink-0 fixed bottom-0 left-0 right-0 z-50 safe-area-pb">
         <button
           onClick={() => {
             setDrawerOpen(false);
             logout();
           }}
-          className="px-4 py-2 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 text-xs font-bold transition-all flex items-center space-x-2"
+          className="h-11 px-4 rounded-lg bg-danger/10 hover:bg-danger/15 text-danger border border-danger/30 text-xs font-semibold transition-colors flex items-center gap-2"
         >
           <LogOut className="w-4 h-4" />
-          <span>ВЫХОД ИЗ СИСТЕМЫ</span>
+          <span>Выход из системы</span>
         </button>
 
-        <span className="text-[11px] font-mono text-slate-500">
-          Mobile Shop POS v2.73
+        <span className="text-[11px] text-fg-subtle">
+          Mobile Shop POS
         </span>
       </div>
     </div>

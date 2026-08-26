@@ -15,6 +15,7 @@ import { PWAInstallPrompt } from '../components/pwa/PWAInstallPrompt';
 import { PWAUpdateNotifier } from '../components/pwa/PWAUpdateNotifier';
 import { useUIStore } from '../stores/useUIStore';
 import { useApp } from '../context/AppContext';
+import { LoadingState } from '../components/ui/Skeleton';
 
 // Lazy-loaded page components for Code Splitting
 const LoginPage = lazy(() => import('../components/pages/LoginPage').then(m => ({ default: m.LoginPage })));
@@ -55,14 +56,7 @@ const PAGE_ROUTES: Record<string, string> = {
 };
 
 function LoadingFallback() {
-  return (
-    <div className="flex flex-1 h-full items-center justify-center bg-[#0B0F17] text-slate-400">
-      <div className="flex flex-col items-center space-y-3">
-        <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
-        <span className="text-xs font-mono tracking-widest text-slate-400">ЗАГРУЗКА МОДУЛЯ...</span>
-      </div>
-    </div>
-  );
+  return <LoadingState label="Загрузка…" className="h-full bg-bg" />;
 }
 
 function MainLayout() {
@@ -86,14 +80,14 @@ function MainLayout() {
   }
 
   return (
-    <div className="flex h-dvh max-h-dvh w-screen overflow-hidden bg-[#0B0F17] text-slate-200 antialiased selection:bg-blue-500 selection:text-white">
+    <div className="flex h-dvh max-h-dvh w-screen overflow-hidden bg-bg text-fg antialiased selection:bg-accent selection:text-accent-fg">
       <Drawer />
       <TabletNavRail />
       <Sidebar />
 
-      <div className="flex-1 flex flex-col min-w-0 h-dvh max-h-dvh overflow-hidden bg-[#0B0F17] relative">
+      <div className="flex-1 flex flex-col min-w-0 h-dvh max-h-dvh overflow-hidden bg-bg relative">
         <TopBar />
-        <main className="flex-1 flex flex-col min-h-0 overflow-y-auto relative bg-[#0B0F17] pb-20 lg:pb-0">
+        <main className="flex-1 flex flex-col min-h-0 overflow-y-auto relative bg-bg pb-16 md:pb-0">
           <Suspense fallback={<LoadingFallback />}>
             <Routes>
               <Route path="/" element={<Navigate to="/sale" replace />} />
@@ -119,22 +113,22 @@ function MainLayout() {
         </main>
         <MobileBottomNav />
 
-        <footer className="hidden md:flex h-6 shrink-0 border-t border-slate-800 bg-[#0F131D] px-3 items-center justify-between text-[10px] font-mono text-slate-400 select-none z-20">
-          <div className="flex items-center space-x-4">
-            <span className="flex items-center space-x-1.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-              <span className="text-slate-300 font-medium">СИСТЕМА: АКТИВНА</span>
+        <footer className="hidden md:flex h-6 shrink-0 border-t border-border bg-surface px-3 items-center justify-between text-[10px] text-fg-subtle select-none z-20">
+          <div className="flex items-center gap-3">
+            <span className="flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-success" />
+              <span className="text-fg-muted font-medium">Система активна</span>
             </span>
-            <span>|</span>
-            <span className="text-slate-400">ТОЧКА: {currentUser?.storeName || 'ГЛАВНЫЙ СКЛАД'}</span>
-            <span>|</span>
-            <span>ПОЛЬЗОВАТЕЛЬ: {currentUser?.name}</span>
+            <span>·</span>
+            <span>Точка: {currentUser?.storeName || 'Главный склад'}</span>
+            <span>·</span>
+            <span>{currentUser?.name}</span>
           </div>
 
-          <div className="flex items-center space-x-4">
-            <span className="text-slate-400">ВАЛЮТА: USD / TJS</span>
-            <span>|</span>
-            <span className="text-slate-300 font-medium">ОНЛАЙН СИНХРОНИЗАЦИЯ</span>
+          <div className="flex items-center gap-3">
+            <span>USD / TJS</span>
+            <span>·</span>
+            <span className="text-fg-muted font-medium">Синхронизация онлайн</span>
           </div>
         </footer>
       </div>

@@ -50,106 +50,88 @@ export const MobileBottomNav: React.FC = () => {
       ? { id: 'PURCHASE', label: 'Приход', icon: PlusCircle }
       : { id: 'EXCHANGE', label: 'Обмен', icon: RefreshCw };
 
+  const NavItem: React.FC<{ routePath: string; label: string; icon: React.ElementType; onSelect: () => void }> = ({
+    routePath,
+    label,
+    icon: Icon,
+    onSelect,
+  }) => {
+    const isActive = location.pathname === routePath;
+    return (
+      <button
+        onClick={onSelect}
+        className={`flex-1 h-full min-h-11 flex flex-col items-center justify-center gap-0.5 transition-colors ${
+          isActive ? 'text-accent' : 'text-fg-subtle active:text-fg'
+        }`}
+      >
+        <Icon className="w-5 h-5" strokeWidth={isActive ? 2.5 : 2} />
+        <span className={`text-[10px] leading-none ${isActive ? 'font-semibold' : 'font-medium'}`}>{label}</span>
+      </button>
+    );
+  };
+
   return (
-    <div className="md:hidden fixed bottom-0 left-0 right-0 z-50 w-full bg-[#0F1219] border-t border-slate-800/90 px-2 pt-1.5 pb-4 flex items-center justify-around select-none shadow-[0_-5px_25px_rgba(0,0,0,0.9)] safe-area-pb font-mono">
-      {/* 1. Склад */}
-      {(() => {
-        const routePath = '/inventory';
-        const isActive = location.pathname === routePath;
-        return (
-          <button
-            onClick={() => {
-              setActivePage('INVENTORY');
-              navigate(routePath);
-            }}
-            className={`flex-1 py-1 flex flex-col items-center justify-center relative transition-colors ${
-              isActive ? 'text-emerald-400 font-bold' : 'text-slate-400 hover:text-slate-200'
-            }`}
-          >
-            <Package className="w-5 h-5" />
-            <span className="text-[10px] mt-0.5 tracking-tight">Склад</span>
-          </button>
-        );
-      })()}
+    <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 w-full h-16 bg-surface border-t border-border flex items-stretch justify-around select-none safe-area-pb">
+      <NavItem
+        routePath="/inventory"
+        label="Склад"
+        icon={Package}
+        onSelect={() => {
+          setActivePage('INVENTORY');
+          navigate('/inventory');
+        }}
+      />
+      <NavItem
+        routePath="/sales-history"
+        label="История"
+        icon={History}
+        onSelect={() => {
+          setActivePage('SALES_HISTORY');
+          navigate('/sales-history');
+        }}
+      />
 
-      {/* 2. Продажи */}
-      {(() => {
-        const routePath = '/sales-history';
-        const isActive = location.pathname === routePath;
-        return (
-          <button
-            onClick={() => {
-              setActivePage('SALES_HISTORY');
-              navigate(routePath);
-            }}
-            className={`flex-1 py-1 flex flex-col items-center justify-center relative transition-colors ${
-              isActive ? 'text-emerald-400 font-bold' : 'text-slate-400 hover:text-slate-200'
-            }`}
-          >
-            <History className="w-5 h-5" />
-            <span className="text-[10px] mt-0.5 tracking-tight">История</span>
-          </button>
-        );
-      })()}
-
-      {/* 3. POS (ПО ЦЕНТРУ - Prominent Action Button) */}
-      <div className="flex-1 flex justify-center items-center relative -top-3">
+      {/* Center primary action — POS */}
+      <div className="flex-1 flex justify-center items-center relative">
         <button
           onClick={() => {
             setActivePage('SALE');
             navigate('/sale');
           }}
-          className={`w-12 h-12 rounded-full flex flex-col items-center justify-center shadow-[0_0_16px_rgba(16,185,129,0.5)] active:scale-90 transition-all ${
-            isSaleActive
-              ? 'bg-emerald-400 text-slate-950 font-extrabold ring-4 ring-emerald-500/30 scale-105'
-              : 'bg-emerald-500 text-slate-950 font-bold hover:bg-emerald-400'
+          className={`w-14 h-14 -mt-5 rounded-full flex flex-col items-center justify-center active:scale-95 transition-transform ${
+            isSaleActive ? 'bg-accent-strong text-accent-fg' : 'bg-accent text-accent-fg'
           }`}
           title="POS Терминал"
         >
-          <ShoppingBag className="w-5 h-5 stroke-[2.5]" />
-          <span className="text-[9px] font-extrabold tracking-tighter uppercase leading-none mt-0.5">
-            POS
-          </span>
+          <ShoppingBag className="w-5 h-5" strokeWidth={2.5} />
+          <span className="text-[9px] font-bold tracking-tight leading-none mt-0.5">POS</span>
         </button>
       </div>
 
-      {/* 4. Обмен / Приход */}
-      {(() => {
-        const item = fourthItem;
-        const Icon = item.icon;
-        const routePath = PAGE_ROUTES[item.id] || '/sale';
-        const isActive = location.pathname === routePath;
-        return (
-          <button
-            onClick={() => {
-              setActivePage(item.id);
-              navigate(routePath);
-            }}
-            className={`flex-1 py-1 flex flex-col items-center justify-center relative transition-colors ${
-              isActive ? 'text-emerald-400 font-bold' : 'text-slate-400 hover:text-slate-200'
-            }`}
-          >
-            <Icon className="w-5 h-5" />
-            <span className="text-[10px] mt-0.5 tracking-tight">{item.label}</span>
-          </button>
-        );
-      })()}
+      <NavItem
+        routePath={PAGE_ROUTES[fourthItem.id] || '/sale'}
+        label={fourthItem.label}
+        icon={fourthItem.icon}
+        onSelect={() => {
+          setActivePage(fourthItem.id);
+          navigate(PAGE_ROUTES[fourthItem.id] || '/sale');
+        }}
+      />
 
-      {/* 5. Меню (Opens Full-Screen Dedicated Menu Page) */}
       <button
         onClick={() => setDrawerOpen(true)}
-        className="flex-1 py-1 flex flex-col items-center justify-center relative text-slate-400 hover:text-slate-200 active:scale-95 transition-all"
+        className="flex-1 h-full min-h-11 flex flex-col items-center justify-center gap-0.5 text-fg-subtle active:text-fg transition-colors"
       >
         <div className="relative">
           <Menu className="w-5 h-5" />
           {unreadNotifs > 0 && (
-            <span className="absolute -top-1 -right-2 flex h-4 min-w-4 items-center justify-center rounded-full bg-rose-500 px-1 text-[9px] font-bold text-white shadow-[0_0_8px_rgba(244,63,94,0.7)]">
+            <span className="absolute -top-1.5 -right-2 flex h-4 min-w-4 items-center justify-center rounded-full bg-danger px-1 text-[9px] font-bold text-white">
               {unreadNotifs}
             </span>
           )}
         </div>
-        <span className="text-[10px] mt-0.5 tracking-tight">Меню</span>
+        <span className="text-[10px] font-medium leading-none">Меню</span>
       </button>
-    </div>
+    </nav>
   );
 };
