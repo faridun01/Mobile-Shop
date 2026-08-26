@@ -491,47 +491,47 @@ export const PurchasePage: React.FC = () => {
       <div className="flex-1 flex flex-col h-full overflow-hidden bg-bg text-fg">
         {/* Search & Filters Bar */}
         <div className="p-3 border-b border-border bg-surface space-y-3 shrink-0">
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5">
-            <div className="relative flex-1">
+          <div className="flex flex-wrap items-center gap-2.5">
+            {/* Compact Search Bar with Scanner inside right corner */}
+            <div className="relative w-full sm:w-72 md:w-80">
               <Search className="absolute left-3 top-2.5 w-4 h-4 text-fg-subtle" />
               <input
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Поиск: № накладной / поставщик / IMEI / модель..."
-                className="w-full rounded-xl bg-surface-raised border border-border pl-9 pr-8 py-2 text-xs text-fg placeholder-fg-subtle focus:border-accent focus:outline-none transition-colors"
+                placeholder="Поиск: № накладной / IMEI..."
+                className="w-full rounded-xl bg-surface-raised border border-border pl-9 pr-9 py-2 text-xs text-fg placeholder-fg-subtle focus:border-accent focus:outline-none transition-colors"
               />
-              {searchQuery && (
+              {searchQuery ? (
                 <button
                   onClick={() => setSearchQuery('')}
                   className="absolute right-2.5 top-2.5 text-fg-subtle hover:text-fg"
+                  title="Очистить"
                 >
                   <X className="w-3.5 h-3.5" />
+                </button>
+              ) : (
+                <button
+                  onClick={handleScanFinder}
+                  className="absolute right-2.5 top-2.5 text-accent hover:text-accent-strong transition-colors"
+                  title="Сканировать IMEI или номер накладной"
+                >
+                  <Scan className="w-4 h-4" />
                 </button>
               )}
             </div>
 
-            <div className="flex items-center space-x-2 shrink-0">
-              <button
-                onClick={handleScanFinder}
-                className="flex items-center space-x-1.5 px-3.5 py-2 rounded-xl bg-surface-raised hover:bg-surface border border-border text-accent text-xs font-bold transition-colors"
-                title="Сканировать IMEI или номер накладной"
-              >
-                <Scan className="w-4 h-4" />
-                <span className="hidden sm:inline">СКАНИРОВАТЬ</span>
-              </button>
-
-              <button
-                onClick={() => {
-                  setStatusMessage(null);
-                  setViewMode('form');
-                }}
-                className="flex items-center space-x-1.5 px-4 py-2 rounded-xl bg-accent hover:bg-accent-strong active:scale-95 text-accent-fg font-bold text-xs transition-colors shadow-xs"
-              >
-                <Plus className="w-4 h-4" />
-                <span>НОВЫЙ ПРИХОД</span>
-              </button>
-            </div>
+            {/* New Purchase button right next to search */}
+            <button
+              onClick={() => {
+                setStatusMessage(null);
+                setViewMode('form');
+              }}
+              className="px-4 py-2 rounded-xl bg-accent hover:bg-accent-strong active:scale-95 text-accent-fg font-bold text-xs flex items-center space-x-1.5 transition-colors shadow-xs"
+            >
+              <Plus className="w-4 h-4" />
+              <span>НОВЫЙ ПРИХОД</span>
+            </button>
           </div>
 
           {/* Period selector & Supplier Filter */}
