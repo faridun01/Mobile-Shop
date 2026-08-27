@@ -466,40 +466,47 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, []);
 
   const refetchAll = useCallback(async () => {
-    // Users/stores first: everything else resolves display names/store labels from them.
-    await Promise.all([fetchUsers(), fetchStores()]);
-    await Promise.all([
-      fetchDevices(),
-      fetchSales(),
-      fetchTransfers(),
-      fetchRepairs(),
-      fetchSuppliers(),
-      fetchInvoices(),
-      fetchBonuses(),
-      fetchExpenses(),
-      fetchOwners(),
-      fetchOwnerTransactions(),
-      fetchNotifications(),
-      fetchAuditLogs(),
-      fetchExchangeRate(),
-    ]);
+    // 1. Critical core data (Users, Stores, Devices/Catalog, Exchange Rate)
+    await Promise.all([fetchUsers(), fetchStores(), fetchDevices(), fetchExchangeRate()]);
+
+    // 2. Secondary modules batched to avoid connection pool saturation
+    await Promise.all([fetchSales(), fetchTransfers(), fetchRepairs(), fetchExpenses()]);
+    await Promise.all([fetchSuppliers(), fetchInvoices(), fetchBonuses(), fetchOwners()]);
+    await Promise.all([fetchOwnerTransactions(), fetchNotifications(), fetchAuditLogs()]);
   }, [fetchUsers, fetchStores, fetchDevices, fetchSales, fetchTransfers, fetchRepairs, fetchSuppliers, fetchInvoices, fetchBonuses, fetchExpenses, fetchOwners, fetchOwnerTransactions, fetchNotifications, fetchAuditLogs, fetchExchangeRate]);
 
-  // Load everything once a session exists (fresh login, or a restored session on page reload)
+  // Load catalog immediately (fast-path) and fetch secondary modules in background
   useEffect(() => {
     if (!authToken || !authUser) return;
     setIsInitialLoading(true);
-    refetchAll()
-      .then(() => fetchExchangeRate())
-      .then((rate) => checkRatePrompt(rate))
-      .catch((e) => console.error('Initial data load failed', e))
-      .finally(() => setIsInitialLoading(false));
+
+    Promise.all([fetchUsers(), fetchStores(), fetchDevices(), fetchExchangeRate()])
+      .then(([_, __, ___, rate]) => {
+        setIsInitialLoading(false);
+        if (rate) checkRatePrompt(rate);
+        // Secondary data loads in background
+        return Promise.all([
+          fetchSales(),
+          fetchTransfers(),
+          fetchRepairs(),
+          fetchExpenses(),
+          fetchSuppliers(),
+          fetchInvoices(),
+          fetchBonuses(),
+          fetchOwners(),
+          fetchOwnerTransactions(),
+          fetchNotifications(),
+          fetchAuditLogs(),
+        ]);
+      })
+      .catch((e) => {
+        console.error('Initial data load failed', e);
+        setIsInitialLoading(false);
+      });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authToken, authUser?.id]);
 
-  // Realtime: any broadcast from another terminal simply triggers a full resync.
-  // Simpler and safer than fine-grained cache invalidation, and the dataset is small
-  // enough for a shop POS that this is cheap.
+  // Realtime: any broadcast from another terminal triggers resync
   useRealtimeSync(authToken, () => {
     refetchAll().catch((e) => console.error('Realtime resync failed', e));
   });

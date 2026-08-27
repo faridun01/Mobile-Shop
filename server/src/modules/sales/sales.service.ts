@@ -159,6 +159,6 @@ export class SalesService {
       });
 
       return sale;
-    });
+    }, { maxWait: 10000, timeout: 20000 });
   }
 }
