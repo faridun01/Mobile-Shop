@@ -238,6 +238,8 @@ model SaleItem {
   sale   Sale   @relation(fields: [saleId], references: [id], onDelete: Cascade)
   device Device @relation(fields: [deviceId], references: [id])
 
+  @@index([saleId])
+  @@index([deviceId])
   @@map("sale_items")
 }
 
@@ -302,6 +304,8 @@ model SupplierInvoice {
   devices     Device[]
   allocations SupplierPaymentAllocation[]
 
+  @@index([supplierId])
+  @@index([storeId])
   @@map("supplier_invoices")
 }
 
@@ -317,6 +321,7 @@ model InvoiceGroup {
 
   invoice SupplierInvoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
 
+  @@index([invoiceId])
   @@map("invoice_groups")
 }
 
@@ -396,6 +401,8 @@ model TransferRequest {
   toStore   Store          @relation("ToStore", fields: [toStoreId], references: [id])
   items     TransferItem[]
 
+  @@index([fromStoreId])
+  @@index([toStoreId])
   @@map("transfer_requests")
 }
 
@@ -409,6 +416,8 @@ model TransferItem {
   transfer TransferRequest @relation(fields: [transferId], references: [id], onDelete: Cascade)
   device   Device          @relation(fields: [deviceId], references: [id])
 
+  @@index([transferId])
+  @@index([deviceId])
   @@map("transfer_items")
 }
 
@@ -481,6 +490,8 @@ model Expense {
 
   store Store? @relation(fields: [storeId], references: [id])
 
+  @@index([storeId, createdAt])
+  @@index([createdAt])
   @@map("expenses")
 }
 
@@ -512,6 +523,7 @@ model OwnerTransaction {
 
   owner Owner @relation(fields: [ownerId], references: [id])
 
+  @@index([ownerId, createdAt])
   @@map("owner_transactions")
 }
 
