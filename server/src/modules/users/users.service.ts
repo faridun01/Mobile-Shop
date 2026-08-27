@@ -72,7 +72,14 @@ export class UsersService {
     return prisma.$transaction(async (tx) => {
       const actor = await resolveActor(tx, updatedByUserId);
       const data: any = {};
-      if (input.login && input.login.trim()) data.login = input.login.trim();
+      if (input.login && input.login.trim()) {
+        const newLogin = input.login.trim();
+        const existing = await tx.user.findUnique({ where: { login: newLogin } });
+        if (existing && existing.id !== userId) {
+          throw new Error('Пользователь с таким логином уже существует');
+        }
+        data.login = newLogin;
+      }
       if (input.name && input.name.trim()) data.name = input.name.trim();
       if (input.role) data.role = input.role;
       if (input.storeId !== undefined) data.storeId = input.storeId;
