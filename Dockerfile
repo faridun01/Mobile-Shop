@@ -44,6 +44,7 @@ COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/prisma ./prisma
 COPY --from=builder /app/server ./server
 COPY --from=builder /app/docker-entrypoint.sh ./docker-entrypoint.sh
+RUN chmod +x ./docker-entrypoint.sh
 
 # Remove the bundled npm CLI (and its vendored deps) - unused at runtime,
 # since the entrypoint invokes prisma/tsx binaries directly
