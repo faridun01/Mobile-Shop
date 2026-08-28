@@ -1,6 +1,7 @@
 import { prisma } from '../../prisma/prisma.service';
 import { resolveActor } from '../../common/actor';
 import { createExpense } from '../expenses/expenses.service';
+import { requireNonNegativeMoney } from '../../common/money';
 
 export interface CreateRepairInput {
   storeId: string;
@@ -21,6 +22,7 @@ export interface CreateRepairInput {
   comment?: string;
   estimatedCostTjs?: number;
   repairCostTjs?: number;
+  prepaymentTjs?: number;
 }
 
 export class RepairsService {
@@ -51,6 +53,7 @@ export class RepairsService {
           equipmentPackage: input.equipmentPackage,
           comment: input.comment,
           estimatedCostTjs: input.estimatedCostTjs,
+          prepaymentTjs: input.prepaymentTjs !== undefined ? requireNonNegativeMoney(input.prepaymentTjs, 'Предоплата') : undefined,
           statusHistory: {
             create: [{ status: 'ACCEPTED', updatedByUserId: input.userId, note: 'Прием телефона на ремонт' }],
           },
@@ -85,10 +88,13 @@ export class RepairsService {
       });
 
       return ticket;
-    });
+    }, { maxWait: 10000, timeout: 25000 });
   }
 
   public static async updateStatus(ticketId: string, newStatus: string, updatedByUserId: string, note?: string, finalCostTjs?: number) {
+    const statuses = ['ACCEPTED', 'IN_PROGRESS', 'READY', 'ISSUED', 'DIAGNOSTICS', 'IN_REPAIR', 'DELIVERED', 'UNREPAIRABLE'];
+    if (!statuses.includes(newStatus)) throw new Error('Некорректный статус ремонта');
+    if (finalCostTjs !== undefined) requireNonNegativeMoney(finalCostTjs, 'Стоимость ремонта');
     return prisma.$transaction(async (tx) => {
       const actor = await resolveActor(tx, updatedByUserId);
       const ticket = await tx.repairTicket.findUnique({ where: { id: ticketId } });
@@ -98,6 +104,8 @@ export class RepairsService {
       if (newStatus === 'ISSUED' && ticket.status === 'ISSUED') {
         throw new Error('Этот ремонт уже был выдан клиенту');
       }
+      if (newStatus === 'ISSUED' && ticket.status !== 'READY') throw new Error('Сначала отметьте ремонт как готовый к выдаче');
+      if (newStatus === ticket.status) return ticket;
 
       const costVal = finalCostTjs !== undefined && finalCostTjs !== null ? Number(finalCostTjs) : (ticket.finalCostTjs || ticket.estimatedCostTjs || 0);
 
@@ -127,12 +135,12 @@ export class RepairsService {
           userName: actor.name,
           userRole: actor.role,
           action: 'REPAIR_STATUS_CHANGE',
-          details: `Ремонт #${ticket.ticketNumber} (${ticket.model}): статус "${newStatus}". Расход: ${costVal} TJS списан со счета магазина.`,
+          details: `Ремонт #${ticket.ticketNumber} (${ticket.model}): статус "${newStatus}".${newStatus === 'ISSUED' && costVal > 0 ? ` Расход: ${costVal} TJS списан с кассы магазина.` : ''}`,
           targetId: ticketId,
         },
       });
 
       return updated;
-    });
+    }, { maxWait: 10000, timeout: 25000 });
   }
 }

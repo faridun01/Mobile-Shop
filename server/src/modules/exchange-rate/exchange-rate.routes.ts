@@ -1,5 +1,5 @@
 import type { Express } from 'express';
-import { authenticateJwt, type AuthenticatedRequest } from '../../auth/auth.middleware';
+import { authenticateJwt, requireRoles, type AuthenticatedRequest } from '../../auth/auth.middleware';
 import { prisma } from '../../prisma/prisma.service';
 import { setTodayRate } from './exchange-rate.service';
 import { RealtimeSyncGateway } from '../../websocket/websocket.gateway';
@@ -15,10 +15,10 @@ export function registerExchangeRateRoutes(app: Express) {
     }
   });
 
-  app.post('/api/exchange-rate/today', authenticateJwt, async (req: AuthenticatedRequest, res, next) => {
+  app.post('/api/exchange-rate/today', authenticateJwt, requireRoles('ADMIN', 'PARTNER'), async (req: AuthenticatedRequest, res, next) => {
     try {
       const rate = Number(req.body?.rate);
-      if (!rate || rate <= 0) {
+      if (!Number.isFinite(rate) || rate <= 0) {
         res.status(400).json({ message: 'Укажите корректный курс валюты' });
         return;
       }

@@ -4,11 +4,13 @@ import { UsersService } from './users.service';
 
 export function registerUserRoutes(app: Express) {
   // Readable by any authenticated role — every page needs to resolve colleague names
-  // (sellers on receipts, assignees on tickets, etc.); only safe fields are exposed
-  // (UsersService.list() never includes the password hash). Mutations stay ADMIN-only below.
-  app.get('/api/users', authenticateJwt, async (_req, res, next) => {
+  // (sellers on receipts, assignees on tickets, etc.). Financial fields (salary, commission)
+  // are only included for ADMIN/PARTNER; SELLERs get name/role/store only. Mutations stay
+  // ADMIN-only below.
+  app.get('/api/users', authenticateJwt, async (req: AuthenticatedRequest, res, next) => {
     try {
-      res.json(await UsersService.list());
+      const isPrivileged = req.user!.role === 'ADMIN' || req.user!.role === 'PARTNER';
+      res.json(await UsersService.list(isPrivileged));
     } catch (error) {
       next(error);
     }
@@ -19,6 +21,10 @@ export function registerUserRoutes(app: Express) {
       const { login, password, name, role, storeId, baseSalaryTjs, salesCommissionPercent } = req.body ?? {};
       if (!login || !password || !name || !role) {
         res.status(400).json({ message: 'login, password, name и role обязательны' });
+        return;
+      }
+      if (role === 'SELLER' && (!storeId || !String(storeId).trim())) {
+        res.status(400).json({ message: 'Для роли Продавец обязательна привязка к магазину' });
         return;
       }
       const user = await UsersService.create({ login, password, name, role, storeId, baseSalaryTjs, salesCommissionPercent, createdByUserId: req.user!.userId });

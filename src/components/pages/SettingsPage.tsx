@@ -31,7 +31,6 @@ export const SettingsPage: React.FC = () => {
     openDailyRateModal,
     theme,
     setTheme,
-    resetAllCashBalances,
     logout
   } = useApp();
 
@@ -86,7 +85,7 @@ export const SettingsPage: React.FC = () => {
   };
 
   const handleDeleteStore = (store: StoreType) => {
-    if (store.isMainWarehouse || store.id === 'store-main') {
+    if (store.isMainWarehouse) {
       setStatusMessage({ type: 'error', text: 'Центральный (Главный) склад нельзя удалить. Он всегда остается в системе.' });
       return;
     }
@@ -227,7 +226,7 @@ export const SettingsPage: React.FC = () => {
                   <div className="text-right text-xs">
                     <span className="text-[10px] text-fg-subtle uppercase block">ОБНОВЛЕНИЕ</span>
                     <span className="text-fg font-bold mt-0.5 block text-[11px]">
-                      {todayRate?.date} (Админ)
+                      {todayRate?.date}
                     </span>
                   </div>
                 </div>
@@ -248,18 +247,6 @@ export const SettingsPage: React.FC = () => {
               </div>
 
               <div className="flex items-center space-x-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    resetAllCashBalances();
-                    setStatusMessage({ type: 'success', text: 'Остатки наличных в кассах всех филиалов успешно обнулены (0 TJS)' });
-                  }}
-                  className="px-3 py-1.5 rounded-lg bg-surface-raised hover:bg-surface text-xs font-bold text-warning hover:text-warning flex items-center space-x-1.5 border border-border transition-colors"
-                  title="Сбросить накопленный остаток денег во всех кассах филиалов до 0 TJS"
-                >
-                  <span>🧹 ОБНУЛИТЬ КАССЫ</span>
-                </button>
-
                 <button
                   onClick={() => setIsAddStoreOpen(true)}
                   className="px-3 py-1.5 rounded-lg bg-surface-raised hover:bg-surface text-xs font-bold text-accent flex items-center space-x-1.5 border border-border transition-colors"
@@ -287,7 +274,7 @@ export const SettingsPage: React.FC = () => {
                       )}
                     </div>
                     <div className="flex items-center space-x-1 shrink-0">
-                      {s.isMainWarehouse || s.id === 'store-main' ? (
+                      {s.isMainWarehouse ? (
                         <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-md bg-accent/15 text-accent border border-accent/30 uppercase">
                           ЦЕНТРАЛЬНЫЙ
                         </span>

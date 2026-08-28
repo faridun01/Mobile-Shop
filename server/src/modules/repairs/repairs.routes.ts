@@ -45,7 +45,7 @@ export function registerRepairRoutes(app: Express) {
       if (req.user!.role === 'SELLER') {
         const existing = await prisma.repairTicket.findUnique({ where: { id: req.params.id } });
         if (!existing || existing.storeId !== req.user!.storeId) {
-          res.status(403).json({ error: 'Forbidden: this repair ticket belongs to another store' });
+          res.status(403).json({ message: 'Эта квитанция на ремонт принадлежит другому магазину' });
           return;
         }
       }

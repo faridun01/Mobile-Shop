@@ -46,12 +46,10 @@ export const TopBar: React.FC = () => {
           <h1 className="text-sm md:text-base font-bold text-fg truncate tracking-tight">
             {getPageTitle()}
           </h1>
-          {currentUser?.role !== 'SELLER' && (
-            <p className="text-[11px] text-fg-subtle truncate flex items-center">
-              <Store className="w-2.5 h-2.5 mr-1 text-accent shrink-0 inline" />
-              <span className="truncate">{userStoreName || (currentUser?.role === 'ADMIN' ? 'Все филиалы' : 'Главный склад')}</span>
-            </p>
-          )}
+          <p className="text-[11px] text-fg-subtle truncate flex items-center">
+            <Store className="w-2.5 h-2.5 mr-1 text-accent shrink-0 inline" />
+            <span className="truncate">{userStoreName || (currentUser?.role === 'ADMIN' ? 'Все филиалы' : 'Магазин не привязан')}</span>
+          </p>
         </div>
       </div>
 

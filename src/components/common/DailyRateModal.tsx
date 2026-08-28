@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
-import { DollarSign } from 'lucide-react';
+import { DollarSign, Clock } from 'lucide-react';
 import { Dialog } from '../ui/Dialog';
 import { Button } from '../ui/Button';
 import { FormField } from '../ui/FormField';
@@ -11,13 +11,17 @@ interface DailyRateModalProps {
 }
 
 export const DailyRateModal: React.FC<DailyRateModalProps> = ({ isOpen, onClose }) => {
-  const { todayRate, setDailyRate } = useApp();
+  const { todayRate, setDailyRate, currentUser } = useApp();
   const todayStr = new Date().toISOString().split('T')[0];
   const isRateSetForToday = todayRate && todayRate.date === todayStr && todayRate.rate > 0;
-  const isMandatory = !isRateSetForToday;
+  // Only ADMIN/PARTNER can actually set the rate (server-enforced) — a SELLER can't act
+  // on this, so blocking them behind a non-dismissable modal would be a dead end.
+  const canSetRate = currentUser?.role === 'ADMIN' || currentUser?.role === 'PARTNER';
+  const isMandatory = !isRateSetForToday && canSetRate;
 
   const [rateInput, setRateInput] = useState<string>('9.50');
   const [error, setError] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
@@ -26,15 +30,47 @@ export const DailyRateModal: React.FC<DailyRateModalProps> = ({ isOpen, onClose 
     }
   }, [isOpen, todayRate]);
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     const val = parseFloat(rateInput.replace(',', '.'));
     if (isNaN(val) || val <= 0) {
       setError('Введите корректный курс (например, 9.50)');
       return;
     }
-    setDailyRate(val);
-    onClose?.();
+    setIsSaving(true);
+    const res = await setDailyRate(val);
+    setIsSaving(false);
+    if (res.success) {
+      onClose?.();
+    } else {
+      setError(res.message || 'Не удалось установить курс');
+    }
   };
+
+  if (!isRateSetForToday && !canSetRate) {
+    // A SELLER can't set the rate — show a dismissable notice instead of a dead-end modal.
+    return (
+      <Dialog
+        open={isOpen}
+        onClose={() => onClose?.()}
+        dismissable
+        title="Курс доллара ещё не задан"
+        subtitle={`Дата: ${todayStr}`}
+        maxWidth="sm"
+        footer={
+          onClose && (
+            <Button variant="primary" fullWidth onClick={onClose}>
+              Понятно
+            </Button>
+          )
+        }
+      >
+        <div className="flex items-start gap-3 text-sm text-fg-muted">
+          <Clock className="w-5 h-5 text-warning shrink-0 mt-0.5" />
+          <p>Администратор или партнёр ещё не установил курс USD/TJS на сегодня. Продажа будет недоступна, пока курс не задан — обратитесь к администратору.</p>
+        </div>
+      </Dialog>
+    );
+  }
 
   return (
     <Dialog
@@ -51,7 +87,7 @@ export const DailyRateModal: React.FC<DailyRateModalProps> = ({ isOpen, onClose 
               Отмена
             </Button>
           )}
-          <Button variant="primary" fullWidth leftIcon={DollarSign} onClick={handleSubmit}>
+          <Button variant="primary" fullWidth leftIcon={DollarSign} loading={isSaving} onClick={handleSubmit}>
             Сохранить курс
           </Button>
         </>

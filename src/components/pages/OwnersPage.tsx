@@ -4,13 +4,11 @@ import {
   Plus,
   PieChart,
   Percent,
-  CheckCircle2,
-  AlertCircle,
   X,
   ArrowDownLeft,
   ArrowUpRight,
   Wallet,
-  User,
+  Users,
   Search,
   Briefcase,
   TrendingUp,
@@ -24,56 +22,44 @@ export const OwnersPage: React.FC = () => {
     currentUser,
     owners,
     users,
-    sales,
-    expenses,
     ownerTransactions,
     todayRate,
     createOwnerTransaction,
     updateOwnerProfitShares,
-    closeQuarterPeriod
+    closeQuarterPeriod,
+    initializeOwners
   } = useApp();
 
-  const displayOwners = useMemo(() => {
-    if (owners.length >= 2) return owners;
-    const adminUser = users.find(u => u.role === 'ADMIN' || u.id === 'user-admin' || u.login === 'admin');
-    const partnerUser = users.find(u => u.role === 'PARTNER' || u.id === 'user-partner' || u.login === 'partner');
+  const [isInitializing, setIsInitializing] = useState(false);
 
-    const o1 = owners[0] || {
-      id: adminUser?.id || 'owner-1',
-      name: adminUser?.name || 'Администратор',
-      profitSharePercent: 50,
-      capitalBalanceUsd: 0,
-      totalAccruedProfitUsd: 0,
-      totalPaidProfitUsd: 0,
-      totalReinvestedUsd: 0,
-      availableProfitUsd: 0
-    };
-    const o2 = owners[1] || {
-      id: partnerUser?.id || 'owner-2',
-      name: partnerUser?.name || 'Партнер',
-      profitSharePercent: 50,
-      capitalBalanceUsd: 0,
-      totalAccruedProfitUsd: 0,
-      totalPaidProfitUsd: 0,
-      totalReinvestedUsd: 0,
-      availableProfitUsd: 0
-    };
-    return [o1, o2];
-  }, [owners, users]);
+  const handleInitializeOwners = async () => {
+    setIsInitializing(true);
+    const res = await initializeOwners();
+    setIsInitializing(false);
+    if (res.success) {
+      setStatusBanner({ tone: 'success', text: 'Владельцы успешно инициализированы в базе данных (50% / 50%)!' });
+    } else {
+      setStatusBanner({ tone: 'error', text: res.message || 'Ошибка инициализации владельцев' });
+    }
+  };
+
+  const displayOwners = owners;
 
   const getOwnerDetails = (owner: { id: string; name?: string }, index: number) => {
     const adminUser = users.find(u => u.role === 'ADMIN' || u.id === 'user-admin' || u.login === 'admin');
     const partnerUser = users.find(u => u.role === 'PARTNER' || u.id === 'user-partner' || u.login === 'partner');
 
-    if (owner.id === 'owner-1' || owner.id === adminUser?.id || index === 0) {
+    const isGenericName = !owner.name || owner.name.startsWith('Владелец') || owner.name.startsWith('Owner');
+
+    if (owner.id === 'owner-1' || owner.id === 'owner-admin' || index === 0) {
       return {
-        name: adminUser?.name || owner.name || 'Администратор',
+        name: isGenericName ? (adminUser?.name || 'Далер') : owner.name!,
         roleTag: 'АДМИНИСТРАТОР',
         roleSub: 'Главный администратор & Владелец бизнеса'
       };
     }
     return {
-      name: partnerUser?.name || owner.name || 'Партнер',
+      name: isGenericName ? (partnerUser?.name || 'Рустам') : owner.name!,
       roleTag: 'ПАРТНЕР',
       roleSub: 'Партнер & Соучредитель бизнеса'
     };
@@ -114,11 +100,66 @@ export const OwnersPage: React.FC = () => {
 
   const rate = todayRate?.rate || 9.5;
 
+  // Filtered transactions (Must be called before any conditional return statements)
+  const filteredTransactions = useMemo(() => {
+    return ownerTransactions.filter((tx) => {
+      if (typeFilter !== 'ALL' && tx.type !== typeFilter) {
+        return false;
+      }
+      if (selectedOwnerFilter !== 'ALL' && tx.ownerId !== selectedOwnerFilter) {
+        return false;
+      }
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase().trim();
+        const matchesOwner = (tx.ownerName || '').toLowerCase().includes(q);
+        const matchesNote = (tx.note || '').toLowerCase().includes(q);
+        const matchesOperator = (tx.createdByName || '').toLowerCase().includes(q);
+        const matchesAmount = (tx.amountUsd?.toString() || '').includes(q);
+        if (!matchesOwner && !matchesNote && !matchesOperator && !matchesAmount) {
+          return false;
+        }
+      }
+      return true;
+    }).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  }, [ownerTransactions, typeFilter, selectedOwnerFilter, searchQuery]);
+
+  const totalCapitalInvested = useMemo(() => owners.reduce((acc, o) => acc + (o.capitalBalanceUsd ?? 0), 0), [owners]);
+  const totalAccruedProfit = useMemo(() => owners.reduce((acc, o) => acc + (o.totalAccruedProfitUsd ?? 0), 0), [owners]);
+  const totalPayouts = useMemo(() => owners.reduce((acc, o) => acc + (o.totalPaidProfitUsd ?? 0), 0), [owners]);
+  const totalAvailableProfit = useMemo(() => owners.reduce((acc, o) => acc + (o.availableProfitUsd ?? 0), 0), [owners]);
+
   if (currentUser?.role === 'SELLER') {
     return (
       <div className="p-8 text-center text-fg-muted text-xs">
         <p className="font-bold text-fg uppercase">Доступ ограничен</p>
         <p className="mt-1 text-fg-subtle">Раздел собственников доступен только администраторам и партнерам</p>
+      </div>
+    );
+  }
+
+  if (owners.length === 0) {
+    return (
+      <div className="flex-1 p-8 flex flex-col items-center justify-center text-center text-xs bg-bg">
+        <StatusBanner message={statusBanner} onDismiss={() => setStatusBanner(null)} />
+        <div className="max-w-md w-full p-6 rounded-2xl bg-surface border border-border shadow-xl space-y-4">
+          <div className="w-12 h-12 rounded-2xl bg-warning/15 text-warning border border-warning/30 flex items-center justify-center mx-auto">
+            <Users className="w-6 h-6" />
+          </div>
+          <div>
+            <h3 className="font-bold text-fg uppercase text-sm">Владельцы не настроены</h3>
+            <p className="mt-1 text-fg-subtle text-xs leading-relaxed">
+              Инициализируйте владельцев в базе данных перед финансовыми операциями, вложениями и распределением прибыли.
+            </p>
+          </div>
+          <button
+            onClick={handleInitializeOwners}
+            disabled={isInitializing}
+            className="w-full py-3 px-4 rounded-xl bg-accent hover:bg-accent-strong disabled:opacity-50 text-accent-fg font-bold text-xs uppercase tracking-wider transition-all shadow-xs flex items-center justify-center space-x-2"
+          >
+            <Plus className="w-4 h-4" />
+            <span>{isInitializing ? 'ИНИЦИАЛИЗАЦИЯ...' : 'ИНИЦИАЛИЗИРОВАТЬ ВЛАДЕЛЬЦЕВ (50% / 50%)'}</span>
+          </button>
+        </div>
       </div>
     );
   }
@@ -235,6 +276,9 @@ export const OwnersPage: React.FC = () => {
 
   const handleConfirmCloseQuarter = async () => {
     const quarterName = `${selectedQuarter} ${selectedQuarterYear}`;
+    if (!window.confirm(`Закрыть квартал ${quarterName}? Начисления и выплаты партнеров за период будут обнулены (с сохранением снимка в истории). Это действие нельзя отменить через интерфейс.`)) {
+      return;
+    }
     const res = await closeQuarterPeriod({
       quarterName,
       transferRemainingToCapital
@@ -251,58 +295,7 @@ export const OwnersPage: React.FC = () => {
     }
   };
 
-  // Filtered transactions
-  const filteredTransactions = useMemo(() => {
-    return ownerTransactions.filter((tx) => {
-      if (typeFilter !== 'ALL' && tx.type !== typeFilter) {
-        return false;
-      }
-      if (selectedOwnerFilter !== 'ALL' && tx.ownerId !== selectedOwnerFilter) {
-        return false;
-      }
-      if (searchQuery.trim()) {
-        const q = searchQuery.toLowerCase().trim();
-        const matchesOwner = (tx.ownerName || '').toLowerCase().includes(q);
-        const matchesNote = (tx.note || '').toLowerCase().includes(q);
-        const matchesOperator = (tx.createdByName || '').toLowerCase().includes(q);
-        const matchesAmount = (tx.amountUsd?.toString() || '').includes(q);
-        if (!matchesOwner && !matchesNote && !matchesOperator && !matchesAmount) {
-          return false;
-        }
-      }
-      return true;
-    }).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-  }, [ownerTransactions, typeFilter, selectedOwnerFilter, searchQuery]);
 
-  const businessNetProfitUsd = useMemo(() => {
-    let revenueUsd = 0;
-    let cogsUsd = 0;
-    (sales || []).forEach(s => {
-      if (s.status !== 'REFUNDED') {
-        revenueUsd += s.totalUsd || (s.totalTjs / rate);
-        (s.items || []).forEach(i => {
-          cogsUsd += i.costBasisUsd || i.purchaseCostUsd || 0;
-        });
-      }
-    });
-    let expensesUsd = 0;
-    (expenses || []).forEach(e => {
-      expensesUsd += (e.amountTjs || 0) / rate;
-    });
-    const net = revenueUsd - cogsUsd - expensesUsd;
-    return Math.max(0, net);
-  }, [sales, expenses, rate]);
-
-  const totalCapitalInvested = owners.reduce((acc, o) => acc + (o.capitalBalanceUsd ?? 0), 0);
-  const totalAccruedProfit = owners.reduce((acc, o) => {
-    const sharePct = o.profitSharePercent ?? 50;
-    const profit = o.totalAccruedProfitUsd && o.totalAccruedProfitUsd > 0
-      ? o.totalAccruedProfitUsd
-      : Math.round(businessNetProfitUsd * (sharePct / 100));
-    return acc + profit;
-  }, 0);
-  const totalPayouts = owners.reduce((acc, o) => acc + (o.totalPaidProfitUsd ?? 0), 0);
-  const totalAvailableProfit = owners.reduce((acc, o) => acc + (o.availableProfitUsd ?? 0), 0);
 
   return (
     <div className="flex-1 flex flex-col h-full overflow-hidden bg-bg text-fg">
@@ -497,9 +490,7 @@ export const OwnersPage: React.FC = () => {
                     {/* Profit Breakdown Grid */}
                     {(() => {
                       const sharePct = owner.profitSharePercent ?? 50;
-                      const ownerProfitUsd = owner.totalAccruedProfitUsd && owner.totalAccruedProfitUsd > 0
-                        ? owner.totalAccruedProfitUsd
-                        : Math.round(businessNetProfitUsd * (sharePct / 100));
+                      const ownerProfitUsd = owner.totalAccruedProfitUsd ?? 0;
                       return (
                         <div className="grid grid-cols-2 gap-2 text-xs">
                           <div className="p-2.5 rounded-xl bg-surface border border-border">

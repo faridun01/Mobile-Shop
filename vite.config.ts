@@ -88,21 +88,12 @@ export default defineConfig(() => {
                 },
               },
             },
-            // API endpoints MUST use NetworkFirst to prevent stale financial/inventory data
+            // Financial and inventory API responses must never come from a stale
+            // service-worker cache. Offline UI assets remain available, but live
+            // business data requires the server.
             {
               urlPattern: /\/api\/.*/i,
-              handler: 'NetworkFirst',
-              options: {
-                cacheName: 'api-freshness-cache',
-                networkTimeoutSeconds: 5,
-                expiration: {
-                  maxEntries: 50,
-                  maxAgeSeconds: 60 * 60 * 24, // 1 day fallback
-                },
-                cacheableResponse: {
-                  statuses: [0, 200],
-                },
-              },
+              handler: 'NetworkOnly',
             }
           ]
         }
@@ -120,8 +111,17 @@ export default defineConfig(() => {
       },
     },
     server: {
+      port: 3000,
       proxy: {
-        '/api': 'http://127.0.0.1:3002',
+        '/api': {
+          target: 'http://127.0.0.1:3001',
+          changeOrigin: true,
+          ws: true,
+        },
+        '/ws': {
+          target: 'ws://127.0.0.1:3001',
+          ws: true,
+        },
       },
     },
     resolve: {

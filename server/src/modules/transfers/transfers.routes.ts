@@ -35,7 +35,7 @@ export function registerTransferRoutes(app: Express) {
       // client-supplied fromStoreId cannot be trusted otherwise (a SELLER could
       // otherwise move stock belonging to a store they have no rights over).
       if (req.user!.role === 'SELLER' && fromStoreId !== req.user!.storeId) {
-        res.status(403).json({ error: 'Forbidden: you may only transfer from your own store' });
+        res.status(403).json({ message: 'Вы можете перемещать товары только из своего магазина' });
         return;
       }
       const transfer = await TransfersService.create({ fromStoreId, toStoreId, deviceIds, requestedByUserId: req.user!.userId });

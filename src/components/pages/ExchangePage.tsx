@@ -25,7 +25,6 @@ export const ExchangePage: React.FC = () => {
   const [selectedOldDevice, setSelectedOldDevice] = useState<Device | null>(null);
 
   const [exchangeInValueTjs, setExchangeInValueTjs] = useState<number>(0);
-  const [tradeInNote, setTradeInNote] = useState('');
 
   const [deviceSearchQuery, setDeviceSearchQuery] = useState('');
   const [replacementDevice, setReplacementDevice] = useState<Device | null>(null);
@@ -212,7 +211,6 @@ export const ExchangePage: React.FC = () => {
       setDeviceSearchQuery('');
       setExchangeInValueTjs(0);
       setNewPriceTjs(0);
-      setTradeInNote('');
       setGivenCashTjs('');
     } else {
       setStatus({ tone: 'error', text: res.message || 'Ошибка проведения обмена' });
@@ -310,19 +308,6 @@ export const ExchangePage: React.FC = () => {
                       />
                       <span className="absolute right-3.5 top-2.5 text-xs text-accent font-bold">TJS</span>
                     </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-xs text-fg-muted mb-1">
-                      Примечание по состоянию / комплектность:
-                    </label>
-                    <input
-                      type="text"
-                      value={tradeInNote ?? ''}
-                      onChange={(e) => setTradeInNote(e.target.value)}
-                      placeholder="Например: Ссадина на корпусе, без коробки"
-                      className="w-full rounded-xl bg-surface-raised border border-border px-3 py-2 text-xs text-fg placeholder-fg-subtle focus:border-accent focus:outline-none transition-colors"
-                    />
                   </div>
                 </div>
               </div>

@@ -1,6 +1,7 @@
 import { WebSocketServer, WebSocket } from 'ws';
 import type { Server } from 'node:http';
 import { AuthService, JwtPayload } from '../auth/auth.service';
+import { prisma } from '../prisma/prisma.service';
 
 interface ConnectedClient {
   ws: WebSocket;
@@ -20,7 +21,7 @@ export class RealtimeSyncGateway {
   public static init(server: Server) {
     this.wss = new WebSocketServer({ server, path: '/ws' });
 
-    this.wss.on('connection', (ws: WebSocket, request) => {
+    this.wss.on('connection', async (ws: WebSocket, request) => {
       const url = new URL(request.url ?? '', 'http://localhost');
       const token = url.searchParams.get('token');
       const user = token ? AuthService.verifyToken(token) : null;
@@ -29,6 +30,15 @@ export class RealtimeSyncGateway {
         ws.close(1008, 'Unauthorized');
         return;
       }
+
+      const currentUser = await prisma.user.findUnique({ where: { id: user.userId }, select: { active: true, login: true, role: true, storeId: true } }).catch(() => null);
+      if (!currentUser?.active) {
+        ws.close(1008, 'Unauthorized');
+        return;
+      }
+      user.login = currentUser.login;
+      user.role = currentUser.role;
+      user.storeId = currentUser.storeId;
 
       const client: ConnectedClient = { ws, user };
       this.clients.add(client);
@@ -44,6 +54,12 @@ export class RealtimeSyncGateway {
         /* no-op: inbound messages are ignored */
       });
     });
+  }
+
+  public static disconnectUser(userId: string) {
+    for (const client of this.clients) {
+      if (client.user.userId === userId) client.ws.close(1008, 'Session disabled');
+    }
   }
 
   public static broadcast(eventType: string, payload: any, options: BroadcastOptions = {}) {

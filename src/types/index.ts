@@ -122,6 +122,7 @@ export interface Device {
   serialNumber?: string;
   brand: string;
   model: string;
+  ram?: string;
   storage: string;
   color: string;
   status: DeviceStatus;
@@ -188,6 +189,7 @@ export interface Sale {
   items: SaleItem[];
   totalTjs: number;
   totalUsd: number;
+  recognizedProfitUsd?: number;
   exchangeRate?: number;
   paymentMethod: PaymentMethod;
   cashAmountTjs: number;
@@ -264,6 +266,7 @@ export interface InvoiceGroup {
   id?: string;
   brand: string;
   model: string;
+  ram?: string;
   storage: string;
   color: string;
   quantity: number;

@@ -34,7 +34,6 @@ export const TransferPage: React.FC = () => {
   const [toLocationId, setToLocationId] = useState<string>(defaultToId);
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [selectedDeviceIds, setSelectedDeviceIds] = useState<string[]>([]);
-  const [notes, setNotes] = useState<string>('');
 
   const [activeTab, setActiveTab] = useState<'create' | 'list'>('create');
   const [historyFilterStoreId, setHistoryFilterStoreId] = useState<string>('ALL');
@@ -124,7 +123,6 @@ export const TransferPage: React.FC = () => {
         text: `Запрос на перемещение (${selectedDeviceIds.length} шт.) успешно сформирован!`
       });
       setSelectedDeviceIds([]);
-      setNotes('');
       setActiveTab('list');
     } else {
       setStatusMessage({ type: 'error', text: res.message || 'Ошибка создания перемещения' });
@@ -167,15 +165,6 @@ export const TransferPage: React.FC = () => {
     <div className="flex-1 flex flex-col h-full overflow-hidden bg-bg text-fg">
       <StatusBanner message={statusBanner} onDismiss={() => setStatusBanner(null)} />
 
-      {/* Header */}
-      <div className="p-3 sm:p-4 border-b border-border bg-surface flex items-center justify-between shrink-0">
-        <div>
-          <h3 className="text-xs sm:text-sm font-bold uppercase text-fg flex items-center space-x-2">
-            <ArrowLeftRight className="w-4 h-4 text-accent" />
-            <span>ПЕРЕМЕЩЕНИЕ И ТРАНЗИТ</span>
-          </h3>
-        </div>
-      </div>
 
       {statusMessage && (
         <div className={`mx-3 sm:mx-4 mt-2.5 p-3 rounded-xl text-xs flex items-center justify-between shrink-0 ${
@@ -324,12 +313,12 @@ export const TransferPage: React.FC = () => {
                               ? 'bg-accent border-accent text-accent-fg'
                               : 'border-border bg-surface-raised'
                           }`}>
-                            {isChecked && <Check className="w-3.5 h-3.5 stroke-[3]" />}
+                            {isChecked && <Check className="w-3.5 h-3.5 stroke-3" />}
                           </div>
 
                           <div className="min-w-0">
                             <h4 className="text-xs font-bold text-fg truncate">{dev.brand} {dev.model}</h4>
-                            <p className="text-[11px] text-fg-muted truncate">{dev.storage} • {dev.color}</p>
+                            <p className="text-[11px] text-fg-muted truncate">{dev.ram ? `${dev.ram} • ` : ''}{dev.storage} • {dev.color}</p>
                             <p className="text-[10px] text-fg-subtle truncate">IMEI: {dev.imei}</p>
                           </div>
                         </div>
@@ -432,8 +421,8 @@ export const TransferPage: React.FC = () => {
                       ))}
                     </div>
 
-                    {/* Pending Actions */}
-                    {tr.status === 'PENDING_APPROVAL' && (
+                    {/* Pending Actions — approving/rejecting is ADMIN/PARTNER-only server-side */}
+                    {tr.status === 'PENDING_APPROVAL' && !isSeller && (
                       <div className="pt-1 flex items-center justify-end space-x-2">
                         <button
                           onClick={() => handleReject(tr.id)}
@@ -467,17 +456,6 @@ export const TransferPage: React.FC = () => {
               <p className="text-fg-muted">Откуда: <strong className="text-accent">{fromStoreName}</strong></p>
               <p className="text-fg-muted">Куда: <strong className="text-accent">{toStoreName}</strong></p>
               <p className="text-fg-muted">Устройств к передаче: <strong className="text-fg">{selectedDeviceIds.length} шт.</strong></p>
-            </div>
-
-            <div>
-              <label className="block text-fg-subtle mb-1 text-[11px] uppercase">Заметка / Примечание:</label>
-              <input
-                type="text"
-                value={notes ?? ''}
-                onChange={(e) => setNotes(e.target.value)}
-                placeholder="Причина перемещения..."
-                className="w-full rounded-xl bg-surface-raised border border-border px-3 py-2 text-xs text-fg focus:border-accent focus:outline-none"
-              />
             </div>
 
             <div className="flex space-x-2 pt-2">

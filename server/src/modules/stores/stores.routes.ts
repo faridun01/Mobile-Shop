@@ -4,16 +4,6 @@ import { StoresService } from './stores.service';
 import { RealtimeSyncGateway } from '../../websocket/websocket.gateway';
 
 export function registerStoreRoutes(app: Express) {
-  app.post('/api/stores/reset-cash', authenticateJwt, requireRoles('ADMIN'), async (req: AuthenticatedRequest, res, next) => {
-    try {
-      const stores = await StoresService.resetAllCashBalances(req.user!.userId);
-      RealtimeSyncGateway.broadcast('INVENTORY_UPDATE', {});
-      res.json(stores);
-    } catch (error) {
-      next(error);
-    }
-  });
-
   app.post('/api/stores', authenticateJwt, requireRoles('ADMIN', 'PARTNER'), async (req: AuthenticatedRequest, res, next) => {
     try {
       const store = await StoresService.create(req.body?.name, req.body?.address, req.user!.userId);

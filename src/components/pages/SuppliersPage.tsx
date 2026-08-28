@@ -5,12 +5,10 @@ import {
   Truck,
   Plus,
   DollarSign,
-  CheckCircle2,
   AlertCircle,
   FileText,
   ChevronRight,
   X,
-  CreditCard,
   Building,
   Edit,
   Trash2
@@ -78,9 +76,9 @@ export const SuppliersPage: React.FC = () => {
 
   if (currentUser?.role === 'SELLER') {
     return (
-      <div className="p-8 text-center text-zinc-500">
-        <p className="text-sm font-medium">Доступ ограничен</p>
-        <p className="text-xs text-zinc-600 mt-1">Раздел поставщиков доступен только Администраторам и Партнерам</p>
+      <div className="p-8 text-center text-fg-subtle">
+        <p className="text-sm font-medium text-fg">Доступ ограничен</p>
+        <p className="text-xs mt-1">Раздел поставщиков доступен только Администраторам и Партнерам</p>
       </div>
     );
   }
@@ -115,21 +113,25 @@ export const SuppliersPage: React.FC = () => {
     }
   };
 
-  const handleAddSupplierSubmit = (e: React.FormEvent) => {
+  const handleAddSupplierSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newSupplierName.trim()) return;
 
-    createSupplier({
+    const res = await createSupplier({
       name: newSupplierName.trim(),
       phone: newSupplierPhone.trim() || undefined,
       contactPerson: newSupplierContact.trim() || undefined
     });
 
-    setIsAddSupplierOpen(false);
-    setNewSupplierName('');
-    setNewSupplierPhone('');
-    setNewSupplierContact('');
-    setStatusMessage(null);
+    if (res.success) {
+      setIsAddSupplierOpen(false);
+      setNewSupplierName('');
+      setNewSupplierPhone('');
+      setNewSupplierContact('');
+      setStatusMessage(null);
+    } else {
+      setStatusMessage({ type: 'error', text: res.message || 'Ошибка добавления поставщика' });
+    }
   };
 
   const handleStartEditSupplier = (sup: Supplier, e?: React.MouseEvent) => {
@@ -212,13 +214,9 @@ export const SuppliersPage: React.FC = () => {
     <div className="flex-1 flex flex-col h-full overflow-hidden bg-bg text-fg">
       {/* Top Header */}
       <div className="p-3 sm:p-4 border-b border-border bg-surface flex items-center justify-between gap-3 shrink-0">
-        <div>
-          <h3 className="text-xs sm:text-sm font-bold text-fg uppercase tracking-wide flex items-center space-x-1.5">
-            <Truck className="w-4 h-4 text-accent" />
-            <span>ПОСТАВЩИКИ И НАКЛАДНЫЕ</span>
-          </h3>
+        <div className="text-xs text-fg-muted">
+          Общий долг поставщикам: <strong className="text-danger">${totalAllDebt.toLocaleString()}</strong>
         </div>
-
         <button
           onClick={() => setIsAddSupplierOpen(true)}
           className="px-3 py-1.5 rounded-xl bg-accent hover:bg-accent-strong text-xs font-bold text-accent-fg flex items-center space-x-1.5 shrink-0 transition-colors shadow-xs"
@@ -230,12 +228,12 @@ export const SuppliersPage: React.FC = () => {
       </div>
 
       {statusMessage && statusMessage.type === 'error' && (
-        <div className="mx-4 mt-3 p-2.5 rounded text-xs flex items-center justify-between shrink-0 bg-rose-950/50 text-rose-300 border border-rose-800">
+        <div className="mx-4 mt-3 p-2.5 rounded-lg text-xs flex items-center justify-between shrink-0 bg-danger/10 text-danger border border-danger/30">
           <div className="flex items-center space-x-2">
-            <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
+            <AlertCircle className="w-4 h-4 shrink-0" />
             <span>{statusMessage.text}</span>
           </div>
-          <button onClick={() => setStatusMessage(null)} className="text-rose-400 hover:text-white ml-2">
+          <button onClick={() => setStatusMessage(null)} className="hover:text-fg ml-2">
             <X className="w-3.5 h-3.5" />
           </button>
         </div>
@@ -263,30 +261,30 @@ export const SuppliersPage: React.FC = () => {
                 >
                   <div>
                     <div className="flex items-center space-x-1.5">
-                      <h4 className="text-sm font-semibold text-zinc-100">{s.name}</h4>
-                      <ChevronRight className="w-3.5 h-3.5 text-zinc-600 lg:hidden" />
+                      <h4 className="text-sm font-semibold text-fg">{s.name}</h4>
+                      <ChevronRight className="w-3.5 h-3.5 text-fg-subtle lg:hidden" />
                     </div>
                     {s.contactPerson && (
-                      <p className="text-xs text-zinc-400 mt-0.5">{s.contactPerson}</p>
+                      <p className="text-xs text-fg-muted mt-0.5">{s.contactPerson}</p>
                     )}
                     {s.phone && (
-                      <p className="text-[11px] font-mono text-zinc-500 mt-0.5">{s.phone}</p>
+                      <p className="text-[11px] text-fg-subtle mt-0.5">{s.phone}</p>
                     )}
                   </div>
 
                   <div className="flex items-center space-x-2">
                     <div className="text-right">
-                      <span className="text-xs font-mono font-bold text-rose-400">
+                      <span className="text-xs font-bold text-danger">
                         ${(s.totalDebtUsd ?? 0).toLocaleString()}
                       </span>
-                      <span className="block text-[10px] text-zinc-500">Долг</span>
+                      <span className="block text-[10px] text-fg-subtle">Долг</span>
                     </div>
 
                     <div className="flex items-center space-x-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
                       <button
                         type="button"
                         onClick={(e) => handleStartEditSupplier(s, e)}
-                        className="p-1.5 rounded text-zinc-400 hover:text-emerald-400 hover:bg-zinc-800"
+                        className="p-1.5 rounded-lg text-fg-subtle hover:text-accent hover:bg-surface"
                         title="Редактировать поставщика"
                       >
                         <Edit className="w-3.5 h-3.5" />
@@ -294,7 +292,7 @@ export const SuppliersPage: React.FC = () => {
                       <button
                         type="button"
                         onClick={(e) => { e.stopPropagation(); setDeletingSupplier(s); }}
-                        className="p-1.5 rounded text-zinc-400 hover:text-rose-400 hover:bg-zinc-800"
+                        className="p-1.5 rounded-lg text-fg-subtle hover:text-danger hover:bg-surface"
                         title="Удалить поставщика"
                       >
                         <Trash2 className="w-3.5 h-3.5" />
@@ -308,19 +306,19 @@ export const SuppliersPage: React.FC = () => {
         </div>
 
         {/* Right Column: Invoices & Payments for selected supplier (Desktop view) */}
-        <div className="hidden lg:flex lg:col-span-2 flex-col overflow-hidden bg-zinc-950">
+        <div className="hidden lg:flex lg:col-span-2 flex-col overflow-hidden bg-bg">
           {selectedSupplier ? (
             <div className="flex-1 flex flex-col overflow-hidden">
               {/* Selected supplier summary header */}
-              <div className="p-4 border-b border-zinc-800 bg-zinc-900/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shrink-0">
+              <div className="p-4 border-b border-border bg-surface flex flex-col sm:flex-row sm:items-center justify-between gap-3 shrink-0">
                 <div>
-                  <h4 className="text-base font-bold text-white">{selectedSupplier.name}</h4>
+                  <h4 className="text-base font-bold text-fg">{selectedSupplier.name}</h4>
                   <div className="flex items-center space-x-3 text-xs mt-1">
-                    <span className="text-zinc-400">Закуплено: <strong className="text-zinc-200 font-mono">${(selectedSupplier.totalPurchasedUsd ?? 0).toLocaleString()}</strong></span>
+                    <span className="text-fg-muted">Закуплено: <strong className="text-fg">${(selectedSupplier.totalPurchasedUsd ?? 0).toLocaleString()}</strong></span>
                     <span>•</span>
-                    <span className="text-zinc-400">Выплачено: <strong className="text-emerald-400 font-mono">${(selectedSupplier.totalPaidUsd ?? 0).toLocaleString()}</strong></span>
+                    <span className="text-fg-muted">Выплачено: <strong className="text-accent">${(selectedSupplier.totalPaidUsd ?? 0).toLocaleString()}</strong></span>
                     <span>•</span>
-                    <span className="text-zinc-400">Остаток долга: <strong className="text-rose-400 font-mono">${(selectedSupplier.totalDebtUsd ?? 0).toLocaleString()}</strong></span>
+                    <span className="text-fg-muted">Остаток долга: <strong className="text-danger">${(selectedSupplier.totalDebtUsd ?? 0).toLocaleString()}</strong></span>
                   </div>
                 </div>
 
@@ -328,28 +326,28 @@ export const SuppliersPage: React.FC = () => {
                   <button
                     onClick={() => handleOpenPay(selectedSupplier)}
                     disabled={selectedSupplier.totalDebtUsd <= 0}
-                    className="px-4 py-2 rounded bg-emerald-500 hover:bg-emerald-400 disabled:opacity-40 disabled:cursor-not-allowed text-xs font-semibold text-white shadow transition-colors flex items-center space-x-1.5"
+                    className="px-4 py-2 rounded-xl bg-accent hover:bg-accent-strong disabled:opacity-40 disabled:cursor-not-allowed text-xs font-semibold text-accent-fg shadow-xs transition-colors flex items-center space-x-1.5"
                   >
                     <DollarSign className="w-4 h-4" />
                     <span>Погасить долг (FIFO)</span>
                   </button>
                   <button
                     onClick={() => handleStartEditSupplier(selectedSupplier)}
-                    className="p-2 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300 hover:text-white transition-colors"
+                    className="p-2 rounded-lg bg-surface-raised hover:bg-surface border border-border text-fg-muted hover:text-fg transition-colors"
                     title="Редактировать поставщика"
                   >
                     <Edit className="w-4 h-4" />
                   </button>
                   <button
                     onClick={() => setDeletingSupplier(selectedSupplier)}
-                    className="p-2 rounded bg-zinc-800 hover:bg-rose-950/80 text-zinc-400 hover:text-rose-400 border border-zinc-800 transition-colors"
+                    className="p-2 rounded-lg bg-surface-raised hover:bg-danger/15 text-fg-subtle hover:text-danger border border-border transition-colors"
                     title="Удалить поставщика"
                   >
                     <Trash2 className="w-4 h-4" />
                   </button>
                   <button
                     onClick={() => setSelectedSupplierId(null)}
-                    className="p-2 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-white"
+                    className="p-2 rounded-lg bg-surface-raised hover:bg-surface border border-border text-fg-subtle hover:text-fg"
                     title="Закрыть"
                   >
                     <X className="w-4 h-4" />
@@ -358,11 +356,11 @@ export const SuppliersPage: React.FC = () => {
               </div>
 
               {/* Invoices List */}
-              <div className="p-3 border-b border-zinc-800 bg-zinc-900/40 text-xs font-semibold text-zinc-300">
+              <div className="p-3 border-b border-border bg-surface-raised text-xs font-semibold text-fg-muted">
                 Накладные и статус оплат
               </div>
 
-              <div className="flex-1 overflow-y-auto divide-y divide-zinc-800/80 bg-zinc-950">
+              <div className="flex-1 overflow-y-auto divide-y divide-border bg-bg">
                 {supplierInvoices
                   .filter(inv => inv.supplierId === selectedSupplier.id)
                   .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
@@ -374,40 +372,40 @@ export const SuppliersPage: React.FC = () => {
                       <div
                         key={inv.id}
                         onClick={() => setSelectedInvoiceId(inv.id)}
-                        className="p-4 hover:bg-zinc-900 cursor-pointer transition-colors flex items-center justify-between group"
+                        className="p-4 hover:bg-surface-raised cursor-pointer transition-colors flex items-center justify-between group"
                       >
                         <div>
                           <div className="flex items-center space-x-2">
-                            <span className="font-mono text-xs font-bold text-zinc-200 group-hover:text-emerald-400 transition-colors">{inv.invoiceNumber}</span>
-                            <span className={`text-[10px] px-2 py-0.5 rounded font-mono font-medium ${
-                              isPaid ? 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30' :
-                              isPartial ? 'bg-amber-500/15 text-amber-300 border border-amber-500/30' :
-                              'bg-rose-500/15 text-rose-300 border border-rose-500/30'
+                            <span className="text-xs font-bold text-fg group-hover:text-accent transition-colors">{inv.invoiceNumber}</span>
+                            <span className={`text-[10px] px-2 py-0.5 rounded-md font-medium ${
+                              isPaid ? 'bg-accent/15 text-accent border border-accent/30' :
+                              isPartial ? 'bg-warning/15 text-warning border border-warning/30' :
+                              'bg-danger/15 text-danger border border-danger/30'
                             }`}>
                               {isPaid ? 'Оплачена' : isPartial ? 'Частично' : 'Не оплачена'}
                             </span>
                           </div>
-                          <p className="text-[11px] text-zinc-500 mt-1">
+                          <p className="text-[11px] text-fg-subtle mt-1">
                             Дата: {formatDateStr(inv.date)} • Устройств: {inv.devicesCount ?? 0} шт.
                           </p>
                         </div>
 
                         <div className="flex items-center space-x-2">
                           <div className="text-right">
-                            <p className="text-xs font-mono font-bold text-zinc-100">
+                            <p className="text-xs font-bold text-fg">
                               Всего: ${(inv.totalAmountUsd ?? 0).toLocaleString()}
                             </p>
-                            <p className="text-[11px] font-mono text-rose-400">
+                            <p className="text-[11px] text-danger">
                               Долг: ${(inv.remainingAmountUsd ?? 0).toLocaleString()}
                             </p>
-                            <p className="text-[10px] font-mono text-emerald-400">
+                            <p className="text-[10px] text-accent">
                               Оплачено: ${(inv.paidAmountUsd ?? 0).toLocaleString()}
                             </p>
                           </div>
                           <button
                             type="button"
                             onClick={(e) => handleStartEditInvoice(inv, e)}
-                            className="p-1.5 rounded bg-zinc-900 text-zinc-400 hover:text-emerald-400 border border-zinc-800 transition-colors"
+                            className="p-1.5 rounded-lg bg-surface-raised text-fg-subtle hover:text-accent border border-border transition-colors"
                             title="Редактировать накладную"
                           >
                             <Edit className="w-3.5 h-3.5" />
@@ -415,14 +413,14 @@ export const SuppliersPage: React.FC = () => {
                           <button
                             type="button"
                             onClick={(e) => { e.stopPropagation(); setDeletingInvoice(inv); }}
-                            className="p-1.5 rounded bg-zinc-900 text-zinc-400 hover:text-rose-400 border border-zinc-800 transition-colors"
+                            className="p-1.5 rounded-lg bg-surface-raised text-fg-subtle hover:text-danger border border-border transition-colors"
                             title="Удалить накладную"
                           >
                             <Trash2 className="w-3.5 h-3.5" />
                           </button>
                           <button
                             type="button"
-                            className="p-1.5 rounded bg-zinc-900 text-zinc-400 group-hover:text-white border border-zinc-800"
+                            className="p-1.5 rounded-lg bg-surface-raised text-fg-subtle group-hover:text-fg border border-border"
                             title="Детали накладной"
                           >
                             <ChevronRight className="w-4 h-4" />
@@ -434,7 +432,7 @@ export const SuppliersPage: React.FC = () => {
               </div>
             </div>
           ) : (
-            <div className="flex-1 flex flex-col items-center justify-center p-8 text-zinc-500 text-xs">
+            <div className="flex-1 flex flex-col items-center justify-center p-8 text-fg-subtle text-xs">
               <FileText className="w-8 h-8 opacity-30 mb-2" />
               <p>Выберите поставщика слева для просмотра накладных и выплат</p>
             </div>
@@ -444,12 +442,12 @@ export const SuppliersPage: React.FC = () => {
 
       {/* MOBILE FULL-SCREEN MODAL FOR SELECTED SUPPLIER */}
       {selectedSupplier && (
-        <div className="lg:hidden fixed inset-0 z-40 bg-[#0B0E14] flex flex-col">
+        <div className="lg:hidden fixed inset-0 z-40 bg-bg flex flex-col">
           {/* Header with Title and prominent Close "X" Button */}
-          <div className="p-3.5 border-b border-zinc-800 bg-zinc-900 flex items-center justify-between shrink-0">
+          <div className="p-3.5 border-b border-border bg-surface flex items-center justify-between shrink-0">
             <div className="flex items-center space-x-2">
-              <Truck className="w-4 h-4 text-emerald-400" />
-              <h3 className="text-sm font-bold text-white truncate max-w-50">
+              <Truck className="w-4 h-4 text-accent" />
+              <h3 className="text-sm font-bold text-fg truncate max-w-50">
                 {selectedSupplier.name}
               </h3>
             </div>
@@ -457,7 +455,7 @@ export const SuppliersPage: React.FC = () => {
             <button
               type="button"
               onClick={() => setSelectedSupplierId(null)}
-              className="p-1.5 rounded-lg bg-zinc-800 text-zinc-300 hover:text-white hover:bg-zinc-700 transition-colors flex items-center justify-center border border-zinc-700"
+              className="p-1.5 rounded-lg bg-surface-raised text-fg-muted hover:text-fg hover:bg-surface transition-colors flex items-center justify-center border border-border"
               title="Закрыть окно"
             >
               <X className="w-5 h-5" />
@@ -465,33 +463,33 @@ export const SuppliersPage: React.FC = () => {
           </div>
 
           {/* Supplier Metrics */}
-          <div className="p-3.5 bg-zinc-900/60 border-b border-zinc-800 grid grid-cols-3 gap-2 text-center text-xs">
-            <div className="bg-zinc-950/80 p-2 rounded border border-zinc-800">
-              <span className="block text-[10px] text-zinc-400">Закуплено</span>
-              <strong className="text-zinc-200 font-mono text-xs">
+          <div className="p-3.5 bg-surface-raised border-b border-border grid grid-cols-3 gap-2 text-center text-xs">
+            <div className="bg-surface p-2 rounded-lg border border-border">
+              <span className="block text-[10px] text-fg-subtle">Закуплено</span>
+              <strong className="text-fg text-xs">
                 ${(selectedSupplier.totalPurchasedUsd ?? 0).toLocaleString()}
               </strong>
             </div>
-            <div className="bg-zinc-950/80 p-2 rounded border border-zinc-800">
-              <span className="block text-[10px] text-zinc-400">Выплачено</span>
-              <strong className="text-emerald-400 font-mono text-xs">
+            <div className="bg-surface p-2 rounded-lg border border-border">
+              <span className="block text-[10px] text-fg-subtle">Выплачено</span>
+              <strong className="text-accent text-xs">
                 ${(selectedSupplier.totalPaidUsd ?? 0).toLocaleString()}
               </strong>
             </div>
-            <div className="bg-zinc-950/80 p-2 rounded border border-zinc-800">
-              <span className="block text-[10px] text-zinc-400">Долг</span>
-              <strong className="text-rose-400 font-mono text-xs">
+            <div className="bg-surface p-2 rounded-lg border border-border">
+              <span className="block text-[10px] text-fg-subtle">Долг</span>
+              <strong className="text-danger text-xs">
                 ${(selectedSupplier.totalDebtUsd ?? 0).toLocaleString()}
               </strong>
             </div>
           </div>
 
           {/* Action button */}
-          <div className="p-3 bg-zinc-950 border-b border-zinc-800 shrink-0">
+          <div className="p-3 bg-bg border-b border-border shrink-0">
             <button
               onClick={() => handleOpenPay(selectedSupplier)}
               disabled={selectedSupplier.totalDebtUsd <= 0}
-              className="w-full py-2.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 disabled:opacity-40 disabled:cursor-not-allowed text-xs font-semibold text-white shadow flex items-center justify-center space-x-1.5 transition-colors"
+              className="w-full py-2.5 rounded-xl bg-accent hover:bg-accent-strong disabled:opacity-40 disabled:cursor-not-allowed text-xs font-semibold text-accent-fg shadow-xs flex items-center justify-center space-x-1.5 transition-colors"
             >
               <DollarSign className="w-4 h-4" />
               <span>Погасить долг поставщику (FIFO)</span>
@@ -499,14 +497,14 @@ export const SuppliersPage: React.FC = () => {
           </div>
 
           {/* Invoices List */}
-          <div className="p-2.5 bg-zinc-900/40 border-b border-zinc-800 text-xs font-semibold text-zinc-400 flex items-center justify-between">
+          <div className="p-2.5 bg-surface-raised border-b border-border text-xs font-semibold text-fg-muted flex items-center justify-between">
             <span>Накладные поставщика</span>
-            <span className="text-[11px] text-zinc-500 font-mono">
+            <span className="text-[11px] text-fg-subtle">
               {supplierInvoices.filter(inv => inv.supplierId === selectedSupplier.id).length} шт.
             </span>
           </div>
 
-          <div className="flex-1 overflow-y-auto divide-y divide-zinc-800/80 bg-zinc-950 p-1">
+          <div className="flex-1 overflow-y-auto divide-y divide-border bg-bg p-1">
             {supplierInvoices
               .filter(inv => inv.supplierId === selectedSupplier.id)
               .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
@@ -518,36 +516,36 @@ export const SuppliersPage: React.FC = () => {
                   <div
                     key={inv.id}
                     onClick={() => setSelectedInvoiceId(inv.id)}
-                    className="p-3 hover:bg-zinc-900/80 active:bg-zinc-900 cursor-pointer transition-colors flex items-center justify-between group border-b border-zinc-800/60"
+                    className="p-3 hover:bg-surface-raised active:bg-surface cursor-pointer transition-colors flex items-center justify-between group border-b border-border"
                   >
                     <div>
                       <div className="flex items-center space-x-2">
-                        <span className="font-mono text-xs font-bold text-zinc-200 group-hover:text-emerald-400 transition-colors">{inv.invoiceNumber}</span>
-                        <span className={`text-[10px] px-2 py-0.5 rounded font-mono font-medium ${
-                          isPaid ? 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30' :
-                          isPartial ? 'bg-amber-500/15 text-amber-300 border border-amber-500/30' :
-                          'bg-rose-500/15 text-rose-300 border border-rose-500/30'
+                        <span className="text-xs font-bold text-fg group-hover:text-accent transition-colors">{inv.invoiceNumber}</span>
+                        <span className={`text-[10px] px-2 py-0.5 rounded-md font-medium ${
+                          isPaid ? 'bg-accent/15 text-accent border border-accent/30' :
+                          isPartial ? 'bg-warning/15 text-warning border border-warning/30' :
+                          'bg-danger/15 text-danger border border-danger/30'
                         }`}>
                           {isPaid ? 'Оплачена' : isPartial ? 'Частично' : 'Не оплачена'}
                         </span>
                       </div>
-                      <p className="text-[11px] text-zinc-500 mt-0.5">
+                      <p className="text-[11px] text-fg-subtle mt-0.5">
                         {formatDateStr(inv.date)} • {inv.devicesCount ?? 0} устройств
                       </p>
                     </div>
 
                     <div className="flex items-center space-x-3">
                       <div className="text-right">
-                        <p className="text-xs font-mono font-bold text-zinc-200">
+                        <p className="text-xs font-bold text-fg">
                           ${(inv.totalAmountUsd ?? 0).toLocaleString()}
                         </p>
-                        <p className="text-[11px] font-mono text-rose-400">
+                        <p className="text-[11px] text-danger">
                           Долг: ${(inv.remainingAmountUsd ?? 0).toLocaleString()}
                         </p>
                       </div>
                       <button
                         type="button"
-                        className="p-1 rounded bg-zinc-900 text-zinc-400 group-hover:text-white border border-zinc-800"
+                        className="p-1 rounded-lg bg-surface-raised text-fg-subtle group-hover:text-fg border border-border"
                         title="Детали накладной"
                       >
                         <ChevronRight className="w-4 h-4" />
@@ -559,11 +557,11 @@ export const SuppliersPage: React.FC = () => {
           </div>
 
           {/* Mobile Footer with Close button */}
-          <div className="p-3 border-t border-zinc-800 bg-zinc-900 shrink-0">
+          <div className="p-3 border-t border-border bg-surface shrink-0">
             <button
               type="button"
               onClick={() => setSelectedSupplierId(null)}
-              className="w-full py-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-xs font-bold text-zinc-200 flex items-center justify-center space-x-1.5 transition-colors border border-zinc-700"
+              className="w-full py-2 rounded-lg bg-surface-raised hover:bg-surface text-xs font-bold text-fg flex items-center justify-center space-x-1.5 transition-colors border border-border"
             >
               <X className="w-4 h-4" />
               <span>ЗАКРЫТЬ КАРТОЧКУ ПОСТАВЩИКА</span>
@@ -574,32 +572,32 @@ export const SuppliersPage: React.FC = () => {
 
       {/* MODAL: Pay Supplier (FIFO auto distribution) */}
       {isPayModalOpen && selectedSupplier && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-4 backdrop-blur-xs">
-          <div className="w-full max-w-sm rounded-lg bg-zinc-900 border border-zinc-800 p-5 text-zinc-100 shadow-2xl">
-            <h4 className="text-sm font-bold text-white mb-1">Выплата поставщику</h4>
-            <p className="text-xs text-zinc-400 mb-4">{selectedSupplier.name} (Текущий долг: ${selectedSupplier.totalDebtUsd})</p>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-xs">
+          <div className="w-full max-w-sm rounded-2xl bg-surface border border-border p-5 text-fg shadow-2xl">
+            <h4 className="text-sm font-bold text-fg mb-1">Выплата поставщику</h4>
+            <p className="text-xs text-fg-subtle mb-4">{selectedSupplier.name} (Текущий долг: ${selectedSupplier.totalDebtUsd})</p>
 
             <div className="space-y-3 text-xs mb-4">
               <div>
-                <label className="block text-zinc-400 mb-1">Сумма оплаты ($ USD):</label>
+                <label className="block text-fg-subtle mb-1">Сумма оплаты ($ USD):</label>
                 <div className="relative">
                   <input
                     type="number"
                     min="1"
                     value={paymentAmountUsd ?? ''}
                     onChange={(e) => setPaymentAmountUsd(e.target.value)}
-                    className="w-full rounded bg-zinc-950 border border-zinc-700 px-3 py-2 font-mono text-emerald-400 text-sm focus:border-emerald-500 focus:outline-none"
+                    className="w-full rounded-lg bg-surface-raised border border-border px-3 py-2 text-accent text-sm font-bold focus:border-accent focus:outline-none"
                   />
-                  <span className="absolute right-3 top-2 text-zinc-500">$</span>
+                  <span className="absolute right-3 top-2 text-fg-subtle">$</span>
                 </div>
               </div>
 
               <div>
-                <label className="block text-zinc-400 mb-1">Списать с кассы / счета:</label>
+                <label className="block text-fg-subtle mb-1">Списать с кассы / счета:</label>
                 <select
                   value={sourceAccountId ?? ''}
                   onChange={(e) => setSourceAccountId(e.target.value)}
-                  className="w-full rounded bg-zinc-950 border border-zinc-700 px-3 py-2 text-zinc-200 focus:border-emerald-500 focus:outline-none"
+                  className="w-full rounded-lg bg-surface-raised border border-border px-3 py-2 text-fg focus:border-accent focus:outline-none"
                 >
                   {stores.map(s => (
                     <option key={s.id} value={s.id}>
@@ -611,16 +609,16 @@ export const SuppliersPage: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-zinc-400 mb-1">Примечание:</label>
+                <label className="block text-fg-subtle mb-1">Примечание:</label>
                 <input
                   type="text"
                   value={paymentNote ?? ''}
                   onChange={(e) => setPaymentNote(e.target.value)}
-                  className="w-full rounded bg-zinc-950 border border-zinc-700 px-3 py-2 text-zinc-200 focus:border-emerald-500 focus:outline-none"
+                  className="w-full rounded-lg bg-surface-raised border border-border px-3 py-2 text-fg focus:border-accent focus:outline-none"
                 />
               </div>
 
-              <div className="p-2.5 rounded bg-emerald-500/15 border border-emerald-900/40 text-[11px] text-emerald-300">
+              <div className="p-2.5 rounded-lg bg-accent/10 border border-accent/30 text-[11px] text-accent">
                 Автоматическое погашение: средства распределятся по старейшим неоплаченным накладным (FIFO).
               </div>
             </div>
@@ -628,13 +626,13 @@ export const SuppliersPage: React.FC = () => {
             <div className="flex space-x-2">
               <button
                 onClick={() => setIsPayModalOpen(false)}
-                className="flex-1 py-2 rounded bg-zinc-800 hover:bg-zinc-700 text-xs font-medium text-zinc-300"
+                className="flex-1 py-2.5 rounded-xl bg-surface-raised hover:bg-surface border border-border text-xs font-bold text-fg-muted uppercase"
               >
                 Отмена
               </button>
               <button
                 onClick={handleExecutePayment}
-                className="flex-1 py-2 rounded bg-emerald-500 hover:bg-emerald-400 text-xs font-semibold text-white"
+                className="flex-1 py-2.5 rounded-xl bg-accent hover:bg-accent-strong text-xs font-bold text-accent-fg uppercase"
               >
                 Оплатить
               </button>
@@ -646,15 +644,15 @@ export const SuppliersPage: React.FC = () => {
       {/* MODAL: ADD SUPPLIER */}
       {isAddSupplierOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4">
-          <div className="w-full max-w-md rounded-lg bg-zinc-900 border border-zinc-800 p-5 shadow-2xl text-xs">
-            <div className="flex items-center justify-between mb-4 border-b border-zinc-800 pb-3">
-              <h3 className="text-sm font-bold text-white flex items-center space-x-2">
-                <Building className="w-4 h-4 text-emerald-400" />
+          <div className="w-full max-w-md rounded-2xl bg-surface border border-border p-5 shadow-2xl text-xs">
+            <div className="flex items-center justify-between mb-4 border-b border-border pb-3">
+              <h3 className="text-sm font-bold text-fg flex items-center space-x-2">
+                <Building className="w-4 h-4 text-accent" />
                 <span>Добавить нового поставщика</span>
               </h3>
               <button
                 onClick={() => setIsAddSupplierOpen(false)}
-                className="p-1 rounded text-zinc-400 hover:text-white"
+                className="p-1 rounded text-fg-subtle hover:text-fg"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -662,36 +660,36 @@ export const SuppliersPage: React.FC = () => {
 
             <form onSubmit={handleAddSupplierSubmit} className="space-y-4">
               <div>
-                <label className="block text-zinc-400 mb-1">Название поставщика *</label>
+                <label className="block text-fg-subtle mb-1">Название поставщика *</label>
                 <input
                   type="text"
                   required
                   value={newSupplierName ?? ''}
                   onChange={(e) => setNewSupplierName(e.target.value)}
                   placeholder="Например: Xiaomi Tech Hub"
-                  className="w-full rounded bg-zinc-950 border border-zinc-700 px-3 py-2 text-zinc-100 focus:border-emerald-500 focus:outline-none"
+                  className="w-full rounded-lg bg-surface-raised border border-border px-3 py-2 text-fg focus:border-accent focus:outline-none"
                 />
               </div>
 
               <div>
-                <label className="block text-zinc-400 mb-1">Контактное лицо</label>
+                <label className="block text-fg-subtle mb-1">Контактное лицо</label>
                 <input
                   type="text"
                   value={newSupplierContact ?? ''}
                   onChange={(e) => setNewSupplierContact(e.target.value)}
                   placeholder="Фарход"
-                  className="w-full rounded bg-zinc-950 border border-zinc-700 px-3 py-2 text-zinc-100 focus:border-emerald-500 focus:outline-none"
+                  className="w-full rounded-lg bg-surface-raised border border-border px-3 py-2 text-fg focus:border-accent focus:outline-none"
                 />
               </div>
 
               <div>
-                <label className="block text-zinc-400 mb-1">Телефон</label>
+                <label className="block text-fg-subtle mb-1">Телефон</label>
                 <input
                   type="tel"
                   value={newSupplierPhone ?? ''}
                   onChange={(e) => setNewSupplierPhone(e.target.value)}
                   placeholder="+992 90 000 0000"
-                  className="w-full rounded bg-zinc-950 border border-zinc-700 px-3 py-2 text-zinc-100 focus:border-emerald-500 focus:outline-none"
+                  className="w-full rounded-lg bg-surface-raised border border-border px-3 py-2 text-fg focus:border-accent focus:outline-none"
                 />
               </div>
 
@@ -699,13 +697,13 @@ export const SuppliersPage: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setIsAddSupplierOpen(false)}
-                  className="flex-1 py-2 rounded bg-zinc-800 hover:bg-zinc-700 text-xs font-medium text-zinc-300"
+                  className="flex-1 py-2.5 rounded-xl bg-surface-raised hover:bg-surface border border-border text-xs font-bold text-fg-muted uppercase"
                 >
                   Отмена
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 py-2 rounded bg-emerald-500 hover:bg-emerald-400 text-xs font-semibold text-white"
+                  className="flex-1 py-2.5 rounded-xl bg-accent hover:bg-accent-strong text-xs font-bold text-accent-fg uppercase"
                 >
                   Добавить
                 </button>
@@ -773,7 +771,7 @@ export const SuppliersPage: React.FC = () => {
                     <div key={gIdx} className="p-2 rounded-xl bg-surface border border-border flex justify-between items-center">
                       <div>
                         <span className="font-bold text-fg">{grp.brand} {grp.model}</span>
-                        <span className="block text-[11px] text-fg-subtle">{grp.storage} • {grp.color}</span>
+                        <span className="block text-[11px] text-fg-subtle">{grp.ram ? `${grp.ram} • ` : ''}{grp.storage} • {grp.color}</span>
                       </div>
                       <div className="text-right">
                         <span className="font-bold text-accent">{grp.quantity} шт.</span>
@@ -816,7 +814,7 @@ export const SuppliersPage: React.FC = () => {
                             <div className="flex items-center space-x-2 flex-wrap gap-y-1">
                               <span className="text-fg-subtle text-[10px] font-bold">#{idx + 1}</span>
                               <strong className="text-fg">{dev.brand} {dev.model}</strong>
-                              <span className="text-fg-subtle text-[11px]">{dev.storage} • {dev.color}</span>
+                              <span className="text-fg-subtle text-[11px]">{dev.ram ? `${dev.ram} • ` : ''}{dev.storage} • {dev.color}</span>
                               {(dev.purchaseCostUsd === 0 || dev.isBonus) && (
                                 <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-purple-500/20 text-purple-400 border border-purple-500/40 font-medium">
                                   🎁 ПОДАРОК ($0)
@@ -868,56 +866,56 @@ export const SuppliersPage: React.FC = () => {
       {/* MODAL: EDIT SUPPLIER */}
       {editingSupplier && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-xs">
-          <div className="w-full max-w-sm rounded-lg bg-zinc-900 border border-zinc-800 p-5 shadow-xl text-zinc-100">
-            <div className="flex items-center justify-between border-b border-zinc-800 pb-3 mb-4">
-              <h3 className="text-sm font-bold text-white flex items-center space-x-2">
-                <Edit className="w-4 h-4 text-emerald-400" />
+          <div className="w-full max-w-sm rounded-2xl bg-surface border border-border p-5 shadow-xl text-fg">
+            <div className="flex items-center justify-between border-b border-border pb-3 mb-4">
+              <h3 className="text-sm font-bold text-fg flex items-center space-x-2">
+                <Edit className="w-4 h-4 text-accent" />
                 <span>Редактировать поставщика</span>
               </h3>
-              <button onClick={() => setEditingSupplier(null)} className="text-zinc-400 hover:text-white">
+              <button onClick={() => setEditingSupplier(null)} className="text-fg-subtle hover:text-fg">
                 <X className="w-4 h-4" />
               </button>
             </div>
             <form onSubmit={handleSaveEditSupplier} className="space-y-3">
               <div>
-                <label className="block text-xs text-zinc-400 mb-1">Название поставщика *</label>
+                <label className="block text-xs text-fg-subtle mb-1">Название поставщика *</label>
                 <input
                   type="text"
                   required
                   value={editSupplierName}
                   onChange={(e) => setEditSupplierName(e.target.value)}
-                  className="w-full rounded bg-zinc-950 border border-zinc-800 px-3 py-1.5 text-xs text-zinc-100 focus:border-emerald-500 focus:outline-none"
+                  className="w-full rounded-lg bg-surface-raised border border-border px-3 py-2 text-xs text-fg focus:border-accent focus:outline-none"
                 />
               </div>
               <div>
-                <label className="block text-xs text-zinc-400 mb-1">Телефон</label>
+                <label className="block text-xs text-fg-subtle mb-1">Телефон</label>
                 <input
                   type="text"
                   value={editSupplierPhone}
                   onChange={(e) => setEditSupplierPhone(e.target.value)}
-                  className="w-full rounded bg-zinc-950 border border-zinc-800 px-3 py-1.5 text-xs text-zinc-100 focus:border-emerald-500 focus:outline-none"
+                  className="w-full rounded-lg bg-surface-raised border border-border px-3 py-2 text-xs text-fg focus:border-accent focus:outline-none"
                 />
               </div>
               <div>
-                <label className="block text-xs text-zinc-400 mb-1">Контактное лицо</label>
+                <label className="block text-xs text-fg-subtle mb-1">Контактное лицо</label>
                 <input
                   type="text"
                   value={editSupplierContact}
                   onChange={(e) => setEditSupplierContact(e.target.value)}
-                  className="w-full rounded bg-zinc-950 border border-zinc-800 px-3 py-1.5 text-xs text-zinc-100 focus:border-emerald-500 focus:outline-none"
+                  className="w-full rounded-lg bg-surface-raised border border-border px-3 py-2 text-xs text-fg focus:border-accent focus:outline-none"
                 />
               </div>
               <div className="pt-2 flex items-center space-x-2">
                 <button
                   type="button"
                   onClick={() => setEditingSupplier(null)}
-                  className="flex-1 py-2 rounded bg-zinc-800 hover:bg-zinc-700 text-xs font-medium text-zinc-300"
+                  className="flex-1 py-2.5 rounded-xl bg-surface-raised hover:bg-surface border border-border text-xs font-bold text-fg-muted uppercase"
                 >
                   Отмена
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 py-2 rounded bg-emerald-500 hover:bg-emerald-400 text-xs font-semibold text-white"
+                  className="flex-1 py-2.5 rounded-xl bg-accent hover:bg-accent-strong text-xs font-bold text-accent-fg uppercase"
                 >
                   Сохранить
                 </button>
@@ -929,25 +927,25 @@ export const SuppliersPage: React.FC = () => {
 
       {/* MODAL: DELETE SUPPLIER CONFIRMATION */}
       {deletingSupplier && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-4 backdrop-blur-xs">
-          <div className="w-full max-w-sm rounded-lg bg-zinc-900 border border-zinc-800 p-5 shadow-2xl text-zinc-100 space-y-4">
-            <div className="flex items-center space-x-3 text-rose-400">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-xs">
+          <div className="w-full max-w-sm rounded-2xl bg-surface border border-danger/40 p-5 shadow-2xl text-fg space-y-4">
+            <div className="flex items-center space-x-3 text-danger">
               <AlertCircle className="w-6 h-6 shrink-0" />
-              <h3 className="text-sm font-bold text-white">Удаление поставщика</h3>
+              <h3 className="text-sm font-bold text-fg">Удаление поставщика</h3>
             </div>
-            <p className="text-xs text-zinc-300 leading-relaxed">
-              Вы действительно хотите удалить поставщика <strong className="text-white">«{deletingSupplier.name}»</strong>? Все связанные накладные, выплатные записи и поставленные устройства будут безвозвратно удалены.
+            <p className="text-xs text-fg-muted leading-relaxed">
+              Вы действительно хотите удалить поставщика <strong className="text-fg">«{deletingSupplier.name}»</strong>? Все связанные накладные, выплатные записи и поставленные устройства будут безвозвратно удалены.
             </p>
             <div className="flex items-center justify-end space-x-2 pt-2">
               <button
                 onClick={() => setDeletingSupplier(null)}
-                className="px-4 py-2 rounded bg-zinc-800 hover:bg-zinc-700 text-xs font-medium text-zinc-300"
+                className="px-4 py-2.5 rounded-xl bg-surface-raised hover:bg-surface border border-border text-xs font-bold text-fg-muted uppercase"
               >
                 Отмена
               </button>
               <button
                 onClick={handleConfirmDeleteSupplier}
-                className="px-4 py-2 rounded bg-rose-600 hover:bg-rose-500 text-xs font-semibold text-white shadow"
+                className="px-4 py-2.5 rounded-xl bg-danger hover:opacity-90 text-xs font-bold text-white uppercase shadow-xs"
               >
                 Удалить поставщика
               </button>
@@ -959,57 +957,57 @@ export const SuppliersPage: React.FC = () => {
       {/* MODAL: EDIT INVOICE */}
       {editingInvoice && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-xs">
-          <div className="w-full max-w-sm rounded-lg bg-zinc-900 border border-zinc-800 p-5 shadow-xl text-zinc-100">
-            <div className="flex items-center justify-between border-b border-zinc-800 pb-3 mb-4">
-              <h3 className="text-sm font-bold text-white flex items-center space-x-2">
-                <Edit className="w-4 h-4 text-emerald-400" />
+          <div className="w-full max-w-sm rounded-2xl bg-surface border border-border p-5 shadow-xl text-fg">
+            <div className="flex items-center justify-between border-b border-border pb-3 mb-4">
+              <h3 className="text-sm font-bold text-fg flex items-center space-x-2">
+                <Edit className="w-4 h-4 text-accent" />
                 <span>Редактировать накладную</span>
               </h3>
-              <button onClick={() => setEditingInvoice(null)} className="text-zinc-400 hover:text-white">
+              <button onClick={() => setEditingInvoice(null)} className="text-fg-subtle hover:text-fg">
                 <X className="w-4 h-4" />
               </button>
             </div>
             <form onSubmit={handleSaveEditInvoice} className="space-y-3">
               <div>
-                <label className="block text-xs text-zinc-400 mb-1">Номер накладной *</label>
+                <label className="block text-xs text-fg-subtle mb-1">Номер накладной *</label>
                 <input
                   type="text"
                   required
                   value={editInvoiceNumber}
                   onChange={(e) => setEditInvoiceNumber(e.target.value)}
-                  className="w-full rounded bg-zinc-950 border border-zinc-800 px-3 py-1.5 text-xs text-zinc-100 font-mono focus:border-emerald-500 focus:outline-none"
+                  className="w-full rounded-lg bg-surface-raised border border-border px-3 py-2 text-xs text-fg focus:border-accent focus:outline-none"
                 />
               </div>
               <div>
-                <label className="block text-xs text-zinc-400 mb-1">Дата накладной</label>
+                <label className="block text-xs text-fg-subtle mb-1">Дата накладной</label>
                 <input
                   type="date"
                   value={editInvoiceDate}
                   onChange={(e) => setEditInvoiceDate(e.target.value)}
-                  className="w-full rounded bg-zinc-950 border border-zinc-800 px-3 py-1.5 text-xs text-zinc-100 font-mono focus:border-emerald-500 focus:outline-none"
+                  className="w-full rounded-lg bg-surface-raised border border-border px-3 py-2 text-xs text-fg focus:border-accent focus:outline-none"
                 />
               </div>
               <div>
-                <label className="block text-xs text-zinc-400 mb-1">Сумма накладной ($ USD)</label>
+                <label className="block text-xs text-fg-subtle mb-1">Сумма накладной ($ USD)</label>
                 <input
                   type="number"
                   step="0.01"
                   value={editInvoiceAmount}
                   onChange={(e) => setEditInvoiceAmount(e.target.value)}
-                  className="w-full rounded bg-zinc-950 border border-zinc-800 px-3 py-1.5 text-xs text-emerald-400 font-mono font-bold focus:border-emerald-500 focus:outline-none"
+                  className="w-full rounded-lg bg-surface-raised border border-border px-3 py-2 text-xs text-accent font-bold focus:border-accent focus:outline-none"
                 />
               </div>
               <div className="pt-2 flex items-center space-x-2">
                 <button
                   type="button"
                   onClick={() => setEditingInvoice(null)}
-                  className="flex-1 py-2 rounded bg-zinc-800 hover:bg-zinc-700 text-xs font-medium text-zinc-300"
+                  className="flex-1 py-2.5 rounded-xl bg-surface-raised hover:bg-surface border border-border text-xs font-bold text-fg-muted uppercase"
                 >
                   Отмена
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 py-2 rounded bg-emerald-500 hover:bg-emerald-400 text-xs font-semibold text-white"
+                  className="flex-1 py-2.5 rounded-xl bg-accent hover:bg-accent-strong text-xs font-bold text-accent-fg uppercase"
                 >
                   Сохранить
                 </button>
@@ -1021,25 +1019,25 @@ export const SuppliersPage: React.FC = () => {
 
       {/* MODAL: DELETE INVOICE CONFIRMATION */}
       {deletingInvoice && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-4 backdrop-blur-xs">
-          <div className="w-full max-w-sm rounded-lg bg-zinc-900 border border-zinc-800 p-5 shadow-2xl text-zinc-100 space-y-4">
-            <div className="flex items-center space-x-3 text-rose-400">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-xs">
+          <div className="w-full max-w-sm rounded-2xl bg-surface border border-danger/40 p-5 shadow-2xl text-fg space-y-4">
+            <div className="flex items-center space-x-3 text-danger">
               <AlertCircle className="w-6 h-6 shrink-0" />
-              <h3 className="text-sm font-bold text-white">Удаление накладной</h3>
+              <h3 className="text-sm font-bold text-fg">Удаление накладной</h3>
             </div>
-            <p className="text-xs text-zinc-300 leading-relaxed">
-              Вы действительно хотите удалить накладную <strong className="text-white">#{deletingInvoice.invoiceNumber}</strong>? Все привязанные к этой накладной устройства и расчеты будут удалены из системы.
+            <p className="text-xs text-fg-muted leading-relaxed">
+              Вы действительно хотите удалить накладную <strong className="text-fg">#{deletingInvoice.invoiceNumber}</strong>? Все привязанные к этой накладной устройства и расчеты будут удалены из системы.
             </p>
             <div className="flex items-center justify-end space-x-2 pt-2">
               <button
                 onClick={() => setDeletingInvoice(null)}
-                className="px-4 py-2 rounded bg-zinc-800 hover:bg-zinc-700 text-xs font-medium text-zinc-300"
+                className="px-4 py-2.5 rounded-xl bg-surface-raised hover:bg-surface border border-border text-xs font-bold text-fg-muted uppercase"
               >
                 Отмена
               </button>
               <button
                 onClick={handleConfirmDeleteInvoice}
-                className="px-4 py-2 rounded bg-rose-600 hover:bg-rose-500 text-xs font-semibold text-white shadow"
+                className="px-4 py-2.5 rounded-xl bg-danger hover:opacity-90 text-xs font-bold text-white uppercase shadow-xs"
               >
                 Удалить накладную
               </button>

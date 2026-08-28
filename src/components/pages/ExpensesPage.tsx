@@ -92,7 +92,7 @@ export const ExpensesPage: React.FC = () => {
   const isSeller = currentUser?.role === 'SELLER';
   const canAddCategory = currentUser?.role === 'ADMIN' || currentUser?.role === 'PARTNER';
 
-  const retailStores = useMemo(() => stores.filter(s => !s.isMainWarehouse && s.id !== 'store-main'), [stores]);
+  const retailStores = useMemo(() => stores.filter(s => !s.isMainWarehouse), [stores]);
 
   const [status, setStatus] = useState<StatusMessage | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -221,7 +221,12 @@ export const ExpensesPage: React.FC = () => {
       return;
     }
 
-    const newCat = { id: `CUSTOM_${Date.now()}`, label: name };
+    // Use the readable name itself as the id (not a synthetic CUSTOM_<timestamp> tag):
+    // the backend stores `category` as a plain string on the expense record, so anyone
+    // viewing it later — a different admin, a different browser/device — must be able to
+    // read the category directly from that stored value, without depending on this
+    // browser's localStorage still holding the id→label mapping.
+    const newCat = { id: name, label: name };
     const updated = [...customCategories, newCat];
     setCustomCategories(updated);
     try { localStorage.setItem('custom_expense_categories', JSON.stringify(updated)); } catch {}
@@ -467,7 +472,10 @@ export const ExpensesPage: React.FC = () => {
           </FormField>
           <FormField label="Точка / филиал">
             <Select value={editStoreId} onChange={(e) => setEditStoreId(e.target.value)} className="w-full">
-              {retailStores.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+              {/* All stores, not just retail ones: a payroll expense (salary/advance for
+                  an ADMIN/PARTNER) can legitimately be attributed to the main warehouse,
+                  and the dropdown must include the record's actual current store. */}
+              {stores.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
             </Select>
           </FormField>
           <FormField label="Описание / примечание">
