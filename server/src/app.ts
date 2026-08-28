@@ -22,8 +22,22 @@ import { requirePositiveMoney } from './common/money';
 
 export const app = express();
 
+// Allowed origins come from APP_URL (comma-separated for multiple, e.g. a staging +
+// prod domain). In this app's actual deployment shape nothing legitimate ever calls
+// the API cross-origin — prod serves the frontend and API from the same origin via
+// nginx, and the Vite dev server proxies /api server-side — so there's no real use
+// case for a wildcard here. Fall back to '*' only when APP_URL isn't configured, so
+// local runs without a .env don't unexpectedly break.
+const allowedOrigins = (process.env.APP_URL || '').split(',').map((o) => o.trim()).filter(Boolean);
+
 app.use((req, res, next) => {
-  res.header('Access-Control-Allow-Origin', '*');
+  const origin = req.headers.origin;
+  if (allowedOrigins.length === 0) {
+    res.header('Access-Control-Allow-Origin', '*');
+  } else if (origin && allowedOrigins.includes(origin)) {
+    res.header('Access-Control-Allow-Origin', origin);
+    res.header('Vary', 'Origin');
+  }
   res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
   res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   if (req.method === 'OPTIONS') {

@@ -29,6 +29,7 @@ services:
     environment:
       DATABASE_URL: "postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set for production}@db:5432/${POSTGRES_DB:-mobile_shop_db}?schema=public"
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET must be set for production}
+      APP_URL: ${APP_URL:-}
       NODE_ENV: "production"
       PORT: "3000"
     depends_on:

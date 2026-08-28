@@ -1,6 +1,7 @@
 import type { Express } from 'express';
 import { authenticateJwt, requireRoles, type AuthenticatedRequest } from '../../auth/auth.middleware';
 import { UsersService } from './users.service';
+import { RealtimeSyncGateway } from '../../websocket/websocket.gateway';
 
 export function registerUserRoutes(app: Express) {
   // Readable by any authenticated role — every page needs to resolve colleague names
@@ -28,6 +29,7 @@ export function registerUserRoutes(app: Express) {
         return;
       }
       const user = await UsersService.create({ login, password, name, role, storeId, baseSalaryTjs, salesCommissionPercent, createdByUserId: req.user!.userId });
+      RealtimeSyncGateway.broadcast('USER_UPDATED', { userId: user.id });
       res.status(201).json(user);
     } catch (error) {
       next(error);
@@ -37,6 +39,7 @@ export function registerUserRoutes(app: Express) {
   app.patch('/api/users/:id', authenticateJwt, requireRoles('ADMIN'), async (req: AuthenticatedRequest, res, next) => {
     try {
       const user = await UsersService.update(req.params.id, req.body ?? {}, req.user!.userId);
+      RealtimeSyncGateway.broadcast('USER_UPDATED', { userId: user.id });
       res.json(user);
     } catch (error) {
       next(error);
@@ -60,6 +63,7 @@ export function registerUserRoutes(app: Express) {
   app.patch('/api/users/:id/status', authenticateJwt, requireRoles('ADMIN'), async (req: AuthenticatedRequest, res, next) => {
     try {
       const user = await UsersService.setActive(req.params.id, Boolean(req.body?.active), req.user!.userId);
+      RealtimeSyncGateway.broadcast('USER_UPDATED', { userId: user.id });
       res.json(user);
     } catch (error) {
       next(error);
@@ -69,6 +73,7 @@ export function registerUserRoutes(app: Express) {
   app.delete('/api/users/:id', authenticateJwt, requireRoles('ADMIN'), async (req: AuthenticatedRequest, res, next) => {
     try {
       await UsersService.remove(req.params.id, req.user!.userId);
+      RealtimeSyncGateway.broadcast('USER_UPDATED', { userId: req.params.id });
       res.json({ success: true });
     } catch (error) {
       next(error);
