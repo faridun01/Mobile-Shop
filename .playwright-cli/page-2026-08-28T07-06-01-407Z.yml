@@ -1,0 +1,60 @@
+- generic [ref=e46]:
+  - complementary [ref=e47]:
+    - generic [ref=e48]:
+      - generic [ref=e49]: Mobile Shop
+      - generic [ref=e52]: POS
+    - navigation [ref=e53]:
+      - generic [ref=e54]:
+        - text: Основное
+        - generic [ref=e55]:
+          - button "POS Терминал" [ref=e56]
+          - button "История продаж" [ref=e62]
+          - button "Обмен Trade-In" [ref=e69]
+          - button "Сервис и ремонт" [ref=e77]
+      - generic [ref=e82]:
+        - text: Склад
+        - generic [ref=e83]:
+          - button "Склад товаров" [ref=e84]
+          - button "Приходы (партии)" [ref=e91]
+          - button "Перемещение" [ref=e96]
+          - button "Поставщики" [ref=e102]
+      - generic [ref=e110]:
+        - text: Финансы
+        - generic [ref=e111]:
+          - button "Финансовые отчёты" [ref=e112]
+          - button "Расходы" [ref=e117]
+          - button "Бонусы" [ref=e123]
+          - button "Партнеры и капитал" [ref=e130]
+      - generic [ref=e138]:
+        - text: Управление
+        - generic [ref=e139]:
+          - button "Сотрудники" [ref=e140]
+          - button "Журнал аудита" [ref=e147]
+          - button "Уведомления" [ref=e153]
+          - button "Настройки" [ref=e159]
+    - generic [ref=e165]:
+      - generic [ref=e166]: ДА
+      - generic [ref=e167]:
+        - paragraph [ref=e168]: Далер
+        - paragraph [ref=e169]: Администратор
+    - button "Выход" [ref=e171]
+  - generic [ref=e176]:
+    - banner [ref=e177]:
+      - generic [ref=e179]:
+        - heading "POS Терминал" [level=1] [ref=e180]
+        - paragraph [ref=e181]:
+          - generic [ref=e186]: Все филиалы
+      - button "Уведомления" [ref=e188]
+    - main [ref=e192]:
+      - generic [ref=e193]: Загрузка…
+    - contentinfo [ref=e197]:
+      - generic [ref=e198]:
+        - generic [ref=e199]: Система активна
+        - generic [ref=e202]: ·
+        - generic [ref=e203]: "Точка: Главный склад"
+        - generic [ref=e204]: ·
+        - generic [ref=e205]: Далер
+      - generic [ref=e206]:
+        - generic [ref=e207]: USD / TJS
+        - generic [ref=e208]: ·
+        - generic [ref=e209]: Синхронизация онлайн
