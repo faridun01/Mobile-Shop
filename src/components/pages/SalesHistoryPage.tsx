@@ -30,6 +30,7 @@ export const SalesHistoryPage: React.FC = () => {
     currentUser,
     sales,
     stores,
+    todayRate,
     openScanner,
     setActivePage,
     processRefund,
@@ -214,7 +215,14 @@ export const SalesHistoryPage: React.FC = () => {
             )}
           </div>
 
-
+          <Button
+            variant="secondary"
+            leftIcon={Download}
+            disabled={filteredSales.length === 0}
+            onClick={() => exportSalesReport(filteredSales, todayRate?.rate || 9.5)}
+          >
+            Экспорт (CSV)
+          </Button>
         </div>
       </div>
 

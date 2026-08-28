@@ -408,9 +408,9 @@ export const PurchasePage: React.FC = () => {
 
   if (currentUser?.role === 'SELLER') {
     return (
-      <div className="p-8 text-center text-zinc-500">
-        <p className="text-sm font-medium">Доступ ограничен</p>
-        <p className="text-xs text-zinc-600 mt-1">Оформление и просмотр приходов разрешены только Администраторам и Партнерам</p>
+      <div className="p-8 text-center text-fg-subtle">
+        <p className="text-sm font-medium text-fg">Доступ ограничен</p>
+        <p className="text-xs mt-1">Оформление и просмотр приходов разрешены только Администраторам и Партнерам</p>
       </div>
     );
   }
@@ -517,12 +517,12 @@ export const PurchasePage: React.FC = () => {
         </div>
 
         {/* Invoices List / Table */}
-        <div className="flex-1 overflow-y-auto divide-y divide-slate-800 bg-[#0B0E14]">
+        <div className="flex-1 overflow-y-auto divide-y divide-border bg-bg">
           {filteredInvoices.length === 0 ? (
-            <div className="p-12 text-center text-slate-500 font-mono">
-              <Package className="w-10 h-10 mx-auto mb-2 text-slate-600 opacity-50" />
+            <div className="p-12 text-center text-fg-subtle">
+              <Package className="w-10 h-10 mx-auto mb-2 opacity-50" />
               <p className="text-xs">Приходы не найдены</p>
-              <p className="text-[11px] text-slate-600 mt-1">
+              <p className="text-[11px] mt-1">
                 Нажмите «Новый приход», чтобы зарегистрировать партию товара
               </p>
             </div>
@@ -539,49 +539,49 @@ export const PurchasePage: React.FC = () => {
                 <div
                   key={inv.id}
                   onClick={() => setSelectedInvoiceId(inv.id)}
-                  className={`p-3 sm:p-3.5 hover:bg-slate-900/60 cursor-pointer transition-colors flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
-                    isJustSaved ? 'bg-emerald-500/15 border-l-4 border-l-blue-500' : ''
+                  className={`p-3 sm:p-3.5 hover:bg-surface-raised cursor-pointer transition-colors flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
+                    isJustSaved ? 'bg-accent/15 border-l-4 border-l-accent' : ''
                   }`}
                 >
                   <div className="flex items-start space-x-3">
-                    <div className="p-2 rounded bg-slate-900 border border-slate-800 text-emerald-400 shrink-0 mt-0.5">
+                    <div className="p-2 rounded-lg bg-surface border border-border text-accent shrink-0 mt-0.5">
                       <FileText className="w-4 h-4" />
                     </div>
 
                     <div>
                       <div className="flex items-center space-x-2">
-                        <span className="font-mono text-xs font-bold text-slate-100">
+                        <span className="text-xs font-bold text-fg">
                           {inv.invoiceNumber}
                         </span>
-                        <span className={`text-[10px] px-2 py-0.5 rounded font-mono font-medium ${
-                          isPaid ? 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30' :
-                          isPartial ? 'bg-amber-500/15 text-amber-300 border border-amber-500/30' :
-                          'bg-rose-500/15 text-rose-300 border border-rose-500/30'
+                        <span className={`text-[10px] px-2 py-0.5 rounded-md font-medium ${
+                          isPaid ? 'bg-accent/15 text-accent border border-accent/30' :
+                          isPartial ? 'bg-warning/15 text-warning border border-warning/30' :
+                          'bg-danger/15 text-danger border border-danger/30'
                         }`}>
                           {isPaid ? 'Оплачена' : isPartial ? 'Частично' : 'Не оплачена'}
                         </span>
                         {(inv.totalAmountUsd === 0 || inv.invoiceNumber.includes('BONUS')) && (
-                          <span className="text-[10px] px-2 py-0.5 rounded font-mono font-medium bg-purple-500/20 text-purple-300 border border-purple-500/40">
+                          <span className="text-[10px] px-2 py-0.5 rounded-md font-medium bg-purple-500/20 text-purple-400 border border-purple-500/40">
                             🎁 ПОДАРОК ($0)
                           </span>
                         )}
                         {isJustSaved && (
-                          <span className="text-[9px] bg-emerald-500 text-white px-1.5 py-0.2 rounded font-bold uppercase">
+                          <span className="text-[9px] bg-accent text-accent-fg px-1.5 py-0.2 rounded font-bold uppercase">
                             НОВОЕ
                           </span>
                         )}
                       </div>
 
-                      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-slate-400 mt-1 font-mono">
-                        <span className="text-slate-300 font-semibold flex items-center space-x-1">
-                          <Truck className="w-3 h-3 text-slate-500" />
+                      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-fg-subtle mt-1">
+                        <span className="text-fg-muted font-semibold flex items-center space-x-1">
+                          <Truck className="w-3 h-3 text-fg-subtle" />
                           <span>{inv.supplierName}</span>
                         </span>
-                        <span className="text-slate-500">•</span>
+                        <span>•</span>
                         <span>{inv.date}</span>
-                        <span className="text-slate-500">•</span>
-                        <span className="flex items-center space-x-1 text-slate-300">
-                          <StoreIcon className="w-3 h-3 text-slate-500" />
+                        <span>•</span>
+                        <span className="flex items-center space-x-1 text-fg-muted">
+                          <StoreIcon className="w-3 h-3 text-fg-subtle" />
                           <span>{locationLabel}</span>
                         </span>
                       </div>
@@ -589,26 +589,26 @@ export const PurchasePage: React.FC = () => {
                   </div>
 
                   <div className="flex items-center justify-between sm:justify-end space-x-4 pl-11 sm:pl-0">
-                    <div className="text-left sm:text-right font-mono">
-                      <div className="text-xs font-bold text-slate-100">
+                    <div className="text-left sm:text-right">
+                      <div className="text-xs font-bold text-fg">
                         {inv.totalAmountUsd === 0 ? '$0 (БОНУС)' : `$${(inv.totalAmountUsd || 0).toLocaleString()}`}
                         {inv.totalAmountUsd > 0 && (
-                          <span className="text-[10px] text-slate-400 font-normal ml-1">
+                          <span className="text-[10px] text-fg-subtle font-normal ml-1">
                             (~{Math.round((inv.totalAmountUsd || 0) * rate).toLocaleString()} TJS)
                           </span>
                         )}
                       </div>
-                      <div className="text-[11px] text-slate-400 flex items-center sm:justify-end space-x-2 mt-0.5">
-                        <span className="text-emerald-400 font-bold">{inv.devicesCount || 0} шт.</span>
+                      <div className="text-[11px] text-fg-subtle flex items-center sm:justify-end space-x-2 mt-0.5">
+                        <span className="text-accent font-bold">{inv.devicesCount || 0} шт.</span>
                         {inv.remainingAmountUsd > 0 && (
-                          <span className="text-rose-400">Долг: ${inv.remainingAmountUsd.toLocaleString()}</span>
+                          <span className="text-danger">Долг: ${inv.remainingAmountUsd.toLocaleString()}</span>
                         )}
                       </div>
                     </div>
 
                     <button
                       type="button"
-                      className="p-1.5 rounded bg-slate-900 text-slate-400 hover:text-white border border-slate-800 hover:border-slate-700"
+                      className="p-1.5 rounded-lg bg-surface-raised text-fg-subtle hover:text-fg border border-border"
                       title="Подробнее"
                     >
                       <ChevronRight className="w-4 h-4" />
@@ -622,14 +622,14 @@ export const PurchasePage: React.FC = () => {
 
         {/* INVOICE DETAILS MODAL */}
         {selectedInvoice && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-3 sm:p-4 backdrop-blur-xs">
-            <div className="w-full max-w-2xl rounded-xl bg-[#0F1219] border border-slate-800 shadow-2xl overflow-hidden flex flex-col max-h-[88vh]">
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-3 sm:p-4 backdrop-blur-sm">
+            <div className="w-full max-w-2xl rounded-2xl bg-surface border border-border shadow-2xl overflow-hidden flex flex-col max-h-[88vh]">
               {/* Modal Header */}
-              <div className="p-3.5 sm:p-4 border-b border-slate-800 bg-[#0B0E14] flex items-center justify-between shrink-0 font-mono">
+              <div className="p-3.5 sm:p-4 border-b border-border bg-surface flex items-center justify-between shrink-0 font-mono">
                 <div className="flex items-center space-x-2">
-                  <FileText className="w-4 h-4 text-emerald-400" />
+                  <FileText className="w-4 h-4 text-accent" />
                   <div>
-                    <h3 className="text-xs font-bold text-slate-100 flex items-center space-x-2">
+                    <h3 className="text-xs font-bold text-fg flex items-center space-x-2">
                       <span>НАКЛАДНАЯ {selectedInvoice.invoiceNumber}</span>
                       {(selectedInvoice.totalAmountUsd === 0 || selectedInvoice.invoiceNumber.includes('BONUS')) && (
                         <span className="text-[10px] px-2 py-0.5 rounded bg-purple-500/20 text-purple-300 border border-purple-500/40 font-normal">
@@ -637,7 +637,7 @@ export const PurchasePage: React.FC = () => {
                         </span>
                       )}
                     </h3>
-                    <p className="text-[11px] text-slate-400">
+                    <p className="text-[11px] text-fg-subtle">
                       Поставщик: {selectedInvoice.supplierName} • {selectedInvoice.date}
                     </p>
                   </div>
@@ -648,14 +648,14 @@ export const PurchasePage: React.FC = () => {
                     <>
                       <button
                         onClick={() => handleStartEditInvoiceModal(selectedInvoice)}
-                        className="p-1.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-emerald-400 transition-colors"
+                        className="p-1.5 rounded-lg bg-surface-raised hover:bg-surface text-fg-subtle hover:text-accent border border-border transition-colors"
                         title="Редактировать накладную"
                       >
                         <Edit2 className="w-4 h-4" />
                       </button>
                       <button
                         onClick={() => handleDeleteInvoiceModal(selectedInvoice.id)}
-                        className="p-1.5 rounded bg-slate-800 hover:bg-rose-500/20 text-slate-400 hover:text-rose-400 transition-colors"
+                        className="p-1.5 rounded-lg bg-surface-raised hover:bg-danger/20 text-fg-subtle hover:text-danger border border-border transition-colors"
                         title="Удалить накладную"
                       >
                         <Trash2 className="w-4 h-4" />
@@ -664,7 +664,7 @@ export const PurchasePage: React.FC = () => {
                   )}
                   <button
                     onClick={() => setSelectedInvoiceId(null)}
-                    className="p-1.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition-colors"
+                    className="p-1.5 rounded-lg bg-surface-raised hover:bg-surface text-fg-subtle hover:text-fg border border-border transition-colors"
                   >
                     <X className="w-4 h-4" />
                   </button>
@@ -672,61 +672,60 @@ export const PurchasePage: React.FC = () => {
               </div>
 
               {/* Financial Breakdown */}
-              <div className="p-3 bg-[#0B0E14]/80 border-b border-slate-800 grid grid-cols-3 gap-2 text-center text-xs font-mono">
-                <div className="bg-[#0F1219] p-2 rounded border border-slate-800">
-                  <span className="text-[10px] text-slate-400 block">СУММА НАКЛАДНОЙ</span>
-                  <strong className={selectedInvoice.totalAmountUsd === 0 ? "text-purple-300 font-bold" : "text-slate-100 font-bold"}>
+              <div className="p-3 bg-surface-raised border-b border-border grid grid-cols-3 gap-2 text-center text-xs font-mono">
+                <div className="bg-surface p-2.5 rounded-xl border border-border">
+                  <span className="text-[10px] text-fg-subtle block font-semibold uppercase">СУММА НАКЛАДНОЙ</span>
+                  <strong className={selectedInvoice.totalAmountUsd === 0 ? "text-purple-400 font-bold" : "text-fg font-bold"}>
                     {selectedInvoice.totalAmountUsd === 0 ? '$0 (БОНУС)' : `$${(selectedInvoice.totalAmountUsd || 0).toLocaleString()}`}
                   </strong>
                 </div>
-                <div className="bg-[#0F1219] p-2 rounded border border-slate-800">
-                  <span className="text-[10px] text-slate-400 block">ОПЛАЧЕНО</span>
-                  <strong className="text-emerald-400 font-bold">${(selectedInvoice.paidAmountUsd || 0).toLocaleString()}</strong>
+                <div className="bg-surface p-2.5 rounded-xl border border-border">
+                  <span className="text-[10px] text-fg-subtle block font-semibold uppercase">ОПЛАЧЕНО</span>
+                  <strong className="text-accent font-bold">${(selectedInvoice.paidAmountUsd || 0).toLocaleString()}</strong>
                 </div>
-                <div className="bg-[#0F1219] p-2 rounded border border-slate-800">
-                  <span className="text-[10px] text-slate-400 block">ОСТАТОК ДОЛГА</span>
-                  <strong className="text-rose-400 font-bold">${(selectedInvoice.remainingAmountUsd || 0).toLocaleString()}</strong>
+                <div className="bg-surface p-2.5 rounded-xl border border-border">
+                  <span className="text-[10px] text-fg-subtle block font-semibold uppercase">ОСТАТОК ДОЛГА</span>
+                  <strong className="text-danger font-bold">${(selectedInvoice.remainingAmountUsd || 0).toLocaleString()}</strong>
                 </div>
               </div>
 
               {/* Contained Devices List */}
               {(() => {
-                const containedDevices = devices.filter(d => 
-                  d.invoiceNumber === selectedInvoice.invoiceNumber ||
+                const containedDevices = devices.filter(d =>
                   (selectedInvoice.id && d.purchaseInvoiceId === selectedInvoice.id) ||
-                  (selectedInvoice.invoiceNumber.includes('112') && d.invoiceNumber === 'INV-112-BONUS')
+                  d.invoiceNumber === selectedInvoice.invoiceNumber
                 );
 
                 return (
                   <>
-                    <div className="p-3 bg-[#0F1219] border-b border-slate-800 flex items-center justify-between text-xs font-mono font-bold text-slate-300 shrink-0">
+                    <div className="p-3 bg-surface-raised border-b border-border flex items-center justify-between text-xs font-mono font-bold text-fg shrink-0">
                       <span>Устройства в накладной</span>
-                      <span className="text-emerald-400">
+                      <span className="text-accent">
                         {containedDevices.length} шт.
                       </span>
                     </div>
 
-                    <div className="flex-1 overflow-y-auto p-3 space-y-2 bg-[#0B0E14] font-mono">
+                    <div className="flex-1 overflow-y-auto p-3 space-y-2 bg-surface font-mono">
                       {containedDevices.map((dev, idx) => (
                         <div
                           key={dev.id}
-                          className="p-2.5 rounded bg-[#0F1219] border border-slate-800 flex items-center justify-between text-xs"
+                          className="p-2.5 rounded-xl bg-surface-raised border border-border flex items-center justify-between text-xs"
                         >
                           <div>
                             <div className="flex items-center space-x-2 flex-wrap gap-y-1">
-                              <span className="text-slate-400 text-[10px] font-bold">#{idx + 1}</span>
-                              <strong className="text-slate-100">{dev.brand} {dev.model}</strong>
-                              <span className="text-slate-400 text-[11px]">{dev.storage} • {dev.color}</span>
+                              <span className="text-fg-subtle text-[10px] font-bold">#{idx + 1}</span>
+                              <strong className="text-fg">{dev.brand} {dev.model}</strong>
+                              <span className="text-fg-subtle text-[11px]">{dev.storage} • {dev.color}</span>
                               {(dev.purchaseCostUsd === 0 || dev.isBonus) && (
-                                <span className="text-[10px] px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-300 border border-purple-500/40 font-medium">
+                                <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-purple-500/20 text-purple-400 border border-purple-500/40 font-medium">
                                   🎁 ПОДАРОК ($0)
                                 </span>
                               )}
                             </div>
-                            <div className="text-[11px] text-slate-400 mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 font-mono">
-                              <span>IMEI 1: <strong className="text-slate-300">{dev.imei}</strong></span>
-                              <span>IMEI 2: <strong className={dev.imei2 ? "text-slate-300" : "text-slate-500 font-normal"}>{dev.imei2 || '—'}</strong></span>
-                              <span>Локация: <strong className="text-slate-300">{dev.locationName}</strong></span>
+                            <div className="text-[11px] text-fg-subtle mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 font-mono">
+                              <span>IMEI 1: <strong className="text-fg">{dev.imei}</strong></span>
+                              <span>IMEI 2: <strong className={dev.imei2 ? "text-fg" : "text-fg-subtle font-normal"}>{dev.imei2 || '—'}</strong></span>
+                              <span>Локация: <strong className="text-fg">{dev.locationName}</strong></span>
                             </div>
                             {dev.bonusCampaign && (
                               <p className="text-[10px] text-purple-400 mt-0.5">
@@ -736,11 +735,11 @@ export const PurchasePage: React.FC = () => {
                           </div>
 
                           <div className="text-right shrink-0">
-                            <span className={`text-xs font-bold font-mono ${dev.purchaseCostUsd === 0 ? 'text-purple-300' : 'text-emerald-400'}`}>
+                            <span className={`text-xs font-bold font-mono ${dev.purchaseCostUsd === 0 ? 'text-purple-400' : 'text-accent'}`}>
                               {dev.purchaseCostUsd === 0 ? '$0 (ПОДАРОК)' : `$${dev.purchaseCostUsd}`}
                             </span>
-                            <span className={`block text-[10px] px-1.5 py-0.2 rounded font-bold mt-0.5 ${
-                              dev.status === 'SOLD' ? 'text-amber-400' : 'text-slate-400'
+                            <span className={`block text-[10px] px-1.5 py-0.2 rounded-md font-bold mt-0.5 ${
+                              dev.status === 'SOLD' ? 'text-warning' : 'text-fg-subtle'
                             }`}>
                               {dev.status === 'SOLD' ? 'ПРОДАН' : 'НА СКЛАДЕ'}
                             </span>
@@ -749,7 +748,7 @@ export const PurchasePage: React.FC = () => {
                       ))}
 
                       {containedDevices.length === 0 && (
-                        <p className="text-xs text-slate-500 text-center py-6">
+                        <p className="text-xs text-fg-subtle text-center py-6">
                           Устройства для этой архивной накладной были оприходованы ранее
                         </p>
                       )}
@@ -759,10 +758,10 @@ export const PurchasePage: React.FC = () => {
               })()}
 
               {/* Modal Footer */}
-              <div className="p-3 border-t border-slate-800 bg-[#0F1219] flex justify-end shrink-0">
+              <div className="p-3 border-t border-border bg-surface flex justify-end shrink-0">
                 <button
                   onClick={() => setSelectedInvoiceId(null)}
-                  className="px-4 py-1.5 rounded bg-slate-800 hover:bg-slate-700 text-xs font-bold text-slate-200 transition-colors font-mono"
+                  className="px-4 py-2 rounded-xl bg-surface-raised hover:bg-surface border border-border text-xs font-bold text-fg transition-colors font-mono uppercase"
                 >
                   ЗАКРЫТЬ
                 </button>
@@ -781,7 +780,7 @@ export const PurchasePage: React.FC = () => {
     <div className="flex-1 flex flex-col h-full overflow-y-auto bg-bg text-fg min-h-0">
       <form onSubmit={handleSubmitPurchase} className="flex-1 flex flex-col min-h-full">
         {/* Top Header with Back Button */}
-        <div className="p-3.5 sm:p-4 border-b border-zinc-800 bg-zinc-900/80 space-y-3 shrink-0">
+        <div className="p-3.5 sm:p-4 border-b border-border bg-surface space-y-3 shrink-0">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-2">
               <button
@@ -790,25 +789,25 @@ export const PurchasePage: React.FC = () => {
                   setStatusMessage(null);
                   setViewMode('list');
                 }}
-                className="flex items-center space-x-1 px-2.5 py-1 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300 hover:text-white text-xs font-mono font-bold transition-colors border border-zinc-700"
+                className="flex items-center space-x-1 px-2.5 py-1.5 rounded-lg bg-surface-raised hover:bg-surface text-fg-muted hover:text-fg text-xs font-bold transition-colors border border-border"
               >
                 <ArrowLeft className="w-3.5 h-3.5" />
                 <span>СПИСОК ПРИХОДОВ</span>
               </button>
-              <span className="text-zinc-500">/</span>
-              <h3 className="text-xs font-bold text-zinc-100 uppercase tracking-wider font-mono">
+              <span className="text-fg-subtle">/</span>
+              <h3 className="text-xs font-bold text-fg uppercase tracking-wider">
                 НОВЫЙ ПРИХОД ТОВАРОВ
               </h3>
             </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs font-mono">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
             <div>
-              <label className="block text-zinc-400 mb-1 font-medium">Поставщик</label>
+              <label className="block text-fg-subtle mb-1 font-medium">Поставщик</label>
               <select
                 value={selectedSupplierId ?? ''}
                 onChange={(e) => setSelectedSupplierId(e.target.value)}
-                className="w-full rounded bg-zinc-950 border border-zinc-700 px-3 py-2 text-xs text-zinc-100 focus:border-emerald-500 focus:outline-none"
+                className="w-full rounded-lg bg-surface-raised border border-border px-3 py-2 text-xs text-fg focus:border-accent focus:outline-none"
               >
                 {suppliers.map(s => (
                   <option key={s.id} value={s.id}>{s.name} (Долг: ${s.totalDebtUsd})</option>
@@ -817,31 +816,31 @@ export const PurchasePage: React.FC = () => {
             </div>
 
             <div>
-              <label className="block text-zinc-400 mb-1 font-medium">Номер накладной</label>
+              <label className="block text-fg-subtle mb-1 font-medium">Номер накладной</label>
               <input
                 type="text"
                 required
                 value={invoiceNumber}
                 onChange={(e) => setInvoiceNumber(e.target.value)}
-                className="w-full rounded bg-zinc-950 border border-zinc-700 px-3 py-2 text-xs text-zinc-100 focus:border-emerald-500 focus:outline-none uppercase"
+                className="w-full rounded-lg bg-surface-raised border border-border px-3 py-2 text-xs text-fg focus:border-accent focus:outline-none uppercase"
                 placeholder="INV-999"
               />
             </div>
 
             <div>
-              <label className="block text-zinc-400 mb-1 font-medium">Дата прихода</label>
+              <label className="block text-fg-subtle mb-1 font-medium">Дата прихода</label>
               <input
                 type="date"
                 required
                 value={purchaseDate}
                 onChange={(e) => setPurchaseDate(e.target.value)}
-                className="w-full rounded bg-zinc-950 border border-zinc-700 px-3 py-2 text-xs text-zinc-100 focus:border-emerald-500 focus:outline-none"
+                className="w-full rounded-lg bg-surface-raised border border-border px-3 py-2 text-xs text-fg focus:border-accent focus:outline-none"
               />
             </div>
           </div>
 
           {/* Destination location selector */}
-          <div className="pt-2 border-t border-zinc-800/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+          <div className="pt-2 border-t border-border flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
             <div className="flex items-center space-x-4">
               {currentUser?.role === 'ADMIN' && (
                 <label className="flex items-center space-x-2 cursor-pointer">
@@ -850,9 +849,9 @@ export const PurchasePage: React.FC = () => {
                     name="dest"
                     checked={!isStorePurchase}
                     onChange={() => setIsStorePurchase(false)}
-                    className="text-emerald-500 focus:ring-blue-500"
+                    className="text-accent focus:ring-accent"
                   />
-                  <span className="text-zinc-300 font-medium">Приход на Главный склад</span>
+                  <span className="text-fg-muted font-medium">Приход на Главный склад</span>
                 </label>
               )}
 
@@ -862,19 +861,19 @@ export const PurchasePage: React.FC = () => {
                   name="dest"
                   checked={isStorePurchase}
                   onChange={() => setIsStorePurchase(true)}
-                  className="text-emerald-500 focus:ring-blue-500"
+                  className="text-accent focus:ring-accent"
                 />
-                <span className="text-zinc-300 font-medium">Прямой приход в магазин</span>
+                <span className="text-fg-muted font-medium">Прямой приход в магазин</span>
               </label>
             </div>
 
             {isStorePurchase && (
               <div className="flex items-center space-x-2">
-                <span className="text-zinc-400">Магазин:</span>
+                <span className="text-fg-subtle">Магазин:</span>
                 <select
                   value={storeId}
                   onChange={(e) => setStoreId(e.target.value)}
-                  className="rounded bg-zinc-950 border border-zinc-700 px-3 py-1 text-xs text-zinc-100 focus:border-emerald-500 focus:outline-none"
+                  className="rounded-lg bg-surface-raised border border-border px-3 py-1.5 text-xs text-fg focus:border-accent focus:outline-none"
                 >
                   {stores.filter(s => !s.isMainWarehouse).map(s => (
                     <option key={s.id} value={s.id}>{s.name}</option>

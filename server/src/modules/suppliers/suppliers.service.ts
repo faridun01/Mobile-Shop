@@ -1,5 +1,16 @@
 import { prisma } from '../../prisma/prisma.service';
+import type { Prisma } from '@prisma/client';
 import { resolveActor } from '../../common/actor';
+
+/** True if any of these devices has a sale, transfer, or repair record referencing it (hard FK, no cascade). */
+async function deviceHasTransactionHistory(tx: Prisma.TransactionClient, deviceIds: string[]): Promise<boolean> {
+  const [saleItem, transferItem, repairTicket] = await Promise.all([
+    tx.saleItem.findFirst({ where: { deviceId: { in: deviceIds } } }),
+    tx.transferItem.findFirst({ where: { deviceId: { in: deviceIds } } }),
+    tx.repairTicket.findFirst({ where: { deviceId: { in: deviceIds } } }),
+  ]);
+  return Boolean(saleItem || transferItem || repairTicket);
+}
 
 export interface PaySupplierInput {
   supplierId: string;
@@ -213,6 +224,18 @@ export class SuppliersService {
       const supplier = await tx.supplier.findUnique({ where: { id } });
       if (!supplier) throw new Error('Поставщик не найден');
 
+      // Devices with transaction history (sold, transferred, sent to repair) cannot be
+      // hard-deleted — they're referenced by SaleItem/TransferItem/RepairTicket rows with
+      // no cascade. Deleting them anyway would crash with a raw FK constraint error.
+      const devices = await tx.device.findMany({ where: { supplierId: id }, select: { id: true } });
+      const deviceIds = devices.map((d) => d.id);
+      if (deviceIds.length > 0) {
+        const hasHistory = await deviceHasTransactionHistory(tx, deviceIds);
+        if (hasHistory) {
+          throw new Error('Нельзя удалить поставщика: часть его устройств уже продана, перемещена или отправлена в ремонт');
+        }
+      }
+
       // Delete allocations, payments, bonus devices, bonuses, group items, devices, and invoices
       const payments = await tx.supplierPayment.findMany({ where: { supplierId: id } });
       const paymentIds = payments.map((p) => p.id);
@@ -291,6 +314,15 @@ export class SuppliersService {
     return prisma.$transaction(async (tx) => {
       const invoice = await tx.supplierInvoice.findUnique({ where: { id } });
       if (!invoice) throw new Error('Накладная не найдена');
+
+      const invoiceDevices = await tx.device.findMany({ where: { purchaseInvoiceId: id }, select: { id: true } });
+      const invoiceDeviceIds = invoiceDevices.map((d) => d.id);
+      if (invoiceDeviceIds.length > 0) {
+        const hasHistory = await deviceHasTransactionHistory(tx, invoiceDeviceIds);
+        if (hasHistory) {
+          throw new Error('Нельзя удалить накладную: устройства из неё уже проданы, перемещены или отправлены в ремонт');
+        }
+      }
 
       const remainingDebtOnInvoice = invoice.totalAmountUsd - invoice.paidAmountUsd;
 

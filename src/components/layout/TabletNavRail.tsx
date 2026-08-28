@@ -6,13 +6,19 @@ import {
   ShoppingBag,
   History,
   Package,
+  PlusCircle,
   ArrowLeftRight,
   RefreshCw,
   Wrench,
+  Truck,
+  Gift,
   Wallet,
+  Users,
   UserCheck,
   BarChart3,
+  FileText,
   Settings,
+  Bell,
   LogOut
 } from 'lucide-react';
 
@@ -42,9 +48,15 @@ const TABLET_NAV_ITEMS: { id: PageId; label: string; icon: React.ElementType; ro
   { id: 'EXCHANGE', label: 'Обмен', icon: RefreshCw, roles: ['ADMIN', 'PARTNER', 'SELLER'] },
   { id: 'REPAIR', label: 'Ремонт', icon: Wrench, roles: ['ADMIN', 'PARTNER', 'SELLER'] },
   { id: 'TRANSFER', label: 'Перевод', icon: ArrowLeftRight, roles: ['ADMIN', 'PARTNER', 'SELLER'] },
+  { id: 'PURCHASE', label: 'Приход', icon: PlusCircle, roles: ['ADMIN', 'PARTNER'] },
+  { id: 'SUPPLIERS', label: 'Поставщ.', icon: Truck, roles: ['ADMIN', 'PARTNER'] },
   { id: 'EXPENSES', label: 'Расходы', icon: Wallet, roles: ['ADMIN', 'PARTNER'] },
+  { id: 'BONUSES', label: 'Бонусы', icon: Gift, roles: ['ADMIN', 'PARTNER'] },
   { id: 'REPORTS', label: 'Отчёты', icon: BarChart3, roles: ['ADMIN', 'PARTNER'] },
+  { id: 'OWNERS', label: 'Партнеры', icon: Users, roles: ['ADMIN', 'PARTNER'] },
   { id: 'EMPLOYEES', label: 'Кадры', icon: UserCheck, roles: ['ADMIN'] },
+  { id: 'AUDIT_LOG', label: 'Аудит', icon: FileText, roles: ['ADMIN'] },
+  { id: 'NOTIFICATIONS', label: 'Увед.', icon: Bell, roles: ['ADMIN', 'PARTNER'] },
   { id: 'SETTINGS', label: 'Опции', icon: Settings, roles: ['ADMIN', 'PARTNER'] },
 ];
 
@@ -88,7 +100,7 @@ export const TabletNavRail: React.FC = () => {
                 {item.label}
               </span>
 
-              {item.id === 'SETTINGS' && unreadNotifs > 0 && (
+              {item.id === 'NOTIFICATIONS' && unreadNotifs > 0 && (
                 <span className="absolute top-1 right-1 flex h-3 min-w-3 items-center justify-center rounded-full bg-danger px-1 text-[8px] font-bold text-white">
                   {unreadNotifs}
                 </span>

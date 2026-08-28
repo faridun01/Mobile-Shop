@@ -281,7 +281,7 @@ export const OwnersPage: React.FC = () => {
       if (s.status !== 'REFUNDED') {
         revenueUsd += s.totalUsd || (s.totalTjs / rate);
         (s.items || []).forEach(i => {
-          cogsUsd += (i as any).purchasePriceUsd || 0;
+          cogsUsd += i.costBasisUsd || i.purchaseCostUsd || 0;
         });
       }
     });

@@ -31,8 +31,6 @@ export class RepairsService {
         where: { imei: input.imei },
       });
 
-      const costTjs = input.repairCostTjs || input.estimatedCostTjs || 0;
-
       const ticket = await tx.repairTicket.create({
         data: {
           storeId: input.storeId,
@@ -59,17 +57,10 @@ export class RepairsService {
         },
       });
 
-      if (costTjs > 0) {
-        await createExpense(tx, {
-          category: 'REPAIR_PARTS',
-          amountTjs: costTjs,
-          storeId: input.storeId,
-          comment: `Ремонт #${ticket.ticketNumber}: ${input.brand} ${input.model}`,
-          paidFromCashRegister: true,
-          createdByUserId: input.userId,
-        });
-      }
-
+      // No expense is booked at intake: estimatedCostTjs here is a rough quote, not a
+      // confirmed spend. The real REPAIR_PARTS expense is recorded once, in updateStatus,
+      // when the ticket is marked ISSUED with the actual final cost — booking it here too
+      // used to double-charge the cash register for every repair with a non-zero estimate.
       if (matchedDevice) {
         await tx.deviceTimelineEvent.create({
           data: {
@@ -102,15 +93,33 @@ export class RepairsService {
       const actor = await resolveActor(tx, updatedByUserId);
       const ticket = await tx.repairTicket.findUnique({ where: { id: ticketId } });
       if (!ticket) throw new Error('Ремонт не найден');
+      // Idempotency guard: issuing books a real cash-register expense, so re-issuing an
+      // already-ISSUED ticket (double-click, retried request) must not book it twice.
+      if (newStatus === 'ISSUED' && ticket.status === 'ISSUED') {
+        throw new Error('Этот ремонт уже был выдан клиенту');
+      }
+
+      const costVal = finalCostTjs !== undefined && finalCostTjs !== null ? Number(finalCostTjs) : (ticket.finalCostTjs || ticket.estimatedCostTjs || 0);
 
       const updated = await tx.repairTicket.update({
         where: { id: ticketId },
         data: {
           status: newStatus as any,
-          finalCostTjs: finalCostTjs ?? ticket.finalCostTjs,
+          finalCostTjs: costVal > 0 ? costVal : ticket.finalCostTjs,
           statusHistory: { create: [{ status: newStatus as any, updatedByUserId, note }] },
         },
       });
+
+      if (costVal > 0 && newStatus === 'ISSUED') {
+        await createExpense(tx, {
+          category: 'REPAIR_PARTS',
+          amountTjs: costVal,
+          storeId: ticket.storeId,
+          comment: `Выдача ремонта #${ticket.ticketNumber}: ${ticket.brand} ${ticket.model}`,
+          paidFromCashRegister: true,
+          createdByUserId: updatedByUserId,
+        });
+      }
 
       await tx.auditLog.create({
         data: {
@@ -118,7 +127,7 @@ export class RepairsService {
           userName: actor.name,
           userRole: actor.role,
           action: 'REPAIR_STATUS_CHANGE',
-          details: `Ремонт #${ticket.ticketNumber} (${ticket.model}): изменен статус на "${newStatus}" (${note || 'без примечания'})`,
+          details: `Ремонт #${ticket.ticketNumber} (${ticket.model}): статус "${newStatus}". Расход: ${costVal} TJS списан со счета магазина.`,
           targetId: ticketId,
         },
       });

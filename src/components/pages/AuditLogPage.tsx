@@ -5,10 +5,11 @@ import {
   Search,
   Calendar,
   X,
-  ArrowUpDown,
   ArrowDown,
-  ArrowUp
+  ArrowUp,
+  Download
 } from 'lucide-react';
+import { exportAuditLogsReport } from '../../utils/exportReports';
 
 type DateFilterMode = 'TODAY' | 'SPECIFIC' | 'ALL';
 type SortOrderMode = 'DESC' | 'ASC';
@@ -138,6 +139,15 @@ export const AuditLogPage: React.FC = () => {
           <span className="text-xs font-bold text-accent bg-accent/15 px-3 py-1 rounded-xl border border-accent/30">
             {filteredLogs.length} событий
           </span>
+          <button
+            type="button"
+            onClick={() => exportAuditLogsReport(filteredLogs)}
+            disabled={filteredLogs.length === 0}
+            className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-surface-raised hover:bg-surface border border-border text-fg text-xs font-bold transition-colors disabled:opacity-40"
+          >
+            <Download className="w-3.5 h-3.5 text-accent" />
+            <span className="hidden sm:inline">Экспорт (CSV)</span>
+          </button>
         </div>
       </div>
 

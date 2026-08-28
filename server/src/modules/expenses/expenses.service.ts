@@ -118,7 +118,6 @@ export async function updateExpense(
     const newDescription = input.description !== undefined ? input.description.trim() : existing.description;
 
     // Adjust store cash balance if amount or store changed
-    const diffTjs = newAmountTjs - existing.amountTjs;
     if (existing.storeId && (existing.paidFromCashRegister || (existing.sourceAccount && existing.sourceAccount.toLowerCase().includes('касса')))) {
       await tx.store.update({
         where: { id: existing.storeId },
@@ -129,6 +128,24 @@ export async function updateExpense(
       await tx.store.update({
         where: { id: newStoreId },
         data: { cashBalanceTjs: { decrement: newAmountTjs } },
+      });
+    }
+
+    // Reverse the old amount's owner profit impact and re-apply it for the new amount —
+    // an expense decrements owner profit at creation (see createExpense), so an edit that
+    // changes the amount must roll that accrual forward too, or owner profit permanently
+    // drifts from the actual expense total.
+    const owners = await tx.owner.findMany();
+    for (const owner of owners) {
+      const share = owner.profitSharePercent / 100;
+      const revertDelta = Number(((existing.amountUsd || 0) * share).toFixed(2));
+      const applyDelta = Number((newAmountUsd * share).toFixed(2));
+      await tx.owner.update({
+        where: { id: owner.id },
+        data: {
+          totalAccruedProfitUsd: { increment: revertDelta - applyDelta },
+          availableProfitUsd: { increment: revertDelta - applyDelta },
+        },
       });
     }
 
@@ -183,6 +200,16 @@ export async function deleteExpense(id: string, actorId: string) {
       await tx.store.update({
         where: { id: existing.storeId },
         data: { cashBalanceTjs: { increment: existing.amountTjs } },
+      });
+    }
+
+    // Reverse the profit impact this expense accrued against owners at creation time.
+    const owners = await tx.owner.findMany();
+    for (const owner of owners) {
+      const delta = Number(((existing.amountUsd || 0) * (owner.profitSharePercent / 100)).toFixed(2));
+      await tx.owner.update({
+        where: { id: owner.id },
+        data: { totalAccruedProfitUsd: { increment: delta }, availableProfitUsd: { increment: delta } },
       });
     }
 

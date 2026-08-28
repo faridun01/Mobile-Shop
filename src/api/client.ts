@@ -16,18 +16,29 @@ export async function apiClient<T>(endpoint: string, options: RequestInit = {}):
     ? `${API_BASE_URL.replace(/\/$/, '')}${cleanEndpoint}`
     : `${API_BASE_URL}${cleanEndpoint}`;
 
-  const response = await fetch(url, {
-    ...options,
-    headers,
-  });
+  try {
+    const response = await fetch(url, {
+      ...options,
+      headers,
+    });
 
-  if (!response.ok) {
-    if (response.status === 401) {
-      useAuthStore.getState().logout();
+    if (!response.ok) {
+      if (response.status === 401) {
+        useAuthStore.getState().logout();
+      }
+      const errorData = await response.json().catch(() => ({
+        message: response.status === 504 || response.status === 502
+          ? 'Сервер API недоступен. Запустите бэкенд: npm run server'
+          : `Ошибка API (HTTP ${response.status})`
+      }));
+      throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
     }
-    const errorData = await response.json().catch(() => ({ message: 'API Request Failed' }));
-    throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
-  }
 
-  return response.json();
+    return await response.json();
+  } catch (err: any) {
+    if (err.name === 'TypeError' || err.message?.includes('Failed to fetch')) {
+      throw new Error('Сервер API недоступен. Запустите бэкенд: npm run server');
+    }
+    throw err;
+  }
 }

@@ -307,9 +307,19 @@ export const ExpensesPage: React.FC = () => {
               </div>
             </div>
 
-            <Button variant="danger" leftIcon={Plus} onClick={() => setIsModalOpen(true)} className="shrink-0">
-              Добавить
-            </Button>
+            <div className="flex items-center gap-2 shrink-0">
+              <Button
+                variant="secondary"
+                leftIcon={Download}
+                disabled={filteredExpenses.length === 0}
+                onClick={() => exportExpensesReport(filteredExpenses, rate)}
+              >
+                CSV
+              </Button>
+              <Button variant="danger" leftIcon={Plus} onClick={() => setIsModalOpen(true)}>
+                Добавить
+              </Button>
+            </div>
           </div>
         </div>
 

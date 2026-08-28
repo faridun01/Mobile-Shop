@@ -480,27 +480,53 @@ export const ExchangePage: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Input Cash Given */}
-                {exchangePaymentMethod === 'CASH' && (
-                  <div className="flex items-center space-x-3 w-full sm:w-auto bg-surface-raised p-2 rounded-xl border border-border">
-                    <div>
-                      <label className="block text-[10px] uppercase font-bold text-fg-subtle mb-0.5">
-                        ВНЕСЕНО КЛИЕНТОМ:
-                      </label>
-                      <div className="relative">
-                        <input
-                          type="number"
-                          min="0"
-                          placeholder={differenceTjs.toString()}
-                          value={givenCashTjs}
-                          onChange={(e) => setGivenCashTjs(e.target.value)}
-                          className="w-28 rounded-lg bg-surface border border-border px-2 py-1 text-xs font-bold text-accent focus:border-accent focus:outline-none"
-                        />
-                        <span className="absolute right-2 top-1 text-[10px] text-fg-subtle">TJS</span>
-                      </div>
-                    </div>
+                <div className="flex items-center space-x-3 w-full sm:w-auto">
+                  {/* Payment method for the customer's top-up */}
+                  <div className="flex items-center bg-surface-raised p-1 rounded-xl border border-border shrink-0">
+                    {(['CASH', 'CARD'] as const).map((method) => (
+                      <button
+                        key={method}
+                        type="button"
+                        onClick={() => setExchangePaymentMethod(method)}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-bold uppercase transition-colors ${
+                          exchangePaymentMethod === method ? 'bg-accent text-accent-fg' : 'text-fg-muted hover:text-fg'
+                        }`}
+                      >
+                        {method === 'CASH' ? 'Наличные' : 'Карта'}
+                      </button>
+                    ))}
                   </div>
-                )}
+
+                  {/* Input Cash Given — change calculator for the cashier */}
+                  {exchangePaymentMethod === 'CASH' && (
+                    <div className="flex items-center space-x-3 bg-surface-raised p-2 rounded-xl border border-border">
+                      <div>
+                        <label className="block text-[10px] uppercase font-bold text-fg-subtle mb-0.5">
+                          ВНЕСЕНО КЛИЕНТОМ:
+                        </label>
+                        <div className="relative">
+                          <input
+                            type="number"
+                            min="0"
+                            placeholder={differenceTjs.toString()}
+                            value={givenCashTjs}
+                            onChange={(e) => setGivenCashTjs(e.target.value)}
+                            className="w-28 rounded-lg bg-surface border border-border px-2 py-1 text-xs font-bold text-accent focus:border-accent focus:outline-none"
+                          />
+                          <span className="absolute right-2 top-1 text-[10px] text-fg-subtle">TJS</span>
+                        </div>
+                      </div>
+                      {givenCashTjs && (parseFloat(givenCashTjs) || 0) > differenceTjs && (
+                        <div>
+                          <span className="block text-[10px] uppercase font-bold text-fg-subtle mb-0.5">СДАЧА:</span>
+                          <span className="text-xs font-bold text-warning">
+                            {((parseFloat(givenCashTjs) || 0) - differenceTjs).toLocaleString()} TJS
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
               </div>
             ) : differenceTjs < 0 ? (
               <div className="p-3.5 rounded-xl bg-warning/15 border border-warning/30 flex items-center space-x-2.5">

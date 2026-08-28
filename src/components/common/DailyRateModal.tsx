@@ -58,12 +58,6 @@ export const DailyRateModal: React.FC<DailyRateModalProps> = ({ isOpen, onClose 
       }
     >
       <div className="space-y-4">
-        {isMandatory && (
-          <div className="rounded-lg bg-warning/10 border border-warning/30 text-warning text-xs leading-relaxed p-3">
-            Курс доллара на сегодня ещё не установлен. Введите курс 1 USD = ? TJS, чтобы начать работу.
-          </div>
-        )}
-
         <FormField label="1 USD =" required error={error ?? undefined}>
           <div className="relative">
             <input

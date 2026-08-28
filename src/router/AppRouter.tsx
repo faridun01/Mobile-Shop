@@ -10,6 +10,7 @@ import { TabletNavRail } from '../components/layout/TabletNavRail';
 import { Drawer } from '../components/layout/Drawer';
 import { MobileBottomNav } from '../components/layout/MobileBottomNav';
 import { DailyRateModal } from '../components/common/DailyRateModal';
+import { ScannerModal } from '../components/common/ScannerModal';
 import { PWAInstallPrompt } from '../components/pwa/PWAInstallPrompt';
 import { PWAUpdateNotifier } from '../components/pwa/PWAUpdateNotifier';
 import { useUIStore } from '../stores/useUIStore';
@@ -133,6 +134,7 @@ function MainLayout() {
       </div>
 
       <DailyRateModal isOpen={isDailyRateModalOpen || isRateModalOpen} onClose={() => setDailyRateModalOpen(false)} />
+      <ScannerModal />
       <PWAInstallPrompt />
       <PWAUpdateNotifier />
     </div>

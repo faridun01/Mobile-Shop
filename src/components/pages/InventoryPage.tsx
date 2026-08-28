@@ -8,11 +8,9 @@ import {
   Store,
   History,
   DollarSign,
-  Download,
   Layers,
   List
 } from 'lucide-react';
-import { exportInventoryReport } from '../../utils/exportReports';
 import { useGroupedDevices } from '../../hooks/useGroupedDevices';
 import { SearchBar } from '../ui/SearchBar';
 import { FilterPillGroup } from '../ui/FilterPillGroup';
@@ -154,6 +152,16 @@ export const InventoryPage: React.FC = () => {
           <Select value={selectedBrand} onChange={(e) => setSelectedBrand(e.target.value)} className="h-8 py-0 px-2 text-[11px] w-auto shrink-0">
             {brands.map(b => <option key={b.value} value={b.value}>{b.label}</option>)}
           </Select>
+
+          <button
+            type="button"
+            onClick={() => setGroupByModel((prev) => !prev)}
+            title={groupByModel ? 'Показать полным списком' : 'Сгруппировать по модели'}
+            className="flex items-center gap-1 h-8 px-2.5 rounded-lg border border-border bg-surface-raised text-[11px] font-medium text-fg-muted hover:text-fg shrink-0 whitespace-nowrap transition-colors"
+          >
+            {groupByModel ? <List className="w-3.5 h-3.5 text-accent" /> : <Layers className="w-3.5 h-3.5 text-accent" />}
+            <span className="hidden sm:inline">{groupByModel ? 'Список' : 'Группы'}</span>
+          </button>
 
           <span className="text-[11px] text-fg-subtle ml-auto shrink-0 whitespace-nowrap pl-2">
             Найдено: <strong className="text-accent font-bold">{filteredDevices.length}</strong>

@@ -42,8 +42,8 @@ export const RepairPage: React.FC = () => {
 
   // Modal state for ISSUING REPAIR & SETTLEMENT
   const [selectedTicket, setSelectedTicket] = useState<RepairTicket | null>(null);
+  const [viewingTicket, setViewingTicket] = useState<RepairTicket | null>(null);
   const [issueFinalCost, setIssueFinalCost] = useState<string>('0');
-  const [issuePaymentMethod, setIssuePaymentMethod] = useState<'CASH' | 'CARD'>('CASH');
 
   const [statusMessage, setStatusMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [statusBanner, setStatusBanner] = useState<StatusMessage | null>(null);
@@ -233,7 +233,6 @@ export const RepairPage: React.FC = () => {
   const handleOpenIssueModal = (ticket: RepairTicket) => {
     setSelectedTicket(ticket);
     setIssueFinalCost((ticket.estimatedCostTjs || 0).toString());
-    setIssuePaymentMethod('CASH');
   };
 
   const handleConfirmIssueTicket = async () => {
@@ -244,7 +243,7 @@ export const RepairPage: React.FC = () => {
 
     setSelectedTicket(null);
     if (res.success) {
-      setStatusBanner({ tone: 'success', text: `Ремонт по квитанции #${selectedTicket.ticketNumber} успешно выдан клиенту!` });
+      setStatusBanner({ tone: 'success', text: `Ремонт #${selectedTicket.ticketNumber} выдан. Расход ${finalCost} TJS автоматически списан со счета магазина.` });
     } else {
       setStatusBanner({ tone: 'error', text: res.message || 'Ошибка выдачи ремонта' });
     }
@@ -558,7 +557,8 @@ export const RepairPage: React.FC = () => {
                   return (
                     <div
                       key={ticket.id}
-                      className="p-4 rounded-xl bg-surface border border-border flex flex-col md:flex-row md:items-center justify-between gap-3 text-xs transition-colors hover:border-fg-subtle"
+                      onClick={() => setViewingTicket(ticket)}
+                      className="p-4 rounded-xl bg-surface border border-border flex flex-col md:flex-row md:items-center justify-between gap-3 text-xs transition-colors hover:border-fg-subtle cursor-pointer"
                     >
                       <div className="space-y-1.5 flex-1 min-w-0">
                         <div className="flex items-center space-x-2">
@@ -594,7 +594,7 @@ export const RepairPage: React.FC = () => {
                         </div>
 
                         {/* Quick action buttons depending on status */}
-                        <div className="flex items-center space-x-1.5">
+                        <div className="flex items-center space-x-1.5" onClick={(e) => e.stopPropagation()}>
                           {ticket.status === 'ACCEPTED' && (
                             <button
                               onClick={() => handleUpdateStatusQuick(ticket.id, 'IN_PROGRESS')}
@@ -668,40 +668,8 @@ export const RepairPage: React.FC = () => {
                   <span className="font-bold text-accent">-{selectedTicket.prepaymentTjs} TJS</span>
                 </div>
               ) : null}
-
-              <div className="pt-1 flex justify-between items-center text-xs">
-                <span className="text-fg-muted uppercase font-semibold">Остаток к оплате клиентом:</span>
-                <span className="text-sm font-bold text-accent">
-                  {Math.max(0, (parseFloat(issueFinalCost) || 0) - (selectedTicket.prepaymentTjs || 0)).toLocaleString()} TJS
-                </span>
-              </div>
-
-              <div>
-                <label className="block text-fg-subtle mb-1 text-[11px] uppercase">Способ оплаты:</label>
-                <div className="grid grid-cols-2 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setIssuePaymentMethod('CASH')}
-                    className={`py-2 px-3 rounded-xl border text-xs font-bold uppercase transition-colors ${
-                      issuePaymentMethod === 'CASH'
-                        ? 'border-accent bg-accent/15 text-accent'
-                        : 'border-border bg-surface-raised text-fg-muted'
-                    }`}
-                  >
-                    Наличные
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setIssuePaymentMethod('CARD')}
-                    className={`py-2 px-3 rounded-xl border text-xs font-bold uppercase transition-colors ${
-                      issuePaymentMethod === 'CARD'
-                        ? 'border-accent bg-accent/15 text-accent'
-                        : 'border-border bg-surface-raised text-fg-muted'
-                    }`}
-                  >
-                    Карта / Перевод
-                  </button>
-                </div>
+              <div className="p-2.5 rounded-xl bg-surface-raised border border-border text-[11px] text-fg-subtle">
+                Сумма расхода автоматически списывается со счета магазина.
               </div>
             </div>
 
@@ -718,6 +686,152 @@ export const RepairPage: React.FC = () => {
               >
                 Подтвердить выдачу
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: VIEW REPAIR CARD DETAILS */}
+      {viewingTicket && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-xs">
+          <div className="w-full max-w-lg rounded-2xl bg-surface border border-border p-5 text-fg shadow-2xl space-y-4 text-xs max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between border-b border-border pb-3">
+              <div className="flex items-center space-x-2">
+                <FileText className="w-4 h-4 text-accent" />
+                <h3 className="text-sm font-bold uppercase text-fg">
+                  Квитанция на ремонт #{viewingTicket.ticketNumber}
+                </h3>
+                <span className={`text-[10px] px-2 py-0.5 rounded-md font-bold uppercase border ${getStatusBadge(viewingTicket.status).color}`}>
+                  {getStatusBadge(viewingTicket.status).label}
+                </span>
+              </div>
+              <button onClick={() => setViewingTicket(null)} className="text-fg-subtle hover:text-fg">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Device Info */}
+            <div className="p-3 bg-surface-raised rounded-xl border border-border space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="font-bold text-fg text-sm">{viewingTicket.deviceModel || `${viewingTicket.brand || ''} ${viewingTicket.model || ''}`}</span>
+                <span className="text-fg-subtle text-[11px]">{new Date(viewingTicket.createdAt).toLocaleString('ru-RU')}</span>
+              </div>
+              <div className="grid grid-cols-2 gap-2 text-fg-muted text-xs">
+                <div>
+                  <span className="text-fg-subtle block text-[10px] uppercase font-semibold">IMEI / Серийный номер</span>
+                  <span className="font-mono text-fg">{viewingTicket.imei || 'N/A'}</span>
+                </div>
+                <div>
+                  <span className="text-fg-subtle block text-[10px] uppercase font-semibold">Магазин / Точка</span>
+                  <span className="text-fg">{viewingTicket.storeName || 'Магазин'}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Customer Details */}
+            <div className="p-3 bg-surface-raised rounded-xl border border-border space-y-1">
+              <span className="text-fg-subtle block text-[10px] uppercase font-semibold">Данные клиента</span>
+              <div className="flex items-center justify-between text-xs">
+                <span className="font-bold text-fg">{viewingTicket.customerName || 'Не указано'}</span>
+                <span className="text-accent font-semibold">{viewingTicket.customerPhone || 'N/A'}</span>
+              </div>
+            </div>
+
+            {/* Problem / Defect Description */}
+            <div className="p-3 bg-danger/10 border border-danger/20 rounded-xl space-y-1">
+              <span className="text-danger font-semibold block text-[10px] uppercase">Заявленная неисправность</span>
+              <p className="text-fg text-xs font-medium leading-relaxed">{viewingTicket.problemDescription}</p>
+            </div>
+
+            {/* Visual Condition, Equipment & Note */}
+            {(viewingTicket.visualCondition || viewingTicket.equipmentPackage || viewingTicket.comment) && (
+              <div className="p-3 bg-surface-raised rounded-xl border border-border space-y-2">
+                {viewingTicket.visualCondition && (
+                  <div>
+                    <span className="text-fg-subtle block text-[10px] uppercase font-semibold">Внешнее состояние</span>
+                    <span className="text-fg">{viewingTicket.visualCondition}</span>
+                  </div>
+                )}
+                {viewingTicket.equipmentPackage && (
+                  <div>
+                    <span className="text-fg-subtle block text-[10px] uppercase font-semibold">Комплектация</span>
+                    <span className="text-fg">{viewingTicket.equipmentPackage}</span>
+                  </div>
+                )}
+                {viewingTicket.comment && (
+                  <div>
+                    <span className="text-fg-subtle block text-[10px] uppercase font-semibold">Примечание мастера</span>
+                    <span className="text-fg">{viewingTicket.comment}</span>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Financial Details */}
+            <div className="p-3 bg-surface-raised rounded-xl border border-border space-y-2">
+              <span className="text-fg-subtle block text-[10px] uppercase font-semibold">Расчет и стоимость</span>
+              <div className="grid grid-cols-2 gap-2 text-xs">
+                <div>
+                  <span className="text-fg-subtle block text-[10px]">Ориентировочная стоимость:</span>
+                  <span className="font-bold text-fg">{viewingTicket.estimatedCostTjs || 0} TJS</span>
+                </div>
+                {viewingTicket.prepaymentTjs ? (
+                  <div>
+                    <span className="text-fg-subtle block text-[10px]">Предоплата (аванс):</span>
+                    <span className="font-bold text-accent">{viewingTicket.prepaymentTjs} TJS</span>
+                  </div>
+                ) : null}
+                {viewingTicket.finalCostTjs ? (
+                  <div>
+                    <span className="text-fg-subtle block text-[10px]">Итоговая стоимость:</span>
+                    <span className="font-bold text-accent">{viewingTicket.finalCostTjs} TJS</span>
+                  </div>
+                ) : null}
+              </div>
+            </div>
+
+            {/* Popup Action Buttons */}
+            <div className="flex space-x-2 pt-2">
+              <button
+                onClick={() => setViewingTicket(null)}
+                className="flex-1 py-2.5 rounded-xl bg-surface-raised hover:bg-surface border border-border text-xs font-bold text-fg-muted uppercase transition-colors"
+              >
+                Закрыть
+              </button>
+              {viewingTicket.status === 'ACCEPTED' && (
+                <button
+                  onClick={() => {
+                    handleUpdateStatusQuick(viewingTicket.id, 'IN_PROGRESS');
+                    setViewingTicket(null);
+                  }}
+                  className="flex-1 py-2.5 rounded-xl bg-warning/20 hover:bg-warning/30 border border-warning/40 text-warning text-xs font-bold uppercase transition-colors"
+                >
+                  В РАБОТУ
+                </button>
+              )}
+              {(viewingTicket.status === 'ACCEPTED' || viewingTicket.status === 'IN_PROGRESS') && (
+                <button
+                  onClick={() => {
+                    handleUpdateStatusQuick(viewingTicket.id, 'READY');
+                    setViewingTicket(null);
+                  }}
+                  className="flex-1 py-2.5 rounded-xl bg-accent/20 hover:bg-accent/30 border border-accent/40 text-accent text-xs font-bold uppercase transition-colors"
+                >
+                  ГОТОВ
+                </button>
+              )}
+              {viewingTicket.status === 'READY' && (
+                <button
+                  onClick={() => {
+                    const ticketToIssue = viewingTicket;
+                    setViewingTicket(null);
+                    handleOpenIssueModal(ticketToIssue);
+                  }}
+                  className="flex-1 py-2.5 rounded-xl bg-accent hover:bg-accent-strong text-accent-fg text-xs font-bold uppercase shadow-xs transition-colors"
+                >
+                  ВЫДАТЬ КЛИЕНТУ
+                </button>
+              )}
             </div>
           </div>
         </div>

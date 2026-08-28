@@ -49,7 +49,8 @@ export function registerRepairRoutes(app: Express) {
           return;
         }
       }
-      const ticket = await RepairsService.updateStatus(req.params.id, status, req.user!.userId, note, finalCostTjs);
+      const parsedCost = finalCostTjs !== undefined && finalCostTjs !== null ? Number(finalCostTjs) : undefined;
+      const ticket = await RepairsService.updateStatus(req.params.id, status, req.user!.userId, note, parsedCost);
       RealtimeSyncGateway.broadcast('REPAIR_UPDATED', { ticketId: ticket.id }, { storeIds: [ticket.storeId] });
       res.json(ticket);
     } catch (error) {
