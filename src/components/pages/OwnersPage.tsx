@@ -13,7 +13,8 @@ import {
   Briefcase,
   TrendingUp,
   CreditCard,
-  Coins
+  Coins,
+  Loader2
 } from 'lucide-react';
 import { StatusBanner, StatusMessage } from '../ui/StatusBanner';
 
@@ -97,6 +98,7 @@ export const OwnersPage: React.FC = () => {
   const [selectedOwnerFilter, setSelectedOwnerFilter] = useState<string>('ALL');
 
   const [statusBanner, setStatusBanner] = useState<StatusMessage | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const rate = todayRate?.rate || 9.5;
 
@@ -205,6 +207,7 @@ export const OwnersPage: React.FC = () => {
 
   const handleSaveShares = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmitting) return;
     const payload = owners.map(o => ({
       ownerId: o.id,
       sharePercent: parseFloat(sharesInput[o.id] || '0') || 0
@@ -219,20 +222,26 @@ export const OwnersPage: React.FC = () => {
       return;
     }
 
-    const res = await updateOwnerProfitShares(payload[0]?.sharePercent || 0, payload[1]?.sharePercent || 0);
-    if (res.success) {
-      setIsSharesModalOpen(false);
-      setStatusBanner({
-        tone: 'success',
-        text: 'Доли партнеров успешно обновлены'
-      });
-    } else {
-      setStatusBanner({ tone: 'error', text: res.message || 'Ошибка сохранения долей' });
+    setIsSubmitting(true);
+    try {
+      const res = await updateOwnerProfitShares(payload[0]?.sharePercent || 0, payload[1]?.sharePercent || 0);
+      if (res.success) {
+        setIsSharesModalOpen(false);
+        setStatusBanner({
+          tone: 'success',
+          text: 'Доли партнеров успешно обновлены'
+        });
+      } else {
+        setStatusBanner({ tone: 'error', text: res.message || 'Ошибка сохранения долей' });
+      }
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   const handleCreateTx = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmitting) return;
     setStatusBanner(null);
 
     const val = parseFloat(amountUsd) || 0;
@@ -253,28 +262,34 @@ export const OwnersPage: React.FC = () => {
       }
     }
 
-    const res = await createOwnerTransaction({
-      ownerId: selectedOwnerId,
-      type: txType,
-      amountUsd: val,
-      note: note.trim() || undefined
-    });
-
-    if (res.success) {
-      setIsTxModalOpen(false);
-      setAmountUsd('');
-      setNote('');
-      const typeText = txType === 'REINVEST' ? 'Реинвестирование из остатка к выплате' : txType === 'INVESTMENT' ? 'Вложение личного капитала' : txType === 'PROFIT_PAYOUT' ? 'Выплата прибыли' : 'Изъятие капитала';
-      setStatusBanner({
-        tone: 'success',
-        text: `Операция «${typeText}» на сумму $${val.toLocaleString()} успешно проведена`
+    setIsSubmitting(true);
+    try {
+      const res = await createOwnerTransaction({
+        ownerId: selectedOwnerId,
+        type: txType,
+        amountUsd: val,
+        note: note.trim() || undefined
       });
-    } else {
-      setStatusBanner({ tone: 'error', text: res.message || 'Ошибка транзакции' });
+
+      if (res.success) {
+        setIsTxModalOpen(false);
+        setAmountUsd('');
+        setNote('');
+        const typeText = txType === 'REINVEST' ? 'Реинвестирование из остатка к выплате' : txType === 'INVESTMENT' ? 'Вложение личного капитала' : txType === 'PROFIT_PAYOUT' ? 'Выплата прибыли' : 'Изъятие капитала';
+        setStatusBanner({
+          tone: 'success',
+          text: `Операция «${typeText}» на сумму $${val.toLocaleString()} успешно проведена`
+        });
+      } else {
+        setStatusBanner({ tone: 'error', text: res.message || 'Ошибка транзакции' });
+      }
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   const handleConfirmCloseQuarter = async () => {
+    if (isSubmitting) return;
     const quarterName = `${selectedQuarter} ${selectedQuarterYear}`;
     const sweepNote = transferRemainingToCapital
       ? 'Невыплаченный остаток прибыли партнеров будет зачислен в их капитал.'
@@ -282,19 +297,24 @@ export const OwnersPage: React.FC = () => {
     if (!window.confirm(`Закрыть квартал ${quarterName}? Будет сохранён снимок текущих показателей в историю. ${sweepNote} Начисленная и выплаченная прибыль (lifetime) не обнуляются.`)) {
       return;
     }
-    const res = await closeQuarterPeriod({
-      quarterName,
-      transferRemainingToCapital
-    });
-
-    if (res.success) {
-      setIsQuarterModalOpen(false);
-      setStatusBanner({
-        tone: 'success',
-        text: `Финансовый период «Квартал ${quarterName}» официально закрыт.`
+    setIsSubmitting(true);
+    try {
+      const res = await closeQuarterPeriod({
+        quarterName,
+        transferRemainingToCapital
       });
-    } else {
-      setStatusBanner({ tone: 'error', text: res.message || 'Ошибка закрытия квартала' });
+
+      if (res.success) {
+        setIsQuarterModalOpen(false);
+        setStatusBanner({
+          tone: 'success',
+          text: `Финансовый период «Квартал ${quarterName}» официально закрыт.`
+        });
+      } else {
+        setStatusBanner({ tone: 'error', text: res.message || 'Ошибка закрытия квартала' });
+      }
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -789,16 +809,19 @@ export const OwnersPage: React.FC = () => {
             <div className="flex space-x-2 pt-2 border-t border-border">
               <button
                 type="button"
+                disabled={isSubmitting}
                 onClick={() => setIsSharesModalOpen(false)}
-                className="flex-1 py-2.5 rounded-xl bg-surface-raised hover:bg-surface text-xs font-bold text-fg-muted border border-border uppercase"
+                className="flex-1 py-2.5 rounded-xl bg-surface-raised hover:bg-surface text-xs font-bold text-fg-muted border border-border uppercase disabled:opacity-50"
               >
                 Отмена
               </button>
               <button
                 type="submit"
-                className="flex-1 py-2.5 rounded-xl bg-accent hover:bg-accent-strong text-xs font-bold text-accent-fg uppercase"
+                disabled={isSubmitting}
+                className="flex-1 py-2.5 rounded-xl bg-accent hover:bg-accent-strong text-xs font-bold text-accent-fg uppercase disabled:opacity-60 flex items-center justify-center gap-1.5"
               >
-                Сохранить
+                {isSubmitting && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                {isSubmitting ? 'Сохранение…' : 'Сохранить'}
               </button>
             </div>
           </form>
@@ -916,16 +939,19 @@ export const OwnersPage: React.FC = () => {
             <div className="flex space-x-2 pt-2 border-t border-border">
               <button
                 type="button"
+                disabled={isSubmitting}
                 onClick={() => setIsTxModalOpen(false)}
-                className="flex-1 py-2.5 rounded-xl bg-surface-raised hover:bg-surface text-xs font-bold text-fg-muted border border-border uppercase"
+                className="flex-1 py-2.5 rounded-xl bg-surface-raised hover:bg-surface text-xs font-bold text-fg-muted border border-border uppercase disabled:opacity-50"
               >
                 Отмена
               </button>
               <button
                 type="submit"
-                className="flex-1 py-2.5 rounded-xl bg-accent hover:bg-accent-strong text-xs font-bold text-accent-fg uppercase"
+                disabled={isSubmitting}
+                className="flex-1 py-2.5 rounded-xl bg-accent hover:bg-accent-strong text-xs font-bold text-accent-fg uppercase disabled:opacity-60 flex items-center justify-center gap-1.5"
               >
-                Провести
+                {isSubmitting && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                {isSubmitting ? 'Проведение…' : 'Провести'}
               </button>
             </div>
           </form>
@@ -1044,17 +1070,20 @@ export const OwnersPage: React.FC = () => {
             <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2 pt-2 border-t border-border">
               <button
                 type="button"
+                disabled={isSubmitting}
                 onClick={() => setIsQuarterModalOpen(false)}
-                className="flex-1 py-2.5 px-3 rounded-xl bg-surface-raised hover:bg-surface text-xs font-bold text-fg-muted border border-border uppercase"
+                className="flex-1 py-2.5 px-3 rounded-xl bg-surface-raised hover:bg-surface text-xs font-bold text-fg-muted border border-border uppercase disabled:opacity-50"
               >
                 Отмена
               </button>
               <button
                 type="button"
+                disabled={isSubmitting}
                 onClick={handleConfirmCloseQuarter}
-                className="flex-1 py-2.5 px-3 rounded-xl bg-warning hover:bg-warning/90 text-xs font-bold uppercase text-black shadow-xs transition-colors"
+                className="flex-1 py-2.5 px-3 rounded-xl bg-warning hover:bg-warning/90 text-xs font-bold uppercase text-black shadow-xs transition-colors disabled:opacity-60 flex items-center justify-center gap-1.5"
               >
-                📊 ЗАКРЫТЬ КВАРТАЛЬНЫЙ ПЕРИОД
+                {isSubmitting && <Loader2 className="w-4 h-4 animate-spin" />}
+                {isSubmitting ? 'ЗАКРЫТИЕ…' : '📊 ЗАКРЫТЬ КВАРТАЛЬНЫЙ ПЕРИОД'}
               </button>
             </div>
           </div>

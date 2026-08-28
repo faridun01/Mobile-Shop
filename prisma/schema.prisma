@@ -44,6 +44,7 @@ enum PaymentMethod {
   CASH
   CARD
   SPLIT
+  DEBT
 }
 
 enum SaleStatus {
@@ -80,6 +81,7 @@ enum LedgerType {
   SUPPLIER_BONUS
   TRANSFER
   REFUND
+  CUSTOMER_PAYMENT
 }
 
 model Store {
@@ -193,12 +195,17 @@ model Sale {
   storeId                  String
   userId                   String
   customerName             String?
+  customerId               String?
   totalTjs                 Float
   totalUsd                 Float
   exchangeRate             Float?
   paymentMethod            PaymentMethod
   cashAmountTjs            Float         @default(0)
   cardAmountTjs            Float         @default(0)
+  // Amount still owed by the customer on this specific sale — 0 for every normal
+  // (fully paid at checkout) sale, so existing sales/reporting are unaffected.
+  // Only DEBT-method sales start with this > 0, decremented as CustomerPayments land.
+  debtAmountTjs            Float         @default(0)
   exchangeTradeInCreditTjs Float?
   status                   SaleStatus    @default(COMPLETED)
   hasBelowCostItem         Boolean       @default(false)
@@ -210,12 +217,15 @@ model Sale {
   actualRefundAmountTjs    Float?
   createdAt                DateTime      @default(now())
 
-  store          Store           @relation(fields: [storeId], references: [id])
-  user           User            @relation(fields: [userId], references: [id])
-  saleItems      SaleItem[]
-  exchangeEvents ExchangeEvent[]
+  store              Store                       @relation(fields: [storeId], references: [id])
+  user               User                        @relation(fields: [userId], references: [id])
+  customer           Customer?                   @relation(fields: [customerId], references: [id])
+  saleItems          SaleItem[]
+  exchangeEvents     ExchangeEvent[]
+  paymentAllocations CustomerPaymentAllocation[]
 
   @@index([storeId, createdAt])
+  @@index([customerId])
   @@map("sales")
 }
 
@@ -351,6 +361,54 @@ model SupplierPaymentAllocation {
   invoice SupplierInvoice @relation(fields: [invoiceId], references: [id])
 
   @@map("supplier_payment_allocations")
+}
+
+// A customer is identified by phone number (unique, when provided) rather than
+// free-text name alone — the same customer must always resolve to the same record
+// across multiple debt sales/payments, so support staff can never end up unsure
+// which "Иван" a payment belongs to the way the shop previously had duplicate stores.
+model Customer {
+  id           String   @id @default(uuid())
+  name         String
+  phone        String?  @unique
+  totalDebtTjs Float    @default(0)
+  totalPaidTjs Float    @default(0)
+  createdAt    DateTime @default(now())
+
+  sales    Sale[]
+  payments CustomerPayment[]
+
+  @@map("customers")
+}
+
+model CustomerPayment {
+  id              String   @id @default(uuid())
+  customerId      String
+  amountTjs       Float
+  sourceAccount   String
+  storeId         String?
+  createdByUserId String
+  createdAt       DateTime @default(now())
+
+  customer    Customer                    @relation(fields: [customerId], references: [id])
+  allocations CustomerPaymentAllocation[]
+
+  @@index([customerId])
+  @@map("customer_payments")
+}
+
+model CustomerPaymentAllocation {
+  id                 String @id @default(uuid())
+  paymentId          String
+  saleId             String
+  allocatedAmountTjs Float
+
+  payment CustomerPayment @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+  sale    Sale            @relation(fields: [saleId], references: [id])
+
+  @@index([paymentId])
+  @@index([saleId])
+  @@map("customer_payment_allocations")
 }
 
 model SupplierBonus {

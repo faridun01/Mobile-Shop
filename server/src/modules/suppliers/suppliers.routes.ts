@@ -69,6 +69,27 @@ export function registerSupplierRoutes(app: Express) {
     }
   });
 
+  app.post('/api/supplier-invoices/:id/payments', authenticateJwt, requireRoles('ADMIN', 'PARTNER'), async (req: AuthenticatedRequest, res, next) => {
+    try {
+      const { amountUsd, sourceAccount, storeId } = req.body ?? {};
+      if (!amountUsd || !sourceAccount) {
+        res.status(400).json({ message: 'amountUsd и sourceAccount обязательны' });
+        return;
+      }
+      const result = await SuppliersService.payInvoice({
+        invoiceId: req.params.id,
+        amountUsd: Number(amountUsd),
+        sourceAccount,
+        storeId,
+        createdByUserId: req.user!.userId,
+      });
+      RealtimeSyncGateway.broadcast('SUPPLIER_PAYMENT', { invoiceId: req.params.id });
+      res.status(201).json(result);
+    } catch (error) {
+      next(error);
+    }
+  });
+
   app.post('/api/supplier-bonuses', authenticateJwt, requireRoles('ADMIN', 'PARTNER'), async (req: AuthenticatedRequest, res, next) => {
     try {
       const bonus = await SuppliersService.createBonus({ ...(req.body ?? {}), createdByUserId: req.user!.userId });

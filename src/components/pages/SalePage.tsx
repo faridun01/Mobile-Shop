@@ -8,6 +8,7 @@ import {
   CreditCard,
   Banknote,
   Split,
+  HandCoins,
   CheckCircle2,
   ChevronDown,
   ShoppingCart,
@@ -57,9 +58,11 @@ export const SalePage: React.FC = () => {
   const [cashAmountInput, setCashAmountInput] = useState('');
   const [cardAmountInput, setCardAmountInput] = useState('');
   const [customerNameInput, setCustomerNameInput] = useState('');
+  const [customerPhoneInput, setCustomerPhoneInput] = useState('');
   const [paymentStatus, setPaymentStatus] = useState<StatusMessage | null>(null);
 
   const [completedReceiptNumber, setCompletedReceiptNumber] = useState<number | null>(null);
+  const [isSubmittingSale, setIsSubmittingSale] = useState(false);
 
   const isAdmin = currentUser?.role === 'ADMIN' || currentUser?.role === 'PARTNER';
 
@@ -199,11 +202,13 @@ export const SalePage: React.FC = () => {
     setPaymentMethod('CASH');
     setCashAmountInput(totalTjs > 0 ? totalTjs.toString() : '');
     setCardAmountInput('0');
+    setCustomerPhoneInput('');
     setPaymentStatus(null);
     setIsCartOpen(true);
   };
 
   const handleFinishPayment = async () => {
+    if (isSubmittingSale) return;
     setPaymentStatus(null);
 
     const invalidItem = cart.find(ci => ci.salePriceTjs === undefined || ci.salePriceTjs <= 0);
@@ -226,23 +231,41 @@ export const SalePage: React.FC = () => {
         setPaymentStatus({ tone: 'error', text: `Сумма наличных (${cashVal}) + карты (${cardVal}) не равна итогу (${totalTjs} TJS)` });
         return;
       }
+    } else if (paymentMethod === 'DEBT') {
+      cashVal = parseFloat(cashAmountInput) || 0;
+      cardVal = parseFloat(cardAmountInput) || 0;
+      if (cashVal + cardVal > totalTjs + 0.01) {
+        setPaymentStatus({ tone: 'error', text: `Предоплата (${cashVal + cardVal}) не может превышать итог (${totalTjs} TJS)` });
+        return;
+      }
+      if (!customerPhoneInput.trim()) {
+        setPaymentStatus({ tone: 'error', text: 'Для продажи в долг укажите телефон клиента — это обязательно, чтобы не перепутать клиентов в будущем' });
+        return;
+      }
     }
 
-    const res = await createSale({
-      items: cart.map(ci => ({ device: ci.device, salePriceTjs: ci.salePriceTjs! })),
-      paymentMethod,
-      cashAmountTjs: cashVal,
-      cardAmountTjs: cardVal,
-      customerName: customerNameInput.trim() || undefined
-    });
+    setIsSubmittingSale(true);
+    try {
+      const res = await createSale({
+        items: cart.map(ci => ({ device: ci.device, salePriceTjs: ci.salePriceTjs! })),
+        paymentMethod,
+        cashAmountTjs: cashVal,
+        cardAmountTjs: cardVal,
+        customerName: customerNameInput.trim() || undefined,
+        customerPhone: paymentMethod === 'DEBT' ? customerPhoneInput.trim() : undefined,
+      });
 
-    if (res.success && res.receiptNumber) {
-      setCompletedReceiptNumber(res.receiptNumber);
-      setIsCartOpen(false);
-      setCart([]);
-      setCustomerNameInput('');
-    } else {
-      setPaymentStatus({ tone: 'error', text: res.message || 'Ошибка оформления продажи' });
+      if (res.success && res.receiptNumber) {
+        setCompletedReceiptNumber(res.receiptNumber);
+        setIsCartOpen(false);
+        setCart([]);
+        setCustomerNameInput('');
+        setCustomerPhoneInput('');
+      } else {
+        setPaymentStatus({ tone: 'error', text: res.message || 'Ошибка оформления продажи' });
+      }
+    } finally {
+      setIsSubmittingSale(false);
     }
   };
 
@@ -419,10 +442,11 @@ export const SalePage: React.FC = () => {
             fullWidth
             size="lg"
             leftIcon={CheckCircle2}
+            loading={isSubmittingSale}
             disabled={hasEmptyPrice || totalTjs <= 0}
             onClick={handleFinishPayment}
           >
-            {hasEmptyPrice ? 'Укажите цену продажи' : `Завершить продажу (${totalTjs.toLocaleString()} TJS)`}
+            {isSubmittingSale ? 'Оформление…' : hasEmptyPrice ? 'Укажите цену продажи' : `Завершить продажу (${totalTjs.toLocaleString()} TJS)`}
           </Button>
         }
       >
@@ -498,11 +522,12 @@ export const SalePage: React.FC = () => {
             />
           </div>
 
-          <div className="grid grid-cols-3 gap-2">
+          <div className="grid grid-cols-4 gap-2">
             {([
               { id: 'CASH' as const, label: 'Наличные', icon: Banknote },
               { id: 'CARD' as const, label: 'Карта', icon: CreditCard },
               { id: 'SPLIT' as const, label: 'Разделить', icon: Split },
+              { id: 'DEBT' as const, label: 'В долг', icon: HandCoins },
             ]).map(({ id, label, icon: Icon }) => (
               <button
                 key={id}
@@ -511,7 +536,8 @@ export const SalePage: React.FC = () => {
                   setPaymentMethod(id);
                   if (id === 'CASH') { setCashAmountInput(totalTjs.toString()); setCardAmountInput('0'); }
                   else if (id === 'CARD') { setCardAmountInput(totalTjs.toString()); setCashAmountInput('0'); }
-                  else { const half = Math.floor(totalTjs / 2); setCashAmountInput(half.toString()); setCardAmountInput((totalTjs - half).toString()); }
+                  else if (id === 'SPLIT') { const half = Math.floor(totalTjs / 2); setCashAmountInput(half.toString()); setCardAmountInput((totalTjs - half).toString()); }
+                  else { setCashAmountInput('0'); setCardAmountInput('0'); }
                 }}
                 className={`h-16 rounded-lg border flex flex-col items-center justify-center gap-1 transition-colors ${
                   paymentMethod === id ? 'border-accent bg-accent/10 text-accent' : 'border-border text-fg-muted'
@@ -522,6 +548,49 @@ export const SalePage: React.FC = () => {
               </button>
             ))}
           </div>
+
+          {paymentMethod === 'DEBT' && (
+            <div className="space-y-2">
+              <div>
+                <label className="block text-xs font-medium text-fg-muted mb-1">Телефон клиента (обязательно)</label>
+                <input
+                  type="text"
+                  value={customerPhoneInput}
+                  onChange={(e) => setCustomerPhoneInput(e.target.value)}
+                  placeholder="+992 ..."
+                  className="w-full h-11 rounded-lg bg-bg border border-border px-3 text-sm text-fg focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent"
+                />
+                <p className="text-[11px] text-fg-subtle mt-1">Клиент определяется по телефону, чтобы избежать путаницы при последующей оплате долга</p>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <span className="text-xs text-fg-muted block mb-1">Предоплата наличными</span>
+                  <input
+                    type="number"
+                    min="0"
+                    max={totalTjs}
+                    value={cashAmountInput}
+                    onChange={(e) => setCashAmountInput(e.target.value)}
+                    className="w-full h-11 rounded-lg bg-bg border border-border px-3 text-sm font-semibold text-fg focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent"
+                  />
+                </div>
+                <div>
+                  <span className="text-xs text-fg-muted block mb-1">Предоплата картой</span>
+                  <input
+                    type="number"
+                    min="0"
+                    max={totalTjs}
+                    value={cardAmountInput}
+                    onChange={(e) => setCardAmountInput(e.target.value)}
+                    className="w-full h-11 rounded-lg bg-bg border border-border px-3 text-sm font-semibold text-fg focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent"
+                  />
+                </div>
+              </div>
+              <div className="p-2 rounded-lg bg-warning/10 border border-warning/30 text-[11px] text-warning">
+                Остаток долга: {Math.max(0, totalTjs - (parseFloat(cashAmountInput) || 0) - (parseFloat(cardAmountInput) || 0)).toLocaleString()} TJS
+              </div>
+            </div>
+          )}
 
           {paymentMethod === 'SPLIT' && (
             <div className="grid grid-cols-2 gap-2">

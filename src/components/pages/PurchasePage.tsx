@@ -15,7 +15,8 @@ import {
   ArrowLeft,
   Package,
   FileText,
-  Edit2
+  Edit2,
+  Loader2
 } from 'lucide-react';
 import { soundEffects } from '../../utils/sound';
 
@@ -63,34 +64,46 @@ export const PurchasePage: React.FC = () => {
 
   const handleSaveEditInvoiceModal = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!editingInvoiceModal) return;
-    const res = await updateSupplierInvoice(editingInvoiceModal.id, {
-      invoiceNumber: editInvoiceNum.trim(),
-      date: editInvoiceDateStr,
-      totalAmountUsd: parseFloat(editInvoiceAmountUsd) || 0,
-    });
-    if (res.success) {
-      setEditingInvoiceModal(null);
-      setSelectedInvoiceId(null);
-      setStatusMessage({ type: 'success', text: 'Накладная успешно обновлена!' });
-    } else {
-      setStatusMessage({ type: 'error', text: res.message || 'Ошибка обновления накладной' });
+    if (!editingInvoiceModal || isSubmitting) return;
+    setIsSubmitting(true);
+    try {
+      const res = await updateSupplierInvoice(editingInvoiceModal.id, {
+        invoiceNumber: editInvoiceNum.trim(),
+        date: editInvoiceDateStr,
+        totalAmountUsd: parseFloat(editInvoiceAmountUsd) || 0,
+      });
+      if (res.success) {
+        setEditingInvoiceModal(null);
+        setSelectedInvoiceId(null);
+        setStatusMessage({ type: 'success', text: 'Накладная успешно обновлена!' });
+      } else {
+        setStatusMessage({ type: 'error', text: res.message || 'Ошибка обновления накладной' });
+      }
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   const handleDeleteInvoiceModal = async (id: string) => {
+    if (isSubmitting) return;
     if (!window.confirm('Вы действительно хотите удалить эту накладную и все её незапроданные устройства?')) return;
-    const res = await deleteSupplierInvoice(id);
-    if (res.success) {
-      setSelectedInvoiceId(null);
-      setStatusMessage({ type: 'success', text: 'Накладная успешно удалена!' });
-    } else {
-      setStatusMessage({ type: 'error', text: res.message || 'Ошибка удаления накладной' });
+    setIsSubmitting(true);
+    try {
+      const res = await deleteSupplierInvoice(id);
+      if (res.success) {
+        setSelectedInvoiceId(null);
+        setStatusMessage({ type: 'success', text: 'Накладная успешно удалена!' });
+      } else {
+        setStatusMessage({ type: 'error', text: res.message || 'Ошибка удаления накладной' });
+      }
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   // Mode: 'list' (History of purchases) or 'form' (Register new purchase intake)
   const [viewMode, setViewMode] = useState<'list' | 'form'>('list');
+  const [expandedDeviceGroups, setExpandedDeviceGroups] = useState<Record<string, boolean>>({});
 
   // List search & filters
   const [searchQuery, setSearchQuery] = useState('');
@@ -142,6 +155,7 @@ export const PurchasePage: React.FC = () => {
   ]);
 
   const [statusMessage, setStatusMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [justSavedInvoice, setJustSavedInvoice] = useState<string | null>(null);
 
   // Current rate
@@ -370,6 +384,7 @@ export const PurchasePage: React.FC = () => {
 
   const handleSubmitPurchase = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmitting) return;
     setStatusMessage(null);
 
     if (!selectedSupplierId) {
@@ -413,42 +428,47 @@ export const PurchasePage: React.FC = () => {
       return;
     }
 
-    const res = await createPurchase({
-      supplierId: selectedSupplierId,
-      invoiceNumber: invoiceNumber.trim(),
-      date: purchaseDate,
-      isStorePurchase,
-      storeId: isStorePurchase ? storeId : undefined,
-      groups: cleanGroups
-    });
-
-    if (res.success) {
-      const savedNum = invoiceNumber.trim();
-      setJustSavedInvoice(savedNum);
-
-      // invoiceNumber resets automatically via the useEffect watching supplierInvoices
-      // once the post-save refetch lands, picking the next sequential INV-XXXX number.
-      setGroups([
-        {
-          id: `g-${Date.now()}`,
-          brand: '',
-          model: '',
-          ram: '',
-          storage: '',
-          color: '',
-          purchasePriceUsd: 0,
-          items: [{ imei: '' }]
-        }
-      ]);
-
-      // Automatically switch back to the list of purchases as requested!
-      setViewMode('list');
-      setStatusMessage({
-        type: 'success',
-        text: `Приход по накладной ${savedNum} успешно сохранен (${cleanGroups.reduce((a, b) => a + b.items.length, 0)} шт.)!`
+    setIsSubmitting(true);
+    try {
+      const res = await createPurchase({
+        supplierId: selectedSupplierId,
+        invoiceNumber: invoiceNumber.trim(),
+        date: purchaseDate,
+        isStorePurchase,
+        storeId: isStorePurchase ? storeId : undefined,
+        groups: cleanGroups
       });
-    } else {
-      setStatusMessage({ type: 'error', text: res.message || 'Ошибка сохранения прихода' });
+
+      if (res.success) {
+        const savedNum = invoiceNumber.trim();
+        setJustSavedInvoice(savedNum);
+
+        // invoiceNumber resets automatically via the useEffect watching supplierInvoices
+        // once the post-save refetch lands, picking the next sequential INV-XXXX number.
+        setGroups([
+          {
+            id: `g-${Date.now()}`,
+            brand: '',
+            model: '',
+            ram: '',
+            storage: '',
+            color: '',
+            purchasePriceUsd: 0,
+            items: [{ imei: '' }]
+          }
+        ]);
+
+        // Automatically switch back to the list of purchases as requested!
+        setViewMode('list');
+        setStatusMessage({
+          type: 'success',
+          text: `Приход по накладной ${savedNum} успешно сохранен (${cleanGroups.reduce((a, b) => a + b.items.length, 0)} шт.)!`
+        });
+      } else {
+        setStatusMessage({ type: 'error', text: res.message || 'Ошибка сохранения прихода' });
+      }
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -765,6 +785,64 @@ export const PurchasePage: React.FC = () => {
                   d.invoiceNumber === selectedInvoice.invoiceNumber
                 );
 
+                const renderDeviceRow = (dev: Device, idx: number) => (
+                  <div
+                    key={dev.id}
+                    className="p-2.5 rounded-xl bg-surface-raised border border-border flex items-center justify-between text-xs"
+                  >
+                    <div>
+                      <div className="flex items-center space-x-2 flex-wrap gap-y-1">
+                        <span className="text-fg-subtle text-[10px] font-bold">#{idx + 1}</span>
+                        <strong className="text-fg">{dev.brand} {dev.model}</strong>
+                        <span className="text-fg-subtle text-[11px]">{dev.ram ? `${dev.ram} • ` : ''}{dev.storage} • {dev.color}</span>
+                        {(dev.purchaseCostUsd === 0 || dev.isBonus) && (
+                          <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-purple-500/20 text-purple-400 border border-purple-500/40 font-medium">
+                            🎁 ПОДАРОК ($0)
+                          </span>
+                        )}
+                      </div>
+                      <div className="text-[11px] text-fg-subtle mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 font-mono">
+                        <span>IMEI 1: <strong className="text-fg">{dev.imei}</strong></span>
+                        <span>IMEI 2: <strong className={dev.imei2 ? "text-fg" : "text-fg-subtle font-normal"}>{dev.imei2 || '—'}</strong></span>
+                        <span>Локация: <strong className="text-fg">{dev.locationName}</strong></span>
+                      </div>
+                      {dev.bonusCampaign && (
+                        <p className="text-[10px] text-purple-400 mt-0.5">
+                          {dev.bonusCampaign}
+                        </p>
+                      )}
+                    </div>
+
+                    <div className="text-right shrink-0">
+                      <span className={`text-xs font-bold font-mono ${dev.purchaseCostUsd === 0 ? 'text-purple-400' : 'text-accent'}`}>
+                        {dev.purchaseCostUsd === 0 ? '$0 (ПОДАРОК)' : `$${dev.purchaseCostUsd}`}
+                      </span>
+                      <span className={`block text-[10px] px-1.5 py-0.2 rounded-md font-bold mt-0.5 ${
+                        dev.status === 'SOLD' ? 'text-warning' : 'text-fg-subtle'
+                      }`}>
+                        {dev.status === 'SOLD' ? 'ПРОДАН' : 'НА СКЛАДЕ'}
+                      </span>
+                    </div>
+                  </div>
+                );
+
+                // Group devices by variant (brand/ram/storage/color) whenever the
+                // invoice actually recorded groups at intake — otherwise a flat list
+                // is just as informative and avoids grouping single-item invoices.
+                const hasGroups = Array.isArray(selectedInvoice.groups) && selectedInvoice.groups.length > 0;
+                const variantGroups = new Map<string, { brand: string; model: string; ram?: string; storage: string; color: string; devices: Device[] }>();
+                if (hasGroups) {
+                  for (const dev of containedDevices) {
+                    const key = `${dev.brand}|${dev.model}|${dev.ram || ''}|${dev.storage}|${dev.color}`;
+                    let g = variantGroups.get(key);
+                    if (!g) {
+                      g = { brand: dev.brand, model: dev.model, ram: dev.ram, storage: dev.storage, color: dev.color, devices: [] };
+                      variantGroups.set(key, g);
+                    }
+                    g.devices.push(dev);
+                  }
+                }
+
                 return (
                   <>
                     <div className="p-3 bg-surface-raised border-b border-border flex items-center justify-between text-xs font-mono font-bold text-fg shrink-0">
@@ -775,46 +853,38 @@ export const PurchasePage: React.FC = () => {
                     </div>
 
                     <div className="flex-1 overflow-y-auto p-3 space-y-2 bg-surface font-mono">
-                      {containedDevices.map((dev, idx) => (
-                        <div
-                          key={dev.id}
-                          className="p-2.5 rounded-xl bg-surface-raised border border-border flex items-center justify-between text-xs"
-                        >
-                          <div>
-                            <div className="flex items-center space-x-2 flex-wrap gap-y-1">
-                              <span className="text-fg-subtle text-[10px] font-bold">#{idx + 1}</span>
-                              <strong className="text-fg">{dev.brand} {dev.model}</strong>
-                              <span className="text-fg-subtle text-[11px]">{dev.ram ? `${dev.ram} • ` : ''}{dev.storage} • {dev.color}</span>
-                              {(dev.purchaseCostUsd === 0 || dev.isBonus) && (
-                                <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-purple-500/20 text-purple-400 border border-purple-500/40 font-medium">
-                                  🎁 ПОДАРОК ($0)
-                                </span>
+                      {hasGroups && variantGroups.size > 0 ? (
+                        Array.from(variantGroups.entries()).map(([key, group]) => {
+                          const isExpanded = expandedDeviceGroups[key] ?? false;
+                          const soldCount = group.devices.filter(d => d.status === 'SOLD').length;
+                          return (
+                            <div key={key} className="rounded-xl border border-border bg-surface-raised overflow-hidden">
+                              <button
+                                type="button"
+                                onClick={() => setExpandedDeviceGroups(prev => ({ ...prev, [key]: !isExpanded }))}
+                                className="w-full p-2.5 flex items-center justify-between text-xs hover:bg-surface transition-colors"
+                              >
+                                <div className="text-left">
+                                  <strong className="text-fg">{group.brand} {group.model}</strong>
+                                  <span className="text-fg-subtle text-[11px] ml-2">{group.ram ? `${group.ram} • ` : ''}{group.storage} • {group.color}</span>
+                                </div>
+                                <div className="flex items-center gap-2 shrink-0">
+                                  <span className="text-accent font-bold">{group.devices.length} шт.</span>
+                                  {soldCount > 0 && <span className="text-[10px] text-warning">({soldCount} продано)</span>}
+                                  <ChevronRight className={`w-4 h-4 text-fg-subtle transition-transform ${isExpanded ? 'rotate-90' : ''}`} />
+                                </div>
+                              </button>
+                              {isExpanded && (
+                                <div className="p-2 pt-0 space-y-2 border-t border-border">
+                                  {group.devices.map((dev, idx) => renderDeviceRow(dev, idx))}
+                                </div>
                               )}
                             </div>
-                            <div className="text-[11px] text-fg-subtle mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 font-mono">
-                              <span>IMEI 1: <strong className="text-fg">{dev.imei}</strong></span>
-                              <span>IMEI 2: <strong className={dev.imei2 ? "text-fg" : "text-fg-subtle font-normal"}>{dev.imei2 || '—'}</strong></span>
-                              <span>Локация: <strong className="text-fg">{dev.locationName}</strong></span>
-                            </div>
-                            {dev.bonusCampaign && (
-                              <p className="text-[10px] text-purple-400 mt-0.5">
-                                {dev.bonusCampaign}
-                              </p>
-                            )}
-                          </div>
-
-                          <div className="text-right shrink-0">
-                            <span className={`text-xs font-bold font-mono ${dev.purchaseCostUsd === 0 ? 'text-purple-400' : 'text-accent'}`}>
-                              {dev.purchaseCostUsd === 0 ? '$0 (ПОДАРОК)' : `$${dev.purchaseCostUsd}`}
-                            </span>
-                            <span className={`block text-[10px] px-1.5 py-0.2 rounded-md font-bold mt-0.5 ${
-                              dev.status === 'SOLD' ? 'text-warning' : 'text-fg-subtle'
-                            }`}>
-                              {dev.status === 'SOLD' ? 'ПРОДАН' : 'НА СКЛАДЕ'}
-                            </span>
-                          </div>
-                        </div>
-                      ))}
+                          );
+                        })
+                      ) : (
+                        containedDevices.map((dev, idx) => renderDeviceRow(dev, idx))
+                      )}
 
                       {containedDevices.length === 0 && (
                         <p className="text-xs text-fg-subtle text-center py-6">
@@ -893,16 +963,19 @@ export const PurchasePage: React.FC = () => {
                 <div className="flex space-x-2 pt-3 border-t border-border">
                   <button
                     type="button"
+                    disabled={isSubmitting}
                     onClick={() => setEditingInvoiceModal(null)}
-                    className="flex-1 py-2 rounded-xl bg-surface-raised hover:bg-surface border border-border text-fg-subtle hover:text-fg font-bold"
+                    className="flex-1 py-2 rounded-xl bg-surface-raised hover:bg-surface border border-border text-fg-subtle hover:text-fg font-bold disabled:opacity-50"
                   >
                     ОТМЕНА
                   </button>
                   <button
                     type="submit"
-                    className="flex-1 py-2 rounded-xl bg-accent hover:bg-accent-strong text-accent-fg font-bold shadow-xs"
+                    disabled={isSubmitting}
+                    className="flex-1 py-2 rounded-xl bg-accent hover:bg-accent-strong text-accent-fg font-bold shadow-xs disabled:opacity-60 flex items-center justify-center gap-1.5"
                   >
-                    СОХРАНИТЬ
+                    {isSubmitting && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                    {isSubmitting ? 'СОХРАНЕНИЕ…' : 'СОХРАНИТЬ'}
                   </button>
                 </div>
               </form>
@@ -1304,22 +1377,23 @@ export const PurchasePage: React.FC = () => {
 
             <button
               type="button"
+              disabled={isSubmitting}
               onClick={() => {
                 setStatusMessage(null);
                 setViewMode('list');
               }}
-              className="px-3 py-2 rounded-xl bg-surface-raised hover:bg-surface border border-border text-fg text-xs font-semibold transition-colors"
+              className="px-3 py-2 rounded-xl bg-surface-raised hover:bg-surface border border-border text-fg text-xs font-semibold transition-colors disabled:opacity-50"
             >
               Отмена
             </button>
 
             <button
               type="submit"
-              disabled={totalFormUnits === 0}
+              disabled={totalFormUnits === 0 || isSubmitting}
               className="px-5 py-2 rounded-xl bg-accent hover:bg-accent-strong active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed text-xs font-bold text-accent-fg shadow-xs transition-colors flex items-center space-x-1.5"
             >
-              <CheckCircle2 className="w-4 h-4" />
-              <span>СОХРАНИТЬ ПРИХОД</span>
+              {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
+              <span>{isSubmitting ? 'СОХРАНЕНИЕ…' : 'СОХРАНИТЬ ПРИХОД'}</span>
             </button>
           </div>
         </div>
@@ -1380,16 +1454,19 @@ export const PurchasePage: React.FC = () => {
               <div className="flex space-x-2 pt-3 border-t border-border">
                 <button
                   type="button"
+                  disabled={isSubmitting}
                   onClick={() => setEditingInvoiceModal(null)}
-                  className="flex-1 py-2 rounded-xl bg-surface-raised hover:bg-surface border border-border text-fg-subtle hover:text-fg font-bold"
+                  className="flex-1 py-2 rounded-xl bg-surface-raised hover:bg-surface border border-border text-fg-subtle hover:text-fg font-bold disabled:opacity-50"
                 >
                   ОТМЕНА
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 py-2 rounded-xl bg-accent hover:bg-accent-strong text-accent-fg font-bold shadow-xs"
+                  disabled={isSubmitting}
+                  className="flex-1 py-2 rounded-xl bg-accent hover:bg-accent-strong text-accent-fg font-bold shadow-xs disabled:opacity-60 flex items-center justify-center gap-1.5"
                 >
-                  СОХРАНИТЬ
+                  {isSubmitting && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                  {isSubmitting ? 'СОХРАНЕНИЕ…' : 'СОХРАНИТЬ'}
                 </button>
               </div>
             </form>

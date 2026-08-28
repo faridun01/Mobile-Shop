@@ -96,6 +96,7 @@ export const ExpensesPage: React.FC = () => {
 
   const [status, setStatus] = useState<StatusMessage | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
   const [editCategory, setEditCategory] = useState<ExpenseCategory>('RENT');
@@ -144,40 +145,51 @@ export const ExpensesPage: React.FC = () => {
 
   const handleSaveEdit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!editingExpense) return;
+    if (!editingExpense || isSubmitting) return;
     const val = parseFloat(editAmountTjs) || 0;
     if (val <= 0) {
       setStatus({ tone: 'error', text: 'Укажите корректную сумму расхода' });
       return;
     }
-    const res = await updateExpense(editingExpense.id, {
-      category: editCategory,
-      amountTjs: val,
-      storeId: editStoreId,
-      comment: editDescription.trim(),
-      description: editDescription.trim(),
-    });
-    if (res.success) {
-      setEditingExpense(null);
-      setStatus({ tone: 'success', text: 'Расход успешно обновлён' });
-    } else {
-      setStatus({ tone: 'error', text: res.message || 'Ошибка обновления расхода' });
+    setIsSubmitting(true);
+    try {
+      const res = await updateExpense(editingExpense.id, {
+        category: editCategory,
+        amountTjs: val,
+        storeId: editStoreId,
+        comment: editDescription.trim(),
+        description: editDescription.trim(),
+      });
+      if (res.success) {
+        setEditingExpense(null);
+        setStatus({ tone: 'success', text: 'Расход успешно обновлён' });
+      } else {
+        setStatus({ tone: 'error', text: res.message || 'Ошибка обновления расхода' });
+      }
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   const handleConfirmDelete = async () => {
-    if (!deletingId) return;
-    const res = await deleteExpense(deletingId);
-    setDeletingId(null);
-    if (res.success) {
-      setStatus({ tone: 'success', text: 'Расход удалён, средства возвращены в баланс кассы' });
-    } else {
-      setStatus({ tone: 'error', text: res.message || 'Ошибка удаления расхода' });
+    if (!deletingId || isSubmitting) return;
+    setIsSubmitting(true);
+    try {
+      const res = await deleteExpense(deletingId);
+      setDeletingId(null);
+      if (res.success) {
+        setStatus({ tone: 'success', text: 'Расход удалён, средства возвращены в баланс кассы' });
+      } else {
+        setStatus({ tone: 'error', text: res.message || 'Ошибка удаления расхода' });
+      }
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   const handleAddExpense = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmitting) return;
     setStatus(null);
 
     const val = parseFloat(amountTjs) || 0;
@@ -188,25 +200,30 @@ export const ExpensesPage: React.FC = () => {
 
     const selectedEmp = selectedEmployeeId ? users.find(u => u.id === selectedEmployeeId) : undefined;
 
-    const res = await createExpense({
-      category,
-      amountTjs: val,
-      storeId: isSeller ? currentUser.storeId : storeId,
-      description: description.trim(),
-      paidFromCashRegister,
-      employeeId: selectedEmployeeId || undefined,
-      employeeName: selectedEmp?.name,
-      isEmployeeAdvance: category === 'EMPLOYEE_ADVANCE' || !!selectedEmployeeId,
-    });
+    setIsSubmitting(true);
+    try {
+      const res = await createExpense({
+        category,
+        amountTjs: val,
+        storeId: isSeller ? currentUser.storeId : storeId,
+        description: description.trim(),
+        paidFromCashRegister,
+        employeeId: selectedEmployeeId || undefined,
+        employeeName: selectedEmp?.name,
+        isEmployeeAdvance: category === 'EMPLOYEE_ADVANCE' || !!selectedEmployeeId,
+      });
 
-    if (res.success) {
-      setIsModalOpen(false);
-      setAmountTjs('');
-      setDescription('');
-      setSelectedEmployeeId('');
-      setStatus({ tone: 'success', text: `Расход на сумму ${val} TJS проведён${selectedEmp ? ` (зачислен сотруднику ${selectedEmp.name})` : ''}` });
-    } else {
-      setStatus({ tone: 'error', text: res.message || 'Ошибка проведения расхода' });
+      if (res.success) {
+        setIsModalOpen(false);
+        setAmountTjs('');
+        setDescription('');
+        setSelectedEmployeeId('');
+        setStatus({ tone: 'success', text: `Расход на сумму ${val} TJS проведён${selectedEmp ? ` (зачислен сотруднику ${selectedEmp.name})` : ''}` });
+      } else {
+        setStatus({ tone: 'error', text: res.message || 'Ошибка проведения расхода' });
+      }
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -442,6 +459,7 @@ export const ExpensesPage: React.FC = () => {
         title="Удалить расход?"
         message="Средства вернутся в баланс кассы. Это действие нельзя отменить."
         confirmLabel="Удалить"
+        loading={isSubmitting}
         onConfirm={handleConfirmDelete}
         onCancel={() => setDeletingId(null)}
       />
@@ -452,8 +470,8 @@ export const ExpensesPage: React.FC = () => {
         title="Редактировать расход"
         footer={
           <>
-            <Button variant="secondary" fullWidth onClick={() => setEditingExpense(null)}>Отмена</Button>
-            <Button variant="primary" fullWidth type="submit" form="edit-expense-form">Сохранить</Button>
+            <Button variant="secondary" fullWidth disabled={isSubmitting} onClick={() => setEditingExpense(null)}>Отмена</Button>
+            <Button variant="primary" fullWidth type="submit" form="edit-expense-form" loading={isSubmitting}>Сохранить</Button>
           </>
         }
       >
@@ -494,8 +512,8 @@ export const ExpensesPage: React.FC = () => {
         title="Регистрация расхода"
         footer={
           <>
-            <Button variant="secondary" fullWidth onClick={() => setIsModalOpen(false)}>Отмена</Button>
-            <Button variant="danger" fullWidth type="submit" form="add-expense-form">Сохранить расход</Button>
+            <Button variant="secondary" fullWidth disabled={isSubmitting} onClick={() => setIsModalOpen(false)}>Отмена</Button>
+            <Button variant="danger" fullWidth type="submit" form="add-expense-form" loading={isSubmitting}>Сохранить расход</Button>
           </>
         }
       >

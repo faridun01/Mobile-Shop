@@ -8,6 +8,7 @@ import {
   Supplier,
   SupplierInvoice,
   SupplierBonus,
+  Customer,
   Expense,
   Owner,
   OwnerTransaction,
@@ -36,6 +37,7 @@ import {
   mapSupplier,
   mapSupplierInvoice,
   mapSupplierBonus,
+  mapCustomer,
   mapExpense,
   mapOwner,
   mapOwnerTransaction,
@@ -62,6 +64,7 @@ interface AppContextType {
   supplierInvoices: SupplierInvoice[];
   bonuses: SupplierBonus[];
   supplierBonuses: SupplierBonus[];
+  customers: Customer[];
   expenses: Expense[];
   owners: Owner[];
   ownerTransactions: OwnerTransaction[];
@@ -94,6 +97,8 @@ interface AppContextType {
     cashAmountTjs: number;
     cardAmountTjs: number;
     customerName?: string;
+    customerId?: string;
+    customerPhone?: string;
   }) => Promise<{ success: boolean; receiptNumber?: number; message?: string }>;
 
   processExchange: (params: {
@@ -206,6 +211,22 @@ interface AppContextType {
     note?: string;
   }) => Promise<{ success: boolean; message?: string }>;
 
+  paySupplierInvoice: (params: {
+    invoiceId: string;
+    amountUsd: number;
+    sourceAccountId?: string;
+    storeId?: string;
+  }) => Promise<{ success: boolean; message?: string }>;
+
+  updateCustomer: (id: string, data: { name?: string; phone?: string }) => Promise<{ success: boolean; message?: string }>;
+
+  payCustomerDebt: (params: {
+    customerId: string;
+    amountTjs: number;
+    sourceAccountId?: string;
+    storeId?: string;
+  }) => Promise<{ success: boolean; message?: string }>;
+
   createExpense: (params: {
     category: ExpenseCategory;
     amountTjs: number;
@@ -299,6 +320,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [transfers, setTransfers] = useState<TransferRequest[]>([]);
   const [repairs, setRepairs] = useState<RepairTicket[]>([]);
   const [bonuses, setBonuses] = useState<SupplierBonus[]>([]);
+  const [customers, setCustomers] = useState<Customer[]>([]);
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [owners, setOwners] = useState<Owner[]>([]);
   const [ownerTransactions, setOwnerTransactions] = useState<OwnerTransaction[]>([]);
@@ -422,6 +444,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   }, []);
 
+  const fetchCustomers = useCallback(async () => {
+    try {
+      const raw = await apiClient<any[]>('/customers');
+      setCustomers(raw.map(mapCustomer));
+    } catch {
+      // ADMIN/PARTNER only — leave empty for SELLER users
+    }
+  }, []);
+
   const fetchExpenses = useCallback(async () => {
     const raw = await apiClient<any[]>('/expenses');
     setExpenses(raw.map((e) => mapExpense(e, namesRef.current)).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
@@ -477,13 +508,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       // 2. Secondary modules batched to avoid connection pool saturation
       await Promise.all([fetchSales(), fetchTransfers(), fetchRepairs(), fetchExpenses()]);
       await Promise.all([fetchSuppliers(), fetchInvoices(), fetchBonuses(), fetchOwners()]);
-      await Promise.all([fetchOwnerTransactions(), fetchNotifications(), fetchAuditLogs()]);
+      await Promise.all([fetchCustomers(), fetchOwnerTransactions(), fetchNotifications(), fetchAuditLogs()]);
     })();
     refetchInFlight.current = task;
     const clear = () => { if (refetchInFlight.current === task) refetchInFlight.current = null; };
     task.then(clear, clear);
     return task;
-  }, [fetchUsers, fetchStores, fetchDevices, fetchSales, fetchTransfers, fetchRepairs, fetchSuppliers, fetchInvoices, fetchBonuses, fetchExpenses, fetchOwners, fetchOwnerTransactions, fetchNotifications, fetchAuditLogs, fetchExchangeRate]);
+  }, [fetchUsers, fetchStores, fetchDevices, fetchSales, fetchTransfers, fetchRepairs, fetchSuppliers, fetchInvoices, fetchBonuses, fetchCustomers, fetchExpenses, fetchOwners, fetchOwnerTransactions, fetchNotifications, fetchAuditLogs, fetchExchangeRate]);
 
   // Load catalog immediately (fast-path) and fetch secondary modules in background
   useEffect(() => {
@@ -503,6 +534,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           fetchSuppliers(),
           fetchInvoices(),
           fetchBonuses(),
+          fetchCustomers(),
           fetchOwners(),
           fetchOwnerTransactions(),
           fetchNotifications(),
@@ -584,7 +616,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // ---- Business operations: call the API, then resync from it ----
 
-  const createSale: AppContextType['createSale'] = async ({ items, paymentMethod, cashAmountTjs, cardAmountTjs, customerName }) => {
+  const createSale: AppContextType['createSale'] = async ({ items, paymentMethod, cashAmountTjs, cardAmountTjs, customerName, customerId, customerPhone }) => {
     // Trust the actual location of the devices in the cart over the (possibly stale,
     // shared-across-pages) selectedStoreId — e.g. an admin who last picked the main
     // warehouse on the Inventory page must not have that leak into a POS sale here.
@@ -603,6 +635,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           cashAmountTjs,
           cardAmountTjs,
           customerName: customerName?.trim() || undefined,
+          customerId,
+          customerPhone: customerPhone?.trim() || undefined,
         }),
       });
       await refetchAll();
@@ -858,6 +892,52 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return { success: true };
     } catch (err) {
       return { success: false, message: errorMessage(err, 'Не удалось провести оплату поставщику') };
+    }
+  };
+
+  const paySupplierInvoice: AppContextType['paySupplierInvoice'] = async ({ invoiceId, amountUsd, storeId, sourceAccountId }) => {
+    const resolvedStoreId = storeId || (sourceAccountId && sourceAccountId !== 'owner-funds' ? sourceAccountId : undefined);
+    try {
+      await apiClient(`/supplier-invoices/${invoiceId}/payments`, {
+        method: 'POST',
+        body: JSON.stringify({
+          amountUsd,
+          sourceAccount: resolvedStoreId ? 'STORE_CASH' : 'MAIN_ACCOUNT',
+          storeId: resolvedStoreId,
+        }),
+      });
+      await refetchAll();
+      return { success: true };
+    } catch (err) {
+      return { success: false, message: errorMessage(err, 'Не удалось провести оплату по накладной') };
+    }
+  };
+
+  const updateCustomer: AppContextType['updateCustomer'] = async (id, data) => {
+    try {
+      await apiClient(`/customers/${id}`, { method: 'PUT', body: JSON.stringify(data) });
+      await fetchCustomers();
+      return { success: true };
+    } catch (err) {
+      return { success: false, message: errorMessage(err, 'Не удалось обновить данные клиента') };
+    }
+  };
+
+  const payCustomerDebt: AppContextType['payCustomerDebt'] = async ({ customerId, amountTjs, storeId, sourceAccountId }) => {
+    const resolvedStoreId = storeId || (sourceAccountId && sourceAccountId !== 'owner-funds' ? sourceAccountId : undefined);
+    try {
+      await apiClient(`/customers/${customerId}/payments`, {
+        method: 'POST',
+        body: JSON.stringify({
+          amountTjs,
+          sourceAccount: resolvedStoreId ? 'STORE_CASH' : 'MAIN_ACCOUNT',
+          storeId: resolvedStoreId,
+        }),
+      });
+      await refetchAll();
+      return { success: true };
+    } catch (err) {
+      return { success: false, message: errorMessage(err, 'Не удалось принять оплату долга') };
     }
   };
 
@@ -1142,6 +1222,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         supplierInvoices: invoices,
         bonuses,
         supplierBonuses: bonuses,
+        customers,
         expenses,
         owners,
         ownerTransactions,
@@ -1182,6 +1263,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         createRepairTicket,
         updateRepairStatus,
         paySupplier,
+        paySupplierInvoice,
+        updateCustomer,
+        payCustomerDebt,
         createExpense,
         updateExpense,
         deleteExpense,

@@ -7,7 +7,8 @@ import {
   AlertCircle,
   X,
   Banknote,
-  RotateCcw
+  RotateCcw,
+  Loader2
 } from 'lucide-react';
 import { StatusBanner, StatusMessage } from '../ui/StatusBanner';
 
@@ -35,6 +36,7 @@ export const ExchangePage: React.FC = () => {
   const [givenCashTjs, setGivenCashTjs] = useState<string>('');
 
   const [status, setStatus] = useState<StatusMessage | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const effectiveStoreId = currentUser?.storeId || '';
   const currentStoreName = stores.find(s => s.id === effectiveStoreId)?.name || currentUser?.storeName || 'Магазин';
@@ -171,6 +173,7 @@ export const ExchangePage: React.FC = () => {
 
   const handleSubmitExchange = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmitting) return;
     if (!selectedOldDevice || !replacementDevice) {
       setStatus({ tone: 'error', text: 'Для проведения обмена выберите сдаваемое и выдаваемое устройство' });
       return;
@@ -186,34 +189,39 @@ export const ExchangePage: React.FC = () => {
       return;
     }
 
-    const res = await processExchange({
-      returnedImei: selectedOldDevice.imei,
-      returnedItem: {
-        brand: selectedOldDevice.brand,
-        model: selectedOldDevice.model,
-        storage: selectedOldDevice.storage,
-        color: selectedOldDevice.color,
-        imei: selectedOldDevice.imei,
+    setIsSubmitting(true);
+    try {
+      const res = await processExchange({
+        returnedImei: selectedOldDevice.imei,
+        returnedItem: {
+          brand: selectedOldDevice.brand,
+          model: selectedOldDevice.model,
+          storage: selectedOldDevice.storage,
+          color: selectedOldDevice.color,
+          imei: selectedOldDevice.imei,
+          exchangeInValueTjs,
+        },
         exchangeInValueTjs,
-      },
-      exchangeInValueTjs,
-      replacementDeviceId: replacementDevice.id,
-      newPriceTjs,
-      differenceTjs,
-      paymentMethod: differenceTjs !== 0 ? exchangePaymentMethod : undefined,
-    });
+        replacementDeviceId: replacementDevice.id,
+        newPriceTjs,
+        differenceTjs,
+        paymentMethod: differenceTjs !== 0 ? exchangePaymentMethod : undefined,
+      });
 
-    if (res.success) {
-      setStatus({ tone: 'success', text: `Обмен Trade-In успешно проведен!` });
-      setSelectedOldDevice(null);
-      setReplacementDevice(null);
-      setReceiptSearch('');
-      setDeviceSearchQuery('');
-      setExchangeInValueTjs(0);
-      setNewPriceTjs(0);
-      setGivenCashTjs('');
-    } else {
-      setStatus({ tone: 'error', text: res.message || 'Ошибка проведения обмена' });
+      if (res.success) {
+        setStatus({ tone: 'success', text: `Обмен Trade-In успешно проведен!` });
+        setSelectedOldDevice(null);
+        setReplacementDevice(null);
+        setReceiptSearch('');
+        setDeviceSearchQuery('');
+        setExchangeInValueTjs(0);
+        setNewPriceTjs(0);
+        setGivenCashTjs('');
+      } else {
+        setStatus({ tone: 'error', text: res.message || 'Ошибка проведения обмена' });
+      }
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -543,11 +551,11 @@ export const ExchangePage: React.FC = () => {
 
           <button
             type="submit"
-            disabled={!selectedOldDevice || !replacementDevice || exchangeInValueTjs <= 0 || newPriceTjs <= 0}
+            disabled={!selectedOldDevice || !replacementDevice || exchangeInValueTjs <= 0 || newPriceTjs <= 0 || isSubmitting}
             className="px-5 py-2.5 bg-accent hover:bg-accent-strong active:scale-95 disabled:opacity-40 text-xs font-bold rounded-xl text-accent-fg uppercase tracking-wider flex items-center space-x-2 transition-all shadow-xs"
           >
-            <RotateCcw className="w-4 h-4" />
-            <span>ПРОВЕСТИ ОБМЕН</span>
+            {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <RotateCcw className="w-4 h-4" />}
+            <span>{isSubmitting ? 'ПРОВЕДЕНИЕ…' : 'ПРОВЕСТИ ОБМЕН'}</span>
           </button>
         </div>
       </form>

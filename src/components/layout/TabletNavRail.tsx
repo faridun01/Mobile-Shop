@@ -14,6 +14,7 @@ import {
   Gift,
   Wallet,
   Users,
+  HandCoins,
   UserCheck,
   BarChart3,
   FileText,
@@ -39,6 +40,7 @@ const PAGE_ROUTES: Record<string, string> = {
   AUDIT_LOG: '/audit-log',
   SETTINGS: '/settings',
   NOTIFICATIONS: '/notifications',
+  CUSTOMERS: '/customers',
 };
 
 const TABLET_NAV_ITEMS: { id: PageId; label: string; icon: React.ElementType; roles: ('ADMIN' | 'PARTNER' | 'SELLER')[] }[] = [
@@ -52,6 +54,7 @@ const TABLET_NAV_ITEMS: { id: PageId; label: string; icon: React.ElementType; ro
   { id: 'SUPPLIERS', label: 'Поставщ.', icon: Truck, roles: ['ADMIN', 'PARTNER'] },
   { id: 'EXPENSES', label: 'Расходы', icon: Wallet, roles: ['ADMIN', 'PARTNER'] },
   { id: 'BONUSES', label: 'Бонусы', icon: Gift, roles: ['ADMIN', 'PARTNER'] },
+  { id: 'CUSTOMERS', label: 'Долги', icon: HandCoins, roles: ['ADMIN', 'PARTNER'] },
   { id: 'REPORTS', label: 'Отчёты', icon: BarChart3, roles: ['ADMIN', 'PARTNER'] },
   { id: 'OWNERS', label: 'Партнеры', icon: Users, roles: ['ADMIN', 'PARTNER'] },
   { id: 'EMPLOYEES', label: 'Кадры', icon: UserCheck, roles: ['ADMIN'] },

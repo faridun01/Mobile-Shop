@@ -7,6 +7,7 @@ import type {
   Supplier,
   SupplierInvoice,
   SupplierBonus,
+  Customer,
   Expense,
   Owner,
   OwnerTransaction,
@@ -117,6 +118,7 @@ export function mapSale(s: any, names: NameLookup): Sale {
     sellerId: s.userId,
     sellerName: s.user?.name ?? names.get(s.userId) ?? '',
     customerName: s.customerName ?? undefined,
+    customerId: s.customerId ?? undefined,
     items: (s.saleItems || []).map(mapSaleItem),
     totalTjs: s.totalTjs,
     totalUsd: s.totalUsd,
@@ -125,6 +127,7 @@ export function mapSale(s: any, names: NameLookup): Sale {
     paymentMethod: s.paymentMethod,
     cashAmountTjs: s.cashAmountTjs,
     cardAmountTjs: s.cardAmountTjs,
+    debtAmountTjs: s.debtAmountTjs ?? undefined,
     exchangeTradeInCreditTjs: s.exchangeTradeInCreditTjs ?? undefined,
     status: s.status,
     hasBelowCostItem: s.hasBelowCostItem,
@@ -210,6 +213,17 @@ export function mapSupplier(s: any): Supplier {
     totalDebtUsd: s.totalDebtUsd,
     active: s.active,
     createdAt: s.createdAt,
+  };
+}
+
+export function mapCustomer(c: any): Customer {
+  return {
+    id: c.id,
+    name: c.name,
+    phone: c.phone ?? undefined,
+    totalDebtTjs: c.totalDebtTjs,
+    totalPaidTjs: c.totalPaidTjs,
+    createdAt: c.createdAt,
   };
 }
 

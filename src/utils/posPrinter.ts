@@ -77,7 +77,7 @@ export function printReceipt(sale: Sale) {
           </div>
           <div style="font-size: 10px; color: #555; text-align: right;">(≈ $${sale.totalUsd} USD)</div>
           <div style="margin-top: 4px; font-size: 10px;">
-            СПОСОБ ОПЛАТЫ: ${sale.paymentMethod === 'CASH' ? 'НАЛИЧНЫЕ' : sale.paymentMethod === 'CARD' ? 'БАРКОВСКАЯ КАРТА' : 'СМЕШАННАЯ'}
+            СПОСОБ ОПЛАТЫ: ${sale.paymentMethod === 'CASH' ? 'НАЛИЧНЫЕ' : sale.paymentMethod === 'CARD' ? 'БАРКОВСКАЯ КАРТА' : sale.paymentMethod === 'DEBT' ? `В ДОЛГ (остаток ${(sale.debtAmountTjs ?? 0).toLocaleString()} TJS)` : 'СМЕШАННАЯ'}
           </div>
         </div>
 

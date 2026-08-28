@@ -35,7 +35,6 @@ export const MobileBottomNav: React.FC = () => {
   const location = useLocation();
   const {
     currentUser,
-    activePage,
     setActivePage,
     setDrawerOpen,
     notifications
@@ -43,7 +42,11 @@ export const MobileBottomNav: React.FC = () => {
 
   const userRole = currentUser?.role || 'SELLER';
   const unreadNotifs = notifications.filter(n => !n.read && !n.resolved).length;
-  const isSaleActive = location.pathname === '/sale' || location.pathname === '/' || activePage === 'SALE';
+  // Route pathname alone is the source of truth for what's on screen — activePage is
+  // plain component state that resets to its 'SALE' default on every mount/reload, so
+  // relying on it here made the POS button stay lit after navigating (or reloading)
+  // into any drawer-only page (e.g. Repair, Settings) that isn't one of the 4 quick slots.
+  const isSaleActive = location.pathname === '/sale' || location.pathname === '/';
 
   const fourthItem: { id: PageId; label: string; icon: React.ElementType } =
     userRole === 'ADMIN' || userRole === 'PARTNER'

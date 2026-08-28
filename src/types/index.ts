@@ -20,7 +20,7 @@ export type RepairStatus =
 
 export type TransferStatus = 'PENDING_APPROVAL' | 'APPROVED' | 'REJECTED';
 
-export type PaymentMethod = 'CASH' | 'CARD' | 'SPLIT';
+export type PaymentMethod = 'CASH' | 'CARD' | 'SPLIT' | 'DEBT';
 
 export type ExpenseCategory = 
   | 'RENT'
@@ -59,7 +59,8 @@ export type LedgerType =
   | 'EXCHANGE_SETTLEMENT'
   | 'SUPPLIER_BONUS'
   | 'TRANSFER'
-  | 'REFUND';
+  | 'REFUND'
+  | 'CUSTOMER_PAYMENT';
 
 export type PageId = 
   | 'SALE'
@@ -77,7 +78,8 @@ export type PageId =
   | 'REPORTS'
   | 'AUDIT_LOG'
   | 'SETTINGS'
-  | 'NOTIFICATIONS';
+  | 'NOTIFICATIONS'
+  | 'CUSTOMERS';
 
 export interface User {
   id: string;
@@ -186,6 +188,7 @@ export interface Sale {
   sellerId: string;
   sellerName: string;
   customerName?: string;
+  customerId?: string;
   items: SaleItem[];
   totalTjs: number;
   totalUsd: number;
@@ -194,6 +197,7 @@ export interface Sale {
   paymentMethod: PaymentMethod;
   cashAmountTjs: number;
   cardAmountTjs: number;
+  debtAmountTjs?: number;
   exchangeTradeInCreditTjs?: number;
   status: 'COMPLETED' | 'EXCHANGED' | 'REFUNDED';
   hasBelowCostItem?: boolean;
@@ -315,6 +319,29 @@ export interface Supplier {
   totalDebtUsd: number;
   active?: boolean;
   createdAt?: string;
+}
+
+export interface Customer {
+  id: string;
+  name: string;
+  phone?: string;
+  totalDebtTjs: number;
+  totalPaidTjs: number;
+  createdAt?: string;
+}
+
+export interface CustomerPayment {
+  id: string;
+  customerId: string;
+  amountTjs: number;
+  sourceAccount: 'MAIN_ACCOUNT' | 'STORE_CASH';
+  storeId?: string;
+  date: string;
+  appliedToSales: {
+    saleId: string;
+    receiptNumber: number;
+    allocatedAmountTjs: number;
+  }[];
 }
 
 export interface SupplierBonus {

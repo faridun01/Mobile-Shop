@@ -17,7 +17,8 @@ import {
   Briefcase,
   Download,
   Eye,
-  EyeOff
+  EyeOff,
+  Loader2
 } from 'lucide-react';
 
 const ROLE_CONFIG: Record<Role, { label: string; bg: string; color: string; border: string }> = {
@@ -80,6 +81,7 @@ export const EmployeesPage: React.FC = () => {
   const [salesCommissionPercent, setSalesCommissionPercent] = useState<string>('');
 
   const [statusMessage, setStatusMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleDeleteUserClick = (u: User) => {
     if (currentUser?.id === u.id) {
@@ -90,15 +92,20 @@ export const EmployeesPage: React.FC = () => {
   };
 
   const handleConfirmDeleteUser = async () => {
-    if (!deletingUserConfirm) return;
+    if (!deletingUserConfirm || isSubmitting) return;
     const targetName = deletingUserConfirm.name;
-    const res = await deleteUser(deletingUserConfirm.id);
-    setDeletingUserConfirm(null);
+    setIsSubmitting(true);
+    try {
+      const res = await deleteUser(deletingUserConfirm.id);
+      setDeletingUserConfirm(null);
 
-    if (res.success) {
-      setStatusMessage({ type: 'success', text: `Сотрудник ${targetName} успешно удален из системы.` });
-    } else {
-      setStatusMessage({ type: 'error', text: res.message || 'Ошибка удаления сотрудника' });
+      if (res.success) {
+        setStatusMessage({ type: 'success', text: `Сотрудник ${targetName} успешно удален из системы.` });
+      } else {
+        setStatusMessage({ type: 'error', text: res.message || 'Ошибка удаления сотрудника' });
+      }
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -141,6 +148,7 @@ export const EmployeesPage: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmitting) return;
     setStatusMessage(null);
 
     if (!name.trim() || !login.trim()) {
@@ -161,79 +169,89 @@ export const EmployeesPage: React.FC = () => {
     const baseSal = parseFloat(baseSalaryTjs) || 0;
     const commPct = parseFloat(salesCommissionPercent) || 0;
 
-    if (editingUser) {
-      const res = await updateUser({
-        ...editingUser,
-        name: name.trim(),
-        login: login.trim(),
-        passwordHash: password.trim() ? password.trim() : editingUser.passwordHash,
-        role,
-        storeId: role === 'SELLER' ? storeId : undefined,
-        isActive,
-        baseSalaryTjs: baseSal,
-        salesCommissionPercent: commPct
-      });
+    setIsSubmitting(true);
+    try {
+      if (editingUser) {
+        const res = await updateUser({
+          ...editingUser,
+          name: name.trim(),
+          login: login.trim(),
+          passwordHash: password.trim() ? password.trim() : editingUser.passwordHash,
+          role,
+          storeId: role === 'SELLER' ? storeId : undefined,
+          isActive,
+          baseSalaryTjs: baseSal,
+          salesCommissionPercent: commPct
+        });
 
-      if (res.success) {
-        setIsModalOpen(false);
-        setStatusMessage({ type: 'success', text: `Данные сотрудника ${name} обновлены` });
+        if (res.success) {
+          setIsModalOpen(false);
+          setStatusMessage({ type: 'success', text: `Данные сотрудника ${name} обновлены` });
+        } else {
+          setStatusMessage({ type: 'error', text: res.message || 'Ошибка обновления' });
+        }
       } else {
-        setStatusMessage({ type: 'error', text: res.message || 'Ошибка обновления' });
-      }
-    } else {
-      const res = await createUser({
-        name: name.trim(),
-        login: login.trim(),
-        passwordHash: password.trim(),
-        role,
-        storeId: role === 'SELLER' ? storeId : undefined,
-        active: true,
-        baseSalaryTjs: baseSal,
-        salesCommissionPercent: commPct
-      });
+        const res = await createUser({
+          name: name.trim(),
+          login: login.trim(),
+          passwordHash: password.trim(),
+          role,
+          storeId: role === 'SELLER' ? storeId : undefined,
+          active: true,
+          baseSalaryTjs: baseSal,
+          salesCommissionPercent: commPct
+        });
 
-      if (res.success) {
-        setIsModalOpen(false);
-        setStatusMessage({ type: 'success', text: `Сотрудник ${name} успешно добавлен` });
-      } else {
-        setStatusMessage({ type: 'error', text: res.message || 'Ошибка создания' });
+        if (res.success) {
+          setIsModalOpen(false);
+          setStatusMessage({ type: 'success', text: `Сотрудник ${name} успешно добавлен` });
+        } else {
+          setStatusMessage({ type: 'error', text: res.message || 'Ошибка создания' });
+        }
       }
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   const handleIssueAdvance = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!advanceIssueUser) return;
+    if (!advanceIssueUser || isSubmitting) return;
     const val = parseFloat(advanceAmountInput) || 0;
     if (val <= 0) {
       setStatusMessage({ type: 'error', text: 'Укажите правильную сумму аванса' });
       return;
     }
 
-    const res = await createExpense({
-      category: 'EMPLOYEE_ADVANCE',
-      amountTjs: val,
-      storeId: advanceIssueUser.storeId || stores[0]?.id,
-      description: `Аванс сотруднику ${advanceIssueUser.name}: ${advanceNoteInput.trim() || 'Выдан под отчет / в счет зарплаты'}`,
-      paidFromCashRegister: true,
-      employeeId: advanceIssueUser.id,
-      employeeName: advanceIssueUser.name,
-      isEmployeeAdvance: true
-    });
+    setIsSubmitting(true);
+    try {
+      const res = await createExpense({
+        category: 'EMPLOYEE_ADVANCE',
+        amountTjs: val,
+        storeId: advanceIssueUser.storeId || stores[0]?.id,
+        description: `Аванс сотруднику ${advanceIssueUser.name}: ${advanceNoteInput.trim() || 'Выдан под отчет / в счет зарплаты'}`,
+        paidFromCashRegister: true,
+        employeeId: advanceIssueUser.id,
+        employeeName: advanceIssueUser.name,
+        isEmployeeAdvance: true
+      });
 
-    if (res.success) {
-      setStatusMessage({ type: 'success', text: `Аванс ${val} TJS успешно выдан сотруднику ${advanceIssueUser.name}` });
-      setAdvanceIssueUser(null);
-      setAdvanceAmountInput('');
-      setAdvanceNoteInput('');
-    } else {
-      setStatusMessage({ type: 'error', text: res.message || 'Ошибка выдачи аванса' });
+      if (res.success) {
+        setStatusMessage({ type: 'success', text: `Аванс ${val} TJS успешно выдан сотруднику ${advanceIssueUser.name}` });
+        setAdvanceIssueUser(null);
+        setAdvanceAmountInput('');
+        setAdvanceNoteInput('');
+      } else {
+        setStatusMessage({ type: 'error', text: res.message || 'Ошибка выдачи аванса' });
+      }
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   const handleExecuteSalaryPayout = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!salaryPayoutUser) return;
+    if (!salaryPayoutUser || isSubmitting) return;
     const grossVal = parseFloat(grossSalaryInput) || 0;
     if (grossVal <= 0) {
       setStatusMessage({ type: 'error', text: 'Укажите сумму начисленной зарплаты' });
@@ -263,26 +281,31 @@ export const EmployeesPage: React.FC = () => {
       return;
     }
 
-    const res = await createExpense({
-      category: 'SALARY',
-      amountTjs: netPayout,
-      storeId: salaryPayoutUser.storeId || stores[0]?.id,
-      description: `Выплата зарплаты сотруднику ${salaryPayoutUser.name} (Начислено: ${grossVal} TJS, Удержано авансов: ${advanceDeduction} TJS, Выдано на руки: ${netPayout} TJS). ${payoutNote.trim()}`,
-      paidFromCashRegister: true,
-      employeeId: salaryPayoutUser.id,
-      employeeName: salaryPayoutUser.name
-    });
-
-    if (res.success) {
-      setStatusMessage({
-        type: 'success',
-        text: `Зарплата сотруднику ${salaryPayoutUser.name} успешно выплачена: ${netPayout} TJS ${advanceDeduction > 0 ? `(Удержано авансов: ${advanceDeduction} TJS)` : ''}`
+    setIsSubmitting(true);
+    try {
+      const res = await createExpense({
+        category: 'SALARY',
+        amountTjs: netPayout,
+        storeId: salaryPayoutUser.storeId || stores[0]?.id,
+        description: `Выплата зарплаты сотруднику ${salaryPayoutUser.name} (Начислено: ${grossVal} TJS, Удержано авансов: ${advanceDeduction} TJS, Выдано на руки: ${netPayout} TJS). ${payoutNote.trim()}`,
+        paidFromCashRegister: true,
+        employeeId: salaryPayoutUser.id,
+        employeeName: salaryPayoutUser.name
       });
-      setSalaryPayoutUser(null);
-      setGrossSalaryInput('');
-      setPayoutNote('');
-    } else {
-      setStatusMessage({ type: 'error', text: res.message || 'Ошибка выплаты зарплаты' });
+
+      if (res.success) {
+        setStatusMessage({
+          type: 'success',
+          text: `Зарплата сотруднику ${salaryPayoutUser.name} успешно выплачена: ${netPayout} TJS ${advanceDeduction > 0 ? `(Удержано авансов: ${advanceDeduction} TJS)` : ''}`
+        });
+        setSalaryPayoutUser(null);
+        setGrossSalaryInput('');
+        setPayoutNote('');
+      } else {
+        setStatusMessage({ type: 'error', text: res.message || 'Ошибка выплаты зарплаты' });
+      }
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -725,16 +748,19 @@ export const EmployeesPage: React.FC = () => {
             <div className="flex space-x-2 pt-2">
               <button
                 type="button"
+                disabled={isSubmitting}
                 onClick={() => setIsModalOpen(false)}
-                className="flex-1 py-2.5 rounded-xl bg-surface-raised hover:bg-surface border border-border text-xs font-bold text-fg-muted uppercase"
+                className="flex-1 py-2.5 rounded-xl bg-surface-raised hover:bg-surface border border-border text-xs font-bold text-fg-muted uppercase disabled:opacity-50"
               >
                 ОТМЕНА
               </button>
               <button
                 type="submit"
-                className="flex-1 py-2.5 rounded-xl bg-accent hover:bg-accent-strong text-xs font-bold uppercase text-accent-fg shadow-xs"
+                disabled={isSubmitting}
+                className="flex-1 py-2.5 rounded-xl bg-accent hover:bg-accent-strong text-xs font-bold uppercase text-accent-fg shadow-xs disabled:opacity-60 flex items-center justify-center gap-1.5"
               >
-                {editingUser ? 'СОХРАНИТЬ' : 'СОЗДАТЬ'}
+                {isSubmitting && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                {isSubmitting ? 'СОХРАНЕНИЕ…' : editingUser ? 'СОХРАНИТЬ' : 'СОЗДАТЬ'}
               </button>
             </div>
           </form>
@@ -767,17 +793,20 @@ export const EmployeesPage: React.FC = () => {
             <div className="flex space-x-2 pt-1">
               <button
                 type="button"
+                disabled={isSubmitting}
                 onClick={() => setDeletingUserConfirm(null)}
-                className="flex-1 py-2.5 rounded-xl bg-surface-raised hover:bg-surface border border-border text-xs font-bold text-fg-muted uppercase transition-colors"
+                className="flex-1 py-2.5 rounded-xl bg-surface-raised hover:bg-surface border border-border text-xs font-bold text-fg-muted uppercase transition-colors disabled:opacity-50"
               >
                 ОТМЕНА
               </button>
               <button
                 type="button"
+                disabled={isSubmitting}
                 onClick={handleConfirmDeleteUser}
-                className="flex-1 py-2.5 rounded-xl bg-danger hover:opacity-90 active:opacity-80 text-xs font-bold uppercase text-white shadow-xs transition-colors"
+                className="flex-1 py-2.5 rounded-xl bg-danger hover:opacity-90 active:opacity-80 text-xs font-bold uppercase text-white shadow-xs transition-colors disabled:opacity-60 flex items-center justify-center gap-1.5"
               >
-                УДАЛИТЬ СОТРУДНИКА
+                {isSubmitting && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                {isSubmitting ? 'УДАЛЕНИЕ…' : 'УДАЛИТЬ СОТРУДНИКА'}
               </button>
             </div>
           </div>
@@ -840,16 +869,19 @@ export const EmployeesPage: React.FC = () => {
             <div className="flex space-x-2 pt-1">
               <button
                 type="button"
+                disabled={isSubmitting}
                 onClick={() => setAdvanceIssueUser(null)}
-                className="flex-1 py-2.5 rounded-xl bg-surface-raised hover:bg-surface border border-border text-xs font-bold text-fg-muted uppercase"
+                className="flex-1 py-2.5 rounded-xl bg-surface-raised hover:bg-surface border border-border text-xs font-bold text-fg-muted uppercase disabled:opacity-50"
               >
                 ОТМЕНА
               </button>
               <button
                 type="submit"
-                className="flex-1 py-2.5 rounded-xl bg-warning hover:opacity-90 text-xs font-bold uppercase text-black shadow-xs"
+                disabled={isSubmitting}
+                className="flex-1 py-2.5 rounded-xl bg-warning hover:opacity-90 text-xs font-bold uppercase text-black shadow-xs disabled:opacity-60 flex items-center justify-center gap-1.5"
               >
-                ВЫДАТЬ АВАНС
+                {isSubmitting && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                {isSubmitting ? 'ВЫДАЧА…' : 'ВЫДАТЬ АВАНС'}
               </button>
             </div>
           </form>
@@ -990,16 +1022,19 @@ export const EmployeesPage: React.FC = () => {
                   <div className="flex space-x-2 pt-1">
                     <button
                       type="button"
+                      disabled={isSubmitting}
                       onClick={() => setSalaryPayoutUser(null)}
-                      className="flex-1 py-2.5 rounded-xl bg-surface-raised hover:bg-surface border border-border text-xs font-bold text-fg-muted uppercase"
+                      className="flex-1 py-2.5 rounded-xl bg-surface-raised hover:bg-surface border border-border text-xs font-bold text-fg-muted uppercase disabled:opacity-50"
                     >
                       ОТМЕНА
                     </button>
                     <button
                       type="submit"
-                      className="flex-1 py-2.5 rounded-xl bg-accent hover:bg-accent-strong text-xs font-bold uppercase text-accent-fg shadow-xs"
+                      disabled={isSubmitting}
+                      className="flex-1 py-2.5 rounded-xl bg-accent hover:bg-accent-strong text-xs font-bold uppercase text-accent-fg shadow-xs disabled:opacity-60 flex items-center justify-center gap-1.5"
                     >
-                      ВЫПЛАТИТЬ ЗАРПЛАТУ
+                      {isSubmitting && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                      {isSubmitting ? 'ВЫПЛАТА…' : 'ВЫПЛАТИТЬ ЗАРПЛАТУ'}
                     </button>
                   </div>
                 </div>
@@ -1114,6 +1149,13 @@ export const EmployeesPage: React.FC = () => {
               const totalAdvancesTaken = advanceExpenses.reduce((sum, e) => sum + (e.amountTjs || 0), 0);
               const totalSalesRev = filteredSales.reduce((sum, s) => sum + s.totalTjs, 0);
 
+              // A single true timeline — expenses and sales interleaved by date, newest
+              // first, instead of two separate blocks (all expenses, then all sales).
+              const combinedOperations = [
+                ...filteredExpenses.map(e => ({ kind: 'expense' as const, date: e.date, data: e })),
+                ...filteredSales.map(s => ({ kind: 'sale' as const, date: s.date, data: s })),
+              ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
               const baseSal = financialHistoryUser.baseSalaryTjs || 0;
               const commPct = financialHistoryUser.salesCommissionPercent || 0;
               const commAmount = Math.round(totalSalesRev * (commPct / 100));
@@ -1162,35 +1204,32 @@ export const EmployeesPage: React.FC = () => {
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-border text-[11px]">
-                            {/* Salary & Advance Expenses */}
-                            {filteredExpenses.map(e => (
-                              <tr key={e.id} className="hover:bg-surface-raised">
-                                <td className="p-2 text-fg-subtle whitespace-nowrap">{new Date(e.date).toLocaleDateString()}</td>
+                            {combinedOperations.map(op => op.kind === 'expense' ? (
+                              <tr key={`e-${op.data.id}`} className="hover:bg-surface-raised">
+                                <td className="p-2 text-fg-subtle whitespace-nowrap">{new Date(op.data.date).toLocaleDateString()}</td>
                                 <td className="p-2">
-                                  {e.category === 'SALARY' ? (
+                                  {op.data.category === 'SALARY' ? (
                                     <span className="px-1.5 py-0.5 rounded-md bg-accent/10 text-accent border border-accent/30 text-[10px] font-bold">ЗАРПЛАТА</span>
                                   ) : (
                                     <span className="px-1.5 py-0.5 rounded-md bg-warning/10 text-warning border border-warning/30 text-[10px] font-bold">АВАНС</span>
                                   )}
                                 </td>
-                                <td className="p-2 text-fg-muted truncate max-w-55">{e.description || e.comment || '-'}</td>
-                                <td className={`p-2 text-right font-bold ${e.category === 'SALARY' ? 'text-accent' : 'text-warning'}`}>
-                                  {e.amountTjs.toLocaleString()} TJS
+                                <td className="p-2 text-fg-muted truncate max-w-55">{op.data.description || op.data.comment || '-'}</td>
+                                <td className={`p-2 text-right font-bold ${op.data.category === 'SALARY' ? 'text-accent' : 'text-warning'}`}>
+                                  {op.data.amountTjs.toLocaleString()} TJS
                                 </td>
                               </tr>
-                            ))}
-                            {/* Sales */}
-                            {filteredSales.map(s => (
-                              <tr key={s.id} className="hover:bg-surface-raised">
-                                <td className="p-2 text-fg-subtle whitespace-nowrap">{new Date(s.date).toLocaleDateString()}</td>
+                            ) : (
+                              <tr key={`s-${op.data.id}`} className="hover:bg-surface-raised">
+                                <td className="p-2 text-fg-subtle whitespace-nowrap">{new Date(op.data.date).toLocaleDateString()}</td>
                                 <td className="p-2">
-                                  <span className="px-1.5 py-0.5 rounded-md bg-info/10 text-info border border-info/30 text-[10px] font-bold">ПРОДАЖА #{s.receiptNumber}</span>
+                                  <span className="px-1.5 py-0.5 rounded-md bg-info/10 text-info border border-info/30 text-[10px] font-bold">ПРОДАЖА #{op.data.receiptNumber}</span>
                                 </td>
                                 <td className="p-2 text-fg-muted truncate max-w-55">
-                                  {s.items.map(i => `${i.brand} ${i.model}`).join(', ')} ({s.customerName || 'Покупатель'})
+                                  {op.data.items.map(i => `${i.brand} ${i.model}`).join(', ')} ({op.data.customerName || 'Покупатель'})
                                 </td>
                                 <td className="p-2 text-right font-bold text-fg">
-                                  +{s.totalTjs.toLocaleString()} TJS
+                                  +{op.data.totalTjs.toLocaleString()} TJS
                                 </td>
                               </tr>
                             ))}

@@ -137,6 +137,93 @@ export class SuppliersService {
     }, { maxWait: 10000, timeout: 25000 });
   }
 
+  /** Pays a single specific invoice directly, instead of FIFO across all open invoices. */
+  public static async payInvoice(input: { invoiceId: string; amountUsd: number; sourceAccount: 'MAIN_ACCOUNT' | 'STORE_CASH'; storeId?: string; createdByUserId: string }) {
+    const amountUsd = requirePositiveMoney(input.amountUsd, 'Сумма оплаты');
+    if (!['MAIN_ACCOUNT', 'STORE_CASH'].includes(input.sourceAccount)) throw new Error('Некорректный источник оплаты');
+    if (input.sourceAccount === 'STORE_CASH' && !input.storeId) throw new Error('Выберите кассу магазина');
+
+    return prisma.$transaction(async (tx) => {
+      const actor = await resolveActor(tx, input.createdByUserId);
+      const invoice = await tx.supplierInvoice.findUnique({ where: { id: input.invoiceId } });
+      if (!invoice) throw new Error('Накладная не найдена');
+      const supplier = await tx.supplier.findUnique({ where: { id: invoice.supplierId } });
+      if (!supplier) throw new Error('Поставщик не найден');
+
+      const remainingOnInvoice = invoice.totalAmountUsd - invoice.paidAmountUsd;
+      if (amountUsd > remainingOnInvoice + 0.01) throw new Error('Сумма оплаты превышает остаток долга по накладной');
+
+      const payment = await tx.supplierPayment.create({
+        data: {
+          supplierId: invoice.supplierId,
+          amountUsd,
+          sourceAccount: input.sourceAccount,
+          storeId: input.storeId,
+          createdByUserId: actor.id,
+        },
+      });
+
+      const invoiceGuard = await tx.supplierInvoice.updateMany({
+        where: { id: input.invoiceId, paidAmountUsd: { lte: invoice.totalAmountUsd - amountUsd + 0.01 } },
+        data: { paidAmountUsd: { increment: amountUsd } },
+      });
+      if (invoiceGuard.count !== 1) throw new Error('Данные накладной изменились, обновите страницу и повторите оплату');
+
+      await tx.supplierPaymentAllocation.create({
+        data: { paymentId: payment.id, invoiceId: invoice.id, allocatedAmountUsd: amountUsd },
+      });
+
+      const debtGuard = await tx.supplier.updateMany({
+        where: { id: invoice.supplierId, totalDebtUsd: { gte: amountUsd } },
+        data: {
+          totalPaidUsd: { increment: amountUsd },
+          totalDebtUsd: { decrement: amountUsd },
+        },
+      });
+      if (debtGuard.count !== 1) throw new Error('Задолженность изменилась, обновите данные и повторите оплату');
+
+      let store = null;
+      if (input.sourceAccount === 'STORE_CASH' && input.storeId) {
+        store = await tx.store.findUnique({ where: { id: input.storeId } });
+        if (store) {
+          if (store.isMainWarehouse) throw new Error('Главный склад не является торговой кассой');
+          const today = new Date().toISOString().split('T')[0];
+          const rate = (await tx.exchangeRate.findUnique({ where: { date: today } }))?.rate;
+          if (!rate) throw new Error('Сначала задайте курс валют на сегодня');
+          const cashAmountTjs = roundMoney(amountUsd * rate);
+          const cashGuard = await tx.store.updateMany({ where: { id: input.storeId, cashBalanceTjs: { gte: cashAmountTjs } }, data: { cashBalanceTjs: { decrement: cashAmountTjs } } });
+          if (cashGuard.count !== 1) throw new Error('В кассе недостаточно наличных для оплаты поставщику');
+        }
+      }
+
+      await tx.ledgerEntry.create({
+        data: {
+          type: 'SUPPLIER_PAYMENT',
+          description: `Выплата поставщику ${supplier.name} по накладной ${invoice.invoiceNumber}: $${amountUsd}`,
+          amountUsd: -amountUsd,
+          storeId: input.storeId,
+          storeName: store?.name,
+          userName: actor.name,
+          referenceId: payment.id,
+        },
+      });
+
+      await tx.auditLog.create({
+        data: {
+          userId: actor.id,
+          userName: actor.name,
+          userRole: actor.role,
+          action: 'SUPPLIER_PAYMENT',
+          details: `Проведена оплата поставщику ${supplier.name} по накладной ${invoice.invoiceNumber} на сумму $${amountUsd}`,
+          financialDetails: { amountUsd },
+          targetId: payment.id,
+        },
+      });
+
+      return { payment, invoiceId: invoice.id };
+    }, { maxWait: 10000, timeout: 25000 });
+  }
+
   public static async createBonus(input: SupplierBonusInput) {
     return prisma.$transaction(async (tx) => {
       const actor = await resolveActor(tx, input.createdByUserId);

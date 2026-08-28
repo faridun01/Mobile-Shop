@@ -8,6 +8,8 @@ export class StoresService {
 
     return prisma.$transaction(async (tx) => {
       const actor = await resolveActor(tx, userId);
+      const existing = await tx.store.findFirst({ where: { name: { equals: trimmed, mode: 'insensitive' } } });
+      if (existing) throw new Error(`Магазин с названием "${trimmed}" уже существует`);
       const store = await tx.store.create({ data: { name: trimmed, address } });
       await tx.auditLog.create({
         data: { userId: actor.id, userName: actor.name, userRole: actor.role, action: 'STORE_CREATE', details: `Создан новый магазин: ${store.name}`, targetId: store.id },
@@ -22,6 +24,8 @@ export class StoresService {
 
     return prisma.$transaction(async (tx) => {
       const actor = await resolveActor(tx, userId);
+      const existing = await tx.store.findFirst({ where: { name: { equals: trimmed, mode: 'insensitive' }, id: { not: storeId } } });
+      if (existing) throw new Error(`Магазин с названием "${trimmed}" уже существует`);
       const store = await tx.store.update({ where: { id: storeId }, data: { name: trimmed, address } });
       await tx.auditLog.create({
         data: { userId: actor.id, userName: actor.name, userRole: actor.role, action: 'STORE_UPDATE', details: `Обновлены данные магазина: ${store.name}`, targetId: store.id },

@@ -14,6 +14,7 @@ import {
   Gift,
   Wallet,
   Users,
+  HandCoins,
   UserCheck,
   BarChart3,
   FileText,
@@ -41,6 +42,7 @@ const PAGE_ROUTES: Record<string, string> = {
   AUDIT_LOG: '/audit-log',
   SETTINGS: '/settings',
   NOTIFICATIONS: '/notifications',
+  CUSTOMERS: '/customers',
 };
 
 interface NavGroup {
@@ -78,6 +80,7 @@ const NAV_GROUPS: NavGroup[] = [
       { id: 'REPORTS', label: 'Финансовые отчёты', icon: BarChart3, roles: ['ADMIN', 'PARTNER'] },
       { id: 'EXPENSES', label: 'Расходы магазина', icon: Wallet, roles: ['ADMIN', 'PARTNER'] },
       { id: 'BONUSES', label: 'Бонусы продавцов', icon: Gift, roles: ['ADMIN', 'PARTNER'] },
+      { id: 'CUSTOMERS', label: 'Долги клиентов', icon: HandCoins, roles: ['ADMIN', 'PARTNER'] },
       { id: 'OWNERS', label: 'Партнеры и капитал', icon: Users, roles: ['ADMIN', 'PARTNER'] },
     ]
   },

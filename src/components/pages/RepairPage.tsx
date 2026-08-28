@@ -8,7 +8,8 @@ import {
   AlertCircle,
   PackageCheck,
   X,
-  FileText
+  FileText,
+  Loader2
 } from 'lucide-react';
 import { StatusBanner, StatusMessage } from '../ui/StatusBanner';
 
@@ -47,10 +48,11 @@ export const RepairPage: React.FC = () => {
 
   const [statusMessage, setStatusMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [statusBanner, setStatusBanner] = useState<StatusMessage | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Retail stores only (Exclude Main Warehouse)
   const retailStores = useMemo(() => {
-    return stores.filter(s => !s.isMainWarehouse && s.id !== 'store-main');
+    return stores.filter(s => !s.isMainWarehouse);
   }, [stores]);
 
   const [selectedStoreId, setSelectedStoreId] = useState<string>('ALL');
@@ -182,6 +184,7 @@ export const RepairPage: React.FC = () => {
 
   const handleCreateTicket = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmitting) return;
     if (!clientName.trim() || !clientPhone.trim() || !deviceModel.trim() || !defectDescription.trim()) {
       setStatusMessage({ type: 'error', text: 'Заполните обязательные поля (ФИО клиента, Телефон, Модель, Описание поломки)' });
       return;
@@ -191,35 +194,40 @@ export const RepairPage: React.FC = () => {
     const brand = modelParts[0] || 'Unknown';
     const model = modelParts.slice(1).join(' ') || 'Device';
 
-    const res = await createRepairTicket({
-      imei: imei.trim() || 'N/A',
-      brand,
-      model,
-      storage: 'N/A',
-      color: 'N/A',
-      customerName: clientName.trim(),
-      customerPhone: clientPhone.trim(),
-      problemDescription: defectDescription.trim(),
-      comment: masterNote.trim() || undefined,
-      estimatedCostTjs: parseFloat(estimatedCostTjs) || 0,
-      prepaymentTjs: parseFloat(prepaymentTjs) || 0,
-      storeId: isSeller ? undefined : createTicketStoreId || undefined,
-    });
+    setIsSubmitting(true);
+    try {
+      const res = await createRepairTicket({
+        imei: imei.trim() || 'N/A',
+        brand,
+        model,
+        storage: 'N/A',
+        color: 'N/A',
+        customerName: clientName.trim(),
+        customerPhone: clientPhone.trim(),
+        problemDescription: defectDescription.trim(),
+        comment: masterNote.trim() || undefined,
+        estimatedCostTjs: parseFloat(estimatedCostTjs) || 0,
+        prepaymentTjs: parseFloat(prepaymentTjs) || 0,
+        storeId: isSeller ? undefined : createTicketStoreId || undefined,
+      });
 
-    if (res.success) {
-      setStatusBanner({ tone: 'success', text: `Прием в ремонт успешно оформлен! Квитанция #${res.ticketNumber || ''}` });
-      setActiveTab('list');
-      setClientName('');
-      setClientPhone('');
-      setDeviceModel('');
-      setImei('');
-      setDefectDescription('');
-      setEstimatedCostTjs('0');
-      setPrepaymentTjs('0');
-      setMasterNote('');
-      setReceiptSearch('');
-    } else {
-      setStatusMessage({ type: 'error', text: res.message || 'Ошибка создания квитанции' });
+      if (res.success) {
+        setStatusBanner({ tone: 'success', text: `Прием в ремонт успешно оформлен! Квитанция #${res.ticketNumber || ''}` });
+        setActiveTab('list');
+        setClientName('');
+        setClientPhone('');
+        setDeviceModel('');
+        setImei('');
+        setDefectDescription('');
+        setEstimatedCostTjs('0');
+        setPrepaymentTjs('0');
+        setMasterNote('');
+        setReceiptSearch('');
+      } else {
+        setStatusMessage({ type: 'error', text: res.message || 'Ошибка создания квитанции' });
+      }
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -238,16 +246,21 @@ export const RepairPage: React.FC = () => {
   };
 
   const handleConfirmIssueTicket = async () => {
-    if (!selectedTicket) return;
+    if (!selectedTicket || isSubmitting) return;
     const finalCost = parseFloat(issueFinalCost) || 0;
 
-    const res = await updateRepairStatus(selectedTicket.id, 'ISSUED', 'Выдано клиенту', finalCost);
+    setIsSubmitting(true);
+    try {
+      const res = await updateRepairStatus(selectedTicket.id, 'ISSUED', 'Выдано клиенту', finalCost);
 
-    setSelectedTicket(null);
-    if (res.success) {
-      setStatusBanner({ tone: 'success', text: `Ремонт #${selectedTicket.ticketNumber} выдан. Расход ${finalCost} TJS автоматически списан со счета магазина.` });
-    } else {
-      setStatusBanner({ tone: 'error', text: res.message || 'Ошибка выдачи ремонта' });
+      setSelectedTicket(null);
+      if (res.success) {
+        setStatusBanner({ tone: 'success', text: `Ремонт #${selectedTicket.ticketNumber} выдан. Расход ${finalCost} TJS автоматически списан со счета магазина.` });
+      } else {
+        setStatusBanner({ tone: 'error', text: res.message || 'Ошибка выдачи ремонта' });
+      }
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -525,9 +538,11 @@ export const RepairPage: React.FC = () => {
 
               <button
                 type="submit"
-                className="w-full py-3 rounded-xl bg-accent hover:bg-accent-strong active:scale-95 text-xs font-bold text-accent-fg uppercase tracking-wider transition-all shadow-xs mt-2"
+                disabled={isSubmitting}
+                className="w-full py-3 rounded-xl bg-accent hover:bg-accent-strong active:scale-95 text-xs font-bold text-accent-fg uppercase tracking-wider transition-all shadow-xs mt-2 disabled:opacity-60 flex items-center justify-center gap-1.5"
               >
-                ОФОРМИТЬ И ВЫДАТЬ КВИТАНЦИЮ
+                {isSubmitting && <Loader2 className="w-4 h-4 animate-spin" />}
+                {isSubmitting ? 'ОФОРМЛЕНИЕ…' : 'ОФОРМИТЬ И ВЫДАТЬ КВИТАНЦИЮ'}
               </button>
             </div>
           </form>
@@ -677,16 +692,19 @@ export const RepairPage: React.FC = () => {
 
             <div className="flex space-x-2 pt-2">
               <button
+                disabled={isSubmitting}
                 onClick={() => setSelectedTicket(null)}
-                className="flex-1 py-2.5 rounded-xl bg-surface-raised hover:bg-surface border border-border text-xs font-bold text-fg-muted uppercase"
+                className="flex-1 py-2.5 rounded-xl bg-surface-raised hover:bg-surface border border-border text-xs font-bold text-fg-muted uppercase disabled:opacity-50"
               >
                 Отмена
               </button>
               <button
+                disabled={isSubmitting}
                 onClick={handleConfirmIssueTicket}
-                className="flex-1 py-2.5 rounded-xl bg-accent hover:bg-accent-strong active:scale-95 text-xs font-bold text-accent-fg uppercase"
+                className="flex-1 py-2.5 rounded-xl bg-accent hover:bg-accent-strong active:scale-95 text-xs font-bold text-accent-fg uppercase disabled:opacity-60 flex items-center justify-center gap-1.5"
               >
-                Подтвердить выдачу
+                {isSubmitting && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                {isSubmitting ? 'Выдача…' : 'Подтвердить выдачу'}
               </button>
             </div>
           </div>

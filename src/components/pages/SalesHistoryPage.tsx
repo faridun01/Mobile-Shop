@@ -8,10 +8,8 @@ import {
   Wrench,
   RotateCcw,
   Receipt,
-  Download,
   ArrowLeft
 } from 'lucide-react';
-import { exportSalesReport } from '../../utils/exportReports';
 import { SearchBar } from '../ui/SearchBar';
 import { FilterPillGroup } from '../ui/FilterPillGroup';
 import { Select } from '../ui/Input';
@@ -30,7 +28,6 @@ export const SalesHistoryPage: React.FC = () => {
     currentUser,
     sales,
     stores,
-    todayRate,
     openScanner,
     setActivePage,
     processRefund,
@@ -58,6 +55,7 @@ export const SalesHistoryPage: React.FC = () => {
   const [penaltyFeeTjs, setPenaltyFeeTjs] = useState<string>('0');
   const [refundMethod, setRefundMethod] = useState<'CASH' | 'CARD'>('CASH');
   const [status, setStatus] = useState<StatusMessage | null>(null);
+  const [isSubmittingRefund, setIsSubmittingRefund] = useState(false);
 
   const activeStoreId = selectedStoreId || retailStores[0]?.id || '';
 
@@ -140,30 +138,36 @@ export const SalesHistoryPage: React.FC = () => {
   };
 
   const handleExecuteRefund = async () => {
-    if (!selectedSale) return;
+    if (!selectedSale || isSubmittingRefund) return;
     if (!refundReason.trim()) {
       setStatus({ tone: 'error', text: 'Укажите причину возврата' });
       return;
     }
 
     const penaltyVal = Math.max(0, parseFloat(penaltyFeeTjs) || 0);
-    const actualRefundVal = Math.max(0, selectedSale.totalTjs - penaltyVal);
+    const amountActuallyCollectedTjs = selectedSale.totalTjs - (selectedSale.debtAmountTjs ?? 0);
+    const actualRefundVal = Math.max(0, amountActuallyCollectedTjs - penaltyVal);
 
-    const res = await processRefund({
-      saleId: selectedSale.id,
-      reason: refundReason.trim(),
-      refundAmountTjs: actualRefundVal,
-      penaltyFeeTjs: penaltyVal,
-      paymentMethod: refundMethod
-    });
+    setIsSubmittingRefund(true);
+    try {
+      const res = await processRefund({
+        saleId: selectedSale.id,
+        reason: refundReason.trim(),
+        refundAmountTjs: actualRefundVal,
+        penaltyFeeTjs: penaltyVal,
+        paymentMethod: refundMethod
+      });
 
-    if (res.success) {
-      setSelectedSaleId(null);
-      setRefundReason('');
-      setPenaltyFeeTjs('0');
-      setStatus({ tone: 'success', text: `Возврат по чеку #${selectedSale.receiptNumber} оформлен` });
-    } else {
-      setStatus({ tone: 'error', text: res.message || 'Ошибка возврата' });
+      if (res.success) {
+        setSelectedSaleId(null);
+        setRefundReason('');
+        setPenaltyFeeTjs('0');
+        setStatus({ tone: 'success', text: `Возврат по чеку #${selectedSale.receiptNumber} оформлен` });
+      } else {
+        setStatus({ tone: 'error', text: res.message || 'Ошибка возврата' });
+      }
+    } finally {
+      setIsSubmittingRefund(false);
     }
   };
 
@@ -213,15 +217,6 @@ export const SalesHistoryPage: React.FC = () => {
               </Select>
             )}
           </div>
-
-          <Button
-            variant="secondary"
-            leftIcon={Download}
-            disabled={filteredSales.length === 0}
-            onClick={() => exportSalesReport(filteredSales, todayRate?.rate || 9.5)}
-          >
-            Экспорт (CSV)
-          </Button>
         </div>
       </div>
 
@@ -262,8 +257,8 @@ export const SalesHistoryPage: React.FC = () => {
                 <div className="text-right shrink-0 flex items-center gap-2">
                   <div>
                     <p className="text-sm font-semibold text-fg">{sale.totalTjs.toLocaleString()} TJS</p>
-                    <p className="text-xs text-fg-subtle">
-                      {sale.paymentMethod === 'CASH' ? 'Наличные' : sale.paymentMethod === 'CARD' ? 'Карта' : 'Смешанная'}
+                    <p className={`text-xs ${sale.paymentMethod === 'DEBT' && (sale.debtAmountTjs ?? 0) > 0 ? 'text-danger font-semibold' : 'text-fg-subtle'}`}>
+                      {sale.paymentMethod === 'CASH' ? 'Наличные' : sale.paymentMethod === 'CARD' ? 'Карта' : sale.paymentMethod === 'DEBT' ? ((sale.debtAmountTjs ?? 0) > 0 ? `В долг (${(sale.debtAmountTjs ?? 0).toLocaleString()} TJS)` : 'В долг (погашено)') : 'Смешанная'}
                     </p>
                   </div>
                   <ChevronRight className="w-4 h-4 text-fg-subtle" />
@@ -303,8 +298,8 @@ export const SalesHistoryPage: React.FC = () => {
             </div>
           ) : dialogView === 'refund' ? (
             <>
-              <Button variant="secondary" fullWidth onClick={() => setDialogView('details')}>Отмена</Button>
-              <Button variant="danger" fullWidth onClick={handleExecuteRefund}>Подтвердить возврат</Button>
+              <Button variant="secondary" fullWidth disabled={isSubmittingRefund} onClick={() => setDialogView('details')}>Отмена</Button>
+              <Button variant="danger" fullWidth loading={isSubmittingRefund} onClick={handleExecuteRefund}>Подтвердить возврат</Button>
             </>
           ) : (
             <Button variant="secondary" fullWidth leftIcon={ArrowLeft} onClick={() => setDialogView('details')}>Назад</Button>
@@ -364,7 +359,7 @@ export const SalesHistoryPage: React.FC = () => {
               <div className="flex justify-between">
                 <span className="text-fg-subtle text-xs uppercase">Способ оплаты</span>
                 <span className="font-semibold text-fg">
-                  {selectedSale.paymentMethod === 'CASH' ? 'Наличные' : selectedSale.paymentMethod === 'CARD' ? 'Карта' : 'Смешанная'}
+                  {selectedSale.paymentMethod === 'CASH' ? 'Наличные' : selectedSale.paymentMethod === 'CARD' ? 'Карта' : selectedSale.paymentMethod === 'DEBT' ? 'В долг' : 'Смешанная'}
                 </span>
               </div>
               {selectedSale.cashAmountTjs > 0 && (
@@ -377,6 +372,12 @@ export const SalesHistoryPage: React.FC = () => {
                 <div className="flex justify-between text-xs">
                   <span className="text-fg-subtle uppercase">Картой</span>
                   <span className="text-fg-muted">{selectedSale.cardAmountTjs.toLocaleString()} TJS</span>
+                </div>
+              )}
+              {(selectedSale.debtAmountTjs ?? 0) > 0 && (
+                <div className="flex justify-between text-xs">
+                  <span className="text-danger uppercase">Остаток долга</span>
+                  <span className="text-danger font-semibold">{(selectedSale.debtAmountTjs ?? 0).toLocaleString()} TJS</span>
                 </div>
               )}
               <div className="flex justify-between pt-2 border-t border-border font-semibold">
@@ -409,7 +410,7 @@ export const SalesHistoryPage: React.FC = () => {
                 <input
                   type="number"
                   min="0"
-                  max={selectedSale.totalTjs}
+                  max={selectedSale.totalTjs - (selectedSale.debtAmountTjs ?? 0)}
                   value={penaltyFeeTjs}
                   onChange={(e) => setPenaltyFeeTjs(e.target.value)}
                   placeholder="0"
@@ -419,7 +420,7 @@ export const SalesHistoryPage: React.FC = () => {
                   <button
                     key={pct}
                     type="button"
-                    onClick={() => setPenaltyFeeTjs(Math.round((selectedSale.totalTjs * pct) / 100).toString())}
+                    onClick={() => setPenaltyFeeTjs(Math.round(((selectedSale.totalTjs - (selectedSale.debtAmountTjs ?? 0)) * pct) / 100).toString())}
                     className="h-11 px-2.5 bg-surface hover:bg-surface-raised border border-border text-xs font-semibold text-fg-muted rounded-lg transition-colors"
                   >
                     {pct}%
@@ -432,9 +433,15 @@ export const SalesHistoryPage: React.FC = () => {
                   <span className="text-fg-subtle">Сумма в чеке</span>
                   <span className="text-fg">{selectedSale.totalTjs.toLocaleString()} TJS</span>
                 </div>
+                {(selectedSale.debtAmountTjs ?? 0) > 0 && (
+                  <div className="flex justify-between text-danger">
+                    <span>Непогашенный долг (будет списан)</span>
+                    <span>{(selectedSale.debtAmountTjs ?? 0).toLocaleString()} TJS</span>
+                  </div>
+                )}
                 <div className="flex justify-between font-semibold">
                   <span className="text-fg">Возврат покупателю</span>
-                  <span className="text-accent">{Math.max(0, selectedSale.totalTjs - (parseFloat(penaltyFeeTjs) || 0)).toLocaleString()} TJS</span>
+                  <span className="text-accent">{Math.max(0, (selectedSale.totalTjs - (selectedSale.debtAmountTjs ?? 0)) - (parseFloat(penaltyFeeTjs) || 0)).toLocaleString()} TJS</span>
                 </div>
                 {(parseFloat(penaltyFeeTjs) || 0) > 0 && (
                   <div className="flex justify-between pt-1 border-t border-border font-semibold">

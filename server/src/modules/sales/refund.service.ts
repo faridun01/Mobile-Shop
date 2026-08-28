@@ -30,10 +30,14 @@ export class RefundService {
       const rate = (await getRateForDate(new Date())) ?? sale.exchangeRate;
       if (!rate || rate <= 0) throw new Error('Не найден курс валют для возврата');
       const penaltyFeeTjs = requestedPenaltyTjs;
-      if (penaltyFeeTjs > sale.totalTjs) throw new Error('Штраф не может превышать сумму чека');
-      const expectedRefundTjs = sale.totalTjs - penaltyFeeTjs;
+      // For a DEBT sale, only the cash/card portion actually collected up front can be
+      // handed back — the still-unpaid remainder was never real money in the register.
+      // That remainder is simply forgiven below instead of being refunded.
+      const amountActuallyCollectedTjs = sale.totalTjs - sale.debtAmountTjs;
+      if (penaltyFeeTjs > amountActuallyCollectedTjs) throw new Error('Штраф не может превышать фактически полученную сумму по чеку');
+      const expectedRefundTjs = amountActuallyCollectedTjs - penaltyFeeTjs;
       if (!moneyEquals(requestedRefundTjs, expectedRefundTjs)) {
-        throw new Error('Сумма возврата должна равняться сумме чека за вычетом штрафа');
+        throw new Error('Сумма возврата должна равняться фактически полученной сумме по чеку за вычетом штрафа');
       }
       const penaltyUsd = roundMoney(penaltyFeeTjs / rate);
       const actualRefundTjs = requestedRefundTjs;
@@ -55,8 +59,15 @@ export class RefundService {
           penaltyFeeTjs,
           penaltyFeeUsd: penaltyUsd,
           actualRefundAmountTjs: actualRefundTjs,
+          debtAmountTjs: 0,
         },
       });
+
+      // Refunding a sale returns the devices to stock, so any debt the customer still
+      // owed on it is forgiven — there's nothing left to collect for.
+      if (sale.debtAmountTjs > 0 && sale.customerId) {
+        await tx.customer.update({ where: { id: sale.customerId }, data: { totalDebtTjs: { decrement: sale.debtAmountTjs } } });
+      }
 
       const deviceIds = sale.saleItems.map((i) => i.deviceId);
       const restockResult = await tx.device.updateMany({

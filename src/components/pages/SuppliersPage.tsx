@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
-import { Supplier, SupplierInvoice } from '../../types';
+import { Supplier, SupplierInvoice, Device } from '../../types';
 import {
   Truck,
   Plus,
@@ -11,7 +11,8 @@ import {
   X,
   Building,
   Edit,
-  Trash2
+  Trash2,
+  Loader2
 } from 'lucide-react';
 
 const formatDateStr = (dateVal?: string) => {
@@ -37,11 +38,13 @@ export const SuppliersPage: React.FC = () => {
     deleteSupplier,
     updateSupplierInvoice,
     deleteSupplierInvoice,
-    paySupplier
+    paySupplier,
+    paySupplierInvoice
   } = useApp();
 
   const [selectedSupplierId, setSelectedSupplierId] = useState<string | null>(null);
   const [selectedInvoiceId, setSelectedInvoiceId] = useState<string | null>(null);
+  const [expandedDeviceGroups, setExpandedDeviceGroups] = useState<Record<string, boolean>>({});
 
   const selectedSupplier = suppliers.find(s => s.id === selectedSupplierId) || null;
   const selectedInvoice = supplierInvoices.find(inv => inv.id === selectedInvoiceId) || null;
@@ -52,6 +55,11 @@ export const SuppliersPage: React.FC = () => {
   const [paymentAmountUsd, setPaymentAmountUsd] = useState('');
   const [sourceAccountId, setSourceAccountId] = useState(stores[0]?.id || 'main-warehouse');
   const [paymentNote, setPaymentNote] = useState('');
+
+  // Pay single invoice form state
+  const [isPayInvoiceModalOpen, setIsPayInvoiceModalOpen] = useState(false);
+  const [payInvoiceAmountUsd, setPayInvoiceAmountUsd] = useState('');
+  const [payInvoiceSourceAccountId, setPayInvoiceSourceAccountId] = useState(stores[0]?.id || 'main-warehouse');
 
   // Add supplier state
   const [newSupplierName, setNewSupplierName] = useState('');
@@ -73,6 +81,7 @@ export const SuppliersPage: React.FC = () => {
   const [deletingInvoice, setDeletingInvoice] = useState<SupplierInvoice | null>(null);
 
   const [statusMessage, setStatusMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   if (currentUser?.role === 'SELLER') {
     return (
@@ -91,46 +100,88 @@ export const SuppliersPage: React.FC = () => {
   };
 
   const handleExecutePayment = async () => {
-    if (!selectedSupplier) return;
+    if (!selectedSupplier || isSubmitting) return;
     const amt = parseFloat(paymentAmountUsd) || 0;
     if (amt <= 0) {
       setStatusMessage({ type: 'error', text: 'Укажите положительную сумму оплаты' });
       return;
     }
 
-    const res = await paySupplier({
-      supplierId: selectedSupplier.id,
-      amountUsd: amt,
-      sourceAccountId,
-      note: paymentNote.trim() || undefined
-    });
+    setIsSubmitting(true);
+    try {
+      const res = await paySupplier({
+        supplierId: selectedSupplier.id,
+        amountUsd: amt,
+        sourceAccountId,
+        note: paymentNote.trim() || undefined
+      });
 
-    if (res.success) {
-      setIsPayModalOpen(false);
-      setStatusMessage(null);
-    } else {
-      setStatusMessage({ type: 'error', text: res.message || 'Ошибка оплаты' });
+      if (res.success) {
+        setIsPayModalOpen(false);
+        setStatusMessage(null);
+      } else {
+        setStatusMessage({ type: 'error', text: res.message || 'Ошибка оплаты' });
+      }
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleOpenPayInvoice = (invoice: SupplierInvoice) => {
+    setPayInvoiceAmountUsd(invoice.remainingAmountUsd.toString());
+    setIsPayInvoiceModalOpen(true);
+  };
+
+  const handleExecuteInvoicePayment = async () => {
+    if (!selectedInvoice || isSubmitting) return;
+    const amt = parseFloat(payInvoiceAmountUsd) || 0;
+    if (amt <= 0) {
+      setStatusMessage({ type: 'error', text: 'Укажите положительную сумму оплаты' });
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const res = await paySupplierInvoice({
+        invoiceId: selectedInvoice.id,
+        amountUsd: amt,
+        sourceAccountId: payInvoiceSourceAccountId,
+      });
+
+      if (res.success) {
+        setIsPayInvoiceModalOpen(false);
+        setStatusMessage(null);
+      } else {
+        setStatusMessage({ type: 'error', text: res.message || 'Ошибка оплаты' });
+      }
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   const handleAddSupplierSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newSupplierName.trim()) return;
+    if (!newSupplierName.trim() || isSubmitting) return;
 
-    const res = await createSupplier({
-      name: newSupplierName.trim(),
-      phone: newSupplierPhone.trim() || undefined,
-      contactPerson: newSupplierContact.trim() || undefined
-    });
+    setIsSubmitting(true);
+    try {
+      const res = await createSupplier({
+        name: newSupplierName.trim(),
+        phone: newSupplierPhone.trim() || undefined,
+        contactPerson: newSupplierContact.trim() || undefined
+      });
 
-    if (res.success) {
-      setIsAddSupplierOpen(false);
-      setNewSupplierName('');
-      setNewSupplierPhone('');
-      setNewSupplierContact('');
-      setStatusMessage(null);
-    } else {
-      setStatusMessage({ type: 'error', text: res.message || 'Ошибка добавления поставщика' });
+      if (res.success) {
+        setIsAddSupplierOpen(false);
+        setNewSupplierName('');
+        setNewSupplierPhone('');
+        setNewSupplierContact('');
+        setStatusMessage(null);
+      } else {
+        setStatusMessage({ type: 'error', text: res.message || 'Ошибка добавления поставщика' });
+      }
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -144,30 +195,40 @@ export const SuppliersPage: React.FC = () => {
 
   const handleSaveEditSupplier = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!editingSupplier || !editSupplierName.trim()) return;
-    const res = await updateSupplier(editingSupplier.id, {
-      name: editSupplierName.trim(),
-      phone: editSupplierPhone.trim() || undefined,
-      contactPerson: editSupplierContact.trim() || undefined,
-    });
-    if (res.success) {
-      setEditingSupplier(null);
-    } else {
-      setStatusMessage({ type: 'error', text: res.message || 'Ошибка обновления поставщика' });
+    if (!editingSupplier || !editSupplierName.trim() || isSubmitting) return;
+    setIsSubmitting(true);
+    try {
+      const res = await updateSupplier(editingSupplier.id, {
+        name: editSupplierName.trim(),
+        phone: editSupplierPhone.trim() || undefined,
+        contactPerson: editSupplierContact.trim() || undefined,
+      });
+      if (res.success) {
+        setEditingSupplier(null);
+      } else {
+        setStatusMessage({ type: 'error', text: res.message || 'Ошибка обновления поставщика' });
+      }
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   const handleConfirmDeleteSupplier = async () => {
-    if (!deletingSupplier) return;
+    if (!deletingSupplier || isSubmitting) return;
     const supId = deletingSupplier.id;
-    const res = await deleteSupplier(supId);
-    if (res.success) {
-      setDeletingSupplier(null);
-      if (selectedSupplierId === supId) {
-        setSelectedSupplierId(null);
+    setIsSubmitting(true);
+    try {
+      const res = await deleteSupplier(supId);
+      if (res.success) {
+        setDeletingSupplier(null);
+        if (selectedSupplierId === supId) {
+          setSelectedSupplierId(null);
+        }
+      } else {
+        setStatusMessage({ type: 'error', text: res.message || 'Ошибка удаления поставщика' });
       }
-    } else {
-      setStatusMessage({ type: 'error', text: res.message || 'Ошибка удаления поставщика' });
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -181,30 +242,40 @@ export const SuppliersPage: React.FC = () => {
 
   const handleSaveEditInvoice = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!editingInvoice || !editInvoiceNumber.trim()) return;
-    const res = await updateSupplierInvoice(editingInvoice.id, {
-      invoiceNumber: editInvoiceNumber.trim(),
-      date: editInvoiceDate,
-      totalAmountUsd: parseFloat(editInvoiceAmount) || 0,
-    });
-    if (res.success) {
-      setEditingInvoice(null);
-    } else {
-      setStatusMessage({ type: 'error', text: res.message || 'Ошибка обновления накладной' });
+    if (!editingInvoice || !editInvoiceNumber.trim() || isSubmitting) return;
+    setIsSubmitting(true);
+    try {
+      const res = await updateSupplierInvoice(editingInvoice.id, {
+        invoiceNumber: editInvoiceNumber.trim(),
+        date: editInvoiceDate,
+        totalAmountUsd: parseFloat(editInvoiceAmount) || 0,
+      });
+      if (res.success) {
+        setEditingInvoice(null);
+      } else {
+        setStatusMessage({ type: 'error', text: res.message || 'Ошибка обновления накладной' });
+      }
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   const handleConfirmDeleteInvoice = async () => {
-    if (!deletingInvoice) return;
+    if (!deletingInvoice || isSubmitting) return;
     const invId = deletingInvoice.id;
-    const res = await deleteSupplierInvoice(invId);
-    if (res.success) {
-      setDeletingInvoice(null);
-      if (selectedInvoiceId === invId) {
-        setSelectedInvoiceId(null);
+    setIsSubmitting(true);
+    try {
+      const res = await deleteSupplierInvoice(invId);
+      if (res.success) {
+        setDeletingInvoice(null);
+        if (selectedInvoiceId === invId) {
+          setSelectedInvoiceId(null);
+        }
+      } else {
+        setStatusMessage({ type: 'error', text: res.message || 'Ошибка удаления накладной' });
       }
-    } else {
-      setStatusMessage({ type: 'error', text: res.message || 'Ошибка удаления накладной' });
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -625,16 +696,84 @@ export const SuppliersPage: React.FC = () => {
 
             <div className="flex space-x-2">
               <button
+                disabled={isSubmitting}
                 onClick={() => setIsPayModalOpen(false)}
-                className="flex-1 py-2.5 rounded-xl bg-surface-raised hover:bg-surface border border-border text-xs font-bold text-fg-muted uppercase"
+                className="flex-1 py-2.5 rounded-xl bg-surface-raised hover:bg-surface border border-border text-xs font-bold text-fg-muted uppercase disabled:opacity-50"
               >
                 Отмена
               </button>
               <button
+                disabled={isSubmitting}
                 onClick={handleExecutePayment}
-                className="flex-1 py-2.5 rounded-xl bg-accent hover:bg-accent-strong text-xs font-bold text-accent-fg uppercase"
+                className="flex-1 py-2.5 rounded-xl bg-accent hover:bg-accent-strong text-xs font-bold text-accent-fg uppercase disabled:opacity-60 flex items-center justify-center gap-1.5"
               >
-                Оплатить
+                {isSubmitting && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                {isSubmitting ? 'Оплата…' : 'Оплатить'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: Pay a single invoice directly (no FIFO across other invoices) */}
+      {isPayInvoiceModalOpen && selectedInvoice && (
+        <div className="fixed inset-0 z-60 flex items-center justify-center bg-black/80 p-4 backdrop-blur-xs">
+          <div className="w-full max-w-sm rounded-2xl bg-surface border border-border p-5 text-fg shadow-2xl">
+            <h4 className="text-sm font-bold text-fg mb-1">Оплата по накладной {selectedInvoice.invoiceNumber}</h4>
+            <p className="text-xs text-fg-subtle mb-4">Остаток по накладной: ${selectedInvoice.remainingAmountUsd}</p>
+
+            <div className="space-y-3 text-xs mb-4">
+              <div>
+                <label className="block text-fg-subtle mb-1">Сумма оплаты ($ USD):</label>
+                <div className="relative">
+                  <input
+                    type="number"
+                    min="1"
+                    max={selectedInvoice.remainingAmountUsd}
+                    value={payInvoiceAmountUsd ?? ''}
+                    onChange={(e) => setPayInvoiceAmountUsd(e.target.value)}
+                    className="w-full rounded-lg bg-surface-raised border border-border px-3 py-2 text-accent text-sm font-bold focus:border-accent focus:outline-none"
+                  />
+                  <span className="absolute right-3 top-2 text-fg-subtle">$</span>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-fg-subtle mb-1">Списать с кассы / счета:</label>
+                <select
+                  value={payInvoiceSourceAccountId ?? ''}
+                  onChange={(e) => setPayInvoiceSourceAccountId(e.target.value)}
+                  className="w-full rounded-lg bg-surface-raised border border-border px-3 py-2 text-fg focus:border-accent focus:outline-none"
+                >
+                  {stores.map(s => (
+                    <option key={s.id} value={s.id}>
+                      {s.name} (Остаток: {(s.cashBalanceTjs ?? 0).toLocaleString()} TJS)
+                    </option>
+                  ))}
+                  <option value="owner-funds">Личные средства инвестора / Партнера</option>
+                </select>
+              </div>
+
+              <div className="p-2.5 rounded-lg bg-accent/10 border border-accent/30 text-[11px] text-accent">
+                Оплата будет применена только к этой накладной, независимо от других долгов поставщика.
+              </div>
+            </div>
+
+            <div className="flex space-x-2">
+              <button
+                disabled={isSubmitting}
+                onClick={() => setIsPayInvoiceModalOpen(false)}
+                className="flex-1 py-2.5 rounded-xl bg-surface-raised hover:bg-surface border border-border text-xs font-bold text-fg-muted uppercase disabled:opacity-50"
+              >
+                Отмена
+              </button>
+              <button
+                disabled={isSubmitting}
+                onClick={handleExecuteInvoicePayment}
+                className="flex-1 py-2.5 rounded-xl bg-accent hover:bg-accent-strong text-xs font-bold text-accent-fg uppercase disabled:opacity-60 flex items-center justify-center gap-1.5"
+              >
+                {isSubmitting && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                {isSubmitting ? 'Оплата…' : 'Оплатить'}
               </button>
             </div>
           </div>
@@ -696,16 +835,19 @@ export const SuppliersPage: React.FC = () => {
               <div className="flex space-x-2 pt-2">
                 <button
                   type="button"
+                  disabled={isSubmitting}
                   onClick={() => setIsAddSupplierOpen(false)}
-                  className="flex-1 py-2.5 rounded-xl bg-surface-raised hover:bg-surface border border-border text-xs font-bold text-fg-muted uppercase"
+                  className="flex-1 py-2.5 rounded-xl bg-surface-raised hover:bg-surface border border-border text-xs font-bold text-fg-muted uppercase disabled:opacity-50"
                 >
                   Отмена
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 py-2.5 rounded-xl bg-accent hover:bg-accent-strong text-xs font-bold text-accent-fg uppercase"
+                  disabled={isSubmitting}
+                  className="flex-1 py-2.5 rounded-xl bg-accent hover:bg-accent-strong text-xs font-bold text-accent-fg uppercase disabled:opacity-60 flex items-center justify-center gap-1.5"
                 >
-                  Добавить
+                  {isSubmitting && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                  {isSubmitting ? 'Добавление…' : 'Добавить'}
                 </button>
               </div>
             </form>
@@ -762,6 +904,18 @@ export const SuppliersPage: React.FC = () => {
               </div>
             </div>
 
+            {selectedInvoice.remainingAmountUsd > 0 && (
+              <div className="px-3 pb-3 bg-surface-raised border-b border-border shrink-0">
+                <button
+                  onClick={() => handleOpenPayInvoice(selectedInvoice)}
+                  className="w-full py-2 rounded-xl bg-accent hover:bg-accent-strong text-xs font-bold text-accent-fg shadow-xs transition-colors flex items-center justify-center space-x-1.5"
+                >
+                  <DollarSign className="w-3.5 h-3.5" />
+                  <span>Оплатить эту накладную</span>
+                </button>
+              </div>
+            )}
+
             {/* Invoice Groups (Summary of positions) */}
             {selectedInvoice.groups && selectedInvoice.groups.length > 0 && (
               <div className="p-3 bg-surface-raised border-b border-border font-mono space-y-1.5 shrink-0">
@@ -790,6 +944,61 @@ export const SuppliersPage: React.FC = () => {
                 d.invoiceNumber === selectedInvoice.invoiceNumber
               );
 
+              const renderDeviceRow = (dev: Device, idx: number) => (
+                <div
+                  key={dev.id}
+                  className="p-2.5 rounded-xl bg-surface-raised border border-border flex items-center justify-between text-xs"
+                >
+                  <div>
+                    <div className="flex items-center space-x-2 flex-wrap gap-y-1">
+                      <span className="text-fg-subtle text-[10px] font-bold">#{idx + 1}</span>
+                      <strong className="text-fg">{dev.brand} {dev.model}</strong>
+                      <span className="text-fg-subtle text-[11px]">{dev.ram ? `${dev.ram} • ` : ''}{dev.storage} • {dev.color}</span>
+                      {(dev.purchaseCostUsd === 0 || dev.isBonus) && (
+                        <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-purple-500/20 text-purple-400 border border-purple-500/40 font-medium">
+                          🎁 ПОДАРОК ($0)
+                        </span>
+                      )}
+                    </div>
+                    <div className="text-[11px] text-fg-subtle mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 font-mono">
+                      <span>IMEI 1: <strong className="text-fg">{dev.imei}</strong></span>
+                      <span>IMEI 2: <strong className={dev.imei2 ? "text-fg" : "text-fg-subtle font-normal"}>{dev.imei2 || '—'}</strong></span>
+                      <span>Локация: <strong className="text-fg">{dev.locationName}</strong></span>
+                    </div>
+                    {dev.bonusCampaign && (
+                      <p className="text-[10px] text-purple-400 mt-0.5">
+                        {dev.bonusCampaign}
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="text-right shrink-0">
+                    <span className={`text-xs font-bold font-mono ${dev.purchaseCostUsd === 0 ? 'text-purple-400' : 'text-accent'}`}>
+                      {dev.purchaseCostUsd === 0 ? '$0 (ПОДАРОК)' : `$${dev.purchaseCostUsd}`}
+                    </span>
+                    <span className={`block text-[10px] px-1.5 py-0.2 rounded-md font-bold mt-0.5 ${
+                      dev.status === 'SOLD' ? 'text-warning' : 'text-fg-subtle'
+                    }`}>
+                      {dev.status === 'SOLD' ? 'ПРОДАН' : 'НА СКЛАДЕ'}
+                    </span>
+                  </div>
+                </div>
+              );
+
+              const hasGroups = Array.isArray(selectedInvoice.groups) && selectedInvoice.groups.length > 0;
+              const variantGroups = new Map<string, { brand: string; model: string; ram?: string; storage: string; color: string; devices: typeof containedDevices }>();
+              if (hasGroups) {
+                for (const dev of containedDevices) {
+                  const key = `${dev.brand}|${dev.model}|${dev.ram || ''}|${dev.storage}|${dev.color}`;
+                  let g = variantGroups.get(key);
+                  if (!g) {
+                    g = { brand: dev.brand, model: dev.model, ram: dev.ram, storage: dev.storage, color: dev.color, devices: [] };
+                    variantGroups.set(key, g);
+                  }
+                  g.devices.push(dev);
+                }
+              }
+
               return (
                 <>
                   <div className="p-3 bg-surface-raised border-b border-border flex items-center justify-between text-xs font-mono font-bold text-fg shrink-0">
@@ -804,47 +1013,37 @@ export const SuppliersPage: React.FC = () => {
                       <div className="p-6 text-center text-fg-subtle text-xs">
                         Нет детальных записей устройств для этой накладной
                       </div>
-                    ) : (
-                      containedDevices.map((dev, idx) => (
-                        <div
-                          key={dev.id}
-                          className="p-2.5 rounded-xl bg-surface-raised border border-border flex items-center justify-between text-xs"
-                        >
-                          <div>
-                            <div className="flex items-center space-x-2 flex-wrap gap-y-1">
-                              <span className="text-fg-subtle text-[10px] font-bold">#{idx + 1}</span>
-                              <strong className="text-fg">{dev.brand} {dev.model}</strong>
-                              <span className="text-fg-subtle text-[11px]">{dev.ram ? `${dev.ram} • ` : ''}{dev.storage} • {dev.color}</span>
-                              {(dev.purchaseCostUsd === 0 || dev.isBonus) && (
-                                <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-purple-500/20 text-purple-400 border border-purple-500/40 font-medium">
-                                  🎁 ПОДАРОК ($0)
-                                </span>
-                              )}
-                            </div>
-                            <div className="text-[11px] text-fg-subtle mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 font-mono">
-                              <span>IMEI 1: <strong className="text-fg">{dev.imei}</strong></span>
-                              <span>IMEI 2: <strong className={dev.imei2 ? "text-fg" : "text-fg-subtle font-normal"}>{dev.imei2 || '—'}</strong></span>
-                              <span>Локация: <strong className="text-fg">{dev.locationName}</strong></span>
-                            </div>
-                            {dev.bonusCampaign && (
-                              <p className="text-[10px] text-purple-400 mt-0.5">
-                                {dev.bonusCampaign}
-                              </p>
+                    ) : hasGroups && variantGroups.size > 0 ? (
+                      Array.from(variantGroups.entries()).map(([key, group]) => {
+                        const isExpanded = expandedDeviceGroups[key] ?? false;
+                        const soldCount = group.devices.filter(d => d.status === 'SOLD').length;
+                        return (
+                          <div key={key} className="rounded-xl border border-border bg-surface-raised overflow-hidden">
+                            <button
+                              type="button"
+                              onClick={() => setExpandedDeviceGroups(prev => ({ ...prev, [key]: !isExpanded }))}
+                              className="w-full p-2.5 flex items-center justify-between text-xs hover:bg-surface transition-colors"
+                            >
+                              <div className="text-left">
+                                <strong className="text-fg">{group.brand} {group.model}</strong>
+                                <span className="text-fg-subtle text-[11px] ml-2">{group.ram ? `${group.ram} • ` : ''}{group.storage} • {group.color}</span>
+                              </div>
+                              <div className="flex items-center gap-2 shrink-0">
+                                <span className="text-accent font-bold">{group.devices.length} шт.</span>
+                                {soldCount > 0 && <span className="text-[10px] text-warning">({soldCount} продано)</span>}
+                                <ChevronRight className={`w-4 h-4 text-fg-subtle transition-transform ${isExpanded ? 'rotate-90' : ''}`} />
+                              </div>
+                            </button>
+                            {isExpanded && (
+                              <div className="p-2 pt-0 space-y-2 border-t border-border">
+                                {group.devices.map((dev, idx) => renderDeviceRow(dev, idx))}
+                              </div>
                             )}
                           </div>
-
-                          <div className="text-right shrink-0">
-                            <span className={`text-xs font-bold font-mono ${dev.purchaseCostUsd === 0 ? 'text-purple-400' : 'text-accent'}`}>
-                              {dev.purchaseCostUsd === 0 ? '$0 (ПОДАРОК)' : `$${dev.purchaseCostUsd}`}
-                            </span>
-                            <span className={`block text-[10px] px-1.5 py-0.2 rounded-md font-bold mt-0.5 ${
-                              dev.status === 'SOLD' ? 'text-warning' : 'text-fg-subtle'
-                            }`}>
-                              {dev.status === 'SOLD' ? 'ПРОДАН' : 'НА СКЛАДЕ'}
-                            </span>
-                          </div>
-                        </div>
-                      ))
+                        );
+                      })
+                    ) : (
+                      containedDevices.map((dev, idx) => renderDeviceRow(dev, idx))
                     )}
                   </div>
                 </>
@@ -908,16 +1107,19 @@ export const SuppliersPage: React.FC = () => {
               <div className="pt-2 flex items-center space-x-2">
                 <button
                   type="button"
+                  disabled={isSubmitting}
                   onClick={() => setEditingSupplier(null)}
-                  className="flex-1 py-2.5 rounded-xl bg-surface-raised hover:bg-surface border border-border text-xs font-bold text-fg-muted uppercase"
+                  className="flex-1 py-2.5 rounded-xl bg-surface-raised hover:bg-surface border border-border text-xs font-bold text-fg-muted uppercase disabled:opacity-50"
                 >
                   Отмена
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 py-2.5 rounded-xl bg-accent hover:bg-accent-strong text-xs font-bold text-accent-fg uppercase"
+                  disabled={isSubmitting}
+                  className="flex-1 py-2.5 rounded-xl bg-accent hover:bg-accent-strong text-xs font-bold text-accent-fg uppercase disabled:opacity-60 flex items-center justify-center gap-1.5"
                 >
-                  Сохранить
+                  {isSubmitting && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                  {isSubmitting ? 'Сохранение…' : 'Сохранить'}
                 </button>
               </div>
             </form>
@@ -938,16 +1140,19 @@ export const SuppliersPage: React.FC = () => {
             </p>
             <div className="flex items-center justify-end space-x-2 pt-2">
               <button
+                disabled={isSubmitting}
                 onClick={() => setDeletingSupplier(null)}
-                className="px-4 py-2.5 rounded-xl bg-surface-raised hover:bg-surface border border-border text-xs font-bold text-fg-muted uppercase"
+                className="px-4 py-2.5 rounded-xl bg-surface-raised hover:bg-surface border border-border text-xs font-bold text-fg-muted uppercase disabled:opacity-50"
               >
                 Отмена
               </button>
               <button
+                disabled={isSubmitting}
                 onClick={handleConfirmDeleteSupplier}
-                className="px-4 py-2.5 rounded-xl bg-danger hover:opacity-90 text-xs font-bold text-white uppercase shadow-xs"
+                className="px-4 py-2.5 rounded-xl bg-danger hover:opacity-90 text-xs font-bold text-white uppercase shadow-xs disabled:opacity-60 flex items-center justify-center gap-1.5"
               >
-                Удалить поставщика
+                {isSubmitting && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                {isSubmitting ? 'Удаление…' : 'Удалить поставщика'}
               </button>
             </div>
           </div>
@@ -1000,16 +1205,19 @@ export const SuppliersPage: React.FC = () => {
               <div className="pt-2 flex items-center space-x-2">
                 <button
                   type="button"
+                  disabled={isSubmitting}
                   onClick={() => setEditingInvoice(null)}
-                  className="flex-1 py-2.5 rounded-xl bg-surface-raised hover:bg-surface border border-border text-xs font-bold text-fg-muted uppercase"
+                  className="flex-1 py-2.5 rounded-xl bg-surface-raised hover:bg-surface border border-border text-xs font-bold text-fg-muted uppercase disabled:opacity-50"
                 >
                   Отмена
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 py-2.5 rounded-xl bg-accent hover:bg-accent-strong text-xs font-bold text-accent-fg uppercase"
+                  disabled={isSubmitting}
+                  className="flex-1 py-2.5 rounded-xl bg-accent hover:bg-accent-strong text-xs font-bold text-accent-fg uppercase disabled:opacity-60 flex items-center justify-center gap-1.5"
                 >
-                  Сохранить
+                  {isSubmitting && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                  {isSubmitting ? 'Сохранение…' : 'Сохранить'}
                 </button>
               </div>
             </form>
@@ -1030,16 +1238,19 @@ export const SuppliersPage: React.FC = () => {
             </p>
             <div className="flex items-center justify-end space-x-2 pt-2">
               <button
+                disabled={isSubmitting}
                 onClick={() => setDeletingInvoice(null)}
-                className="px-4 py-2.5 rounded-xl bg-surface-raised hover:bg-surface border border-border text-xs font-bold text-fg-muted uppercase"
+                className="px-4 py-2.5 rounded-xl bg-surface-raised hover:bg-surface border border-border text-xs font-bold text-fg-muted uppercase disabled:opacity-50"
               >
                 Отмена
               </button>
               <button
+                disabled={isSubmitting}
                 onClick={handleConfirmDeleteInvoice}
-                className="px-4 py-2.5 rounded-xl bg-danger hover:opacity-90 text-xs font-bold text-white uppercase shadow-xs"
+                className="px-4 py-2.5 rounded-xl bg-danger hover:opacity-90 text-xs font-bold text-white uppercase shadow-xs disabled:opacity-60 flex items-center justify-center gap-1.5"
               >
-                Удалить накладную
+                {isSubmitting && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                {isSubmitting ? 'Удаление…' : 'Удалить накладную'}
               </button>
             </div>
           </div>

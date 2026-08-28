@@ -27,6 +27,7 @@ const TransferPage = lazy(() => import('../components/pages/TransferPage').then(
 const ExchangePage = lazy(() => import('../components/pages/ExchangePage').then(m => ({ default: m.ExchangePage })));
 const RepairPage = lazy(() => import('../components/pages/RepairPage').then(m => ({ default: m.RepairPage })));
 const SuppliersPage = lazy(() => import('../components/pages/SuppliersPage').then(m => ({ default: m.SuppliersPage })));
+const CustomersPage = lazy(() => import('../components/pages/CustomersPage').then(m => ({ default: m.CustomersPage })));
 const BonusesPage = lazy(() => import('../components/pages/BonusesPage').then(m => ({ default: m.BonusesPage })));
 const ExpensesPage = lazy(() => import('../components/pages/ExpensesPage').then(m => ({ default: m.ExpensesPage })));
 const OwnersPage = lazy(() => import('../components/pages/OwnersPage').then(m => ({ default: m.OwnersPage })));
@@ -53,6 +54,7 @@ const PAGE_ROUTES: Record<string, string> = {
   AUDIT_LOG: '/audit-log',
   SETTINGS: '/settings',
   NOTIFICATIONS: '/notifications',
+  CUSTOMERS: '/customers',
 };
 
 function LoadingFallback() {
@@ -99,6 +101,7 @@ function MainLayout() {
               <Route path="/exchange" element={<ExchangePage />} />
               <Route path="/repair" element={<RepairPage />} />
               <Route path="/suppliers" element={<SuppliersPage />} />
+              <Route path="/customers" element={<CustomersPage />} />
               <Route path="/bonuses" element={<BonusesPage />} />
               <Route path="/expenses" element={<ExpensesPage />} />
               <Route path="/owners" element={<OwnersPage />} />

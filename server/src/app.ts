@@ -18,6 +18,7 @@ import { registerAuditLogRoutes } from './modules/audit/audit.routes';
 import { registerNotificationRoutes } from './modules/notifications/notifications.routes';
 import { registerExchangeRateRoutes } from './modules/exchange-rate/exchange-rate.routes';
 import { registerStoreRoutes } from './modules/stores/stores.routes';
+import { registerCustomerRoutes } from './modules/customers/customers.routes';
 import { requirePositiveMoney } from './common/money';
 
 export const app = express();
@@ -297,6 +298,7 @@ registerAuditLogRoutes(app);
 registerNotificationRoutes(app);
 registerExchangeRateRoutes(app);
 registerStoreRoutes(app);
+registerCustomerRoutes(app);
 
 app.use((error: any, _req: Request, res: Response, _next: NextFunction) => {
   if (error && typeof error === 'object' && 'code' in error && error.code === 'P2002') {
