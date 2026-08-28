@@ -140,18 +140,24 @@ export class OwnersService {
       }));
       await tx.quarterClosure.create({ data: { quarterName, closedByUserId: actor.id, snapshot } });
 
-      for (const owner of owners) {
-        const remaining = owner.availableProfitUsd || 0;
-        await tx.owner.update({
-          where: { id: owner.id },
-          data: {
-            capitalBalanceUsd: transferRemainingToCapital ? { increment: remaining } : undefined,
-            totalReinvestedUsd: transferRemainingToCapital ? { increment: remaining } : undefined,
-            availableProfitUsd: transferRemainingToCapital ? 0 : undefined,
-            totalAccruedProfitUsd: 0,
-            totalPaidProfitUsd: 0,
-          },
-        });
+      // totalAccruedProfitUsd / totalPaidProfitUsd are lifetime counters — the same
+      // fields drive the always-visible KPI cards on the main Owners dashboard, which
+      // carry no "this quarter" qualifier. Closing a quarter must not zero them; only
+      // the yet-unclaimed availableProfitUsd is affected, and only if the admin opts
+      // to sweep it into capital instead of leaving it payable into next quarter.
+      if (transferRemainingToCapital) {
+        for (const owner of owners) {
+          const remaining = owner.availableProfitUsd || 0;
+          if (remaining <= 0) continue;
+          await tx.owner.update({
+            where: { id: owner.id },
+            data: {
+              capitalBalanceUsd: { increment: remaining },
+              totalReinvestedUsd: { increment: remaining },
+              availableProfitUsd: 0,
+            },
+          });
+        }
       }
 
       await tx.auditLog.create({
@@ -160,7 +166,7 @@ export class OwnersService {
           userName: actor.name,
           userRole: actor.role,
           action: 'QUARTER_CLOSE',
-          details: `Закрыт квартальный период (${quarterName})${transferRemainingToCapital ? ', остаток зачислен в капитал' : ''}, обнулены начисления квартала`,
+          details: `Закрыт квартальный период (${quarterName})${transferRemainingToCapital ? ', неполученный остаток прибыли зачислен в капитал' : ', неполученный остаток прибыли перенесён на следующий период'}`,
         },
       });
 

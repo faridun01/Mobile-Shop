@@ -217,7 +217,7 @@ export const SettingsPage: React.FC = () => {
                     <span className="text-[10px] text-fg-subtle uppercase block">ТЕКУЩИЙ КУРС</span>
                     <div className="flex items-baseline space-x-2 mt-0.5">
                       <span className="text-xl font-bold text-accent">
-                        {todayRate?.rate || 9.50} TJS
+                        {(todayRate?.rate ?? 9.5).toFixed(2)} TJS
                       </span>
                       <span className="text-xs text-fg-muted">за $1 USD</span>
                     </div>

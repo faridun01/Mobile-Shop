@@ -276,7 +276,10 @@ export const OwnersPage: React.FC = () => {
 
   const handleConfirmCloseQuarter = async () => {
     const quarterName = `${selectedQuarter} ${selectedQuarterYear}`;
-    if (!window.confirm(`Закрыть квартал ${quarterName}? Начисления и выплаты партнеров за период будут обнулены (с сохранением снимка в истории). Это действие нельзя отменить через интерфейс.`)) {
+    const sweepNote = transferRemainingToCapital
+      ? 'Невыплаченный остаток прибыли партнеров будет зачислен в их капитал.'
+      : 'Невыплаченный остаток прибыли партнеров сохранится и перейдет на следующий период.';
+    if (!window.confirm(`Закрыть квартал ${quarterName}? Будет сохранён снимок текущих показателей в историю. ${sweepNote} Начисленная и выплаченная прибыль (lifetime) не обнуляются.`)) {
       return;
     }
     const res = await closeQuarterPeriod({
@@ -1032,7 +1035,7 @@ export const OwnersPage: React.FC = () => {
                 <div>
                   <strong className="block text-warning">Автоматически реинвестировать невыплаченный остаток в капитал</strong>
                   <span className="text-[11px] text-fg-subtle block mt-0.5">
-                    При установке этой галочки все невыплаченные средства партнеров будут зачислены в их оборотный капитал бизнеса до обнуления периода.
+                    При установке этой галочки остаток к выплате партнеров будет зачислен в их оборотный капитал. Если не отмечено — остаток сохранится и перейдет на следующий период. Начисленная и выплаченная прибыль (lifetime-показатели на главной панели) не обнуляются в любом случае.
                   </span>
                 </div>
               </label>
@@ -1051,7 +1054,7 @@ export const OwnersPage: React.FC = () => {
                 onClick={handleConfirmCloseQuarter}
                 className="flex-1 py-2.5 px-3 rounded-xl bg-warning hover:bg-warning/90 text-xs font-bold uppercase text-black shadow-xs transition-colors"
               >
-                🧹 ЗАКРЫТЬ КВАРТАЛ И ОБНУЛИТЬ
+                📊 ЗАКРЫТЬ КВАРТАЛЬНЫЙ ПЕРИОД
               </button>
             </div>
           </div>
