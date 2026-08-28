@@ -10,7 +10,8 @@ import {
   Store as StoreIcon,
   Send,
   X,
-  Check
+  Check,
+  Loader2
 } from 'lucide-react';
 import { StatusBanner, StatusMessage } from '../ui/StatusBanner';
 
@@ -41,6 +42,8 @@ export const TransferPage: React.FC = () => {
   const [statusBanner, setStatusBanner] = useState<StatusMessage | null>(null);
 
   const [confirmTransferModal, setConfirmTransferModal] = useState<boolean>(false);
+  const [isSubmittingTransfer, setIsSubmittingTransfer] = useState(false);
+  const [processingTransferId, setProcessingTransferId] = useState<string | null>(null);
 
   const fromStoreName = stores.find(s => s.id === fromLocationId)?.name || 'Исходный склад';
   const toStoreName = stores.find(s => s.id === toLocationId)?.name || 'Целевой склад';
@@ -110,40 +113,58 @@ export const TransferPage: React.FC = () => {
   };
 
   const handleExecuteTransfer = async () => {
-    setConfirmTransferModal(false);
-    const res = await createTransferRequest({
-      fromLocationId,
-      toLocationId,
-      deviceIds: selectedDeviceIds,
-    });
-
-    if (res.success) {
-      setStatusBanner({
-        tone: 'success',
-        text: `Запрос на перемещение (${selectedDeviceIds.length} шт.) успешно сформирован!`
+    if (isSubmittingTransfer) return;
+    setIsSubmittingTransfer(true);
+    try {
+      const res = await createTransferRequest({
+        fromLocationId,
+        toLocationId,
+        deviceIds: selectedDeviceIds,
       });
-      setSelectedDeviceIds([]);
-      setActiveTab('list');
-    } else {
-      setStatusMessage({ type: 'error', text: res.message || 'Ошибка создания перемещения' });
+
+      if (res.success) {
+        setConfirmTransferModal(false);
+        setStatusBanner({
+          tone: 'success',
+          text: `Запрос на перемещение (${selectedDeviceIds.length} шт.) успешно сформирован!`
+        });
+        setSelectedDeviceIds([]);
+        setActiveTab('list');
+      } else {
+        setStatusMessage({ type: 'error', text: res.message || 'Ошибка создания перемещения' });
+      }
+    } finally {
+      setIsSubmittingTransfer(false);
     }
   };
 
   const handleApprove = async (transferId: string) => {
-    const res = await approveTransfer(transferId);
-    if (res.success) {
-      setStatusBanner({ tone: 'success', text: 'Перемещение успешно подтверждено и принято на склад!' });
-    } else {
-      setStatusBanner({ tone: 'error', text: res.message || 'Ошибка подтверждения' });
+    if (processingTransferId) return;
+    setProcessingTransferId(transferId);
+    try {
+      const res = await approveTransfer(transferId);
+      if (res.success) {
+        setStatusBanner({ tone: 'success', text: 'Перемещение успешно подтверждено и принято на склад!' });
+      } else {
+        setStatusBanner({ tone: 'error', text: res.message || 'Ошибка подтверждения' });
+      }
+    } finally {
+      setProcessingTransferId(null);
     }
   };
 
   const handleReject = async (transferId: string) => {
-    const res = await rejectTransfer(transferId, 'Отклонено пользователем');
-    if (res.success) {
-      setStatusBanner({ tone: 'success', text: 'Перемещение отклонено' });
-    } else {
-      setStatusBanner({ tone: 'error', text: res.message || 'Ошибка отклонения' });
+    if (processingTransferId) return;
+    setProcessingTransferId(transferId);
+    try {
+      const res = await rejectTransfer(transferId, 'Отклонено пользователем');
+      if (res.success) {
+        setStatusBanner({ tone: 'success', text: 'Перемещение отклонено' });
+      } else {
+        setStatusBanner({ tone: 'error', text: res.message || 'Ошибка отклонения' });
+      }
+    } finally {
+      setProcessingTransferId(null);
     }
   };
 
@@ -426,15 +447,19 @@ export const TransferPage: React.FC = () => {
                       <div className="pt-1 flex items-center justify-end space-x-2">
                         <button
                           onClick={() => handleReject(tr.id)}
-                          className="px-3 py-1.5 rounded-xl bg-danger/10 hover:bg-danger/15 text-danger border border-danger/30 text-xs font-bold transition-colors"
+                          disabled={processingTransferId === tr.id}
+                          className="px-3 py-1.5 rounded-xl bg-danger/10 hover:bg-danger/15 text-danger border border-danger/30 text-xs font-bold transition-colors disabled:opacity-50 flex items-center gap-1.5"
                         >
+                          {processingTransferId === tr.id && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
                           ОТКЛОНИТЬ
                         </button>
                         <button
                           onClick={() => handleApprove(tr.id)}
-                          className="px-4 py-1.5 rounded-xl bg-accent hover:bg-accent-strong text-accent-fg text-xs font-bold shadow-xs transition-colors"
+                          disabled={processingTransferId === tr.id}
+                          className="px-4 py-1.5 rounded-xl bg-accent hover:bg-accent-strong text-accent-fg text-xs font-bold shadow-xs transition-colors disabled:opacity-60 flex items-center gap-1.5"
                         >
-                          ПОДТВЕРДИТЬ И ПРИНЯТЬ
+                          {processingTransferId === tr.id && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                          {processingTransferId === tr.id ? 'ОБРАБОТКА…' : 'ПОДТВЕРДИТЬ И ПРИНЯТЬ'}
                         </button>
                       </div>
                     )}
@@ -461,17 +486,20 @@ export const TransferPage: React.FC = () => {
             <div className="flex space-x-2 pt-2">
               <button
                 type="button"
+                disabled={isSubmittingTransfer}
                 onClick={() => setConfirmTransferModal(false)}
-                className="flex-1 py-2.5 rounded-xl bg-surface-raised hover:bg-surface border border-border text-xs font-bold text-fg-muted uppercase"
+                className="flex-1 py-2.5 rounded-xl bg-surface-raised hover:bg-surface border border-border text-xs font-bold text-fg-muted uppercase disabled:opacity-50"
               >
                 ОТМЕНА
               </button>
               <button
                 type="button"
+                disabled={isSubmittingTransfer}
                 onClick={handleExecuteTransfer}
-                className="flex-1 py-2.5 rounded-xl bg-accent hover:bg-accent-strong text-xs font-bold text-accent-fg uppercase"
+                className="flex-1 py-2.5 rounded-xl bg-accent hover:bg-accent-strong text-xs font-bold text-accent-fg uppercase disabled:opacity-60 flex items-center justify-center gap-1.5"
               >
-                ПОДТВЕРДИТЬ
+                {isSubmittingTransfer && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                {isSubmittingTransfer ? 'ОФОРМЛЕНИЕ…' : 'ПОДТВЕРДИТЬ'}
               </button>
             </div>
           </div>
