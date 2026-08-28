@@ -33,6 +33,10 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV PORT=3000
 
+# Pull the latest Alpine security patches (e.g. OpenSSL) at build time, since the
+# base image tag can lag behind newly-disclosed CVEs between its own rebuilds.
+RUN apk update && apk upgrade --no-cache
+
 # Create non-root system user for security
 RUN addgroup -g 1001 -S nodejs && \
     adduser -S nodejs -u 1001
