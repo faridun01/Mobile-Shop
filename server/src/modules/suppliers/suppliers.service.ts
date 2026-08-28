@@ -96,7 +96,9 @@ export class SuppliersService {
       if (input.sourceAccount === 'STORE_CASH' && input.storeId) {
         store = await tx.store.findUnique({ where: { id: input.storeId } });
         if (store) {
-          if (store.isMainWarehouse) throw new Error('Главный склад не является торговой кассой');
+          // Unlike sales/expenses, supplier payments may be funded from the main
+          // warehouse's account — purchases (приходы) are recorded there and its
+          // balance is meant to fund paying those suppliers back, not just retail stores.
           // amountUsd was collected in USD terms but store registers hold TJS; convert via today's rate if available.
           const today = new Date().toISOString().split('T')[0];
           const rate = (await tx.exchangeRate.findUnique({ where: { date: today } }))?.rate;
@@ -186,7 +188,6 @@ export class SuppliersService {
       if (input.sourceAccount === 'STORE_CASH' && input.storeId) {
         store = await tx.store.findUnique({ where: { id: input.storeId } });
         if (store) {
-          if (store.isMainWarehouse) throw new Error('Главный склад не является торговой кассой');
           const today = new Date().toISOString().split('T')[0];
           const rate = (await tx.exchangeRate.findUnique({ where: { date: today } }))?.rate;
           if (!rate) throw new Error('Сначала задайте курс валют на сегодня');
