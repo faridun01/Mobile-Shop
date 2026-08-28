@@ -827,7 +827,6 @@ export const SuppliersPage: React.FC = () => {
                             <div className="text-[11px] text-slate-400 mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 font-mono">
                               <span>IMEI 1: <strong className="text-slate-300">{dev.imei}</strong></span>
                               <span>IMEI 2: <strong className={dev.imei2 ? "text-slate-300" : "text-slate-500 font-normal"}>{dev.imei2 || '—'}</strong></span>
-                              <span>Штрихкод (EAN): <strong className={dev.barcode ? "text-amber-400 font-mono" : "text-slate-500 font-normal"}>{dev.barcode || '—'}</strong></span>
                               <span>Локация: <strong className="text-slate-300">{dev.locationName}</strong></span>
                             </div>
                             {dev.bonusCampaign && (

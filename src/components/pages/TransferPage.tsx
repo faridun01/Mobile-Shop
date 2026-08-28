@@ -57,7 +57,6 @@ export const TransferPage: React.FC = () => {
         const matches =
           d.imei.toLowerCase().includes(q) ||
           (d.imei2 && d.imei2.toLowerCase().includes(q)) ||
-          (d.barcode && d.barcode.toLowerCase().includes(q)) ||
           d.brand.toLowerCase().includes(q) ||
           d.model.toLowerCase().includes(q) ||
           d.color.toLowerCase().includes(q);
@@ -86,7 +85,7 @@ export const TransferPage: React.FC = () => {
     openScanner((scannedCode) => {
       const code = scannedCode.trim();
       const matched = availableDevicesAtFromLocation.find(d =>
-        d.imei === code || d.imei2 === code || d.barcode === code
+        d.imei === code || d.imei2 === code
       );
       if (matched) {
         if (!selectedDeviceIds.includes(matched.id)) {
@@ -283,11 +282,10 @@ export const TransferPage: React.FC = () => {
               <button
                 type="button"
                 onClick={handleScanDevice}
-                className="flex items-center space-x-1.5 px-3 py-1.5 bg-surface-raised hover:bg-surface text-accent text-xs font-bold rounded-xl border border-border shrink-0 transition-colors"
+                className="flex items-center justify-center p-2 bg-surface-raised hover:bg-surface text-accent text-xs font-bold rounded-xl border border-border shrink-0 transition-colors"
                 title="Сканировать"
               >
                 <Scan className="w-4 h-4" />
-                <span className="hidden sm:inline">СКАНИРОВАТЬ</span>
               </button>
             </div>
 

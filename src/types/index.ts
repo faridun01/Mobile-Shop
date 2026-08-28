@@ -120,7 +120,6 @@ export interface Device {
   imei: string;
   imei2?: string;
   serialNumber?: string;
-  barcode?: string;
   brand: string;
   model: string;
   storage: string;
@@ -146,7 +145,6 @@ export interface SaleItem {
   deviceId: string;
   imei: string;
   imei2?: string;
-  barcode?: string;
   brand: string;
   model: string;
   storage: string;
@@ -230,7 +228,6 @@ export interface RepairTicket {
   deviceId?: string;
   imei: string;
   imei2?: string;
-  barcode?: string;
   brand?: string;
   model?: string;
   deviceModel?: string;

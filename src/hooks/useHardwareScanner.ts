@@ -1,7 +1,6 @@
 import { useEffect, useRef } from 'react';
 
 /**
- * Custom React Hook for listening to Physical Hardware USB/HID Barcode & IMEI Scanners.
  * Captures fast keystrokes typed by hardware wedge scanners anywhere in the app.
  */
 export function useHardwareScanner(onScan: (scannedCode: string) => void) {

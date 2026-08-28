@@ -35,7 +35,6 @@ export const RepairPage: React.FC = () => {
   const [clientPhone, setClientPhone] = useState('');
   const [deviceModel, setDeviceModel] = useState('');
   const [imei, setImei] = useState('');
-  const [barcode, setBarcode] = useState('');
   const [defectDescription, setDefectDescription] = useState('');
   const [estimatedCostTjs, setEstimatedCostTjs] = useState<string>('0');
   const [prepaymentTjs, setPrepaymentTjs] = useState<string>('0');
@@ -104,8 +103,7 @@ export const RepairPage: React.FC = () => {
           (t.customerPhone && t.customerPhone.toLowerCase().includes(q)) ||
           (t.deviceModel && t.deviceModel.toLowerCase().includes(q)) ||
           (t.model && t.model.toLowerCase().includes(q)) ||
-          (t.imei && t.imei.toLowerCase().includes(q)) ||
-          (t.barcode && t.barcode.toLowerCase().includes(q));
+          (t.imei && t.imei.toLowerCase().includes(q));
         if (!matches) return false;
       }
 
@@ -127,18 +125,16 @@ export const RepairPage: React.FC = () => {
         if (item) {
           setDeviceModel(`${item.brand} ${item.model} ${item.storage}`);
           if (item.imei) setImei(item.imei);
-          if (item.barcode) setBarcode(item.barcode);
           if (matched.customerName) setClientName(matched.customerName);
           setStatusMessage({ type: 'success', text: `Данные из чека #${code} автоматически подставлены` });
           return;
         }
       }
 
-      const devMatch = devices.find(d => d.imei === code || d.barcode === code);
+      const devMatch = devices.find(d => d.imei === code);
       if (devMatch) {
         setDeviceModel(`${devMatch.brand} ${devMatch.model} ${devMatch.storage}`);
         if (devMatch.imei) setImei(devMatch.imei);
-        if (devMatch.barcode) setBarcode(devMatch.barcode);
         setStatusMessage({ type: 'success', text: `Данные устройства ${devMatch.brand} ${devMatch.model} подставлены` });
         return;
       }
@@ -157,29 +153,26 @@ export const RepairPage: React.FC = () => {
         if (item) {
           setDeviceModel(`${item.brand} ${item.model} ${item.storage}`);
           if (item.imei) setImei(item.imei);
-          if (item.barcode) setBarcode(item.barcode);
           if (sale.customerName) setClientName(sale.customerName);
           setStatusMessage({ type: 'success', text: `Найдена покупка по чеку #${sale.receiptNumber}` });
           return;
         }
       }
       for (const item of sale.items) {
-        if (item.imei.toLowerCase() === q || (item.barcode && item.barcode.toLowerCase() === q)) {
+        if (item.imei.toLowerCase() === q) {
           setDeviceModel(`${item.brand} ${item.model} ${item.storage}`);
           if (item.imei) setImei(item.imei);
-          if (item.barcode) setBarcode(item.barcode);
           if (sale.customerName) setClientName(sale.customerName);
-          setStatusMessage({ type: 'success', text: `Найдено устройство по IMEI/штрихкоду` });
+          setStatusMessage({ type: 'success', text: `Найдено устройство по IMEI` });
           return;
         }
       }
     }
 
-    const devMatch = devices.find(d => d.imei.toLowerCase() === q || (d.barcode && d.barcode.toLowerCase() === q));
+    const devMatch = devices.find(d => d.imei.toLowerCase() === q);
     if (devMatch) {
       setDeviceModel(`${devMatch.brand} ${devMatch.model} ${devMatch.storage}`);
       if (devMatch.imei) setImei(devMatch.imei);
-      if (devMatch.barcode) setBarcode(devMatch.barcode);
       setStatusMessage({ type: 'success', text: `Устройство найдено в каталоге` });
       return;
     }
@@ -200,7 +193,6 @@ export const RepairPage: React.FC = () => {
 
     const res = await createRepairTicket({
       imei: imei.trim() || 'N/A',
-      barcode: barcode.trim() || undefined,
       brand,
       model,
       storage: 'N/A',
@@ -219,7 +211,6 @@ export const RepairPage: React.FC = () => {
       setClientPhone('');
       setDeviceModel('');
       setImei('');
-      setBarcode('');
       setDefectDescription('');
       setEstimatedCostTjs('0');
       setPrepaymentTjs('0');
@@ -472,27 +463,15 @@ export const RepairPage: React.FC = () => {
                   />
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-fg-subtle mb-1 text-[11px] uppercase">IMEI устройства</label>
-                    <input
-                      type="text"
-                      value={imei ?? ''}
-                      onChange={(e) => setImei(e.target.value)}
-                      placeholder="354891100234561"
-                      className="w-full rounded-xl bg-surface-raised border border-border px-3 py-2 text-fg focus:border-accent focus:outline-none"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-fg-subtle mb-1 text-[11px] uppercase">Штрихкод / S/N</label>
-                    <input
-                      type="text"
-                      value={barcode ?? ''}
-                      onChange={(e) => setBarcode(e.target.value)}
-                      placeholder="BC-10023"
-                      className="w-full rounded-xl bg-surface-raised border border-border px-3 py-2 text-fg focus:border-accent focus:outline-none"
-                    />
-                  </div>
+                <div>
+                  <label className="block text-fg-subtle mb-1 text-[11px] uppercase">IMEI устройства</label>
+                  <input
+                    type="text"
+                    value={imei ?? ''}
+                    onChange={(e) => setImei(e.target.value)}
+                    placeholder="354891100234561"
+                    className="w-full rounded-xl bg-surface-raised border border-border px-3 py-2 text-fg focus:border-accent focus:outline-none"
+                  />
                 </div>
 
                 <div>

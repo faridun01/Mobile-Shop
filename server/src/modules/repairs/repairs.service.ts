@@ -7,7 +7,6 @@ export interface CreateRepairInput {
   userId: string;
   imei: string;
   imei2?: string;
-  barcode?: string;
   brand: string;
   model: string;
   storage?: string;
@@ -29,7 +28,7 @@ export class RepairsService {
     return prisma.$transaction(async (tx) => {
       const actor = await resolveActor(tx, input.userId);
       const matchedDevice = await tx.device.findFirst({
-        where: { OR: [{ imei: input.imei }, ...(input.barcode ? [{ barcode: input.barcode }] : [])] },
+        where: { imei: input.imei },
       });
 
       const costTjs = input.repairCostTjs || input.estimatedCostTjs || 0;
@@ -41,7 +40,6 @@ export class RepairsService {
           deviceId: matchedDevice?.id,
           imei: input.imei,
           imei2: input.imei2,
-          barcode: input.barcode,
           brand: input.brand,
           model: input.model,
           storage: input.storage,

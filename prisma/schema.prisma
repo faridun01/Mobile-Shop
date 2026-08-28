@@ -136,7 +136,6 @@ model Device {
   // any duplicate non-null value.
   imei2             String?      @unique
   serialNumber      String?
-  barcode           String?
   brand             String
   model             String
   storage           String
@@ -429,7 +428,6 @@ model RepairTicket {
   deviceId           String?
   imei               String
   imei2              String?
-  barcode            String?
   brand              String
   model              String
   storage            String?

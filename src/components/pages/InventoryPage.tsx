@@ -57,7 +57,6 @@ const DeviceRow: React.FC<DeviceRowProps> = ({ device, isAdminOrPartner, onClick
       </div>
       <p className="text-xs text-fg-subtle mt-0.5 truncate">
         IMEI: {device.imei}{device.imei2 ? ` / ${device.imei2}` : ''}
-        {device.barcode && ` · EAN: ${device.barcode}`}
       </p>
     </div>
 
@@ -101,7 +100,6 @@ export const InventoryPage: React.FC = () => {
           d.imei.toLowerCase().includes(q) ||
           d.imei2?.toLowerCase().includes(q) ||
           d.serialNumber?.toLowerCase().includes(q) ||
-          d.barcode?.toLowerCase().includes(q) ||
           d.brand.toLowerCase().includes(q) ||
           d.model.toLowerCase().includes(q) ||
           d.color.toLowerCase().includes(q) ||
@@ -126,7 +124,7 @@ export const InventoryPage: React.FC = () => {
     openScanner((scannedCode) => {
       const code = scannedCode.trim();
       const match = devices.find(d =>
-        (d.imei === code || d.imei2 === code || d.barcode === code || d.serialNumber === code) &&
+        (d.imei === code || d.imei2 === code || d.serialNumber === code) &&
         (!isSeller || d.locationId === currentUser?.storeId)
       );
       if (match) setSelectedDevice(match);
@@ -242,12 +240,6 @@ export const InventoryPage: React.FC = () => {
                 <span className="text-fg-subtle block text-xs uppercase">IMEI 2</span>
                 <span className={`text-sm font-semibold select-all break-all ${selectedDevice.imei2 ? 'text-fg' : 'text-fg-subtle font-normal'}`}>
                   {selectedDevice.imei2 || '— не указан'}
-                </span>
-              </div>
-              <div className="col-span-2 pt-2 border-t border-border">
-                <span className="text-fg-subtle block text-xs uppercase">Штрихкод / EAN</span>
-                <span className={`text-sm font-semibold select-all break-all ${selectedDevice.barcode ? 'text-fg' : 'text-fg-subtle font-normal'}`}>
-                  {selectedDevice.barcode || '— не указан'}
                 </span>
               </div>
               {selectedDevice.serialNumber && (

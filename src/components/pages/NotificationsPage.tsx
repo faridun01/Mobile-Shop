@@ -58,7 +58,7 @@ export const NotificationsPage: React.FC = () => {
     <div className="flex-1 flex flex-col h-full overflow-hidden bg-bg text-fg">
       <PageHeader
         icon={Bell}
-        title="Уведомления и задачи"
+        title="Уведомления"
         action={
           hasUnread ? (
             <Button variant="secondary" size="md" leftIcon={CheckCheck} className="h-9 px-3" onClick={() => markAllNotificationsAsRead?.()}>

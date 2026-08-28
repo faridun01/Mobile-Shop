@@ -137,8 +137,6 @@ interface AppContextType {
       storage: string;
       color: string;
       purchasePriceUsd: number;
-      barcode?: string;
-      imeis: string[];
     }[];
   }) => Promise<{ success: boolean; message?: string }>;
 
@@ -178,7 +176,6 @@ interface AppContextType {
   createRepairTicket: (params: {
     imei: string;
     imei2?: string;
-    barcode?: string;
     brand: string;
     model: string;
     storage: string;

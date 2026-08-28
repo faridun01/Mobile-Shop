@@ -85,7 +85,6 @@ export const SalePage: React.FC = () => {
         const matches =
           d.imei.toLowerCase().includes(q) ||
           (d.imei2 && d.imei2.toLowerCase().includes(q)) ||
-          (d.barcode && d.barcode.toLowerCase().includes(q)) ||
           (d.serialNumber && d.serialNumber.toLowerCase().includes(q)) ||
           d.brand.toLowerCase().includes(q) ||
           d.model.toLowerCase().includes(q) ||
@@ -167,7 +166,7 @@ export const SalePage: React.FC = () => {
     openScanner((scannedCode) => {
       const code = scannedCode.trim();
       const exactDev = devices.find(d =>
-        (d.imei === code || d.imei2 === code || d.barcode === code || d.serialNumber === code) &&
+        (d.imei === code || d.imei2 === code || d.serialNumber === code) &&
         (d.status === 'STORE_STOCK' || d.status === 'IN_STOCK_AFTER_EXCHANGE') &&
         (!effectiveStoreId || d.locationId === effectiveStoreId) &&
         !cart.some(ci => ci.device.id === d.id)
@@ -315,7 +314,6 @@ export const SalePage: React.FC = () => {
                     </div>
                     <p className="text-xs text-fg-subtle mt-0.5">
                       {variant.storage} · {variant.color}
-                      {variant.devices[0]?.barcode && <span className="ml-2">EAN: {variant.devices[0].barcode}</span>}
                     </p>
                   </div>
 
@@ -352,7 +350,6 @@ export const SalePage: React.FC = () => {
                               IMEI: {dev.imei}{dev.imei2 ? ` / ${dev.imei2}` : ''}
                             </p>
                             <p className="text-xs text-fg-subtle mt-0.5">
-                              {dev.barcode && <span>EAN: {dev.barcode} · </span>}
                               Закупка: ${devCost}
                             </p>
                           </div>
@@ -439,7 +436,6 @@ export const SalePage: React.FC = () => {
                     <p className="text-xs text-fg-subtle">{item.device.storage} · {item.device.color}</p>
                     <p className="text-xs text-fg-subtle mt-0.5">
                       IMEI: {item.device.imei}{item.device.imei2 ? ` / ${item.device.imei2}` : ''}
-                      {item.device.barcode && ` · EAN: ${item.device.barcode}`}
                     </p>
                   </div>
                   <IconButton icon={Trash2} tone="danger" size="sm" aria-label="Удалить из корзины" onClick={() => handleRemoveFromCart(idx)} />

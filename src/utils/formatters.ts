@@ -9,22 +9,18 @@ export function formatDeviceName(device: { brand: string; model: string; storage
 }
 
 /**
- * Formats device IMEI & Barcode identifiers consistently:
- * "IMEI: 35489... / 35489... • EAN: 1234567890123"
+ * Formats device IMEI identifiers consistently:
+ * "IMEI: 35489... / 35489..."
  */
-export function formatDeviceIdentifiers(device: { imei: string; imei2?: string; barcode?: string; serialNumber?: string }): {
+export function formatDeviceIdentifiers(device: { imei: string; imei2?: string; serialNumber?: string }): {
   imeiText: string;
-  barcodeText?: string;
   fullText: string;
 } {
   const imeiText = device.imei2 ? `IMEI: ${device.imei} / ${device.imei2}` : `IMEI: ${device.imei}`;
-  const barcodeText = device.barcode ? `EAN: ${device.barcode}` : undefined;
-  const fullText = [imeiText, barcodeText].filter(Boolean).join(' • ');
 
   return {
     imeiText,
-    barcodeText,
-    fullText
+    fullText: imeiText
   };
 }
 

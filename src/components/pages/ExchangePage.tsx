@@ -51,7 +51,6 @@ export const ExchangePage: React.FC = () => {
         const matches =
           d.imei.toLowerCase().includes(q) ||
           (d.imei2 && d.imei2.toLowerCase().includes(q)) ||
-          (d.barcode && d.barcode.toLowerCase().includes(q)) ||
           d.brand.toLowerCase().includes(q) ||
           d.model.toLowerCase().includes(q) ||
           d.color.toLowerCase().includes(q);
@@ -74,7 +73,6 @@ export const ExchangePage: React.FC = () => {
             id: item.deviceId || `old-${Date.now()}`,
             imei: item.imei,
             imei2: item.imei2,
-            barcode: item.barcode,
             brand: item.brand,
             model: item.model,
             color: item.color,
@@ -99,15 +97,13 @@ export const ExchangePage: React.FC = () => {
       for (const item of sale.items) {
         if (
           item.imei.toLowerCase() === q ||
-          (item.imei2 && item.imei2.toLowerCase() === q) ||
-          (item.barcode && item.barcode.toLowerCase() === q)
+          (item.imei2 && item.imei2.toLowerCase() === q)
         ) {
           const matchedDev = devices.find(d => d.imei === item.imei || d.id === item.deviceId);
           const oldDev: Device = matchedDev || {
             id: item.deviceId || `old-${Date.now()}`,
             imei: item.imei,
             imei2: item.imei2,
-            barcode: item.barcode,
             brand: item.brand,
             model: item.model,
             color: item.color,
@@ -132,8 +128,7 @@ export const ExchangePage: React.FC = () => {
 
     const devMatch = devices.find(d =>
       d.imei.toLowerCase() === q ||
-      (d.imei2 && d.imei2.toLowerCase() === q) ||
-      (d.barcode && d.barcode.toLowerCase() === q)
+      (d.imei2 && d.imei2.toLowerCase() === q)
     );
 
     if (devMatch) {
@@ -156,7 +151,7 @@ export const ExchangePage: React.FC = () => {
     openScanner((scannedCode) => {
       const code = scannedCode.trim();
       const dev = availableDevices.find(d =>
-        d.imei === code || d.imei2 === code || d.barcode === code
+        d.imei === code || d.imei2 === code
       );
       if (dev) {
         handleSelectReplacement(dev);

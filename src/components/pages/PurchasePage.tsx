@@ -26,7 +26,6 @@ import {
 
 interface PurchaseItem {
   imei: string;
-  barcode: string;
 }
 
 interface PurchaseItemGroup {
@@ -38,21 +37,6 @@ interface PurchaseItemGroup {
   purchasePriceUsd: number;
   items: PurchaseItem[];
 }
-
-const incrementBarcode = (barcode: string): string => {
-  if (!barcode || !barcode.trim()) return '';
-  const trimmed = barcode.trim();
-  const match = trimmed.match(/^(.*?)(\d+)$/);
-  if (!match) return trimmed;
-  const prefix = match[1];
-  const numStr = match[2];
-  try {
-    const nextNum = (BigInt(numStr) + 1n).toString().padStart(numStr.length, '0');
-    return prefix + nextNum;
-  } catch {
-    return trimmed;
-  }
-};
 
 export const PurchasePage: React.FC = () => {
   const {
@@ -162,7 +146,7 @@ export const PurchasePage: React.FC = () => {
       storage: '256 GB',
       color: 'Black Titanium',
       purchasePriceUsd: 900,
-      items: [{ imei: '', barcode: '' }]
+      items: [{ imei: '' }]
     }
   ]);
 
@@ -204,7 +188,6 @@ export const PurchasePage: React.FC = () => {
         const matchesDevice = invoiceDevices.some(
           d => d.imei.toLowerCase().includes(q) ||
                (d.imei2 && d.imei2.toLowerCase().includes(q)) ||
-               (d.barcode && d.barcode.toLowerCase().includes(q)) ||
                d.model.toLowerCase().includes(q) ||
                d.brand.toLowerCase().includes(q)
         );
@@ -228,7 +211,7 @@ export const PurchasePage: React.FC = () => {
   const handleScanFinder = () => {
     openScanner((scannedCode) => {
       const code = scannedCode.trim();
-      const matchedDevice = devices.find(d => d.imei === code || d.imei2 === code || d.barcode === code);
+      const matchedDevice = devices.find(d => d.imei === code || d.imei2 === code);
       if (matchedDevice && matchedDevice.invoiceNumber) {
         const matchedInv = supplierInvoices.find(inv => inv.invoiceNumber === matchedDevice.invoiceNumber);
         if (matchedInv) {
@@ -257,7 +240,7 @@ export const PurchasePage: React.FC = () => {
         storage: '128 GB',
         color: 'Black',
         purchasePriceUsd: 700,
-        items: [{ imei: '', barcode: '' }]
+        items: [{ imei: '' }]
       }
     ]);
   };
@@ -278,9 +261,7 @@ export const PurchasePage: React.FC = () => {
     setGroups(prev => {
       const next = [...prev];
       const items = [...next[groupIdx].items];
-      const lastItem = items[items.length - 1];
-      const nextBarcode = incrementBarcode(lastItem?.barcode || '');
-      items.push({ imei: '', barcode: nextBarcode });
+      items.push({ imei: '' });
       next[groupIdx] = { ...next[groupIdx], items };
       return next;
     });
@@ -292,7 +273,7 @@ export const PurchasePage: React.FC = () => {
       const items = next[groupIdx].items.filter((_, i) => i !== itemIdx);
       next[groupIdx] = {
         ...next[groupIdx],
-        items: items.length > 0 ? items : [{ imei: '', barcode: '' }]
+        items: items.length > 0 ? items : [{ imei: '' }]
       };
       return next;
     });
@@ -303,30 +284,6 @@ export const PurchasePage: React.FC = () => {
       const next = [...prev];
       const items = [...next[groupIdx].items];
       items[itemIdx] = { ...items[itemIdx], imei: val };
-      next[groupIdx] = { ...next[groupIdx], items };
-      return next;
-    });
-  };
-
-  const handleUpdateBarcode = (groupIdx: number, itemIdx: number, val: string) => {
-    setGroups(prev => {
-      const next = [...prev];
-      const items = [...next[groupIdx].items];
-      items[itemIdx] = { ...items[itemIdx], barcode: val };
-
-      // Auto-propagate and auto-increment barcode to subsequent empty items
-      let currentBarcode = val.trim();
-      for (let i = itemIdx + 1; i < items.length; i++) {
-        if (!items[i].barcode || items[i].barcode.trim() === '') {
-          if (currentBarcode) {
-            currentBarcode = incrementBarcode(currentBarcode);
-            items[i] = { ...items[i], barcode: currentBarcode };
-          }
-        } else {
-          break;
-        }
-      }
-
       next[groupIdx] = { ...next[groupIdx], items };
       return next;
     });
@@ -349,28 +306,13 @@ export const PurchasePage: React.FC = () => {
     });
   };
 
-  const handleScanBarcode = (groupIdx: number, itemIdx: number) => {
-    openScanner((scannedCode) => {
-      handleUpdateBarcode(groupIdx, itemIdx, scannedCode.trim());
-    });
-  };
-
   // Quick batch paste IMEI helper
   const handleBatchImeiPaste = (groupIdx: number, text: string) => {
     const rawLines = text.split(/[\n,\s]+/).map(s => s.trim()).filter(Boolean);
     if (rawLines.length > 0) {
       setGroups(prev => {
         const next = [...prev];
-        const currentItems = next[groupIdx].items;
-        let currentBarcode = currentItems[0]?.barcode?.trim() || '';
-
-        const newItems: PurchaseItem[] = rawLines.map((imei, idx) => {
-          if (idx === 0) {
-            return { imei, barcode: currentBarcode };
-          }
-          currentBarcode = currentBarcode ? incrementBarcode(currentBarcode) : '';
-          return { imei, barcode: currentBarcode };
-        });
+        const newItems: PurchaseItem[] = rawLines.map((imei) => ({ imei }));
 
         next[groupIdx] = {
           ...next[groupIdx],
@@ -406,18 +348,9 @@ export const PurchasePage: React.FC = () => {
     }
 
     const cleanGroups = groups.map(g => {
-      let currentBCode = g.items[0]?.barcode?.trim() || ('200' + Math.floor(100000000 + Math.random() * 900000000).toString());
       const validItems = g.items
         .filter(i => i.imei.trim().length > 0)
-        .map((i, idx) => {
-          let itemBarcode = i.barcode.trim();
-          if (!itemBarcode) {
-            itemBarcode = idx === 0 ? currentBCode : (currentBCode = incrementBarcode(currentBCode));
-          } else {
-            currentBCode = itemBarcode;
-          }
-          return { imei: i.imei.trim(), barcode: itemBarcode };
-        });
+        .map(i => ({ imei: i.imei.trim() }));
 
       return {
         brand: g.brand.trim(),
@@ -426,8 +359,7 @@ export const PurchasePage: React.FC = () => {
         color: g.color.trim(),
         purchasePriceUsd: g.purchasePriceUsd,
         items: validItems,
-        imeis: validItems.map(i => i.imei),
-        barcodes: validItems.map(i => i.barcode)
+        imeis: validItems.map(i => i.imei)
       };
     }).filter(g => g.items.length > 0);
 
@@ -459,7 +391,7 @@ export const PurchasePage: React.FC = () => {
           storage: '256 GB',
           color: 'Black Titanium',
           purchasePriceUsd: 900,
-          items: [{ imei: '', barcode: '' }]
+          items: [{ imei: '' }]
         }
       ]);
 
@@ -794,7 +726,6 @@ export const PurchasePage: React.FC = () => {
                             <div className="text-[11px] text-slate-400 mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 font-mono">
                               <span>IMEI 1: <strong className="text-slate-300">{dev.imei}</strong></span>
                               <span>IMEI 2: <strong className={dev.imei2 ? "text-slate-300" : "text-slate-500 font-normal"}>{dev.imei2 || '—'}</strong></span>
-                              <span>Штрихкод (EAN): <strong className={dev.barcode ? "text-amber-400 font-mono" : "text-slate-500 font-normal"}>{dev.barcode || '—'}</strong></span>
                               <span>Локация: <strong className="text-slate-300">{dev.locationName}</strong></span>
                             </div>
                             {dev.bonusCampaign && (
@@ -1088,29 +1019,7 @@ export const PurchasePage: React.FC = () => {
                   {group.items.map((item, itemIdx) => {
                     const [imei1, imei2] = getImeiPair(item.imei);
                     return (
-                      <div key={itemIdx} className="grid grid-cols-1 md:grid-cols-3 gap-2">
-                        <div>
-                          <label className="block text-zinc-400 mb-1">Штрихкод (EAN) <span className="text-rose-400">*</span></label>
-                          <div className="flex items-center gap-1.5">
-                            <input
-                              type="text"
-                              required
-                              value={item.barcode}
-                              onChange={(e) => handleUpdateBarcode(groupIdx, itemIdx, e.target.value)}
-                              className="min-w-0 flex-1 rounded bg-zinc-950 border border-zinc-800 px-2.5 py-1.5 text-xs text-amber-400 font-mono focus:border-emerald-500 focus:outline-none"
-                              placeholder="EAN-13 / UPC *"
-                            />
-                            <button
-                              type="button"
-                              onClick={() => handleScanBarcode(groupIdx, itemIdx)}
-                              className="shrink-0 rounded bg-zinc-800 p-1.5 text-amber-400 hover:bg-zinc-700 hover:text-amber-300 transition-colors"
-                              title="Сканировать EAN"
-                              aria-label="Сканировать EAN"
-                            >
-                              <Scan className="w-4 h-4" />
-                            </button>
-                          </div>
-                        </div>
+                      <div key={itemIdx} className="grid grid-cols-1 md:grid-cols-2 gap-2">
 
                         <div>
                           <label className="block text-zinc-400 mb-1">IMEI 1</label>

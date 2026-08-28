@@ -49,7 +49,6 @@ export const BonusesPage: React.FC = () => {
   const [bonusColor, setBonusColor] = useState('Black');
   const [bonusImei, setBonusImei] = useState('');
   const [bonusImei2, setBonusImei2] = useState('');
-  const [bonusBarcode, setBonusBarcode] = useState('');
   const [destinationLocationId, setDestinationLocationId] = useState('main-warehouse');
 
   const [statusMessage, setStatusMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
@@ -137,7 +136,6 @@ export const BonusesPage: React.FC = () => {
         color: bonusColor,
         imei: bonusImei.trim() || `35${Math.floor(1000000000000 + Math.random() * 9000000000000)}`,
         imei2: bonusImei2.trim() || undefined,
-        barcode: bonusBarcode.trim() || undefined,
         costBasisUsd: 0
       }
     ] : undefined;
@@ -154,7 +152,6 @@ export const BonusesPage: React.FC = () => {
       setIsModalOpen(false);
       setBonusImei('');
       setBonusImei2('');
-      setBonusBarcode('');
       setStatusMessage({
         type: 'success',
         text: `Бонус успешно сохранен и оприходован на склад`
@@ -340,19 +337,7 @@ export const BonusesPage: React.FC = () => {
 
                   <div className="space-y-2 pt-1 border-t border-zinc-800">
                     <div className="grid grid-cols-2 gap-2 font-mono text-xs">
-                      <div>
-                        <label className="block text-zinc-400 text-[10px] uppercase font-bold mb-0.5">
-                          Штрихкод / EAN <span className="text-rose-400">*</span>
-                        </label>
-                        <input
-                          type="text"
-                          required
-                          value={bonusBarcode ?? ''}
-                          onChange={(e) => setBonusBarcode(e.target.value)}
-                          placeholder="690123456789"
-                          className="w-full rounded bg-zinc-900 border border-zinc-700 px-2 py-1 text-xs text-amber-400 font-mono focus:border-emerald-500 focus:outline-none"
-                        />
-                      </div>
+
                       <div>
                         <label className="block text-zinc-400 text-[10px] uppercase font-bold mb-0.5">
                           IMEI 1 <span className="text-rose-400">*</span>

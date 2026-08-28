@@ -86,8 +86,7 @@ export const SalesHistoryPage: React.FC = () => {
               item.brand.toLowerCase().includes(q) ||
               item.model.toLowerCase().includes(q) ||
               item.imei.toLowerCase().includes(q) ||
-              (item.imei2 && item.imei2.toLowerCase().includes(q)) ||
-              (item.barcode && item.barcode.toLowerCase().includes(q))
+              (item.imei2 && item.imei2.toLowerCase().includes(q))
           );
         if (!matches) return false;
       }
@@ -101,7 +100,7 @@ export const SalesHistoryPage: React.FC = () => {
       const code = scannedCode.trim();
       const matched = sales.find(s =>
         s.receiptNumber.toString() === code ||
-        s.items.some(i => i.imei === code || i.imei2 === code || i.barcode === code)
+        s.items.some(i => i.imei === code || i.imei2 === code)
       );
       if (matched) {
         setSelectedSaleId(matched.id);
@@ -325,7 +324,6 @@ export const SalesHistoryPage: React.FC = () => {
                       <p className="text-xs text-fg-subtle">{item.storage} · {item.color}</p>
                       <p className="text-xs text-fg-subtle mt-0.5">
                         IMEI: {item.imei}{item.imei2 ? ` / ${item.imei2}` : ''}
-                        {item.barcode && ` · EAN: ${item.barcode}`}
                       </p>
                     </div>
                     <div className="text-right shrink-0">

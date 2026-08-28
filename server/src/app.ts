@@ -118,15 +118,7 @@ app.get('/api/devices', authenticateJwt, enforceStoreScope, async (req: Authenti
       orderBy: { createdAt: 'desc' },
     });
 
-    const withBarcodes = devices.map((d) => {
-      if (!d.barcode || d.barcode.trim() === '') {
-        const gen = '200' + Math.floor(100000000 + Math.random() * 900000000).toString();
-        return { ...d, barcode: gen };
-      }
-      return d;
-    });
-
-    res.json(withBarcodes);
+    res.json(devices);
   } catch (error) {
     next(error);
   }
@@ -145,25 +137,16 @@ app.post('/api/purchases', authenticateJwt, requireRoles('ADMIN', 'PARTNER'), en
       const store = await transaction.store.findUnique({ where: { id: storeId } });
       if (!supplier || !store) throw new Error('Поставщик или магазин не найден');
 
-      function generateFallbackBarcode(): string {
-        return '200' + Math.floor(100000000 + Math.random() * 900000000).toString();
-      }
-
       const normalizedDevices = groups.flatMap((group: any) => {
         if (Array.isArray(group.items) && group.items.length > 0) {
           return group.items
             .filter((item: any) => item && typeof item.imei === 'string' && item.imei.trim().length > 0)
-            .map((item: any, idx: number) => {
+            .map((item: any) => {
               const [imei1, imei2] = String(item.imei).split(/[\/,]/).map((part) => part.trim());
               const explicitImei2 = typeof item.imei2 === 'string' && item.imei2.trim() ? item.imei2.trim() : null;
-              const itemBarcode = typeof item.barcode === 'string' && item.barcode.trim() ? item.barcode.trim() : null;
-              const arrayBarcode = (Array.isArray(group.barcodes) && group.barcodes[idx] && typeof group.barcodes[idx] === 'string' && group.barcodes[idx].trim()) ? group.barcodes[idx].trim() : null;
-              const groupBarcode = typeof group.barcode === 'string' && group.barcode.trim() ? group.barcode.trim() : null;
-              const bCode = itemBarcode || arrayBarcode || groupBarcode || generateFallbackBarcode();
               return {
                 imei: imei1,
                 imei2: explicitImei2 || imei2 || null,
-                barcode: bCode,
                 brand: String(group.brand || '').trim(),
                 model: String(group.model || '').trim(),
                 storage: String(group.storage || '').trim(),
@@ -174,16 +157,11 @@ app.post('/api/purchases', authenticateJwt, requireRoles('ADMIN', 'PARTNER'), en
         }
 
         const imeis = Array.isArray(group.imeis) ? group.imeis : [];
-        const barcodes = Array.isArray(group.barcodes) ? group.barcodes : [];
-        return imeis.filter((imei: unknown): imei is string => typeof imei === 'string' && imei.trim().length > 0).map((imei: string, idx: number) => {
+        return imeis.filter((imei: unknown): imei is string => typeof imei === 'string' && imei.trim().length > 0).map((imei: string) => {
           const [imei1, imei2] = imei.split(/[\/,]/).map((part) => part.trim());
-          const bCode = (barcodes[idx] && typeof barcodes[idx] === 'string' && barcodes[idx].trim())
-            ? barcodes[idx].trim()
-            : (typeof group.barcode === 'string' && group.barcode.trim() ? group.barcode.trim() : generateFallbackBarcode());
           return {
             imei: imei1,
             imei2: imei2 || null,
-            barcode: bCode,
             brand: String(group.brand || '').trim(),
             model: String(group.model || '').trim(),
             storage: String(group.storage || '').trim(),
