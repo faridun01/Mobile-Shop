@@ -6,10 +6,10 @@ export interface AuthenticatedRequest extends Request {
   user?: JwtPayload;
 }
 
-// Middleware to verify JWT token from Authorization header or cookie
+// Middleware to verify JWT token from the Authorization header
 export async function authenticateJwt(req: AuthenticatedRequest, res: Response, next: NextFunction) {
   const authHeader = req.headers.authorization;
-  const token = authHeader?.startsWith('Bearer ') ? authHeader.substring(7) : req.cookies?.access_token;
+  const token = authHeader?.startsWith('Bearer ') ? authHeader.substring(7) : undefined;
 
   if (!token) {
     return res.status(401).json({ message: 'Требуется авторизация: токен доступа отсутствует' });
