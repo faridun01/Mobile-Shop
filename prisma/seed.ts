@@ -18,6 +18,11 @@ const SUPPLIER_SEEDS = [
   { id: 'sup-china', name: 'China Tech', phone: '+86 20 8888 9999', contactPerson: 'Ли' },
 ];
 
+const OWNER_SEEDS = [
+  { id: 'owner-admin', name: 'Далер', profitSharePercent: 50 },
+  { id: 'owner-partner', name: 'Рустам', profitSharePercent: 50 },
+];
+
 async function main() {
   for (const store of STORE_SEEDS) {
     await prisma.store.upsert({
@@ -35,11 +40,18 @@ async function main() {
     });
   }
 
+  for (const owner of OWNER_SEEDS) {
+    await prisma.owner.upsert({ where: { id: owner.id }, update: {}, create: owner });
+  }
+
   for (const user of USER_SEEDS) {
     const hashedPassword = await AuthService.hashPassword(user.password);
     await prisma.user.upsert({
       where: { id: user.id },
-      update: {},
+      update: {
+        password: hashedPassword,
+        storeId: user.storeId,
+      },
       create: {
         id: user.id,
         name: user.name,

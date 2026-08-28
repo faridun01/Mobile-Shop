@@ -19,12 +19,15 @@ export function registerNotificationRoutes(app: Express) {
     }
   });
 
-  app.patch('/api/notifications/:id/read', authenticateJwt, async (req, res, next) => {
+  app.patch('/api/notifications/:id/read', authenticateJwt, async (req: AuthenticatedRequest, res, next) => {
     try {
-      const notification = await prisma.notification.update({
-        where: { id: req.params.id },
+      const scope = { OR: [{ targetUserId: req.user!.userId }, { targetRole: req.user!.role }, { AND: [{ targetUserId: null }, { targetRole: null }] }] };
+      const result = await prisma.notification.updateMany({
+        where: { id: req.params.id, ...scope },
         data: { read: true, readAt: new Date() },
       });
+      if (result.count !== 1) { res.status(404).json({ message: 'Уведомление не найдено' }); return; }
+      const notification = await prisma.notification.findUniqueOrThrow({ where: { id: req.params.id } });
       res.json(notification);
     } catch (error) {
       next(error);
@@ -44,12 +47,15 @@ export function registerNotificationRoutes(app: Express) {
     }
   });
 
-  app.patch('/api/notifications/:id/resolve', authenticateJwt, async (req, res, next) => {
+  app.patch('/api/notifications/:id/resolve', authenticateJwt, async (req: AuthenticatedRequest, res, next) => {
     try {
-      const notification = await prisma.notification.update({
-        where: { id: req.params.id },
+      const scope = { OR: [{ targetUserId: req.user!.userId }, { targetRole: req.user!.role }, { AND: [{ targetUserId: null }, { targetRole: null }] }] };
+      const result = await prisma.notification.updateMany({
+        where: { id: req.params.id, ...scope },
         data: { resolved: true, read: true, resolvedAt: new Date(), readAt: new Date() },
       });
+      if (result.count !== 1) { res.status(404).json({ message: 'Уведомление не найдено' }); return; }
+      const notification = await prisma.notification.findUniqueOrThrow({ where: { id: req.params.id } });
       RealtimeSyncGateway.broadcast('NOTIFICATION_CREATED', notification);
       res.json(notification);
     } catch (error) {

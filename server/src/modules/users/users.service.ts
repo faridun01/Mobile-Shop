@@ -1,6 +1,7 @@
 import { prisma } from '../../prisma/prisma.service';
 import { AuthService } from '../../auth/auth.service';
 import { resolveActor } from '../../common/actor';
+import { RealtimeSyncGateway } from '../../websocket/websocket.gateway';
 
 const SAFE_SELECT = {
   id: true,
@@ -15,9 +16,23 @@ const SAFE_SELECT = {
   updatedAt: true,
 } as const;
 
+const PUBLIC_SELECT = {
+  id: true,
+  login: true,
+  name: true,
+  role: true,
+  active: true,
+  storeId: true,
+  createdAt: true,
+  updatedAt: true,
+} as const;
+
 export class UsersService {
-  public static async list() {
-    return prisma.user.findMany({ select: SAFE_SELECT, orderBy: { createdAt: 'asc' } });
+  public static async list(includeFinancialFields: boolean = false) {
+    if (includeFinancialFields) {
+      return prisma.user.findMany({ select: SAFE_SELECT, orderBy: { createdAt: 'asc' } });
+    }
+    return prisma.user.findMany({ select: PUBLIC_SELECT, orderBy: { createdAt: 'asc' } });
   }
 
   public static async create(input: {
@@ -34,6 +49,10 @@ export class UsersService {
       const actor = await resolveActor(tx, input.createdByUserId);
       const existing = await tx.user.findUnique({ where: { login: input.login } });
       if (existing) throw new Error('Пользователь с таким логином уже существует');
+
+      if (input.role === 'SELLER' && (!input.storeId || !input.storeId.trim())) {
+        throw new Error('Для роли Продавец обязательна привязка к магазину');
+      }
 
       const hashed = await AuthService.hashPassword(input.password);
       const user = await tx.user.create({
@@ -53,7 +72,7 @@ export class UsersService {
         data: { userId: actor.id, userName: actor.name, userRole: actor.role, action: 'USER_CREATE', details: `Создан сотрудник: ${user.name} (${user.role})`, targetId: user.id },
       });
       return user;
-    });
+    }, { maxWait: 10000, timeout: 25000 });
   }
 
   public static async update(
@@ -71,6 +90,9 @@ export class UsersService {
   ) {
     return prisma.$transaction(async (tx) => {
       const actor = await resolveActor(tx, updatedByUserId);
+      const targetUser = await tx.user.findUnique({ where: { id: userId } });
+      if (!targetUser) throw new Error('Пользователь не найден');
+
       const data: any = {};
       if (input.login && input.login.trim()) {
         const newLogin = input.login.trim();
@@ -86,6 +108,12 @@ export class UsersService {
       if (input.baseSalaryTjs !== undefined) data.baseSalaryTjs = input.baseSalaryTjs;
       if (input.salesCommissionPercent !== undefined) data.salesCommissionPercent = input.salesCommissionPercent;
 
+      const effectiveRole = data.role || targetUser.role;
+      const effectiveStoreId = data.storeId !== undefined ? data.storeId : targetUser.storeId;
+      if (effectiveRole === 'SELLER' && (!effectiveStoreId || !String(effectiveStoreId).trim())) {
+        throw new Error('Для роли Продавец обязательна привязка к магазину');
+      }
+
       if (input.password && input.password.trim().length > 0) {
         data.password = await AuthService.hashPassword(input.password.trim());
       }
@@ -95,7 +123,7 @@ export class UsersService {
         data: { userId: actor.id, userName: actor.name, userRole: actor.role, action: 'USER_UPDATE', details: `Обновлены данные сотрудника: ${user.name} (${user.role})${input.password ? ' (пароль изменен)' : ''}`, targetId: user.id },
       });
       return user;
-    });
+    }, { maxWait: 10000, timeout: 25000 });
   }
 
   public static async resetPassword(userId: string, newPassword: string, actingUserId: string) {
@@ -108,11 +136,11 @@ export class UsersService {
       await tx.auditLog.create({
         data: { userId: actor.id, userName: actor.name, userRole: actor.role, action: 'PASSWORD_RESET', details: `Сброшен пароль сотрудника: ${target.name}`, targetId: userId },
       });
-    });
+    }, { maxWait: 10000, timeout: 25000 });
   }
 
   public static async setActive(userId: string, active: boolean, actingUserId: string) {
-    return prisma.$transaction(async (tx) => {
+    const user = await prisma.$transaction(async (tx) => {
       const actor = await resolveActor(tx, actingUserId);
       const user = await tx.user.update({ where: { id: userId }, data: { active }, select: SAFE_SELECT });
       await tx.auditLog.create({
@@ -126,14 +154,16 @@ export class UsersService {
         },
       });
       return user;
-    });
+    }, { maxWait: 10000, timeout: 25000 });
+    if (!active) RealtimeSyncGateway.disconnectUser(userId);
+    return user;
   }
 
   public static async remove(userId: string, actingUserId: string) {
     if (userId === actingUserId) {
       throw new Error('Нельзя удалить собственный профиль во время активной сессии');
     }
-    return prisma.$transaction(async (tx) => {
+    await prisma.$transaction(async (tx) => {
       const actor = await resolveActor(tx, actingUserId);
       const target = await tx.user.findUnique({ where: { id: userId } });
       if (!target) throw new Error('Сотрудник не найден');
@@ -141,6 +171,7 @@ export class UsersService {
       await tx.auditLog.create({
         data: { userId: actor.id, userName: actor.name, userRole: actor.role, action: 'USER_DELETE', details: `Удален сотрудник: ${target.name} (${target.role})` },
       });
-    });
+    }, { maxWait: 10000, timeout: 25000 });
+    RealtimeSyncGateway.disconnectUser(userId);
   }
 }

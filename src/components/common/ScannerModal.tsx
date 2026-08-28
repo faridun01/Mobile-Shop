@@ -4,6 +4,7 @@ import { AlertCircle } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { useHardwareScanner } from '../../hooks/useHardwareScanner';
 import { Dialog } from '../ui/Dialog';
+import { soundEffects } from '../../utils/sound';
 
 const READER_ELEMENT_ID = 'ms-barcode-scanner-viewport';
 
@@ -23,6 +24,7 @@ export const ScannerModal: React.FC = () => {
   const resolveScan = (code: string) => {
     const trimmed = code.trim();
     if (!trimmed) return;
+    soundEffects.playAddToCartSuccess();
     scannerCallback?.(trimmed);
     closeScanner();
   };
@@ -75,7 +77,6 @@ export const ScannerModal: React.FC = () => {
       open={isScannerOpen}
       onClose={closeScanner}
       title="Сканирование"
-      subtitle="Наведите камеру на штрихкод или IMEI"
       maxWidth="sm"
     >
       <div className="space-y-3">
@@ -86,9 +87,6 @@ export const ScannerModal: React.FC = () => {
             <span>{cameraError}</span>
           </div>
         )}
-        <p className="text-xs text-fg-subtle text-center">
-          Также можно сканировать физическим сканером штрихкодов прямо сейчас.
-        </p>
       </div>
     </Dialog>
   );

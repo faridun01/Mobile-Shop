@@ -15,7 +15,7 @@ export function registerExpenseRoutes(app: Express) {
     }
   });
 
-  app.post('/api/expenses', authenticateJwt, enforceBodyStoreScope, async (req: AuthenticatedRequest, res, next) => {
+  app.post('/api/expenses', authenticateJwt, requireRoles('ADMIN', 'PARTNER'), enforceBodyStoreScope, async (req: AuthenticatedRequest, res, next) => {
     try {
       const { category, amountTjs, targetType, storeId, sourceAccount, comment, description, paidFromCashRegister, employeeId, isEmployeeAdvance } =
         req.body ?? {};

@@ -2,10 +2,12 @@ import { prisma } from '../../prisma/prisma.service';
 import type { Prisma } from '@prisma/client';
 import { RealtimeSyncGateway } from '../../websocket/websocket.gateway';
 import { resolveActor } from '../../common/actor';
+import crypto from 'node:crypto';
 
-async function nextTransferNumber(tx: Prisma.TransactionClient): Promise<string> {
-  const count = await tx.transferRequest.count();
-  return `TR-${String(count + 1).padStart(4, '0')}`;
+function nextTransferNumber(): string {
+  const now = new Date();
+  const stamp = now.toISOString().replace(/[-:TZ.]/g, '').slice(0, 14);
+  return `TR-${stamp}-${crypto.randomBytes(2).toString('hex').toUpperCase()}`;
 }
 
 function statusForStore(storeId: string): 'MAIN_WAREHOUSE' | 'STORE_STOCK' {
@@ -38,7 +40,7 @@ export class TransfersService {
         throw new Error('Одно или несколько устройств недоступны для перемещения (уже перемещаются, проданы или в ремонте)');
       }
 
-      const transferNumber = await nextTransferNumber(tx);
+      const transferNumber = nextTransferNumber();
       const transfer = await tx.transferRequest.create({
         data: {
           transferNumber,
@@ -94,7 +96,7 @@ export class TransfersService {
       RealtimeSyncGateway.broadcast('NOTIFICATION_CREATED', notification);
 
       return transfer;
-    });
+    }, { maxWait: 10000, timeout: 25000 });
   }
 
   /** ADMIN/PARTNER-only immediate move that bypasses the approval step. */
@@ -115,7 +117,7 @@ export class TransfersService {
         throw new Error('Одно или несколько устройств недоступны для перемещения');
       }
 
-      const transferNumber = await nextTransferNumber(tx);
+      const transferNumber = nextTransferNumber();
       const transfer = await tx.transferRequest.create({
         data: {
           transferNumber,
@@ -167,7 +169,7 @@ export class TransfersService {
       RealtimeSyncGateway.broadcast('INVENTORY_UPDATE', {}, { storeIds: [input.fromStoreId, input.toStoreId] });
 
       return transfer;
-    });
+    }, { maxWait: 10000, timeout: 25000 });
   }
 
   public static async approve(transferId: string, approvedByUserId: string) {
@@ -224,7 +226,7 @@ export class TransfersService {
       RealtimeSyncGateway.broadcast('INVENTORY_UPDATE', {}, { storeIds: [transfer.fromStoreId, transfer.toStoreId] });
 
       return updated;
-    });
+    }, { maxWait: 10000, timeout: 25000 });
   }
 
   public static async reject(transferId: string, rejectedByUserId: string, reason: string) {
@@ -283,6 +285,6 @@ export class TransfersService {
       RealtimeSyncGateway.broadcast('INVENTORY_UPDATE', {}, { storeIds: [transfer.fromStoreId, transfer.toStoreId] });
 
       return updated;
-    });
+    }, { maxWait: 10000, timeout: 25000 });
   }
 }

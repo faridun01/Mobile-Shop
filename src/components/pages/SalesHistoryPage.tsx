@@ -41,10 +41,10 @@ export const SalesHistoryPage: React.FC = () => {
   const [periodFilter, setPeriodFilter] = useState<'TODAY' | 'MONTH' | 'SPECIFIC_MONTH' | 'ALL'>('TODAY');
   const [selectedMonth, setSelectedMonth] = useState<string>(new Date().toISOString().substring(0, 7));
 
-  const retailStores = useMemo(() => stores.filter((s) => !s.isMainWarehouse && s.id !== 'store-main'), [stores]);
+  const retailStores = useMemo(() => stores.filter((s) => !s.isMainWarehouse), [stores]);
 
   const [selectedStoreId, setSelectedStoreId] = useState<string>(() => {
-    if (currentUser?.storeId && currentUser.storeId !== 'store-main') {
+    if (currentUser?.storeId) {
       return currentUser.storeId;
     }
     return retailStores[0]?.id || '';
@@ -67,7 +67,6 @@ export const SalesHistoryPage: React.FC = () => {
 
     return sales.filter((sale) => {
       if (currentUser?.role === 'SELLER' && sale.sellerId !== currentUser.id) return false;
-      if (sale.storeId === 'store-main') return false;
       if (activeStoreId && sale.storeId !== activeStoreId) return false;
 
       const saleDateStr = sale.date.split('T')[0];

@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import { SupplierInvoice, Device } from '../../types';
 import {
@@ -8,21 +8,16 @@ import {
   AlertCircle,
   CheckCircle2,
   Truck,
-  Layers,
   Store as StoreIcon,
-  DollarSign,
   Search,
-  Calendar,
   X,
   ChevronRight,
   ArrowLeft,
   Package,
   FileText,
-  Clock,
-  Eye,
-  Check,
   Edit2
 } from 'lucide-react';
+import { soundEffects } from '../../utils/sound';
 
 interface PurchaseItem {
   imei: string;
@@ -32,6 +27,7 @@ interface PurchaseItemGroup {
   id: string;
   brand: string;
   model: string;
+  ram?: string;
   storage: string;
   color: string;
   purchasePriceUsd: number;
@@ -112,6 +108,8 @@ export const PurchasePage: React.FC = () => {
     return `INV-${((supplierInvoices?.length || 0) + 1).toString().padStart(4, '0')}`;
   });
 
+  // Suppliers now load asynchronously from the API, so they're typically still empty
+  // at mount time — resync once they arrive (but never clobber a manual selection).
   useEffect(() => {
     if (suppliers.length > 0 && (!selectedSupplierId || !suppliers.some(s => s.id === selectedSupplierId))) {
       setSelectedSupplierId(suppliers[0].id);
@@ -123,14 +121,6 @@ export const PurchasePage: React.FC = () => {
       setInvoiceNumber(`INV-${(supplierInvoices.length + 1).toString().padStart(4, '0')}`);
     }
   }, [supplierInvoices]);
-
-  // Suppliers now load asynchronously from the API, so they're typically still empty
-  // at mount time — resync once they arrive (but never clobber a manual selection).
-  useEffect(() => {
-    if (!selectedSupplierId && suppliers.length > 0) {
-      setSelectedSupplierId(suppliers[0].id);
-    }
-  }, [suppliers, selectedSupplierId]);
   const [purchaseDate, setPurchaseDate] = useState<string>(new Date().toISOString().split('T')[0]);
   
   // Destination mode (Main Warehouse intake is ADMIN ONLY)
@@ -141,11 +131,12 @@ export const PurchasePage: React.FC = () => {
   const [groups, setGroups] = useState<PurchaseItemGroup[]>([
     {
       id: 'g-1',
-      brand: 'Apple',
-      model: 'iPhone 16 Pro',
-      storage: '256 GB',
-      color: 'Black Titanium',
-      purchasePriceUsd: 900,
+      brand: '',
+      model: '',
+      ram: '',
+      storage: '',
+      color: '',
+      purchasePriceUsd: 0,
       items: [{ imei: '' }]
     }
   ]);
@@ -155,6 +146,50 @@ export const PurchasePage: React.FC = () => {
 
   // Current rate
   const rate = todayRate?.rate || 9.5;
+
+  // Autocomplete suggestion lists derived from database devices and standard presets
+  const brandOptions = useMemo(() => {
+    const set = new Set<string>(['Apple', 'Samsung', 'Xiaomi', 'Google', 'OnePlus', 'Honor', 'Realme', 'Huawei', 'Nothing']);
+    (devices || []).forEach(d => { if (d.brand) set.add(d.brand.trim()); });
+    return Array.from(set).sort();
+  }, [devices]);
+
+  const getModelOptions = useCallback((selectedBrand: string) => {
+    const set = new Set<string>();
+    const brandLower = (selectedBrand || '').trim().toLowerCase();
+    (devices || []).forEach(d => {
+      if (d.model && (!brandLower || (d.brand && d.brand.toLowerCase() === brandLower))) {
+        set.add(d.model.trim());
+      }
+    });
+    return Array.from(set).sort();
+  }, [devices]);
+
+  const ramOptions = useMemo(() => {
+    const set = new Set<string>(['4 GB', '6 GB', '8 GB', '12 GB', '16 GB', '24 GB']);
+    (devices || []).forEach(d => {
+      if (d.ram) set.add(d.ram.trim());
+    });
+    return Array.from(set).sort();
+  }, [devices]);
+
+  const storageOptions = useMemo(() => {
+    const set = new Set<string>(['64 GB', '128 GB', '256 GB', '512 GB', '1 TB']);
+    (devices || []).forEach(d => {
+      if (d.storage) set.add(d.storage.trim());
+    });
+    return Array.from(set).sort();
+  }, [devices]);
+
+  const colorOptions = useMemo(() => {
+    const set = new Set<string>([
+      'Black', 'White', 'Titanium', 'Natural Titanium', 'Black Titanium',
+      'Desert Titanium', 'Midnight', 'Starlight', 'Silver', 'Gold',
+      'Blue', 'Graphite', 'Purple', 'Green'
+    ]);
+    (devices || []).forEach(d => { if (d.color) set.add(d.color.trim()); });
+    return Array.from(set).sort();
+  }, [devices]);
 
   // Filtered list of purchase invoices
   const filteredInvoices = useMemo(() => {
@@ -235,11 +270,12 @@ export const PurchasePage: React.FC = () => {
       ...prev,
       {
         id: `g-${Date.now()}`,
-        brand: 'Apple',
-        model: 'iPhone 16',
-        storage: '128 GB',
-        color: 'Black',
-        purchasePriceUsd: 700,
+        brand: '',
+        model: '',
+        ram: '',
+        storage: '',
+        color: '',
+        purchasePriceUsd: 0,
         items: [{ imei: '' }]
       }
     ]);
@@ -258,6 +294,7 @@ export const PurchasePage: React.FC = () => {
   };
 
   const handleAddImeiToGroup = (groupIdx: number) => {
+    soundEffects.playAddToCartSuccess();
     setGroups(prev => {
       const next = [...prev];
       const items = [...next[groupIdx].items];
@@ -310,6 +347,7 @@ export const PurchasePage: React.FC = () => {
   const handleBatchImeiPaste = (groupIdx: number, text: string) => {
     const rawLines = text.split(/[\n,\s]+/).map(s => s.trim()).filter(Boolean);
     if (rawLines.length > 0) {
+      soundEffects.playAddToCartSuccess();
       setGroups(prev => {
         const next = [...prev];
         const newItems: PurchaseItem[] = rawLines.map((imei) => ({ imei }));
@@ -352,10 +390,17 @@ export const PurchasePage: React.FC = () => {
         .filter(i => i.imei.trim().length > 0)
         .map(i => ({ imei: i.imei.trim() }));
 
+      const ramStr = g.ram?.trim() || '';
+      const storageStr = g.storage.trim();
+      const combinedStorage = ramStr && !storageStr.toLowerCase().includes(ramStr.toLowerCase())
+        ? `${ramStr} / ${storageStr}`
+        : storageStr;
+
       return {
         brand: g.brand.trim(),
         model: g.model.trim(),
-        storage: g.storage.trim(),
+        ram: ramStr || undefined,
+        storage: combinedStorage,
         color: g.color.trim(),
         purchasePriceUsd: g.purchasePriceUsd,
         items: validItems,
@@ -381,16 +426,17 @@ export const PurchasePage: React.FC = () => {
       const savedNum = invoiceNumber.trim();
       setJustSavedInvoice(savedNum);
 
-      // Reset form with a fresh invoice number
-      setInvoiceNumber(`INV-${Math.floor(100 + Math.random() * 900)}`);
+      // invoiceNumber resets automatically via the useEffect watching supplierInvoices
+      // once the post-save refetch lands, picking the next sequential INV-XXXX number.
       setGroups([
         {
           id: `g-${Date.now()}`,
-          brand: 'Apple',
-          model: 'iPhone 16 Pro',
-          storage: '256 GB',
-          color: 'Black Titanium',
-          purchasePriceUsd: 900,
+          brand: '',
+          model: '',
+          ram: '',
+          storage: '',
+          color: '',
+          purchasePriceUsd: 0,
           items: [{ imei: '' }]
         }
       ]);
@@ -606,13 +652,36 @@ export const PurchasePage: React.FC = () => {
                       </div>
                     </div>
 
-                    <button
-                      type="button"
-                      className="p-1.5 rounded-lg bg-surface-raised text-fg-subtle hover:text-fg border border-border"
-                      title="Подробнее"
-                    >
-                      <ChevronRight className="w-4 h-4" />
-                    </button>
+                    <div className="flex items-center space-x-1.5" onClick={(e) => e.stopPropagation()}>
+                      {(currentUser?.role === 'ADMIN' || currentUser?.role === 'PARTNER') && (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => handleStartEditInvoiceModal(inv)}
+                            className="p-1.5 rounded-lg bg-surface-raised hover:bg-surface text-fg-subtle hover:text-accent border border-border transition-colors"
+                            title="Редактировать накладную"
+                          >
+                            <Edit2 className="w-4 h-4" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteInvoiceModal(inv.id)}
+                            className="p-1.5 rounded-lg bg-surface-raised hover:bg-danger/20 text-fg-subtle hover:text-danger border border-border transition-colors"
+                            title="Удалить накладную"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => setSelectedInvoiceId(inv.id)}
+                        className="p-1.5 rounded-lg bg-surface-raised text-fg-subtle hover:text-fg border border-border"
+                        title="Подробнее"
+                      >
+                        <ChevronRight className="w-4 h-4" />
+                      </button>
+                    </div>
                   </div>
                 </div>
               );
@@ -715,7 +784,7 @@ export const PurchasePage: React.FC = () => {
                             <div className="flex items-center space-x-2 flex-wrap gap-y-1">
                               <span className="text-fg-subtle text-[10px] font-bold">#{idx + 1}</span>
                               <strong className="text-fg">{dev.brand} {dev.model}</strong>
-                              <span className="text-fg-subtle text-[11px]">{dev.storage} • {dev.color}</span>
+                              <span className="text-fg-subtle text-[11px]">{dev.ram ? `${dev.ram} • ` : ''}{dev.storage} • {dev.color}</span>
                               {(dev.purchaseCostUsd === 0 || dev.isBonus) && (
                                 <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-purple-500/20 text-purple-400 border border-purple-500/40 font-medium">
                                   🎁 ПОДАРОК ($0)
@@ -766,6 +835,77 @@ export const PurchasePage: React.FC = () => {
                   ЗАКРЫТЬ
                 </button>
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* EDIT INVOICE MODAL */}
+        {editingInvoiceModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
+            <div className="w-full max-w-md rounded-2xl bg-surface border border-border shadow-2xl p-5 space-y-4 font-mono">
+              <div className="flex items-center justify-between border-b border-border pb-3">
+                <h3 className="text-xs font-bold text-fg uppercase">РЕДАКТИРОВАНИЕ НАКЛАДНОЙ</h3>
+                <button
+                  type="button"
+                  onClick={() => setEditingInvoiceModal(null)}
+                  className="text-fg-subtle hover:text-fg"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              <form onSubmit={handleSaveEditInvoiceModal} className="space-y-3 text-xs">
+                <div>
+                  <label className="block text-fg-subtle text-[10px] uppercase mb-1">НОМЕР НАКЛАДНОЙ</label>
+                  <input
+                    type="text"
+                    required
+                    value={editInvoiceNum}
+                    onChange={(e) => setEditInvoiceNum(e.target.value)}
+                    className="w-full rounded-xl bg-surface-raised border border-border px-3 py-2 text-fg font-bold focus:border-accent focus:outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-fg-subtle text-[10px] uppercase mb-1">ДАТА НАКЛАДНОЙ</label>
+                  <input
+                    type="date"
+                    required
+                    value={editInvoiceDateStr}
+                    onChange={(e) => setEditInvoiceDateStr(e.target.value)}
+                    className="w-full rounded-xl bg-surface-raised border border-border px-3 py-2 text-fg focus:border-accent focus:outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-fg-subtle text-[10px] uppercase mb-1">СУММА НАКЛАДНОЙ ($)</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    required
+                    min="0"
+                    value={editInvoiceAmountUsd}
+                    onChange={(e) => setEditInvoiceAmountUsd(e.target.value)}
+                    className="w-full rounded-xl bg-surface-raised border border-border px-3 py-2 text-accent font-bold focus:border-accent focus:outline-none font-mono"
+                  />
+                </div>
+
+                <div className="flex space-x-2 pt-3 border-t border-border">
+                  <button
+                    type="button"
+                    onClick={() => setEditingInvoiceModal(null)}
+                    className="flex-1 py-2 rounded-xl bg-surface-raised hover:bg-surface border border-border text-fg-subtle hover:text-fg font-bold"
+                  >
+                    ОТМЕНА
+                  </button>
+                  <button
+                    type="submit"
+                    className="flex-1 py-2 rounded-xl bg-accent hover:bg-accent-strong text-accent-fg font-bold shadow-xs"
+                  >
+                    СОХРАНИТЬ
+                  </button>
+                </div>
+              </form>
             </div>
           </div>
         )}
@@ -885,14 +1025,14 @@ export const PurchasePage: React.FC = () => {
         </div>
 
         {/* Groups list */}
-        <div className="flex-1 p-3.5 sm:p-4 space-y-4 bg-zinc-950 pb-8">
+        <div className="flex-1 p-3.5 sm:p-4 space-y-4 bg-bg pb-8">
           {groups.map((group, groupIdx) => (
             <div
               key={group.id}
-              className="rounded-lg border border-zinc-800 bg-zinc-900/90 p-3.5 sm:p-4 space-y-3 relative"
+              className="rounded-xl border border-border bg-surface shadow-xs p-3.5 sm:p-4 space-y-3 relative"
             >
-              <div className="flex items-center justify-between border-b border-zinc-800 pb-2">
-                <span className="text-xs font-bold text-zinc-300 uppercase tracking-wider font-mono">
+              <div className="flex items-center justify-between border-b border-border pb-2">
+                <span className="text-xs font-bold text-fg uppercase tracking-wider font-mono">
                   Позиция #{groupIdx + 1}
                 </span>
 
@@ -900,7 +1040,7 @@ export const PurchasePage: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => handleRemoveGroup(groupIdx)}
-                    className="text-zinc-500 hover:text-rose-400 p-1 transition-colors"
+                    className="text-fg-subtle hover:text-danger p-1 transition-colors"
                     title="Удалить позицию"
                   >
                     <Trash2 className="w-4 h-4" />
@@ -911,51 +1051,94 @@ export const PurchasePage: React.FC = () => {
               {/* Group Specs Form */}
               <div className="grid grid-cols-2 sm:grid-cols-6 gap-2.5 text-xs font-mono">
                 <div>
-                  <label className="block text-zinc-400 mb-1">Бренд</label>
+                  <label className="block text-fg-subtle mb-1">Бренд</label>
                   <input
                     type="text"
                     required
+                    list={`brand-suggestions-${groupIdx}`}
                     value={group.brand}
                     onChange={(e) => handleUpdateGroup(groupIdx, 'brand', e.target.value)}
-                    className="w-full rounded bg-zinc-950 border border-zinc-700 px-2.5 py-1.5 text-xs text-zinc-100 focus:border-emerald-500 focus:outline-none"
+                    className="w-full rounded-lg bg-surface-raised border border-border px-2.5 py-1.5 text-xs text-fg focus:border-accent focus:outline-none"
+                    placeholder="Apple"
                   />
+                  <datalist id={`brand-suggestions-${groupIdx}`}>
+                    {brandOptions.map(b => (
+                      <option key={b} value={b} />
+                    ))}
+                  </datalist>
                 </div>
 
                 <div>
-                  <label className="block text-zinc-400 mb-1">Модель</label>
+                  <label className="block text-fg-subtle mb-1">Модель</label>
                   <input
                     type="text"
                     required
+                    list={`model-suggestions-${groupIdx}`}
                     value={group.model}
                     onChange={(e) => handleUpdateGroup(groupIdx, 'model', e.target.value)}
-                    className="w-full rounded bg-zinc-950 border border-zinc-700 px-2.5 py-1.5 text-xs text-zinc-100 focus:border-emerald-500 focus:outline-none"
+                    className="w-full rounded-lg bg-surface-raised border border-border px-2.5 py-1.5 text-xs text-fg focus:border-accent focus:outline-none"
+                    placeholder="iPhone 16 Pro"
                   />
+                  <datalist id={`model-suggestions-${groupIdx}`}>
+                    {getModelOptions(group.brand).map(m => (
+                      <option key={m} value={m} />
+                    ))}
+                  </datalist>
                 </div>
 
                 <div>
-                  <label className="block text-zinc-400 mb-1">Память</label>
+                  <label className="block text-fg-subtle mb-1">RAM</label>
                   <input
                     type="text"
+                    list={`ram-suggestions-${groupIdx}`}
+                    value={group.ram || ''}
+                    onChange={(e) => handleUpdateGroup(groupIdx, 'ram', e.target.value)}
+                    className="w-full rounded-lg bg-surface-raised border border-border px-2.5 py-1.5 text-xs text-fg focus:border-accent focus:outline-none"
+                    placeholder="8 GB"
+                  />
+                  <datalist id={`ram-suggestions-${groupIdx}`}>
+                    {ramOptions.map(r => (
+                      <option key={r} value={r} />
+                    ))}
+                  </datalist>
+                </div>
+
+                <div>
+                  <label className="block text-fg-subtle mb-1">Память</label>
+                  <input
+                    type="text"
+                    list={`storage-suggestions-${groupIdx}`}
                     value={group.storage}
                     onChange={(e) => handleUpdateGroup(groupIdx, 'storage', e.target.value)}
-                    className="w-full rounded bg-zinc-950 border border-zinc-700 px-2.5 py-1.5 text-xs text-zinc-100 focus:border-emerald-500 focus:outline-none"
-                    placeholder="128 GB"
+                    className="w-full rounded-lg bg-surface-raised border border-border px-2.5 py-1.5 text-xs text-fg focus:border-accent focus:outline-none"
+                    placeholder="256 GB"
                   />
+                  <datalist id={`storage-suggestions-${groupIdx}`}>
+                    {storageOptions.map(s => (
+                      <option key={s} value={s} />
+                    ))}
+                  </datalist>
                 </div>
 
                 <div>
-                  <label className="block text-zinc-400 mb-1">Цвет</label>
+                  <label className="block text-fg-subtle mb-1">Цвет</label>
                   <input
                     type="text"
+                    list={`color-suggestions-${groupIdx}`}
                     value={group.color}
                     onChange={(e) => handleUpdateGroup(groupIdx, 'color', e.target.value)}
-                    className="w-full rounded bg-zinc-950 border border-zinc-700 px-2.5 py-1.5 text-xs text-zinc-100 focus:border-emerald-500 focus:outline-none"
-                    placeholder="Black"
+                    className="w-full rounded-lg bg-surface-raised border border-border px-2.5 py-1.5 text-xs text-fg focus:border-accent focus:outline-none"
+                    placeholder="Black Titanium"
                   />
+                  <datalist id={`color-suggestions-${groupIdx}`}>
+                    {colorOptions.map(c => (
+                      <option key={c} value={c} />
+                    ))}
+                  </datalist>
                 </div>
 
                 <div>
-                  <label className="block text-zinc-400 mb-1">Цена закупки ($)</label>
+                  <label className="block text-fg-subtle mb-1">Цена закупки ($)</label>
                   <input
                     type="number"
                     required
@@ -963,19 +1146,20 @@ export const PurchasePage: React.FC = () => {
                     step="1"
                     value={group.purchasePriceUsd || ''}
                     onChange={(e) => handleUpdateGroup(groupIdx, 'purchasePriceUsd', parseFloat(e.target.value) || 0)}
-                    className="w-full rounded bg-zinc-950 border border-zinc-700 px-2.5 py-1.5 text-xs text-emerald-400 font-bold focus:border-emerald-500 focus:outline-none font-mono"
+                    className="w-full rounded-lg bg-surface-raised border border-border px-2.5 py-1.5 text-xs text-accent font-bold focus:border-accent focus:outline-none font-mono"
+                    placeholder="0"
                   />
                 </div>
               </div>
 
               {/* IMEI Input List with Batch Paste */}
-              <div className="pt-2 border-t border-zinc-800/80 space-y-2">
+              <div className="pt-2 border-t border-border space-y-2">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-2">
-                    <span className="text-xs font-semibold text-zinc-300 font-mono">
+                    <span className="text-xs font-semibold text-fg font-mono">
                       Список IMEI ({group.items.filter(i => i.imei.trim().length > 0).length} шт.)
                     </span>
-                    <span className="text-[10px] text-zinc-500 font-mono">
+                    <span className="text-[10px] text-fg-subtle font-mono">
                       Сумма: ${group.items.filter(i => i.imei.trim().length > 0).length * group.purchasePriceUsd}
                     </span>
                   </div>
@@ -984,7 +1168,7 @@ export const PurchasePage: React.FC = () => {
                     <button
                       type="button"
                       onClick={() => handleAddImeiToGroup(groupIdx)}
-                      className="px-2.5 py-1 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-mono font-medium flex items-center space-x-1 transition-colors"
+                      className="px-2.5 py-1 rounded-lg bg-surface-raised hover:bg-surface border border-border text-fg text-xs font-mono font-medium flex items-center space-x-1 transition-colors"
                     >
                       <Plus className="w-3 h-3" />
                       <span>Добавить устройство</span>
@@ -1010,7 +1194,7 @@ export const PurchasePage: React.FC = () => {
                         e.target.value = '';
                       }
                     }}
-                    className="w-full rounded bg-zinc-950/70 border border-dashed border-zinc-800 px-3 py-1 text-[11px] font-mono text-zinc-300 placeholder-zinc-600 focus:border-emerald-500 focus:outline-none"
+                    className="w-full rounded-lg bg-surface-raised border border-dashed border-border px-3 py-1 text-[11px] font-mono text-fg placeholder-fg-subtle focus:border-accent focus:outline-none"
                   />
                 </div>
 
@@ -1021,7 +1205,7 @@ export const PurchasePage: React.FC = () => {
                       <div key={itemIdx} className="grid grid-cols-1 md:grid-cols-2 gap-2">
 
                         <div>
-                          <label className="block text-zinc-400 mb-1">IMEI 1</label>
+                          <label className="block text-fg-subtle mb-1">IMEI 1</label>
                           <div className="relative">
                             <input
                               type="text"
@@ -1029,12 +1213,12 @@ export const PurchasePage: React.FC = () => {
                               value={imei1}
                               onChange={(e) => handleUpdateImei(groupIdx, itemIdx, `${e.target.value} / ${imei2}`.replace(/ \/ $/, ''))}
                               placeholder="IMEI 1"
-                              className="w-full rounded bg-zinc-950 border border-zinc-800 px-2.5 py-1.5 text-xs text-zinc-100 font-mono focus:border-emerald-500 focus:outline-none pr-8"
+                              className="w-full rounded-lg bg-surface-raised border border-border px-2.5 py-1.5 text-xs text-fg font-mono focus:border-accent focus:outline-none pr-8"
                             />
                             <button
                               type="button"
                               onClick={() => handleScanImei(groupIdx, itemIdx)}
-                              className="absolute right-1.5 top-1.5 text-zinc-400 hover:text-emerald-400 p-0.5"
+                              className="absolute right-1.5 top-1.5 text-fg-subtle hover:text-accent p-0.5"
                               title="Сканировать IMEI 1"
                               aria-label="Сканировать IMEI 1"
                             >
@@ -1045,18 +1229,18 @@ export const PurchasePage: React.FC = () => {
 
                         <div className="flex items-end gap-1">
                           <div className="relative flex-1">
-                            <label className="block text-zinc-400 mb-1">IMEI 2 <span className="text-zinc-600">(необязательно)</span></label>
+                            <label className="block text-fg-subtle mb-1">IMEI 2 <span className="text-fg-subtle/70">(необязательно)</span></label>
                             <input
                               type="text"
                               value={imei2}
                               onChange={(e) => handleUpdateImei2(groupIdx, itemIdx, e.target.value)}
                               placeholder="IMEI 2 (необязательно)"
-                              className="w-full rounded bg-zinc-950 border border-zinc-800 px-2.5 py-1.5 text-xs text-zinc-100 font-mono focus:border-emerald-500 focus:outline-none pr-8"
+                              className="w-full rounded-lg bg-surface-raised border border-border px-2.5 py-1.5 text-xs text-fg font-mono focus:border-accent focus:outline-none pr-8"
                             />
                             <button
                               type="button"
                               onClick={() => openScanner((scannedCode) => handleUpdateImei2(groupIdx, itemIdx, scannedCode))}
-                              className="absolute right-1.5 top-1.5 text-zinc-400 hover:text-emerald-400 p-0.5"
+                              className="absolute right-1.5 top-1.5 text-fg-subtle hover:text-accent p-0.5"
                               title="Сканировать IMEI 2"
                               aria-label="Сканировать IMEI 2"
                             >
@@ -1067,7 +1251,7 @@ export const PurchasePage: React.FC = () => {
                             <button
                               type="button"
                               onClick={() => handleRemoveImeiFromGroup(groupIdx, itemIdx)}
-                              className="text-zinc-600 hover:text-rose-400 p-1"
+                              className="text-fg-subtle hover:text-danger p-1"
                               title="Удалить устройство"
                               aria-label="Удалить устройство"
                             >
@@ -1087,7 +1271,7 @@ export const PurchasePage: React.FC = () => {
           <button
             type="button"
             onClick={handleAddGroup}
-            className="w-full py-2.5 rounded-lg border border-dashed border-zinc-800 hover:border-emerald-500/50 bg-zinc-900/40 hover:bg-zinc-900/80 text-zinc-400 hover:text-emerald-400 text-xs font-mono font-bold flex items-center justify-center space-x-2 transition-colors"
+            className="w-full py-2.5 rounded-xl border border-dashed border-border hover:border-accent bg-surface-raised hover:bg-surface text-fg-muted hover:text-accent text-xs font-mono font-bold flex items-center justify-center space-x-2 transition-colors"
           >
             <Plus className="w-4 h-4" />
             <span>ДОБАВИТЬ ЕЩЕ МОДЕЛЬ / ПОЗИЦИЮ В НАКЛАДНУЮ</span>
@@ -1095,25 +1279,25 @@ export const PurchasePage: React.FC = () => {
         </div>
 
         {/* Bottom Actions & Total Bar (Sticky at bottom) */}
-        <div className="sticky bottom-0 z-20 p-3.5 sm:p-4 border-t border-zinc-800 bg-zinc-900/95 backdrop-blur-md flex flex-col sm:flex-row items-center justify-between gap-3 shrink-0 shadow-lg font-mono">
+        <div className="sticky bottom-0 z-20 p-3.5 sm:p-4 border-t border-border bg-surface/95 backdrop-blur-md flex flex-col sm:flex-row items-center justify-between gap-3 shrink-0 shadow-lg font-mono">
           {statusMessage ? (
             <div className={`flex items-center space-x-2 text-xs ${
-              statusMessage.type === 'success' ? 'text-emerald-400' : 'text-rose-400'
+              statusMessage.type === 'success' ? 'text-accent' : 'text-danger'
             }`}>
               {statusMessage.type === 'success' ? <CheckCircle2 className="w-4 h-4" /> : <AlertCircle className="w-4 h-4" />}
               <span>{statusMessage.text}</span>
             </div>
           ) : (
-            <div className="text-xs text-zinc-400">
-              Позиций: <strong className="text-zinc-200">{groups.length}</strong> • 
-              Устройств: <strong className="text-emerald-400 font-bold text-sm ml-1">{totalFormUnits} шт.</strong>
+            <div className="text-xs text-fg-subtle">
+              Позиций: <strong className="text-fg">{groups.length}</strong> • 
+              Устройств: <strong className="text-accent font-bold text-sm ml-1">{totalFormUnits} шт.</strong>
             </div>
           )}
 
           <div className="flex items-center space-x-3 w-full sm:w-auto justify-end">
             <div className="text-right mr-2">
-              <span className="text-[10px] text-zinc-400 block">ИТОГОВАЯ СУММА НАКЛАДНОЙ:</span>
-              <span className="text-base font-bold text-emerald-400 font-mono">
+              <span className="text-[10px] text-fg-subtle block uppercase font-medium">ИТОГОВАЯ СУММА НАКЛАДНОЙ:</span>
+              <span className="text-base font-bold text-accent font-mono">
                 ${totalFormUsd.toLocaleString()}
               </span>
             </div>
@@ -1124,7 +1308,7 @@ export const PurchasePage: React.FC = () => {
                 setStatusMessage(null);
                 setViewMode('list');
               }}
-              className="px-3 py-2 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs font-semibold transition-colors"
+              className="px-3 py-2 rounded-xl bg-surface-raised hover:bg-surface border border-border text-fg text-xs font-semibold transition-colors"
             >
               Отмена
             </button>
@@ -1132,7 +1316,7 @@ export const PurchasePage: React.FC = () => {
             <button
               type="submit"
               disabled={totalFormUnits === 0}
-              className="px-5 py-2 rounded bg-emerald-500 hover:bg-emerald-400 disabled:opacity-40 disabled:cursor-not-allowed text-xs font-bold text-white shadow transition-colors flex items-center space-x-1.5"
+              className="px-5 py-2 rounded-xl bg-accent hover:bg-accent-strong active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed text-xs font-bold text-accent-fg shadow-xs transition-colors flex items-center space-x-1.5"
             >
               <CheckCircle2 className="w-4 h-4" />
               <span>СОХРАНИТЬ ПРИХОД</span>
@@ -1143,45 +1327,45 @@ export const PurchasePage: React.FC = () => {
 
       {/* Edit Invoice Modal */}
       {editingInvoiceModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-xs p-4 font-mono">
-          <div className="w-full max-w-md rounded-2xl bg-[#0F1219] border border-slate-800 p-5 text-slate-200 shadow-2xl space-y-4">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 font-mono">
+          <div className="w-full max-w-md rounded-2xl bg-surface border border-border p-5 text-fg shadow-2xl space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-border">
               <div className="flex items-center space-x-2">
-                <div className="p-2 rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
+                <div className="p-2 rounded-lg bg-accent/15 text-accent border border-accent/30">
                   <Edit2 className="w-4 h-4" />
                 </div>
-                <h3 className="text-sm font-bold text-slate-100 uppercase">РЕДАКТИРОВАТЬ НАКЛАДНУЮ</h3>
+                <h3 className="text-sm font-bold text-fg uppercase">РЕДАКТИРОВАТЬ НАКЛАДНУЮ</h3>
               </div>
-              <button onClick={() => setEditingInvoiceModal(null)} className="p-1 rounded text-slate-400 hover:text-white">
+              <button onClick={() => setEditingInvoiceModal(null)} className="p-1 rounded text-fg-subtle hover:text-fg">
                 <X className="w-4 h-4" />
               </button>
             </div>
 
             <form onSubmit={handleSaveEditInvoiceModal} className="space-y-3 text-xs">
               <div>
-                <label className="block text-slate-400 text-[10px] uppercase mb-1">НОМЕР НАКЛАДНОЙ</label>
+                <label className="block text-fg-subtle text-[10px] uppercase mb-1">НОМЕР НАКЛАДНОЙ</label>
                 <input
                   type="text"
                   required
                   value={editInvoiceNum}
                   onChange={(e) => setEditInvoiceNum(e.target.value)}
-                  className="w-full rounded bg-[#0B0E14] border border-slate-800 px-3 py-2 text-slate-100 font-bold focus:border-emerald-500 focus:outline-none"
+                  className="w-full rounded-xl bg-surface-raised border border-border px-3 py-2 text-fg font-bold focus:border-accent focus:outline-none"
                 />
               </div>
 
               <div>
-                <label className="block text-slate-400 text-[10px] uppercase mb-1">ДАТА НАКЛАДНОЙ</label>
+                <label className="block text-fg-subtle text-[10px] uppercase mb-1">ДАТА НАКЛАДНОЙ</label>
                 <input
                   type="date"
                   required
                   value={editInvoiceDateStr}
                   onChange={(e) => setEditInvoiceDateStr(e.target.value)}
-                  className="w-full rounded bg-[#0B0E14] border border-slate-800 px-3 py-2 text-slate-100 focus:border-emerald-500 focus:outline-none"
+                  className="w-full rounded-xl bg-surface-raised border border-border px-3 py-2 text-fg focus:border-accent focus:outline-none"
                 />
               </div>
 
               <div>
-                <label className="block text-slate-400 text-[10px] uppercase mb-1">СУММА НАКЛАДНОЙ ($)</label>
+                <label className="block text-fg-subtle text-[10px] uppercase mb-1">СУММА НАКЛАДНОЙ ($)</label>
                 <input
                   type="number"
                   step="0.01"
@@ -1189,21 +1373,21 @@ export const PurchasePage: React.FC = () => {
                   min="0"
                   value={editInvoiceAmountUsd}
                   onChange={(e) => setEditInvoiceAmountUsd(e.target.value)}
-                  className="w-full rounded bg-[#0B0E14] border border-slate-800 px-3 py-2 text-emerald-400 font-bold focus:border-emerald-500 focus:outline-none font-mono"
+                  className="w-full rounded-xl bg-surface-raised border border-border px-3 py-2 text-accent font-bold focus:border-accent focus:outline-none font-mono"
                 />
               </div>
 
-              <div className="flex space-x-2 pt-3 border-t border-slate-800">
+              <div className="flex space-x-2 pt-3 border-t border-border">
                 <button
                   type="button"
                   onClick={() => setEditingInvoiceModal(null)}
-                  className="flex-1 py-2 rounded bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-400 font-bold"
+                  className="flex-1 py-2 rounded-xl bg-surface-raised hover:bg-surface border border-border text-fg-subtle hover:text-fg font-bold"
                 >
                   ОТМЕНА
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 py-2 rounded bg-emerald-500 hover:bg-emerald-400 text-white font-bold"
+                  className="flex-1 py-2 rounded-xl bg-accent hover:bg-accent-strong text-accent-fg font-bold shadow-xs"
                 >
                   СОХРАНИТЬ
                 </button>

@@ -47,6 +47,7 @@ export function mapDevice(d: any): Device {
     serialNumber: d.serialNumber ?? undefined,
     brand: d.brand,
     model: d.model,
+    ram: d.ram ?? undefined,
     storage: d.storage,
     color: d.color,
     status: d.status,
@@ -119,6 +120,7 @@ export function mapSale(s: any, names: NameLookup): Sale {
     items: (s.saleItems || []).map(mapSaleItem),
     totalTjs: s.totalTjs,
     totalUsd: s.totalUsd,
+    recognizedProfitUsd: s.recognizedProfitUsd ?? undefined,
     exchangeRate: s.exchangeRate ?? undefined,
     paymentMethod: s.paymentMethod,
     cashAmountTjs: s.cashAmountTjs,
@@ -225,6 +227,18 @@ export function mapSupplierInvoice(inv: any): SupplierInvoice {
     devicesCount: inv.devicesCount,
     isStorePurchase: inv.isStorePurchase ?? undefined,
     storeId: inv.storeId ?? undefined,
+    groups: Array.isArray(inv.groups)
+      ? inv.groups.map((g: any) => ({
+          id: g.id,
+          brand: g.brand,
+          model: g.model,
+          ram: g.ram ?? undefined,
+          storage: g.storage,
+          color: g.color,
+          quantity: g.quantity,
+          purchasePriceUsd: g.purchasePriceUsd,
+        }))
+      : undefined,
   };
 }
 
@@ -309,15 +323,16 @@ export function mapOwnerTransaction(t: any, ownerNames: NameLookup, userNames: N
 }
 
 export function mapUser(u: any, storeNames: NameLookup): User {
+  const isAct = u.active !== undefined ? Boolean(u.active) : (u.isActive !== undefined ? Boolean(u.isActive) : true);
   return {
     id: u.id,
-    name: u.name,
-    login: u.login,
-    role: u.role,
+    name: u.name || '',
+    login: u.login || '',
+    role: u.role || 'SELLER',
     storeId: u.storeId ?? undefined,
     storeName: u.storeId ? storeNames.get(u.storeId) : undefined,
-    active: u.active,
-    isActive: u.active,
+    active: isAct,
+    isActive: isAct,
     createdAt: u.createdAt,
     baseSalaryTjs: u.baseSalaryTjs ?? undefined,
     salesCommissionPercent: u.salesCommissionPercent ?? undefined,

@@ -25,14 +25,12 @@ export const ReportsPage: React.FC = () => {
     suppliers,
     stores,
     supplierBonuses,
-    todayRate,
-    resetAllCashBalances
+    todayRate
   } = useApp();
 
   const [period, setPeriod] = useState<'TODAY' | 'MONTH' | 'SPECIFIC_MONTH' | 'ALL'>('MONTH');
   const [selectedMonth, setSelectedMonth] = useState<string>(new Date().toISOString().substring(0, 7));
   const [selectedStore, setSelectedStore] = useState<string>('all');
-  const [statusMsg, setStatusMsg] = useState<string | null>(null);
 
   const rate = todayRate?.rate || 9.50;
 
@@ -77,15 +75,21 @@ export const ReportsPage: React.FC = () => {
 
     periodSales.forEach(sale => {
       const saleRate = sale.exchangeRate || rate;
-      revenueUsd += sale.totalUsd || +(sale.totalTjs / saleRate).toFixed(2);
+      const saleRevenueUsd = sale.totalUsd || +(sale.totalTjs / saleRate).toFixed(2);
+      revenueUsd += saleRevenueUsd;
+
+      // The server persists recognized profit because an exchanged sale cannot be
+      // reconstructed from only the current SaleItem: the returned phone is back in
+      // inventory and the replacement has a different cost basis.
+      const fallbackCostUsd = sale.items.reduce((sum, item) => sum + (item.costBasisUsd || item.purchaseCostUsd || 0), 0);
+      const saleProfitUsd = sale.recognizedProfitUsd ?? (saleRevenueUsd - fallbackCostUsd);
+      cogsUsd += saleRevenueUsd - saleProfitUsd;
 
       sale.items.forEach(item => {
         unitsSold++;
         const itemCostUsd = item.costBasisUsd || item.purchaseCostUsd || 0;
         const itemPriceUsd = item.salePriceUsd || +(item.salePriceTjs / saleRate).toFixed(2);
         const itemProfitUsd = +(itemPriceUsd - itemCostUsd).toFixed(2);
-
-        cogsUsd += itemCostUsd;
 
         const modelKey = `${item.brand} ${item.model}`.trim();
         if (!modelCounts[modelKey]) {
@@ -107,7 +111,7 @@ export const ReportsPage: React.FC = () => {
 
     // Operating expenses converted to USD
     const expensesTjs = periodExpenses.reduce((acc, e) => acc + (e.amountTjs || 0), 0);
-    const expensesUsd = +(expensesTjs / rate).toFixed(2);
+    const expensesUsd = +periodExpenses.reduce((acc, e) => acc + (e.amountUsd ?? ((e.amountTjs || 0) / (e.exchangeRate || rate))), 0).toFixed(2);
 
     // Cash supplier bonuses in period count 100% towards Net Profit
     const periodCashBonusesUsd = (supplierBonuses || [])
@@ -117,6 +121,7 @@ export const ReportsPage: React.FC = () => {
         if (!bDate) return true;
         if (period === 'TODAY') return bDate === todayStr;
         if (period === 'MONTH') return bDate.startsWith(currentMonthStr);
+        if (period === 'SPECIFIC_MONTH') return bDate.startsWith(selectedMonth);
         return true;
       })
       .reduce((acc, b) => acc + (b.amountUsd || 0), 0);
@@ -198,24 +203,24 @@ export const ReportsPage: React.FC = () => {
       netBusinessValueTjs,
       modelCounts: sortedModelList
     };
-  }, [sales, expenses, devices, suppliers, stores, period, selectedStore, rate]);
+  }, [sales, expenses, devices, suppliers, stores, supplierBonuses, period, selectedMonth, selectedStore, rate]);
 
   if (currentUser?.role === 'SELLER') {
     return (
-      <div className="p-8 text-center text-slate-500 font-mono text-xs">
-        <p className="font-bold">ДОСТУП ОГРАНИЧЕН</p>
+      <div className="p-8 text-center text-fg-subtle text-xs">
+        <p className="font-bold text-fg">ДОСТУП ОГРАНИЧЕН</p>
         <p className="mt-1">Финансовые отчеты доступны только руководству</p>
       </div>
     );
   }
 
   return (
-    <div className="flex-1 flex flex-col h-full overflow-hidden bg-bg text-fg font-mono">
+    <div className="flex-1 flex flex-col h-full overflow-hidden bg-bg text-fg">
       {/* Top Filter Bar */}
-      <div className="p-3 border-b border-slate-800 bg-[#0F1219] flex flex-col lg:flex-row lg:items-center justify-between gap-2.5 shrink-0">
+      <div className="p-3 border-b border-border bg-surface flex flex-col lg:flex-row lg:items-center justify-between gap-2.5 shrink-0">
         <div>
-          <h3 className="text-xs font-bold text-slate-100 flex items-center space-x-1.5 uppercase">
-            <BarChart3 className="w-4 h-4 text-emerald-400" />
+          <h3 className="text-xs font-bold text-fg flex items-center space-x-1.5 uppercase">
+            <BarChart3 className="w-4 h-4 text-accent" />
             <span>ФИНАНСОВЫЙ И БАЛАНСОВЫЙ ОТЧЕТ</span>
           </h3>
         </div>
@@ -226,10 +231,10 @@ export const ReportsPage: React.FC = () => {
             <button
               type="button"
               onClick={() => setPeriod('TODAY')}
-              className={`px-3 py-1 rounded-md border text-xs font-mono font-bold uppercase tracking-wider transition-colors bg-transparent ${
+              className={`px-3 py-1.5 rounded-lg border text-xs font-bold uppercase tracking-wider transition-colors ${
                 period === 'TODAY'
-                  ? 'border-[#22c55e] text-[#22c55e]'
-                  : 'border-slate-800 text-slate-400 hover:border-slate-700 hover:text-slate-200'
+                  ? 'border-accent bg-accent/10 text-accent'
+                  : 'border-border bg-surface-raised text-fg-muted hover:text-fg'
               }`}
             >
               СЕГОДНЯ
@@ -237,16 +242,16 @@ export const ReportsPage: React.FC = () => {
             <button
               type="button"
               onClick={() => setPeriod('MONTH')}
-              className={`px-3 py-1 rounded-md border text-xs font-mono font-bold uppercase tracking-wider transition-colors bg-transparent ${
+              className={`px-3 py-1.5 rounded-lg border text-xs font-bold uppercase tracking-wider transition-colors ${
                 period === 'MONTH'
-                  ? 'border-[#22c55e] text-[#22c55e]'
-                  : 'border-slate-800 text-slate-400 hover:border-slate-700 hover:text-slate-200'
+                  ? 'border-accent bg-accent/10 text-accent'
+                  : 'border-border bg-surface-raised text-fg-muted hover:text-fg'
               }`}
             >
               ЭТОТ МЕСЯЦ
             </button>
-            <div className="flex items-center space-x-1 pl-1 border-l border-slate-800">
-              <span className="text-[10px] text-slate-500 font-mono font-bold uppercase hidden md:inline">ВЫБОР МЕСЯЦА:</span>
+            <div className="flex items-center space-x-1 pl-1 border-l border-border">
+              <span className="text-[10px] text-fg-subtle font-bold uppercase hidden md:inline">ВЫБОР МЕСЯЦА:</span>
               <input
                 type="month"
                 value={selectedMonth}
@@ -256,10 +261,10 @@ export const ReportsPage: React.FC = () => {
                     setPeriod('SPECIFIC_MONTH');
                   }
                 }}
-                className={`px-2 py-0.5 rounded border text-xs font-mono font-bold transition-colors bg-[#0B0E14] focus:outline-none ${
+                className={`px-2 py-1 rounded-lg border text-xs font-bold transition-colors bg-surface-raised focus:outline-none ${
                   period === 'SPECIFIC_MONTH'
-                    ? 'border-[#22c55e] text-[#22c55e]'
-                    : 'border-slate-800 text-slate-400 hover:border-slate-700'
+                    ? 'border-accent text-accent'
+                    : 'border-border text-fg-muted'
                 }`}
                 title="Выберите любой конкретный месяц для отчета"
               />
@@ -267,10 +272,10 @@ export const ReportsPage: React.FC = () => {
             <button
               type="button"
               onClick={() => setPeriod('ALL')}
-              className={`px-3 py-1 rounded-md border text-xs font-mono font-bold uppercase tracking-wider transition-colors bg-transparent ${
+              className={`px-3 py-1.5 rounded-lg border text-xs font-bold uppercase tracking-wider transition-colors ${
                 period === 'ALL'
-                  ? 'border-[#22c55e] text-[#22c55e]'
-                  : 'border-slate-800 text-slate-400 hover:border-slate-700 hover:text-slate-200'
+                  ? 'border-accent bg-accent/10 text-accent'
+                  : 'border-border bg-surface-raised text-fg-muted hover:text-fg'
               }`}
             >
               ВСЕ ВРЕМЯ
@@ -281,7 +286,7 @@ export const ReportsPage: React.FC = () => {
           <select
             value={selectedStore}
             onChange={(e) => setSelectedStore(e.target.value)}
-            className="rounded bg-[#0B0E14] border border-slate-800 px-2.5 py-1 text-xs text-slate-200 focus:outline-none focus:border-emerald-500"
+            className="rounded-lg bg-surface-raised border border-border px-2.5 py-1.5 text-xs text-fg focus:outline-none focus:border-accent"
           >
             <option value="all">ВСЕ ФИЛИАЛЫ</option>
             {stores.map(s => (
@@ -289,23 +294,10 @@ export const ReportsPage: React.FC = () => {
             ))}
           </select>
 
-          {/* Reset Cash Balances */}
-          <button
-            onClick={() => {
-              resetAllCashBalances();
-              setStatusMsg('Остатки наличных во всех кассах обнулены (0 TJS)');
-              setTimeout(() => setStatusMsg(null), 4000);
-            }}
-            className="flex items-center space-x-1.5 px-3 py-1 rounded bg-slate-900 hover:bg-slate-800 border border-slate-800 text-amber-400 hover:text-amber-300 font-bold text-xs transition-colors"
-            title="Обнулить отрицательный или неактуальный остаток наличных во всех кассах"
-          >
-            <span>🧹 ОБНУЛИТЬ КАССЫ</span>
-          </button>
-
           {/* Quick Export Sales */}
           <button
             onClick={() => exportSalesReport(sales, rate)}
-            className="flex items-center space-x-1.5 px-3 py-1 rounded bg-emerald-500 hover:bg-emerald-400 text-black font-bold text-xs transition-colors shadow-[0_0_10px_rgba(16,185,129,0.3)]"
+            className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-accent hover:bg-accent-strong text-accent-fg font-bold text-xs transition-colors shadow-xs"
           >
             <Download className="w-3.5 h-3.5" />
             <span className="hidden sm:inline">ЭКСПОРТ (CSV)</span>
@@ -313,76 +305,69 @@ export const ReportsPage: React.FC = () => {
         </div>
       </div>
 
-      {statusMsg && (
-        <div className="mx-3 mt-2 p-2.5 rounded bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-xs font-mono flex items-center justify-between shrink-0">
-          <span>{statusMsg}</span>
-          <button onClick={() => setStatusMsg(null)} className="text-slate-400 hover:text-white">✕</button>
-        </div>
-      )}
-
       {/* Main Content Area */}
       <div className="flex-1 overflow-y-auto p-3 sm:p-4 space-y-4">
         {/* KPI SECTION 1: PROFIT & LOSS (P&L) */}
         <div>
-          <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2 flex items-center space-x-1.5">
-            <TrendingUp className="w-3.5 h-3.5 text-emerald-400" />
+          <h4 className="text-[10px] font-bold text-fg-subtle uppercase tracking-wider mb-2 flex items-center space-x-1.5">
+            <TrendingUp className="w-3.5 h-3.5 text-accent" />
             <span>ОТЧЕТ О ПРИБЫЛЯХ И УБЫТКАХ (P&L)</span>
           </h4>
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3">
             {/* Card 1: Revenue */}
-            <div className="p-3 sm:p-4 rounded-lg bg-[#0F1219] border border-slate-800 space-y-1">
-              <div className="flex items-center justify-between text-slate-400 text-[10px] uppercase">
+            <div className="p-3 sm:p-4 rounded-xl bg-surface border border-border space-y-1">
+              <div className="flex items-center justify-between text-fg-subtle text-[10px] uppercase">
                 <span>ВЫРУЧКА (ОБОРОТ)</span>
-                <DollarSign className="w-3.5 h-3.5 text-emerald-400" />
+                <DollarSign className="w-3.5 h-3.5 text-accent" />
               </div>
-              <p className="text-base sm:text-lg font-bold text-slate-100 font-mono">
+              <p className="text-base sm:text-lg font-bold text-fg">
                 ${filteredData.revenueUsd.toLocaleString()}
               </p>
-              <p className="text-[10px] text-slate-400 font-mono">
-                ≈ {filteredData.revenueTjs.toLocaleString()} TJS | <strong className="text-emerald-400">{filteredData.unitsSold}</strong> шт.
+              <p className="text-[10px] text-fg-subtle">
+                ≈ {filteredData.revenueTjs.toLocaleString()} TJS | <strong className="text-accent">{filteredData.unitsSold}</strong> шт.
               </p>
             </div>
 
             {/* Card 2: COGS */}
-            <div className="p-3 sm:p-4 rounded-lg bg-[#0F1219] border border-slate-800 space-y-1">
-              <div className="flex items-center justify-between text-slate-400 text-[10px] uppercase">
+            <div className="p-3 sm:p-4 rounded-xl bg-surface border border-border space-y-1">
+              <div className="flex items-center justify-between text-fg-subtle text-[10px] uppercase">
                 <span>СЕБЕСТОИМОСТЬ (COGS)</span>
-                <Package className="w-3.5 h-3.5 text-slate-400" />
+                <Package className="w-3.5 h-3.5 text-fg-subtle" />
               </div>
-              <p className="text-base sm:text-lg font-bold text-slate-300 font-mono">
+              <p className="text-base sm:text-lg font-bold text-fg-muted">
                 ${filteredData.cogsUsd.toLocaleString()}
               </p>
-              <p className="text-[10px] text-slate-400 font-mono">
+              <p className="text-[10px] text-fg-subtle">
                 ≈ {filteredData.cogsTjs.toLocaleString()} TJS (закупка)
               </p>
             </div>
 
             {/* Card 3: Gross Profit */}
-            <div className="p-3 sm:p-4 rounded-lg bg-[#0F1219] border border-slate-800 space-y-1">
-              <div className="flex items-center justify-between text-slate-400 text-[10px] uppercase">
+            <div className="p-3 sm:p-4 rounded-xl bg-surface border border-border space-y-1">
+              <div className="flex items-center justify-between text-fg-subtle text-[10px] uppercase">
                 <span>ВАЛОВАЯ МАРЖА</span>
-                <TrendingUp className="w-3.5 h-3.5 text-emerald-400" />
+                <TrendingUp className="w-3.5 h-3.5 text-accent" />
               </div>
-              <p className="text-base sm:text-lg font-bold text-emerald-400 font-mono">
+              <p className="text-base sm:text-lg font-bold text-accent">
                 ${filteredData.grossProfitUsd.toLocaleString()}
               </p>
-              <p className="text-[10px] text-slate-400 font-mono">
-                ≈ {filteredData.grossProfitTjs.toLocaleString()} TJS | Маржа: <strong className="text-emerald-400">{filteredData.grossMarginPercent}%</strong>
+              <p className="text-[10px] text-fg-subtle">
+                ≈ {filteredData.grossProfitTjs.toLocaleString()} TJS | Маржа: <strong className="text-accent">{filteredData.grossMarginPercent}%</strong>
               </p>
             </div>
 
             {/* Card 4: Net Profit */}
-            <div className="p-3 sm:p-4 rounded-lg bg-[#0F1219] border border-slate-800 space-y-1">
-              <div className="flex items-center justify-between text-slate-400 text-[10px] uppercase font-bold">
+            <div className="p-3 sm:p-4 rounded-xl bg-surface border border-border space-y-1">
+              <div className="flex items-center justify-between text-fg-subtle text-[10px] uppercase font-bold">
                 <span>ЧИСТАЯ ПРИБЫЛЬ</span>
-                <DollarSign className="w-3.5 h-3.5 text-emerald-400" />
+                <DollarSign className="w-3.5 h-3.5 text-accent" />
               </div>
-              <p className={`text-base sm:text-lg font-bold font-mono ${
-                filteredData.netProfitUsd >= 0 ? 'text-emerald-400' : 'text-rose-400'
+              <p className={`text-base sm:text-lg font-bold ${
+                filteredData.netProfitUsd >= 0 ? 'text-accent' : 'text-danger'
               }`}>
                 ${filteredData.netProfitUsd.toLocaleString()}
               </p>
-              <p className="text-[10px] text-slate-400 font-mono">
+              <p className="text-[10px] text-fg-subtle">
                 ≈ {filteredData.netProfitTjs.toLocaleString()} TJS (расходы: {filteredData.expensesTjs.toLocaleString()} TJS)
               </p>
             </div>
@@ -391,63 +376,63 @@ export const ReportsPage: React.FC = () => {
 
         {/* KPI SECTION 2: BALANCE SHEET & NET WORTH */}
         <div>
-          <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2 flex items-center space-x-1.5">
-            <Landmark className="w-3.5 h-3.5 text-emerald-400" />
+          <h4 className="text-[10px] font-bold text-fg-subtle uppercase tracking-wider mb-2 flex items-center space-x-1.5">
+            <Landmark className="w-3.5 h-3.5 text-accent" />
             <span>БАЛАНС АКТИВОВ И КАПИТАЛИЗАЦИИ БИЗНЕСА</span>
           </h4>
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3">
             {/* Asset 1: Stock Inventory */}
-            <div className="p-3 sm:p-4 rounded-lg bg-[#0F1219] border border-slate-800 space-y-1">
-              <div className="flex items-center justify-between text-slate-400 text-[10px] uppercase">
+            <div className="p-3 sm:p-4 rounded-xl bg-surface border border-border space-y-1">
+              <div className="flex items-center justify-between text-fg-subtle text-[10px] uppercase">
                 <span>ТОВАРЫ НА СКЛАДЕ</span>
-                <Smartphone className="w-3.5 h-3.5 text-emerald-400" />
+                <Smartphone className="w-3.5 h-3.5 text-accent" />
               </div>
-              <p className="text-base sm:text-lg font-bold text-emerald-400 font-mono">
+              <p className="text-base sm:text-lg font-bold text-accent">
                 ${filteredData.inventoryAssetUsd.toLocaleString()}
               </p>
-              <p className="text-[10px] text-slate-400 font-mono">
-                ≈ {filteredData.inventoryAssetTjs.toLocaleString()} TJS | <strong className="text-slate-200">{filteredData.inventoryDevicesCount}</strong> шт.
+              <p className="text-[10px] text-fg-subtle">
+                ≈ {filteredData.inventoryAssetTjs.toLocaleString()} TJS | <strong className="text-fg">{filteredData.inventoryDevicesCount}</strong> шт.
               </p>
             </div>
 
             {/* Asset 2: Cash Registers */}
-            <div className="p-3 sm:p-4 rounded-lg bg-[#0F1219] border border-slate-800 space-y-1">
-              <div className="flex items-center justify-between text-slate-400 text-[10px] uppercase">
+            <div className="p-3 sm:p-4 rounded-xl bg-surface border border-border space-y-1">
+              <div className="flex items-center justify-between text-fg-subtle text-[10px] uppercase">
                 <span>ОСТАТОК В КАССАХ</span>
-                <StoreIcon className="w-3.5 h-3.5 text-slate-400" />
+                <StoreIcon className="w-3.5 h-3.5 text-fg-subtle" />
               </div>
-              <p className="text-base sm:text-lg font-bold text-slate-100 font-mono">
+              <p className="text-base sm:text-lg font-bold text-fg">
                 {filteredData.totalCashRegistersTjs.toLocaleString()} TJS
               </p>
-              <p className="text-[10px] text-slate-400 font-mono">
+              <p className="text-[10px] text-fg-subtle">
                 ≈ ${filteredData.totalCashRegistersUsd.toLocaleString()}
               </p>
             </div>
 
             {/* Liability 3: Supplier Debts */}
-            <div className="p-3 sm:p-4 rounded-lg bg-[#0F1219] border border-slate-800 space-y-1">
-              <div className="flex items-center justify-between text-slate-400 text-[10px] uppercase">
+            <div className="p-3 sm:p-4 rounded-xl bg-surface border border-border space-y-1">
+              <div className="flex items-center justify-between text-fg-subtle text-[10px] uppercase">
                 <span>ДОЛГ ПОСТАВЩИКАМ</span>
-                <ArrowDownRight className="w-3.5 h-3.5 text-rose-400" />
+                <ArrowDownRight className="w-3.5 h-3.5 text-danger" />
               </div>
-              <p className="text-base sm:text-lg font-bold text-rose-400 font-mono">
+              <p className="text-base sm:text-lg font-bold text-danger">
                 ${filteredData.totalSupplierDebtUsd.toLocaleString()}
               </p>
-              <p className="text-[10px] text-slate-400 font-mono">
+              <p className="text-[10px] text-fg-subtle">
                 ≈ {filteredData.totalSupplierDebtTjs.toLocaleString()} TJS (долги)
               </p>
             </div>
 
             {/* Net Worth 4: Business Value */}
-            <div className="p-3 sm:p-4 rounded-lg bg-[#0F1219] border border-emerald-500/40 space-y-1">
-              <div className="flex items-center justify-between text-emerald-400 text-[10px] uppercase font-bold">
+            <div className="p-3 sm:p-4 rounded-xl bg-surface border border-accent/40 space-y-1">
+              <div className="flex items-center justify-between text-accent text-[10px] uppercase font-bold">
                 <span>ЧИСТАЯ СТОИМОСТЬ БИЗНЕСА</span>
-                <ArrowUpRight className="w-3.5 h-3.5 text-emerald-400" />
+                <ArrowUpRight className="w-3.5 h-3.5 text-accent" />
               </div>
-              <p className="text-base sm:text-lg font-bold text-emerald-400 font-mono">
+              <p className="text-base sm:text-lg font-bold text-accent">
                 ${filteredData.netBusinessValueUsd.toLocaleString()}
               </p>
-              <p className="text-[10px] text-slate-400 font-mono">
+              <p className="text-[10px] text-fg-subtle">
                 ≈ {filteredData.netBusinessValueTjs.toLocaleString()} TJS (Активы − Обязательства)
               </p>
             </div>
@@ -456,21 +441,21 @@ export const ReportsPage: React.FC = () => {
 
         {/* TOP SELLING MODELS TABLE */}
         {filteredData.modelCounts.length > 0 && (
-          <div className="p-3.5 rounded-lg bg-[#0F1219] border border-slate-800 space-y-2.5">
+          <div className="p-3.5 rounded-xl bg-surface border border-border space-y-2.5">
             <div className="flex items-center justify-between">
-              <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center space-x-1.5">
-                <Smartphone className="w-3.5 h-3.5 text-emerald-400" />
+              <h4 className="text-[10px] font-bold text-fg-subtle uppercase tracking-wider flex items-center space-x-1.5">
+                <Smartphone className="w-3.5 h-3.5 text-accent" />
                 <span>РЕЙТИНГ ПРОДАЖ И МАРЖИНАЛЬНОСТЬ МОДЕЛЕЙ</span>
               </h4>
-              <span className="text-[10px] text-slate-500 font-mono">
+              <span className="text-[10px] text-fg-subtle">
                 Топ-{Math.min(10, filteredData.modelCounts.length)} по марже
               </span>
             </div>
 
             <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs font-mono">
+              <table className="w-full text-left text-xs">
                 <thead>
-                  <tr className="border-b border-slate-800 text-[10px] text-slate-500 uppercase">
+                  <tr className="border-b border-border text-[10px] text-fg-subtle uppercase">
                     <th className="py-2 px-3">#</th>
                     <th className="py-2 px-3">Модель</th>
                     <th className="py-2 px-3 text-center">Продано (шт)</th>
@@ -480,20 +465,20 @@ export const ReportsPage: React.FC = () => {
                     <th className="py-2 px-3 text-right">Рентабельность (%)</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-800/60">
+                <tbody className="divide-y divide-border">
                   {filteredData.modelCounts.slice(0, 10).map((m, idx) => {
                     const marginPct = m.revenueUsd > 0 ? ((m.profitUsd / m.revenueUsd) * 100).toFixed(1) : '0.0';
                     return (
-                      <tr key={m.name} className="hover:bg-slate-800/30 transition-colors">
-                        <td className="py-2 px-3 text-slate-500 font-bold">{idx + 1}</td>
-                        <td className="py-2 px-3 font-bold text-slate-200">{m.name}</td>
-                        <td className="py-2 px-3 text-center text-slate-300 font-bold">{m.count}</td>
-                        <td className="py-2 px-3 text-right text-slate-200">${m.revenueUsd.toFixed(2)}</td>
-                        <td className="py-2 px-3 text-right text-slate-400">${m.cogsUsd.toFixed(2)}</td>
-                        <td className={`py-2 px-3 text-right font-bold ${m.profitUsd >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                      <tr key={m.name} className="hover:bg-surface-raised transition-colors">
+                        <td className="py-2 px-3 text-fg-subtle font-bold">{idx + 1}</td>
+                        <td className="py-2 px-3 font-bold text-fg">{m.name}</td>
+                        <td className="py-2 px-3 text-center text-fg-muted font-bold">{m.count}</td>
+                        <td className="py-2 px-3 text-right text-fg">${m.revenueUsd.toFixed(2)}</td>
+                        <td className="py-2 px-3 text-right text-fg-subtle">${m.cogsUsd.toFixed(2)}</td>
+                        <td className={`py-2 px-3 text-right font-bold ${m.profitUsd >= 0 ? 'text-accent' : 'text-danger'}`}>
                           {m.profitUsd >= 0 ? '+' : ''}${m.profitUsd.toFixed(2)}
                         </td>
-                        <td className="py-2 px-3 text-right font-bold text-emerald-400">
+                        <td className="py-2 px-3 text-right font-bold text-accent">
                           {marginPct}%
                         </td>
                       </tr>
@@ -506,29 +491,29 @@ export const ReportsPage: React.FC = () => {
         )}
 
         {/* Export Reports Action Section */}
-        <div className="p-3.5 rounded-lg bg-[#0F1219] border border-slate-800 space-y-2.5">
-          <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center space-x-1.5">
-            <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-400" />
+        <div className="p-3.5 rounded-xl bg-surface border border-border space-y-2.5">
+          <h4 className="text-[10px] font-bold text-fg-subtle uppercase tracking-wider flex items-center space-x-1.5">
+            <FileSpreadsheet className="w-3.5 h-3.5 text-accent" />
             <span>ЭКСПОРТ ДАННЫХ И ЭЛЕКТРОННЫЕ ОТЧЕТЫ (CSV / EXCEL)</span>
           </h4>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
             {/* Sales Report Download Card */}
-            <div className="p-3 rounded bg-[#0B0E14] border border-slate-800 space-y-2 flex flex-col justify-between">
+            <div className="p-3 rounded-xl bg-surface-raised border border-border space-y-2 flex flex-col justify-between">
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between">
-                  <span className="font-bold text-slate-200 text-xs">Отчет по продажам</span>
-                  <span className="text-[10px] text-emerald-400 font-mono bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20">
+                  <span className="font-bold text-fg text-xs">Отчет по продажам</span>
+                  <span className="text-[10px] text-accent bg-accent/10 px-1.5 py-0.5 rounded-md border border-accent/20">
                     {sales.length} чеков
                   </span>
                 </div>
-                <p className="text-[11px] text-slate-400 font-sans">
+                <p className="text-[11px] text-fg-subtle">
                   Номер чека, дата, кассир, магазин, товар, IMEI 1/2, цена, себестоимость, прибыль и статус.
                 </p>
               </div>
               <button
                 onClick={() => exportSalesReport(sales, rate)}
-                className="w-full py-2 px-3 rounded bg-emerald-500 hover:bg-emerald-400 text-black font-bold text-xs flex items-center justify-center space-x-2 transition-colors shadow-[0_0_10px_rgba(16,185,129,0.3)] mt-2"
+                className="w-full py-2 px-3 rounded-lg bg-accent hover:bg-accent-strong text-accent-fg font-bold text-xs flex items-center justify-center space-x-2 transition-colors shadow-xs mt-2"
               >
                 <Download className="w-3.5 h-3.5" />
                 <span>СКАЧАТЬ ПРОДАЖИ (CSV)</span>
@@ -536,21 +521,21 @@ export const ReportsPage: React.FC = () => {
             </div>
 
             {/* Inventory Report Download Card */}
-            <div className="p-3 rounded bg-[#0B0E14] border border-slate-800 space-y-2 flex flex-col justify-between">
+            <div className="p-3 rounded-xl bg-surface-raised border border-border space-y-2 flex flex-col justify-between">
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between">
-                  <span className="font-bold text-slate-200 text-xs">Остатки склада</span>
-                  <span className="text-[10px] text-emerald-400 font-mono bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20">
+                  <span className="font-bold text-fg text-xs">Остатки склада</span>
+                  <span className="text-[10px] text-accent bg-accent/10 px-1.5 py-0.5 rounded-md border border-accent/20">
                     {devices.length} устройств
                   </span>
                 </div>
-                <p className="text-[11px] text-slate-400 font-sans">
+                <p className="text-[11px] text-fg-subtle">
                   Бренд, модель, память, цвет, IMEI 1/2, штрихкод, локация склада, статус и себестоимость.
                 </p>
               </div>
               <button
                 onClick={() => exportInventoryReport(devices, stores, rate)}
-                className="w-full py-2 px-3 rounded bg-slate-800 hover:bg-slate-700 text-slate-100 border border-slate-700 font-bold text-xs flex items-center justify-center space-x-2 transition-colors mt-2"
+                className="w-full py-2 px-3 rounded-lg bg-surface hover:bg-surface-raised text-fg border border-border font-bold text-xs flex items-center justify-center space-x-2 transition-colors mt-2"
               >
                 <Download className="w-3.5 h-3.5" />
                 <span>СКАЧАТЬ СКЛАД (CSV)</span>
@@ -558,21 +543,21 @@ export const ReportsPage: React.FC = () => {
             </div>
 
             {/* Expenses Report Download Card */}
-            <div className="p-3 rounded bg-[#0B0E14] border border-slate-800 space-y-2 flex flex-col justify-between">
+            <div className="p-3 rounded-xl bg-surface-raised border border-border space-y-2 flex flex-col justify-between">
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between">
-                  <span className="font-bold text-slate-200 text-xs">Отчет по расходам</span>
-                  <span className="text-[10px] text-rose-400 font-mono bg-rose-500/10 px-1.5 py-0.5 rounded border border-rose-500/20">
+                  <span className="font-bold text-fg text-xs">Отчет по расходам</span>
+                  <span className="text-[10px] text-danger bg-danger/10 px-1.5 py-0.5 rounded-md border border-danger/20">
                     {expenses.length} записей
                   </span>
                 </div>
-                <p className="text-[11px] text-slate-400 font-sans">
+                <p className="text-[11px] text-fg-subtle">
                   Дата, категория, сумма в TJS и USD, филиал, касса списания, комментарий и ответственный.
                 </p>
               </div>
               <button
                 onClick={() => exportExpensesReport(expenses, rate)}
-                className="w-full py-2 px-3 rounded bg-slate-800 hover:bg-slate-700 text-slate-100 border border-slate-700 font-bold text-xs flex items-center justify-center space-x-2 transition-colors mt-2"
+                className="w-full py-2 px-3 rounded-lg bg-surface hover:bg-surface-raised text-fg border border-border font-bold text-xs flex items-center justify-center space-x-2 transition-colors mt-2"
               >
                 <Download className="w-3.5 h-3.5" />
                 <span>СКАЧАТЬ РАСХОДЫ (CSV)</span>
@@ -580,21 +565,21 @@ export const ReportsPage: React.FC = () => {
             </div>
 
             {/* Repairs Report Download Card */}
-            <div className="p-3 rounded bg-[#0B0E14] border border-slate-800 space-y-2 flex flex-col justify-between">
+            <div className="p-3 rounded-xl bg-surface-raised border border-border space-y-2 flex flex-col justify-between">
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between">
-                  <span className="font-bold text-slate-200 text-xs">Журнал ремонтов</span>
-                  <span className="text-[10px] text-emerald-400 font-mono bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20">
+                  <span className="font-bold text-fg text-xs">Журнал ремонтов</span>
+                  <span className="text-[10px] text-accent bg-accent/10 px-1.5 py-0.5 rounded-md border border-accent/20">
                     {repairs.length} заказов
                   </span>
                 </div>
-                <p className="text-[11px] text-slate-400 font-sans">
+                <p className="text-[11px] text-fg-subtle">
                   Квитанция, дата, клиент, модель, IMEI, поломка, статус и финальная стоимость ремонта.
                 </p>
               </div>
               <button
                 onClick={() => exportRepairsReport(repairs)}
-                className="w-full py-2 px-3 rounded bg-slate-800 hover:bg-slate-700 text-slate-100 border border-slate-700 font-bold text-xs flex items-center justify-center space-x-2 transition-colors mt-2"
+                className="w-full py-2 px-3 rounded-lg bg-surface hover:bg-surface-raised text-fg border border-border font-bold text-xs flex items-center justify-center space-x-2 transition-colors mt-2"
               >
                 <Download className="w-4 h-4" />
                 <span>СКАЧАТЬ РЕМОНТЫ (CSV)</span>

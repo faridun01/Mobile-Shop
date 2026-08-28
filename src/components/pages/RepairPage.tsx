@@ -43,7 +43,7 @@ export const RepairPage: React.FC = () => {
   // Modal state for ISSUING REPAIR & SETTLEMENT
   const [selectedTicket, setSelectedTicket] = useState<RepairTicket | null>(null);
   const [viewingTicket, setViewingTicket] = useState<RepairTicket | null>(null);
-  const [issueFinalCost, setIssueFinalCost] = useState<string>('0');
+  const [issueFinalCost, setIssueFinalCost] = useState<string>('');
 
   const [statusMessage, setStatusMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [statusBanner, setStatusBanner] = useState<StatusMessage | null>(null);
@@ -202,6 +202,8 @@ export const RepairPage: React.FC = () => {
       problemDescription: defectDescription.trim(),
       comment: masterNote.trim() || undefined,
       estimatedCostTjs: parseFloat(estimatedCostTjs) || 0,
+      prepaymentTjs: parseFloat(prepaymentTjs) || 0,
+      storeId: isSeller ? undefined : createTicketStoreId || undefined,
     });
 
     if (res.success) {
@@ -232,7 +234,7 @@ export const RepairPage: React.FC = () => {
 
   const handleOpenIssueModal = (ticket: RepairTicket) => {
     setSelectedTicket(ticket);
-    setIssueFinalCost((ticket.estimatedCostTjs || 0).toString());
+    setIssueFinalCost('');
   };
 
   const handleConfirmIssueTicket = async () => {
@@ -493,7 +495,7 @@ export const RepairPage: React.FC = () => {
                       min="0"
                       value={estimatedCostTjs}
                       onChange={(e) => setEstimatedCostTjs(e.target.value)}
-                      className="w-full rounded-xl bg-surface-raised border border-border px-3 py-2 text-fg text-warning font-bold focus:border-accent focus:outline-none"
+                      className="w-full rounded-xl bg-surface-raised border border-border px-3 py-2 text-warning font-bold focus:border-accent focus:outline-none"
                     />
                   </div>
 
@@ -658,7 +660,7 @@ export const RepairPage: React.FC = () => {
                   min="0"
                   value={issueFinalCost}
                   onChange={(e) => setIssueFinalCost(e.target.value)}
-                  className="w-full rounded-xl bg-surface-raised border border-border px-3 py-2 text-fg text-accent font-bold focus:border-accent focus:outline-none"
+                  className="w-full rounded-xl bg-surface-raised border border-border px-3 py-2 text-accent font-bold focus:border-accent focus:outline-none"
                 />
               </div>
 

@@ -18,6 +18,7 @@ import { registerAuditLogRoutes } from './modules/audit/audit.routes';
 import { registerNotificationRoutes } from './modules/notifications/notifications.routes';
 import { registerExchangeRateRoutes } from './modules/exchange-rate/exchange-rate.routes';
 import { registerStoreRoutes } from './modules/stores/stores.routes';
+import { requirePositiveMoney } from './common/money';
 
 export const app = express();
 
@@ -100,9 +101,12 @@ app.post('/api/auth/logout', authenticateJwt, async (req: AuthenticatedRequest, 
   }
 });
 
-app.get('/api/stores', authenticateJwt, async (_req, res, next) => {
+app.get('/api/stores', authenticateJwt, async (req: AuthenticatedRequest, res, next) => {
   try {
-    const stores = await prisma.store.findMany({ orderBy: { name: 'asc' } });
+    const isSeller = req.user!.role === 'SELLER';
+    const storeId = req.user!.storeId;
+    const where = isSeller ? (storeId ? { id: storeId } : { id: '__none__' }) : undefined;
+    const stores = await prisma.store.findMany({ where, orderBy: { name: 'asc' } });
     res.json(stores);
   } catch (error) {
     next(error);
@@ -135,7 +139,7 @@ app.post('/api/purchases', authenticateJwt, requireRoles('ADMIN', 'PARTNER'), en
     const result = await prisma.$transaction(async (transaction: Prisma.TransactionClient) => {
       const supplier = await transaction.supplier.findUnique({ where: { id: supplierId } });
       const store = await transaction.store.findUnique({ where: { id: storeId } });
-      if (!supplier || !store) throw new Error('Поставщик или магазин не найден');
+      if (!supplier || !store || !supplier.active || !store.active) throw new Error('Поставщик или магазин не найден либо неактивен');
 
       const normalizedDevices = groups.flatMap((group: any) => {
         if (Array.isArray(group.items) && group.items.length > 0) {
@@ -149,9 +153,10 @@ app.post('/api/purchases', authenticateJwt, requireRoles('ADMIN', 'PARTNER'), en
                 imei2: explicitImei2 || imei2 || null,
                 brand: String(group.brand || '').trim(),
                 model: String(group.model || '').trim(),
+                ram: String(group.ram || '').trim() || null,
                 storage: String(group.storage || '').trim(),
                 color: String(group.color || '').trim(),
-                purchasePriceUsd: Number(group.purchasePriceUsd) || 0,
+                purchasePriceUsd: requirePositiveMoney(group.purchasePriceUsd, 'Закупочная цена'),
               };
             });
         }
@@ -164,9 +169,10 @@ app.post('/api/purchases', authenticateJwt, requireRoles('ADMIN', 'PARTNER'), en
             imei2: imei2 || null,
             brand: String(group.brand || '').trim(),
             model: String(group.model || '').trim(),
+            ram: String(group.ram || '').trim() || null,
             storage: String(group.storage || '').trim(),
             color: String(group.color || '').trim(),
-            purchasePriceUsd: Number(group.purchasePriceUsd) || 0,
+            purchasePriceUsd: requirePositiveMoney(group.purchasePriceUsd, 'Закупочная цена'),
           };
         });
       });
@@ -190,22 +196,23 @@ app.post('/api/purchases', authenticateJwt, requireRoles('ADMIN', 'PARTNER'), en
           date: date ? new Date(date) : new Date(),
           totalAmountUsd,
           devicesCount: normalizedDevices.length,
-          isStorePurchase: Boolean(isStorePurchase),
+          isStorePurchase: !store.isMainWarehouse,
           storeId,
           groups: {
             create: groups.map((group: any) => ({
               brand: String(group.brand || '').trim(), model: String(group.model || '').trim(),
+              ram: String(group.ram || '').trim() || null,
               storage: String(group.storage || '').trim(), color: String(group.color || '').trim(),
               quantity: Array.isArray(group.items)
                 ? group.items.filter((i: any) => i && typeof i.imei === 'string' && i.imei.trim().length > 0).length
                 : (Array.isArray(group.imeis) ? group.imeis.filter(Boolean).length : 0),
-              purchasePriceUsd: Number(group.purchasePriceUsd) || 0,
+              purchasePriceUsd: requirePositiveMoney(group.purchasePriceUsd, 'Закупочная цена'),
             })),
           },
         },
       });
 
-      const targetStatus = isStorePurchase ? ('STORE_STOCK' as const) : ('MAIN_WAREHOUSE' as const);
+      const targetStatus = store.isMainWarehouse ? ('MAIN_WAREHOUSE' as const) : ('STORE_STOCK' as const);
       const devices = await transaction.device.createManyAndReturn({
         data: normalizedDevices.map((device) => ({
           ...device,
@@ -245,7 +252,7 @@ app.post('/api/purchases', authenticateJwt, requireRoles('ADMIN', 'PARTNER'), en
       });
 
       return { invoice, devices };
-    });
+    }, { maxWait: 10000, timeout: 25000 });
 
     RealtimeSyncGateway.broadcast('INVENTORY_UPDATE', { storeId }, { storeIds: [storeId] });
     res.status(201).json(result);

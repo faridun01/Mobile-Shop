@@ -6,7 +6,7 @@ import { app } from './app';
 import { prisma } from './prisma/prisma.service';
 import { RealtimeSyncGateway } from './websocket/websocket.gateway';
 
-const port = Number(process.env.PORT || 3002);
+const port = Number(process.env.PORT || 3001);
 const currentFile = fileURLToPath(import.meta.url);
 const currentDirectory = path.dirname(currentFile);
 const projectRoot = path.resolve(currentDirectory, '../..');

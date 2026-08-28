@@ -18,7 +18,7 @@ export function registerExchangeRoutes(app: Express) {
       if (req.user!.role === 'SELLER') {
         const sourceSale = await prisma.sale.findUnique({ where: { id: body.saleId } });
         if (!sourceSale || sourceSale.storeId !== req.user!.storeId) {
-          res.status(403).json({ error: 'Forbidden: this sale belongs to another store' });
+          res.status(403).json({ message: 'Этот чек принадлежит другому магазину' });
           return;
         }
       }

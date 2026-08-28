@@ -138,6 +138,7 @@ model Device {
   serialNumber      String?
   brand             String
   model             String
+  ram               String?
   storage           String
   color             String
   status            DeviceStatus @default(MAIN_WAREHOUSE)
@@ -313,6 +314,7 @@ model InvoiceGroup {
   invoiceId        String
   brand            String
   model            String
+  ram              String?
   storage          String
   color            String
   quantity         Int

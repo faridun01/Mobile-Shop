@@ -70,6 +70,8 @@ export class AuthService {
         return null;
       }
 
+      const decodedHeader = JSON.parse(Buffer.from(header, 'base64url').toString('utf8'));
+      if (decodedHeader?.alg !== 'HS256' || decodedHeader?.typ !== 'JWT') return null;
       const payload: JwtPayload & { exp: number } = JSON.parse(Buffer.from(encodedPayload, 'base64url').toString('utf8'));
       if (payload.exp < Math.floor(Date.now() / 1000)) return null;
 

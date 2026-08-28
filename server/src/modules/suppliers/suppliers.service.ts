@@ -1,6 +1,7 @@
 import { prisma } from '../../prisma/prisma.service';
 import type { Prisma } from '@prisma/client';
 import { resolveActor } from '../../common/actor';
+import { requireNonNegativeMoney, requirePositiveMoney, roundMoney } from '../../common/money';
 
 /** True if any of these devices has a sale, transfer, or repair record referencing it (hard FK, no cascade). */
 async function deviceHasTransactionHistory(tx: Prisma.TransactionClient, deviceIds: string[]): Promise<boolean> {
@@ -40,23 +41,28 @@ export class SuppliersService {
 
   /** FIFO allocation across the supplier's open invoices, oldest first. */
   public static async pay(input: PaySupplierInput) {
+    const amountUsd = requirePositiveMoney(input.amountUsd, 'Сумма оплаты');
+    if (!['MAIN_ACCOUNT', 'STORE_CASH'].includes(input.sourceAccount)) throw new Error('Некорректный источник оплаты');
+    if (input.sourceAccount === 'STORE_CASH' && !input.storeId) throw new Error('Выберите кассу магазина');
+
     return prisma.$transaction(async (tx) => {
       const actor = await resolveActor(tx, input.createdByUserId);
       const supplier = await tx.supplier.findUnique({ where: { id: input.supplierId } });
       if (!supplier) throw new Error('Поставщик не найден');
+      if (amountUsd > supplier.totalDebtUsd + 0.01) throw new Error('Сумма оплаты превышает задолженность поставщику');
 
       const openInvoices = await tx.supplierInvoice.findMany({
         where: { supplierId: input.supplierId },
         orderBy: { date: 'asc' },
       });
 
-      let remainingToPay = input.amountUsd;
+      let remainingToPay = amountUsd;
       const allocations: { invoiceId: string; invoiceNumber: string; allocatedAmountUsd: number }[] = [];
 
       const payment = await tx.supplierPayment.create({
         data: {
           supplierId: input.supplierId,
-          amountUsd: input.amountUsd,
+          amountUsd,
           sourceAccount: input.sourceAccount,
           storeId: input.storeId,
           createdByUserId: actor.id,
@@ -77,30 +83,35 @@ export class SuppliersService {
         remainingToPay -= payForThis;
       }
 
-      await tx.supplier.update({
-        where: { id: input.supplierId },
+      const debtGuard = await tx.supplier.updateMany({
+        where: { id: input.supplierId, totalDebtUsd: { gte: amountUsd } },
         data: {
-          totalPaidUsd: { increment: input.amountUsd },
-          totalDebtUsd: Math.max(0, supplier.totalDebtUsd - input.amountUsd),
+          totalPaidUsd: { increment: amountUsd },
+          totalDebtUsd: { decrement: amountUsd },
         },
       });
+      if (debtGuard.count !== 1) throw new Error('Задолженность изменилась, обновите данные и повторите оплату');
 
       let store = null;
       if (input.sourceAccount === 'STORE_CASH' && input.storeId) {
         store = await tx.store.findUnique({ where: { id: input.storeId } });
         if (store) {
+          if (store.isMainWarehouse) throw new Error('Главный склад не является торговой кассой');
           // amountUsd was collected in USD terms but store registers hold TJS; convert via today's rate if available.
           const today = new Date().toISOString().split('T')[0];
-          const rate = (await tx.exchangeRate.findUnique({ where: { date: today } }))?.rate ?? 9.5;
-          await tx.store.update({ where: { id: input.storeId }, data: { cashBalanceTjs: { decrement: input.amountUsd * rate } } });
+          const rate = (await tx.exchangeRate.findUnique({ where: { date: today } }))?.rate;
+          if (!rate) throw new Error('Сначала задайте курс валют на сегодня');
+          const cashAmountTjs = roundMoney(amountUsd * rate);
+          const cashGuard = await tx.store.updateMany({ where: { id: input.storeId, cashBalanceTjs: { gte: cashAmountTjs } }, data: { cashBalanceTjs: { decrement: cashAmountTjs } } });
+          if (cashGuard.count !== 1) throw new Error('В кассе недостаточно наличных для оплаты поставщику');
         }
       }
 
       await tx.ledgerEntry.create({
         data: {
           type: 'SUPPLIER_PAYMENT',
-          description: `Выплата поставщику ${supplier.name}: $${input.amountUsd}`,
-          amountUsd: -input.amountUsd,
+          description: `Выплата поставщику ${supplier.name}: $${amountUsd}`,
+          amountUsd: -amountUsd,
           storeId: input.storeId,
           storeName: store?.name,
           userName: actor.name,
@@ -114,16 +125,16 @@ export class SuppliersService {
           userName: actor.name,
           userRole: actor.role,
           action: 'SUPPLIER_PAYMENT',
-          details: `Проведена оплата поставщику ${supplier.name} на сумму $${input.amountUsd}. Распределено по FIFO: ${allocations
+          details: `Проведена оплата поставщику ${supplier.name} на сумму $${amountUsd}. Распределено по FIFO: ${allocations
             .map((a) => `${a.invoiceNumber} ($${a.allocatedAmountUsd})`)
             .join(', ')}`,
-          financialDetails: { amountUsd: input.amountUsd },
+          financialDetails: { amountUsd },
           targetId: payment.id,
         },
       });
 
       return { payment, allocations };
-    });
+    }, { maxWait: 10000, timeout: 25000 });
   }
 
   public static async createBonus(input: SupplierBonusInput) {
@@ -131,6 +142,8 @@ export class SuppliersService {
       const actor = await resolveActor(tx, input.createdByUserId);
       const supplier = await tx.supplier.findUnique({ where: { id: input.supplierId } });
       if (!supplier) throw new Error('Поставщик не найден');
+      if (!['FREE_DEVICES', 'CASH_DISCOUNT'].includes(input.bonusType)) throw new Error('Некорректный тип бонуса');
+      if (input.bonusType === 'CASH_DISCOUNT') input.amountUsd = requirePositiveMoney(input.amountUsd, 'Сумма бонуса');
 
       const bonus = await tx.supplierBonus.create({
         data: {
@@ -151,6 +164,7 @@ export class SuppliersService {
         const storeId = input.destinationStoreId ?? 'main-warehouse';
 
         for (const device of input.freeDevices) {
+          const costBasisUsd = requireNonNegativeMoney(device.costBasisUsd, 'Себестоимость бонусного устройства');
           const created = await tx.device.create({
             data: {
               imei: device.imei,
@@ -161,7 +175,7 @@ export class SuppliersService {
               status: targetStatus,
               storeId,
               purchasePriceUsd: 0,
-              costBasisUsd: device.costBasisUsd,
+              costBasisUsd,
               isBonus: true,
               bonusCampaign: input.campaignTitle,
               supplierId: input.supplierId,
@@ -170,13 +184,13 @@ export class SuppliersService {
             },
           });
           await tx.supplierBonusDevice.create({
-            data: { bonusId: bonus.id, deviceId: created.id, brand: device.brand, model: device.model, storage: device.storage, color: device.color, imei: device.imei, costBasisUsd: device.costBasisUsd },
+            data: { bonusId: bonus.id, deviceId: created.id, brand: device.brand, model: device.model, storage: device.storage, color: device.color, imei: device.imei, costBasisUsd },
           });
         }
       } else if (input.bonusType === 'CASH_DISCOUNT' && input.amountUsd) {
         const owners = await tx.owner.findMany();
         for (const owner of owners) {
-          const delta = Number((input.amountUsd * (owner.profitSharePercent / 100)).toFixed(2));
+          const delta = roundMoney(input.amountUsd * (owner.profitSharePercent / 100));
           await tx.owner.update({
             where: { id: owner.id },
             data: { totalAccruedProfitUsd: { increment: delta }, availableProfitUsd: { increment: delta } },
@@ -205,7 +219,7 @@ export class SuppliersService {
       });
 
       return bonus;
-    });
+    }, { maxWait: 10000, timeout: 25000 });
   }
   public static async update(id: string, input: { name?: string; phone?: string; contactPerson?: string }) {
     const data: any = {};
@@ -260,7 +274,7 @@ export class SuppliersService {
       await tx.device.deleteMany({ where: { supplierId: id } });
       await tx.supplierInvoice.deleteMany({ where: { supplierId: id } });
       return tx.supplier.delete({ where: { id } });
-    });
+    }, { maxWait: 10000, timeout: 25000 });
   }
 
   public static async updateInvoice(id: string, input: { invoiceNumber?: string; date?: string; totalAmountUsd?: number }) {
@@ -276,14 +290,30 @@ export class SuppliersService {
         data.date = new Date(input.date);
       }
 
-      if (input.totalAmountUsd !== undefined && Number(input.totalAmountUsd) >= 0) {
+      if (input.totalAmountUsd !== undefined) {
         const oldTotal = invoice.totalAmountUsd;
-        const newTotal = Number(input.totalAmountUsd);
+        const newTotal = requireNonNegativeMoney(input.totalAmountUsd, 'Сумма накладной');
+        if (newTotal + 0.01 < invoice.paidAmountUsd) throw new Error('Сумма накладной не может быть меньше уже оплаченной суммы');
         const diff = newTotal - oldTotal;
 
         data.totalAmountUsd = newTotal;
 
         if (diff !== 0) {
+          const invoiceDevices = await tx.device.findMany({ where: { purchaseInvoiceId: id }, select: { id: true } });
+          if (await deviceHasTransactionHistory(tx, invoiceDevices.map((device) => device.id))) {
+            throw new Error('Нельзя менять сумму накладной после продажи, перемещения или ремонта её устройств');
+          }
+          if (oldTotal <= 0 && invoiceDevices.length > 0) throw new Error('Для изменения нулевой накладной отредактируйте состав прихода');
+          const ratio = oldTotal > 0 ? newTotal / oldTotal : 1;
+          const groups = await tx.invoiceGroup.findMany({ where: { invoiceId: id } });
+          for (const group of groups) {
+            await tx.invoiceGroup.update({ where: { id: group.id }, data: { purchasePriceUsd: Number((group.purchasePriceUsd * ratio).toFixed(2)) } });
+          }
+          const devices = await tx.device.findMany({ where: { purchaseInvoiceId: id } });
+          for (const device of devices) {
+            const adjustedCost = Number((device.purchasePriceUsd * ratio).toFixed(2));
+            await tx.device.update({ where: { id: device.id }, data: { purchasePriceUsd: adjustedCost, costBasisUsd: adjustedCost } });
+          }
           await tx.supplier.update({
             where: { id: invoice.supplierId },
             data: {
@@ -307,15 +337,24 @@ export class SuppliersService {
       }
 
       return updated;
-    });
+    }, { maxWait: 10000, timeout: 25000 });
   }
 
   public static async deleteInvoice(id: string) {
     return prisma.$transaction(async (tx) => {
       const invoice = await tx.supplierInvoice.findUnique({ where: { id } });
       if (!invoice) throw new Error('Накладная не найдена');
+      if (invoice.paidAmountUsd > 0) throw new Error('Нельзя удалить уже оплаченную или частично оплаченную накладную');
 
-      const invoiceDevices = await tx.device.findMany({ where: { purchaseInvoiceId: id }, select: { id: true } });
+      const invoiceDevices = await tx.device.findMany({
+        where: {
+          OR: [
+            { purchaseInvoiceId: id },
+            { invoiceNumber: invoice.invoiceNumber }
+          ]
+        },
+        select: { id: true }
+      });
       const invoiceDeviceIds = invoiceDevices.map((d) => d.id);
       if (invoiceDeviceIds.length > 0) {
         const hasHistory = await deviceHasTransactionHistory(tx, invoiceDeviceIds);
@@ -328,7 +367,10 @@ export class SuppliersService {
 
       await tx.invoiceGroup.deleteMany({ where: { invoiceId: id } });
       await tx.supplierPaymentAllocation.deleteMany({ where: { invoiceId: id } });
-      await tx.device.deleteMany({ where: { purchaseInvoiceId: id } });
+      if (invoiceDeviceIds.length > 0) {
+        await tx.deviceTimelineEvent.deleteMany({ where: { deviceId: { in: invoiceDeviceIds } } });
+        await tx.device.deleteMany({ where: { id: { in: invoiceDeviceIds } } });
+      }
 
       await tx.supplier.update({
         where: { id: invoice.supplierId },
@@ -339,6 +381,6 @@ export class SuppliersService {
       });
 
       return tx.supplierInvoice.delete({ where: { id } });
-    });
+    }, { maxWait: 10000, timeout: 25000 });
   }
 }

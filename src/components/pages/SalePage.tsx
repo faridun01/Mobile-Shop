@@ -26,6 +26,7 @@ import { LoadingState } from '../ui/Skeleton';
 import { StatusBanner, StatusMessage } from '../ui/StatusBanner';
 import { Dialog } from '../ui/Dialog';
 import { ConfirmDialog } from '../ui/ConfirmDialog';
+import { soundEffects } from '../../utils/sound';
 
 interface CartItem {
   device: Device;
@@ -63,7 +64,7 @@ export const SalePage: React.FC = () => {
   const isAdmin = currentUser?.role === 'ADMIN' || currentUser?.role === 'PARTNER';
 
   const selectableStores = useMemo(() => {
-    return stores.filter(s => !s.isMainWarehouse && s.id !== 'store-main');
+    return stores.filter(s => !s.isMainWarehouse);
   }, [stores]);
 
   const effectiveStoreId = currentUser?.role === 'SELLER'
@@ -110,6 +111,7 @@ export const SalePage: React.FC = () => {
     device.retailPriceTjs && device.retailPriceTjs > 0 ? device.retailPriceTjs : undefined;
 
   const addDeviceToCart = (device: Device) => {
+    soundEffects.playAddToCartSuccess();
     setCart(prev => [...prev, { device, salePriceTjs: defaultPriceFor(device) }]);
     setExpandedVariantKey(null);
   };
@@ -175,6 +177,7 @@ export const SalePage: React.FC = () => {
       if (exactDev) {
         addDeviceToCart(exactDev);
       } else {
+        soundEffects.playError();
         setSearchQuery(code);
       }
     });

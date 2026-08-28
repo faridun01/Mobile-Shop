@@ -125,13 +125,18 @@ export const BonusesPage: React.FC = () => {
     e.preventDefault();
     setStatusMessage(null);
 
+    if (bonusType === 'FREE_DEVICES' && !bonusImei.trim()) {
+      setStatusMessage({ type: 'error', text: 'Укажите реальный IMEI подарочного устройства' });
+      return;
+    }
+
     const freeDevices = bonusType === 'FREE_DEVICES' ? [
       {
         brand: bonusBrand,
         model: bonusModel,
         storage: bonusStorage,
         color: bonusColor,
-        imei: bonusImei.trim() || `35${Math.floor(1000000000000 + Math.random() * 9000000000000)}`,
+        imei: bonusImei.trim(),
         imei2: bonusImei2.trim() || undefined,
         costBasisUsd: 0
       }

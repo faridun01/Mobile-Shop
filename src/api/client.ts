@@ -31,7 +31,7 @@ export async function apiClient<T>(endpoint: string, options: RequestInit = {}):
           ? 'Сервер API недоступен. Запустите бэкенд: npm run server'
           : `Ошибка API (HTTP ${response.status})`
       }));
-      throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
+      throw new Error(errorData.message || errorData.error || `HTTP error! status: ${response.status}`);
     }
 
     return await response.json();

@@ -2,17 +2,6 @@ import { prisma } from '../../prisma/prisma.service';
 import { resolveActor } from '../../common/actor';
 
 export class StoresService {
-  public static async resetAllCashBalances(userId: string) {
-    return prisma.$transaction(async (tx) => {
-      const actor = await resolveActor(tx, userId);
-      await tx.store.updateMany({ data: { cashBalanceTjs: 0 } });
-      await tx.auditLog.create({
-        data: { userId: actor.id, userName: actor.name, userRole: actor.role, action: 'CASH_REGISTER_RESET', details: 'Остатки наличных средств во всех кассах магазинов обнулены (0 TJS)' },
-      });
-      return tx.store.findMany();
-    });
-  }
-
   public static async create(name: string, address: string | undefined, userId: string) {
     const trimmed = name?.trim();
     if (!trimmed) throw new Error('Укажите название магазина');
@@ -24,7 +13,7 @@ export class StoresService {
         data: { userId: actor.id, userName: actor.name, userRole: actor.role, action: 'STORE_CREATE', details: `Создан новый магазин: ${store.name}`, targetId: store.id },
       });
       return store;
-    });
+    }, { maxWait: 10000, timeout: 25000 });
   }
 
   public static async update(storeId: string, name: string, address: string | undefined, userId: string) {
@@ -38,7 +27,7 @@ export class StoresService {
         data: { userId: actor.id, userName: actor.name, userRole: actor.role, action: 'STORE_UPDATE', details: `Обновлены данные магазина: ${store.name}`, targetId: store.id },
       });
       return store;
-    });
+    }, { maxWait: 10000, timeout: 25000 });
   }
 
   public static async remove(storeId: string, userId: string) {
@@ -74,6 +63,6 @@ export class StoresService {
       await tx.auditLog.create({
         data: { userId: actor.id, userName: actor.name, userRole: actor.role, action: 'STORE_DELETE', details: `Удален филиал: ${store.name}. Товары филиала перенесены на ${mainWarehouse.name}` },
       });
-    });
+    }, { maxWait: 10000, timeout: 25000 });
   }
 }

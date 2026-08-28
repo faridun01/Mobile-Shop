@@ -80,7 +80,7 @@ interface AppContextType {
   // Navigation & UI controls
   login: (login: string, pass: string) => Promise<{ success: boolean; message?: string }>;
   logout: () => void;
-  setDailyRate: (rate: number) => void;
+  setDailyRate: (rate: number) => Promise<{ success: boolean; message?: string }>;
   setActivePage: (page: PageId, navTargetId?: string) => void;
   setSelectedStoreId: (storeId: string) => void;
   setDrawerOpen: (open: boolean) => void;
@@ -134,6 +134,7 @@ interface AppContextType {
     groups: {
       brand: string;
       model: string;
+      ram?: string;
       storage: string;
       color: string;
       purchasePriceUsd: number;
@@ -190,6 +191,8 @@ interface AppContextType {
     comment?: string;
     estimatedCostTjs?: number;
     repairCostTjs?: number;
+    prepaymentTjs?: number;
+    storeId?: string;
   }) => Promise<{ success: boolean; ticketNumber?: number; message?: string }>;
 
   updateRepairStatus: (ticketId: string, newStatus: RepairStatus, note?: string, costTjs?: number) => Promise<{ success: boolean; message?: string }>;
@@ -226,6 +229,7 @@ interface AppContextType {
     note?: string;
   }) => Promise<{ success: boolean; message?: string }>;
 
+  initializeOwners: () => Promise<{ success: boolean; message?: string }>;
   ownerInvestment: (ownerId: string, amountUsd: number, destination: string, note?: string) => Promise<{ success: boolean; message?: string }>;
   ownerCapitalWithdrawal: (ownerId: string, amountUsd: number, source: string, note?: string) => Promise<{ success: boolean; message?: string }>;
   ownerProfitPayout: (ownerId: string, amountUsd: number, source: string, note?: string) => Promise<{ success: boolean; message?: string }>;
@@ -234,7 +238,6 @@ interface AppContextType {
 
   createUser: (user: Omit<User, 'id' | 'createdAt'>) => Promise<{ success: boolean; message?: string }>;
   updateUser: (user: User) => Promise<{ success: boolean; message?: string }>;
-  resetUserPassword: (userId: string, newPass: string) => Promise<{ success: boolean; message?: string }>;
   toggleUserActive: (userId: string) => Promise<{ success: boolean; message?: string }>;
   deleteUser: (userId: string) => Promise<{ success: boolean; message?: string }>;
 
@@ -243,13 +246,11 @@ interface AppContextType {
   markAllNotificationsAsRead: () => void;
   resolveNotification: (id: string) => void;
   openDailyRateModal: () => void;
-  setTodayExchangeRate: (rate: number) => Promise<{ success: boolean; message?: string }>;
   createStore: (name: string, address?: string) => Promise<{ success: boolean; message?: string }>;
   updateStore: (storeId: string, name: string, address?: string) => Promise<{ success: boolean; message?: string }>;
   deleteStore: (storeId: string) => Promise<{ success: boolean; message?: string }>;
   resetToDemo: () => void;
   switchToRealDataMode: () => void;
-  resetAllCashBalances: () => void;
   resetAllOwnerCapital: () => void;
   closeQuarterPeriod: (params: { quarterName: string; transferRemainingToCapital: boolean }) => Promise<{ success: boolean; message?: string }>;
   resetEntireSystemDataToZero: () => void;
@@ -345,13 +346,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, [authUser]);
 
   const checkRatePrompt = useCallback((rate: DailyRate | null) => {
+    if (authUser?.role === 'SELLER') {
+      setIsRateModalOpen(false);
+      return;
+    }
     const todayStr = new Date().toISOString().split('T')[0];
     if (!rate || rate.date !== todayStr || !rate.rate || rate.rate <= 0) {
       setIsRateModalOpen(true);
     } else {
       setIsRateModalOpen(false);
     }
-  }, []);
+  }, [authUser?.role]);
 
   // ---- Data fetching: the API/Postgres is the single source of truth ----
   const namesRef = useRef(buildNameLookup([]));
@@ -462,14 +467,22 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return mapped;
   }, []);
 
-  const refetchAll = useCallback(async () => {
-    // 1. Critical core data (Users, Stores, Devices/Catalog, Exchange Rate)
-    await Promise.all([fetchUsers(), fetchStores(), fetchDevices(), fetchExchangeRate()]);
+  const refetchInFlight = useRef<Promise<void> | null>(null);
+  const refetchAll = useCallback(() => {
+    if (refetchInFlight.current) return refetchInFlight.current;
+    const task = (async () => {
+      // 1. Critical core data (Users, Stores, Devices/Catalog, Exchange Rate)
+      await Promise.all([fetchUsers(), fetchStores(), fetchDevices(), fetchExchangeRate()]);
 
-    // 2. Secondary modules batched to avoid connection pool saturation
-    await Promise.all([fetchSales(), fetchTransfers(), fetchRepairs(), fetchExpenses()]);
-    await Promise.all([fetchSuppliers(), fetchInvoices(), fetchBonuses(), fetchOwners()]);
-    await Promise.all([fetchOwnerTransactions(), fetchNotifications(), fetchAuditLogs()]);
+      // 2. Secondary modules batched to avoid connection pool saturation
+      await Promise.all([fetchSales(), fetchTransfers(), fetchRepairs(), fetchExpenses()]);
+      await Promise.all([fetchSuppliers(), fetchInvoices(), fetchBonuses(), fetchOwners()]);
+      await Promise.all([fetchOwnerTransactions(), fetchNotifications(), fetchAuditLogs()]);
+    })();
+    refetchInFlight.current = task;
+    const clear = () => { if (refetchInFlight.current === task) refetchInFlight.current = null; };
+    task.then(clear, clear);
+    return task;
   }, [fetchUsers, fetchStores, fetchDevices, fetchSales, fetchTransfers, fetchRepairs, fetchSuppliers, fetchInvoices, fetchBonuses, fetchExpenses, fetchOwners, fetchOwnerTransactions, fetchNotifications, fetchAuditLogs, fetchExchangeRate]);
 
   // Load catalog immediately (fast-path) and fetch secondary modules in background
@@ -523,9 +536,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setSelectedStoreIdState('all');
       }
       setActivePageState('SALE');
-      await refetchAll();
-      const freshRate = await fetchExchangeRate();
-      checkRatePrompt(freshRate);
+      // The authenticated-data effect performs the initial fetch. Calling refetchAll
+      // here as well doubled every API request on login and delayed the first screen.
       return { success: true };
     } catch (err) {
       return { success: false, message: errorMessage(err, 'Неверный логин или пароль') };
@@ -538,14 +550,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setCurrentUserState(null);
   };
 
-  const setDailyRate = (rate: number) => {
-    apiClient('/exchange-rate/today', { method: 'POST', body: JSON.stringify({ rate }) })
-      .then(() => {
-        setIsRateModalOpen(false);
-        useUIStore.getState().setDailyRateModalOpen(false);
-        return fetchExchangeRate();
-      })
-      .catch((e) => console.error('Failed to set exchange rate', e));
+  const setDailyRate: AppContextType['setDailyRate'] = async (rate) => {
+    try {
+      await apiClient('/exchange-rate/today', { method: 'POST', body: JSON.stringify({ rate }) });
+      setIsRateModalOpen(false);
+      useUIStore.getState().setDailyRateModalOpen(false);
+      await fetchExchangeRate();
+      return { success: true };
+    } catch (err) {
+      return { success: false, message: errorMessage(err, 'Не удалось установить курс') };
+    }
   };
 
   const setActivePage = (page: PageId, _navTargetId?: string) => {
@@ -571,7 +585,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // ---- Business operations: call the API, then resync from it ----
 
   const createSale: AppContextType['createSale'] = async ({ items, paymentMethod, cashAmountTjs, cardAmountTjs, customerName }) => {
-    const storeId = currentUser?.role === 'SELLER' ? currentUser.storeId : (selectedStoreId !== 'all' ? selectedStoreId : items[0]?.device.locationId);
+    // Trust the actual location of the devices in the cart over the (possibly stale,
+    // shared-across-pages) selectedStoreId — e.g. an admin who last picked the main
+    // warehouse on the Inventory page must not have that leak into a POS sale here.
+    const storeId = currentUser?.role === 'SELLER'
+      ? currentUser.storeId
+      : (items[0]?.device.locationId || (selectedStoreId !== 'all' ? selectedStoreId : undefined));
     if (!storeId) return { success: false, message: 'Не удалось определить магазин для продажи' };
 
     try {
@@ -795,7 +814,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const createRepairTicket: AppContextType['createRepairTicket'] = async (data) => {
-    const storeId = currentUser?.storeId || stores.find((s) => !s.isMainWarehouse)?.id || stores[0]?.id;
+    const storeId = currentUser?.storeId || data.storeId || stores.find((s) => !s.isMainWarehouse)?.id || stores[0]?.id;
     if (!storeId) return { success: false, message: 'Не удалось определить магазин' };
 
     try {
@@ -875,6 +894,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return { success: true };
     } catch (err) {
       return { success: false, message: errorMessage(err, 'Не удалось удалить расход') };
+    }
+  };
+
+  const initializeOwners: AppContextType['initializeOwners'] = async () => {
+    try {
+      await apiClient('/owners/init', { method: 'POST' });
+      await Promise.all([fetchOwners(), fetchOwnerTransactions()]);
+      return { success: true };
+    } catch (err) {
+      try {
+        await fetchOwners();
+        return { success: true };
+      } catch (innerErr) {
+        return { success: false, message: errorMessage(err, 'Не удалось инициализировать владельцев') };
+      }
     }
   };
 
@@ -989,15 +1023,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
-  const resetUserPassword: AppContextType['resetUserPassword'] = async (userId, newPass) => {
-    try {
-      await apiClient(`/users/${userId}/reset-password`, { method: 'POST', body: JSON.stringify({ newPassword: newPass }) });
-      return { success: true };
-    } catch (err) {
-      return { success: false, message: errorMessage(err, 'Не удалось сбросить пароль') };
-    }
-  };
-
   const toggleUserActive: AppContextType['toggleUserActive'] = async (userId) => {
     const target = users.find((u) => u.id === userId);
     if (!target) return { success: false };
@@ -1037,18 +1062,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const openDailyRateModal = () => {
     setIsRateModalOpen(true);
     useUIStore.getState().setDailyRateModalOpen(true);
-  };
-
-  const setTodayExchangeRate: AppContextType['setTodayExchangeRate'] = async (rate) => {
-    try {
-      await apiClient('/exchange-rate/today', { method: 'POST', body: JSON.stringify({ rate }) });
-      setIsRateModalOpen(false);
-      useUIStore.getState().setDailyRateModalOpen(false);
-      await fetchExchangeRate();
-      return { success: true };
-    } catch (err) {
-      return { success: false, message: errorMessage(err, 'Не удалось установить курс') };
-    }
   };
 
   const createStore: AppContextType['createStore'] = async (name, address) => {
@@ -1095,12 +1108,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     apiClient('/owners/reset-capital', { method: 'POST' })
       .then(() => Promise.all([fetchOwners(), fetchOwnerTransactions()]))
       .catch((e) => console.error('Failed to reset owner capital', e));
-  };
-
-  const resetAllCashBalances = () => {
-    apiClient('/stores/reset-cash', { method: 'POST' })
-      .then(() => fetchStores())
-      .catch((e) => console.error('Failed to reset cash balances', e));
   };
 
   // The app is always backed by real PostgreSQL now — these demo/local-only reset
@@ -1151,7 +1158,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         logout,
         setDailyRate,
         openDailyRateModal,
-        setTodayExchangeRate,
         setActivePage,
         setSelectedStoreId,
         setDrawerOpen,
@@ -1179,6 +1185,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         createExpense,
         updateExpense,
         deleteExpense,
+        initializeOwners,
         createOwnerTransaction,
         ownerInvestment,
         ownerCapitalWithdrawal,
@@ -1187,7 +1194,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         updateOwnerProfitShares,
         createUser,
         updateUser,
-        resetUserPassword,
         toggleUserActive,
         deleteUser,
         markNotificationRead,
@@ -1199,7 +1205,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         deleteStore,
         resetToDemo,
         switchToRealDataMode,
-        resetAllCashBalances,
         resetAllOwnerCapital,
         closeQuarterPeriod,
         resetEntireSystemDataToZero,
