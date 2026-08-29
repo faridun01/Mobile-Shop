@@ -1104,6 +1104,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           salesCommissionPercent: userData.salesCommissionPercent,
         }),
       });
+      // The general update endpoint doesn't touch active status — that's a
+      // dedicated ADMIN-only action that also force-disconnects a deactivated
+      // user's live session, so it has to go through its own endpoint.
+      const nextActive = userData.isActive ?? userData.active;
+      if (nextActive !== undefined) {
+        await apiClient(`/users/${userData.id}/status`, { method: 'PATCH', body: JSON.stringify({ active: nextActive }) });
+      }
       await fetchUsers();
       if (currentUser?.id === userData.id) {
         const mapped = mapUser(updated, storeNamesRef.current);
