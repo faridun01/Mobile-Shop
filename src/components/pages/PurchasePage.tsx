@@ -1014,7 +1014,7 @@ export const PurchasePage: React.FC = () => {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+          <div className="text-xs">
             <div>
               <label className="block text-fg-subtle mb-1 font-medium">Поставщик</label>
               <select
@@ -1027,29 +1027,7 @@ export const PurchasePage: React.FC = () => {
                 ))}
               </select>
             </div>
-
-            <div>
-              <label className="block text-fg-subtle mb-1 font-medium">Номер накладной</label>
-              <input
-                type="text"
-                required
-                value={invoiceNumber}
-                onChange={(e) => setInvoiceNumber(e.target.value)}
-                className="w-full rounded-lg bg-surface-raised border border-border px-3 py-2 text-xs text-fg focus:border-accent focus:outline-none uppercase"
-                placeholder="INV-999"
-              />
-            </div>
-
-            <div>
-              <label className="block text-fg-subtle mb-1 font-medium">Дата прихода</label>
-              <input
-                type="date"
-                required
-                value={purchaseDate}
-                onChange={(e) => setPurchaseDate(e.target.value)}
-                className="w-full rounded-lg bg-surface-raised border border-border px-3 py-2 text-xs text-fg focus:border-accent focus:outline-none"
-              />
-            </div>
+            {/* Номер накладной и дата прихода формируются автоматически (INV-XXXX, сегодня) — не требуют ввода */}
           </div>
 
           {/* Destination location selector */}
@@ -1301,24 +1279,26 @@ export const PurchasePage: React.FC = () => {
                         </div>
 
                         <div className="flex items-end gap-1">
-                          <div className="relative flex-1">
+                          <div className="flex-1">
                             <label className="block text-fg-subtle mb-1">IMEI 2 <span className="text-fg-subtle/70">(необязательно)</span></label>
-                            <input
-                              type="text"
-                              value={imei2}
-                              onChange={(e) => handleUpdateImei2(groupIdx, itemIdx, e.target.value)}
-                              placeholder="IMEI 2 (необязательно)"
-                              className="w-full rounded-lg bg-surface-raised border border-border px-2.5 py-1.5 text-xs text-fg font-mono focus:border-accent focus:outline-none pr-8"
-                            />
-                            <button
-                              type="button"
-                              onClick={() => openScanner((scannedCode) => handleUpdateImei2(groupIdx, itemIdx, scannedCode))}
-                              className="absolute right-1.5 top-1.5 text-fg-subtle hover:text-accent p-0.5"
-                              title="Сканировать IMEI 2"
-                              aria-label="Сканировать IMEI 2"
-                            >
-                              <Scan className="w-3.5 h-3.5" />
-                            </button>
+                            <div className="relative">
+                              <input
+                                type="text"
+                                value={imei2}
+                                onChange={(e) => handleUpdateImei2(groupIdx, itemIdx, e.target.value)}
+                                placeholder="IMEI 2 (необязательно)"
+                                className="w-full rounded-lg bg-surface-raised border border-border px-2.5 py-1.5 text-xs text-fg font-mono focus:border-accent focus:outline-none pr-8"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => openScanner((scannedCode) => handleUpdateImei2(groupIdx, itemIdx, scannedCode))}
+                                className="absolute right-1.5 top-1.5 text-fg-subtle hover:text-accent p-0.5"
+                                title="Сканировать IMEI 2"
+                                aria-label="Сканировать IMEI 2"
+                              >
+                                <Scan className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
                           </div>
                           {group.items.length > 1 && (
                             <button

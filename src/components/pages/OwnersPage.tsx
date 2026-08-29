@@ -453,7 +453,7 @@ export const OwnersPage: React.FC = () => {
           <div className="flex items-center justify-between pb-2 border-b border-border">
             <span className="text-xs font-bold text-fg uppercase tracking-wider flex items-center space-x-2">
               <Briefcase className="w-4 h-4 text-accent" />
-              <span>СОБСТВЕННИКИ И ВЛОЖЕНИЯ ({owners.length})</span>
+              <span>СОБСТВЕННИКИ И ВЛОЖЕНИЯ</span>
             </span>
             <span className="text-xs text-fg-subtle">2 учредителя бизнеса</span>
           </div>

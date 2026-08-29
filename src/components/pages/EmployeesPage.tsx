@@ -166,8 +166,11 @@ export const EmployeesPage: React.FC = () => {
       return;
     }
 
-    const baseSal = parseFloat(baseSalaryTjs) || 0;
-    const commPct = parseFloat(salesCommissionPercent) || 0;
+    // Salary/commission only apply to sellers — admins and partners are compensated
+    // via profit share (Owners), not a salary, so their form fields are hidden and
+    // any stale leftover values must never be persisted.
+    const baseSal = role === 'SELLER' ? parseFloat(baseSalaryTjs) || 0 : 0;
+    const commPct = role === 'SELLER' ? parseFloat(salesCommissionPercent) || 0 : 0;
 
     setIsSubmitting(true);
     try {
@@ -486,12 +489,14 @@ export const EmployeesPage: React.FC = () => {
 
                   return (
                     <div className="pt-2 border-t border-border space-y-1.5 text-[11px]">
-                      <div className="flex items-center justify-between">
-                        <span className="text-[10px] text-fg-subtle">ОКЛАД / КОМИССИЯ:</span>
-                        <span className="font-mono text-accent font-semibold">
-                          {baseSal > 0 ? `${baseSal.toLocaleString()} TJS` : 'Без оклада'} {commPct > 0 ? `(+${commPct}%)` : ''}
-                        </span>
-                      </div>
+                      {u.role === 'SELLER' && (
+                        <div className="flex items-center justify-between">
+                          <span className="text-[10px] text-fg-subtle">ОКЛАД / КОМИССИЯ:</span>
+                          <span className="font-mono text-accent font-semibold">
+                            {baseSal > 0 ? `${baseSal.toLocaleString()} TJS` : 'Без оклада'} {commPct > 0 ? `(+${commPct}%)` : ''}
+                          </span>
+                        </div>
+                      )}
                       {u.role === 'SELLER' && (
                         <div className="flex items-center justify-between">
                           <span className="text-[10px] text-fg-subtle">ПРОДАЖИ:</span>
@@ -702,33 +707,36 @@ export const EmployeesPage: React.FC = () => {
                 </div>
               )}
 
-              {/* Salary & Commission Settings */}
-              <div className="grid grid-cols-2 gap-2.5 p-3 rounded-lg bg-surface-raised border border-border">
-                <div>
-                  <label className="block text-accent text-[10px] uppercase mb-1 font-bold">ОКЛАД (TJS/МЕС)</label>
-                  <input
-                    type="number"
-                    min="0"
-                    value={baseSalaryTjs}
-                    onChange={(e) => setBaseSalaryTjs(e.target.value)}
-                    placeholder="1500"
-                    className="w-full rounded-lg bg-surface border border-border px-3 py-1.5 text-fg font-mono text-xs focus:border-accent focus:outline-none"
-                  />
+              {/* Salary & Commission Settings — sellers only; admins/partners are
+                  compensated via profit share on the Owners page instead. */}
+              {role === 'SELLER' && (
+                <div className="grid grid-cols-2 gap-2.5 p-3 rounded-lg bg-surface-raised border border-border">
+                  <div>
+                    <label className="block text-accent text-[10px] uppercase mb-1 font-bold">ОКЛАД (TJS/МЕС)</label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={baseSalaryTjs}
+                      onChange={(e) => setBaseSalaryTjs(e.target.value)}
+                      placeholder="1500"
+                      className="w-full rounded-lg bg-surface border border-border px-3 py-1.5 text-fg font-mono text-xs focus:border-accent focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-accent text-[10px] uppercase mb-1 font-bold">КОМИССИЯ ПРОДАЖ (%)</label>
+                    <input
+                      type="number"
+                      min="0"
+                      max="100"
+                      step="0.1"
+                      value={salesCommissionPercent}
+                      onChange={(e) => setSalesCommissionPercent(e.target.value)}
+                      placeholder="2.5"
+                      className="w-full rounded-lg bg-surface border border-border px-3 py-1.5 text-fg font-mono text-xs focus:border-accent focus:outline-none"
+                    />
+                  </div>
                 </div>
-                <div>
-                  <label className="block text-accent text-[10px] uppercase mb-1 font-bold">КОМИССИЯ ПРОДАЖ (%)</label>
-                  <input
-                    type="number"
-                    min="0"
-                    max="100"
-                    step="0.1"
-                    value={salesCommissionPercent}
-                    onChange={(e) => setSalesCommissionPercent(e.target.value)}
-                    placeholder="2.5"
-                    className="w-full rounded-lg bg-surface border border-border px-3 py-1.5 text-fg font-mono text-xs focus:border-accent focus:outline-none"
-                  />
-                </div>
-              </div>
+              )}
 
               {editingUser && (
                 <div className="pt-2 border-t border-border">
