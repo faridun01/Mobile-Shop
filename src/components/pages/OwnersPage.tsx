@@ -56,7 +56,16 @@ export const OwnersPage: React.FC = () => {
     }
   };
 
-  const displayOwners = owners;
+  // Always show the admin's card before the partner's, regardless of creation
+  // order in the database — driven by the actual linked account's role, not a guess.
+  const ownerRoleRank = (role?: string) => (role === 'ADMIN' ? 0 : role === 'PARTNER' ? 1 : 2);
+  const displayOwners = useMemo(() => {
+    return [...owners].sort((a, b) => {
+      const roleA = a.userId ? users.find(u => u.id === a.userId)?.role : undefined;
+      const roleB = b.userId ? users.find(u => u.id === b.userId)?.role : undefined;
+      return ownerRoleRank(roleA) - ownerRoleRank(roleB);
+    });
+  }, [owners, users]);
 
   // Role/name are derived from the owner's actually linked account (not a guessed
   // position) — "владелец #1 is always admin" broke the moment names/roles changed
@@ -875,7 +884,7 @@ export const OwnersPage: React.FC = () => {
                   className="w-full rounded-xl bg-surface-raised border border-border px-3 py-2 text-fg text-xs font-semibold focus:border-accent focus:outline-none"
                 >
                   {displayOwners.map((o, idx) => (
-                    <option key={o.id} value={o.id}>{getOwnerDetails(o).name} ({o.profitSharePercent ?? 0}% доли)</option>
+                    <option key={o.id} value={o.id}>{getOwnerDetails(o).name}</option>
                   ))}
                 </select>
               </div>
