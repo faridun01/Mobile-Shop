@@ -34,6 +34,21 @@ export function registerStoreRoutes(app: Express) {
     }
   });
 
+  app.post('/api/stores/:id/adjust-cash', authenticateJwt, requireRoles('ADMIN', 'PARTNER'), async (req: AuthenticatedRequest, res, next) => {
+    try {
+      const { newBalanceTjs, reason } = req.body ?? {};
+      if (newBalanceTjs === undefined || newBalanceTjs === null) {
+        res.status(400).json({ message: 'newBalanceTjs обязателен' });
+        return;
+      }
+      const store = await StoresService.adjustCashBalance(req.params.id, Number(newBalanceTjs), reason, req.user!.userId);
+      RealtimeSyncGateway.broadcast('STORE_UPDATED', { storeId: store.id });
+      res.json(store);
+    } catch (error) {
+      next(error);
+    }
+  });
+
   app.post('/api/stores/:id/merge', authenticateJwt, requireRoles('ADMIN', 'PARTNER'), async (req: AuthenticatedRequest, res, next) => {
     try {
       const targetStoreId = req.body?.targetStoreId;

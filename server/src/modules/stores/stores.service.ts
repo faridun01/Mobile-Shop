@@ -71,6 +71,41 @@ export class StoresService {
   }
 
   /**
+   * Manually corrects a store's cash balance to an exact value — for reconciling
+   * drift from historical bugs/edge cases (e.g. legacy data inconsistencies) without
+   * needing direct database access. Logged to the audit trail with the reason and
+   * the old→new values; deliberately NOT written to the ledger, since a correction
+   * isn't a real cash movement and shouldn't appear as fake revenue/expense in P&L.
+   */
+  public static async adjustCashBalance(storeId: string, newBalanceTjs: number, reason: string, userId: string) {
+    if (!Number.isFinite(newBalanceTjs)) throw new Error('Укажите корректную сумму');
+    if (!reason?.trim()) throw new Error('Укажите причину корректировки');
+
+    return prisma.$transaction(async (tx) => {
+      const actor = await resolveActor(tx, userId);
+      const store = await tx.store.findUnique({ where: { id: storeId } });
+      if (!store) throw new Error('Магазин не найден');
+
+      const roundedBalance = Math.round(newBalanceTjs * 100) / 100;
+      const updated = await tx.store.update({ where: { id: storeId }, data: { cashBalanceTjs: roundedBalance } });
+
+      await tx.auditLog.create({
+        data: {
+          userId: actor.id,
+          userName: actor.name,
+          userRole: actor.role,
+          action: 'STORE_CASH_ADJUSTMENT',
+          details: `Корректировка кассы "${store.name}": ${store.cashBalanceTjs} TJS → ${roundedBalance} TJS. Причина: ${reason.trim()}`,
+          financialDetails: { oldBalanceTjs: store.cashBalanceTjs, newBalanceTjs: roundedBalance },
+          targetId: storeId,
+        },
+      });
+
+      return updated;
+    }, { maxWait: 10000, timeout: 25000 });
+  }
+
+  /**
    * Merges a duplicate store into a surviving one: every record referencing the
    * source store (devices, sales, repairs, expenses, transfers, purchase invoices,
    * payments, assigned sellers) is reassigned to the target, the source's cash

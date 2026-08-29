@@ -271,6 +271,7 @@ interface AppContextType {
   updateStore: (storeId: string, name: string, address?: string) => Promise<{ success: boolean; message?: string }>;
   deleteStore: (storeId: string) => Promise<{ success: boolean; message?: string }>;
   mergeStores: (sourceStoreId: string, targetStoreId: string) => Promise<{ success: boolean; message?: string }>;
+  adjustStoreCashBalance: (storeId: string, newBalanceTjs: number, reason: string) => Promise<{ success: boolean; message?: string }>;
   resetToDemo: () => void;
   switchToRealDataMode: () => void;
   resetAllOwnerCapital: () => void;
@@ -1185,6 +1186,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
+  const adjustStoreCashBalance: AppContextType['adjustStoreCashBalance'] = async (storeId, newBalanceTjs, reason) => {
+    try {
+      await apiClient(`/stores/${storeId}/adjust-cash`, { method: 'POST', body: JSON.stringify({ newBalanceTjs, reason }) });
+      await refetchAll();
+      return { success: true };
+    } catch (err) {
+      return { success: false, message: errorMessage(err, 'Не удалось скорректировать кассу') };
+    }
+  };
+
   const closeQuarterPeriod: AppContextType['closeQuarterPeriod'] = async ({ quarterName, transferRemainingToCapital }) => {
     try {
       await apiClient('/owners/quarter-close', { method: 'POST', body: JSON.stringify({ quarterName, transferRemainingToCapital }) });
@@ -1299,6 +1310,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         updateStore,
         deleteStore,
         mergeStores,
+        adjustStoreCashBalance,
         resetToDemo,
         switchToRealDataMode,
         resetAllOwnerCapital,

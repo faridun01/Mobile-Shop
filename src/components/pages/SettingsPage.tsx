@@ -19,6 +19,7 @@ import {
   Trash2,
   LogOut,
   Combine,
+  Wrench,
   Loader2
 } from 'lucide-react';
 
@@ -31,6 +32,7 @@ export const SettingsPage: React.FC = () => {
     updateStore,
     deleteStore,
     mergeStores,
+    adjustStoreCashBalance,
     openDailyRateModal,
     theme,
     setTheme,
@@ -49,6 +51,11 @@ export const SettingsPage: React.FC = () => {
   const [mergingStore, setMergingStore] = useState<StoreType | null>(null);
   const [mergeTargetId, setMergeTargetId] = useState<string>('');
   const [isSubmittingMerge, setIsSubmittingMerge] = useState(false);
+
+  const [adjustingStore, setAdjustingStore] = useState<StoreType | null>(null);
+  const [adjustNewBalance, setAdjustNewBalance] = useState<string>('');
+  const [adjustReason, setAdjustReason] = useState<string>('');
+  const [isSubmittingAdjust, setIsSubmittingAdjust] = useState(false);
 
   const [statusMessage, setStatusMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
@@ -142,6 +149,38 @@ export const SettingsPage: React.FC = () => {
       }
     } finally {
       setIsSubmittingMerge(false);
+    }
+  };
+
+  const handleOpenAdjust = (store: StoreType) => {
+    setAdjustingStore(store);
+    setAdjustNewBalance((store.cashBalanceTjs ?? 0).toString());
+    setAdjustReason('');
+  };
+
+  const handleConfirmAdjust = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!adjustingStore || isSubmittingAdjust) return;
+    if (!adjustReason.trim()) {
+      setStatusMessage({ type: 'error', text: 'Укажите причину корректировки' });
+      return;
+    }
+    const parsed = parseFloat(adjustNewBalance);
+    if (!Number.isFinite(parsed)) {
+      setStatusMessage({ type: 'error', text: 'Укажите корректную сумму' });
+      return;
+    }
+    setIsSubmittingAdjust(true);
+    try {
+      const res = await adjustStoreCashBalance(adjustingStore.id, parsed, adjustReason.trim());
+      if (res.success) {
+        setAdjustingStore(null);
+        setStatusMessage({ type: 'success', text: `Касса «${adjustingStore.name}» скорректирована на ${parsed.toLocaleString()} TJS` });
+      } else {
+        setStatusMessage({ type: 'error', text: res.message || 'Ошибка корректировки кассы' });
+      }
+    } finally {
+      setIsSubmittingAdjust(false);
     }
   };
 
@@ -335,6 +374,13 @@ export const SettingsPage: React.FC = () => {
                           </button>
                         </>
                       )}
+                      <button
+                        onClick={() => handleOpenAdjust(s)}
+                        className="p-1.5 rounded-lg hover:bg-warning/10 text-fg-subtle hover:text-warning transition-colors"
+                        title="Скорректировать кассу"
+                      >
+                        <Wrench className="w-3.5 h-3.5" />
+                      </button>
                       <button
                         onClick={() => handleEditStore(s)}
                         className="p-1.5 rounded-lg hover:bg-surface text-fg-subtle hover:text-fg transition-colors"
@@ -571,6 +617,73 @@ export const SettingsPage: React.FC = () => {
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* MODAL: ADJUST CASH BALANCE */}
+      {adjustingStore && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-xs">
+          <form onSubmit={handleConfirmAdjust} className="w-full max-w-sm rounded-2xl bg-surface border border-warning/40 p-5 shadow-2xl space-y-4 text-fg">
+            <div className="flex items-center space-x-3 text-warning border-b border-border pb-3">
+              <div className="p-2 rounded-xl bg-warning/15 text-warning shrink-0 border border-warning/20">
+                <Wrench className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-sm font-bold uppercase text-fg">КОРРЕКТИРОВКА КАССЫ</h3>
+                <p className="text-[11px] text-fg-muted mt-0.5">{adjustingStore.name}</p>
+              </div>
+            </div>
+
+            <div className="text-xs space-y-3">
+              <div>
+                <label className="block text-fg-subtle mb-1 text-[11px] uppercase">Текущий остаток</label>
+                <p className="text-fg-muted">{(adjustingStore.cashBalanceTjs ?? 0).toLocaleString()} TJS</p>
+              </div>
+              <div>
+                <label className="block text-fg-subtle mb-1 text-[11px] uppercase">Новый остаток (TJS) *</label>
+                <input
+                  type="number"
+                  value={adjustNewBalance}
+                  onChange={(e) => setAdjustNewBalance(e.target.value)}
+                  required
+                  className="w-full rounded-lg bg-surface-raised border border-border px-3 py-2 text-fg font-bold focus:outline-none focus:border-warning"
+                />
+              </div>
+              <div>
+                <label className="block text-fg-subtle mb-1 text-[11px] uppercase">Причина корректировки *</label>
+                <input
+                  type="text"
+                  value={adjustReason}
+                  onChange={(e) => setAdjustReason(e.target.value)}
+                  placeholder="Например: исправление исторической ошибки в остатке"
+                  required
+                  className="w-full rounded-lg bg-surface-raised border border-border px-3 py-2 text-fg focus:outline-none focus:border-warning"
+                />
+              </div>
+              <p className="text-[11px] text-fg-subtle">
+                Причина сохраняется в журнале аудита. Это прямая корректировка остатка, а не транзакция — в отчётах она не отражается как доход или расход.
+              </p>
+            </div>
+
+            <div className="flex space-x-2 pt-1">
+              <button
+                type="button"
+                disabled={isSubmittingAdjust}
+                onClick={() => setAdjustingStore(null)}
+                className="flex-1 py-2.5 rounded-xl bg-surface-raised hover:bg-surface border border-border text-xs font-bold text-fg-muted uppercase transition-colors disabled:opacity-50"
+              >
+                ОТМЕНА
+              </button>
+              <button
+                type="submit"
+                disabled={isSubmittingAdjust}
+                className="flex-1 py-2.5 rounded-xl bg-warning hover:bg-warning/90 active:scale-95 text-xs font-bold uppercase text-black shadow-lg transition-colors disabled:opacity-60 flex items-center justify-center gap-1.5"
+              >
+                {isSubmittingAdjust && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                {isSubmittingAdjust ? 'СОХРАНЕНИЕ…' : 'СОХРАНИТЬ'}
+              </button>
+            </div>
+          </form>
         </div>
       )}
     </div>
