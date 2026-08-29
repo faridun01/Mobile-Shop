@@ -33,4 +33,19 @@ export function registerStoreRoutes(app: Express) {
       next(error);
     }
   });
+
+  app.post('/api/stores/:id/merge', authenticateJwt, requireRoles('ADMIN', 'PARTNER'), async (req: AuthenticatedRequest, res, next) => {
+    try {
+      const targetStoreId = req.body?.targetStoreId;
+      if (!targetStoreId) {
+        res.status(400).json({ message: 'targetStoreId обязателен' });
+        return;
+      }
+      const store = await StoresService.mergeAndDelete(req.params.id, targetStoreId, req.user!.userId);
+      RealtimeSyncGateway.broadcast('STORE_UPDATED', { storeId: targetStoreId });
+      res.json(store);
+    } catch (error) {
+      next(error);
+    }
+  });
 }

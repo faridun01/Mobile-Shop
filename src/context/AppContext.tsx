@@ -270,6 +270,7 @@ interface AppContextType {
   createStore: (name: string, address?: string) => Promise<{ success: boolean; message?: string }>;
   updateStore: (storeId: string, name: string, address?: string) => Promise<{ success: boolean; message?: string }>;
   deleteStore: (storeId: string) => Promise<{ success: boolean; message?: string }>;
+  mergeStores: (sourceStoreId: string, targetStoreId: string) => Promise<{ success: boolean; message?: string }>;
   resetToDemo: () => void;
   switchToRealDataMode: () => void;
   resetAllOwnerCapital: () => void;
@@ -1174,6 +1175,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
+  const mergeStores: AppContextType['mergeStores'] = async (sourceStoreId, targetStoreId) => {
+    try {
+      await apiClient(`/stores/${sourceStoreId}/merge`, { method: 'POST', body: JSON.stringify({ targetStoreId }) });
+      await refetchAll();
+      return { success: true };
+    } catch (err) {
+      return { success: false, message: errorMessage(err, 'Не удалось объединить магазины') };
+    }
+  };
+
   const closeQuarterPeriod: AppContextType['closeQuarterPeriod'] = async ({ quarterName, transferRemainingToCapital }) => {
     try {
       await apiClient('/owners/quarter-close', { method: 'POST', body: JSON.stringify({ quarterName, transferRemainingToCapital }) });
@@ -1287,6 +1298,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         createStore,
         updateStore,
         deleteStore,
+        mergeStores,
         resetToDemo,
         switchToRealDataMode,
         resetAllOwnerCapital,

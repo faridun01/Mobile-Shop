@@ -17,7 +17,9 @@ import {
   Sparkles,
   Pencil,
   Trash2,
-  LogOut
+  LogOut,
+  Combine,
+  Loader2
 } from 'lucide-react';
 
 export const SettingsPage: React.FC = () => {
@@ -28,6 +30,7 @@ export const SettingsPage: React.FC = () => {
     createStore,
     updateStore,
     deleteStore,
+    mergeStores,
     openDailyRateModal,
     theme,
     setTheme,
@@ -42,6 +45,10 @@ export const SettingsPage: React.FC = () => {
   const [editName, setEditName] = useState('');
   const [editAddress, setEditAddress] = useState('');
   const [deletingStoreConfirm, setDeletingStoreConfirm] = useState<StoreType | null>(null);
+
+  const [mergingStore, setMergingStore] = useState<StoreType | null>(null);
+  const [mergeTargetId, setMergeTargetId] = useState<string>('');
+  const [isSubmittingMerge, setIsSubmittingMerge] = useState(false);
 
   const [statusMessage, setStatusMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
@@ -105,6 +112,36 @@ export const SettingsPage: React.FC = () => {
       });
     } else {
       setStatusMessage({ type: 'error', text: res.message || 'Ошибка удаления филиала' });
+    }
+  };
+
+  const handleOpenMerge = (store: StoreType) => {
+    if (store.isMainWarehouse) {
+      setStatusMessage({ type: 'error', text: 'Главный склад нельзя объединить с другим магазином' });
+      return;
+    }
+    setMergingStore(store);
+    setMergeTargetId(stores.find(s => s.id !== store.id && !s.isMainWarehouse)?.id || '');
+  };
+
+  const handleConfirmMerge = async () => {
+    if (!mergingStore || !mergeTargetId || isSubmittingMerge) return;
+    const sourceName = mergingStore.name;
+    const targetName = stores.find(s => s.id === mergeTargetId)?.name || '';
+    setIsSubmittingMerge(true);
+    try {
+      const res = await mergeStores(mergingStore.id, mergeTargetId);
+      if (res.success) {
+        setMergingStore(null);
+        setStatusMessage({
+          type: 'success',
+          text: `Магазин «${sourceName}» объединён с «${targetName}»: касса и вся история перенесены.`
+        });
+      } else {
+        setStatusMessage({ type: 'error', text: res.message || 'Ошибка объединения магазинов' });
+      }
+    } finally {
+      setIsSubmittingMerge(false);
     }
   };
 
@@ -279,13 +316,24 @@ export const SettingsPage: React.FC = () => {
                           ЦЕНТРАЛЬНЫЙ
                         </span>
                       ) : (
-                        <button
-                          onClick={() => handleDeleteStore(s)}
-                          className="p-1.5 rounded-lg hover:bg-danger/10 text-fg-subtle hover:text-danger transition-colors"
-                          title="Удалить филиал"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
+                        <>
+                          {stores.length > 2 && (
+                            <button
+                              onClick={() => handleOpenMerge(s)}
+                              className="p-1.5 rounded-lg hover:bg-accent/10 text-fg-subtle hover:text-accent transition-colors"
+                              title="Объединить с другим филиалом"
+                            >
+                              <Combine className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                          <button
+                            onClick={() => handleDeleteStore(s)}
+                            className="p-1.5 rounded-lg hover:bg-danger/10 text-fg-subtle hover:text-danger transition-colors"
+                            title="Удалить филиал"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </>
                       )}
                       <button
                         onClick={() => handleEditStore(s)}
@@ -464,6 +512,62 @@ export const SettingsPage: React.FC = () => {
                 className="flex-1 py-2.5 rounded-xl bg-danger hover:bg-danger/90 active:scale-95 text-xs font-bold uppercase text-white shadow-lg transition-colors"
               >
                 УДАЛИТЬ ФИЛИАЛ
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: MERGE STORES */}
+      {mergingStore && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-xs">
+          <div className="w-full max-w-md rounded-2xl bg-surface border border-accent/40 p-5 shadow-2xl space-y-4 text-fg">
+            <div className="flex items-center space-x-3 text-accent border-b border-border pb-3">
+              <div className="p-2 rounded-xl bg-accent/15 text-accent shrink-0 border border-accent/20">
+                <Combine className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-sm font-bold uppercase text-fg">ОБЪЕДИНЕНИЕ ФИЛИАЛОВ</h3>
+                <p className="text-[11px] text-fg-muted mt-0.5">{mergingStore.name}</p>
+              </div>
+            </div>
+
+            <div className="p-3 rounded-xl bg-surface-raised border border-border text-xs space-y-3">
+              <p className="text-fg">
+                Все товары, продажи, ремонты, расходы, перемещения и касса филиала «<strong className="text-fg">{mergingStore.name}</strong>» ({(mergingStore.cashBalanceTjs ?? 0).toLocaleString()} TJS) будут перенесены в:
+              </p>
+              <select
+                value={mergeTargetId}
+                onChange={(e) => setMergeTargetId(e.target.value)}
+                className="w-full rounded-lg bg-surface border border-border px-3 py-2 text-fg focus:outline-none focus:border-accent"
+              >
+                {stores.filter(s => s.id !== mergingStore.id && !s.isMainWarehouse).map(s => (
+                  <option key={s.id} value={s.id}>{s.name} (Остаток: {(s.cashBalanceTjs ?? 0).toLocaleString()} TJS)</option>
+                ))}
+              </select>
+              <p className="text-[11px] text-danger flex items-start space-x-1.5 pt-1">
+                <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                <span>Филиал «{mergingStore.name}» будет удалён после переноса. Действие необратимо.</span>
+              </p>
+            </div>
+
+            <div className="flex space-x-2 pt-1">
+              <button
+                type="button"
+                disabled={isSubmittingMerge}
+                onClick={() => setMergingStore(null)}
+                className="flex-1 py-2.5 rounded-xl bg-surface-raised hover:bg-surface border border-border text-xs font-bold text-fg-muted uppercase transition-colors disabled:opacity-50"
+              >
+                ОТМЕНА
+              </button>
+              <button
+                type="button"
+                disabled={isSubmittingMerge || !mergeTargetId}
+                onClick={handleConfirmMerge}
+                className="flex-1 py-2.5 rounded-xl bg-accent hover:bg-accent-strong active:scale-95 text-xs font-bold uppercase text-accent-fg shadow-lg transition-colors disabled:opacity-60 flex items-center justify-center gap-1.5"
+              >
+                {isSubmittingMerge && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                {isSubmittingMerge ? 'ОБЪЕДИНЕНИЕ…' : 'ОБЪЕДИНИТЬ'}
               </button>
             </div>
           </div>

@@ -69,4 +69,61 @@ export class StoresService {
       });
     }, { maxWait: 10000, timeout: 25000 });
   }
+
+  /**
+   * Merges a duplicate store into a surviving one: every record referencing the
+   * source store (devices, sales, repairs, expenses, transfers, purchase invoices,
+   * payments, assigned sellers) is reassigned to the target, the source's cash
+   * balance is folded into the target's, then the now-empty source is deleted.
+   * Unlike remove(), this works even when the source has real sales/repair history.
+   */
+  public static async mergeAndDelete(sourceStoreId: string, targetStoreId: string, userId: string) {
+    if (sourceStoreId === targetStoreId) throw new Error('Магазин-источник и магазин-получатель должны отличаться');
+
+    return prisma.$transaction(async (tx) => {
+      const actor = await resolveActor(tx, userId);
+      const [source, target] = await Promise.all([
+        tx.store.findUnique({ where: { id: sourceStoreId } }),
+        tx.store.findUnique({ where: { id: targetStoreId } }),
+      ]);
+      if (!source) throw new Error('Магазин-источник не найден');
+      if (!target) throw new Error('Магазин-получатель не найден');
+      if (source.isMainWarehouse) throw new Error('Главный склад нельзя объединить с другим магазином');
+
+      await tx.user.updateMany({ where: { storeId: sourceStoreId }, data: { storeId: targetStoreId } });
+      await tx.device.updateMany({ where: { storeId: sourceStoreId }, data: { storeId: targetStoreId } });
+      await tx.sale.updateMany({ where: { storeId: sourceStoreId }, data: { storeId: targetStoreId } });
+      await tx.supplierInvoice.updateMany({ where: { storeId: sourceStoreId }, data: { storeId: targetStoreId } });
+      await tx.supplierPayment.updateMany({ where: { storeId: sourceStoreId }, data: { storeId: targetStoreId } });
+      await tx.customerPayment.updateMany({ where: { storeId: sourceStoreId }, data: { storeId: targetStoreId } });
+      await tx.transferRequest.updateMany({ where: { fromStoreId: sourceStoreId }, data: { fromStoreId: targetStoreId } });
+      await tx.transferRequest.updateMany({ where: { toStoreId: sourceStoreId }, data: { toStoreId: targetStoreId } });
+      await tx.repairTicket.updateMany({ where: { storeId: sourceStoreId }, data: { storeId: targetStoreId } });
+      await tx.expense.updateMany({ where: { storeId: sourceStoreId }, data: { storeId: targetStoreId } });
+      await tx.ledgerEntry.updateMany({ where: { storeId: sourceStoreId }, data: { storeId: targetStoreId } });
+
+      await tx.store.update({ where: { id: targetStoreId }, data: { cashBalanceTjs: { increment: source.cashBalanceTjs } } });
+
+      try {
+        await tx.store.delete({ where: { id: sourceStoreId } });
+      } catch (error: any) {
+        if (error?.code === 'P2003') {
+          throw new Error('Не удалось полностью перенести историю магазина — обратитесь к разработчику');
+        }
+        throw error;
+      }
+
+      await tx.auditLog.create({
+        data: {
+          userId: actor.id,
+          userName: actor.name,
+          userRole: actor.role,
+          action: 'STORE_MERGE',
+          details: `Магазин "${source.name}" объединён с "${target.name}": перенесена касса ${source.cashBalanceTjs} TJS и вся история продаж/ремонтов/расходов`,
+        },
+      });
+
+      return tx.store.findUnique({ where: { id: targetStoreId } });
+    }, { maxWait: 20000, timeout: 60000 });
+  }
 }
