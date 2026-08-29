@@ -256,6 +256,7 @@ interface AppContextType {
   ownerProfitPayout: (ownerId: string, amountUsd: number, source: string, note?: string) => Promise<{ success: boolean; message?: string }>;
   ownerReinvest: (ownerId: string, amountUsd: number, note?: string) => Promise<{ success: boolean; message?: string }>;
   updateOwnerProfitShares: (owner1Share: number | { ownerId: string; sharePercent: number }[], owner2Share?: number) => Promise<{ success: boolean; message?: string }>;
+  linkOwnerToUser: (ownerId: string, userId: string | null) => Promise<{ success: boolean; message?: string }>;
 
   createUser: (user: Omit<User, 'id' | 'createdAt'>) => Promise<{ success: boolean; message?: string }>;
   updateUser: (user: User) => Promise<{ success: boolean; message?: string }>;
@@ -1058,6 +1059,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
+  const linkOwnerToUser: AppContextType['linkOwnerToUser'] = async (ownerId, userId) => {
+    try {
+      await apiClient(`/owners/${ownerId}/link-user`, { method: 'POST', body: JSON.stringify({ userId }) });
+      await fetchOwners();
+      return { success: true };
+    } catch (err) {
+      return { success: false, message: errorMessage(err, 'Не удалось привязать аккаунт') };
+    }
+  };
+
   const createUser: AppContextType['createUser'] = async (userData) => {
     try {
       await apiClient('/users', {
@@ -1298,6 +1309,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         ownerProfitPayout,
         ownerReinvest,
         updateOwnerProfitShares,
+        linkOwnerToUser,
         createUser,
         updateUser,
         toggleUserActive,

@@ -192,16 +192,13 @@ export class OwnersService {
     const existing = await prisma.owner.findMany();
     if (existing.length > 0) return existing;
 
-    const adminUser = await prisma.user.findFirst({ where: { role: 'ADMIN' }, select: { name: true } });
-    const partnerUser = await prisma.user.findFirst({ where: { role: 'PARTNER' }, select: { name: true } });
-
-    const owner1Name = adminUser?.name || 'Далер';
-    const owner2Name = partnerUser?.name || 'Рустам';
+    const adminUser = await prisma.user.findFirst({ where: { role: 'ADMIN' }, orderBy: { createdAt: 'asc' } });
+    const partnerUser = await prisma.user.findFirst({ where: { role: 'PARTNER' }, orderBy: { createdAt: 'asc' } });
 
     await prisma.owner.createMany({
       data: [
-        { name: owner1Name, profitSharePercent: 50, capitalBalanceUsd: 0, totalAccruedProfitUsd: 0, totalPaidProfitUsd: 0, totalReinvestedUsd: 0, availableProfitUsd: 0 },
-        { name: owner2Name, profitSharePercent: 50, capitalBalanceUsd: 0, totalAccruedProfitUsd: 0, totalPaidProfitUsd: 0, totalReinvestedUsd: 0, availableProfitUsd: 0 },
+        { userId: adminUser?.id, name: adminUser?.name || 'Далер', profitSharePercent: 50, capitalBalanceUsd: 0, totalAccruedProfitUsd: 0, totalPaidProfitUsd: 0, totalReinvestedUsd: 0, availableProfitUsd: 0 },
+        { userId: partnerUser?.id, name: partnerUser?.name || 'Рустам', profitSharePercent: 50, capitalBalanceUsd: 0, totalAccruedProfitUsd: 0, totalPaidProfitUsd: 0, totalReinvestedUsd: 0, availableProfitUsd: 0 },
       ],
     });
 
@@ -223,5 +220,63 @@ export class OwnersService {
     }
 
     return prisma.owner.findMany();
+  }
+
+  /**
+   * Returns owners with their display name always resolved live from the linked
+   * User account — never a manually-copied snapshot that can silently drift out of
+   * sync with a rename. Any owner still missing a link (e.g. created before this
+   * feature existed) is auto-linked here, best-effort, to an as-yet-unlinked
+   * ADMIN/PARTNER account — so production data self-heals the first time this loads
+   * instead of needing a manual database fix.
+   */
+  public static async listWithResolvedNames() {
+    let owners = await prisma.owner.findMany({ include: { user: { select: { id: true, name: true } } }, orderBy: { createdAt: 'asc' } });
+
+    const unlinked = owners.filter((o) => !o.userId);
+    if (unlinked.length > 0) {
+      const linkedUserIds = owners.filter((o) => o.userId).map((o) => o.userId as string);
+      const candidates = await prisma.user.findMany({
+        where: { role: { in: ['ADMIN', 'PARTNER'] }, id: { notIn: linkedUserIds } },
+        orderBy: { createdAt: 'asc' },
+      });
+      for (let i = 0; i < unlinked.length && i < candidates.length; i++) {
+        const owner = unlinked[i];
+        const user = candidates[i];
+        await prisma.owner.update({ where: { id: owner.id }, data: { userId: user.id, name: user.name } });
+      }
+      if (candidates.length > 0) {
+        owners = await prisma.owner.findMany({ include: { user: { select: { id: true, name: true } } }, orderBy: { createdAt: 'asc' } });
+      }
+    }
+
+    return owners.map((o) => ({ ...o, name: o.user?.name ?? o.name }));
+  }
+
+  /** Explicitly (re)links an owner's capital record to a specific login account. */
+  public static async linkUser(ownerId: string, targetUserId: string | null, actingUserId: string) {
+    return prisma.$transaction(async (tx) => {
+      const actor = await resolveActor(tx, actingUserId);
+      const owner = await tx.owner.findUnique({ where: { id: ownerId } });
+      if (!owner) throw new Error('Владелец не найден');
+
+      if (targetUserId) {
+        const user = await tx.user.findUnique({ where: { id: targetUserId } });
+        if (!user) throw new Error('Сотрудник не найден');
+        const alreadyLinked = await tx.owner.findUnique({ where: { userId: targetUserId } });
+        if (alreadyLinked && alreadyLinked.id !== ownerId) throw new Error(`Этот аккаунт уже привязан к владельцу "${alreadyLinked.name}"`);
+        const updated = await tx.owner.update({ where: { id: ownerId }, data: { userId: targetUserId, name: user.name } });
+        await tx.auditLog.create({
+          data: { userId: actor.id, userName: actor.name, userRole: actor.role, action: 'OWNER_LINK_USER', details: `Владелец "${owner.name}" привязан к аккаунту "${user.name}" (${user.login})`, targetId: ownerId },
+        });
+        return updated;
+      }
+
+      const updated = await tx.owner.update({ where: { id: ownerId }, data: { userId: null } });
+      await tx.auditLog.create({
+        data: { userId: actor.id, userName: actor.name, userRole: actor.role, action: 'OWNER_LINK_USER', details: `Владелец "${owner.name}" отвязан от аккаунта`, targetId: ownerId },
+      });
+      return updated;
+    }, { maxWait: 10000, timeout: 25000 });
   }
 }

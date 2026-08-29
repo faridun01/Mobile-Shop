@@ -396,6 +396,7 @@ export interface Expense {
 
 export interface Owner {
   id: string;
+  userId?: string;
   name: string;
   profitSharePercent: number; // e.g. 60
   capitalBalanceUsd: number;

@@ -125,6 +125,7 @@ model User {
   repairs       RepairTicket[]
   auditLogs     AuditLog[]
   notifications Notification[]
+  ownerProfile  Owner?
 
   @@map("users")
 }
@@ -555,6 +556,10 @@ model Expense {
 
 model Owner {
   id                    String   @id @default(uuid())
+  // Links this capital/profit record to the actual login account of the business
+  // partner it belongs to, so the name is never a manually-copied snapshot that can
+  // drift out of sync — nullable because a legacy/silent investor may have no login.
+  userId                String?  @unique
   name                  String
   profitSharePercent    Float
   capitalBalanceUsd     Float    @default(0)
@@ -564,6 +569,7 @@ model Owner {
   availableProfitUsd    Float    @default(0)
   createdAt             DateTime @default(now())
 
+  user         User?              @relation(fields: [userId], references: [id], onDelete: SetNull)
   transactions OwnerTransaction[]
 
   @@map("owners")

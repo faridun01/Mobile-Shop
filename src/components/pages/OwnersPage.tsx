@@ -27,11 +27,23 @@ export const OwnersPage: React.FC = () => {
     todayRate,
     createOwnerTransaction,
     updateOwnerProfitShares,
+    linkOwnerToUser,
     closeQuarterPeriod,
     initializeOwners
   } = useApp();
 
   const [isInitializing, setIsInitializing] = useState(false);
+  const [linkingOwnerId, setLinkingOwnerId] = useState<string | null>(null);
+
+  const handleChangeLinkedUser = async (ownerId: string, newUserId: string) => {
+    if (linkingOwnerId) return;
+    setLinkingOwnerId(ownerId);
+    const res = await linkOwnerToUser(ownerId, newUserId || null);
+    setLinkingOwnerId(null);
+    if (!res.success) {
+      setStatusBanner({ tone: 'error', text: res.message || 'Не удалось привязать аккаунт' });
+    }
+  };
 
   const handleInitializeOwners = async () => {
     setIsInitializing(true);
@@ -46,24 +58,18 @@ export const OwnersPage: React.FC = () => {
 
   const displayOwners = owners;
 
-  const getOwnerDetails = (owner: { id: string; name?: string }, index: number) => {
-    const adminUser = users.find(u => u.role === 'ADMIN' || u.id === 'user-admin' || u.login === 'admin');
-    const partnerUser = users.find(u => u.role === 'PARTNER' || u.id === 'user-partner' || u.login === 'partner');
-
-    const isGenericName = !owner.name || owner.name.startsWith('Владелец') || owner.name.startsWith('Owner');
-
-    if (owner.id === 'owner-1' || owner.id === 'owner-admin' || index === 0) {
-      return {
-        name: isGenericName ? (adminUser?.name || 'Далер') : owner.name!,
-        roleTag: 'АДМИНИСТРАТОР',
-        roleSub: 'Главный администратор & Владелец бизнеса'
-      };
+  // Role/name are derived from the owner's actually linked account (not a guessed
+  // position) — "владелец #1 is always admin" broke the moment names/roles changed
+  // without this link, which is exactly the bug this fixes.
+  const getOwnerDetails = (owner: { id: string; name?: string; userId?: string }) => {
+    const linkedUser = owner.userId ? users.find(u => u.id === owner.userId) : undefined;
+    if (linkedUser?.role === 'ADMIN') {
+      return { name: owner.name!, roleTag: 'АДМИНИСТРАТОР', roleSub: 'Главный администратор & Владелец бизнеса' };
     }
-    return {
-      name: isGenericName ? (partnerUser?.name || 'Рустам') : owner.name!,
-      roleTag: 'ПАРТНЕР',
-      roleSub: 'Партнер & Соучредитель бизнеса'
-    };
+    if (linkedUser?.role === 'PARTNER') {
+      return { name: owner.name!, roleTag: 'ПАРТНЕР', roleSub: 'Партнер & Соучредитель бизнеса' };
+    }
+    return { name: owner.name || 'Владелец', roleTag: 'ВЛАДЕЛЕЦ', roleSub: 'Совладелец бизнеса (аккаунт не привязан)' };
   };
 
   const [isTxModalOpen, setIsTxModalOpen] = useState(false);
@@ -454,7 +460,7 @@ export const OwnersPage: React.FC = () => {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {displayOwners.map((owner, idx) => {
-              const info = getOwnerDetails(owner, idx);
+              const info = getOwnerDetails(owner);
               const capitalTjs = Math.round((owner.capitalBalanceUsd ?? 0) * rate);
               return (
                 <div
@@ -618,7 +624,7 @@ export const OwnersPage: React.FC = () => {
               >
                 <option value="ALL">Все партнеры</option>
                 {displayOwners.map((o, idx) => (
-                  <option key={o.id} value={o.id}>{getOwnerDetails(o, idx).name}</option>
+                  <option key={o.id} value={o.id}>{getOwnerDetails(o).name}</option>
                 ))}
               </select>
             </div>
@@ -784,10 +790,10 @@ export const OwnersPage: React.FC = () => {
             </p>
 
             <div className="space-y-3">
-              {displayOwners.map((owner, idx) => (
-                <div key={owner.id}>
+              {displayOwners.map((owner) => (
+                <div key={owner.id} className="space-y-1.5">
                   <label className="block text-[11px] uppercase font-semibold text-fg-subtle mb-1">
-                    {getOwnerDetails(owner, idx).name} (%)
+                    {getOwnerDetails(owner).name} (%)
                   </label>
                   <div className="relative">
                     <input
@@ -801,6 +807,20 @@ export const OwnersPage: React.FC = () => {
                       className="w-full rounded-xl bg-surface-raised border border-border px-3 py-2 text-xs text-accent font-bold focus:border-accent focus:outline-none pr-8"
                     />
                     <span className="absolute right-3 top-2.5 text-fg-subtle font-bold">%</span>
+                  </div>
+                  <div>
+                    <label className="block text-[10px] uppercase text-fg-subtle mb-1">Привязанный аккаунт</label>
+                    <select
+                      value={owner.userId ?? ''}
+                      disabled={linkingOwnerId === owner.id}
+                      onChange={(e) => handleChangeLinkedUser(owner.id, e.target.value)}
+                      className="w-full rounded-xl bg-surface-raised border border-border px-3 py-2 text-xs text-fg focus:border-accent focus:outline-none disabled:opacity-50"
+                    >
+                      <option value="">— не привязан —</option>
+                      {users.filter(u => u.role === 'ADMIN' || u.role === 'PARTNER').map(u => (
+                        <option key={u.id} value={u.id}>{u.name} ({u.login})</option>
+                      ))}
+                    </select>
                   </div>
                 </div>
               ))}
@@ -855,7 +875,7 @@ export const OwnersPage: React.FC = () => {
                   className="w-full rounded-xl bg-surface-raised border border-border px-3 py-2 text-fg text-xs font-semibold focus:border-accent focus:outline-none"
                 >
                   {displayOwners.map((o, idx) => (
-                    <option key={o.id} value={o.id}>{getOwnerDetails(o, idx).name} ({o.profitSharePercent ?? 0}% доли)</option>
+                    <option key={o.id} value={o.id}>{getOwnerDetails(o).name} ({o.profitSharePercent ?? 0}% доли)</option>
                   ))}
                 </select>
               </div>
@@ -1025,7 +1045,7 @@ export const OwnersPage: React.FC = () => {
                   <tbody className="divide-y divide-border text-xs">
                     {displayOwners.map((o, idx) => (
                       <tr key={o.id} className="hover:bg-surface/50">
-                        <td className="p-2.5 font-bold text-fg">{getOwnerDetails(o, idx).name}</td>
+                        <td className="p-2.5 font-bold text-fg">{getOwnerDetails(o).name}</td>
                         <td className="p-2.5 text-center text-fg-subtle">{o.profitSharePercent || 0}%</td>
                         <td className="p-2.5 text-right font-semibold text-fg">${(o.totalAccruedProfitUsd || 0).toLocaleString()}</td>
                         <td className="p-2.5 text-right text-info">${(o.totalPaidProfitUsd || 0).toLocaleString()}</td>

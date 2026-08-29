@@ -119,6 +119,13 @@ export class UsersService {
       }
 
       const user = await tx.user.update({ where: { id: userId }, data, select: SAFE_SELECT });
+
+      // Keep a linked Owner's display name in sync — it must never drift from the
+      // actual account it represents (a partner is a real person, not a free-text label).
+      if (data.name) {
+        await tx.owner.updateMany({ where: { userId }, data: { name: data.name } });
+      }
+
       await tx.auditLog.create({
         data: { userId: actor.id, userName: actor.name, userRole: actor.role, action: 'USER_UPDATE', details: `Обновлены данные сотрудника: ${user.name} (${user.role})${input.password ? ' (пароль изменен)' : ''}`, targetId: user.id },
       });

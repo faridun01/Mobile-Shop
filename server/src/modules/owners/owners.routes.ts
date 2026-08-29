@@ -7,11 +7,21 @@ import { RealtimeSyncGateway } from '../../websocket/websocket.gateway';
 export function registerOwnerRoutes(app: Express) {
   app.get('/api/owners', authenticateJwt, requireRoles('ADMIN', 'PARTNER'), async (_req, res, next) => {
     try {
-      let owners = await prisma.owner.findMany();
-      if (owners.length === 0) {
-        owners = await OwnersService.initializeDefaultOwners();
+      const count = await prisma.owner.count();
+      if (count === 0) {
+        await OwnersService.initializeDefaultOwners();
       }
-      res.json(owners);
+      res.json(await OwnersService.listWithResolvedNames());
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.post('/api/owners/:id/link-user', authenticateJwt, requireRoles('ADMIN', 'PARTNER'), async (req: AuthenticatedRequest, res, next) => {
+    try {
+      const owner = await OwnersService.linkUser(req.params.id, req.body?.userId || null, req.user!.userId);
+      RealtimeSyncGateway.broadcast('OWNER_TX', { ownerId: owner.id });
+      res.json(owner);
     } catch (error) {
       next(error);
     }

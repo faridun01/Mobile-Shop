@@ -312,6 +312,7 @@ export function mapExpense(e: any, names: NameLookup): Expense {
 export function mapOwner(o: any): Owner {
   return {
     id: o.id,
+    userId: o.userId ?? undefined,
     name: o.name,
     profitSharePercent: o.profitSharePercent,
     capitalBalanceUsd: o.capitalBalanceUsd,
