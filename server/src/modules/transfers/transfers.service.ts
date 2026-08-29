@@ -60,16 +60,14 @@ export class TransfersService {
         throw new Error('Одно или несколько устройств стали недоступны во время оформления перемещения');
       }
 
-      for (const device of devices) {
-        await tx.deviceTimelineEvent.create({
-          data: {
-            deviceId: device.id,
-            type: 'TRANSFER_REQUEST',
-            description: `Запрошено перемещение ${transferNumber} в другой магазин`,
-            userName: actor.name,
-          },
-        });
-      }
+      await tx.deviceTimelineEvent.createMany({
+        data: devices.map((device) => ({
+          deviceId: device.id,
+          type: 'TRANSFER_REQUEST',
+          description: `Запрошено перемещение ${transferNumber} в другой магазин`,
+          userName: actor.name,
+        })),
+      });
 
       await tx.auditLog.create({
         data: {
@@ -139,16 +137,14 @@ export class TransfersService {
         throw new Error('Одно или несколько устройств стали недоступны во время перемещения');
       }
 
-      for (const device of devices) {
-        await tx.deviceTimelineEvent.create({
-          data: {
-            deviceId: device.id,
-            type: 'TRANSFER',
-            description: `Прямое перемещение ${transferNumber}`,
-            userName: actor.name,
-          },
-        });
-      }
+      await tx.deviceTimelineEvent.createMany({
+        data: devices.map((device) => ({
+          deviceId: device.id,
+          type: 'TRANSFER',
+          description: `Прямое перемещение ${transferNumber}`,
+          userName: actor.name,
+        })),
+      });
 
       await tx.ledgerEntry.create({
         data: { type: 'TRANSFER', description: `Прямое перемещение ${transferNumber}: ${devices.length} устройств`, userName: actor.name },
@@ -195,16 +191,14 @@ export class TransfersService {
         data: { status: 'APPROVED', approvedByUserId, approvedAt: new Date() },
       });
 
-      for (const item of transfer.items) {
-        await tx.deviceTimelineEvent.create({
-          data: {
-            deviceId: item.deviceId,
-            type: 'TRANSFER_APPROVED',
-            description: `Перемещение ${transfer.transferNumber} подтверждено`,
-            userName: actor.name,
-          },
-        });
-      }
+      await tx.deviceTimelineEvent.createMany({
+        data: transfer.items.map((item) => ({
+          deviceId: item.deviceId,
+          type: 'TRANSFER_APPROVED',
+          description: `Перемещение ${transfer.transferNumber} подтверждено`,
+          userName: actor.name,
+        })),
+      });
 
       await tx.notification.updateMany({
         where: { targetId: transferId, targetType: 'TRANSFER_REQUEST' },
@@ -254,16 +248,14 @@ export class TransfersService {
         data: { status: 'REJECTED', approvedByUserId: rejectedByUserId, approvedAt: new Date(), rejectedReason: reason },
       });
 
-      for (const item of transfer.items) {
-        await tx.deviceTimelineEvent.create({
-          data: {
-            deviceId: item.deviceId,
-            type: 'TRANSFER_REJECTED',
-            description: `Перемещение ${transfer.transferNumber} отклонено: ${reason}`,
-            userName: actor.name,
-          },
-        });
-      }
+      await tx.deviceTimelineEvent.createMany({
+        data: transfer.items.map((item) => ({
+          deviceId: item.deviceId,
+          type: 'TRANSFER_REJECTED',
+          description: `Перемещение ${transfer.transferNumber} отклонено: ${reason}`,
+          userName: actor.name,
+        })),
+      });
 
       await tx.notification.updateMany({
         where: { targetId: transferId, targetType: 'TRANSFER_REQUEST' },

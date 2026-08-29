@@ -96,13 +96,13 @@ export class RefundService {
       }
 
       const owners = await tx.owner.findMany();
-      for (const owner of owners) {
+      await Promise.all(owners.map((owner) => {
         const delta = roundMoney(netProfitImpactUsd * (owner.profitSharePercent / 100));
-        await tx.owner.update({
+        return tx.owner.update({
           where: { id: owner.id },
           data: { totalAccruedProfitUsd: { increment: delta }, availableProfitUsd: { increment: delta } },
         });
-      }
+      }));
 
       await tx.ledgerEntry.create({
         data: {

@@ -276,14 +276,15 @@ export class SuppliersService {
           });
         }
       } else if (input.bonusType === 'CASH_DISCOUNT' && input.amountUsd) {
+        const bonusAmountUsd = input.amountUsd;
         const owners = await tx.owner.findMany();
-        for (const owner of owners) {
-          const delta = roundMoney(input.amountUsd * (owner.profitSharePercent / 100));
-          await tx.owner.update({
+        await Promise.all(owners.map((owner) => {
+          const delta = roundMoney(bonusAmountUsd * (owner.profitSharePercent / 100));
+          return tx.owner.update({
             where: { id: owner.id },
             data: { totalAccruedProfitUsd: { increment: delta }, availableProfitUsd: { increment: delta } },
           });
-        }
+        }));
         await tx.ledgerEntry.create({
           data: {
             type: 'SUPPLIER_BONUS',

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useApp } from '../../context/AppContext';
 import { Supplier, SupplierInvoice, Device } from '../../types';
 import {
@@ -48,6 +48,15 @@ export const SuppliersPage: React.FC = () => {
 
   const selectedSupplier = suppliers.find(s => s.id === selectedSupplierId) || null;
   const selectedInvoice = supplierInvoices.find(inv => inv.id === selectedInvoiceId) || null;
+  // Filters/sorts the full (unbounded, grows with every purchase invoice ever
+  // raised) supplierInvoices array — computed once per relevant change instead of
+  // twice per render (desktop panel + mobile overlay both need the same list).
+  const selectedSupplierInvoices = useMemo(() => {
+    if (!selectedSupplier) return [];
+    return supplierInvoices
+      .filter(inv => inv.supplierId === selectedSupplier.id)
+      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  }, [supplierInvoices, selectedSupplier]);
   const [isPayModalOpen, setIsPayModalOpen] = useState(false);
   const [isAddSupplierOpen, setIsAddSupplierOpen] = useState(false);
 
@@ -432,9 +441,7 @@ export const SuppliersPage: React.FC = () => {
               </div>
 
               <div className="flex-1 overflow-y-auto divide-y divide-border bg-bg">
-                {supplierInvoices
-                  .filter(inv => inv.supplierId === selectedSupplier.id)
-                  .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+                {selectedSupplierInvoices
                   .map((inv) => {
                     const isPaid = inv.status === 'PAID';
                     const isPartial = inv.status === 'PARTIALLY_PAID';
@@ -571,14 +578,12 @@ export const SuppliersPage: React.FC = () => {
           <div className="p-2.5 bg-surface-raised border-b border-border text-xs font-semibold text-fg-muted flex items-center justify-between">
             <span>Накладные поставщика</span>
             <span className="text-[11px] text-fg-subtle">
-              {supplierInvoices.filter(inv => inv.supplierId === selectedSupplier.id).length} шт.
+              {selectedSupplierInvoices.length} шт.
             </span>
           </div>
 
           <div className="flex-1 overflow-y-auto divide-y divide-border bg-bg p-1">
-            {supplierInvoices
-              .filter(inv => inv.supplierId === selectedSupplier.id)
-              .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+            {selectedSupplierInvoices
               .map((inv) => {
                 const isPaid = inv.status === 'PAID';
                 const isPartial = inv.status === 'PARTIALLY_PAID';

@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
   User,
   Store,
@@ -1245,9 +1245,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     console.warn('Полный сброс данных недоступен в реальном режиме — обратитесь к администратору базы данных.');
   };
 
-  return (
-    <AppContext.Provider
-      value={{
+  // Every field/function below is redefined on each render (plain consts in the
+  // component body, not individually useCallback-wrapped) — but since they all
+  // close over the SAME state tracked in this dependency array, memoizing the
+  // whole value object here is safe: whenever none of this state actually
+  // changed, the cached object (including its functions, captured at the last
+  // render where the tracked state matched) is functionally identical to a
+  // freshly-built one. Without this, every one of the ~25 useApp() consumers in
+  // the tree re-rendered on ANY AppProvider re-render, including ones driven by
+  // state a given consumer never reads (e.g. a notifications refetch forcing
+  // SalePage to re-render).
+  const contextValue = useMemo<AppContextType>(() => ({
         currentUser,
         todayRate,
         activePage,
@@ -1338,8 +1346,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         theme,
         setTheme,
         toggleTheme
-      }}
-    >
+  }), [
+    currentUser, todayRate, activePage, selectedStoreId, stores, devices, sales,
+    transfers, repairs, suppliers, invoices, bonuses, customers, expenses, owners,
+    ownerTransactions, users, notifications, auditLogs, ledger, isInitialLoading,
+    isRateModalOpen, isScannerOpen, scannerCallback, drawerOpen, theme, authToken,
+  ]);
+
+  return (
+    <AppContext.Provider value={contextValue}>
       {children}
     </AppContext.Provider>
   );

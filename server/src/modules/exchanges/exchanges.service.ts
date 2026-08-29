@@ -171,13 +171,13 @@ export class ExchangesService {
       // The original sale profit remains booked; the returned device comes back as an
       // asset at the agreed trade-in value, which offsets the customer's trade-in credit.
       const owners = await tx.owner.findMany();
-      for (const owner of owners) {
+      await Promise.all(owners.map((owner) => {
         const delta = roundMoney(exchangeProfitUsd * (owner.profitSharePercent / 100));
-        await tx.owner.update({
+        return tx.owner.update({
           where: { id: owner.id },
           data: { totalAccruedProfitUsd: { increment: delta }, availableProfitUsd: { increment: delta } },
         });
-      }
+      }));
 
       await tx.ledgerEntry.create({
         data: {

@@ -11,8 +11,22 @@ const currentFile = fileURLToPath(import.meta.url);
 const currentDirectory = path.dirname(currentFile);
 const projectRoot = path.resolve(currentDirectory, '../..');
 
-app.use(express.static(path.join(projectRoot, 'dist')));
-app.get('*', (_req, res) => res.sendFile(path.join(projectRoot, 'dist', 'index.html')));
+// Vite hashes every filename under /assets (content changes -> new filename), so those
+// are safe to cache forever; everything else (index.html, sw.js, manifest) must stay
+// revalidated on every request so a new deploy is picked up immediately.
+app.use(express.static(path.join(projectRoot, 'dist'), {
+  setHeaders: (res, filePath) => {
+    if (filePath.includes(`${path.sep}assets${path.sep}`)) {
+      res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+    } else {
+      res.setHeader('Cache-Control', 'no-cache');
+    }
+  },
+}));
+app.get('*', (_req, res) => {
+  res.setHeader('Cache-Control', 'no-cache');
+  res.sendFile(path.join(projectRoot, 'dist', 'index.html'));
+});
 
 const server = app.listen(port, '0.0.0.0', () => {
   console.log(`Mobile Shop API listening on port ${port}`);

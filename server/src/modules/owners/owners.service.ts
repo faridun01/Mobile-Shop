@@ -146,10 +146,9 @@ export class OwnersService {
       // the yet-unclaimed availableProfitUsd is affected, and only if the admin opts
       // to sweep it into capital instead of leaving it payable into next quarter.
       if (transferRemainingToCapital) {
-        for (const owner of owners) {
+        await Promise.all(owners.filter((owner) => (owner.availableProfitUsd || 0) > 0).map((owner) => {
           const remaining = owner.availableProfitUsd || 0;
-          if (remaining <= 0) continue;
-          await tx.owner.update({
+          return tx.owner.update({
             where: { id: owner.id },
             data: {
               capitalBalanceUsd: { increment: remaining },
@@ -157,7 +156,7 @@ export class OwnersService {
               availableProfitUsd: 0,
             },
           });
-        }
+        }));
       }
 
       await tx.auditLog.create({

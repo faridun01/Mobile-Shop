@@ -149,18 +149,18 @@ export async function updateExpense(
     // changes the amount must roll that accrual forward too, or owner profit permanently
     // drifts from the actual expense total.
     const owners = await tx.owner.findMany();
-    for (const owner of owners) {
+    await Promise.all(owners.map((owner) => {
       const share = owner.profitSharePercent / 100;
       const revertDelta = roundMoney((existing.amountUsd || 0) * share);
       const applyDelta = roundMoney(newAmountUsd * share);
-      await tx.owner.update({
+      return tx.owner.update({
         where: { id: owner.id },
         data: {
           totalAccruedProfitUsd: { increment: revertDelta - applyDelta },
           availableProfitUsd: { increment: revertDelta - applyDelta },
         },
       });
-    }
+    }));
 
     const updated = await tx.expense.update({
       where: { id },
@@ -218,13 +218,13 @@ export async function deleteExpense(id: string, actorId: string) {
 
     // Reverse the profit impact this expense accrued against owners at creation time.
     const owners = await tx.owner.findMany();
-    for (const owner of owners) {
+    await Promise.all(owners.map((owner) => {
       const delta = roundMoney((existing.amountUsd || 0) * (owner.profitSharePercent / 100));
-      await tx.owner.update({
+      return tx.owner.update({
         where: { id: owner.id },
         data: { totalAccruedProfitUsd: { increment: delta }, availableProfitUsd: { increment: delta } },
       });
-    }
+    }));
 
     // Delete corresponding ledger entries
     await tx.ledgerEntry.deleteMany({ where: { referenceId: id } });

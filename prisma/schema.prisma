@@ -170,6 +170,7 @@ model Device {
   @@index([imei])
   @@index([storeId, status])
   @@index([status])
+  @@index([createdAt])
   @@map("devices")
 }
 
@@ -227,6 +228,7 @@ model Sale {
 
   @@index([storeId, createdAt])
   @@index([customerId])
+  @@index([createdAt])
   @@map("sales")
 }
 
@@ -514,6 +516,7 @@ model RepairTicket {
   statusHistory RepairStatusHistory[]
 
   @@index([storeId, status])
+  @@index([storeId, createdAt])
   @@map("repair_tickets")
 }
 
@@ -632,6 +635,8 @@ model Notification {
 
   @@index([targetUserId, read])
   @@index([targetRole, read])
+  @@index([targetUserId, createdAt])
+  @@index([targetRole, createdAt])
   @@map("notifications")
 }
 
@@ -653,6 +658,7 @@ model AuditLog {
   user User? @relation(fields: [userId], references: [id])
 
   @@index([createdAt])
+  @@index([targetId])
   @@map("audit_logs")
 }
 

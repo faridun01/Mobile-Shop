@@ -162,18 +162,16 @@ export class SalesService {
         throw new Error('One or more selected devices were sold concurrently. Please refresh and try again.');
       }
 
-      for (const item of saleItemsData) {
-        await tx.deviceTimelineEvent.create({
-          data: {
-            deviceId: item.deviceId,
-            type: 'SALE',
-            description: `Продано за ${item.salePriceTjs} TJS (чек #${sale.receiptNumber})`,
-            userName: input.userId,
-            priceTjs: item.salePriceTjs,
-            priceUsd: item.salePriceUsd,
-          },
-        });
-      }
+      await tx.deviceTimelineEvent.createMany({
+        data: saleItemsData.map((item) => ({
+          deviceId: item.deviceId,
+          type: 'SALE',
+          description: `Продано за ${item.salePriceTjs} TJS (чек #${sale.receiptNumber})`,
+          userName: input.userId,
+          priceTjs: item.salePriceTjs,
+          priceUsd: item.salePriceUsd,
+        })),
+      });
 
       if (cashAmountTjs !== 0) {
         await tx.store.update({ where: { id: input.storeId }, data: { cashBalanceTjs: { increment: cashAmountTjs } } });
@@ -181,13 +179,13 @@ export class SalesService {
 
       const saleProfitUsd = roundMoney(totalUsd - totalCostUsd);
       const owners = await tx.owner.findMany();
-      for (const owner of owners) {
+      await Promise.all(owners.map((owner) => {
         const delta = roundMoney(saleProfitUsd * (owner.profitSharePercent / 100));
-        await tx.owner.update({
+        return tx.owner.update({
           where: { id: owner.id },
           data: { totalAccruedProfitUsd: { increment: delta }, availableProfitUsd: { increment: delta } },
         });
-      }
+      }));
 
       await tx.ledgerEntry.create({
         data: {

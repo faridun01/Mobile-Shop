@@ -133,7 +133,11 @@ export const PurchasePage: React.FC = () => {
     if (supplierInvoices) {
       setInvoiceNumber(`INV-${(supplierInvoices.length + 1).toString().padStart(4, '0')}`);
     }
-  }, [supplierInvoices]);
+    // Only the count matters for the next sequential number — depending on the
+    // array reference re-ran this on every unrelated invoice update anywhere in
+    // the company (e.g. a payment changing one invoice's status elsewhere).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [supplierInvoices?.length]);
   const [purchaseDate, setPurchaseDate] = useState<string>(new Date().toISOString().split('T')[0]);
   
   // Destination mode (Main Warehouse intake is ADMIN ONLY)
