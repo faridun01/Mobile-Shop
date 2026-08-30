@@ -19,8 +19,8 @@ const SUPPLIER_SEEDS = [
 ];
 
 const OWNER_SEEDS = [
-  { id: 'owner-admin', name: 'Далер', profitSharePercent: 50 },
-  { id: 'owner-partner', name: 'Рустам', profitSharePercent: 50 },
+  { id: 'owner-admin', userId: 'user-admin', name: 'Далер', profitSharePercent: 50 },
+  { id: 'owner-partner', userId: 'user-partner', name: 'Рустам', profitSharePercent: 50 },
 ];
 
 async function main() {
@@ -40,10 +40,6 @@ async function main() {
     });
   }
 
-  for (const owner of OWNER_SEEDS) {
-    await prisma.owner.upsert({ where: { id: owner.id }, update: {}, create: owner });
-  }
-
   for (const user of USER_SEEDS) {
     const hashedPassword = await AuthService.hashPassword(user.password);
     await prisma.user.upsert({
@@ -60,6 +56,28 @@ async function main() {
         role: user.role,
         storeId: user.storeId,
       },
+    });
+  }
+
+  // Owner profiles belong to the actual ADMIN/PARTNER accounts. Looking them up
+  // by userId prevents a later seed from creating owner-admin/owner-partner beside
+  // legacy UUID-based profiles that are already linked to those same users.
+  for (const owner of OWNER_SEEDS) {
+    const ownerUser = await prisma.user.findUniqueOrThrow({ where: { id: owner.userId } });
+    const ownerData = { ...owner, name: ownerUser.name };
+    const linkedOwner = await prisma.owner.findUnique({ where: { userId: owner.userId } });
+    if (linkedOwner) {
+      await prisma.owner.update({
+        where: { id: linkedOwner.id },
+        data: { name: ownerUser.name },
+      });
+      continue;
+    }
+
+    await prisma.owner.upsert({
+      where: { id: owner.id },
+      update: { userId: owner.userId, name: ownerUser.name },
+      create: ownerData,
     });
   }
 
