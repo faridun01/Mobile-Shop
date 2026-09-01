@@ -7,11 +7,9 @@ import {
   Store as StoreIcon,
   TrendingUp,
   ArrowDownRight,
-  ArrowUpRight,
   Download,
   FileSpreadsheet,
-  Package,
-  Landmark
+  Package
 } from 'lucide-react';
 import { exportSalesReport, exportInventoryReport, exportExpensesReport, exportRepairsReport } from '../../utils/exportReports';
 import { getBusinessDateKey } from '../../utils/businessDate';
@@ -24,8 +22,6 @@ export const ReportsPage: React.FC = () => {
     expenses,
     repairs,
     suppliers,
-    supplierInvoices,
-    customers,
     stores,
     supplierBonuses,
     todayRate
@@ -40,7 +36,7 @@ export const ReportsPage: React.FC = () => {
   // Filtered dataset & financial calculations
   const filteredData = useMemo(() => {
     const todayStr = getBusinessDateKey();
-    const currentMonthStr = new Date().toISOString().substring(0, 7);
+    const currentMonthStr = todayStr.substring(0, 7);
 
     // 1. Sales filtering (exclude refunded sales)
     let periodSales = sales.filter(s => s.status !== 'REFUNDED');
@@ -174,57 +170,23 @@ export const ReportsPage: React.FC = () => {
     const netProfitUsd = +(grossProfitUsd - expensesUsd + periodCashBonusesUsd + periodRefundPenaltiesUsd).toFixed(2);
     const netProfitTjs = Math.round(grossProfitTjs - expensesTjs + periodCashBonusesTjs + periodRefundPenaltiesTjs);
 
-    // Balance Sheet Assets & Liabilities in USD (store-aware)
-    const targetDevices = selectedStore === 'all' 
-      ? devices 
-      : devices.filter(d => d.locationId === selectedStore);
-
-    const inStockDevices = targetDevices.filter(d => 
-      d.status === 'STORE_STOCK' || d.status === 'MAIN_WAREHOUSE' || d.status === 'IN_STOCK_AFTER_EXCHANGE'
-    );
-
-    const inventoryAssetUsd = inStockDevices.reduce((acc, d) => acc + (d.costBasisUsd || d.purchaseCostUsd || 0), 0);
-    const inventoryAssetTjs = Math.round(inventoryAssetUsd * rate);
-    const inventoryDevicesCount = inStockDevices.length;
-
-    const targetStores = selectedStore === 'all'
-      ? stores
-      : stores.filter(s => s.id === selectedStore);
-
-    const totalCashRegistersTjs = targetStores.reduce((acc, s) => acc + s.cashBalanceTjs, 0);
-    const totalCashRegistersUsd = +(totalCashRegistersTjs / rate).toFixed(2);
-
     const totalSupplierDebtUsd = suppliers.reduce((acc, s) => acc + s.totalDebtUsd, 0);
     const totalSupplierDebtTjs = Math.round(totalSupplierDebtUsd * rate);
-
-    // Customer debt (money owed TO the business) is a receivable asset, same
-    // company-wide status as supplier debt — not tied to any single store.
-    const totalCustomerDebtTjs = (customers || []).reduce((acc, c) => acc + c.totalDebtTjs, 0);
-    const totalCustomerDebtUsd = +(totalCustomerDebtTjs / rate).toFixed(2);
-
-    const totalAssetsUsd = +(inventoryAssetUsd + totalCashRegistersUsd + totalCustomerDebtUsd).toFixed(2);
-    const totalAssetsTjs = Math.round(totalAssetsUsd * rate);
-    const netBusinessValueUsd = +(totalAssetsUsd - totalSupplierDebtUsd).toFixed(2);
-    const netBusinessValueTjs = Math.round(netBusinessValueUsd * rate);
 
     // Главный склад owns purchasing/supplier relations — this account is split out
     // from retail store cash so the two-tier model (warehouse funds purchases &
     // pays suppliers, stores just sell) is visible at a glance instead of blended
     // into one "total cash" number.
     const mainWarehouseStore = stores.find(s => s.isMainWarehouse);
-    const mainWarehouseCashTjs = mainWarehouseStore?.cashBalanceTjs || 0;
+    const mainWarehouseStock = devices.filter(device =>
+      device.locationId === mainWarehouseStore?.id &&
+      device.status === 'MAIN_WAREHOUSE'
+    );
+    const mainWarehouseStockCostUsd = +mainWarehouseStock
+      .reduce((sum, device) => sum + (device.costBasisUsd || device.purchaseCostUsd || 0), 0)
+      .toFixed(2);
+    const mainWarehouseStockCostTjs = Math.round(mainWarehouseStockCostUsd * rate);
     const retailStoresList = stores.filter(s => !s.isMainWarehouse);
-    const retailCashTjs = retailStoresList.reduce((acc, s) => acc + s.cashBalanceTjs, 0);
-
-    // Purchases received this period (приходы) — always company-wide, since intake
-    // is recorded at the main warehouse regardless of which store filter is active.
-    let periodInvoices = supplierInvoices || [];
-    if (period === 'TODAY') periodInvoices = periodInvoices.filter(i => i.date.startsWith(todayStr));
-    else if (period === 'MONTH') periodInvoices = periodInvoices.filter(i => i.date.startsWith(currentMonthStr));
-    else if (period === 'SPECIFIC_MONTH') periodInvoices = periodInvoices.filter(i => i.date.startsWith(selectedMonth));
-    const periodPurchasesUsd = +periodInvoices.reduce((acc, i) => acc + (i.totalAmountUsd || 0), 0).toFixed(2);
-    const periodPurchasesTjs = Math.round(periodInvoices.reduce((acc, i) => acc + (i.totalAmountUsd || 0) * i.exchangeRate, 0));
-    const periodPurchasesDevicesCount = periodInvoices.reduce((acc, i) => acc + (i.devicesCount || 0), 0);
 
     const topSuppliersByDebt = [...suppliers]
       .filter(s => s.totalDebtUsd > 0)
@@ -239,27 +201,51 @@ export const ReportsPage: React.FC = () => {
     else if (period === 'MONTH') periodSalesAllStores = periodSalesAllStores.filter(s => s.date.startsWith(currentMonthStr));
     else if (period === 'SPECIFIC_MONTH') periodSalesAllStores = periodSalesAllStores.filter(s => s.date.startsWith(selectedMonth));
 
-    const storeBreakdown = retailStoresList.map(store => {
+    const storeBreakdown = retailStoresList
+      .filter(store => selectedStore === 'all' || store.id === selectedStore)
+      .map(store => {
       const storeSales = periodSalesAllStores.filter(s => s.storeId === store.id);
       let storeRevenueUsd = 0;
+      let storeRevenueTjs = 0;
+      let storeCogsUsd = 0;
+      let storeCogsTjs = 0;
       let storeProfitUsd = 0;
+      let storeProfitTjs = 0;
       let storeUnits = 0;
       storeSales.forEach(sale => {
         const saleRate = sale.exchangeRate || rate;
         const saleRevenueUsd = sale.totalUsd || +(sale.totalTjs / saleRate).toFixed(2);
-        storeRevenueUsd += saleRevenueUsd;
         const fallbackCostUsd = sale.items.reduce((sum, item) => sum + (item.costBasisUsd || item.purchaseCostUsd || 0), 0);
-        storeProfitUsd += sale.recognizedProfitUsd ?? (saleRevenueUsd - fallbackCostUsd);
+        const saleProfitUsd = sale.recognizedProfitUsd ?? (saleRevenueUsd - fallbackCostUsd);
+        const saleCogsUsd = saleRevenueUsd - saleProfitUsd;
+        storeRevenueUsd += saleRevenueUsd;
+        storeRevenueTjs += sale.totalTjs;
+        storeCogsUsd += saleCogsUsd;
+        storeCogsTjs += saleCogsUsd * saleRate;
+        storeProfitUsd += saleProfitUsd;
+        storeProfitTjs += sale.totalTjs - saleCogsUsd * saleRate;
         storeUnits += sale.items.length;
       });
+      const stock = devices.filter(device =>
+        device.locationId === store.id &&
+        (device.status === 'STORE_STOCK' || device.status === 'IN_STOCK_AFTER_EXCHANGE')
+      );
+      const stockCostUsd = stock.reduce((sum, device) => sum + (device.costBasisUsd || device.purchaseCostUsd || 0), 0);
       return {
         storeId: store.id,
         storeName: store.name,
         revenueUsd: +storeRevenueUsd.toFixed(2),
+        revenueTjs: Math.round(storeRevenueTjs),
+        cogsUsd: +storeCogsUsd.toFixed(2),
+        cogsTjs: Math.round(storeCogsTjs),
         profitUsd: +storeProfitUsd.toFixed(2),
+        profitTjs: Math.round(storeProfitTjs),
         unitsSold: storeUnits,
         salesCount: storeSales.length,
         cashTjs: store.cashBalanceTjs,
+        stockCount: stock.length,
+        stockCostUsd: +stockCostUsd.toFixed(2),
+        stockCostTjs: Math.round(stockCostUsd * rate),
       };
     }).sort((a, b) => b.revenueUsd - a.revenueUsd);
 
@@ -280,29 +266,16 @@ export const ReportsPage: React.FC = () => {
       expensesUsd,
       netProfitUsd,
       netProfitTjs,
-      inventoryAssetUsd: +inventoryAssetUsd.toFixed(2),
-      inventoryAssetTjs,
-      inventoryDevicesCount,
       totalSupplierDebtUsd: +totalSupplierDebtUsd.toFixed(2),
       totalSupplierDebtTjs,
-      totalCashRegistersTjs,
-      totalCashRegistersUsd,
-      totalCustomerDebtUsd,
-      totalCustomerDebtTjs,
-      mainWarehouseCashTjs,
-      retailCashTjs,
-      periodPurchasesUsd,
-      periodPurchasesTjs,
-      periodPurchasesDevicesCount,
+      mainWarehouseStockCount: mainWarehouseStock.length,
+      mainWarehouseStockCostUsd,
+      mainWarehouseStockCostTjs,
       topSuppliersByDebt,
       storeBreakdown,
-      totalAssetsUsd,
-      totalAssetsTjs,
-      netBusinessValueUsd,
-      netBusinessValueTjs,
       modelCounts: sortedModelList
     };
-  }, [sales, expenses, devices, suppliers, supplierInvoices, customers, stores, supplierBonuses, period, selectedMonth, selectedStore, rate]);
+  }, [sales, expenses, devices, suppliers, stores, supplierBonuses, period, selectedMonth, selectedStore, rate]);
 
   if (currentUser?.role === 'SELLER') {
     return (
@@ -387,8 +360,8 @@ export const ReportsPage: React.FC = () => {
             onChange={(e) => setSelectedStore(e.target.value)}
             className="rounded-lg bg-surface-raised border border-border px-2.5 py-1.5 text-xs text-fg focus:outline-none focus:border-accent"
           >
-            <option value="all">ВСЕ ФИЛИАЛЫ</option>
-            {stores.map(s => (
+            <option value="all">ВСЕ МАГАЗИНЫ</option>
+            {stores.filter(s => !s.isMainWarehouse).map(s => (
               <option key={s.id} value={s.id}>{s.name.toUpperCase()}</option>
             ))}
           </select>
@@ -473,37 +446,37 @@ export const ReportsPage: React.FC = () => {
           </div>
         </div>
 
-        {/* KPI SECTION 2: MAIN WAREHOUSE — PURCHASING & SUPPLIERS (always company-wide) */}
+        {/* MAIN WAREHOUSE: stock storage and supplier obligations only */}
         <div>
           <h4 className="text-[10px] font-bold text-fg-subtle uppercase tracking-wider mb-2 flex items-center space-x-1.5">
             <Package className="w-3.5 h-3.5 text-accent" />
-            <span>ГЛАВНЫЙ СКЛАД: ЗАКУПКИ И ПОСТАВЩИКИ</span>
-            <span className="text-[9px] font-normal normal-case text-fg-subtle">(вся компания, не зависит от фильтра филиала)</span>
+            <span>ГЛАВНЫЙ СКЛАД</span>
+            <span className="text-[9px] font-normal normal-case text-fg-subtle">(хранение товара и обязательства перед поставщиками)</span>
           </h4>
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 sm:gap-3">
             <div className="p-3 sm:p-4 rounded-xl bg-surface border border-border space-y-1">
               <div className="flex items-center justify-between text-fg-subtle text-[10px] uppercase">
-                <span>ЗАКУПКИ ЗА ПЕРИОД</span>
-                <Package className="w-3.5 h-3.5 text-accent" />
+                <span>ТОВАРОВ НА ГЛАВНОМ СКЛАДЕ</span>
+                <Smartphone className="w-3.5 h-3.5 text-accent" />
               </div>
-              <p className="text-base sm:text-lg font-bold text-fg">
-                ${filteredData.periodPurchasesUsd.toLocaleString()}
+              <p className="text-base sm:text-lg font-bold text-accent">
+                {filteredData.mainWarehouseStockCount.toLocaleString()} шт.
               </p>
               <p className="text-[10px] text-fg-subtle">
-                ≈ {filteredData.periodPurchasesTjs.toLocaleString()} TJS | <strong className="text-fg">{filteredData.periodPurchasesDevicesCount}</strong> шт.
+                Доступно и хранится на главном складе
               </p>
             </div>
 
             <div className="p-3 sm:p-4 rounded-xl bg-surface border border-border space-y-1">
               <div className="flex items-center justify-between text-fg-subtle text-[10px] uppercase">
-                <span>КАССА ГЛАВНОГО СКЛАДА</span>
-                <Landmark className="w-3.5 h-3.5 text-fg-subtle" />
+                <span>ОБЩАЯ СЕБЕСТОИМОСТЬ ТОВАРА</span>
+                <Package className="w-3.5 h-3.5 text-fg-subtle" />
               </div>
-              <p className={`text-base sm:text-lg font-bold ${filteredData.mainWarehouseCashTjs < 0 ? 'text-danger' : 'text-fg'}`}>
-                {filteredData.mainWarehouseCashTjs.toLocaleString()} TJS
+              <p className="text-base sm:text-lg font-bold text-fg">
+                ${filteredData.mainWarehouseStockCostUsd.toLocaleString()}
               </p>
               <p className="text-[10px] text-fg-subtle">
-                ≈ ${(filteredData.mainWarehouseCashTjs / rate).toFixed(2)} | для оплаты поставщикам
+                ≈ {filteredData.mainWarehouseStockCostTjs.toLocaleString()} TJS
               </p>
             </div>
 
@@ -520,123 +493,69 @@ export const ReportsPage: React.FC = () => {
               </p>
             </div>
 
-            <div className="p-3 sm:p-4 rounded-xl bg-surface border border-border space-y-1">
-              <div className="flex items-center justify-between text-fg-subtle text-[10px] uppercase">
-                <span>ДОЛГ КЛИЕНТОВ</span>
-                <ArrowUpRight className="w-3.5 h-3.5 text-accent" />
-              </div>
-              <p className="text-base sm:text-lg font-bold text-accent">
-                ${filteredData.totalCustomerDebtUsd.toLocaleString()}
-              </p>
-              <p className="text-[10px] text-fg-subtle">
-                ≈ {filteredData.totalCustomerDebtTjs.toLocaleString()} TJS (нам должны)
-              </p>
-            </div>
           </div>
         </div>
 
-        {/* KPI SECTION 3: BALANCE SHEET & NET WORTH */}
+        {/* RETAIL STORES: current stock/cash plus period sales economics */}
         <div>
           <h4 className="text-[10px] font-bold text-fg-subtle uppercase tracking-wider mb-2 flex items-center space-x-1.5">
-            <Landmark className="w-3.5 h-3.5 text-accent" />
-            <span>БАЛАНС АКТИВОВ И КАПИТАЛИЗАЦИИ БИЗНЕСА</span>
+            <StoreIcon className="w-3.5 h-3.5 text-accent" />
+            <span>МАГАЗИНЫ</span>
+            <span className="text-[9px] font-normal normal-case text-fg-subtle">(остатки и касса сейчас; продажи, себестоимость и прибыль за выбранный период)</span>
           </h4>
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3">
-            {/* Asset 1: Stock Inventory */}
-            <div className="p-3 sm:p-4 rounded-xl bg-surface border border-border space-y-1">
-              <div className="flex items-center justify-between text-fg-subtle text-[10px] uppercase">
-                <span>ТОВАРЫ НА СКЛАДЕ</span>
-                <Smartphone className="w-3.5 h-3.5 text-accent" />
-              </div>
-              <p className="text-base sm:text-lg font-bold text-accent">
-                ${filteredData.inventoryAssetUsd.toLocaleString()}
-              </p>
-              <p className="text-[10px] text-fg-subtle">
-                ≈ {filteredData.inventoryAssetTjs.toLocaleString()} TJS | <strong className="text-fg">{filteredData.inventoryDevicesCount}</strong> шт.
-              </p>
+          {filteredData.storeBreakdown.length === 0 ? (
+            <div className="p-6 rounded-xl bg-surface border border-border text-center text-xs text-fg-subtle">
+              Магазины не найдены
             </div>
+          ) : (
+            <div className="grid grid-cols-1 xl:grid-cols-2 gap-3">
+              {filteredData.storeBreakdown.map(store => (
+                <div key={store.storeId} className="p-3.5 rounded-xl bg-surface border border-border space-y-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <div className="p-2 rounded-lg bg-accent/10 text-accent border border-accent/20">
+                        <StoreIcon className="w-4 h-4" />
+                      </div>
+                      <div className="min-w-0">
+                        <h5 className="text-sm font-bold text-fg truncate">{store.storeName}</h5>
+                        <p className="text-[10px] text-fg-subtle">{store.salesCount} чеков · продано {store.unitsSold} шт.</p>
+                      </div>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <p className="text-[10px] uppercase text-fg-subtle">Касса магазина</p>
+                      <p className="text-sm font-bold text-fg">{store.cashTjs.toLocaleString()} TJS</p>
+                    </div>
+                  </div>
 
-            {/* Asset 2: Retail Store Cash (excludes main warehouse — shown separately above) */}
-            <div className="p-3 sm:p-4 rounded-xl bg-surface border border-border space-y-1">
-              <div className="flex items-center justify-between text-fg-subtle text-[10px] uppercase">
-                <span>КАССЫ МАГАЗИНОВ</span>
-                <StoreIcon className="w-3.5 h-3.5 text-fg-subtle" />
-              </div>
-              <p className="text-base sm:text-lg font-bold text-fg">
-                {filteredData.retailCashTjs.toLocaleString()} TJS
-              </p>
-              <p className="text-[10px] text-fg-subtle">
-                ≈ ${(filteredData.retailCashTjs / rate).toFixed(2)} | розница
-              </p>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    <div className="p-2.5 rounded-lg bg-surface-raised border border-border">
+                      <p className="text-[9px] uppercase text-fg-subtle">Товаров сейчас</p>
+                      <p className="text-sm font-bold text-accent">{store.stockCount} шт.</p>
+                      <p className="text-[9px] text-fg-subtle">${store.stockCostUsd.toLocaleString()} себестоимость</p>
+                    </div>
+                    <div className="p-2.5 rounded-lg bg-surface-raised border border-border">
+                      <p className="text-[9px] uppercase text-fg-subtle">Продано на сумму</p>
+                      <p className="text-sm font-bold text-fg">{store.revenueTjs.toLocaleString()} TJS</p>
+                      <p className="text-[9px] text-fg-subtle">${store.revenueUsd.toLocaleString()}</p>
+                    </div>
+                    <div className="p-2.5 rounded-lg bg-surface-raised border border-border">
+                      <p className="text-[9px] uppercase text-fg-subtle">Себестоимость проданного</p>
+                      <p className="text-sm font-bold text-fg-muted">{store.cogsTjs.toLocaleString()} TJS</p>
+                      <p className="text-[9px] text-fg-subtle">${store.cogsUsd.toLocaleString()}</p>
+                    </div>
+                    <div className="p-2.5 rounded-lg bg-accent/5 border border-accent/30">
+                      <p className="text-[9px] uppercase text-fg-subtle">Прибыль</p>
+                      <p className={`text-sm font-bold ${store.profitTjs >= 0 ? 'text-accent' : 'text-danger'}`}>
+                        {store.profitTjs.toLocaleString()} TJS
+                      </p>
+                      <p className="text-[9px] text-fg-subtle">${store.profitUsd.toLocaleString()}</p>
+                    </div>
+                  </div>
+                </div>
+              ))}
             </div>
-
-            {/* Asset 3: Total cash (warehouse + stores) used in net worth */}
-            <div className="p-3 sm:p-4 rounded-xl bg-surface border border-border space-y-1">
-              <div className="flex items-center justify-between text-fg-subtle text-[10px] uppercase">
-                <span>ВСЕГО НАЛИЧНЫХ</span>
-                <DollarSign className="w-3.5 h-3.5 text-fg-subtle" />
-              </div>
-              <p className="text-base sm:text-lg font-bold text-fg">
-                {filteredData.totalCashRegistersTjs.toLocaleString()} TJS
-              </p>
-              <p className="text-[10px] text-fg-subtle">
-                ≈ ${filteredData.totalCashRegistersUsd.toLocaleString()} | склад + магазины
-              </p>
-            </div>
-
-            {/* Net Worth 4: Business Value */}
-            <div className="p-3 sm:p-4 rounded-xl bg-surface border border-accent/40 space-y-1">
-              <div className="flex items-center justify-between text-accent text-[10px] uppercase font-bold">
-                <span>ЧИСТАЯ СТОИМОСТЬ БИЗНЕСА</span>
-                <ArrowUpRight className="w-3.5 h-3.5 text-accent" />
-              </div>
-              <p className="text-base sm:text-lg font-bold text-accent">
-                ${filteredData.netBusinessValueUsd.toLocaleString()}
-              </p>
-              <p className="text-[10px] text-fg-subtle">
-                ≈ {filteredData.netBusinessValueTjs.toLocaleString()} TJS (Активы − Обязательства)
-              </p>
-            </div>
-          </div>
+          )}
         </div>
-
-        {/* STORE-BY-STORE SALES BREAKDOWN */}
-        {filteredData.storeBreakdown.length > 0 && (
-          <div className="p-3.5 rounded-xl bg-surface border border-border space-y-2.5">
-            <h4 className="text-[10px] font-bold text-fg-subtle uppercase tracking-wider flex items-center space-x-1.5">
-              <StoreIcon className="w-3.5 h-3.5 text-accent" />
-              <span>ПРОДАЖИ ПО МАГАЗИНАМ ЗА ПЕРИОД</span>
-            </h4>
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs">
-                <thead>
-                  <tr className="border-b border-border text-[10px] text-fg-subtle uppercase">
-                    <th className="py-2 px-3">Магазин</th>
-                    <th className="py-2 px-3 text-center">Чеков</th>
-                    <th className="py-2 px-3 text-center">Продано (шт)</th>
-                    <th className="py-2 px-3 text-right">Выручка ($)</th>
-                    <th className="py-2 px-3 text-right">Прибыль ($)</th>
-                    <th className="py-2 px-3 text-right">Касса (TJS)</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border">
-                  {filteredData.storeBreakdown.map((sb) => (
-                    <tr key={sb.storeId} className="hover:bg-surface-raised transition-colors">
-                      <td className="py-2 px-3 font-bold text-fg">{sb.storeName}</td>
-                      <td className="py-2 px-3 text-center text-fg-muted">{sb.salesCount}</td>
-                      <td className="py-2 px-3 text-center text-fg-muted">{sb.unitsSold}</td>
-                      <td className="py-2 px-3 text-right text-fg">${sb.revenueUsd.toLocaleString()}</td>
-                      <td className={`py-2 px-3 text-right font-bold ${sb.profitUsd >= 0 ? 'text-accent' : 'text-danger'}`}>
-                        {sb.profitUsd >= 0 ? '+' : ''}${sb.profitUsd.toLocaleString()}
-                      </td>
-                      <td className="py-2 px-3 text-right text-fg-subtle">{sb.cashTjs.toLocaleString()}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
 
         {/* TOP SUPPLIERS BY DEBT */}
         {filteredData.topSuppliersByDebt.length > 0 && (

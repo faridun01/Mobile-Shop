@@ -94,12 +94,10 @@ interface AppContextType {
   // Business logic operations
   createSale: (params: {
     items: { device: Device; salePriceTjs: number }[];
-    paymentMethod: PaymentMethod;
+    paymentMethod: Exclude<PaymentMethod, 'DEBT'>;
     cashAmountTjs: number;
     cardAmountTjs: number;
     customerName?: string;
-    customerId?: string;
-    customerPhone?: string;
   }) => Promise<{ success: boolean; receiptNumber?: number; message?: string }>;
 
   processExchange: (params: {
@@ -620,7 +618,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // ---- Business operations: call the API, then resync from it ----
 
-  const createSale: AppContextType['createSale'] = async ({ items, paymentMethod, cashAmountTjs, cardAmountTjs, customerName, customerId, customerPhone }) => {
+  const createSale: AppContextType['createSale'] = async ({ items, paymentMethod, cashAmountTjs, cardAmountTjs, customerName }) => {
     // Trust the actual location of the devices in the cart over the (possibly stale,
     // shared-across-pages) selectedStoreId — e.g. an admin who last picked the main
     // warehouse on the Inventory page must not have that leak into a POS sale here.
@@ -639,8 +637,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           cashAmountTjs,
           cardAmountTjs,
           customerName: customerName?.trim() || undefined,
-          customerId,
-          customerPhone: customerPhone?.trim() || undefined,
         }),
       });
       await refetchAll();

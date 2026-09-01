@@ -78,8 +78,7 @@ export type PageId =
   | 'REPORTS'
   | 'AUDIT_LOG'
   | 'SETTINGS'
-  | 'NOTIFICATIONS'
-  | 'CUSTOMERS';
+  | 'NOTIFICATIONS';
 
 export interface User {
   id: string;
