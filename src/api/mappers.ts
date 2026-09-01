@@ -104,6 +104,7 @@ function mapExchangeEvent(e: any, names: NameLookup): ExchangeEvent {
     paymentMethod: e.paymentMethod ?? undefined,
     cashAmountTjs: e.cashAmountTjs ?? undefined,
     cardAmountTjs: e.cardAmountTjs ?? undefined,
+    exchangeRate: e.exchangeRate,
     processedBy: names.get(e.processedByUserId) || e.processedByUserId,
   };
 }
@@ -235,6 +236,7 @@ export function mapSupplierInvoice(inv: any): SupplierInvoice {
     supplierName: inv.supplier?.name ?? '',
     date: inv.date,
     totalAmountUsd: inv.totalAmountUsd,
+    exchangeRate: inv.exchangeRate,
     paidAmountUsd: inv.paidAmountUsd,
     remainingAmountUsd: inv.remainingAmountUsd,
     status: inv.status,
@@ -266,6 +268,7 @@ export function mapSupplierBonus(b: any): SupplierBonus {
     campaignTitle: b.campaignTitle ?? undefined,
     bonusType: b.bonusType,
     amountUsd: b.amountUsd ?? undefined,
+    exchangeRate: b.exchangeRate,
     deviceId: first?.deviceId ?? undefined,
     imei: first?.imei ?? undefined,
     brand: first?.brand ?? undefined,
@@ -330,6 +333,7 @@ export function mapOwnerTransaction(t: any, ownerNames: NameLookup, userNames: N
     ownerName: ownerNames.get(t.ownerId) || '',
     type: t.type,
     amountUsd: t.amountUsd,
+    exchangeRate: t.exchangeRate,
     date: t.createdAt,
     sourceOrDestination: t.sourceOrDestination ?? '',
     createdByName: userNames.get(t.createdByUserId) || t.createdByUserId,

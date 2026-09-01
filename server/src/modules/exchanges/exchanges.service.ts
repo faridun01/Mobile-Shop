@@ -151,6 +151,7 @@ export class ExchangesService {
                 paymentMethod,
                 cashAmountTjs,
                 cardAmountTjs,
+                exchangeRate: rate,
                 processedByUserId: actor.id,
               },
             ],

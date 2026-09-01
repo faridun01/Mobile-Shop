@@ -64,12 +64,13 @@ export function exportSalesReport(sales: Sale[], rate: number = 9.5) {
   sales.forEach((sale) => {
     const isRefunded = sale.status === 'REFUNDED';
     const dateFormatted = new Date(sale.date).toLocaleString('ru-RU');
+    const operationRate = sale.exchangeRate || rate;
 
     sale.items.forEach((item) => {
       totalUnits += 1;
       const costUsd = item.costBasisUsd || 0;
-      const priceUsd = item.salePriceUsd || +(item.salePriceTjs / rate).toFixed(2);
-      const priceTjs = item.salePriceTjs || +(item.salePriceUsd * rate).toFixed(2);
+      const priceUsd = item.salePriceUsd || +(item.salePriceTjs / operationRate).toFixed(2);
+      const priceTjs = item.salePriceTjs || +(item.salePriceUsd * operationRate).toFixed(2);
       const profitUsd = +(priceUsd - costUsd).toFixed(2);
 
       if (!isRefunded) {
@@ -349,4 +350,3 @@ export function exportAuditLogsReport(logs: any[]) {
   const fileName = `otchet_audit_log_${new Date().toISOString().split('T')[0]}.csv`;
   downloadCsv(csvContent, fileName);
 }
-

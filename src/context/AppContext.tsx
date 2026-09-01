@@ -28,6 +28,7 @@ import { useAuthStore } from '../stores/useAuthStore';
 import { useUIStore } from '../stores/useUIStore';
 import { apiClient } from '../api/client';
 import { useRealtimeSync } from '../hooks/useRealtimeSync';
+import { getBusinessDateKey } from '../utils/businessDate';
 import {
   buildNameLookup,
   mapDevice,
@@ -375,7 +376,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setIsRateModalOpen(false);
       return;
     }
-    const todayStr = new Date().toISOString().split('T')[0];
+    const todayStr = getBusinessDateKey();
     if (!rate || rate.date !== todayStr || !rate.rate || rate.rate <= 0) {
       setIsRateModalOpen(true);
     } else {
@@ -498,8 +499,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const raw = await apiClient<any>('/exchange-rate/today');
     const mapped = mapDailyRate(raw);
     setTodayRateState(mapped);
+    checkRatePrompt(mapped);
     return mapped;
-  }, []);
+  }, [checkRatePrompt]);
 
   const refetchInFlight = useRef<Promise<void> | null>(null);
   const refetchAll = useCallback(() => {
@@ -525,9 +527,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setIsInitialLoading(true);
 
     Promise.all([fetchUsers(), fetchStores(), fetchDevices(), fetchExchangeRate()])
-      .then(([_, __, ___, rate]) => {
+      .then(() => {
         setIsInitialLoading(false);
-        if (rate) checkRatePrompt(rate);
         // Secondary data loads in background
         return Promise.all([
           fetchSales(),

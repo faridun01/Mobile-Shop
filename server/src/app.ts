@@ -20,6 +20,7 @@ import { registerExchangeRateRoutes } from './modules/exchange-rate/exchange-rat
 import { registerStoreRoutes } from './modules/stores/stores.routes';
 import { registerCustomerRoutes } from './modules/customers/customers.routes';
 import { requirePositiveMoney } from './common/money';
+import { requireTodayRate } from './modules/exchange-rate/exchange-rate.service';
 
 export const app = express();
 
@@ -152,6 +153,7 @@ app.post('/api/purchases', authenticateJwt, requireRoles('ADMIN', 'PARTNER'), en
     }
 
     const result = await prisma.$transaction(async (transaction: Prisma.TransactionClient) => {
+      const exchangeRate = await requireTodayRate(transaction);
       const supplier = await transaction.supplier.findUnique({ where: { id: supplierId } });
       const store = await transaction.store.findUnique({ where: { id: storeId } });
       if (!supplier || !store || !supplier.active || !store.active) throw new Error('Поставщик или магазин не найден либо неактивен');
@@ -210,6 +212,7 @@ app.post('/api/purchases', authenticateJwt, requireRoles('ADMIN', 'PARTNER'), en
           supplierId,
           date: date ? new Date(date) : new Date(),
           totalAmountUsd,
+          exchangeRate,
           devicesCount: normalizedDevices.length,
           isStorePurchase: !store.isMainWarehouse,
           storeId,
@@ -251,6 +254,7 @@ app.post('/api/purchases', authenticateJwt, requireRoles('ADMIN', 'PARTNER'), en
           type: 'PURCHASE',
           description: `Приход по накладной ${invoice.invoiceNumber} (${supplier.name}): ${devices.length} устройств`,
           amountUsd: totalAmountUsd,
+          exchangeRate,
           storeId,
           storeName: store.name,
           referenceId: invoice.id,
@@ -263,6 +267,7 @@ app.post('/api/purchases', authenticateJwt, requireRoles('ADMIN', 'PARTNER'), en
           userRole: req.user!.role,
           action: 'PURCHASE',
           details: `Создан приход по накладной ${invoice.invoiceNumber} (${supplier.name}): ${devices.length} устройств, сумма $${totalAmountUsd}`,
+          financialDetails: { amountUsd: totalAmountUsd, exchangeRate },
         },
       });
 

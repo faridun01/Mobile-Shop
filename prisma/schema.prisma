@@ -274,6 +274,7 @@ model ExchangeEvent {
   paymentMethod       PaymentMethod?
   cashAmountTjs       Float?
   cardAmountTjs       Float?
+  exchangeRate        Float
   processedByUserId   String
 
   sale Sale @relation(fields: [saleId], references: [id], onDelete: Cascade)
@@ -306,6 +307,7 @@ model SupplierInvoice {
   supplierId      String
   date            DateTime @default(now())
   totalAmountUsd  Float
+  exchangeRate    Float
   paidAmountUsd   Float    @default(0)
   devicesCount    Int      @default(0)
   isStorePurchase Boolean  @default(false)
@@ -343,6 +345,7 @@ model SupplierPayment {
   id              String   @id @default(uuid())
   supplierId      String
   amountUsd       Float
+  exchangeRate    Float
   sourceAccount   String
   storeId         String?
   createdByUserId String
@@ -388,6 +391,7 @@ model CustomerPayment {
   id              String   @id @default(uuid())
   customerId      String
   amountTjs       Float
+  exchangeRate    Float
   sourceAccount   String
   storeId         String?
   createdByUserId String
@@ -420,6 +424,7 @@ model SupplierBonus {
   campaignTitle String?
   bonusType     BonusType
   amountUsd     Float?
+  exchangeRate  Float
   status        String?
   dateReceived  DateTime  @default(now())
   createdAt     DateTime  @default(now())
@@ -583,6 +588,7 @@ model OwnerTransaction {
   ownerId             String
   type                OwnerTransactionType
   amountUsd           Float
+  exchangeRate        Float
   sourceOrDestination String?
   createdByUserId     String
   note                String?

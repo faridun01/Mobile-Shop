@@ -2,6 +2,7 @@ import { prisma } from '../../prisma/prisma.service';
 import type { Prisma } from '@prisma/client';
 import { resolveActor } from '../../common/actor';
 import { requireNonNegativeMoney, requirePositiveMoney, roundMoney } from '../../common/money';
+import { requireTodayRate } from '../exchange-rate/exchange-rate.service';
 
 /** True if any of these devices has a sale, transfer, or repair record referencing it (hard FK, no cascade). */
 async function deviceHasTransactionHistory(tx: Prisma.TransactionClient, deviceIds: string[]): Promise<boolean> {
@@ -47,6 +48,7 @@ export class SuppliersService {
 
     return prisma.$transaction(async (tx) => {
       const actor = await resolveActor(tx, input.createdByUserId);
+      const exchangeRate = await requireTodayRate(tx);
       const supplier = await tx.supplier.findUnique({ where: { id: input.supplierId } });
       if (!supplier) throw new Error('Поставщик не найден');
       if (amountUsd > supplier.totalDebtUsd + 0.01) throw new Error('Сумма оплаты превышает задолженность поставщику');
@@ -63,6 +65,7 @@ export class SuppliersService {
         data: {
           supplierId: input.supplierId,
           amountUsd,
+          exchangeRate,
           sourceAccount: input.sourceAccount,
           storeId: input.storeId,
           createdByUserId: actor.id,
@@ -100,10 +103,7 @@ export class SuppliersService {
           // warehouse's account — purchases (приходы) are recorded there and its
           // balance is meant to fund paying those suppliers back, not just retail stores.
           // amountUsd was collected in USD terms but store registers hold TJS; convert via today's rate if available.
-          const today = new Date().toISOString().split('T')[0];
-          const rate = (await tx.exchangeRate.findUnique({ where: { date: today } }))?.rate;
-          if (!rate) throw new Error('Сначала задайте курс валют на сегодня');
-          const cashAmountTjs = roundMoney(amountUsd * rate);
+          const cashAmountTjs = roundMoney(amountUsd * exchangeRate);
           const cashGuard = await tx.store.updateMany({ where: { id: input.storeId, cashBalanceTjs: { gte: cashAmountTjs } }, data: { cashBalanceTjs: { decrement: cashAmountTjs } } });
           if (cashGuard.count !== 1) throw new Error('В кассе недостаточно наличных для оплаты поставщику');
         }
@@ -114,6 +114,7 @@ export class SuppliersService {
           type: 'SUPPLIER_PAYMENT',
           description: `Выплата поставщику ${supplier.name}: $${amountUsd}`,
           amountUsd: -amountUsd,
+          exchangeRate,
           storeId: input.storeId,
           storeName: store?.name,
           userName: actor.name,
@@ -130,7 +131,7 @@ export class SuppliersService {
           details: `Проведена оплата поставщику ${supplier.name} на сумму $${amountUsd}. Распределено по FIFO: ${allocations
             .map((a) => `${a.invoiceNumber} ($${a.allocatedAmountUsd})`)
             .join(', ')}`,
-          financialDetails: { amountUsd },
+          financialDetails: { amountUsd, exchangeRate },
           targetId: payment.id,
         },
       });
@@ -147,6 +148,7 @@ export class SuppliersService {
 
     return prisma.$transaction(async (tx) => {
       const actor = await resolveActor(tx, input.createdByUserId);
+      const exchangeRate = await requireTodayRate(tx);
       const invoice = await tx.supplierInvoice.findUnique({ where: { id: input.invoiceId } });
       if (!invoice) throw new Error('Накладная не найдена');
       const supplier = await tx.supplier.findUnique({ where: { id: invoice.supplierId } });
@@ -159,6 +161,7 @@ export class SuppliersService {
         data: {
           supplierId: invoice.supplierId,
           amountUsd,
+          exchangeRate,
           sourceAccount: input.sourceAccount,
           storeId: input.storeId,
           createdByUserId: actor.id,
@@ -188,10 +191,7 @@ export class SuppliersService {
       if (input.sourceAccount === 'STORE_CASH' && input.storeId) {
         store = await tx.store.findUnique({ where: { id: input.storeId } });
         if (store) {
-          const today = new Date().toISOString().split('T')[0];
-          const rate = (await tx.exchangeRate.findUnique({ where: { date: today } }))?.rate;
-          if (!rate) throw new Error('Сначала задайте курс валют на сегодня');
-          const cashAmountTjs = roundMoney(amountUsd * rate);
+          const cashAmountTjs = roundMoney(amountUsd * exchangeRate);
           const cashGuard = await tx.store.updateMany({ where: { id: input.storeId, cashBalanceTjs: { gte: cashAmountTjs } }, data: { cashBalanceTjs: { decrement: cashAmountTjs } } });
           if (cashGuard.count !== 1) throw new Error('В кассе недостаточно наличных для оплаты поставщику');
         }
@@ -202,6 +202,7 @@ export class SuppliersService {
           type: 'SUPPLIER_PAYMENT',
           description: `Выплата поставщику ${supplier.name} по накладной ${invoice.invoiceNumber}: $${amountUsd}`,
           amountUsd: -amountUsd,
+          exchangeRate,
           storeId: input.storeId,
           storeName: store?.name,
           userName: actor.name,
@@ -216,7 +217,7 @@ export class SuppliersService {
           userRole: actor.role,
           action: 'SUPPLIER_PAYMENT',
           details: `Проведена оплата поставщику ${supplier.name} по накладной ${invoice.invoiceNumber} на сумму $${amountUsd}`,
-          financialDetails: { amountUsd },
+          financialDetails: { amountUsd, exchangeRate },
           targetId: payment.id,
         },
       });
@@ -228,6 +229,7 @@ export class SuppliersService {
   public static async createBonus(input: SupplierBonusInput) {
     return prisma.$transaction(async (tx) => {
       const actor = await resolveActor(tx, input.createdByUserId);
+      const exchangeRate = await requireTodayRate(tx);
       const supplier = await tx.supplier.findUnique({ where: { id: input.supplierId } });
       if (!supplier) throw new Error('Поставщик не найден');
       if (!['FREE_DEVICES', 'CASH_DISCOUNT'].includes(input.bonusType)) throw new Error('Некорректный тип бонуса');
@@ -239,6 +241,7 @@ export class SuppliersService {
           campaignTitle: input.campaignTitle,
           bonusType: input.bonusType,
           amountUsd: input.amountUsd,
+          exchangeRate,
           status: 'IN_STOCK',
         },
       });
@@ -290,6 +293,7 @@ export class SuppliersService {
             type: 'SUPPLIER_BONUS',
             description: `Денежный бонус от ${supplier.name}: +$${input.amountUsd}`,
             amountUsd: input.amountUsd,
+            exchangeRate,
             userName: actor.name,
             referenceId: bonus.id,
           },
@@ -303,6 +307,7 @@ export class SuppliersService {
           userRole: actor.role,
           action: 'SUPPLIER_BONUS',
           details: `Зафиксирован бонус от ${supplier.name}${input.amountUsd ? `: $${input.amountUsd}` : ''}`,
+          financialDetails: input.amountUsd ? { amountUsd: input.amountUsd, exchangeRate } : { exchangeRate },
           targetId: bonus.id,
         },
       });

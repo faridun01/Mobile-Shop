@@ -235,7 +235,7 @@ export const BonusesPage: React.FC = () => {
                   {bonus.bonusType === 'CASH_DISCOUNT' ? (
                     <div>
                       <span className="text-sm font-bold text-accent block">+${bonus.amountUsd} USD</span>
-                      <span className="text-[11px] text-accent font-bold block">≈ {Math.round((bonus.amountUsd || 0) * rate)} TJS</span>
+                      <span className="text-[11px] text-accent font-bold block">≈ {Math.round((bonus.amountUsd || 0) * bonus.exchangeRate)} TJS · курс {bonus.exchangeRate}</span>
                     </div>
                   ) : (
                     <span className="text-xs font-semibold text-warning block">

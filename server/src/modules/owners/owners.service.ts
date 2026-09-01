@@ -1,22 +1,24 @@
 import { prisma } from '../../prisma/prisma.service';
 import { resolveActor } from '../../common/actor';
 import { requirePositiveMoney, requireNonNegativeMoney } from '../../common/money';
+import { requireTodayRate } from '../exchange-rate/exchange-rate.service';
 
 export class OwnersService {
   public static async investment(ownerId: string, amountUsd: number, destination: string, note: string | undefined, userId: string) {
     amountUsd = requirePositiveMoney(amountUsd, 'Сумма инвестиции');
     return prisma.$transaction(async (tx) => {
       const actor = await resolveActor(tx, userId);
+      const exchangeRate = await requireTodayRate(tx);
       const owner = await tx.owner.findUnique({ where: { id: ownerId } });
       if (!owner) throw new Error('Владелец не найден');
 
       const updated = await tx.owner.update({ where: { id: ownerId }, data: { capitalBalanceUsd: { increment: amountUsd } } });
       await tx.ownerTransaction.create({
-        data: { ownerId, type: 'INVESTMENT', amountUsd, sourceOrDestination: destination, createdByUserId: actor.id, note },
+        data: { ownerId, type: 'INVESTMENT', amountUsd, exchangeRate, sourceOrDestination: destination, createdByUserId: actor.id, note },
       });
-      await tx.ledgerEntry.create({ data: { type: 'OWNER_INVESTMENT', description: `${owner.name} вложил $${amountUsd} в капитал (${destination})`, amountUsd, userName: actor.name } });
+      await tx.ledgerEntry.create({ data: { type: 'OWNER_INVESTMENT', description: `${owner.name} вложил $${amountUsd} в капитал (${destination})`, amountUsd, exchangeRate, userName: actor.name } });
       await tx.auditLog.create({
-        data: { userId: actor.id, userName: actor.name, userRole: actor.role, action: 'OWNER_INVESTMENT', details: `${owner.name} вложил $${amountUsd} в капитал (${destination})`, financialDetails: { amountUsd } },
+        data: { userId: actor.id, userName: actor.name, userRole: actor.role, action: 'OWNER_INVESTMENT', details: `${owner.name} вложил $${amountUsd} в капитал (${destination})`, financialDetails: { amountUsd, exchangeRate } },
       });
       return updated;
     }, { maxWait: 10000, timeout: 25000 });
@@ -26,17 +28,18 @@ export class OwnersService {
     amountUsd = requirePositiveMoney(amountUsd, 'Сумма изъятия');
     return prisma.$transaction(async (tx) => {
       const actor = await resolveActor(tx, userId);
+      const exchangeRate = await requireTodayRate(tx);
       const owner = await tx.owner.findUnique({ where: { id: ownerId } });
       if (!owner) throw new Error('Владелец не найден');
       const guard = await tx.owner.updateMany({ where: { id: ownerId, capitalBalanceUsd: { gte: amountUsd } }, data: { capitalBalanceUsd: { decrement: amountUsd } } });
       if (guard.count !== 1) throw new Error('Сумма изъятия превышает текущий капитал');
       const updated = await tx.owner.findUniqueOrThrow({ where: { id: ownerId } });
       await tx.ownerTransaction.create({
-        data: { ownerId, type: 'WITHDRAWAL', amountUsd, sourceOrDestination: source, createdByUserId: actor.id, note },
+        data: { ownerId, type: 'WITHDRAWAL', amountUsd, exchangeRate, sourceOrDestination: source, createdByUserId: actor.id, note },
       });
-      await tx.ledgerEntry.create({ data: { type: 'OWNER_CAPITAL_WITHDRAWAL', description: `${owner.name} изъял $${amountUsd} из капитала`, amountUsd: -amountUsd, userName: actor.name } });
+      await tx.ledgerEntry.create({ data: { type: 'OWNER_CAPITAL_WITHDRAWAL', description: `${owner.name} изъял $${amountUsd} из капитала`, amountUsd: -amountUsd, exchangeRate, userName: actor.name } });
       await tx.auditLog.create({
-        data: { userId: actor.id, userName: actor.name, userRole: actor.role, action: 'OWNER_WITHDRAWAL', details: `${owner.name} изъял $${amountUsd} из капитала`, financialDetails: { amountUsd } },
+        data: { userId: actor.id, userName: actor.name, userRole: actor.role, action: 'OWNER_WITHDRAWAL', details: `${owner.name} изъял $${amountUsd} из капитала`, financialDetails: { amountUsd, exchangeRate } },
       });
       return updated;
     }, { maxWait: 10000, timeout: 25000 });
@@ -46,6 +49,7 @@ export class OwnersService {
     amountUsd = requirePositiveMoney(amountUsd, 'Сумма выплаты');
     return prisma.$transaction(async (tx) => {
       const actor = await resolveActor(tx, userId);
+      const exchangeRate = await requireTodayRate(tx);
       const owner = await tx.owner.findUnique({ where: { id: ownerId } });
       if (!owner) throw new Error('Владелец не найден');
       const guard = await tx.owner.updateMany({
@@ -55,11 +59,11 @@ export class OwnersService {
       if (guard.count !== 1) throw new Error('Сумма выплаты превышает доступную прибыль');
       const updated = await tx.owner.findUniqueOrThrow({ where: { id: ownerId } });
       await tx.ownerTransaction.create({
-        data: { ownerId, type: 'PROFIT_PAYOUT', amountUsd, sourceOrDestination: source, createdByUserId: actor.id, note },
+        data: { ownerId, type: 'PROFIT_PAYOUT', amountUsd, exchangeRate, sourceOrDestination: source, createdByUserId: actor.id, note },
       });
-      await tx.ledgerEntry.create({ data: { type: 'OWNER_PROFIT_PAYOUT', description: `Выплачена прибыль ${owner.name}: $${amountUsd}`, amountUsd: -amountUsd, userName: actor.name } });
+      await tx.ledgerEntry.create({ data: { type: 'OWNER_PROFIT_PAYOUT', description: `Выплачена прибыль ${owner.name}: $${amountUsd}`, amountUsd: -amountUsd, exchangeRate, userName: actor.name } });
       await tx.auditLog.create({
-        data: { userId: actor.id, userName: actor.name, userRole: actor.role, action: 'PROFIT_PAYOUT', details: `Выплачена прибыль ${owner.name}: $${amountUsd}`, financialDetails: { amountUsd } },
+        data: { userId: actor.id, userName: actor.name, userRole: actor.role, action: 'PROFIT_PAYOUT', details: `Выплачена прибыль ${owner.name}: $${amountUsd}`, financialDetails: { amountUsd, exchangeRate } },
       });
       return updated;
     }, { maxWait: 10000, timeout: 25000 });
@@ -69,6 +73,7 @@ export class OwnersService {
     amountUsd = requirePositiveMoney(amountUsd, 'Сумма реинвестирования');
     return prisma.$transaction(async (tx) => {
       const actor = await resolveActor(tx, userId);
+      const exchangeRate = await requireTodayRate(tx);
       const owner = await tx.owner.findUnique({ where: { id: ownerId } });
       if (!owner) throw new Error('Владелец не найден');
       const guard = await tx.owner.updateMany({
@@ -78,11 +83,11 @@ export class OwnersService {
       if (guard.count !== 1) throw new Error('Сумма реинвестирования превышает доступную прибыль');
       const updated = await tx.owner.findUniqueOrThrow({ where: { id: ownerId } });
       await tx.ownerTransaction.create({
-        data: { ownerId, type: 'REINVEST', amountUsd, createdByUserId: actor.id, note },
+        data: { ownerId, type: 'REINVEST', amountUsd, exchangeRate, createdByUserId: actor.id, note },
       });
-      await tx.ledgerEntry.create({ data: { type: 'OWNER_REINVESTMENT', description: `${owner.name} реинвестировал $${amountUsd} доступной прибыли в капитал`, amountUsd, userName: actor.name } });
+      await tx.ledgerEntry.create({ data: { type: 'OWNER_REINVESTMENT', description: `${owner.name} реинвестировал $${amountUsd} доступной прибыли в капитал`, amountUsd, exchangeRate, userName: actor.name } });
       await tx.auditLog.create({
-        data: { userId: actor.id, userName: actor.name, userRole: actor.role, action: 'REINVEST', details: `${owner.name} реинвестировал $${amountUsd} доступной прибыли в капитал`, financialDetails: { amountUsd } },
+        data: { userId: actor.id, userName: actor.name, userRole: actor.role, action: 'REINVEST', details: `${owner.name} реинвестировал $${amountUsd} доступной прибыли в капитал`, financialDetails: { amountUsd, exchangeRate } },
       });
       return updated;
     }, { maxWait: 10000, timeout: 25000 });

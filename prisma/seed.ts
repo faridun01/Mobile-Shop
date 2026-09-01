@@ -1,5 +1,6 @@
 import { prisma } from '../server/src/prisma/prisma.service.js';
 import { AuthService } from '../server/src/auth/auth.service.js';
+import { getBusinessDateKey } from '../server/src/modules/exchange-rate/exchange-rate.service.js';
 
 const STORE_SEEDS = [
   { id: 'main-warehouse', name: 'Главный склад', isMainWarehouse: true },
@@ -81,7 +82,7 @@ async function main() {
     });
   }
 
-  const todayStr = new Date().toISOString().split('T')[0];
+  const todayStr = getBusinessDateKey();
   const adminUser = await prisma.user.findFirst({ where: { role: 'ADMIN' } });
   await prisma.exchangeRate.upsert({
     where: { date: todayStr },

@@ -4,6 +4,7 @@ import { DollarSign, Clock } from 'lucide-react';
 import { Dialog } from '../ui/Dialog';
 import { Button } from '../ui/Button';
 import { FormField } from '../ui/FormField';
+import { getBusinessDateKey } from '../../utils/businessDate';
 
 interface DailyRateModalProps {
   isOpen: boolean;
@@ -12,7 +13,7 @@ interface DailyRateModalProps {
 
 export const DailyRateModal: React.FC<DailyRateModalProps> = ({ isOpen, onClose }) => {
   const { todayRate, setDailyRate, currentUser } = useApp();
-  const todayStr = new Date().toISOString().split('T')[0];
+  const todayStr = getBusinessDateKey();
   const isRateSetForToday = todayRate && todayRate.date === todayStr && todayRate.rate > 0;
   // Only ADMIN/PARTNER can actually set the rate (server-enforced) — a SELLER can't act
   // on this, so blocking them behind a non-dismissable modal would be a dead end.

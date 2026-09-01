@@ -1,6 +1,7 @@
 import { prisma } from '../../prisma/prisma.service';
 import { resolveActor } from '../../common/actor';
-import { requirePositiveMoney } from '../../common/money';
+import { requirePositiveMoney, roundMoney } from '../../common/money';
+import { requireTodayRate } from '../exchange-rate/exchange-rate.service';
 
 export interface PayCustomerInput {
   customerId: string;
@@ -26,6 +27,8 @@ export class CustomersService {
 
     return prisma.$transaction(async (tx) => {
       const actor = await resolveActor(tx, input.createdByUserId);
+      const exchangeRate = await requireTodayRate(tx);
+      const amountUsd = roundMoney(amountTjs / exchangeRate);
       const customer = await tx.customer.findUnique({ where: { id: input.customerId } });
       if (!customer) throw new Error('Клиент не найден');
       if (amountTjs > customer.totalDebtTjs + 0.01) throw new Error('Сумма оплаты превышает задолженность клиента');
@@ -42,6 +45,7 @@ export class CustomersService {
         data: {
           customerId: input.customerId,
           amountTjs,
+          exchangeRate,
           sourceAccount: input.sourceAccount,
           storeId: input.storeId,
           createdByUserId: actor.id,
@@ -85,6 +89,8 @@ export class CustomersService {
           type: 'CUSTOMER_PAYMENT',
           description: `Оплата долга от клиента ${customer.name}: ${amountTjs} TJS`,
           amountTjs,
+          amountUsd,
+          exchangeRate,
           storeId: input.storeId,
           storeName: store?.name,
           userName: actor.name,
@@ -101,7 +107,7 @@ export class CustomersService {
           details: `Принята оплата долга от клиента ${customer.name} на сумму ${amountTjs} TJS. Погашено по чекам: ${allocations
             .map((a) => `#${a.receiptNumber} (${a.allocatedAmountTjs})`)
             .join(', ')}`,
-          financialDetails: { amountTjs },
+          financialDetails: { amountTjs, amountUsd, exchangeRate },
           targetId: payment.id,
         },
       });

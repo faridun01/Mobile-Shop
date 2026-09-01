@@ -176,6 +176,7 @@ export interface ExchangeEvent {
   paymentMethod?: PaymentMethod;
   cashAmountTjs?: number;
   cardAmountTjs?: number;
+  exchangeRate: number;
   processedBy: string;
 }
 
@@ -284,6 +285,7 @@ export interface SupplierInvoice {
   supplierName: string;
   date: string;
   totalAmountUsd: number;
+  exchangeRate: number;
   paidAmountUsd: number;
   remainingAmountUsd: number;
   status: 'PAID' | 'PARTIALLY_PAID' | 'UNPAID';
@@ -298,6 +300,7 @@ export interface SupplierPayment {
   supplierId: string;
   supplierName: string;
   amountUsd: number;
+  exchangeRate: number;
   sourceAccount: 'MAIN_ACCOUNT' | 'STORE_CASH';
   storeId?: string;
   date: string;
@@ -334,6 +337,7 @@ export interface CustomerPayment {
   id: string;
   customerId: string;
   amountTjs: number;
+  exchangeRate: number;
   sourceAccount: 'MAIN_ACCOUNT' | 'STORE_CASH';
   storeId?: string;
   date: string;
@@ -352,6 +356,7 @@ export interface SupplierBonus {
   campaignTitle?: string;
   bonusType?: 'FREE_DEVICES' | 'CASH_DISCOUNT';
   amountUsd?: number;
+  exchangeRate: number;
   deviceId?: string;
   imei?: string;
   brand?: string;
@@ -412,6 +417,7 @@ export interface OwnerTransaction {
   ownerName: string;
   type: 'INVESTMENT' | 'WITHDRAWAL' | 'PROFIT_PAYOUT' | 'REINVEST';
   amountUsd: number;
+  exchangeRate: number;
   date: string;
   sourceOrDestination: string;
   createdByName: string;

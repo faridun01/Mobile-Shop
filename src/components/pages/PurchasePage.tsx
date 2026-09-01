@@ -664,7 +664,7 @@ export const PurchasePage: React.FC = () => {
                         {inv.totalAmountUsd === 0 ? '$0 (БОНУС)' : `$${(inv.totalAmountUsd || 0).toLocaleString()}`}
                         {inv.totalAmountUsd > 0 && (
                           <span className="text-[10px] text-fg-subtle font-normal ml-1">
-                            (~{Math.round((inv.totalAmountUsd || 0) * rate).toLocaleString()} TJS)
+                            (~{Math.round((inv.totalAmountUsd || 0) * inv.exchangeRate).toLocaleString()} TJS, курс {inv.exchangeRate})
                           </span>
                         )}
                       </div>

@@ -710,7 +710,7 @@ export const OwnersPage: React.FC = () => {
                 const isDeposit = tx.type === 'INVESTMENT';
                 const isReinvest = tx.type === 'REINVEST';
                 const isPayout = tx.type === 'PROFIT_PAYOUT';
-                const tjsVal = Math.round((tx.amountUsd || 0) * rate);
+                const tjsVal = Math.round((tx.amountUsd || 0) * tx.exchangeRate);
 
                 return (
                   <div
@@ -765,7 +765,7 @@ export const OwnersPage: React.FC = () => {
                         {isDeposit ? '+' : '-'}${tx.amountUsd?.toLocaleString()} USD
                       </span>
                       <span className="text-[10px] text-fg-subtle block">
-                        ≈ {isDeposit ? '+' : '-'}{tjsVal.toLocaleString()} TJS
+                        ≈ {isDeposit ? '+' : '-'}{tjsVal.toLocaleString()} TJS · курс {tx.exchangeRate}
                       </span>
                     </div>
                   </div>

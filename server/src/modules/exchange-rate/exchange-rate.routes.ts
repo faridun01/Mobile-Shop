@@ -1,13 +1,13 @@
 import type { Express } from 'express';
 import { authenticateJwt, requireRoles, type AuthenticatedRequest } from '../../auth/auth.middleware';
 import { prisma } from '../../prisma/prisma.service';
-import { setTodayRate } from './exchange-rate.service';
+import { getBusinessDateKey, setTodayRate } from './exchange-rate.service';
 import { RealtimeSyncGateway } from '../../websocket/websocket.gateway';
 
 export function registerExchangeRateRoutes(app: Express) {
   app.get('/api/exchange-rate/today', authenticateJwt, async (_req, res, next) => {
     try {
-      const today = new Date().toISOString().split('T')[0];
+      const today = getBusinessDateKey();
       const rate = await prisma.exchangeRate.findUnique({ where: { date: today } });
       res.json(rate);
     } catch (error) {
@@ -23,7 +23,7 @@ export function registerExchangeRateRoutes(app: Express) {
         return;
       }
 
-      const before = await prisma.exchangeRate.findUnique({ where: { date: new Date().toISOString().split('T')[0] } });
+      const before = await prisma.exchangeRate.findUnique({ where: { date: getBusinessDateKey() } });
       const result = await setTodayRate(rate, req.user!.userId);
 
       await prisma.auditLog.create({

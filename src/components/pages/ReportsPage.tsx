@@ -14,6 +14,7 @@ import {
   Landmark
 } from 'lucide-react';
 import { exportSalesReport, exportInventoryReport, exportExpensesReport, exportRepairsReport } from '../../utils/exportReports';
+import { getBusinessDateKey } from '../../utils/businessDate';
 
 export const ReportsPage: React.FC = () => {
   const {
@@ -38,7 +39,7 @@ export const ReportsPage: React.FC = () => {
 
   // Filtered dataset & financial calculations
   const filteredData = useMemo(() => {
-    const todayStr = new Date().toISOString().split('T')[0];
+    const todayStr = getBusinessDateKey();
     const currentMonthStr = new Date().toISOString().substring(0, 7);
 
     // 1. Sales filtering (exclude refunded sales)
@@ -72,6 +73,8 @@ export const ReportsPage: React.FC = () => {
     // Revenue, COGS, Gross Profit in USD
     let revenueUsd = 0;
     let cogsUsd = 0;
+    let historicalRevenueTjs = 0;
+    let historicalCogsTjs = 0;
     let unitsSold = 0;
     const modelCounts: Record<string, { count: number; revenueUsd: number; cogsUsd: number; profitUsd: number }> = {};
 
@@ -79,6 +82,7 @@ export const ReportsPage: React.FC = () => {
       const saleRate = sale.exchangeRate || rate;
       const saleRevenueUsd = sale.totalUsd || +(sale.totalTjs / saleRate).toFixed(2);
       revenueUsd += saleRevenueUsd;
+      historicalRevenueTjs += sale.totalTjs;
 
       // The server persists recognized profit because an exchanged sale cannot be
       // reconstructed from only the current SaleItem: the returned phone is back in
@@ -86,6 +90,7 @@ export const ReportsPage: React.FC = () => {
       const fallbackCostUsd = sale.items.reduce((sum, item) => sum + (item.costBasisUsd || item.purchaseCostUsd || 0), 0);
       const saleProfitUsd = sale.recognizedProfitUsd ?? (saleRevenueUsd - fallbackCostUsd);
       cogsUsd += saleRevenueUsd - saleProfitUsd;
+      historicalCogsTjs += (saleRevenueUsd - saleProfitUsd) * saleRate;
 
       sale.items.forEach(item => {
         unitsSold++;
@@ -106,9 +111,9 @@ export const ReportsPage: React.FC = () => {
 
     const grossProfitUsd = +(revenueUsd - cogsUsd).toFixed(2);
     const totalRevenueUsd = +revenueUsd.toFixed(2);
-    const revenueTjs = Math.round(totalRevenueUsd * rate);
-    const cogsTjs = Math.round(cogsUsd * rate);
-    const grossProfitTjs = Math.round(grossProfitUsd * rate);
+    const revenueTjs = Math.round(historicalRevenueTjs);
+    const cogsTjs = Math.round(historicalCogsTjs);
+    const grossProfitTjs = revenueTjs - cogsTjs;
     const grossMarginPercent = revenueUsd > 0 ? +((grossProfitUsd / revenueUsd) * 100).toFixed(1) : 0;
 
     // Operating expenses converted to USD
@@ -121,12 +126,23 @@ export const ReportsPage: React.FC = () => {
         if (b.bonusType !== 'CASH_DISCOUNT' || !b.amountUsd) return false;
         const bDate = b.dateReceived || b.date;
         if (!bDate) return true;
-        if (period === 'TODAY') return bDate === todayStr;
+        if (period === 'TODAY') return bDate.startsWith(todayStr);
         if (period === 'MONTH') return bDate.startsWith(currentMonthStr);
         if (period === 'SPECIFIC_MONTH') return bDate.startsWith(selectedMonth);
         return true;
       })
       .reduce((acc, b) => acc + (b.amountUsd || 0), 0);
+    const periodCashBonusesTjs = (supplierBonuses || [])
+      .filter(b => {
+        if (b.bonusType !== 'CASH_DISCOUNT' || !b.amountUsd) return false;
+        const bDate = b.dateReceived || b.date;
+        if (!bDate) return true;
+        if (period === 'TODAY') return bDate.startsWith(todayStr);
+        if (period === 'MONTH') return bDate.startsWith(currentMonthStr);
+        if (period === 'SPECIFIC_MONTH') return bDate.startsWith(selectedMonth);
+        return true;
+      })
+      .reduce((acc, b) => acc + (b.amountUsd || 0) * b.exchangeRate, 0);
 
     // Refund penalties in period count 100% towards Net Profit
     const periodRefundPenaltiesUsd = (sales || [])
@@ -140,12 +156,23 @@ export const ReportsPage: React.FC = () => {
         return true;
       })
       .reduce((acc, s) => acc + (s.penaltyFeeUsd || 0), 0);
+    const periodRefundPenaltiesTjs = (sales || [])
+      .filter(s => {
+        if (s.status !== 'REFUNDED' || !s.penaltyFeeTjs) return false;
+        if (selectedStore !== 'all' && s.storeId !== selectedStore) return false;
+        const rDate = (s.refundedAt || s.date || '').split('T')[0];
+        if (period === 'TODAY') return rDate === todayStr;
+        if (period === 'MONTH') return rDate.startsWith(currentMonthStr);
+        if (period === 'SPECIFIC_MONTH') return rDate.startsWith(selectedMonth);
+        return true;
+      })
+      .reduce((acc, s) => acc + (s.penaltyFeeTjs || 0), 0);
 
     // Net Profit in USD & TJS (sales gross profit - all expenses, including repair
     // parts/labor which is already inside expensesUsd - + 100% cash supplier bonuses
     // + 100% refund penalties).
     const netProfitUsd = +(grossProfitUsd - expensesUsd + periodCashBonusesUsd + periodRefundPenaltiesUsd).toFixed(2);
-    const netProfitTjs = Math.round(netProfitUsd * rate);
+    const netProfitTjs = Math.round(grossProfitTjs - expensesTjs + periodCashBonusesTjs + periodRefundPenaltiesTjs);
 
     // Balance Sheet Assets & Liabilities in USD (store-aware)
     const targetDevices = selectedStore === 'all' 
@@ -196,7 +223,7 @@ export const ReportsPage: React.FC = () => {
     else if (period === 'MONTH') periodInvoices = periodInvoices.filter(i => i.date.startsWith(currentMonthStr));
     else if (period === 'SPECIFIC_MONTH') periodInvoices = periodInvoices.filter(i => i.date.startsWith(selectedMonth));
     const periodPurchasesUsd = +periodInvoices.reduce((acc, i) => acc + (i.totalAmountUsd || 0), 0).toFixed(2);
-    const periodPurchasesTjs = Math.round(periodPurchasesUsd * rate);
+    const periodPurchasesTjs = Math.round(periodInvoices.reduce((acc, i) => acc + (i.totalAmountUsd || 0) * i.exchangeRate, 0));
     const periodPurchasesDevicesCount = periodInvoices.reduce((acc, i) => acc + (i.devicesCount || 0), 0);
 
     const topSuppliersByDebt = [...suppliers]
