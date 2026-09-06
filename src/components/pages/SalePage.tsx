@@ -13,7 +13,8 @@ import {
   ShoppingCart,
   Store as StoreIcon,
   Plus,
-  Flame
+  Flame,
+  ScanLine
 } from 'lucide-react';
 import { SearchBar } from '../ui/SearchBar';
 import { FilterPillGroup } from '../ui/FilterPillGroup';
@@ -87,7 +88,6 @@ export const SalePage: React.FC = () => {
         const matches =
           d.imei.toLowerCase().includes(q) ||
           (d.imei2 && d.imei2.toLowerCase().includes(q)) ||
-          (d.serialNumber && d.serialNumber.toLowerCase().includes(q)) ||
           d.brand.toLowerCase().includes(q) ||
           d.model.toLowerCase().includes(q) ||
           d.color.toLowerCase().includes(q) ||
@@ -169,7 +169,7 @@ export const SalePage: React.FC = () => {
     openScanner((scannedCode) => {
       const code = scannedCode.trim();
       const exactDev = devices.find(d =>
-        (d.imei === code || d.imei2 === code || d.serialNumber === code) &&
+        (d.imei === code || d.imei2 === code) &&
         (d.status === 'STORE_STOCK' || d.status === 'IN_STOCK_AFTER_EXCHANGE') &&
         (!effectiveStoreId || d.locationId === effectiveStoreId) &&
         !cart.some(ci => ci.device.id === d.id)
@@ -177,11 +177,18 @@ export const SalePage: React.FC = () => {
 
       if (exactDev) {
         addDeviceToCart(exactDev);
+        setPaymentStatus(null);
+        setIsCartOpen(true);
       } else {
         soundEffects.playError();
         setSearchQuery(code);
       }
     });
+  };
+
+  const handleScanMore = () => {
+    setIsCartOpen(false);
+    handleTriggerScanner();
   };
 
   const totalTjs = cart.reduce((acc, item) => acc + (item.salePriceTjs && item.salePriceTjs > 0 ? item.salePriceTjs : 0), 0);
@@ -200,7 +207,7 @@ export const SalePage: React.FC = () => {
     setPaymentMethod('CASH');
     setCashAmountInput(totalTjs > 0 ? totalTjs.toString() : '');
     setCardAmountInput('0');
-    setCustomerPhoneInput('');
+    setCustomerNameInput('');
     setPaymentStatus(null);
     setIsCartOpen(true);
   };
@@ -423,16 +430,27 @@ export const SalePage: React.FC = () => {
         subtitle={`${totalTjs.toLocaleString()} TJS ≈ $${totalUsd}`}
         maxWidth="lg"
         footer={
-          <Button
-            fullWidth
-            size="lg"
-            leftIcon={CheckCircle2}
-            loading={isSubmittingSale}
-            disabled={hasEmptyPrice || totalTjs <= 0}
-            onClick={handleFinishPayment}
-          >
-            {isSubmittingSale ? 'Оформление…' : hasEmptyPrice ? 'Укажите цену продажи' : `Завершить продажу (${totalTjs.toLocaleString()} TJS)`}
-          </Button>
+          <div className="flex gap-2">
+            <Button
+              variant="secondary"
+              size="lg"
+              leftIcon={ScanLine}
+              disabled={isSubmittingSale}
+              onClick={handleScanMore}
+            >
+              Сканировать ещё
+            </Button>
+            <Button
+              fullWidth
+              size="lg"
+              leftIcon={CheckCircle2}
+              loading={isSubmittingSale}
+              disabled={hasEmptyPrice || totalTjs <= 0}
+              onClick={handleFinishPayment}
+            >
+              {isSubmittingSale ? 'Оформление…' : hasEmptyPrice ? 'Укажите цену продажи' : `Завершить продажу (${totalTjs.toLocaleString()} TJS)`}
+            </Button>
+          </div>
         }
       >
         <div className="space-y-2 mb-4">

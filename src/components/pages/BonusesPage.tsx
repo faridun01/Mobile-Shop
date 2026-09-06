@@ -65,8 +65,7 @@ export const BonusesPage: React.FC = () => {
           imei: fd.imei,
           costBasisUsd: fd.costBasisUsd ?? 0,
           status: liveDev?.status || 'MAIN_WAREHOUSE',
-          locationName: liveDev?.locationName || 'Главный склад',
-          serialNumber: liveDev?.serialNumber || 'SN-GIFT-BONUS'
+          locationName: liveDev?.locationName || 'Главный склад'
         };
       });
     }
@@ -86,8 +85,7 @@ export const BonusesPage: React.FC = () => {
         imei: d.imei,
         costBasisUsd: d.costBasisUsd,
         status: d.status,
-        locationName: d.locationName,
-        serialNumber: d.serialNumber
+        locationName: d.locationName
       }));
     }
 
@@ -103,8 +101,7 @@ export const BonusesPage: React.FC = () => {
           imei: singleDev.imei,
           costBasisUsd: singleDev.costBasisUsd,
           status: singleDev.status,
-          locationName: singleDev.locationName,
-          serialNumber: singleDev.serialNumber
+          locationName: singleDev.locationName
         }];
       }
     }

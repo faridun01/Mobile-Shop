@@ -2,17 +2,17 @@ import React, { useState, useMemo } from 'react';
 import { useApp } from '../../context/AppContext';
 import {
   BarChart3,
-  DollarSign,
   Smartphone,
-  Store as StoreIcon,
-  TrendingUp,
   ArrowDownRight,
   Download,
-  FileSpreadsheet,
-  Package
+  FileSpreadsheet
 } from 'lucide-react';
-import { exportSalesReport, exportInventoryReport, exportExpensesReport, exportRepairsReport } from '../../utils/exportReports';
+import {
+  exportSalesReport, exportInventoryReport, exportExpensesReport, exportRepairsReport,
+  buildSalesReportTable, buildInventoryReportTable, buildExpensesReportTable, buildRepairsReportTable
+} from '../../utils/exportReports';
 import { getBusinessDateKey } from '../../utils/businessDate';
+import { ReportPreviewModal } from '../common/ReportPreviewModal';
 
 export const ReportsPage: React.FC = () => {
   const {
@@ -27,11 +27,73 @@ export const ReportsPage: React.FC = () => {
     todayRate
   } = useApp();
 
-  const [period, setPeriod] = useState<'TODAY' | 'MONTH' | 'SPECIFIC_MONTH' | 'ALL'>('MONTH');
+  const [period, setPeriod] = useState<'TODAY' | 'MONTH' | 'SPECIFIC_MONTH' | 'ALL'>('TODAY');
   const [selectedMonth, setSelectedMonth] = useState<string>(new Date().toISOString().substring(0, 7));
   const [selectedStore, setSelectedStore] = useState<string>('all');
+  const [previewReport, setPreviewReport] = useState<null | 'sales' | 'inventory' | 'expenses' | 'repairs'>(null);
 
   const rate = todayRate?.rate || 9.50;
+
+  const selectedStoreName = selectedStore === 'all' ? 'все магазины' : (stores.find(s => s.id === selectedStore)?.name || selectedStore);
+  const periodLabel = period === 'TODAY' ? 'сегодня' : period === 'MONTH' ? 'текущий месяц' : period === 'SPECIFIC_MONTH' ? selectedMonth : 'весь период';
+
+  // Datasets actually going into the exports/preview — mirror the on-screen period
+  // and store filters (unlike the raw sales/devices/expenses/repairs arrays, which
+  // previously fed the downloads unfiltered regardless of what was selected above).
+  const exportSales = useMemo(() => {
+    const todayStr = getBusinessDateKey();
+    const currentMonthStr = todayStr.substring(0, 7);
+    let result = sales;
+    if (period === 'TODAY') result = result.filter(s => s.date.startsWith(todayStr));
+    else if (period === 'MONTH') result = result.filter(s => s.date.startsWith(currentMonthStr));
+    else if (period === 'SPECIFIC_MONTH') result = result.filter(s => s.date.startsWith(selectedMonth));
+    if (selectedStore !== 'all') result = result.filter(s => s.storeId === selectedStore);
+    return result;
+  }, [sales, period, selectedMonth, selectedStore]);
+
+  const exportExpenses = useMemo(() => {
+    const todayStr = getBusinessDateKey();
+    const currentMonthStr = todayStr.substring(0, 7);
+    let result = expenses;
+    if (period === 'TODAY') result = result.filter(e => e.date.startsWith(todayStr));
+    else if (period === 'MONTH') result = result.filter(e => e.date.startsWith(currentMonthStr));
+    else if (period === 'SPECIFIC_MONTH') result = result.filter(e => e.date.startsWith(selectedMonth));
+    if (selectedStore !== 'all') result = result.filter(e => e.storeId === selectedStore);
+    return result;
+  }, [expenses, period, selectedMonth, selectedStore]);
+
+  // Inventory is a point-in-time snapshot (no created-date period makes sense for
+  // "what's on the shelf right now"), so only the store filter applies.
+  const exportDevices = useMemo(() => {
+    if (selectedStore === 'all') return devices;
+    return devices.filter(d => d.locationId === selectedStore);
+  }, [devices, selectedStore]);
+
+  const exportRepairs = useMemo(() => {
+    const todayStr = getBusinessDateKey();
+    const currentMonthStr = todayStr.substring(0, 7);
+    let result = repairs;
+    if (period === 'TODAY') result = result.filter(r => (r.createdAt || '').startsWith(todayStr));
+    else if (period === 'MONTH') result = result.filter(r => (r.createdAt || '').startsWith(currentMonthStr));
+    else if (period === 'SPECIFIC_MONTH') result = result.filter(r => (r.createdAt || '').startsWith(selectedMonth));
+    if (selectedStore !== 'all') result = result.filter(r => r.storeId === selectedStore);
+    return result;
+  }, [repairs, period, selectedMonth, selectedStore]);
+
+  const previewTable = useMemo(() => {
+    if (previewReport === 'sales') return buildSalesReportTable(exportSales, rate);
+    if (previewReport === 'inventory') return buildInventoryReportTable(exportDevices, stores, rate);
+    if (previewReport === 'expenses') return buildExpensesReportTable(exportExpenses, rate);
+    if (previewReport === 'repairs') return buildRepairsReportTable(exportRepairs);
+    return null;
+  }, [previewReport, exportSales, exportDevices, exportExpenses, exportRepairs, stores, rate]);
+
+  const previewMeta: Record<'sales' | 'inventory' | 'expenses' | 'repairs', { title: string; download: () => void }> = {
+    sales: { title: 'Отчет по продажам', download: () => exportSalesReport(exportSales, rate) },
+    inventory: { title: 'Остатки склада', download: () => exportInventoryReport(exportDevices, stores, rate) },
+    expenses: { title: 'Отчет по расходам', download: () => exportExpensesReport(exportExpenses, rate) },
+    repairs: { title: 'Журнал ремонтов', download: () => exportRepairsReport(exportRepairs) },
+  };
 
   // Filtered dataset & financial calculations
   const filteredData = useMemo(() => {
@@ -311,17 +373,6 @@ export const ReportsPage: React.FC = () => {
             >
               СЕГОДНЯ
             </button>
-            <button
-              type="button"
-              onClick={() => setPeriod('MONTH')}
-              className={`px-3 py-1.5 rounded-lg border text-xs font-bold uppercase tracking-wider transition-colors ${
-                period === 'MONTH'
-                  ? 'border-accent bg-accent/10 text-accent'
-                  : 'border-border bg-surface-raised text-fg-muted hover:text-fg'
-              }`}
-            >
-              ЭТОТ МЕСЯЦ
-            </button>
             <div className="flex items-center space-x-1 pl-1 border-l border-border">
               <span className="text-[10px] text-fg-subtle font-bold uppercase hidden md:inline">ВЫБОР МЕСЯЦА:</span>
               <input
@@ -341,17 +392,6 @@ export const ReportsPage: React.FC = () => {
                 title="Выберите любой конкретный месяц для отчета"
               />
             </div>
-            <button
-              type="button"
-              onClick={() => setPeriod('ALL')}
-              className={`px-3 py-1.5 rounded-lg border text-xs font-bold uppercase tracking-wider transition-colors ${
-                period === 'ALL'
-                  ? 'border-accent bg-accent/10 text-accent'
-                  : 'border-border bg-surface-raised text-fg-muted hover:text-fg'
-              }`}
-            >
-              ВСЕ ВРЕМЯ
-            </button>
           </div>
 
           {/* Store selector */}
@@ -366,9 +406,9 @@ export const ReportsPage: React.FC = () => {
             ))}
           </select>
 
-          {/* Quick Export Sales */}
+          {/* Quick Export Sales — opens the same preview as the card below, scoped to the filters above */}
           <button
-            onClick={() => exportSalesReport(sales, rate)}
+            onClick={() => setPreviewReport('sales')}
             className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-accent hover:bg-accent-strong text-accent-fg font-bold text-xs transition-colors shadow-xs"
           >
             <Download className="w-3.5 h-3.5" />
@@ -379,183 +419,6 @@ export const ReportsPage: React.FC = () => {
 
       {/* Main Content Area */}
       <div className="flex-1 overflow-y-auto p-3 sm:p-4 space-y-4">
-        {/* KPI SECTION 1: PROFIT & LOSS (P&L) */}
-        <div>
-          <h4 className="text-[10px] font-bold text-fg-subtle uppercase tracking-wider mb-2 flex items-center space-x-1.5">
-            <TrendingUp className="w-3.5 h-3.5 text-accent" />
-            <span>ОТЧЕТ О ПРИБЫЛЯХ И УБЫТКАХ (P&L)</span>
-          </h4>
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3">
-            {/* Card 1: Revenue */}
-            <div className="p-3 sm:p-4 rounded-xl bg-surface border border-border space-y-1">
-              <div className="flex items-center justify-between text-fg-subtle text-[10px] uppercase">
-                <span>ВЫРУЧКА (ОБОРОТ)</span>
-                <DollarSign className="w-3.5 h-3.5 text-accent" />
-              </div>
-              <p className="text-base sm:text-lg font-bold text-fg">
-                ${filteredData.revenueUsd.toLocaleString()}
-              </p>
-              <p className="text-[10px] text-fg-subtle">
-                ≈ {filteredData.revenueTjs.toLocaleString()} TJS | <strong className="text-accent">{filteredData.unitsSold}</strong> шт.
-              </p>
-            </div>
-
-            {/* Card 2: COGS */}
-            <div className="p-3 sm:p-4 rounded-xl bg-surface border border-border space-y-1">
-              <div className="flex items-center justify-between text-fg-subtle text-[10px] uppercase">
-                <span>СЕБЕСТОИМОСТЬ (COGS)</span>
-                <Package className="w-3.5 h-3.5 text-fg-subtle" />
-              </div>
-              <p className="text-base sm:text-lg font-bold text-fg-muted">
-                ${filteredData.cogsUsd.toLocaleString()}
-              </p>
-              <p className="text-[10px] text-fg-subtle">
-                ≈ {filteredData.cogsTjs.toLocaleString()} TJS (закупка)
-              </p>
-            </div>
-
-            {/* Card 3: Gross Profit */}
-            <div className="p-3 sm:p-4 rounded-xl bg-surface border border-border space-y-1">
-              <div className="flex items-center justify-between text-fg-subtle text-[10px] uppercase">
-                <span>ВАЛОВАЯ МАРЖА</span>
-                <TrendingUp className="w-3.5 h-3.5 text-accent" />
-              </div>
-              <p className="text-base sm:text-lg font-bold text-accent">
-                ${filteredData.grossProfitUsd.toLocaleString()}
-              </p>
-              <p className="text-[10px] text-fg-subtle">
-                ≈ {filteredData.grossProfitTjs.toLocaleString()} TJS | Маржа: <strong className="text-accent">{filteredData.grossMarginPercent}%</strong>
-              </p>
-            </div>
-
-            {/* Card 4: Net Profit */}
-            <div className="p-3 sm:p-4 rounded-xl bg-surface border border-border space-y-1">
-              <div className="flex items-center justify-between text-fg-subtle text-[10px] uppercase font-bold">
-                <span>ЧИСТАЯ ПРИБЫЛЬ</span>
-                <DollarSign className="w-3.5 h-3.5 text-accent" />
-              </div>
-              <p className={`text-base sm:text-lg font-bold ${
-                filteredData.netProfitUsd >= 0 ? 'text-accent' : 'text-danger'
-              }`}>
-                ${filteredData.netProfitUsd.toLocaleString()}
-              </p>
-              <p className="text-[10px] text-fg-subtle">
-                ≈ {filteredData.netProfitTjs.toLocaleString()} TJS (расходы: {filteredData.expensesTjs.toLocaleString()} TJS)
-              </p>
-            </div>
-          </div>
-        </div>
-
-        {/* MAIN WAREHOUSE: stock storage and supplier obligations only */}
-        <div>
-          <h4 className="text-[10px] font-bold text-fg-subtle uppercase tracking-wider mb-2 flex items-center space-x-1.5">
-            <Package className="w-3.5 h-3.5 text-accent" />
-            <span>ГЛАВНЫЙ СКЛАД</span>
-            <span className="text-[9px] font-normal normal-case text-fg-subtle">(хранение товара и обязательства перед поставщиками)</span>
-          </h4>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 sm:gap-3">
-            <div className="p-3 sm:p-4 rounded-xl bg-surface border border-border space-y-1">
-              <div className="flex items-center justify-between text-fg-subtle text-[10px] uppercase">
-                <span>ТОВАРОВ НА ГЛАВНОМ СКЛАДЕ</span>
-                <Smartphone className="w-3.5 h-3.5 text-accent" />
-              </div>
-              <p className="text-base sm:text-lg font-bold text-accent">
-                {filteredData.mainWarehouseStockCount.toLocaleString()} шт.
-              </p>
-              <p className="text-[10px] text-fg-subtle">
-                Доступно и хранится на главном складе
-              </p>
-            </div>
-
-            <div className="p-3 sm:p-4 rounded-xl bg-surface border border-border space-y-1">
-              <div className="flex items-center justify-between text-fg-subtle text-[10px] uppercase">
-                <span>ОБЩАЯ СЕБЕСТОИМОСТЬ ТОВАРА</span>
-                <Package className="w-3.5 h-3.5 text-fg-subtle" />
-              </div>
-              <p className="text-base sm:text-lg font-bold text-fg">
-                ${filteredData.mainWarehouseStockCostUsd.toLocaleString()}
-              </p>
-              <p className="text-[10px] text-fg-subtle">
-                ≈ {filteredData.mainWarehouseStockCostTjs.toLocaleString()} TJS
-              </p>
-            </div>
-
-            <div className="p-3 sm:p-4 rounded-xl bg-surface border border-border space-y-1">
-              <div className="flex items-center justify-between text-fg-subtle text-[10px] uppercase">
-                <span>ДОЛГ ПОСТАВЩИКАМ</span>
-                <ArrowDownRight className="w-3.5 h-3.5 text-danger" />
-              </div>
-              <p className="text-base sm:text-lg font-bold text-danger">
-                ${filteredData.totalSupplierDebtUsd.toLocaleString()}
-              </p>
-              <p className="text-[10px] text-fg-subtle">
-                ≈ {filteredData.totalSupplierDebtTjs.toLocaleString()} TJS (долги)
-              </p>
-            </div>
-
-          </div>
-        </div>
-
-        {/* RETAIL STORES: current stock/cash plus period sales economics */}
-        <div>
-          <h4 className="text-[10px] font-bold text-fg-subtle uppercase tracking-wider mb-2 flex items-center space-x-1.5">
-            <StoreIcon className="w-3.5 h-3.5 text-accent" />
-            <span>МАГАЗИНЫ</span>
-            <span className="text-[9px] font-normal normal-case text-fg-subtle">(остатки и касса сейчас; продажи, себестоимость и прибыль за выбранный период)</span>
-          </h4>
-          {filteredData.storeBreakdown.length === 0 ? (
-            <div className="p-6 rounded-xl bg-surface border border-border text-center text-xs text-fg-subtle">
-              Магазины не найдены
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 xl:grid-cols-2 gap-3">
-              {filteredData.storeBreakdown.map(store => (
-                <div key={store.storeId} className="p-3.5 rounded-xl bg-surface border border-border space-y-3">
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="flex items-center gap-2 min-w-0">
-                      <div className="p-2 rounded-lg bg-accent/10 text-accent border border-accent/20">
-                        <StoreIcon className="w-4 h-4" />
-                      </div>
-                      <div className="min-w-0">
-                        <h5 className="text-sm font-bold text-fg truncate">{store.storeName}</h5>
-                        <p className="text-[10px] text-fg-subtle">{store.salesCount} чеков · продано {store.unitsSold} шт.</p>
-                      </div>
-                    </div>
-                    <div className="text-right shrink-0">
-                      <p className="text-[10px] uppercase text-fg-subtle">Касса магазина</p>
-                      <p className="text-sm font-bold text-fg">{store.cashTjs.toLocaleString()} TJS</p>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                    <div className="p-2.5 rounded-lg bg-surface-raised border border-border">
-                      <p className="text-[9px] uppercase text-fg-subtle">Товаров сейчас</p>
-                      <p className="text-sm font-bold text-accent">{store.stockCount} шт.</p>
-                      <p className="text-[9px] text-fg-subtle">${store.stockCostUsd.toLocaleString()} себестоимость</p>
-                    </div>
-                    <div className="p-2.5 rounded-lg bg-surface-raised border border-border">
-                      <p className="text-[9px] uppercase text-fg-subtle">Продано на сумму</p>
-                      <p className="text-sm font-bold text-fg">{store.revenueTjs.toLocaleString()} TJS</p>
-                      <p className="text-[9px] text-fg-subtle">${store.revenueUsd.toLocaleString()}</p>
-                    </div>
-                    <div className="p-2.5 rounded-lg bg-surface-raised border border-border">
-                      <p className="text-[9px] uppercase text-fg-subtle">Себестоимость проданного</p>
-                      <p className="text-sm font-bold text-fg-muted">{store.cogsTjs.toLocaleString()} TJS</p>
-                      <p className="text-[9px] text-fg-subtle">${store.cogsUsd.toLocaleString()}</p>
-                    </div>
-                    <div className="p-2.5 rounded-lg bg-accent/5 border border-accent/30">
-                      <p className="text-[9px] uppercase text-fg-subtle">Прибыль</p>
-                      <p className={`text-sm font-bold ${store.profitTjs >= 0 ? 'text-accent' : 'text-danger'}`}>
-                        {store.profitTjs.toLocaleString()} TJS
-                      </p>
-                      <p className="text-[9px] text-fg-subtle">${store.profitUsd.toLocaleString()}</p>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
 
         {/* TOP SUPPLIERS BY DEBT */}
         {filteredData.topSuppliersByDebt.length > 0 && (
@@ -648,6 +511,9 @@ export const ReportsPage: React.FC = () => {
             <FileSpreadsheet className="w-3.5 h-3.5 text-accent" />
             <span>ЭКСПОРТ ДАННЫХ И ЭЛЕКТРОННЫЕ ОТЧЕТЫ (CSV / EXCEL)</span>
           </h4>
+          <p className="text-[10px] text-fg-subtle">
+            Отчеты ниже учитывают выбранный период и магазин ({periodLabel} · {selectedStoreName}). Нажмите на карточку, чтобы посмотреть данные перед скачиванием.
+          </p>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
             {/* Sales Report Download Card */}
@@ -656,7 +522,7 @@ export const ReportsPage: React.FC = () => {
                 <div className="flex items-center justify-between">
                   <span className="font-bold text-fg text-xs">Отчет по продажам</span>
                   <span className="text-[10px] text-accent bg-accent/10 px-1.5 py-0.5 rounded-md border border-accent/20">
-                    {sales.length} чеков
+                    {exportSales.length} чеков
                   </span>
                 </div>
                 <p className="text-[11px] text-fg-subtle">
@@ -664,11 +530,11 @@ export const ReportsPage: React.FC = () => {
                 </p>
               </div>
               <button
-                onClick={() => exportSalesReport(sales, rate)}
+                onClick={() => setPreviewReport('sales')}
                 className="w-full py-2 px-3 rounded-lg bg-accent hover:bg-accent-strong text-accent-fg font-bold text-xs flex items-center justify-center space-x-2 transition-colors shadow-xs mt-2"
               >
                 <Download className="w-3.5 h-3.5" />
-                <span>СКАЧАТЬ ПРОДАЖИ (CSV)</span>
+                <span>ПРОСМОТР И СКАЧИВАНИЕ</span>
               </button>
             </div>
 
@@ -678,7 +544,7 @@ export const ReportsPage: React.FC = () => {
                 <div className="flex items-center justify-between">
                   <span className="font-bold text-fg text-xs">Остатки склада</span>
                   <span className="text-[10px] text-accent bg-accent/10 px-1.5 py-0.5 rounded-md border border-accent/20">
-                    {devices.length} устройств
+                    {exportDevices.length} устройств
                   </span>
                 </div>
                 <p className="text-[11px] text-fg-subtle">
@@ -686,11 +552,11 @@ export const ReportsPage: React.FC = () => {
                 </p>
               </div>
               <button
-                onClick={() => exportInventoryReport(devices, stores, rate)}
+                onClick={() => setPreviewReport('inventory')}
                 className="w-full py-2 px-3 rounded-lg bg-surface hover:bg-surface-raised text-fg border border-border font-bold text-xs flex items-center justify-center space-x-2 transition-colors mt-2"
               >
                 <Download className="w-3.5 h-3.5" />
-                <span>СКАЧАТЬ СКЛАД (CSV)</span>
+                <span>ПРОСМОТР И СКАЧИВАНИЕ</span>
               </button>
             </div>
 
@@ -700,7 +566,7 @@ export const ReportsPage: React.FC = () => {
                 <div className="flex items-center justify-between">
                   <span className="font-bold text-fg text-xs">Отчет по расходам</span>
                   <span className="text-[10px] text-danger bg-danger/10 px-1.5 py-0.5 rounded-md border border-danger/20">
-                    {expenses.length} записей
+                    {exportExpenses.length} записей
                   </span>
                 </div>
                 <p className="text-[11px] text-fg-subtle">
@@ -708,11 +574,11 @@ export const ReportsPage: React.FC = () => {
                 </p>
               </div>
               <button
-                onClick={() => exportExpensesReport(expenses, rate)}
+                onClick={() => setPreviewReport('expenses')}
                 className="w-full py-2 px-3 rounded-lg bg-surface hover:bg-surface-raised text-fg border border-border font-bold text-xs flex items-center justify-center space-x-2 transition-colors mt-2"
               >
                 <Download className="w-3.5 h-3.5" />
-                <span>СКАЧАТЬ РАСХОДЫ (CSV)</span>
+                <span>ПРОСМОТР И СКАЧИВАНИЕ</span>
               </button>
             </div>
 
@@ -722,7 +588,7 @@ export const ReportsPage: React.FC = () => {
                 <div className="flex items-center justify-between">
                   <span className="font-bold text-fg text-xs">Журнал ремонтов</span>
                   <span className="text-[10px] text-accent bg-accent/10 px-1.5 py-0.5 rounded-md border border-accent/20">
-                    {repairs.length} заказов
+                    {exportRepairs.length} заказов
                   </span>
                 </div>
                 <p className="text-[11px] text-fg-subtle">
@@ -730,16 +596,25 @@ export const ReportsPage: React.FC = () => {
                 </p>
               </div>
               <button
-                onClick={() => exportRepairsReport(repairs)}
+                onClick={() => setPreviewReport('repairs')}
                 className="w-full py-2 px-3 rounded-lg bg-surface hover:bg-surface-raised text-fg border border-border font-bold text-xs flex items-center justify-center space-x-2 transition-colors mt-2"
               >
                 <Download className="w-4 h-4" />
-                <span>СКАЧАТЬ РЕМОНТЫ (CSV)</span>
+                <span>ПРОСМОТР И СКАЧИВАНИЕ</span>
               </button>
             </div>
           </div>
         </div>
       </div>
+
+      <ReportPreviewModal
+        open={previewReport !== null}
+        onClose={() => setPreviewReport(null)}
+        title={previewReport ? previewMeta[previewReport].title : ''}
+        subtitle={`${periodLabel} · ${selectedStoreName}`}
+        table={previewTable}
+        onDownload={() => previewReport && previewMeta[previewReport].download()}
+      />
     </div>
   );
 };

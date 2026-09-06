@@ -12,7 +12,7 @@ export function formatDeviceName(device: { brand: string; model: string; storage
  * Formats device IMEI identifiers consistently:
  * "IMEI: 35489... / 35489..."
  */
-export function formatDeviceIdentifiers(device: { imei: string; imei2?: string; serialNumber?: string }): {
+export function formatDeviceIdentifiers(device: { imei: string; imei2?: string }): {
   imeiText: string;
   fullText: string;
 } {

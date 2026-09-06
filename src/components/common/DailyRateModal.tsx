@@ -20,13 +20,13 @@ export const DailyRateModal: React.FC<DailyRateModalProps> = ({ isOpen, onClose 
   const canSetRate = currentUser?.role === 'ADMIN' || currentUser?.role === 'PARTNER';
   const isMandatory = !isRateSetForToday && canSetRate;
 
-  const [rateInput, setRateInput] = useState<string>('9.50');
+  const [rateInput, setRateInput] = useState<string>('');
   const [error, setError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
-      setRateInput(todayRate?.rate ? todayRate.rate.toString() : '9.50');
+      setRateInput(todayRate?.rate ? todayRate.rate.toString() : '');
       setError(null);
     }
   }, [isOpen, todayRate]);
@@ -108,7 +108,7 @@ export const DailyRateModal: React.FC<DailyRateModalProps> = ({ isOpen, onClose 
               }}
               onKeyDown={(e) => e.key === 'Enter' && handleSubmit()}
               autoFocus
-              placeholder="9.50"
+              placeholder="например, 9.50"
               className="w-full h-14 rounded-lg bg-bg border border-accent/50 px-4 text-xl font-bold text-accent focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
             />
             <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs font-bold text-fg-subtle uppercase">TJS</span>

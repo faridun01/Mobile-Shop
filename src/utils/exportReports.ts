@@ -1,11 +1,18 @@
 import { Sale, Device, Store, Expense, RepairTicket } from '../types';
 
+export interface ReportTable {
+  headers: string[];
+  rows: (string | number)[][];
+  /** Trailing "ИТОГО" row, kept separate from `rows` so the on-screen preview can style it distinctly. */
+  totalsRow: (string | number)[];
+}
+
 /**
  * Clean helper function to trigger CSV file download with UTF-8 BOM
  * ensuring full compatibility with Microsoft Excel, Apple Numbers and Google Sheets.
  */
 function downloadCsv(content: string, fileName: string) {
-  const blob = new Blob(['\uFEFF' + content], { type: 'text/csv;charset=utf-8;' });
+  const blob = new Blob(['﻿' + content], { type: 'text/csv;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
   link.setAttribute('href', url);
@@ -22,6 +29,14 @@ function escapeCsvField(field: any): string {
   return `"${str.replace(/"/g, '""')}"`;
 }
 
+function tableToCsv(table: ReportTable): string {
+  const lines = [table.headers.join(',')];
+  for (const row of table.rows) lines.push(row.map(escapeCsvField).join(','));
+  lines.push('');
+  lines.push(table.totalsRow.map(escapeCsvField).join(','));
+  return lines.join('\r\n');
+}
+
 /**
  * Format IMEI so Microsoft Excel displays full 15-digit string without scientific notation (3.55E+14)
  */
@@ -33,9 +48,10 @@ function formatImeiForCsv(imei?: string): string {
 }
 
 /**
- * Exports sales report with detailed items breakdown, IMEI numbers and comprehensive summary totals.
+ * Builds the sales report table (headers/rows/totals) shared by the on-screen
+ * preview and the CSV export, so what the user previews is exactly what downloads.
  */
-export function exportSalesReport(sales: Sale[], rate: number = 9.5) {
+export function buildSalesReportTable(sales: Sale[], rate: number = 9.5): ReportTable {
   const headers = [
     '№ Чека',
     'Дата и время',
@@ -54,7 +70,7 @@ export function exportSalesReport(sales: Sale[], rate: number = 9.5) {
     'Статус'
   ];
 
-  const rows: string[][] = [];
+  const rows: (string | number)[][] = [];
   let totalUnits = 0;
   let totalCostBasisUsd = 0;
   let totalRevenueUsd = 0;
@@ -81,58 +97,56 @@ export function exportSalesReport(sales: Sale[], rate: number = 9.5) {
       }
 
       rows.push([
-        escapeCsvField(sale.receiptNumber),
-        escapeCsvField(dateFormatted),
-        escapeCsvField(sale.storeName),
-        escapeCsvField(sale.sellerName),
-        escapeCsvField(sale.customerName || 'Розничный покупатель'),
-        escapeCsvField(`${item.brand} ${item.model} ${item.storage || ''} ${item.color || ''}`.trim()),
-        escapeCsvField(formatImeiForCsv(item.imei)),
-        escapeCsvField(formatImeiForCsv(item.imei2)),
-        escapeCsvField(1),
-        escapeCsvField(costUsd.toFixed(2)),
-        escapeCsvField(priceUsd.toFixed(2)),
-        escapeCsvField(priceTjs.toFixed(2)),
-        escapeCsvField(profitUsd.toFixed(2)),
-        escapeCsvField(sale.paymentMethod === 'CASH' ? 'Наличные' : sale.paymentMethod === 'CARD' ? 'Карта' : 'Раздельная'),
-        escapeCsvField(isRefunded ? 'ВОЗВРАТ' : 'ЗАВЕРШЕНА')
+        sale.receiptNumber,
+        dateFormatted,
+        sale.storeName,
+        sale.sellerName,
+        sale.customerName || 'Розничный покупатель',
+        `${item.brand} ${item.model} ${item.storage || ''} ${item.color || ''}`.trim(),
+        formatImeiForCsv(item.imei),
+        formatImeiForCsv(item.imei2),
+        1,
+        costUsd.toFixed(2),
+        priceUsd.toFixed(2),
+        priceTjs.toFixed(2),
+        profitUsd.toFixed(2),
+        sale.paymentMethod === 'CASH' ? 'Наличные' : sale.paymentMethod === 'CARD' ? 'Карта' : 'Раздельная',
+        isRefunded ? 'ВОЗВРАТ' : 'ЗАВЕРШЕНА'
       ]);
     });
   });
 
-  // Summary Row "ИТОГО"
-  rows.push([]);
-  rows.push([
-    escapeCsvField('ИТОГО:'),
-    escapeCsvField(''),
-    escapeCsvField(''),
-    escapeCsvField(''),
-    escapeCsvField(''),
-    escapeCsvField(`Всего позиций: ${rows.length - 1}`),
-    escapeCsvField(''),
-    escapeCsvField(''),
-    escapeCsvField(totalUnits),
-    escapeCsvField(totalCostBasisUsd.toFixed(2)),
-    escapeCsvField(totalRevenueUsd.toFixed(2)),
-    escapeCsvField(totalRevenueTjs.toFixed(2)),
-    escapeCsvField(totalProfitUsd.toFixed(2)),
-    escapeCsvField(''),
-    escapeCsvField('')
-  ]);
+  const totalsRow = [
+    'ИТОГО:', '', '', '', '',
+    `Всего позиций: ${rows.length}`,
+    '', '',
+    totalUnits,
+    totalCostBasisUsd.toFixed(2),
+    totalRevenueUsd.toFixed(2),
+    totalRevenueTjs.toFixed(2),
+    totalProfitUsd.toFixed(2),
+    '', ''
+  ];
 
-  const csvContent = [headers.join(','), ...rows.map(r => r.join(','))].join('\r\n');
-  const fileName = `otchet_prodazhi_${new Date().toISOString().split('T')[0]}.csv`;
-  downloadCsv(csvContent, fileName);
+  return { headers, rows, totalsRow };
 }
 
 /**
- * Exports current stock inventory report with full specs, IMEI numbers, locations and totals.
+ * Exports sales report with detailed items breakdown, IMEI numbers and comprehensive summary totals.
  */
-export function exportInventoryReport(devices: Device[], stores: Store[], rate: number = 9.5) {
+export function exportSalesReport(sales: Sale[], rate: number = 9.5) {
+  const table = buildSalesReportTable(sales, rate);
+  const fileName = `otchet_prodazhi_${new Date().toISOString().split('T')[0]}.csv`;
+  downloadCsv(tableToCsv(table), fileName);
+}
+
+/**
+ * Builds the current-stock inventory report table (excludes SOLD devices).
+ */
+export function buildInventoryReportTable(devices: Device[], stores: Store[], rate: number = 9.5): ReportTable {
   const storeMap = new Map<string, string>();
   stores.forEach(s => storeMap.set(s.id, s.name));
 
-  // Exclude SOLD devices from inventory stock export (sold items belong to sales history)
   const inStockDevices = devices.filter(dev => dev.status !== 'SOLD');
 
   const headers = [
@@ -142,7 +156,6 @@ export function exportInventoryReport(devices: Device[], stores: Store[], rate: 
     'Цвет',
     'IMEI 1',
     'IMEI 2',
-    'Серийный номер',
     'Локация / Склад',
     'Статус',
     'Поставщик',
@@ -150,7 +163,7 @@ export function exportInventoryReport(devices: Device[], stores: Store[], rate: 
     'Дата прихода'
   ];
 
-  const rows: string[][] = [];
+  const rows: (string | number)[][] = [];
   let totalUnits = 0;
   let totalCostBasisUsd = 0;
 
@@ -160,55 +173,49 @@ export function exportInventoryReport(devices: Device[], stores: Store[], rate: 
     totalCostBasisUsd += costUsd;
 
     const locationName = storeMap.get(dev.locationId) || dev.locationName || dev.locationId;
-    const statusText = 
+    const statusText =
       dev.status === 'MAIN_WAREHOUSE' ? 'Главный склад' :
       dev.status === 'STORE_STOCK' ? 'В наличии в магазине' :
       dev.status === 'IN_STOCK_AFTER_EXCHANGE' ? 'Склад (после обмена)' :
       dev.status === 'IN_REPAIR' ? 'В ремонте' : 'Транзит';
 
     rows.push([
-      escapeCsvField(dev.brand),
-      escapeCsvField(dev.model),
-      escapeCsvField(dev.storage || '-'),
-      escapeCsvField(dev.color || '-'),
-      escapeCsvField(formatImeiForCsv(dev.imei)),
-      escapeCsvField(formatImeiForCsv(dev.imei2)),
-      escapeCsvField(dev.serialNumber || '-'),
-      escapeCsvField(locationName),
-      escapeCsvField(statusText),
-      escapeCsvField(dev.supplierName || '-'),
-      escapeCsvField(costUsd.toFixed(2)),
-      escapeCsvField(dev.createdAt ? dev.createdAt.split('T')[0] : '-')
+      dev.brand,
+      dev.model,
+      dev.storage || '-',
+      dev.color || '-',
+      formatImeiForCsv(dev.imei),
+      formatImeiForCsv(dev.imei2),
+      locationName,
+      statusText,
+      dev.supplierName || '-',
+      costUsd.toFixed(2),
+      dev.createdAt ? dev.createdAt.split('T')[0] : '-'
     ]);
   });
 
-  // Summary Row "ИТОГО"
-  rows.push([]);
-  rows.push([
-    escapeCsvField('ИТОГО:'),
-    escapeCsvField(''),
-    escapeCsvField(''),
-    escapeCsvField(''),
-    escapeCsvField(''),
-    escapeCsvField(''),
-    escapeCsvField(''),
-    escapeCsvField(''),
-    escapeCsvField(''),
-    escapeCsvField(''),
-    escapeCsvField(`Всего позиций в остатке: ${totalUnits}`),
-    escapeCsvField(totalCostBasisUsd.toFixed(2)),
-    escapeCsvField('')
-  ]);
+  const totalsRow = [
+    'ИТОГО:', '', '', '', '', '', '', '', '',
+    `${totalCostBasisUsd.toFixed(2)} (${totalUnits} шт.)`,
+    ''
+  ];
 
-  const csvContent = [headers.join(','), ...rows.map(r => r.join(','))].join('\r\n');
-  const fileName = `otchet_ostatki_sklada_${new Date().toISOString().split('T')[0]}.csv`;
-  downloadCsv(csvContent, fileName);
+  return { headers, rows, totalsRow };
 }
 
 /**
- * Exports operational expenses report.
+ * Exports current stock inventory report with full specs, IMEI numbers, locations and totals.
  */
-export function exportExpensesReport(expenses: Expense[], rate: number = 9.5) {
+export function exportInventoryReport(devices: Device[], stores: Store[], rate: number = 9.5) {
+  const table = buildInventoryReportTable(devices, stores, rate);
+  const fileName = `otchet_ostatki_sklada_${new Date().toISOString().split('T')[0]}.csv`;
+  downloadCsv(tableToCsv(table), fileName);
+}
+
+/**
+ * Builds the operational expenses report table.
+ */
+export function buildExpensesReportTable(expenses: Expense[], rate: number = 9.5): ReportTable {
   const headers = [
     'ID Расхода',
     'Дата',
@@ -223,7 +230,7 @@ export function exportExpensesReport(expenses: Expense[], rate: number = 9.5) {
     'Сотрудник'
   ];
 
-  const rows: string[][] = [];
+  const rows: (string | number)[][] = [];
   let totalTjs = 0;
   let totalUsd = 0;
 
@@ -231,44 +238,41 @@ export function exportExpensesReport(expenses: Expense[], rate: number = 9.5) {
     totalTjs += e.amountTjs || 0;
     totalUsd += e.amountUsd || 0;
     rows.push([
-      escapeCsvField(e.id),
-      escapeCsvField(e.date),
-      escapeCsvField(e.category),
-      escapeCsvField((e.amountTjs || 0).toFixed(2)),
-      escapeCsvField(e.exchangeRate || rate),
-      escapeCsvField((e.amountUsd || 0).toFixed(2)),
-      escapeCsvField(e.targetType || 'STORE'),
-      escapeCsvField(e.storeName || 'Бизнес'),
-      escapeCsvField(e.sourceAccount || 'Касса'),
-      escapeCsvField(e.comment || '-'),
-      escapeCsvField(e.createdByName || 'Администратор')
+      e.id,
+      e.date,
+      e.category,
+      (e.amountTjs || 0).toFixed(2),
+      e.exchangeRate || rate,
+      (e.amountUsd || 0).toFixed(2),
+      e.targetType || 'STORE',
+      e.storeName || 'Бизнес',
+      e.sourceAccount || 'Касса',
+      e.comment || '-',
+      e.createdByName || 'Администратор'
     ]);
   });
 
-  rows.push([]);
-  rows.push([
-    escapeCsvField('ИТОГО:'),
-    escapeCsvField(''),
-    escapeCsvField(`Всего записей: ${expenses.length}`),
-    escapeCsvField(totalTjs.toFixed(2)),
-    escapeCsvField(''),
-    escapeCsvField(totalUsd.toFixed(2)),
-    escapeCsvField(''),
-    escapeCsvField(''),
-    escapeCsvField(''),
-    escapeCsvField(''),
-    escapeCsvField('')
-  ]);
+  const totalsRow = [
+    'ИТОГО:', '', `Всего записей: ${expenses.length}`,
+    totalTjs.toFixed(2), '', totalUsd.toFixed(2), '', '', '', '', ''
+  ];
 
-  const csvContent = [headers.join(','), ...rows.map(r => r.join(','))].join('\r\n');
-  const fileName = `otchet_rashody_${new Date().toISOString().split('T')[0]}.csv`;
-  downloadCsv(csvContent, fileName);
+  return { headers, rows, totalsRow };
 }
 
 /**
- * Exports repair tickets journal report.
+ * Exports operational expenses report.
  */
-export function exportRepairsReport(repairs: RepairTicket[]) {
+export function exportExpensesReport(expenses: Expense[], rate: number = 9.5) {
+  const table = buildExpensesReportTable(expenses, rate);
+  const fileName = `otchet_rashody_${new Date().toISOString().split('T')[0]}.csv`;
+  downloadCsv(tableToCsv(table), fileName);
+}
+
+/**
+ * Builds the repair tickets journal report table.
+ */
+export function buildRepairsReportTable(repairs: RepairTicket[]): ReportTable {
   const headers = [
     '№ Квитанции',
     'Дата приема',
@@ -286,51 +290,47 @@ export function exportRepairsReport(repairs: RepairTicket[]) {
     'Финальная стоимость (TJS)'
   ];
 
-  const rows: string[][] = [];
+  const rows: (string | number)[][] = [];
   let totalCostTjs = 0;
 
   repairs.forEach((r) => {
     const cost = r.finalCostTjs || r.estimatedCostTjs || 0;
     totalCostTjs += cost;
     rows.push([
-      escapeCsvField(r.ticketNumber),
-      escapeCsvField(r.createdAt ? r.createdAt.split('T')[0] : '-'),
-      escapeCsvField(r.storeName || '-'),
-      escapeCsvField(r.intakeSeller || '-'),
-      escapeCsvField(r.customerName || '-'),
-      escapeCsvField(r.customerPhone ? formatImeiForCsv(r.customerPhone) : '-'),
-      escapeCsvField(r.brand || '-'),
-      escapeCsvField(r.deviceModel || r.model || '-'),
-      escapeCsvField(formatImeiForCsv(r.imei)),
-      escapeCsvField(r.issueDescription || r.problemDescription || '-'),
-      escapeCsvField(`${r.visualCondition || ''} / ${r.equipmentPackage || ''}`.trim()),
-      escapeCsvField(r.status),
-      escapeCsvField((r.estimatedCostTjs || 0).toFixed(2)),
-      escapeCsvField((r.finalCostTjs || 0).toFixed(2))
+      r.ticketNumber,
+      r.createdAt ? r.createdAt.split('T')[0] : '-',
+      r.storeName || '-',
+      r.intakeSeller || '-',
+      r.customerName || '-',
+      r.customerPhone ? formatImeiForCsv(r.customerPhone) : '-',
+      r.brand || '-',
+      r.deviceModel || r.model || '-',
+      formatImeiForCsv(r.imei),
+      r.issueDescription || r.problemDescription || '-',
+      `${r.visualCondition || ''} / ${r.equipmentPackage || ''}`.trim(),
+      r.status,
+      (r.estimatedCostTjs || 0).toFixed(2),
+      (r.finalCostTjs || 0).toFixed(2)
     ]);
   });
 
-  rows.push([]);
-  rows.push([
-    escapeCsvField('ИТОГО:'),
-    escapeCsvField(''),
-    escapeCsvField(''),
-    escapeCsvField(''),
-    escapeCsvField(''),
-    escapeCsvField(''),
-    escapeCsvField(''),
-    escapeCsvField(''),
-    escapeCsvField(''),
-    escapeCsvField(''),
-    escapeCsvField(''),
-    escapeCsvField(`Всего квитанций: ${repairs.length}`),
-    escapeCsvField(''),
-    escapeCsvField(totalCostTjs.toFixed(2))
-  ]);
+  const totalsRow = [
+    'ИТОГО:', '', '', '', '', '', '', '', '', '', '',
+    `Всего квитанций: ${repairs.length}`,
+    '',
+    totalCostTjs.toFixed(2)
+  ];
 
-  const csvContent = [headers.join(','), ...rows.map(r => r.join(','))].join('\r\n');
+  return { headers, rows, totalsRow };
+}
+
+/**
+ * Exports repair tickets journal report.
+ */
+export function exportRepairsReport(repairs: RepairTicket[]) {
+  const table = buildRepairsReportTable(repairs);
   const fileName = `otchet_remonty_${new Date().toISOString().split('T')[0]}.csv`;
-  downloadCsv(csvContent, fileName);
+  downloadCsv(tableToCsv(table), fileName);
 }
 
 /**

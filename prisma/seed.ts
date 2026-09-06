@@ -82,19 +82,7 @@ async function main() {
     });
   }
 
-  const todayStr = getBusinessDateKey();
-  const adminUser = await prisma.user.findFirst({ where: { role: 'ADMIN' } });
-  await prisma.exchangeRate.upsert({
-    where: { date: todayStr },
-    update: {},
-    create: {
-      date: todayStr,
-      rate: 9.50,
-      createdByUserId: adminUser?.id || 'user-admin',
-    },
-  });
-
-  console.log(`Seeded ${STORE_SEEDS.length} stores, ${USER_SEEDS.length} users, and exchange rate ${todayStr}: 9.50 TJS. Database clean of test data.`);
+  console.log(`Seeded ${STORE_SEEDS.length} stores and ${USER_SEEDS.length} users. Exchange rate left unset for first login prompt.`);
 }
 
 main()

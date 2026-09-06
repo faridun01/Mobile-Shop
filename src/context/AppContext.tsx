@@ -995,7 +995,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const ownerInvestment: AppContextType['ownerInvestment'] = async (ownerId, amountUsd, destination, note) => {
     try {
       await apiClient(`/owners/${ownerId}/investment`, { method: 'POST', body: JSON.stringify({ amountUsd, destination, note }) });
-      await Promise.all([fetchOwners(), fetchOwnerTransactions()]);
+      await Promise.all([fetchOwners(), fetchOwnerTransactions(), fetchStores()]);
       return { success: true };
     } catch (err) {
       return { success: false, message: errorMessage(err, 'Нет прав') };
@@ -1005,7 +1005,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const ownerCapitalWithdrawal: AppContextType['ownerCapitalWithdrawal'] = async (ownerId, amountUsd, source, note) => {
     try {
       await apiClient(`/owners/${ownerId}/withdrawal`, { method: 'POST', body: JSON.stringify({ amountUsd, source, note }) });
-      await Promise.all([fetchOwners(), fetchOwnerTransactions()]);
+      await Promise.all([fetchOwners(), fetchOwnerTransactions(), fetchStores()]);
       return { success: true };
     } catch (err) {
       return { success: false, message: errorMessage(err, 'Сумма изъятия превышает текущий капитал') };
@@ -1015,7 +1015,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const ownerProfitPayout: AppContextType['ownerProfitPayout'] = async (ownerId, amountUsd, source, note) => {
     try {
       await apiClient(`/owners/${ownerId}/payout`, { method: 'POST', body: JSON.stringify({ amountUsd, source, note }) });
-      await Promise.all([fetchOwners(), fetchOwnerTransactions()]);
+      await Promise.all([fetchOwners(), fetchOwnerTransactions(), fetchStores()]);
       return { success: true };
     } catch (err) {
       return { success: false, message: errorMessage(err, 'Сумма выплаты превышает доступную прибыль') };

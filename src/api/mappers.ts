@@ -45,7 +45,6 @@ export function mapDevice(d: any): Device {
     id: d.id,
     imei: d.imei,
     imei2: d.imei2 ?? undefined,
-    serialNumber: d.serialNumber ?? undefined,
     brand: d.brand,
     model: d.model,
     ram: d.ram ?? undefined,

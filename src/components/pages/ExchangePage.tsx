@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { useApp } from '../../context/AppContext';
-import { Device, PaymentMethod } from '../../types';
+import { Device, PaymentMethod, Sale, SaleItem } from '../../types';
 import {
   Search,
   Scan,
@@ -24,6 +24,7 @@ export const ExchangePage: React.FC = () => {
 
   const [receiptSearch, setReceiptSearch] = useState('');
   const [selectedOldDevice, setSelectedOldDevice] = useState<Device | null>(null);
+  const [receiptChoice, setReceiptChoice] = useState<{ sale: Sale; items: SaleItem[] } | null>(null);
 
   const [exchangeInValueTjs, setExchangeInValueTjs] = useState<number>(0);
 
@@ -46,6 +47,7 @@ export const ExchangePage: React.FC = () => {
       const isAvailable = d.status === 'STORE_STOCK' || d.status === 'IN_STOCK_AFTER_EXCHANGE';
       if (!isAvailable) return false;
       if (effectiveStoreId && d.locationId !== effectiveStoreId) return false;
+      if (selectedOldDevice && d.id === selectedOldDevice.id) return false;
 
       if (deviceSearchQuery.trim()) {
         const q = deviceSearchQuery.toLowerCase().trim();
@@ -59,37 +61,56 @@ export const ExchangePage: React.FC = () => {
       }
       return true;
     });
-  }, [devices, effectiveStoreId, deviceSearchQuery]);
+  }, [devices, effectiveStoreId, deviceSearchQuery, selectedOldDevice]);
 
+  const resolveOldDeviceFromItem = (sale: Sale, item: SaleItem): Device => {
+    const matchedDev = devices.find(d => d.imei === item.imei || d.id === item.deviceId);
+    return matchedDev || {
+      id: item.deviceId || `old-${Date.now()}`,
+      imei: item.imei,
+      imei2: item.imei2,
+      brand: item.brand,
+      model: item.model,
+      color: item.color,
+      storage: item.storage,
+      costBasisUsd: 100,
+      purchaseCostUsd: 100,
+      retailPriceTjs: item.salePriceTjs || 1000,
+      status: 'SOLD',
+      locationId: sale.storeId,
+      locationName: sale.storeName,
+      supplierId: 'sup-tradein',
+      createdAt: sale.date,
+      timeline: [],
+    };
+  };
+
+  const handlePickReceiptItem = (sale: Sale, item: SaleItem) => {
+    setSelectedOldDevice(resolveOldDeviceFromItem(sale, item));
+    setExchangeInValueTjs(item.salePriceTjs ? Math.round(item.salePriceTjs * 0.7) : 0);
+    setReceiptChoice(null);
+    setStatus({ tone: 'success', text: `Устройство ${item.brand} ${item.model} выбрано из чека #${sale.receiptNumber}` });
+  };
+
+  // Only devices with an actual sale record can be traded in — the exchange is modeled
+  // as swapping an item within that sale, not a standalone "customer's own phone" credit.
+  // A device merely sitting in stock (never sold here) has no sale to attach the exchange
+  // to, so that lookup path was removed rather than accepted only to fail on submit.
   const handleFindSoldImei = (query: string) => {
     const q = query.trim().toLowerCase();
     if (!q) return;
+    setReceiptChoice(null);
 
     for (const sale of sales) {
       if (sale.receiptNumber.toString() === q) {
+        if (sale.items.length > 1) {
+          setReceiptChoice({ sale, items: sale.items });
+          setStatus({ tone: 'info', text: `В чеке #${sale.receiptNumber} несколько товаров — выберите нужный` });
+          return;
+        }
         const item = sale.items[0];
         if (item) {
-          const matchedDev = devices.find(d => d.imei === item.imei || d.id === item.deviceId);
-          const oldDev: Device = matchedDev || {
-            id: item.deviceId || `old-${Date.now()}`,
-            imei: item.imei,
-            imei2: item.imei2,
-            brand: item.brand,
-            model: item.model,
-            color: item.color,
-            storage: item.storage,
-            costBasisUsd: 100,
-            purchaseCostUsd: 100,
-            retailPriceTjs: item.salePriceTjs || 1000,
-            status: 'SOLD',
-            locationId: sale.storeId,
-            locationName: sale.storeName,
-            supplierId: 'sup-tradein',
-            createdAt: sale.date,
-            timeline: [],
-          };
-          setSelectedOldDevice(oldDev);
-          setExchangeInValueTjs(item.salePriceTjs ? Math.round(item.salePriceTjs * 0.7) : 0);
+          handlePickReceiptItem(sale, item);
           setStatus({ tone: 'success', text: `Найдено проданное устройство по чеку #${sale.receiptNumber}` });
           return;
         }
@@ -100,26 +121,7 @@ export const ExchangePage: React.FC = () => {
           item.imei.toLowerCase() === q ||
           (item.imei2 && item.imei2.toLowerCase() === q)
         ) {
-          const matchedDev = devices.find(d => d.imei === item.imei || d.id === item.deviceId);
-          const oldDev: Device = matchedDev || {
-            id: item.deviceId || `old-${Date.now()}`,
-            imei: item.imei,
-            imei2: item.imei2,
-            brand: item.brand,
-            model: item.model,
-            color: item.color,
-            storage: item.storage,
-            costBasisUsd: 100,
-            purchaseCostUsd: 100,
-            retailPriceTjs: item.salePriceTjs || 1000,
-            status: 'SOLD',
-            locationId: sale.storeId,
-            locationName: sale.storeName,
-            supplierId: 'sup-tradein',
-            createdAt: sale.date,
-            timeline: [],
-          };
-          setSelectedOldDevice(oldDev);
+          setSelectedOldDevice(resolveOldDeviceFromItem(sale, item));
           setExchangeInValueTjs(item.salePriceTjs ? Math.round(item.salePriceTjs * 0.7) : 0);
           setStatus({ tone: 'success', text: `Устройство ${item.brand} ${item.model} найдено в истории продаж` });
           return;
@@ -127,19 +129,7 @@ export const ExchangePage: React.FC = () => {
       }
     }
 
-    const devMatch = devices.find(d =>
-      d.imei.toLowerCase() === q ||
-      (d.imei2 && d.imei2.toLowerCase() === q)
-    );
-
-    if (devMatch) {
-      setSelectedOldDevice(devMatch);
-      setExchangeInValueTjs(devMatch.retailPriceTjs ? Math.round(devMatch.retailPriceTjs * 0.7) : 0);
-      setStatus({ tone: 'success', text: `Устройство ${devMatch.brand} ${devMatch.model} найдено на складе` });
-      return;
-    }
-
-    setStatus({ tone: 'error', text: `Устройство или чек "${query}" не найдено в системе` });
+    setStatus({ tone: 'error', text: `Проданное устройство по чеку/IMEI "${query}" не найдено в истории продаж` });
   };
 
   const handleScanOldDevice = () => {
@@ -205,7 +195,12 @@ export const ExchangePage: React.FC = () => {
         replacementDeviceId: replacementDevice.id,
         newPriceTjs,
         differenceTjs,
-        paymentMethod: differenceTjs !== 0 ? exchangePaymentMethod : undefined,
+        // The payment-method toggle is only ever shown to the cashier when the customer
+        // owes a top-up (differenceTjs > 0) — for a refund (differenceTjs < 0) the UI never
+        // lets them pick, so we must not forward a stale choice left over from a previous
+        // exchange in this session. Omitting it lets the backend default to CASH, matching
+        // the "Выплатите клиенту из кассы" copy shown for that case.
+        paymentMethod: differenceTjs > 0 ? exchangePaymentMethod : undefined,
       });
 
       if (res.success) {
@@ -214,9 +209,11 @@ export const ExchangePage: React.FC = () => {
         setReplacementDevice(null);
         setReceiptSearch('');
         setDeviceSearchQuery('');
+        setReceiptChoice(null);
         setExchangeInValueTjs(0);
         setNewPriceTjs(0);
         setGivenCashTjs('');
+        setExchangePaymentMethod('CASH');
       } else {
         setStatus({ tone: 'error', text: res.message || 'Ошибка проведения обмена' });
       }
@@ -275,12 +272,35 @@ export const ExchangePage: React.FC = () => {
                     <Scan className="w-4 h-4" />
                   </button>
                 </div>
+
+                {receiptChoice && (
+                  <div className="rounded-xl border border-border bg-surface divide-y divide-border overflow-hidden">
+                    {receiptChoice.items.map((item, idx) => (
+                      <button
+                        key={`${item.deviceId || item.imei}-${idx}`}
+                        type="button"
+                        onClick={() => handlePickReceiptItem(receiptChoice.sale, item)}
+                        className="w-full text-left p-3 hover:bg-surface-raised flex items-center justify-between text-xs transition-colors"
+                      >
+                        <div>
+                          <p className="font-bold text-fg">{item.brand} {item.model}</p>
+                          <p className="text-[11px] text-fg-muted mt-0.5">{item.storage} • {item.color}</p>
+                          <p className="text-[10px] text-fg-subtle mt-0.5">IMEI: {item.imei}</p>
+                        </div>
+                        <span className="font-bold text-accent text-xs">{item.salePriceTjs.toLocaleString()} TJS</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
             ) : (
               <div className="p-4 rounded-xl bg-surface border border-border space-y-3.5 relative">
                 <button
                   type="button"
-                  onClick={() => setSelectedOldDevice(null)}
+                  onClick={() => {
+                    setSelectedOldDevice(null);
+                    setExchangeInValueTjs(0);
+                  }}
                   className="absolute right-3.5 top-3.5 text-fg-subtle hover:text-fg transition-colors"
                   title="Отменить выбор"
                 >

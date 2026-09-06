@@ -1,25 +1,31 @@
 import React, { useState, useMemo } from 'react';
 import { useApp } from '../../context/AppContext';
-import { Device, DeviceStatus } from '../../types';
+import { Device, DeviceStatus, Store as StoreType } from '../../types';
 import {
   Smartphone,
   ChevronRight,
   ChevronDown,
+  ChevronLeft,
   Store,
+  Warehouse,
   History,
   DollarSign,
   Layers,
-  List
+  List,
+  Package,
+  Boxes
 } from 'lucide-react';
 import { useGroupedDevices } from '../../hooks/useGroupedDevices';
 import { SearchBar } from '../ui/SearchBar';
-import { FilterPillGroup } from '../ui/FilterPillGroup';
 import { Select } from '../ui/Input';
 import { Button } from '../ui/Button';
 import { Badge, BadgeTone } from '../ui/Badge';
 import { EmptyState } from '../ui/EmptyState';
 import { LoadingState } from '../ui/Skeleton';
 import { Dialog } from '../ui/Dialog';
+import { StatCard } from '../ui/StatCard';
+
+const IN_STOCK_STATUSES: DeviceStatus[] = ['STORE_STOCK', 'MAIN_WAREHOUSE', 'IN_STOCK_AFTER_EXCHANGE'];
 
 const STATUS_LABELS: Record<DeviceStatus, string> = {
   MAIN_WAREHOUSE: 'Главный склад',
@@ -70,9 +76,40 @@ const DeviceRow: React.FC<DeviceRowProps> = ({ device, isAdminOrPartner, onClick
   </button>
 );
 
-export const InventoryPage: React.FC = () => {
-  const { currentUser, devices, stores, selectedStoreId, setSelectedStoreId, openScanner, isInitialLoading } = useApp();
+interface StoreCardProps {
+  store: StoreType;
+  unitCount: number;
+  valueUsd: number;
+  showValue: boolean;
+  onClick: () => void;
+}
 
+const StoreCard: React.FC<StoreCardProps> = ({ store, unitCount, valueUsd, showValue, onClick }) => (
+  <button
+    onClick={onClick}
+    className="w-full text-left rounded-xl border border-border bg-surface p-3.5 active:bg-surface-raised transition-colors space-y-3"
+  >
+    <div className="flex items-center gap-2 min-w-0">
+      <span className="w-9 h-9 rounded-lg bg-accent/10 text-accent flex items-center justify-center shrink-0">
+        {store.isMainWarehouse ? <Warehouse className="w-4.5 h-4.5" /> : <Store className="w-4.5 h-4.5" />}
+      </span>
+      <div className="min-w-0">
+        <p className="text-sm font-semibold text-fg truncate">{store.name}</p>
+        {store.isMainWarehouse && <p className="text-[11px] text-fg-subtle">Главный склад</p>}
+      </div>
+      <ChevronRight className="w-4 h-4 text-fg-subtle ml-auto shrink-0" />
+    </div>
+    <div className={`grid gap-2 ${showValue ? 'grid-cols-2' : 'grid-cols-1'}`}>
+      <StatCard label="Единиц" value={String(unitCount)} icon={Boxes} />
+      {showValue && <StatCard label="Стоимость" value={`$${valueUsd.toLocaleString()}`} icon={DollarSign} tone="accent" />}
+    </div>
+  </button>
+);
+
+export const InventoryPage: React.FC = () => {
+  const { currentUser, devices, stores, openScanner, isInitialLoading } = useApp();
+
+  const [pickedStoreId, setPickedStoreId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedBrand, setSelectedBrand] = useState<string>('ALL');
   const [selectedDevice, setSelectedDevice] = useState<Device | null>(null);
@@ -80,16 +117,42 @@ export const InventoryPage: React.FC = () => {
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
 
   const isSeller = currentUser?.role === 'SELLER';
-  const effectiveStoreId = isSeller ? (currentUser?.storeId || 'store-1') : (selectedStoreId || 'all');
   const isAdminOrPartner = currentUser?.role === 'ADMIN' || currentUser?.role === 'PARTNER';
+  const activeStoreId = isSeller ? (currentUser?.storeId || '') : pickedStoreId;
+  const activeStore = stores.find(s => s.id === activeStoreId) || null;
+  const showPicker = !isSeller && !activeStoreId;
+
+  const storeStats = useMemo(() => {
+    const map = new Map<string, { unitCount: number; valueUsd: number }>();
+    for (const s of stores) map.set(s.id, { unitCount: 0, valueUsd: 0 });
+    for (const d of devices) {
+      if (!IN_STOCK_STATUSES.includes(d.status)) continue;
+      const entry = map.get(d.locationId);
+      if (!entry) continue;
+      entry.unitCount++;
+      entry.valueUsd += d.purchaseCostUsd || 0;
+    }
+    return map;
+  }, [devices, stores]);
+
+  const devicesInActiveStore = useMemo(
+    () => devices.filter(d => d.locationId === activeStoreId && IN_STOCK_STATUSES.includes(d.status)),
+    [devices, activeStoreId]
+  );
+
+  const distinctModelCount = useMemo(() => {
+    const set = new Set<string>();
+    devicesInActiveStore.forEach(d => set.add(`${d.brand}__${d.model}`));
+    return set.size;
+  }, [devicesInActiveStore]);
+
+  const stockValueUsd = useMemo(
+    () => devicesInActiveStore.reduce((acc, d) => acc + (d.purchaseCostUsd || 0), 0),
+    [devicesInActiveStore]
+  );
 
   const filteredDevices = useMemo(() => {
-    return devices.filter((d) => {
-      if (effectiveStoreId !== 'all' && d.locationId !== effectiveStoreId) return false;
-
-      // Always show items in stock
-      if (d.status !== 'STORE_STOCK' && d.status !== 'MAIN_WAREHOUSE' && d.status !== 'IN_STOCK_AFTER_EXCHANGE') return false;
-
+    return devicesInActiveStore.filter((d) => {
       if (selectedBrand !== 'ALL' && d.brand !== selectedBrand) return false;
 
       if (searchQuery.trim()) {
@@ -97,7 +160,6 @@ export const InventoryPage: React.FC = () => {
         const matches =
           d.imei.toLowerCase().includes(q) ||
           d.imei2?.toLowerCase().includes(q) ||
-          d.serialNumber?.toLowerCase().includes(q) ||
           d.brand.toLowerCase().includes(q) ||
           d.model.toLowerCase().includes(q) ||
           d.color.toLowerCase().includes(q) ||
@@ -108,21 +170,21 @@ export const InventoryPage: React.FC = () => {
 
       return true;
     });
-  }, [devices, effectiveStoreId, selectedBrand, searchQuery]);
+  }, [devicesInActiveStore, selectedBrand, searchQuery]);
 
   const groups = useGroupedDevices(filteredDevices);
 
   const brands = useMemo(() => {
     const set = new Set<string>();
-    devices.forEach((d) => set.add(d.brand));
+    devicesInActiveStore.forEach((d) => set.add(d.brand));
     return [{ value: 'ALL', label: 'Все бренды' }, ...Array.from(set).map(b => ({ value: b, label: b }))];
-  }, [devices]);
+  }, [devicesInActiveStore]);
 
   const handleScanDevice = () => {
     openScanner((scannedCode) => {
       const code = scannedCode.trim();
       const match = devices.find(d =>
-        (d.imei === code || d.imei2 === code || d.serialNumber === code) &&
+        (d.imei === code || d.imei2 === code) &&
         (!isSeller || d.locationId === currentUser?.storeId)
       );
       if (match) setSelectedDevice(match);
@@ -130,25 +192,77 @@ export const InventoryPage: React.FC = () => {
     });
   };
 
+  const handleBackToPicker = () => {
+    setPickedStoreId(null);
+    setSearchQuery('');
+    setSelectedBrand('ALL');
+  };
+
+  if (showPicker) {
+    const activeStores = stores.filter(s => s.active);
+    return (
+      <div className="flex-1 flex flex-col h-full overflow-hidden bg-bg text-fg">
+        <div className="p-3 border-b border-border bg-surface shrink-0">
+          <p className="text-sm font-semibold text-fg">Выберите склад</p>
+          <p className="text-xs text-fg-subtle mt-0.5">Чтобы посмотреть остатки, сначала выберите магазин или главный склад</p>
+        </div>
+        <div className="flex-1 overflow-y-auto p-3">
+          {activeStores.length === 0 ? (
+            <EmptyState icon={Package} title="Нет активных складов" description="Добавьте магазин в настройках" />
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {activeStores.map(s => {
+                const stat = storeStats.get(s.id) || { unitCount: 0, valueUsd: 0 };
+                return (
+                  <StoreCard
+                    key={s.id}
+                    store={s}
+                    unitCount={stat.unitCount}
+                    valueUsd={stat.valueUsd}
+                    showValue={isAdminOrPartner}
+                    onClick={() => setPickedStoreId(s.id)}
+                  />
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex-1 flex flex-col h-full overflow-hidden bg-bg text-fg">
       <div className="p-2.5 sm:p-3 border-b border-border bg-surface space-y-2 shrink-0">
+        {/* Row 1: current store + back (admin/partner only) */}
+        <div className="flex items-center gap-2">
+          {!isSeller && (
+            <button
+              type="button"
+              onClick={handleBackToPicker}
+              className="flex items-center gap-1 h-8 px-2 rounded-lg text-fg-subtle hover:text-fg shrink-0 transition-colors"
+              aria-label="Выбрать другой склад"
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </button>
+          )}
+          <span className="flex items-center gap-1.5 text-sm font-semibold text-fg truncate">
+            {activeStore?.isMainWarehouse ? <Warehouse className="w-4 h-4 text-accent shrink-0" /> : <Store className="w-4 h-4 text-accent shrink-0" />}
+            {isSeller ? (currentUser?.storeName || 'Мой магазин') : (activeStore?.name || 'Склад')}
+          </span>
+        </div>
+
+        {/* Row 2: at-a-glance stats */}
+        <div className={`grid gap-2 ${isAdminOrPartner ? 'grid-cols-3' : 'grid-cols-2'}`}>
+          <StatCard label="Единиц" value={String(devicesInActiveStore.length)} icon={Boxes} />
+          <StatCard label="Моделей" value={String(distinctModelCount)} icon={Layers} />
+          {isAdminOrPartner && <StatCard label="Стоимость" value={`$${stockValueUsd.toLocaleString()}`} icon={DollarSign} tone="accent" />}
+        </div>
+
         <SearchBar value={searchQuery} onChange={setSearchQuery} onScan={handleScanDevice} placeholder="Поиск по IMEI / штрихкоду / модели..." />
 
-        {/* Row 2: Store select, Brand select & Count */}
+        {/* Row 3: Brand select, group toggle & filtered count */}
         <div className="flex items-center gap-2 overflow-x-auto scrollbar-none py-0.5 shrink-0">
-          {!isSeller ? (
-            <Select value={effectiveStoreId} onChange={(e) => setSelectedStoreId(e.target.value)} className="h-8 py-0 px-2 text-[11px] w-auto shrink-0">
-              <option value="all">Все склады</option>
-              {stores.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-            </Select>
-          ) : (
-            <span className="flex items-center gap-1 h-8 px-2.5 rounded-lg border border-border bg-surface-raised text-[11px] font-medium text-fg-muted shrink-0 whitespace-nowrap">
-              <Store className="w-3.5 h-3.5 text-accent" />
-              {currentUser?.storeName || 'Мой магазин'}
-            </span>
-          )}
-
           <Select value={selectedBrand} onChange={(e) => setSelectedBrand(e.target.value)} className="h-8 py-0 px-2 text-[11px] w-auto shrink-0">
             {brands.map(b => <option key={b.value} value={b.value}>{b.label}</option>)}
           </Select>
@@ -195,7 +309,16 @@ export const InventoryPage: React.FC = () => {
                       <Smartphone className="w-4 h-4 text-accent shrink-0" />
                       <div className="min-w-0 text-left">
                         <p className="text-sm font-semibold text-fg truncate">{group.brand} {group.model}</p>
-                        <p className="text-xs text-fg-subtle truncate">{group.storageGroups.map(s => s.storage).join(', ')}</p>
+                        <div className="flex items-center gap-1 flex-wrap mt-1">
+                          {group.storageGroups.map((sg) => (
+                            <span
+                              key={sg.key}
+                              className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-surface-raised text-fg-subtle border border-border whitespace-nowrap"
+                            >
+                              {sg.storage}×{sg.count}
+                            </span>
+                          ))}
+                        </div>
                       </div>
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
@@ -250,12 +373,6 @@ export const InventoryPage: React.FC = () => {
                   {selectedDevice.imei2 || '— не указан'}
                 </span>
               </div>
-              {selectedDevice.serialNumber && (
-                <div className="col-span-2 pt-2 border-t border-border">
-                  <span className="text-fg-subtle block text-xs uppercase">Серийный номер</span>
-                  <span className="text-sm text-fg break-all">{selectedDevice.serialNumber}</span>
-                </div>
-              )}
               <div className="col-span-2 pt-2 border-t border-border flex items-center justify-between">
                 <span className="text-fg-subtle text-xs uppercase">Статус</span>
                 <Badge tone={STATUS_TONE[selectedDevice.status]}>{STATUS_LABELS[selectedDevice.status] || selectedDevice.status}</Badge>

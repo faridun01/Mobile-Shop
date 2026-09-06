@@ -738,7 +738,7 @@ export const RepairPage: React.FC = () => {
               </div>
               <div className="grid grid-cols-2 gap-2 text-fg-muted text-xs">
                 <div>
-                  <span className="text-fg-subtle block text-[10px] uppercase font-semibold">IMEI / Серийный номер</span>
+                  <span className="text-fg-subtle block text-[10px] uppercase font-semibold">IMEI</span>
                   <span className="font-mono text-fg">{viewingTicket.imei || 'N/A'}</span>
                 </div>
                 <div>

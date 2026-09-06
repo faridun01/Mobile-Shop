@@ -120,7 +120,6 @@ export interface Device {
   id: string;
   imei: string;
   imei2?: string;
-  serialNumber?: string;
   brand: string;
   model: string;
   ram?: string;

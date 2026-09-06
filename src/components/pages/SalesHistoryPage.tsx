@@ -35,7 +35,7 @@ export const SalesHistoryPage: React.FC = () => {
   } = useApp();
 
   // Defaults to "today" — this is a same-shift lookup tool far more often than a monthly report.
-  const [periodFilter, setPeriodFilter] = useState<'TODAY' | 'MONTH' | 'SPECIFIC_MONTH' | 'ALL'>('TODAY');
+  const [periodFilter, setPeriodFilter] = useState<'TODAY' | 'SPECIFIC_MONTH' | 'ALL'>('TODAY');
   const [selectedMonth, setSelectedMonth] = useState<string>(new Date().toISOString().substring(0, 7));
 
   const retailStores = useMemo(() => stores.filter((s) => !s.isMainWarehouse), [stores]);
@@ -61,7 +61,6 @@ export const SalesHistoryPage: React.FC = () => {
 
   const filteredSales = useMemo(() => {
     const todayStr = new Date().toISOString().split('T')[0];
-    const currentMonthStr = todayStr.substring(0, 7);
 
     return sales.filter((sale) => {
       if (currentUser?.role === 'SELLER' && sale.sellerId !== currentUser.id) return false;
@@ -69,7 +68,6 @@ export const SalesHistoryPage: React.FC = () => {
 
       const saleDateStr = sale.date.split('T')[0];
       if (periodFilter === 'TODAY' && saleDateStr !== todayStr) return false;
-      if (periodFilter === 'MONTH' && !saleDateStr.startsWith(currentMonthStr)) return false;
       if (periodFilter === 'SPECIFIC_MONTH' && !saleDateStr.startsWith(selectedMonth)) return false;
 
       if (searchQuery.trim()) {
@@ -190,7 +188,6 @@ export const SalesHistoryPage: React.FC = () => {
             <FilterPillGroup
               options={[
                 { value: 'TODAY', label: 'Сегодня' },
-                { value: 'MONTH', label: 'Этот месяц' },
               ]}
               value={periodFilter === 'SPECIFIC_MONTH' ? '' : periodFilter}
               onChange={(v) => setPeriodFilter(v as typeof periodFilter)}

@@ -138,7 +138,6 @@ model Device {
   // that allows unlimited NULLs (most devices have no second slot) while rejecting
   // any duplicate non-null value.
   imei2             String?      @unique
-  serialNumber      String?
   brand             String
   model             String
   ram               String?
