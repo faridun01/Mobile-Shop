@@ -3,13 +3,21 @@ import { authenticateJwt, enforceBodyStoreScope, type AuthenticatedRequest } fro
 import { prisma } from '../../prisma/prisma.service';
 import { RepairsService } from './repairs.service';
 import { RealtimeSyncGateway } from '../../websocket/websocket.gateway';
+import { dateRangeForPeriod, type ReportPeriod } from '../reports/reports.service';
+
+const VALID_PERIODS: ReportPeriod[] = ['TODAY', 'MONTH', 'SPECIFIC_MONTH', 'ALL'];
 
 export function registerRepairRoutes(app: Express) {
   app.get('/api/repairs', authenticateJwt, async (req: AuthenticatedRequest, res, next) => {
     try {
-      const storeScope = req.user!.role === 'SELLER' && req.user!.storeId ? { storeId: req.user!.storeId } : undefined;
+      const storeScopeId = req.user!.role === 'SELLER' && req.user!.storeId ? req.user!.storeId : typeof req.query.storeId === 'string' ? req.query.storeId : undefined;
+      // period/month let the Reports export preview ask for exactly the range it's showing,
+      // instead of the client filtering the entire repairs history it used to fetch in full.
+      const period = VALID_PERIODS.includes(req.query.period as ReportPeriod) ? (req.query.period as ReportPeriod) : 'ALL';
+      const month = typeof req.query.month === 'string' ? req.query.month : undefined;
+      const dateRange = dateRangeForPeriod(period, month);
       const repairs = await prisma.repairTicket.findMany({
-        where: storeScope,
+        where: { ...(storeScopeId ? { storeId: storeScopeId } : {}), ...(dateRange ? { createdAt: dateRange } : {}) },
         include: { statusHistory: { orderBy: { updatedAt: 'asc' } }, store: true, user: true },
         orderBy: { createdAt: 'desc' },
       });

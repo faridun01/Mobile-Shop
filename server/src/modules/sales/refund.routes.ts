@@ -4,13 +4,21 @@ import { prisma } from '../../prisma/prisma.service';
 import { RefundService } from './refund.service';
 import { RealtimeSyncGateway } from '../../websocket/websocket.gateway';
 import { calculateRecognizedProfit } from './profit';
+import { dateRangeForPeriod, type ReportPeriod } from '../reports/reports.service';
+
+const VALID_PERIODS: ReportPeriod[] = ['TODAY', 'MONTH', 'SPECIFIC_MONTH', 'ALL'];
 
 export function registerRefundRoutes(app: Express) {
   app.get('/api/sales', authenticateJwt, enforceStoreScope, async (req: AuthenticatedRequest, res, next) => {
     try {
       const storeId = typeof req.query.storeId === 'string' ? req.query.storeId : undefined;
+      // period/month let the Reports export preview ask for exactly the range it's showing,
+      // instead of the client filtering the entire sales history it used to fetch in full.
+      const period = VALID_PERIODS.includes(req.query.period as ReportPeriod) ? (req.query.period as ReportPeriod) : 'ALL';
+      const month = typeof req.query.month === 'string' ? req.query.month : undefined;
+      const dateRange = dateRangeForPeriod(period, month);
       const sales = await prisma.sale.findMany({
-        where: storeId ? { storeId } : undefined,
+        where: { ...(storeId ? { storeId } : {}), ...(dateRange ? { createdAt: dateRange } : {}) },
         include: { saleItems: true, exchangeEvents: true, store: true, user: true },
         orderBy: { createdAt: 'desc' },
       });

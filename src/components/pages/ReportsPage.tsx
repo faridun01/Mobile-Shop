@@ -1,5 +1,8 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useApp } from '../../context/AppContext';
+import { apiClient } from '../../api/client';
+import { mapSale, mapExpense, mapRepair, buildNameLookup } from '../../api/mappers';
+import { Sale, Expense, RepairTicket } from '../../types';
 import {
   BarChart3,
   Smartphone,
@@ -16,24 +19,57 @@ import {
   exportSalesReport, exportInventoryReport, exportExpensesReport, exportRepairsReport,
   buildSalesReportTable, buildInventoryReportTable, buildExpensesReportTable, buildRepairsReportTable
 } from '../../utils/exportReports';
-import { getBusinessDateKey } from '../../utils/businessDate';
 import { ReportPreviewModal } from '../common/ReportPreviewModal';
+
+type Period = 'TODAY' | 'MONTH' | 'SPECIFIC_MONTH' | 'ALL';
+
+interface ReportsSummary {
+  unitsSold: number;
+  revenueUsd: number;
+  revenueTjs: number;
+  cogsUsd: number;
+  cogsTjs: number;
+  grossProfitUsd: number;
+  grossProfitTjs: number;
+  grossMarginPercent: number;
+  expensesTjs: number;
+  expensesUsd: number;
+  netProfitUsd: number;
+  netProfitTjs: number;
+  periodCashBonusesUsd: number;
+  periodCashBonusesTjs: number;
+  giftDeviceUnitsSold: number;
+  giftDeviceProfitUsd: number;
+  giftDeviceProfitTjs: number;
+  periodFreeDeviceBonusesReceived: number;
+  freeDeviceBonusesInStock: number;
+  totalSupplierDebtUsd: number;
+  totalSupplierDebtTjs: number;
+  mainWarehouseStockCount: number;
+  mainWarehouseStockCostUsd: number;
+  mainWarehouseStockCostTjs: number;
+  mainWarehouseCashUsd: number;
+  mainWarehouseCashTjs: number;
+  topSuppliersByDebt: { id: string; name: string; totalPurchasedUsd: number; totalPaidUsd: number; totalDebtUsd: number }[];
+  storeBreakdown: {
+    storeId: string; storeName: string; revenueUsd: number; revenueTjs: number; cogsUsd: number; cogsTjs: number;
+    profitUsd: number; profitTjs: number; unitsSold: number; salesCount: number; cashTjs: number;
+    stockCount: number; stockCostUsd: number; stockCostTjs: number;
+  }[];
+  modelCounts: { name: string; count: number; revenueUsd: number; cogsUsd: number; profitUsd: number }[];
+}
 
 export const ReportsPage: React.FC = () => {
   const {
     currentUser,
-    sales,
     devices,
-    expenses,
-    repairs,
-    suppliers,
     stores,
-    supplierBonuses,
+    users,
     todayRate,
     selectedStoreId: globalSelectedStoreId
   } = useApp();
 
-  const [period, setPeriod] = useState<'TODAY' | 'MONTH' | 'SPECIFIC_MONTH' | 'ALL'>('TODAY');
+  const [period, setPeriod] = useState<Period>('TODAY');
   const [selectedMonth, setSelectedMonth] = useState<string>(new Date().toISOString().substring(0, 7));
   // Defaults to whichever store is currently active on the POS Terminal page —
   // an admin picking a store there should see that same store here without
@@ -42,52 +78,68 @@ export const ReportsPage: React.FC = () => {
   const [previewReport, setPreviewReport] = useState<null | 'sales' | 'inventory' | 'expenses' | 'repairs'>(null);
 
   const rate = todayRate?.rate || 9.50;
+  const isSeller = currentUser?.role === 'SELLER';
+  const namesLookup = useMemo(() => buildNameLookup(users), [users]);
 
   const selectedStoreName = selectedStore === 'all' ? 'все магазины' : (stores.find(s => s.id === selectedStore)?.name || selectedStore);
   const periodLabel = period === 'TODAY' ? 'сегодня' : period === 'MONTH' ? 'текущий месяц' : period === 'SPECIFIC_MONTH' ? selectedMonth : 'весь период';
 
-  // Datasets actually going into the exports/preview — mirror the on-screen period
-  // and store filters (unlike the raw sales/devices/expenses/repairs arrays, which
-  // previously fed the downloads unfiltered regardless of what was selected above).
-  const exportSales = useMemo(() => {
-    const todayStr = getBusinessDateKey();
-    const currentMonthStr = todayStr.substring(0, 7);
-    let result = sales;
-    if (period === 'TODAY') result = result.filter(s => s.date.startsWith(todayStr));
-    else if (period === 'MONTH') result = result.filter(s => s.date.startsWith(currentMonthStr));
-    else if (period === 'SPECIFIC_MONTH') result = result.filter(s => s.date.startsWith(selectedMonth));
-    if (selectedStore !== 'all') result = result.filter(s => s.storeId === selectedStore);
-    return result;
-  }, [sales, period, selectedMonth, selectedStore]);
+  // Everything below used to be derived client-side from the FULL sales/expenses/repairs
+  // history fetched on every login — as that history grows over months/years this only got
+  // slower. Now the period/store filtering happens on the server (see /api/reports/summary
+  // and the matching query params on /api/sales, /api/expenses, /api/repairs), so what
+  // actually crosses the network and gets processed here scales with the selected period,
+  // not with the business's entire lifetime.
+  const [summary, setSummary] = useState<ReportsSummary | null>(null);
+  const [summaryLoading, setSummaryLoading] = useState(true);
+  const [exportSales, setExportSales] = useState<Sale[]>([]);
+  const [exportExpenses, setExportExpenses] = useState<Expense[]>([]);
+  const [exportRepairs, setExportRepairs] = useState<RepairTicket[]>([]);
 
-  const exportExpenses = useMemo(() => {
-    const todayStr = getBusinessDateKey();
-    const currentMonthStr = todayStr.substring(0, 7);
-    let result = expenses;
-    if (period === 'TODAY') result = result.filter(e => e.date.startsWith(todayStr));
-    else if (period === 'MONTH') result = result.filter(e => e.date.startsWith(currentMonthStr));
-    else if (period === 'SPECIFIC_MONTH') result = result.filter(e => e.date.startsWith(selectedMonth));
-    if (selectedStore !== 'all') result = result.filter(e => e.storeId === selectedStore);
-    return result;
-  }, [expenses, period, selectedMonth, selectedStore]);
+  useEffect(() => {
+    if (isSeller) return;
+    let cancelled = false;
+    setSummaryLoading(true);
+
+    const params = new URLSearchParams({ period });
+    if (period === 'SPECIFIC_MONTH') params.set('month', selectedMonth);
+    if (selectedStore !== 'all') params.set('storeId', selectedStore);
+    const query = params.toString();
+
+    Promise.all([
+      apiClient<ReportsSummary>(`/reports/summary?${query}`),
+      apiClient<any[]>(`/sales?${query}`),
+      apiClient<any[]>(`/expenses?${query}`),
+      apiClient<any[]>(`/repairs?${query}`),
+    ])
+      .then(([summaryData, rawSales, rawExpenses, rawRepairs]) => {
+        if (cancelled) return;
+        setSummary(summaryData);
+        setExportSales(rawSales.map((s) => mapSale(s, namesLookup)));
+        setExportExpenses(rawExpenses.map((e) => mapExpense(e, namesLookup)));
+        setExportRepairs(rawRepairs.map((r) => mapRepair(r, namesLookup)));
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setSummary(null);
+        setExportSales([]);
+        setExportExpenses([]);
+        setExportRepairs([]);
+      })
+      .finally(() => {
+        if (!cancelled) setSummaryLoading(false);
+      });
+
+    return () => { cancelled = true; };
+  }, [isSeller, period, selectedMonth, selectedStore, namesLookup]);
 
   // Inventory is a point-in-time snapshot (no created-date period makes sense for
-  // "what's on the shelf right now"), so only the store filter applies.
+  // "what's on the shelf right now"), so only the store filter applies — this one still
+  // comes from the already-loaded device catalog, no extra fetch needed.
   const exportDevices = useMemo(() => {
     if (selectedStore === 'all') return devices;
     return devices.filter(d => d.locationId === selectedStore);
   }, [devices, selectedStore]);
-
-  const exportRepairs = useMemo(() => {
-    const todayStr = getBusinessDateKey();
-    const currentMonthStr = todayStr.substring(0, 7);
-    let result = repairs;
-    if (period === 'TODAY') result = result.filter(r => (r.createdAt || '').startsWith(todayStr));
-    else if (period === 'MONTH') result = result.filter(r => (r.createdAt || '').startsWith(currentMonthStr));
-    else if (period === 'SPECIFIC_MONTH') result = result.filter(r => (r.createdAt || '').startsWith(selectedMonth));
-    if (selectedStore !== 'all') result = result.filter(r => r.storeId === selectedStore);
-    return result;
-  }, [repairs, period, selectedMonth, selectedStore]);
 
   const previewTable = useMemo(() => {
     if (previewReport === 'sales') return buildSalesReportTable(exportSales, rate);
@@ -104,288 +156,18 @@ export const ReportsPage: React.FC = () => {
     repairs: { title: 'Журнал ремонтов', download: () => exportRepairsReport(exportRepairs) },
   };
 
-  // Filtered dataset & financial calculations
-  const filteredData = useMemo(() => {
-    const todayStr = getBusinessDateKey();
-    const currentMonthStr = todayStr.substring(0, 7);
-
-    // 1. Sales filtering (exclude refunded sales)
-    let periodSales = sales.filter(s => s.status !== 'REFUNDED');
-    if (period === 'TODAY') {
-      periodSales = periodSales.filter(s => s.date.startsWith(todayStr));
-    } else if (period === 'MONTH') {
-      periodSales = periodSales.filter(s => s.date.startsWith(currentMonthStr));
-    } else if (period === 'SPECIFIC_MONTH') {
-      periodSales = periodSales.filter(s => s.date.startsWith(selectedMonth));
-    }
-
-    if (selectedStore !== 'all') {
-      periodSales = periodSales.filter(s => s.storeId === selectedStore);
-    }
-
-    // 2. Expenses filtering
-    let periodExpenses = expenses;
-    if (period === 'TODAY') {
-      periodExpenses = expenses.filter(e => e.date.startsWith(todayStr));
-    } else if (period === 'MONTH') {
-      periodExpenses = expenses.filter(e => e.date.startsWith(currentMonthStr));
-    } else if (period === 'SPECIFIC_MONTH') {
-      periodExpenses = expenses.filter(e => e.date.startsWith(selectedMonth));
-    }
-
-    if (selectedStore !== 'all') {
-      periodExpenses = periodExpenses.filter(e => e.storeId === selectedStore);
-    }
-
-    // Revenue, COGS, Gross Profit in USD
-    let revenueUsd = 0;
-    let cogsUsd = 0;
-    let historicalRevenueTjs = 0;
-    let historicalCogsTjs = 0;
-    let unitsSold = 0;
-    const modelCounts: Record<string, { count: number; revenueUsd: number; cogsUsd: number; profitUsd: number }> = {};
-
-    // Gift devices from supplier bonuses always carry a $0 cost basis, so any sold item
-    // with no cost basis is, by construction, a bonus phone realizing 100% profit.
-    let giftDeviceUnitsSold = 0;
-    let giftDeviceProfitUsd = 0;
-    let giftDeviceProfitTjs = 0;
-
-    periodSales.forEach(sale => {
-      const saleRate = sale.exchangeRate || rate;
-      const saleRevenueUsd = sale.totalUsd || +(sale.totalTjs / saleRate).toFixed(2);
-      revenueUsd += saleRevenueUsd;
-      historicalRevenueTjs += sale.totalTjs;
-
-      // The server persists recognized profit because an exchanged sale cannot be
-      // reconstructed from only the current SaleItem: the returned phone is back in
-      // inventory and the replacement has a different cost basis.
-      const fallbackCostUsd = sale.items.reduce((sum, item) => sum + (item.costBasisUsd || item.purchaseCostUsd || 0), 0);
-      const saleProfitUsd = sale.recognizedProfitUsd ?? (saleRevenueUsd - fallbackCostUsd);
-      cogsUsd += saleRevenueUsd - saleProfitUsd;
-      historicalCogsTjs += (saleRevenueUsd - saleProfitUsd) * saleRate;
-
-      sale.items.forEach(item => {
-        unitsSold++;
-        const itemCostUsd = item.costBasisUsd || item.purchaseCostUsd || 0;
-        const itemPriceUsd = item.salePriceUsd || +(item.salePriceTjs / saleRate).toFixed(2);
-        const itemProfitUsd = +(itemPriceUsd - itemCostUsd).toFixed(2);
-
-        const modelKey = `${item.brand} ${item.model}`.trim();
-        if (!modelCounts[modelKey]) {
-          modelCounts[modelKey] = { count: 0, revenueUsd: 0, cogsUsd: 0, profitUsd: 0 };
-        }
-        modelCounts[modelKey].count += 1;
-        modelCounts[modelKey].revenueUsd += itemPriceUsd;
-        modelCounts[modelKey].cogsUsd += itemCostUsd;
-        modelCounts[modelKey].profitUsd += itemProfitUsd;
-
-        if (!itemCostUsd) {
-          giftDeviceUnitsSold += 1;
-          giftDeviceProfitUsd += itemPriceUsd;
-          giftDeviceProfitTjs += item.salePriceTjs || itemPriceUsd * saleRate;
-        }
-      });
-    });
-
-    const grossProfitUsd = +(revenueUsd - cogsUsd).toFixed(2);
-    const totalRevenueUsd = +revenueUsd.toFixed(2);
-    const revenueTjs = Math.round(historicalRevenueTjs);
-    const cogsTjs = Math.round(historicalCogsTjs);
-    const grossProfitTjs = revenueTjs - cogsTjs;
-    const grossMarginPercent = revenueUsd > 0 ? +((grossProfitUsd / revenueUsd) * 100).toFixed(1) : 0;
-
-    // Operating expenses converted to USD
-    const expensesTjs = periodExpenses.reduce((acc, e) => acc + (e.amountTjs || 0), 0);
-    const expensesUsd = +periodExpenses.reduce((acc, e) => acc + (e.amountUsd ?? ((e.amountTjs || 0) / (e.exchangeRate || rate))), 0).toFixed(2);
-
-    // Cash supplier bonuses in period count 100% towards Net Profit
-    const periodCashBonusesUsd = (supplierBonuses || [])
-      .filter(b => {
-        if (b.bonusType !== 'CASH_DISCOUNT' || !b.amountUsd) return false;
-        const bDate = b.dateReceived || b.date;
-        if (!bDate) return true;
-        if (period === 'TODAY') return bDate.startsWith(todayStr);
-        if (period === 'MONTH') return bDate.startsWith(currentMonthStr);
-        if (period === 'SPECIFIC_MONTH') return bDate.startsWith(selectedMonth);
-        return true;
-      })
-      .reduce((acc, b) => acc + (b.amountUsd || 0), 0);
-    const periodCashBonusesTjs = (supplierBonuses || [])
-      .filter(b => {
-        if (b.bonusType !== 'CASH_DISCOUNT' || !b.amountUsd) return false;
-        const bDate = b.dateReceived || b.date;
-        if (!bDate) return true;
-        if (period === 'TODAY') return bDate.startsWith(todayStr);
-        if (period === 'MONTH') return bDate.startsWith(currentMonthStr);
-        if (period === 'SPECIFIC_MONTH') return bDate.startsWith(selectedMonth);
-        return true;
-      })
-      .reduce((acc, b) => acc + (b.amountUsd || 0) * b.exchangeRate, 0);
-
-    // Free-device (gift phone) bonuses received in the period — their profit only
-    // materializes once sold (tracked above via giftDeviceProfitUsd), this just counts
-    // how many arrived so the two figures can be shown side by side.
-    const periodFreeDeviceBonusesReceived = (supplierBonuses || [])
-      .filter(b => {
-        if (b.bonusType !== 'FREE_DEVICES') return false;
-        const bDate = b.dateReceived || b.date;
-        if (!bDate) return true;
-        if (period === 'TODAY') return bDate.startsWith(todayStr);
-        if (period === 'MONTH') return bDate.startsWith(currentMonthStr);
-        if (period === 'SPECIFIC_MONTH') return bDate.startsWith(selectedMonth);
-        return true;
-      }).length;
-    const freeDeviceBonusesInStock = (supplierBonuses || [])
-      .filter(b => b.bonusType === 'FREE_DEVICES' && b.status !== 'SOLD').length;
-
-    // Refund penalties in period count 100% towards Net Profit
-    const periodRefundPenaltiesUsd = (sales || [])
-      .filter(s => {
-        if (s.status !== 'REFUNDED' || !s.penaltyFeeUsd) return false;
-        if (selectedStore !== 'all' && s.storeId !== selectedStore) return false;
-        const rDate = (s.refundedAt || s.date || '').split('T')[0];
-        if (period === 'TODAY') return rDate === todayStr;
-        if (period === 'MONTH') return rDate.startsWith(currentMonthStr);
-        if (period === 'SPECIFIC_MONTH') return rDate.startsWith(selectedMonth);
-        return true;
-      })
-      .reduce((acc, s) => acc + (s.penaltyFeeUsd || 0), 0);
-    const periodRefundPenaltiesTjs = (sales || [])
-      .filter(s => {
-        if (s.status !== 'REFUNDED' || !s.penaltyFeeTjs) return false;
-        if (selectedStore !== 'all' && s.storeId !== selectedStore) return false;
-        const rDate = (s.refundedAt || s.date || '').split('T')[0];
-        if (period === 'TODAY') return rDate === todayStr;
-        if (period === 'MONTH') return rDate.startsWith(currentMonthStr);
-        if (period === 'SPECIFIC_MONTH') return rDate.startsWith(selectedMonth);
-        return true;
-      })
-      .reduce((acc, s) => acc + (s.penaltyFeeTjs || 0), 0);
-
-    // Net Profit in USD & TJS (sales gross profit - all expenses, including repair
-    // parts/labor which is already inside expensesUsd - + 100% cash supplier bonuses
-    // + 100% refund penalties).
-    const netProfitUsd = +(grossProfitUsd - expensesUsd + periodCashBonusesUsd + periodRefundPenaltiesUsd).toFixed(2);
-    const netProfitTjs = Math.round(grossProfitTjs - expensesTjs + periodCashBonusesTjs + periodRefundPenaltiesTjs);
-
-    const totalSupplierDebtUsd = suppliers.reduce((acc, s) => acc + s.totalDebtUsd, 0);
-    const totalSupplierDebtTjs = Math.round(totalSupplierDebtUsd * rate);
-
-    // Главный склад owns purchasing/supplier relations — this account is split out
-    // from retail store cash so the two-tier model (warehouse funds purchases &
-    // pays suppliers, stores just sell) is visible at a glance instead of blended
-    // into one "total cash" number.
-    const mainWarehouseStore = stores.find(s => s.isMainWarehouse);
-    const mainWarehouseStock = devices.filter(device =>
-      device.locationId === mainWarehouseStore?.id &&
-      device.status === 'MAIN_WAREHOUSE'
-    );
-    const mainWarehouseStockCostUsd = +mainWarehouseStock
-      .reduce((sum, device) => sum + (device.costBasisUsd || device.purchaseCostUsd || 0), 0)
-      .toFixed(2);
-    const mainWarehouseStockCostTjs = Math.round(mainWarehouseStockCostUsd * rate);
-    const mainWarehouseCashTjs = mainWarehouseStore?.cashBalanceTjs || 0;
-    const mainWarehouseCashUsd = +(mainWarehouseCashTjs / rate).toFixed(2);
-    const retailStoresList = stores.filter(s => !s.isMainWarehouse);
-
-    const topSuppliersByDebt = [...suppliers]
-      .filter(s => s.totalDebtUsd > 0)
-      .sort((a, b) => b.totalDebtUsd - a.totalDebtUsd)
-      .slice(0, 8);
-
-    // Per-store P&L breakdown, always for ALL retail stores regardless of the store
-    // filter dropdown — so nothing needs flipping through one store at a time to see
-    // where the money actually came from this period.
-    let periodSalesAllStores = sales.filter(s => s.status !== 'REFUNDED');
-    if (period === 'TODAY') periodSalesAllStores = periodSalesAllStores.filter(s => s.date.startsWith(todayStr));
-    else if (period === 'MONTH') periodSalesAllStores = periodSalesAllStores.filter(s => s.date.startsWith(currentMonthStr));
-    else if (period === 'SPECIFIC_MONTH') periodSalesAllStores = periodSalesAllStores.filter(s => s.date.startsWith(selectedMonth));
-
-    const storeBreakdown = retailStoresList
-      .filter(store => selectedStore === 'all' || store.id === selectedStore)
-      .map(store => {
-      const storeSales = periodSalesAllStores.filter(s => s.storeId === store.id);
-      let storeRevenueUsd = 0;
-      let storeRevenueTjs = 0;
-      let storeCogsUsd = 0;
-      let storeCogsTjs = 0;
-      let storeProfitUsd = 0;
-      let storeProfitTjs = 0;
-      let storeUnits = 0;
-      storeSales.forEach(sale => {
-        const saleRate = sale.exchangeRate || rate;
-        const saleRevenueUsd = sale.totalUsd || +(sale.totalTjs / saleRate).toFixed(2);
-        const fallbackCostUsd = sale.items.reduce((sum, item) => sum + (item.costBasisUsd || item.purchaseCostUsd || 0), 0);
-        const saleProfitUsd = sale.recognizedProfitUsd ?? (saleRevenueUsd - fallbackCostUsd);
-        const saleCogsUsd = saleRevenueUsd - saleProfitUsd;
-        storeRevenueUsd += saleRevenueUsd;
-        storeRevenueTjs += sale.totalTjs;
-        storeCogsUsd += saleCogsUsd;
-        storeCogsTjs += saleCogsUsd * saleRate;
-        storeProfitUsd += saleProfitUsd;
-        storeProfitTjs += sale.totalTjs - saleCogsUsd * saleRate;
-        storeUnits += sale.items.length;
-      });
-      const stock = devices.filter(device =>
-        device.locationId === store.id &&
-        (device.status === 'STORE_STOCK' || device.status === 'IN_STOCK_AFTER_EXCHANGE')
-      );
-      const stockCostUsd = stock.reduce((sum, device) => sum + (device.costBasisUsd || device.purchaseCostUsd || 0), 0);
-      return {
-        storeId: store.id,
-        storeName: store.name,
-        revenueUsd: +storeRevenueUsd.toFixed(2),
-        revenueTjs: Math.round(storeRevenueTjs),
-        cogsUsd: +storeCogsUsd.toFixed(2),
-        cogsTjs: Math.round(storeCogsTjs),
-        profitUsd: +storeProfitUsd.toFixed(2),
-        profitTjs: Math.round(storeProfitTjs),
-        unitsSold: storeUnits,
-        salesCount: storeSales.length,
-        cashTjs: store.cashBalanceTjs,
-        stockCount: stock.length,
-        stockCostUsd: +stockCostUsd.toFixed(2),
-        stockCostTjs: Math.round(stockCostUsd * rate),
-      };
-    }).sort((a, b) => b.revenueUsd - a.revenueUsd);
-
-    const sortedModelList = Object.entries(modelCounts)
-      .map(([name, data]) => ({ name, ...data }))
-      .sort((a, b) => b.profitUsd - a.profitUsd || b.revenueUsd - a.revenueUsd);
-
-    return {
-      unitsSold,
-      revenueUsd: +revenueUsd.toFixed(2),
-      revenueTjs,
-      cogsUsd: +cogsUsd.toFixed(2),
-      cogsTjs,
-      grossProfitUsd: +grossProfitUsd.toFixed(2),
-      grossProfitTjs,
-      grossMarginPercent,
-      expensesTjs,
-      expensesUsd,
-      netProfitUsd,
-      netProfitTjs,
-      periodCashBonusesUsd: +periodCashBonusesUsd.toFixed(2),
-      periodCashBonusesTjs: Math.round(periodCashBonusesTjs),
-      giftDeviceUnitsSold,
-      giftDeviceProfitUsd: +giftDeviceProfitUsd.toFixed(2),
-      giftDeviceProfitTjs: Math.round(giftDeviceProfitTjs),
-      periodFreeDeviceBonusesReceived,
-      freeDeviceBonusesInStock,
-      totalSupplierDebtUsd: +totalSupplierDebtUsd.toFixed(2),
-      totalSupplierDebtTjs,
-      mainWarehouseStockCount: mainWarehouseStock.length,
-      mainWarehouseStockCostUsd,
-      mainWarehouseStockCostTjs,
-      mainWarehouseCashUsd,
-      mainWarehouseCashTjs,
-      topSuppliersByDebt,
-      storeBreakdown,
-      modelCounts: sortedModelList
-    };
-  }, [sales, expenses, devices, suppliers, stores, supplierBonuses, period, selectedMonth, selectedStore, rate]);
+  const filteredData: ReportsSummary = summary ?? {
+    unitsSold: 0, revenueUsd: 0, revenueTjs: 0, cogsUsd: 0, cogsTjs: 0,
+    grossProfitUsd: 0, grossProfitTjs: 0, grossMarginPercent: 0,
+    expensesTjs: 0, expensesUsd: 0, netProfitUsd: 0, netProfitTjs: 0,
+    periodCashBonusesUsd: 0, periodCashBonusesTjs: 0,
+    giftDeviceUnitsSold: 0, giftDeviceProfitUsd: 0, giftDeviceProfitTjs: 0,
+    periodFreeDeviceBonusesReceived: 0, freeDeviceBonusesInStock: 0,
+    totalSupplierDebtUsd: 0, totalSupplierDebtTjs: 0,
+    mainWarehouseStockCount: 0, mainWarehouseStockCostUsd: 0, mainWarehouseStockCostTjs: 0,
+    mainWarehouseCashUsd: 0, mainWarehouseCashTjs: 0,
+    topSuppliersByDebt: [], storeBreakdown: [], modelCounts: [],
+  };
 
   if (currentUser?.role === 'SELLER') {
     return (
@@ -457,7 +239,7 @@ export const ReportsPage: React.FC = () => {
       </div>
 
       {/* Main Content Area */}
-      <div className="flex-1 overflow-y-auto p-3 sm:p-4 space-y-4">
+      <div className={`flex-1 overflow-y-auto p-3 sm:p-4 space-y-4 transition-opacity ${summaryLoading ? 'opacity-60' : ''}`}>
 
         {/* MAIN WAREHOUSE: stock storage, cash register and supplier obligations */}
         <div>

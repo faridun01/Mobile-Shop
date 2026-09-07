@@ -18,6 +18,7 @@ import { registerAuditLogRoutes } from './modules/audit/audit.routes';
 import { registerNotificationRoutes } from './modules/notifications/notifications.routes';
 import { registerExchangeRateRoutes } from './modules/exchange-rate/exchange-rate.routes';
 import { registerStoreRoutes } from './modules/stores/stores.routes';
+import { registerReportRoutes } from './modules/reports/reports.routes';
 import { requirePositiveMoney } from './common/money';
 import { requireTodayRate } from './modules/exchange-rate/exchange-rate.service';
 
@@ -319,6 +320,7 @@ registerAuditLogRoutes(app);
 registerNotificationRoutes(app);
 registerExchangeRateRoutes(app);
 registerStoreRoutes(app);
+registerReportRoutes(app);
 
 app.use((error: any, _req: Request, res: Response, _next: NextFunction) => {
   if (error && typeof error === 'object' && 'code' in error && error.code === 'P2002') {
