@@ -41,10 +41,19 @@ export class AuthService {
     });
   }
 
+  // Token lifetime: there is no refresh mechanism (see auth-architecture-review memory)
+  // and the token lives in localStorage — if it were ever stolen via XSS or a compromised
+  // dependency, this is the entire blast-radius window before it stops working on its own.
+  // 24h covers a full shift on a shared store terminal without forcing a mid-shift
+  // re-login, while cutting the previous 7-day exposure window by 7x. Deactivating a user
+  // (see users.routes.ts) still revokes access immediately regardless of this value,
+  // since authenticateJwt re-checks `active` from the DB on every request.
+  private static readonly TOKEN_LIFETIME_SECONDS = 60 * 60 * 24;
+
   // Create JWT Token
   public static generateToken(payload: JwtPayload): string {
     const header = Buffer.from(JSON.stringify({ alg: 'HS256', typ: 'JWT' })).toString('base64url');
-    const encodedPayload = Buffer.from(JSON.stringify({ ...payload, exp: Math.floor(Date.now() / 1000) + 86400 * 7 })).toString('base64url');
+    const encodedPayload = Buffer.from(JSON.stringify({ ...payload, exp: Math.floor(Date.now() / 1000) + AuthService.TOKEN_LIFETIME_SECONDS })).toString('base64url');
     const signature = crypto
       .createHmac('sha256', this.JWT_SECRET)
       .update(`${header}.${encodedPayload}`)

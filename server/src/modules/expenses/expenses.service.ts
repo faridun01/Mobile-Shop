@@ -1,5 +1,5 @@
 import { prisma } from '../../prisma/prisma.service';
-import type { Prisma } from '@prisma/client';
+import type { TransactionClient } from '../../prisma/prisma.service';
 import { resolveActor } from '../../common/actor';
 import { getRateForDate } from '../exchange-rate/exchange-rate.service';
 import { requirePositiveMoney, roundMoney } from '../../common/money';
@@ -19,7 +19,7 @@ export interface CreateExpenseInput {
 }
 
 /** Runs inside a caller-supplied transaction so repair-cost bookings share one atomic unit. */
-export async function createExpense(tx: Prisma.TransactionClient, input: CreateExpenseInput) {
+export async function createExpense(tx: TransactionClient, input: CreateExpenseInput) {
   const actor = await resolveActor(tx, input.createdByUserId);
   const amountTjs = requirePositiveMoney(input.amountTjs, 'Сумма расхода');
   const rate = await getRateForDate(new Date());

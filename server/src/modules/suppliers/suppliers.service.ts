@@ -1,11 +1,11 @@
 import { prisma } from '../../prisma/prisma.service';
-import type { Prisma } from '@prisma/client';
+import type { TransactionClient } from '../../prisma/prisma.service';
 import { resolveActor } from '../../common/actor';
 import { requireNonNegativeMoney, requirePositiveMoney, roundMoney } from '../../common/money';
 import { requireTodayRate } from '../exchange-rate/exchange-rate.service';
 
 /** True if any of these devices has a sale, transfer, or repair record referencing it (hard FK, no cascade). */
-async function deviceHasTransactionHistory(tx: Prisma.TransactionClient, deviceIds: string[]): Promise<boolean> {
+async function deviceHasTransactionHistory(tx: TransactionClient, deviceIds: string[]): Promise<boolean> {
   const [saleItem, transferItem, repairTicket] = await Promise.all([
     tx.saleItem.findFirst({ where: { deviceId: { in: deviceIds } } }),
     tx.transferItem.findFirst({ where: { deviceId: { in: deviceIds } } }),

@@ -1,5 +1,5 @@
-import type { Prisma } from '@prisma/client';
 import { prisma } from '../../prisma/prisma.service';
+import type { TransactionClient } from '../../prisma/prisma.service';
 import { resolveActor } from '../../common/actor';
 import { requirePositiveMoney, requireNonNegativeMoney, roundMoney } from '../../common/money';
 import { requireTodayRate } from '../exchange-rate/exchange-rate.service';
@@ -11,7 +11,7 @@ export class OwnersService {
    * without this, investments and payouts were pure bookkeeping with no
    * matching movement in any real till.
    */
-  private static async getMainWarehouse(tx: Prisma.TransactionClient) {
+  private static async getMainWarehouse(tx: TransactionClient) {
     const store = await tx.store.findFirst({ where: { isMainWarehouse: true } });
     if (!store) throw new Error('Главный склад не найден');
     return store;

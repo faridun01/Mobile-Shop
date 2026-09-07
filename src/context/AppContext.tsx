@@ -258,7 +258,6 @@ interface AppContextType {
   adjustStoreCashBalance: (storeId: string, newBalanceTjs: number, reason: string) => Promise<{ success: boolean; message?: string }>;
   resetToDemo: () => void;
   switchToRealDataMode: () => void;
-  resetAllOwnerCapital: () => void;
   closeQuarterPeriod: (params: { quarterName: string; transferRemainingToCapital: boolean }) => Promise<{ success: boolean; message?: string }>;
   resetEntireSystemDataToZero: () => void;
   theme: ThemeMode;
@@ -1147,12 +1146,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
-  const resetAllOwnerCapital = () => {
-    apiClient('/owners/reset-capital', { method: 'POST' })
-      .then(() => Promise.all([fetchOwners(), fetchOwnerTransactions()]))
-      .catch((e) => console.error('Failed to reset owner capital', e));
-  };
-
   // The app is always backed by real PostgreSQL now — these demo/local-only reset
   // helpers from the pre-migration mock no longer have a meaningful, safe server
   // equivalent (a full destructive wipe of production data isn't something a UI
@@ -1258,7 +1251,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         adjustStoreCashBalance,
         resetToDemo,
         switchToRealDataMode,
-        resetAllOwnerCapital,
         closeQuarterPeriod,
         resetEntireSystemDataToZero,
         theme,

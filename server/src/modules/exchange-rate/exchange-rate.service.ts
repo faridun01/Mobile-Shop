@@ -1,5 +1,5 @@
 import { prisma } from '../../prisma/prisma.service';
-import type { Prisma } from '@prisma/client';
+import type { TransactionClient } from '../../prisma/prisma.service';
 
 export function getBusinessDateKey(date: Date = new Date()): string {
   const parts = new Intl.DateTimeFormat('en-US', {
@@ -18,7 +18,7 @@ export async function getRateForDate(date: Date): Promise<number | null> {
 }
 
 export async function requireTodayRate(
-  db: Pick<Prisma.TransactionClient, 'exchangeRate'> = prisma,
+  db: Pick<TransactionClient, 'exchangeRate'> = prisma,
 ): Promise<number> {
   const rate = await db.exchangeRate.findUnique({ where: { date: getBusinessDateKey() } });
   if (!rate?.rate || rate.rate <= 0) {

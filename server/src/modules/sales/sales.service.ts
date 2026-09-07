@@ -1,5 +1,5 @@
 import { prisma } from '../../prisma/prisma.service';
-import type { Prisma } from '@prisma/client';
+import type { TransactionClient } from '../../prisma/prisma.service';
 import { getRateForDate } from '../exchange-rate/exchange-rate.service';
 import { moneyEquals, requireNonNegativeMoney, requirePositiveMoney, roundMoney } from '../../common/money';
 
@@ -52,7 +52,7 @@ export class SalesService {
       throw new Error('Сумма наличных и по карте должна совпадать с итоговой суммой чека');
     }
 
-    return prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+    return prisma.$transaction(async (tx: TransactionClient) => {
       const store = await tx.store.findUnique({ where: { id: input.storeId } });
       if (!store || !store.active || store.isMainWarehouse) {
         throw new Error('Продажа возможна только из активной торговой точки');

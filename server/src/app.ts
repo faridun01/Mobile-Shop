@@ -1,6 +1,7 @@
 import 'dotenv/config';
 import express, { type NextFunction, type Request, type Response } from 'express';
 import { prisma } from './prisma/prisma.service';
+import type { TransactionClient } from './prisma/prisma.service';
 import type { Prisma } from '@prisma/client';
 import { AuthService } from './auth/auth.service';
 import { authenticateJwt, type AuthenticatedRequest, enforceBodyStoreScope, requireRoles } from './auth/auth.middleware';
@@ -121,6 +122,7 @@ app.post('/api/auth/login', async (req, res, next) => {
         userRole: user.role,
         action: 'LOGIN',
         details: `Пользователь ${user.name} (${user.role}) вошел в систему`,
+        ipAddress: req.ip,
       },
     });
 
@@ -210,7 +212,7 @@ app.post('/api/purchases', authenticateJwt, requireRoles('ADMIN', 'PARTNER'), en
       return;
     }
 
-    const result = await prisma.$transaction(async (transaction: Prisma.TransactionClient) => {
+    const result = await prisma.$transaction(async (transaction: TransactionClient) => {
       const exchangeRate = await requireTodayRate(transaction);
       const supplier = await transaction.supplier.findUnique({ where: { id: supplierId } });
       const store = await transaction.store.findUnique({ where: { id: storeId } });

@@ -89,7 +89,7 @@ model Store {
   name            String
   address         String?
   isMainWarehouse Boolean  @default(false)
-  cashBalanceTjs  Float    @default(0)
+  cashBalanceTjs  Decimal  @default(0) @db.Decimal(14, 2)
   active          Boolean  @default(true)
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
@@ -114,7 +114,8 @@ model User {
   role                   Role     @default(SELLER)
   active                 Boolean  @default(true)
   storeId                String?
-  baseSalaryTjs          Float?
+  baseSalaryTjs          Decimal? @db.Decimal(14, 2)
+  // A commission rate, not a money amount — left as Float on purpose.
   salesCommissionPercent Float?
   pin                    String?
   createdAt              DateTime @default(now())
@@ -145,9 +146,9 @@ model Device {
   color             String
   status            DeviceStatus @default(MAIN_WAREHOUSE)
   storeId           String
-  purchasePriceUsd  Float
-  costBasisUsd      Float
-  retailPriceTjs    Float?
+  purchasePriceUsd  Decimal      @db.Decimal(14, 2)
+  costBasisUsd      Decimal      @db.Decimal(14, 2)
+  retailPriceTjs    Decimal?     @db.Decimal(14, 2)
   receivedDate      DateTime?
   isBonus           Boolean      @default(false)
   bonusCampaign     String?
@@ -181,8 +182,8 @@ model DeviceTimelineEvent {
   description String
   userName    String
   storeName   String?
-  priceTjs    Float?
-  priceUsd    Float?
+  priceTjs    Decimal? @db.Decimal(14, 2)
+  priceUsd    Decimal? @db.Decimal(14, 2)
 
   device Device @relation(fields: [deviceId], references: [id], onDelete: Cascade)
 
@@ -197,25 +198,25 @@ model Sale {
   userId                   String
   customerName             String?
   customerId               String?
-  totalTjs                 Float
-  totalUsd                 Float
-  exchangeRate             Float?
+  totalTjs                 Decimal       @db.Decimal(14, 2)
+  totalUsd                 Decimal       @db.Decimal(14, 2)
+  exchangeRate             Decimal?      @db.Decimal(10, 4)
   paymentMethod            PaymentMethod
-  cashAmountTjs            Float         @default(0)
-  cardAmountTjs            Float         @default(0)
+  cashAmountTjs            Decimal       @default(0) @db.Decimal(14, 2)
+  cardAmountTjs            Decimal       @default(0) @db.Decimal(14, 2)
   // Amount still owed by the customer on this specific sale — 0 for every normal
   // (fully paid at checkout) sale, so existing sales/reporting are unaffected.
   // Only DEBT-method sales start with this > 0, decremented as CustomerPayments land.
-  debtAmountTjs            Float         @default(0)
-  exchangeTradeInCreditTjs Float?
+  debtAmountTjs            Decimal       @default(0) @db.Decimal(14, 2)
+  exchangeTradeInCreditTjs Decimal?      @db.Decimal(14, 2)
   status                   SaleStatus    @default(COMPLETED)
   hasBelowCostItem         Boolean       @default(false)
   refundReason             String?
   refundedAt               DateTime?
   refundedByUserId         String?
-  penaltyFeeTjs            Float?
-  penaltyFeeUsd            Float?
-  actualRefundAmountTjs    Float?
+  penaltyFeeTjs            Decimal?      @db.Decimal(14, 2)
+  penaltyFeeUsd            Decimal?      @db.Decimal(14, 2)
+  actualRefundAmountTjs    Decimal?      @db.Decimal(14, 2)
   createdAt                DateTime      @default(now())
 
   store              Store                       @relation(fields: [storeId], references: [id])
@@ -241,10 +242,10 @@ model SaleItem {
   color           String
   imei            String
   imei2           String?
-  salePriceTjs    Float
-  salePriceUsd    Float
-  purchaseCostUsd Float
-  costBasisUsd    Float
+  salePriceTjs    Decimal @db.Decimal(14, 2)
+  salePriceUsd    Decimal @db.Decimal(14, 2)
+  purchaseCostUsd Decimal @db.Decimal(14, 2)
+  costBasisUsd    Decimal @db.Decimal(14, 2)
   isBelowCost     Boolean @default(false)
 
   sale   Sale   @relation(fields: [saleId], references: [id], onDelete: Cascade)
@@ -262,18 +263,18 @@ model ExchangeEvent {
   returnedDeviceId    String
   returnedImei        String
   returnedModel       String
-  exchangeInValueTjs  Float
-  exchangeInValueUsd  Float
+  exchangeInValueTjs  Decimal        @db.Decimal(14, 2)
+  exchangeInValueUsd  Decimal        @db.Decimal(14, 2)
   replacementDeviceId String
   replacementImei     String
   replacementModel    String
-  newPriceTjs         Float
-  newPriceUsd         Float
-  differenceTjs       Float
+  newPriceTjs         Decimal        @db.Decimal(14, 2)
+  newPriceUsd         Decimal        @db.Decimal(14, 2)
+  differenceTjs       Decimal        @db.Decimal(14, 2)
   paymentMethod       PaymentMethod?
-  cashAmountTjs       Float?
-  cardAmountTjs       Float?
-  exchangeRate        Float
+  cashAmountTjs       Decimal?       @db.Decimal(14, 2)
+  cardAmountTjs       Decimal?       @db.Decimal(14, 2)
+  exchangeRate        Decimal        @db.Decimal(10, 4)
   processedByUserId   String
 
   sale Sale @relation(fields: [saleId], references: [id], onDelete: Cascade)
@@ -286,9 +287,9 @@ model Supplier {
   name              String
   phone             String?
   contactPerson     String?
-  totalPurchasedUsd Float    @default(0)
-  totalPaidUsd      Float    @default(0)
-  totalDebtUsd      Float    @default(0)
+  totalPurchasedUsd Decimal  @default(0) @db.Decimal(14, 2)
+  totalPaidUsd      Decimal  @default(0) @db.Decimal(14, 2)
+  totalDebtUsd      Decimal  @default(0) @db.Decimal(14, 2)
   active            Boolean  @default(true)
   createdAt         DateTime @default(now())
 
@@ -305,9 +306,9 @@ model SupplierInvoice {
   invoiceNumber   String
   supplierId      String
   date            DateTime @default(now())
-  totalAmountUsd  Float
-  exchangeRate    Float
-  paidAmountUsd   Float    @default(0)
+  totalAmountUsd  Decimal  @db.Decimal(14, 2)
+  exchangeRate    Decimal  @db.Decimal(10, 4)
+  paidAmountUsd   Decimal  @default(0) @db.Decimal(14, 2)
   devicesCount    Int      @default(0)
   isStorePurchase Boolean  @default(false)
   storeId         String?
@@ -324,7 +325,7 @@ model SupplierInvoice {
 }
 
 model InvoiceGroup {
-  id               String @id @default(uuid())
+  id               String  @id @default(uuid())
   invoiceId        String
   brand            String
   model            String
@@ -332,7 +333,7 @@ model InvoiceGroup {
   storage          String
   color            String
   quantity         Int
-  purchasePriceUsd Float
+  purchasePriceUsd Decimal @db.Decimal(14, 2)
 
   invoice SupplierInvoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
 
@@ -343,8 +344,8 @@ model InvoiceGroup {
 model SupplierPayment {
   id              String   @id @default(uuid())
   supplierId      String
-  amountUsd       Float
-  exchangeRate    Float
+  amountUsd       Decimal  @db.Decimal(14, 2)
+  exchangeRate    Decimal  @db.Decimal(10, 4)
   sourceAccount   String
   storeId         String?
   createdByUserId String
@@ -357,10 +358,10 @@ model SupplierPayment {
 }
 
 model SupplierPaymentAllocation {
-  id                 String @id @default(uuid())
+  id                 String  @id @default(uuid())
   paymentId          String
   invoiceId          String
-  allocatedAmountUsd Float
+  allocatedAmountUsd Decimal @db.Decimal(14, 2)
 
   payment SupplierPayment @relation(fields: [paymentId], references: [id], onDelete: Cascade)
   invoice SupplierInvoice @relation(fields: [invoiceId], references: [id])
@@ -376,8 +377,8 @@ model Customer {
   id           String   @id @default(uuid())
   name         String
   phone        String?  @unique
-  totalDebtTjs Float    @default(0)
-  totalPaidTjs Float    @default(0)
+  totalDebtTjs Decimal  @default(0) @db.Decimal(14, 2)
+  totalPaidTjs Decimal  @default(0) @db.Decimal(14, 2)
   createdAt    DateTime @default(now())
 
   sales    Sale[]
@@ -389,8 +390,8 @@ model Customer {
 model CustomerPayment {
   id              String   @id @default(uuid())
   customerId      String
-  amountTjs       Float
-  exchangeRate    Float
+  amountTjs       Decimal  @db.Decimal(14, 2)
+  exchangeRate    Decimal  @db.Decimal(10, 4)
   sourceAccount   String
   storeId         String?
   createdByUserId String
@@ -404,10 +405,10 @@ model CustomerPayment {
 }
 
 model CustomerPaymentAllocation {
-  id                 String @id @default(uuid())
+  id                 String  @id @default(uuid())
   paymentId          String
   saleId             String
-  allocatedAmountTjs Float
+  allocatedAmountTjs Decimal @db.Decimal(14, 2)
 
   payment CustomerPayment @relation(fields: [paymentId], references: [id], onDelete: Cascade)
   sale    Sale            @relation(fields: [saleId], references: [id])
@@ -422,8 +423,8 @@ model SupplierBonus {
   supplierId    String
   campaignTitle String?
   bonusType     BonusType
-  amountUsd     Float?
-  exchangeRate  Float
+  amountUsd     Decimal?  @db.Decimal(14, 2)
+  exchangeRate  Decimal   @db.Decimal(10, 4)
   status        String?
   dateReceived  DateTime  @default(now())
   createdAt     DateTime  @default(now())
@@ -443,7 +444,7 @@ model SupplierBonusDevice {
   storage      String
   color        String
   imei         String
-  costBasisUsd Float
+  costBasisUsd Decimal @db.Decimal(14, 2)
 
   bonus SupplierBonus @relation(fields: [bonusId], references: [id], onDelete: Cascade)
 
@@ -504,14 +505,14 @@ model RepairTicket {
   saleDate           DateTime?
   customerName       String?
   customerPhone      String?
-  prepaymentTjs      Float?
+  prepaymentTjs      Decimal?     @db.Decimal(14, 2)
   problemDescription String
   visualCondition    String?
   equipmentPackage   String?
   comment            String?
   status             RepairStatus @default(ACCEPTED)
-  estimatedCostTjs   Float?
-  finalCostTjs       Float?
+  estimatedCostTjs   Decimal?     @db.Decimal(14, 2)
+  finalCostTjs       Decimal?     @db.Decimal(14, 2)
   createdAt          DateTime     @default(now())
   updatedAt          DateTime     @updatedAt
 
@@ -541,9 +542,9 @@ model RepairStatusHistory {
 model Expense {
   id                   String   @id @default(uuid())
   category             String
-  amountTjs            Float
-  amountUsd            Float?
-  exchangeRate         Float?
+  amountTjs            Decimal  @db.Decimal(14, 2)
+  amountUsd            Decimal? @db.Decimal(14, 2)
+  exchangeRate         Decimal? @db.Decimal(10, 4)
   targetType           String   @default("STORE")
   storeId              String?
   sourceAccount        String?
@@ -563,18 +564,20 @@ model Expense {
 }
 
 model Owner {
-  id                    String   @id @default(uuid())
+  id     String  @id @default(uuid())
   // Links this capital/profit record to the actual login account of the business
   // partner it belongs to, so the name is never a manually-copied snapshot that can
   // drift out of sync — nullable because a legacy/silent investor may have no login.
-  userId                String?  @unique
-  name                  String
+  userId String? @unique
+  name   String
+  // The partner's ownership share as a percentage, not a money amount — left as
+  // Float on purpose.
   profitSharePercent    Float
-  capitalBalanceUsd     Float    @default(0)
-  totalAccruedProfitUsd Float    @default(0)
-  totalPaidProfitUsd    Float    @default(0)
-  totalReinvestedUsd    Float    @default(0)
-  availableProfitUsd    Float    @default(0)
+  capitalBalanceUsd     Decimal  @default(0) @db.Decimal(14, 2)
+  totalAccruedProfitUsd Decimal  @default(0) @db.Decimal(14, 2)
+  totalPaidProfitUsd    Decimal  @default(0) @db.Decimal(14, 2)
+  totalReinvestedUsd    Decimal  @default(0) @db.Decimal(14, 2)
+  availableProfitUsd    Decimal  @default(0) @db.Decimal(14, 2)
   createdAt             DateTime @default(now())
 
   user         User?              @relation(fields: [userId], references: [id], onDelete: SetNull)
@@ -587,8 +590,8 @@ model OwnerTransaction {
   id                  String               @id @default(uuid())
   ownerId             String
   type                OwnerTransactionType
-  amountUsd           Float
-  exchangeRate        Float
+  amountUsd           Decimal              @db.Decimal(14, 2)
+  exchangeRate        Decimal              @db.Decimal(10, 4)
   sourceOrDestination String?
   createdByUserId     String
   note                String?
@@ -613,7 +616,7 @@ model QuarterClosure {
 model ExchangeRate {
   id              String    @id @default(uuid())
   date            String    @unique
-  rate            Float
+  rate            Decimal   @db.Decimal(10, 4)
   createdByUserId String
   createdAt       DateTime  @default(now())
   updatedByUserId String?
@@ -672,9 +675,9 @@ model LedgerEntry {
   id           String     @id @default(uuid())
   type         LedgerType
   description  String
-  amountTjs    Float?
-  amountUsd    Float?
-  exchangeRate Float?
+  amountTjs    Decimal?   @db.Decimal(14, 2)
+  amountUsd    Decimal?   @db.Decimal(14, 2)
+  exchangeRate Decimal?   @db.Decimal(10, 4)
   storeId      String?
   storeName    String?
   userName     String?
