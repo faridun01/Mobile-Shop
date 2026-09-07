@@ -95,7 +95,7 @@ export class TransfersService {
       const notification = await tx.notification.create({
         data: {
           title: 'Устройства перемещены',
-          message: `${transferNumber}: ${devices.length} устройств(о) перемещено из ${fromStore.name} в ${toStore.name}`,
+          message: `${devices.length} устройств(о) перемещено из ${fromStore.name} в ${toStore.name}`,
           targetType: 'TRANSFER_REQUEST',
           targetId: transfer.id,
           targetRole: 'ADMIN',

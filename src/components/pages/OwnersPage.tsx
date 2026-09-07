@@ -575,39 +575,39 @@ export const OwnersPage: React.FC = () => {
                   </div>
 
                   {/* Available for Payout Banner */}
-                  <div className="p-3 rounded-xl bg-warning/10 border border-warning/30 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs mt-2">
-                    <div>
-                      <span className="text-fg-subtle text-[10px] uppercase block">Остаток к выплате:</span>
-                      <span className="font-bold text-warning text-sm mt-0.5 block">
+                  <div className="p-3 rounded-xl bg-warning/10 border border-warning/30 space-y-2.5 text-xs mt-2">
+                    <div className="flex items-baseline justify-between gap-2">
+                      <span className="text-fg-subtle text-[11px] uppercase">Остаток к выплате:</span>
+                      <span className="font-bold text-warning text-sm">
                         ${(owner.availableProfitUsd ?? 0).toLocaleString()} USD
                       </span>
                     </div>
 
-                    <div className="flex flex-wrap items-center gap-1.5">
+                    <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none">
                       <button
                         onClick={() => openTxModalForOwner(owner.id, 'INVESTMENT')}
-                        className="px-2.5 py-1 rounded-lg bg-surface hover:bg-surface-raised text-accent border border-border text-xs font-bold transition-colors"
+                        className="flex-1 min-w-fit px-2 sm:px-2.5 py-1.5 rounded-lg bg-surface hover:bg-surface-raised text-accent border border-border text-[11px] sm:text-xs font-bold whitespace-nowrap transition-colors text-center"
                         title="Внести новые личные средства в капитал"
                       >
                         + ЛИЧНЫЕ
                       </button>
                       <button
                         onClick={() => openTxModalForOwner(owner.id, 'REINVEST')}
-                        className="px-2.5 py-1 rounded-lg bg-warning/20 hover:bg-warning/30 text-warning border border-warning/40 text-xs font-bold transition-colors flex items-center space-x-1"
+                        className="flex-1 min-w-fit px-2 sm:px-2.5 py-1.5 rounded-lg bg-warning/20 hover:bg-warning/30 text-warning border border-warning/40 text-[11px] sm:text-xs font-bold whitespace-nowrap transition-colors text-center"
                         title="Реинвестировать остаток к выплате в бизнес"
                       >
-                        <span>ВЛОЖИТЬ ОСТАТОК</span>
+                        ВЛОЖИТЬ ОСТАТОК
                       </button>
                       <button
                         onClick={() => openTxModalForOwner(owner.id, 'PROFIT_PAYOUT')}
-                        className="px-2.5 py-1 rounded-lg bg-accent/20 hover:bg-accent/30 text-accent border border-accent/30 text-xs font-bold transition-colors"
+                        className="flex-1 min-w-fit px-2 sm:px-2.5 py-1.5 rounded-lg bg-accent/20 hover:bg-accent/30 text-accent border border-accent/30 text-[11px] sm:text-xs font-bold whitespace-nowrap transition-colors text-center"
                         title="Выплатить прибыль на руки"
                       >
                         ↑ ВЫПЛАТИТЬ
                       </button>
                       <button
                         onClick={() => openTxModalForOwner(owner.id, 'WITHDRAWAL')}
-                        className="px-2.5 py-1 rounded-lg bg-danger/10 hover:bg-danger/20 text-danger border border-danger/30 text-xs font-bold transition-colors"
+                        className="flex-1 min-w-fit px-2 sm:px-2.5 py-1.5 rounded-lg bg-danger/10 hover:bg-danger/20 text-danger border border-danger/30 text-[11px] sm:text-xs font-bold whitespace-nowrap transition-colors text-center"
                         title="Изъять вложенный капитал"
                       >
                         🏦 ИЗЪЯТЬ

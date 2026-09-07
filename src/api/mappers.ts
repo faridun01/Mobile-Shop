@@ -370,10 +370,13 @@ export function mapStore(s: any): Store {
 }
 
 export function mapNotification(n: any): NotificationItem {
+  const rawMsg = n.message || '';
+  const cleanMsg = typeof rawMsg === 'string' ? rawMsg.replace(/^TR-[^:]*:\s*/i, '') : rawMsg;
+
   return {
     id: n.id,
     title: n.title,
-    message: n.message,
+    message: cleanMsg,
     date: n.createdAt,
     timestamp: n.createdAt,
     targetType: n.targetType ?? undefined,

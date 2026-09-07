@@ -90,7 +90,7 @@ export const NotificationsPage: React.FC = () => {
                     <span className={`text-sm font-semibold ${isUnread ? 'text-fg' : 'text-fg-muted'}`}>{n.title}</span>
                     {isUnread && <span className="w-2 h-2 rounded-full bg-accent shrink-0" />}
                   </div>
-                  <p className="text-sm text-fg-muted">{n.message}</p>
+                  <p className="text-sm text-fg-muted">{(n.message || '').replace(/^TR-[^:]*:\s*/i, '')}</p>
                   <span className="text-xs text-fg-subtle block mt-1">{new Date(dateStr).toLocaleString('ru-RU')}</span>
                 </div>
 

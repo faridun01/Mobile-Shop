@@ -446,7 +446,7 @@ export const SalePage: React.FC = () => {
               disabled={hasEmptyPrice || totalTjs <= 0}
               onClick={handleFinishPayment}
             >
-              {isSubmittingSale ? 'Оформление…' : hasEmptyPrice ? 'Укажите цену продажи' : `Завершить продажу `}
+              {isSubmittingSale ? 'Оформление…' : hasEmptyPrice ? 'Укажите цену продажи' : `Оплата `}
             </Button>
           </div>
         }
