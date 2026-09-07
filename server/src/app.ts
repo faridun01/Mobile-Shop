@@ -3,7 +3,7 @@ import express, { type NextFunction, type Request, type Response } from 'express
 import { prisma } from './prisma/prisma.service';
 import type { Prisma } from '@prisma/client';
 import { AuthService } from './auth/auth.service';
-import { authenticateJwt, type AuthenticatedRequest, enforceBodyStoreScope, enforceStoreScope, requireRoles } from './auth/auth.middleware';
+import { authenticateJwt, type AuthenticatedRequest, enforceBodyStoreScope, requireRoles } from './auth/auth.middleware';
 import { SalesService } from './modules/sales/sales.service';
 import { RealtimeSyncGateway } from './websocket/websocket.gateway';
 import { registerTransferRoutes } from './modules/transfers/transfers.routes';
@@ -121,7 +121,9 @@ app.get('/api/stores', authenticateJwt, async (req: AuthenticatedRequest, res, n
   try {
     const isSeller = req.user!.role === 'SELLER';
     const storeId = req.user!.storeId;
-    const where = isSeller ? (storeId ? { id: storeId } : { id: '__none__' }) : undefined;
+    // A SELLER also needs to see the main warehouse (not just their own store) — that's where
+    // they pull transfer requests from when the admin isn't around to move stock themselves.
+    const where = isSeller ? (storeId ? { OR: [{ id: storeId }, { isMainWarehouse: true }] } : { id: '__none__' }) : undefined;
     const stores = await prisma.store.findMany({ where, orderBy: { name: 'asc' } });
     res.json(stores);
   } catch (error) {
@@ -129,11 +131,26 @@ app.get('/api/stores', authenticateJwt, async (req: AuthenticatedRequest, res, n
   }
 });
 
-app.get('/api/devices', authenticateJwt, enforceStoreScope, async (req: AuthenticatedRequest, res, next) => {
+app.get('/api/devices', authenticateJwt, async (req: AuthenticatedRequest, res, next) => {
   try {
-    const storeId = typeof req.query.storeId === 'string' ? req.query.storeId : undefined;
+    let where: Prisma.DeviceWhereInput | undefined;
+    if (req.user!.role === 'SELLER') {
+      // A SELLER also needs to see devices sitting at the main warehouse — that's what they
+      // pick from when requesting a transfer into their own store — but no other retail store.
+      if (!req.user!.storeId) {
+        res.status(403).json({ message: 'Пользователь не привязан ни к одному магазину' });
+        return;
+      }
+      const mainWarehouse = await prisma.store.findFirst({ where: { isMainWarehouse: true }, select: { id: true } });
+      const scopedStoreIds = mainWarehouse ? [req.user!.storeId, mainWarehouse.id] : [req.user!.storeId];
+      where = { storeId: { in: scopedStoreIds } };
+    } else {
+      const storeId = typeof req.query.storeId === 'string' ? req.query.storeId : undefined;
+      where = storeId ? { storeId } : undefined;
+    }
+
     const devices = await prisma.device.findMany({
-      where: storeId ? { storeId } : undefined,
+      where,
       include: { store: true },
       orderBy: { createdAt: 'desc' },
     });

@@ -16,8 +16,10 @@ function statusForStore(storeId: string): 'MAIN_WAREHOUSE' | 'STORE_STOCK' {
 
 export class TransfersService {
   /**
-   * Moves devices to their destination immediately — transfers no longer wait on
-   * admin approval, admin is just informed via an (already-resolved) notification.
+   * Requests a transfer: devices are frozen as TRANSFER_PENDING (still physically at the
+   * source store) and the request sits at PENDING_APPROVAL until an ADMIN/PARTNER approves
+   * it. This is what lets a SELLER pull stock from the main warehouse into their own store
+   * without being able to move it themselves — an admin confirms it remotely afterwards.
    */
   public static async create(input: { fromStoreId: string; toStoreId: string; deviceIds: string[]; requestedByUserId: string }) {
     if (!input.deviceIds || input.deviceIds.length === 0) {
@@ -35,8 +37,7 @@ export class TransfersService {
         throw new Error('Магазин отправления и назначения не могут совпадать');
       }
 
-      const sourceStatus = statusForStore(input.fromStoreId);
-      const destStatus = statusForStore(input.toStoreId);
+      const sourceStatus = fromStore.isMainWarehouse ? 'MAIN_WAREHOUSE' : 'STORE_STOCK';
       const devices = await tx.device.findMany({
         where: { id: { in: input.deviceIds }, storeId: input.fromStoreId, status: sourceStatus },
       });
@@ -50,34 +51,28 @@ export class TransfersService {
           transferNumber,
           fromStoreId: input.fromStoreId,
           toStoreId: input.toStoreId,
-          status: 'APPROVED',
+          status: 'PENDING_APPROVAL',
           requestedByUserId: input.requestedByUserId,
-          approvedByUserId: input.requestedByUserId,
-          approvedAt: new Date(),
           items: { create: devices.map((d) => ({ deviceId: d.id, imei: d.imei, brand: d.brand, model: d.model })) },
         },
         include: { items: true },
       });
 
-      const moveResult = await tx.device.updateMany({
+      const holdResult = await tx.device.updateMany({
         where: { id: { in: input.deviceIds }, storeId: input.fromStoreId, status: sourceStatus },
-        data: { storeId: input.toStoreId, status: destStatus },
+        data: { status: 'TRANSFER_PENDING' },
       });
-      if (moveResult.count !== input.deviceIds.length) {
+      if (holdResult.count !== input.deviceIds.length) {
         throw new Error('Одно или несколько устройств стали недоступны во время перемещения');
       }
 
       await tx.deviceTimelineEvent.createMany({
         data: devices.map((device) => ({
           deviceId: device.id,
-          type: 'TRANSFER',
-          description: `Перемещение ${transferNumber} в ${toStore.name}`,
+          type: 'TRANSFER_REQUESTED',
+          description: `Запрошено перемещение ${transferNumber} в ${toStore.name}`,
           userName: actor.name,
         })),
-      });
-
-      await tx.ledgerEntry.create({
-        data: { type: 'TRANSFER', description: `Перемещение ${transferNumber}: ${devices.length} устройств из ${fromStore.name} в ${toStore.name}`, userName: actor.name },
       });
 
       await tx.auditLog.create({
@@ -85,27 +80,33 @@ export class TransfersService {
           userId: actor.id,
           userName: actor.name,
           userRole: actor.role,
-          action: 'TRANSFER',
-          details: `Выполнено перемещение ${transferNumber} (${devices.length} шт.) из ${fromStore.name} в ${toStore.name}`,
+          action: 'TRANSFER_REQUEST',
+          details: `Запрошено перемещение ${transferNumber} (${devices.length} шт.) из ${fromStore.name} в ${toStore.name}`,
           targetId: transfer.id,
         },
       });
 
-      // Informational only — nothing for admin to approve, so it's created already resolved.
-      const notification = await tx.notification.create({
-        data: {
-          title: 'Устройства перемещены',
-          message: `${devices.length} устройств(о) перемещено из ${fromStore.name} в ${toStore.name}`,
-          targetType: 'TRANSFER_REQUEST',
-          targetId: transfer.id,
-          targetRole: 'ADMIN',
-          resolved: true,
-        },
-      });
+      // Both ADMIN and PARTNER can approve (see requireRoles on the /approve route), and
+      // notifications only match a single exact targetRole — so one is created per role,
+      // otherwise a PARTNER-run store would never see pending requests.
+      const notificationMessage = `${actor.name} запрашивает перемещение ${devices.length} устройств(о) из ${fromStore.name} в ${toStore.name}`;
+      const notifications = await Promise.all(
+        (['ADMIN', 'PARTNER'] as const).map((targetRole) =>
+          tx.notification.create({
+            data: {
+              title: 'Новый запрос на перемещение',
+              message: notificationMessage,
+              targetType: 'TRANSFER_REQUEST',
+              targetId: transfer.id,
+              targetRole,
+            },
+          })
+        )
+      );
 
       RealtimeSyncGateway.broadcast('TRANSFER_UPDATED', { transferId: transfer.id }, { storeIds: [input.fromStoreId, input.toStoreId] });
       RealtimeSyncGateway.broadcast('INVENTORY_UPDATE', {}, { storeIds: [input.fromStoreId, input.toStoreId] });
-      RealtimeSyncGateway.broadcast('NOTIFICATION_CREATED', notification);
+      notifications.forEach((notification) => RealtimeSyncGateway.broadcast('NOTIFICATION_CREATED', notification));
 
       return transfer;
     }, { maxWait: 10000, timeout: 25000 });
@@ -185,12 +186,15 @@ export class TransfersService {
   public static async approve(transferId: string, approvedByUserId: string) {
     return prisma.$transaction(async (tx) => {
       const actor = await resolveActor(tx, approvedByUserId);
-      const transfer = await tx.transferRequest.findUnique({ where: { id: transferId }, include: { items: true } });
+      const transfer = await tx.transferRequest.findUnique({
+        where: { id: transferId },
+        include: { items: true, fromStore: true, toStore: true },
+      });
       if (!transfer) throw new Error('Запрос на перемещение не найден');
       if (transfer.status !== 'PENDING_APPROVAL') throw new Error('Этот запрос уже обработан');
 
       const deviceIds = transfer.items.map((i) => i.deviceId);
-      const destStatus = statusForStore(transfer.toStoreId);
+      const destStatus = transfer.toStore.isMainWarehouse ? 'MAIN_WAREHOUSE' : 'STORE_STOCK';
 
       const moveResult = await tx.device.updateMany({
         where: { id: { in: deviceIds }, status: 'TRANSFER_PENDING' },
@@ -212,6 +216,14 @@ export class TransfersService {
           description: `Перемещение ${transfer.transferNumber} подтверждено`,
           userName: actor.name,
         })),
+      });
+
+      await tx.ledgerEntry.create({
+        data: {
+          type: 'TRANSFER',
+          description: `Перемещение ${transfer.transferNumber}: ${deviceIds.length} устройств из ${transfer.fromStore.name} в ${transfer.toStore.name}`,
+          userName: actor.name,
+        },
       });
 
       await tx.notification.updateMany({
@@ -240,12 +252,12 @@ export class TransfersService {
   public static async reject(transferId: string, rejectedByUserId: string, reason: string) {
     return prisma.$transaction(async (tx) => {
       const actor = await resolveActor(tx, rejectedByUserId);
-      const transfer = await tx.transferRequest.findUnique({ where: { id: transferId }, include: { items: true } });
+      const transfer = await tx.transferRequest.findUnique({ where: { id: transferId }, include: { items: true, fromStore: true } });
       if (!transfer) throw new Error('Запрос на перемещение не найден');
       if (transfer.status !== 'PENDING_APPROVAL') throw new Error('Этот запрос уже обработан');
 
       const deviceIds = transfer.items.map((i) => i.deviceId);
-      const revertStatus = statusForStore(transfer.fromStoreId);
+      const revertStatus = transfer.fromStore.isMainWarehouse ? 'MAIN_WAREHOUSE' : 'STORE_STOCK';
 
       // Revert both status AND location — this closes the latent inconsistency in the
       // original mock logic where rejection reverted status but left location stale.

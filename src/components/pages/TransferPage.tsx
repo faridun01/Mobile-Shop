@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { useLocation } from 'react-router-dom';
 import { useApp } from '../../context/AppContext';
 import { TransferRequest } from '../../types';
 import {
@@ -29,15 +30,25 @@ export const TransferPage: React.FC = () => {
   } = useApp();
 
   const isSeller = currentUser?.role === 'SELLER';
-  const defaultFromId = isSeller ? (currentUser?.storeId || stores[0]?.id || '') : stores[0]?.id || '';
-  const defaultToId = stores.find(s => s.id !== defaultFromId)?.id || stores[1]?.id || '';
+  const mainWarehouse = stores.find(s => s.isMainWarehouse);
+  // A seller's default flow is pulling stock IN from the main warehouse into their own store
+  // (the admin isn't always around to move it) — so that's the default, not sending stock out.
+  const defaultFromId = isSeller ? (mainWarehouse?.id || currentUser?.storeId || stores[0]?.id || '') : stores[0]?.id || '';
+  const defaultToId = isSeller
+    ? (currentUser?.storeId || stores.find(s => s.id !== defaultFromId)?.id || '')
+    : (stores.find(s => s.id !== defaultFromId)?.id || stores[1]?.id || '');
 
   const [fromLocationId, setFromLocationId] = useState<string>(defaultFromId);
   const [toLocationId, setToLocationId] = useState<string>(defaultToId);
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [selectedDeviceIds, setSelectedDeviceIds] = useState<string[]>([]);
 
-  const [activeTab, setActiveTab] = useState<'create' | 'list'>('create');
+  // A notification click for a transfer request navigates here with { state: { tab: 'list' } }
+  // so the admin lands directly on the approve/reject tab instead of "Новое перемещение".
+  const location = useLocation();
+  const [activeTab, setActiveTab] = useState<'create' | 'list'>(
+    (location.state as { tab?: 'create' | 'list' } | null)?.tab === 'list' ? 'list' : 'create'
+  );
   // Defaults to whichever store is currently active on the POS Terminal page —
   // an admin picking a store there should see that same store here without
   // re-picking it; they can still switch it locally afterward.
@@ -73,6 +84,14 @@ export const TransferPage: React.FC = () => {
       return true;
     });
   }, [devices, fromLocationId, searchQuery]);
+
+  // A seller can also pull stock IN from the main warehouse (admin approval still required
+  // before it actually moves) — switching to that source locks the destination to their own store.
+  const handleSellerFromChange = (id: string) => {
+    setFromLocationId(id);
+    setSelectedDeviceIds([]);
+    setToLocationId(mainWarehouse && id === mainWarehouse.id ? (currentUser?.storeId || '') : (stores.find(s => s.id !== id)?.id || ''));
+  };
 
   const handleToggleSelectDevice = (id: string) => {
     setSelectedDeviceIds(prev =>
@@ -132,7 +151,7 @@ export const TransferPage: React.FC = () => {
         setConfirmTransferModal(false);
         setStatusBanner({
           tone: 'success',
-          text: `Перемещение (${selectedDeviceIds.length} шт.) успешно выполнено!`
+          text: `Заявка на перемещение (${selectedDeviceIds.length} шт.) отправлена и ожидает подтверждения администратора.`
         });
         setSelectedDeviceIds([]);
         setActiveTab('list');
@@ -247,10 +266,21 @@ export const TransferPage: React.FC = () => {
                 <div>
                   <label className="block text-fg-subtle mb-1 text-[11px] uppercase font-bold">Откуда (Отправитель):</label>
                   {isSeller ? (
-                    <div className="p-2.5 rounded-xl bg-surface-raised border border-border text-fg font-bold flex items-center space-x-2">
-                      <StoreIcon className="w-4 h-4 text-accent" />
-                      <span>{currentUser?.storeName || 'Мой магазин'}</span>
-                    </div>
+                    mainWarehouse && mainWarehouse.id !== currentUser?.storeId ? (
+                      <select
+                        value={fromLocationId ?? ''}
+                        onChange={(e) => handleSellerFromChange(e.target.value)}
+                        className="w-full rounded-xl bg-surface-raised border border-border px-3 py-2 text-xs text-fg focus:border-accent focus:outline-none"
+                      >
+                        <option value={mainWarehouse.id}>{mainWarehouse.name}</option>
+                        <option value={currentUser?.storeId || ''}>{currentUser?.storeName || 'Мой магазин'}</option>
+                      </select>
+                    ) : (
+                      <div className="p-2.5 rounded-xl bg-surface-raised border border-border text-fg font-bold flex items-center space-x-2">
+                        <StoreIcon className="w-4 h-4 text-accent" />
+                        <span>{currentUser?.storeName || 'Мой магазин'}</span>
+                      </div>
+                    )
                   ) : (
                     <select
                       value={fromLocationId ?? ''}
@@ -269,6 +299,12 @@ export const TransferPage: React.FC = () => {
 
                 <div>
                   <label className="block text-fg-subtle mb-1 text-[11px] uppercase font-bold">Куда (Получатель):</label>
+                  {isSeller && mainWarehouse && fromLocationId === mainWarehouse.id ? (
+                    <div className="p-2.5 rounded-xl bg-surface-raised border border-border text-fg font-bold flex items-center space-x-2">
+                      <StoreIcon className="w-4 h-4 text-accent" />
+                      <span>{currentUser?.storeName || 'Мой магазин'}</span>
+                    </div>
+                  ) : (
                   <select
                     value={toLocationId ?? ''}
                     onChange={(e) => setToLocationId(e.target.value)}
@@ -278,6 +314,7 @@ export const TransferPage: React.FC = () => {
                       <option key={s.id} value={s.id}>{s.name}</option>
                     ))}
                   </select>
+                  )}
                 </div>
               </div>
             </div>

@@ -314,6 +314,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [drawerOpen, setDrawerOpen] = useState(false);
 
   const [stores, setStores] = useState<Store[]>([]);
+
+  // login() clears storeName to undefined (the store list isn't loaded yet at that point),
+  // and nothing ever re-populates it afterwards — so it's resolved here from the live store
+  // list instead, for every consumer of currentUser (Drawer, TransferPage, TopBar, ...).
+  const resolvedCurrentUser = useMemo<User | null>(() => {
+    if (!currentUser) return null;
+    const resolvedName = currentUser.storeId ? stores.find((s) => s.id === currentUser.storeId)?.name : undefined;
+    return resolvedName && resolvedName !== currentUser.storeName ? { ...currentUser, storeName: resolvedName } : currentUser;
+  }, [currentUser, stores]);
+
   const [users, setUsers] = useState<User[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [invoices, setInvoices] = useState<SupplierInvoice[]>([]);
@@ -1253,7 +1263,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // state a given consumer never reads (e.g. a notifications refetch forcing
   // SalePage to re-render).
   const contextValue = useMemo<AppContextType>(() => ({
-        currentUser,
+        currentUser: resolvedCurrentUser,
         todayRate,
         activePage,
         selectedStoreId,
@@ -1344,7 +1354,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setTheme,
         toggleTheme
   }), [
-    currentUser, todayRate, activePage, selectedStoreId, stores, devices, sales,
+    resolvedCurrentUser, todayRate, activePage, selectedStoreId, stores, devices, sales,
     transfers, repairs, suppliers, invoices, bonuses, customers, expenses, owners,
     ownerTransactions, users, notifications, auditLogs, ledger, isInitialLoading,
     isRateModalOpen, isScannerOpen, scannerCallback, drawerOpen, theme, authToken,

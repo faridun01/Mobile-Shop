@@ -31,12 +31,21 @@ export function registerTransferRoutes(app: Express) {
         res.status(400).json({ message: 'fromStoreId, toStoreId и deviceIds обязательны' });
         return;
       }
-      // SELLERs may only request transfers OUT of their own assigned store — the
-      // client-supplied fromStoreId cannot be trusted otherwise (a SELLER could
-      // otherwise move stock belonging to a store they have no rights over).
-      if (req.user!.role === 'SELLER' && fromStoreId !== req.user!.storeId) {
-        res.status(403).json({ message: 'Вы можете перемещать товары только из своего магазина' });
-        return;
+      // SELLERs may request transfers OUT of their own assigned store, or IN from the main
+      // warehouse into their own store (e.g. when the admin is away and stock still needs to
+      // reach the shop floor) — approval still requires an ADMIN/PARTNER, so this never lets a
+      // SELLER move stock on their own authority. Any other combination (another store's stock,
+      // or a destination that isn't their own store) stays blocked.
+      if (req.user!.role === 'SELLER') {
+        const ownStoreId = req.user!.storeId;
+        const isOwnStoreOrigin = fromStoreId === ownStoreId;
+        const isPullFromMainWarehouse =
+          toStoreId === ownStoreId &&
+          !!(await prisma.store.findUnique({ where: { id: fromStoreId }, select: { isMainWarehouse: true } }))?.isMainWarehouse;
+        if (!isOwnStoreOrigin && !isPullFromMainWarehouse) {
+          res.status(403).json({ message: 'Вы можете перемещать товары только из своего магазина или с главного склада в свой магазин' });
+          return;
+        }
       }
       const transfer = await TransfersService.create({ fromStoreId, toStoreId, deviceIds, requestedByUserId: req.user!.userId });
       res.status(201).json(transfer);
