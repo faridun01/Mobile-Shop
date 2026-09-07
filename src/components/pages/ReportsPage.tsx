@@ -9,7 +9,8 @@ import {
   Package,
   Wallet,
   Store as StoreIcon,
-  Gift
+  Gift,
+  Receipt
 } from 'lucide-react';
 import {
   exportSalesReport, exportInventoryReport, exportExpensesReport, exportRepairsReport,
@@ -528,7 +529,7 @@ export const ReportsPage: React.FC = () => {
               <span>{store.storeName}</span>
               <span className="text-[9px] font-normal normal-case text-fg-subtle">(остатки, касса и прибыль за выбранный период)</span>
             </h4>
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3">
+            <div className="grid grid-cols-2 lg:grid-cols-5 gap-2.5 sm:gap-3">
               <div className="p-3 sm:p-4 rounded-xl bg-surface border border-border space-y-1">
                 <div className="flex items-center justify-between text-fg-subtle text-[10px] uppercase">
                   <span>ТОВАРОВ В МАГАЗИНЕ</span>
@@ -552,6 +553,19 @@ export const ReportsPage: React.FC = () => {
                 </p>
                 <p className="text-[10px] text-fg-subtle">
                   ≈ {store.stockCostTjs.toLocaleString()} TJS
+                </p>
+              </div>
+
+              <div className="p-3 sm:p-4 rounded-xl bg-surface border border-border space-y-1">
+                <div className="flex items-center justify-between text-fg-subtle text-[10px] uppercase">
+                  <span>СЕБЕСТОИМОСТЬ ПРОДАЖИ</span>
+                  <Receipt className="w-3.5 h-3.5 text-fg-subtle" />
+                </div>
+                <p className="text-base sm:text-lg font-bold text-fg">
+                  ${store.cogsUsd.toLocaleString()}
+                </p>
+                <p className="text-[10px] text-fg-subtle">
+                  ≈ {store.cogsTjs.toLocaleString()} TJS · за период
                 </p>
               </div>
 

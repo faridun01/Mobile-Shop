@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useApp } from '../../context/AppContext';
 import { TransferRequest } from '../../types';
@@ -49,6 +49,13 @@ export const TransferPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'create' | 'list'>(
     (location.state as { tab?: 'create' | 'list' } | null)?.tab === 'list' ? 'list' : 'create'
   );
+  // Covers clicking a notification while TransferPage is already mounted — same route, so
+  // it doesn't remount and the initial useState value above never re-runs.
+  useEffect(() => {
+    if ((location.state as { tab?: 'create' | 'list' } | null)?.tab === 'list') {
+      setActiveTab('list');
+    }
+  }, [location.state]);
   // Defaults to whichever store is currently active on the POS Terminal page —
   // an admin picking a store there should see that same store here without
   // re-picking it; they can still switch it locally afterward.

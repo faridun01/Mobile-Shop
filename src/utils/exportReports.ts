@@ -1,5 +1,28 @@
 import { Sale, Device, Store, Expense, RepairTicket } from '../types';
 
+const EXPENSE_CATEGORY_LABELS: Record<string, string> = {
+  RENT: 'Аренда помещения',
+  SALARY: 'Зарплата сотрудников',
+  EMPLOYEE_ADVANCE: 'Аванс / Подотчет сотрудника',
+  UTILITIES: 'Коммуналка и интернет',
+  MARKETING: 'Реклама и маркетинг',
+  REPAIR_PARTS: 'Запчасти для ремонта',
+  TAXES: 'Налоги и сборы',
+  SUPPLIES: 'Расходные материалы',
+  OTHER: 'Прочие расходы',
+};
+
+const REPAIR_STATUS_LABELS: Record<string, string> = {
+  ACCEPTED: 'Принят',
+  IN_PROGRESS: 'В работе',
+  READY: 'Готов к выдаче',
+  ISSUED: 'Выдан клиенту',
+  DIAGNOSTICS: 'Диагностика',
+  IN_REPAIR: 'В ремонте',
+  DELIVERED: 'Доставлен',
+  UNREPAIRABLE: 'Не подлежит ремонту',
+};
+
 export interface ReportTable {
   headers: string[];
   rows: (string | number)[][];
@@ -57,10 +80,7 @@ export function buildSalesReportTable(sales: Sale[], rate: number = 9.5): Report
     'Дата и время',
     'Магазин',
     'Кассир',
-    'Покупатель',
     'Товар / Модель',
-    'IMEI 1',
-    'IMEI 2',
     'Количество (шт)',
     'Себестоимость ($)',
     'Цена продажи ($)',
@@ -101,10 +121,7 @@ export function buildSalesReportTable(sales: Sale[], rate: number = 9.5): Report
         dateFormatted,
         sale.storeName,
         sale.sellerName,
-        sale.customerName || 'Розничный покупатель',
         `${item.brand} ${item.model} ${item.storage || ''} ${item.color || ''}`.trim(),
-        formatImeiForCsv(item.imei),
-        formatImeiForCsv(item.imei2),
         1,
         costUsd.toFixed(2),
         priceUsd.toFixed(2),
@@ -117,9 +134,8 @@ export function buildSalesReportTable(sales: Sale[], rate: number = 9.5): Report
   });
 
   const totalsRow = [
-    'ИТОГО:', '', '', '', '',
+    'ИТОГО:', '', '', '',
     `Всего позиций: ${rows.length}`,
-    '', '',
     totalUnits,
     totalCostBasisUsd.toFixed(2),
     totalRevenueUsd.toFixed(2),
@@ -217,7 +233,6 @@ export function exportInventoryReport(devices: Device[], stores: Store[], rate: 
  */
 export function buildExpensesReportTable(expenses: Expense[], rate: number = 9.5): ReportTable {
   const headers = [
-    'ID Расхода',
     'Дата',
     'Категория',
     'Сумма (TJS)',
@@ -238,9 +253,8 @@ export function buildExpensesReportTable(expenses: Expense[], rate: number = 9.5
     totalTjs += e.amountTjs || 0;
     totalUsd += e.amountUsd || 0;
     rows.push([
-      e.id,
       e.date,
-      e.category,
+      EXPENSE_CATEGORY_LABELS[e.category as string] || e.category,
       (e.amountTjs || 0).toFixed(2),
       e.exchangeRate || rate,
       (e.amountUsd || 0).toFixed(2),
@@ -253,7 +267,7 @@ export function buildExpensesReportTable(expenses: Expense[], rate: number = 9.5
   });
 
   const totalsRow = [
-    'ИТОГО:', '', `Всего записей: ${expenses.length}`,
+    'ИТОГО:', `Всего записей: ${expenses.length}`,
     totalTjs.toFixed(2), '', totalUsd.toFixed(2), '', '', '', '', ''
   ];
 
@@ -284,9 +298,7 @@ export function buildRepairsReportTable(repairs: RepairTicket[]): ReportTable {
     'Модель',
     'IMEI',
     'Неисправность',
-    'Состояние / Комплект',
     'Статус',
-    'Предв. стоимость (TJS)',
     'Финальная стоимость (TJS)'
   ];
 
@@ -307,17 +319,14 @@ export function buildRepairsReportTable(repairs: RepairTicket[]): ReportTable {
       r.deviceModel || r.model || '-',
       formatImeiForCsv(r.imei),
       r.issueDescription || r.problemDescription || '-',
-      `${r.visualCondition || ''} / ${r.equipmentPackage || ''}`.trim(),
-      r.status,
-      (r.estimatedCostTjs || 0).toFixed(2),
+      REPAIR_STATUS_LABELS[r.status as string] || r.status,
       (r.finalCostTjs || 0).toFixed(2)
     ]);
   });
 
   const totalsRow = [
-    'ИТОГО:', '', '', '', '', '', '', '', '', '', '',
+    'ИТОГО:', '', '', '', '', '', '', '', '', '',
     `Всего квитанций: ${repairs.length}`,
-    '',
     totalCostTjs.toFixed(2)
   ];
 
