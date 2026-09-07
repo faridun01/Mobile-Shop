@@ -477,6 +477,7 @@ model TransferItem {
   transferId String
   deviceId   String
   imei       String
+  brand      String
   model      String
 
   transfer TransferRequest @relation(fields: [transferId], references: [id], onDelete: Cascade)

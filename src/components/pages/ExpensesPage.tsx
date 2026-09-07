@@ -1,14 +1,12 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import { Expense, ExpenseCategory } from '../../types';
-import { exportExpensesReport } from '../../utils/exportReports';
 import {
   Receipt,
   Plus,
   TrendingDown,
   Calendar,
   Tag,
-  Download,
   Home,
   UserCheck,
   Zap,
@@ -330,14 +328,6 @@ export const ExpensesPage: React.FC = () => {
             </div>
 
             <div className="flex items-center gap-2 shrink-0">
-              <Button
-                variant="secondary"
-                leftIcon={Download}
-                disabled={filteredExpenses.length === 0}
-                onClick={() => exportExpensesReport(filteredExpenses, rate)}
-              >
-                CSV
-              </Button>
               <Button variant="danger" leftIcon={Plus} onClick={() => setIsModalOpen(true)}>
                 Добавить
               </Button>

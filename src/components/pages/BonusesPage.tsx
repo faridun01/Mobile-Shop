@@ -40,10 +40,10 @@ export const BonusesPage: React.FC = () => {
   const [amountUsd, setAmountUsd] = useState('');
   
   // Free device bonus spec
-  const [bonusBrand, setBonusBrand] = useState('Apple');
-  const [bonusModel, setBonusModel] = useState('iPhone 16');
-  const [bonusStorage, setBonusStorage] = useState('128 GB');
-  const [bonusColor, setBonusColor] = useState('Black');
+  const [bonusBrand, setBonusBrand] = useState('');
+  const [bonusModel, setBonusModel] = useState('');
+  const [bonusStorage, setBonusStorage] = useState('');
+  const [bonusColor, setBonusColor] = useState('');
   const [bonusImei, setBonusImei] = useState('');
   const [bonusImei2, setBonusImei2] = useState('');
   const [destinationLocationId, setDestinationLocationId] = useState('main-warehouse');
@@ -122,6 +122,11 @@ export const BonusesPage: React.FC = () => {
     e.preventDefault();
     setStatusMessage(null);
 
+    if (bonusType === 'FREE_DEVICES' && (!bonusBrand.trim() || !bonusModel.trim())) {
+      setStatusMessage({ type: 'error', text: 'Укажите бренд и модель подарочного устройства' });
+      return;
+    }
+
     if (bonusType === 'FREE_DEVICES' && !bonusImei.trim()) {
       setStatusMessage({ type: 'error', text: 'Укажите реальный IMEI подарочного устройства' });
       return;
@@ -149,6 +154,10 @@ export const BonusesPage: React.FC = () => {
 
     if (res.success) {
       setIsModalOpen(false);
+      setBonusBrand('');
+      setBonusModel('');
+      setBonusStorage('');
+      setBonusColor('');
       setBonusImei('');
       setBonusImei2('');
       setStatusMessage({

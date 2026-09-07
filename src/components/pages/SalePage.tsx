@@ -13,8 +13,7 @@ import {
   ShoppingCart,
   Store as StoreIcon,
   Plus,
-  Flame,
-  ScanLine
+  Flame
 } from 'lucide-react';
 import { SearchBar } from '../ui/SearchBar';
 import { FilterPillGroup } from '../ui/FilterPillGroup';
@@ -186,9 +185,8 @@ export const SalePage: React.FC = () => {
     });
   };
 
-  const handleScanMore = () => {
+  const handleAddMore = () => {
     setIsCartOpen(false);
-    handleTriggerScanner();
   };
 
   const totalTjs = cart.reduce((acc, item) => acc + (item.salePriceTjs && item.salePriceTjs > 0 ? item.salePriceTjs : 0), 0);
@@ -434,11 +432,11 @@ export const SalePage: React.FC = () => {
             <Button
               variant="secondary"
               size="lg"
-              leftIcon={ScanLine}
+              leftIcon={Plus}
               disabled={isSubmittingSale}
-              onClick={handleScanMore}
+              onClick={handleAddMore}
             >
-              Сканировать ещё
+              Добавить ещё
             </Button>
             <Button
               fullWidth
@@ -448,7 +446,7 @@ export const SalePage: React.FC = () => {
               disabled={hasEmptyPrice || totalTjs <= 0}
               onClick={handleFinishPayment}
             >
-              {isSubmittingSale ? 'Оформление…' : hasEmptyPrice ? 'Укажите цену продажи' : `Завершить продажу (${totalTjs.toLocaleString()} TJS)`}
+              {isSubmittingSale ? 'Оформление…' : hasEmptyPrice ? 'Укажите цену продажи' : `Завершить продажу `}
             </Button>
           </div>
         }

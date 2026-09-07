@@ -5,7 +5,9 @@ import {
   Smartphone,
   ArrowDownRight,
   Download,
-  FileSpreadsheet
+  FileSpreadsheet,
+  Package,
+  Wallet
 } from 'lucide-react';
 import {
   exportSalesReport, exportInventoryReport, exportExpensesReport, exportRepairsReport,
@@ -248,6 +250,8 @@ export const ReportsPage: React.FC = () => {
       .reduce((sum, device) => sum + (device.costBasisUsd || device.purchaseCostUsd || 0), 0)
       .toFixed(2);
     const mainWarehouseStockCostTjs = Math.round(mainWarehouseStockCostUsd * rate);
+    const mainWarehouseCashTjs = mainWarehouseStore?.cashBalanceTjs || 0;
+    const mainWarehouseCashUsd = +(mainWarehouseCashTjs / rate).toFixed(2);
     const retailStoresList = stores.filter(s => !s.isMainWarehouse);
 
     const topSuppliersByDebt = [...suppliers]
@@ -333,6 +337,8 @@ export const ReportsPage: React.FC = () => {
       mainWarehouseStockCount: mainWarehouseStock.length,
       mainWarehouseStockCostUsd,
       mainWarehouseStockCostTjs,
+      mainWarehouseCashUsd,
+      mainWarehouseCashTjs,
       topSuppliersByDebt,
       storeBreakdown,
       modelCounts: sortedModelList
@@ -419,6 +425,68 @@ export const ReportsPage: React.FC = () => {
 
       {/* Main Content Area */}
       <div className="flex-1 overflow-y-auto p-3 sm:p-4 space-y-4">
+
+        {/* MAIN WAREHOUSE: stock storage, cash register and supplier obligations */}
+        <div>
+          <h4 className="text-[10px] font-bold text-fg-subtle uppercase tracking-wider mb-2 flex items-center space-x-1.5">
+            <Package className="w-3.5 h-3.5 text-accent" />
+            <span>ГЛАВНЫЙ СКЛАД</span>
+            <span className="text-[9px] font-normal normal-case text-fg-subtle">(хранение товара, касса и обязательства перед поставщиками)</span>
+          </h4>
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3">
+            <div className="p-3 sm:p-4 rounded-xl bg-surface border border-border space-y-1">
+              <div className="flex items-center justify-between text-fg-subtle text-[10px] uppercase">
+                <span>ТОВАРОВ НА ГЛАВНОМ СКЛАДЕ</span>
+                <Smartphone className="w-3.5 h-3.5 text-accent" />
+              </div>
+              <p className="text-base sm:text-lg font-bold text-accent">
+                {filteredData.mainWarehouseStockCount.toLocaleString()} шт.
+              </p>
+              <p className="text-[10px] text-fg-subtle">
+                Доступно и хранится на главном складе
+              </p>
+            </div>
+
+            <div className="p-3 sm:p-4 rounded-xl bg-surface border border-border space-y-1">
+              <div className="flex items-center justify-between text-fg-subtle text-[10px] uppercase">
+                <span>ОБЩАЯ СЕБЕСТОИМОСТЬ ТОВАРА</span>
+                <Package className="w-3.5 h-3.5 text-fg-subtle" />
+              </div>
+              <p className="text-base sm:text-lg font-bold text-fg">
+                ${filteredData.mainWarehouseStockCostUsd.toLocaleString()}
+              </p>
+              <p className="text-[10px] text-fg-subtle">
+                ≈ {filteredData.mainWarehouseStockCostTjs.toLocaleString()} TJS
+              </p>
+            </div>
+
+            <div className="p-3 sm:p-4 rounded-xl bg-surface border border-border space-y-1">
+              <div className="flex items-center justify-between text-fg-subtle text-[10px] uppercase">
+                <span>КАССА ГЛАВНОГО СКЛАДА</span>
+                <Wallet className="w-3.5 h-3.5 text-accent" />
+              </div>
+              <p className="text-base sm:text-lg font-bold text-fg">
+                {filteredData.mainWarehouseCashTjs.toLocaleString()} TJS
+              </p>
+              <p className="text-[10px] text-fg-subtle">
+                ≈ ${filteredData.mainWarehouseCashUsd.toLocaleString()}
+              </p>
+            </div>
+
+            <div className="p-3 sm:p-4 rounded-xl bg-surface border border-border space-y-1">
+              <div className="flex items-center justify-between text-fg-subtle text-[10px] uppercase">
+                <span>ДОЛГ ПОСТАВЩИКАМ</span>
+                <ArrowDownRight className="w-3.5 h-3.5 text-danger" />
+              </div>
+              <p className="text-base sm:text-lg font-bold text-danger">
+                ${filteredData.totalSupplierDebtUsd.toLocaleString()}
+              </p>
+              <p className="text-[10px] text-fg-subtle">
+                ≈ {filteredData.totalSupplierDebtTjs.toLocaleString()} TJS (долги)
+              </p>
+            </div>
+          </div>
+        </div>
 
         {/* TOP SUPPLIERS BY DEBT */}
         {filteredData.topSuppliersByDebt.length > 0 && (

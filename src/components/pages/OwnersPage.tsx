@@ -18,12 +18,22 @@ import {
 } from 'lucide-react';
 import { StatusBanner, StatusMessage } from '../ui/StatusBanner';
 
+// The operation is now fixed by which button opened the modal, not chosen inside it —
+// this just labels the modal so the user still sees what they're about to do.
+const TX_TYPE_LABELS: Record<'INVESTMENT' | 'WITHDRAWAL' | 'PROFIT_PAYOUT' | 'REINVEST', string> = {
+  INVESTMENT: '📥 Внесение капитала (Личные внешние средства)',
+  REINVEST: '🔄 Реинвестирование в бизнес (Из Остатка к выплате)',
+  PROFIT_PAYOUT: '📤 Выплата чистой прибыли / дивидендов ($)',
+  WITHDRAWAL: '🏦 Изъятие / Вывод капитала ($)',
+};
+
 export const OwnersPage: React.FC = () => {
   const {
     currentUser,
     owners,
     users,
     ownerTransactions,
+    suppliers,
     todayRate,
     createOwnerTransaction,
     updateOwnerProfitShares,
@@ -141,6 +151,10 @@ export const OwnersPage: React.FC = () => {
   }, [ownerTransactions, typeFilter, selectedOwnerFilter, searchQuery]);
 
   const totalCapitalInvested = useMemo(() => owners.reduce((acc, o) => acc + (o.capitalBalanceUsd ?? 0), 0), [owners]);
+  // Money that has actually left the main-warehouse cash register to pay suppliers for
+  // goods — distinct from totalDebtUsd (still owed) and from stock already received but
+  // not yet paid for, so it answers "how much of the invested capital is gone on inventory".
+  const totalSpentOnGoodsUsd = useMemo(() => (suppliers || []).reduce((acc, s) => acc + (s.totalPaidUsd ?? 0), 0), [suppliers]);
   const totalAccruedProfit = useMemo(() => owners.reduce((acc, o) => acc + (o.totalAccruedProfitUsd ?? 0), 0), [owners]);
   const totalPayouts = useMemo(() => owners.reduce((acc, o) => acc + (o.totalPaidProfitUsd ?? 0), 0), [owners]);
   const totalAvailableProfit = useMemo(() => owners.reduce((acc, o) => acc + (o.availableProfitUsd ?? 0), 0), [owners]);
@@ -365,14 +379,6 @@ export const OwnersPage: React.FC = () => {
             <Percent className="w-3.5 h-3.5 text-accent" />
             <span>Доли партнеров</span>
           </button>
-
-          <button
-            onClick={() => openTxModalForOwner(displayOwners[0]?.id || '', 'PROFIT_PAYOUT')}
-            className="px-3 py-1.5 rounded-xl bg-accent hover:bg-accent-strong active:scale-95 text-[11px] font-bold text-accent-fg uppercase tracking-wider flex items-center space-x-1 transition-colors shadow-xs shrink-0 whitespace-nowrap"
-          >
-            <Plus className="w-3.5 h-3.5" />
-            <span>Провести операцию</span>
-          </button>
         </div>
       </div>
 
@@ -392,6 +398,9 @@ export const OwnersPage: React.FC = () => {
               </div>
               <span className="text-[10px] text-fg-muted block mt-0.5">
                 ≈ {(Math.round(totalCapitalInvested * rate)).toLocaleString()} TJS
+              </span>
+              <span className="text-[10px] text-fg-subtle block mt-1.5 pt-1.5 border-t border-border">
+                Потрачено на товары: <strong className="text-fg-muted">${totalSpentOnGoodsUsd.toLocaleString()}</strong>
               </span>
             </div>
             <div className="p-2 rounded-xl bg-accent/10 border border-accent/20 text-accent shrink-0">
@@ -581,6 +590,13 @@ export const OwnersPage: React.FC = () => {
                         title="Выплатить прибыль на руки"
                       >
                         ↑ ВЫПЛАТИТЬ
+                      </button>
+                      <button
+                        onClick={() => openTxModalForOwner(owner.id, 'WITHDRAWAL')}
+                        className="px-2.5 py-1 rounded-lg bg-danger/10 hover:bg-danger/20 text-danger border border-danger/30 text-xs font-bold transition-colors"
+                        title="Изъять вложенный капитал"
+                      >
+                        🏦 ИЗЪЯТЬ
                       </button>
                     </div>
                   </div>
@@ -890,17 +906,10 @@ export const OwnersPage: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-fg-subtle text-[11px] uppercase mb-1 font-semibold">ТИП ОПЕРАЦИИ *</label>
-                <select
-                  value={txType ?? 'PROFIT_PAYOUT'}
-                  onChange={(e) => setTxType(e.target.value as any)}
-                  className="w-full rounded-xl bg-surface-raised border border-border px-3 py-2 text-fg text-xs font-semibold focus:border-accent focus:outline-none"
-                >
-                  <option value="INVESTMENT">📥 Внесение капитала (Личные внешние средства)</option>
-                  <option value="REINVEST">🔄 Реинвестирование в бизнес (Из Остатка к выплате)</option>
-                  <option value="PROFIT_PAYOUT">📤 Выплата чистой прибыли / дивидендов ($)</option>
-                  <option value="WITHDRAWAL">🏦 Изъятие / Вывод капитала ($)</option>
-                </select>
+                <label className="block text-fg-subtle text-[11px] uppercase mb-1 font-semibold">Операция</label>
+                <div className="w-full rounded-xl bg-surface-raised border border-border px-3 py-2 text-fg text-xs font-semibold">
+                  {TX_TYPE_LABELS[txType]}
+                </div>
               </div>
 
               {/* Helper box for INVESTMENT / REINVEST */}
@@ -959,7 +968,7 @@ export const OwnersPage: React.FC = () => {
                   type="text"
                   value={note ?? ''}
                   onChange={(e) => setNote(e.target.value)}
-                  placeholder="Дополнительное вложение в оборот"
+                  placeholder="Необязательно"
                   className="w-full rounded-xl bg-surface-raised border border-border px-3 py-2 text-fg text-xs focus:border-accent focus:outline-none"
                 />
               </div>

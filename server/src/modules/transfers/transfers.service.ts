@@ -15,7 +15,10 @@ function statusForStore(storeId: string): 'MAIN_WAREHOUSE' | 'STORE_STOCK' {
 }
 
 export class TransfersService {
-  /** Creates a pending transfer and immediately reserves the devices as TRANSFER_PENDING. */
+  /**
+   * Moves devices to their destination immediately — transfers no longer wait on
+   * admin approval, admin is just informed via an (already-resolved) notification.
+   */
   public static async create(input: { fromStoreId: string; toStoreId: string; deviceIds: string[]; requestedByUserId: string }) {
     if (!input.deviceIds || input.deviceIds.length === 0) {
       throw new Error('Выберите устройства для перемещения');
@@ -33,6 +36,7 @@ export class TransfersService {
       }
 
       const sourceStatus = statusForStore(input.fromStoreId);
+      const destStatus = statusForStore(input.toStoreId);
       const devices = await tx.device.findMany({
         where: { id: { in: input.deviceIds }, storeId: input.fromStoreId, status: sourceStatus },
       });
@@ -46,27 +50,34 @@ export class TransfersService {
           transferNumber,
           fromStoreId: input.fromStoreId,
           toStoreId: input.toStoreId,
+          status: 'APPROVED',
           requestedByUserId: input.requestedByUserId,
-          items: { create: devices.map((d) => ({ deviceId: d.id, imei: d.imei, model: d.model })) },
+          approvedByUserId: input.requestedByUserId,
+          approvedAt: new Date(),
+          items: { create: devices.map((d) => ({ deviceId: d.id, imei: d.imei, brand: d.brand, model: d.model })) },
         },
         include: { items: true },
       });
 
-      const reserveResult = await tx.device.updateMany({
+      const moveResult = await tx.device.updateMany({
         where: { id: { in: input.deviceIds }, storeId: input.fromStoreId, status: sourceStatus },
-        data: { status: 'TRANSFER_PENDING' },
+        data: { storeId: input.toStoreId, status: destStatus },
       });
-      if (reserveResult.count !== input.deviceIds.length) {
-        throw new Error('Одно или несколько устройств стали недоступны во время оформления перемещения');
+      if (moveResult.count !== input.deviceIds.length) {
+        throw new Error('Одно или несколько устройств стали недоступны во время перемещения');
       }
 
       await tx.deviceTimelineEvent.createMany({
         data: devices.map((device) => ({
           deviceId: device.id,
-          type: 'TRANSFER_REQUEST',
-          description: `Запрошено перемещение ${transferNumber} в другой магазин`,
+          type: 'TRANSFER',
+          description: `Перемещение ${transferNumber} в ${toStore.name}`,
           userName: actor.name,
         })),
+      });
+
+      await tx.ledgerEntry.create({
+        data: { type: 'TRANSFER', description: `Перемещение ${transferNumber}: ${devices.length} устройств из ${fromStore.name} в ${toStore.name}`, userName: actor.name },
       });
 
       await tx.auditLog.create({
@@ -74,23 +85,26 @@ export class TransfersService {
           userId: actor.id,
           userName: actor.name,
           userRole: actor.role,
-          action: 'TRANSFER_REQUEST',
-          details: `Создан запрос на перемещение ${transferNumber} (${devices.length} шт.)`,
+          action: 'TRANSFER',
+          details: `Выполнено перемещение ${transferNumber} (${devices.length} шт.) из ${fromStore.name} в ${toStore.name}`,
           targetId: transfer.id,
         },
       });
 
+      // Informational only — nothing for admin to approve, so it's created already resolved.
       const notification = await tx.notification.create({
         data: {
-          title: 'Новый запрос на перемещение',
-          message: `${transferNumber}: ${devices.length} устройств(о) ожидает подтверждения`,
+          title: 'Устройства перемещены',
+          message: `${transferNumber}: ${devices.length} устройств(о) перемещено из ${fromStore.name} в ${toStore.name}`,
           targetType: 'TRANSFER_REQUEST',
           targetId: transfer.id,
           targetRole: 'ADMIN',
+          resolved: true,
         },
       });
 
       RealtimeSyncGateway.broadcast('TRANSFER_UPDATED', { transferId: transfer.id }, { storeIds: [input.fromStoreId, input.toStoreId] });
+      RealtimeSyncGateway.broadcast('INVENTORY_UPDATE', {}, { storeIds: [input.fromStoreId, input.toStoreId] });
       RealtimeSyncGateway.broadcast('NOTIFICATION_CREATED', notification);
 
       return transfer;
@@ -125,7 +139,7 @@ export class TransfersService {
           requestedByUserId: input.requestedByUserId,
           approvedByUserId: input.requestedByUserId,
           approvedAt: new Date(),
-          items: { create: devices.map((d) => ({ deviceId: d.id, imei: d.imei, model: d.model })) },
+          items: { create: devices.map((d) => ({ deviceId: d.id, imei: d.imei, brand: d.brand, model: d.model })) },
         },
       });
 

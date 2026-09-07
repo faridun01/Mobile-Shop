@@ -218,6 +218,7 @@ export interface TransferRequest {
   toLocationName: string;
   deviceIds: string[];
   deviceImeis: string[];
+  deviceBrands: string[];
   deviceModels: string[];
   requestedBy: string;
   requestedAt: string;

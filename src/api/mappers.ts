@@ -152,6 +152,7 @@ export function mapTransfer(t: any, names: NameLookup): TransferRequest {
     toLocationName: t.toStore?.name ?? '',
     deviceIds: items.map((i: any) => i.deviceId),
     deviceImeis: items.map((i: any) => i.imei),
+    deviceBrands: items.map((i: any) => i.brand),
     deviceModels: items.map((i: any) => i.model),
     requestedBy: names.get(t.requestedByUserId) || t.requestedByUserId,
     requestedAt: t.requestedAt,

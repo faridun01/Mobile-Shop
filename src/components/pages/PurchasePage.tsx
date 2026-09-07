@@ -436,15 +436,12 @@ export const PurchasePage: React.FC = () => {
 
       const ramStr = g.ram?.trim() || '';
       const storageStr = g.storage.trim();
-      const combinedStorage = ramStr && !storageStr.toLowerCase().includes(ramStr.toLowerCase())
-        ? `${ramStr} / ${storageStr}`
-        : storageStr;
 
       return {
         brand: g.brand.trim(),
         model: g.model.trim(),
         ram: ramStr || undefined,
-        storage: combinedStorage,
+        storage: storageStr,
         color: g.color.trim(),
         purchasePriceUsd: g.purchasePriceUsd,
         items: validItems,

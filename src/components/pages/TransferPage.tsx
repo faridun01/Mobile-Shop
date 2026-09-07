@@ -126,7 +126,7 @@ export const TransferPage: React.FC = () => {
         setConfirmTransferModal(false);
         setStatusBanner({
           tone: 'success',
-          text: `Запрос на перемещение (${selectedDeviceIds.length} шт.) успешно сформирован!`
+          text: `Перемещение (${selectedDeviceIds.length} шт.) успешно выполнено!`
         });
         setSelectedDeviceIds([]);
         setActiveTab('list');
@@ -211,7 +211,7 @@ export const TransferPage: React.FC = () => {
               : 'border-transparent text-fg-muted hover:text-fg'
           }`}
         >
-          {isSeller ? 'Новый запрос' : 'Новое перемещение'}
+          Новое перемещение
         </button>
 
         <button
@@ -418,7 +418,7 @@ export const TransferPage: React.FC = () => {
                           tr.status === 'PENDING_APPROVAL' ? 'bg-warning/15 text-warning border-warning/30' :
                           'bg-danger/15 text-danger border-danger/30'
                         }`}>
-                          {tr.status === 'APPROVED' ? 'ПОДТВЕРЖДЕНО' : tr.status === 'PENDING_APPROVAL' ? 'ОЖИДАЕТ ПОДТВЕРЖДЕНИЯ' : 'ОТКЛОНЕНО'}
+                          {tr.status === 'APPROVED' ? 'ВЫПОЛНЕНО' : tr.status === 'PENDING_APPROVAL' ? 'ОЖИДАЕТ ПОДТВЕРЖДЕНИЯ' : 'ОТКЛОНЕНО'}
                         </span>
                       </div>
                       <span className="text-fg-subtle text-[11px]">
@@ -436,7 +436,7 @@ export const TransferPage: React.FC = () => {
                       <span className="text-[10px] text-fg-subtle uppercase block">Передаваемые устройства ({(tr.deviceIds || []).length} шт.):</span>
                       {(tr.deviceModels || []).map((mod, idx) => (
                         <div key={idx} className="flex items-center justify-between text-xs text-fg">
-                          <span>{mod}</span>
+                          <span>{tr.deviceBrands?.[idx] ? `${tr.deviceBrands[idx]} ${mod}` : mod}</span>
                           <span className="text-fg-subtle text-[11px]">IMEI: {tr.deviceImeis?.[idx] || 'N/A'}</span>
                         </div>
                       ))}
