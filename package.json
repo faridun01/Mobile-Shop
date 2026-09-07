@@ -56,5 +56,8 @@
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
+  },
+  "overrides": {
+    "qs": "^6.16.0"
   }
 }

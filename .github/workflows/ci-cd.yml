@@ -39,6 +39,9 @@ jobs:
       - name: TypeScript Type Check
         run: npm run lint
 
+      - name: Run Test Suite
+        run: npm test
+
       - name: Build Production Bundle
         run: npm run build
 
