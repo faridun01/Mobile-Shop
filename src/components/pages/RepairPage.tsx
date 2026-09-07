@@ -64,7 +64,12 @@ export const RepairPage: React.FC = () => {
   const [selectedStoreId, setSelectedStoreId] = useState<string>(
     globalSelectedStoreId && globalSelectedStoreId !== 'all' ? globalSelectedStoreId : 'ALL'
   );
-  const [createTicketStoreId, setCreateTicketStoreId] = useState<string>('');
+  // Defaults to the store active on the POS Terminal page, same as the list-view
+  // filter above; falls back to the first retail store once stores load if no
+  // store is active there (e.g. "все магазины" was selected).
+  const [createTicketStoreId, setCreateTicketStoreId] = useState<string>(
+    globalSelectedStoreId && globalSelectedStoreId !== 'all' ? globalSelectedStoreId : ''
+  );
 
   useEffect(() => {
     if (!createTicketStoreId && retailStores.length > 0) {

@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import { SupplierBonus } from '../../types';
 import {
@@ -9,7 +9,8 @@ import {
   AlertCircle,
   Award,
   ChevronRight,
-  X
+  X,
+  Scan
 } from 'lucide-react';
 
 export const BonusesPage: React.FC = () => {
@@ -20,7 +21,8 @@ export const BonusesPage: React.FC = () => {
     stores,
     devices,
     createSupplierBonus,
-    todayRate
+    todayRate,
+    openScanner
   } = useApp();
 
   const rate = todayRate?.rate || 9.50;
@@ -47,6 +49,49 @@ export const BonusesPage: React.FC = () => {
   const [bonusImei, setBonusImei] = useState('');
   const [bonusImei2, setBonusImei2] = useState('');
   const [destinationLocationId, setDestinationLocationId] = useState('main-warehouse');
+
+  // Autocomplete suggestion lists derived from database devices and standard presets —
+  // same pattern as the purchase-intake form, so gift-device entry gets the same hints.
+  const brandOptions = useMemo(() => {
+    const set = new Set<string>(['Apple', 'Samsung', 'Xiaomi', 'Google', 'OnePlus', 'Honor', 'Realme', 'Huawei', 'Nothing']);
+    (devices || []).forEach(d => { if (d.brand) set.add(d.brand.trim()); });
+    return Array.from(set).sort();
+  }, [devices]);
+
+  const getModelOptions = useCallback((selectedBrand: string) => {
+    const set = new Set<string>();
+    const brandLower = (selectedBrand || '').trim().toLowerCase();
+    (devices || []).forEach(d => {
+      if (d.model && (!brandLower || (d.brand && d.brand.toLowerCase() === brandLower))) {
+        set.add(d.model.trim());
+      }
+    });
+    return Array.from(set).sort();
+  }, [devices]);
+
+  const storageOptions = useMemo(() => {
+    const set = new Set<string>(['64 GB', '128 GB', '256 GB', '512 GB', '1 TB']);
+    (devices || []).forEach(d => { if (d.storage) set.add(d.storage.trim()); });
+    return Array.from(set).sort();
+  }, [devices]);
+
+  const colorOptions = useMemo(() => {
+    const set = new Set<string>([
+      'Black', 'White', 'Titanium', 'Natural Titanium', 'Black Titanium',
+      'Desert Titanium', 'Midnight', 'Starlight', 'Silver', 'Gold',
+      'Blue', 'Graphite', 'Purple', 'Green'
+    ]);
+    (devices || []).forEach(d => { if (d.color) set.add(d.color.trim()); });
+    return Array.from(set).sort();
+  }, [devices]);
+
+  const handleScanBonusImei = () => {
+    openScanner((code) => setBonusImei(code.trim()));
+  };
+
+  const handleScanBonusImei2 = () => {
+    openScanner((code) => setBonusImei2(code.trim()));
+  };
 
   const [statusMessage, setStatusMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
@@ -329,32 +374,48 @@ export const BonusesPage: React.FC = () => {
                   <div className="grid grid-cols-2 gap-2">
                     <input
                       type="text"
+                      list="bonus-brand-suggestions"
                       value={bonusBrand ?? ''}
                       onChange={(e) => setBonusBrand(e.target.value)}
                       placeholder="Apple"
                       className="rounded-lg bg-surface border border-border px-2 py-1.5 text-xs text-fg focus:border-accent focus:outline-none"
                     />
+                    <datalist id="bonus-brand-suggestions">
+                      {brandOptions.map(b => <option key={b} value={b} />)}
+                    </datalist>
                     <input
                       type="text"
+                      list="bonus-model-suggestions"
                       value={bonusModel ?? ''}
                       onChange={(e) => setBonusModel(e.target.value)}
                       placeholder="iPhone 16"
                       className="rounded-lg bg-surface border border-border px-2 py-1.5 text-xs text-fg focus:border-accent focus:outline-none"
                     />
+                    <datalist id="bonus-model-suggestions">
+                      {getModelOptions(bonusBrand).map(m => <option key={m} value={m} />)}
+                    </datalist>
                     <input
                       type="text"
+                      list="bonus-storage-suggestions"
                       value={bonusStorage ?? ''}
                       onChange={(e) => setBonusStorage(e.target.value)}
                       placeholder="128 GB"
                       className="rounded-lg bg-surface border border-border px-2 py-1.5 text-xs text-fg focus:border-accent focus:outline-none"
                     />
+                    <datalist id="bonus-storage-suggestions">
+                      {storageOptions.map(s => <option key={s} value={s} />)}
+                    </datalist>
                     <input
                       type="text"
+                      list="bonus-color-suggestions"
                       value={bonusColor ?? ''}
                       onChange={(e) => setBonusColor(e.target.value)}
                       placeholder="Black"
                       className="rounded-lg bg-surface border border-border px-2 py-1.5 text-xs text-fg focus:border-accent focus:outline-none"
                     />
+                    <datalist id="bonus-color-suggestions">
+                      {colorOptions.map(c => <option key={c} value={c} />)}
+                    </datalist>
                   </div>
 
                   <div className="space-y-2 pt-1 border-t border-border">
@@ -362,27 +423,47 @@ export const BonusesPage: React.FC = () => {
                       <label className="block text-fg-subtle text-[10px] uppercase font-bold mb-0.5">
                         IMEI 1 <span className="text-danger">*</span>
                       </label>
-                      <input
-                        type="text"
-                        required
-                        value={bonusImei ?? ''}
-                        onChange={(e) => setBonusImei(e.target.value)}
-                        placeholder="351234567890123"
-                        className="w-full rounded-lg bg-surface border border-border px-2 py-1.5 text-xs text-fg focus:border-accent focus:outline-none"
-                      />
+                      <div className="flex space-x-1.5">
+                        <input
+                          type="text"
+                          required
+                          value={bonusImei ?? ''}
+                          onChange={(e) => setBonusImei(e.target.value)}
+                          placeholder="351234567890123"
+                          className="flex-1 rounded-lg bg-surface border border-border px-2 py-1.5 text-xs text-fg focus:border-accent focus:outline-none"
+                        />
+                        <button
+                          type="button"
+                          onClick={handleScanBonusImei}
+                          className="px-2.5 py-1.5 bg-surface hover:bg-surface-raised text-accent rounded-lg border border-border transition-colors shrink-0"
+                          title="Сканировать IMEI"
+                        >
+                          <Scan className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
                     </div>
 
                     <div>
                       <label className="block text-fg-subtle text-[10px] uppercase font-bold mb-0.5">
                         IMEI 2 <span className="font-normal">(опционально / по желанию)</span>
                       </label>
-                      <input
-                        type="text"
-                        value={bonusImei2 ?? ''}
-                        onChange={(e) => setBonusImei2(e.target.value)}
-                        placeholder="351234567890124 (по желанию)"
-                        className="w-full rounded-lg bg-surface border border-border px-2.5 py-1.5 text-xs text-fg focus:border-accent focus:outline-none"
-                      />
+                      <div className="flex space-x-1.5">
+                        <input
+                          type="text"
+                          value={bonusImei2 ?? ''}
+                          onChange={(e) => setBonusImei2(e.target.value)}
+                          placeholder="351234567890124 (по желанию)"
+                          className="flex-1 rounded-lg bg-surface border border-border px-2.5 py-1.5 text-xs text-fg focus:border-accent focus:outline-none"
+                        />
+                        <button
+                          type="button"
+                          onClick={handleScanBonusImei2}
+                          className="px-2.5 py-1.5 bg-surface hover:bg-surface-raised text-accent rounded-lg border border-border transition-colors shrink-0"
+                          title="Сканировать IMEI 2"
+                        >
+                          <Scan className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
                     </div>
                   </div>
                 </div>

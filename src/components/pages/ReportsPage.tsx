@@ -452,15 +452,6 @@ export const ReportsPage: React.FC = () => {
               <option key={s.id} value={s.id}>{s.name.toUpperCase()}</option>
             ))}
           </select>
-
-          {/* Quick Export Sales — opens the same preview as the card below, scoped to the filters above */}
-          <button
-            onClick={() => setPreviewReport('sales')}
-            className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-accent hover:bg-accent-strong text-accent-fg font-bold text-xs transition-colors shadow-xs"
-          >
-            <Download className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">ЭКСПОРТ (CSV)</span>
-          </button>
         </div>
       </div>
 
@@ -507,10 +498,10 @@ export const ReportsPage: React.FC = () => {
                 <Wallet className="w-3.5 h-3.5 text-accent" />
               </div>
               <p className="text-base sm:text-lg font-bold text-fg">
-                {filteredData.mainWarehouseCashTjs.toLocaleString()} TJS
+                ${filteredData.mainWarehouseCashUsd.toLocaleString()}
               </p>
               <p className="text-[10px] text-fg-subtle">
-                ≈ ${filteredData.mainWarehouseCashUsd.toLocaleString()}
+                ≈ {filteredData.mainWarehouseCashTjs.toLocaleString()} TJS
               </p>
             </div>
 
@@ -570,10 +561,10 @@ export const ReportsPage: React.FC = () => {
                   <Wallet className="w-3.5 h-3.5 text-accent" />
                 </div>
                 <p className="text-base sm:text-lg font-bold text-fg">
-                  {store.cashTjs.toLocaleString()} TJS
+                  ${(store.cashTjs / rate).toFixed(2)}
                 </p>
                 <p className="text-[10px] text-fg-subtle">
-                  ≈ ${(store.cashTjs / rate).toFixed(2)}
+                  ≈ {store.cashTjs.toLocaleString()} TJS
                 </p>
               </div>
 

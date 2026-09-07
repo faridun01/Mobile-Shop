@@ -207,10 +207,6 @@ export const InventoryPage: React.FC = () => {
     const activeStores = stores.filter(s => s.active);
     return (
       <div className="flex-1 flex flex-col h-full overflow-hidden bg-bg text-fg">
-        <div className="p-3 border-b border-border bg-surface shrink-0">
-          <p className="text-sm font-semibold text-fg">Выберите склад</p>
-          <p className="text-xs text-fg-subtle mt-0.5">Чтобы посмотреть остатки, сначала выберите магазин или главный склад</p>
-        </div>
         <div className="flex-1 overflow-y-auto p-3">
           {activeStores.length === 0 ? (
             <EmptyState icon={Package} title="Нет активных складов" description="Добавьте магазин в настройках" />

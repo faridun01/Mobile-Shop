@@ -19,7 +19,8 @@ export const ExchangePage: React.FC = () => {
     devices,
     processExchange,
     openScanner,
-    stores
+    stores,
+    selectedStoreId: globalSelectedStoreId
   } = useApp();
 
   const [receiptSearch, setReceiptSearch] = useState('');
@@ -39,7 +40,15 @@ export const ExchangePage: React.FC = () => {
   const [status, setStatus] = useState<StatusMessage | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const effectiveStoreId = currentUser?.storeId || '';
+  // The exchange must happen within a single store — the server already enforces this
+  // (the replacement device lookup is scoped to sale.storeId), but without mirroring it
+  // here, an admin/partner (who has no fixed currentUser.storeId) could browse and pick
+  // a replacement sitting in a different store's stock and only find out at submit time.
+  // Once an old device is selected, its own store (where it was originally sold) wins;
+  // otherwise fall back to the seller's fixed store, then whatever's active on POS Terminal.
+  const effectiveStoreId = selectedOldDevice?.locationId
+    || currentUser?.storeId
+    || (globalSelectedStoreId && globalSelectedStoreId !== 'all' ? globalSelectedStoreId : '');
   const currentStoreName = stores.find(s => s.id === effectiveStoreId)?.name || currentUser?.storeName || 'Магазин';
 
   const availableDevices = useMemo(() => {
@@ -85,9 +94,22 @@ export const ExchangePage: React.FC = () => {
     };
   };
 
+  // The exchange is anchored to whichever store the old device was originally sold at
+  // (see effectiveStoreId above) — if a replacement was already picked from a different
+  // store before that, it's no longer valid and must be cleared rather than silently
+  // left in place to fail at submit.
+  const applySelectedOldDevice = (dev: Device, amountTjs: number) => {
+    setSelectedOldDevice(dev);
+    setExchangeInValueTjs(amountTjs);
+    if (replacementDevice && replacementDevice.locationId !== dev.locationId) {
+      setReplacementDevice(null);
+      setNewPriceTjs(0);
+      setStatus({ tone: 'info', text: `Устройство на замену было выбрано из другого магазина и сброшено — обмен проводится в пределах одного магазина` });
+    }
+  };
+
   const handlePickReceiptItem = (sale: Sale, item: SaleItem) => {
-    setSelectedOldDevice(resolveOldDeviceFromItem(sale, item));
-    setExchangeInValueTjs(item.salePriceTjs || 0);
+    applySelectedOldDevice(resolveOldDeviceFromItem(sale, item), item.salePriceTjs || 0);
     setReceiptChoice(null);
     setStatus({ tone: 'success', text: `Устройство ${item.brand} ${item.model} выбрано из чека #${sale.receiptNumber}` });
   };
@@ -121,8 +143,7 @@ export const ExchangePage: React.FC = () => {
           item.imei.toLowerCase() === q ||
           (item.imei2 && item.imei2.toLowerCase() === q)
         ) {
-          setSelectedOldDevice(resolveOldDeviceFromItem(sale, item));
-          setExchangeInValueTjs(item.salePriceTjs || 0);
+          applySelectedOldDevice(resolveOldDeviceFromItem(sale, item), item.salePriceTjs || 0);
           setStatus({ tone: 'success', text: `Устройство ${item.brand} ${item.model} найдено в истории продаж` });
           return;
         }
@@ -177,6 +198,17 @@ export const ExchangePage: React.FC = () => {
     if (newPriceTjs <= 0) {
       setStatus({ tone: 'error', text: 'Укажите новую цену продажи выдаваемого устройства' });
       return;
+    }
+
+    // Customer owes a cash top-up — the exchange must not go through until that
+    // payment is actually confirmed (cash received covers the amount due). Card
+    // top-ups have no numeric confirmation step of their own, so they're exempt.
+    if (differenceTjs > 0 && exchangePaymentMethod === 'CASH') {
+      const givenCash = parseFloat(givenCashTjs) || 0;
+      if (givenCash < differenceTjs) {
+        setStatus({ tone: 'error', text: `Подтвердите оплату: клиент должен доплатить ${differenceTjs.toLocaleString()} TJS наличными, прежде чем можно провести обмен` });
+        return;
+      }
     }
 
     setIsSubmitting(true);
@@ -571,7 +603,10 @@ export const ExchangePage: React.FC = () => {
 
           <button
             type="submit"
-            disabled={!selectedOldDevice || !replacementDevice || exchangeInValueTjs <= 0 || newPriceTjs <= 0 || isSubmitting}
+            disabled={
+              !selectedOldDevice || !replacementDevice || exchangeInValueTjs <= 0 || newPriceTjs <= 0 || isSubmitting ||
+              (differenceTjs > 0 && exchangePaymentMethod === 'CASH' && (parseFloat(givenCashTjs) || 0) < differenceTjs)
+            }
             className="px-5 py-2.5 bg-accent hover:bg-accent-strong active:scale-95 disabled:opacity-40 text-xs font-bold rounded-xl text-accent-fg uppercase tracking-wider flex items-center space-x-2 transition-all shadow-xs"
           >
             {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <RotateCcw className="w-4 h-4" />}

@@ -564,53 +564,49 @@ export const PurchasePage: React.FC = () => {
             </button>
           </div>
 
-          {/* Period selector & Supplier Filter */}
-          <div className="flex flex-wrap items-center justify-between gap-2.5 text-xs">
-            <div className="flex items-center space-x-1.5 overflow-x-auto">
-              <input
-                type="month"
-                value={selectedMonth}
-                onChange={(e) => {
-                  if (e.target.value) {
-                    setSelectedMonth(e.target.value);
-                    setPeriodFilter('SPECIFIC_MONTH');
-                  }
-                }}
-                onClick={() => setPeriodFilter('SPECIFIC_MONTH')}
-                className={`px-3 py-1.5 rounded-xl border text-xs font-semibold transition-colors bg-surface focus:outline-none cursor-pointer ${
-                  periodFilter === 'SPECIFIC_MONTH'
-                    ? 'border-accent text-accent font-bold'
-                    : 'border-border text-fg-muted hover:border-fg-subtle'
-                }`}
-                title="Выберите месяц"
-              />
+          {/* Period selector & Supplier Filter — kept on one scrollable row instead of
+              wrapping to a second line on narrow/mobile screens. */}
+          <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none text-xs">
+            <input
+              type="month"
+              value={selectedMonth}
+              onChange={(e) => {
+                if (e.target.value) {
+                  setSelectedMonth(e.target.value);
+                  setPeriodFilter('SPECIFIC_MONTH');
+                }
+              }}
+              onClick={() => setPeriodFilter('SPECIFIC_MONTH')}
+              className={`shrink-0 px-3 py-1.5 rounded-xl border text-xs font-semibold transition-colors bg-surface focus:outline-none cursor-pointer ${
+                periodFilter === 'SPECIFIC_MONTH'
+                  ? 'border-accent text-accent font-bold'
+                  : 'border-border text-fg-muted hover:border-fg-subtle'
+              }`}
+              title="Выберите месяц"
+            />
 
-              <button
-                type="button"
-                onClick={() => setPeriodFilter('ALL')}
-                className={`px-3 py-1.5 rounded-xl border text-xs font-bold uppercase transition-colors ${
-                  periodFilter === 'ALL'
-                    ? 'border-accent bg-accent/10 text-accent'
-                    : 'border-border bg-surface text-fg-muted hover:text-fg'
-                }`}
-              >
-                Все приходы
-              </button>
-            </div>
+            <button
+              type="button"
+              onClick={() => setPeriodFilter('ALL')}
+              className={`shrink-0 px-3 py-1.5 rounded-xl border text-xs font-bold uppercase transition-colors ${
+                periodFilter === 'ALL'
+                  ? 'border-accent bg-accent/10 text-accent'
+                  : 'border-border bg-surface text-fg-muted hover:text-fg'
+              }`}
+            >
+              Все приходы
+            </button>
 
-            {/* Supplier selector filter */}
-            <div className="flex items-center space-x-2">
-              <select
-                value={selectedSupplierFilter}
-                onChange={(e) => setSelectedSupplierFilter(e.target.value)}
-                className="bg-surface border border-border text-fg text-xs font-semibold rounded-xl px-3 py-1.5 focus:outline-none focus:border-accent"
-              >
-                <option value="all">Все поставщики</option>
-                {suppliers.map(s => (
-                  <option key={s.id} value={s.id}>{s.name}</option>
-                ))}
-              </select>
-            </div>
+            <select
+              value={selectedSupplierFilter}
+              onChange={(e) => setSelectedSupplierFilter(e.target.value)}
+              className="shrink-0 bg-surface border border-border text-fg text-xs font-semibold rounded-xl px-3 py-1.5 focus:outline-none focus:border-accent"
+            >
+              <option value="all">Все поставщики</option>
+              {suppliers.map(s => (
+                <option key={s.id} value={s.id}>{s.name}</option>
+              ))}
+            </select>
           </div>
         </div>
 
