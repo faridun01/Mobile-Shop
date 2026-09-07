@@ -29,9 +29,18 @@ services:
     restart: always
     environment:
       DATABASE_URL: "postgresql://postgres:postgrespassword@db:5432/mobile_shop_db?schema=public"
-      JWT_SECRET: "mobile-shop-super-secret-production-jwt-key"
+      # Clearly non-production-grade on purpose — this compose file is the local full-stack
+      # Docker harness (see docker-compose.prod.yml for the real production config, which
+      # fails to boot instead of falling back to a hardcoded secret).
+      JWT_SECRET: "local-docker-dev-only-jwt-secret-do-not-use-in-real-production"
       NODE_ENV: "production"
       PORT: "3000"
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/api/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
     depends_on:
       db:
         condition: service_healthy
@@ -48,7 +57,8 @@ services:
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
     depends_on:
-      - app
+      app:
+        condition: service_healthy
     networks:
       - mobile_shop_net
 

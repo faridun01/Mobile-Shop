@@ -49,8 +49,8 @@ export function registerUserRoutes(app: Express) {
   app.post('/api/users/:id/reset-password', authenticateJwt, requireRoles('ADMIN'), async (req: AuthenticatedRequest, res, next) => {
     try {
       const newPassword = req.body?.newPassword;
-      if (!newPassword || String(newPassword).length < 4) {
-        res.status(400).json({ message: 'Укажите новый пароль (минимум 4 символа)' });
+      if (!newPassword) {
+        res.status(400).json({ message: 'Укажите новый пароль' });
         return;
       }
       await UsersService.resetPassword(req.params.id, newPassword, req.user!.userId);

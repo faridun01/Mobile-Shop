@@ -3,6 +3,15 @@ import { AuthService } from '../../auth/auth.service';
 import { resolveActor } from '../../common/actor';
 import { RealtimeSyncGateway } from '../../websocket/websocket.gateway';
 
+const MIN_PASSWORD_LENGTH = 6;
+
+function requireValidPassword(password: string): string {
+  if (password.length < MIN_PASSWORD_LENGTH) {
+    throw new Error(`Пароль должен содержать не менее ${MIN_PASSWORD_LENGTH} символов`);
+  }
+  return password;
+}
+
 const SAFE_SELECT = {
   id: true,
   login: true,
@@ -54,7 +63,7 @@ export class UsersService {
         throw new Error('Для роли Продавец обязательна привязка к магазину');
       }
 
-      const hashed = await AuthService.hashPassword(input.password);
+      const hashed = await AuthService.hashPassword(requireValidPassword(input.password));
       const user = await tx.user.create({
         data: {
           login: input.login,
@@ -115,7 +124,7 @@ export class UsersService {
       }
 
       if (input.password && input.password.trim().length > 0) {
-        data.password = await AuthService.hashPassword(input.password.trim());
+        data.password = await AuthService.hashPassword(requireValidPassword(input.password.trim()));
       }
 
       const user = await tx.user.update({ where: { id: userId }, data, select: SAFE_SELECT });
@@ -138,7 +147,7 @@ export class UsersService {
       const actor = await resolveActor(tx, actingUserId);
       const target = await tx.user.findUnique({ where: { id: userId } });
       if (!target) throw new Error('Сотрудник не найден');
-      const hashed = await AuthService.hashPassword(newPassword);
+      const hashed = await AuthService.hashPassword(requireValidPassword(newPassword));
       await tx.user.update({ where: { id: userId }, data: { password: hashed } });
       await tx.auditLog.create({
         data: { userId: actor.id, userName: actor.name, userRole: actor.role, action: 'PASSWORD_RESET', details: `Сброшен пароль сотрудника: ${target.name}`, targetId: userId },

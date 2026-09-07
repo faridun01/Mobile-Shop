@@ -24,12 +24,24 @@ import { requireTodayRate } from './modules/exchange-rate/exchange-rate.service'
 
 export const app = express();
 
+// Trusts the immediate upstream proxy (nginx, in production — see docker-compose.prod.yml)
+// so req.ip reflects the real client IP from X-Forwarded-For instead of nginx's own
+// container IP. Without this every request behind the proxy looks like it comes from the
+// same address, which would make the login rate limiter below either lock out every user
+// at once or protect no one.
+app.set('trust proxy', 1);
+
 // Allowed origins come from APP_URL (comma-separated for multiple, e.g. a staging +
 // prod domain). In this app's actual deployment shape nothing legitimate ever calls
 // the API cross-origin — prod serves the frontend and API from the same origin via
 // nginx, and the Vite dev server proxies /api server-side — so there's no real use
 // case for a wildcard here. Fall back to '*' only when APP_URL isn't configured, so
-// local runs without a .env don't unexpectedly break.
+// local runs without a .env don't unexpectedly break — but production must never silently
+// degrade to a wildcard just because an operator forgot to set APP_URL, so it fails to boot
+// instead (same fail-fast contract as JWT_SECRET in auth.service.ts).
+if (process.env.NODE_ENV === 'production' && !process.env.APP_URL?.trim()) {
+  throw new Error('APP_URL environment variable must be set in production (no wildcard CORS fallback is permitted)');
+}
 const allowedOrigins = (process.env.APP_URL || '').split(',').map((o) => o.trim()).filter(Boolean);
 
 app.use((req, res, next) => {
@@ -60,10 +72,38 @@ app.get('/api/health', async (_req, res, next) => {
   }
 });
 
+// Login brute-force throttle: nginx's general /api/ rate limit (10 req/s, see
+// nginx/nginx.conf) is generous enough that it doesn't meaningfully slow down password
+// guessing on its own. This is a simple in-memory per-IP+login sliding window — sufficient
+// for this app's single-instance deployment (docker-compose.prod.yml runs one `app`
+// container); it would need a shared store (e.g. Redis) if that ever changes to multiple
+// replicas.
+const LOGIN_ATTEMPT_WINDOW_MS = 15 * 60 * 1000;
+const LOGIN_MAX_ATTEMPTS = 10;
+const loginAttempts = new Map<string, { count: number; windowStartedAt: number }>();
+
+function isLoginRateLimited(key: string): boolean {
+  const now = Date.now();
+  const entry = loginAttempts.get(key);
+  if (!entry || now - entry.windowStartedAt > LOGIN_ATTEMPT_WINDOW_MS) {
+    loginAttempts.set(key, { count: 1, windowStartedAt: now });
+    return false;
+  }
+  entry.count += 1;
+  return entry.count > LOGIN_MAX_ATTEMPTS;
+}
+
 app.post('/api/auth/login', async (req, res, next) => {
   try {
     const login = typeof req.body?.login === 'string' ? req.body.login.trim() : '';
     const password = typeof req.body?.password === 'string' ? req.body.password : '';
+
+    const rateLimitKey = `${req.ip}:${login.toLowerCase()}`;
+    if (isLoginRateLimited(rateLimitKey)) {
+      res.status(429).json({ message: 'Слишком много попыток входа. Попробуйте снова через несколько минут.' });
+      return;
+    }
+
     const user = await prisma.user.findUnique({ where: { login }, include: { store: true } });
 
     if (!user || !user.active || !(await AuthService.verifyPassword(password, user.password))) {
@@ -71,6 +111,7 @@ app.post('/api/auth/login', async (req, res, next) => {
       return;
     }
 
+    loginAttempts.delete(rateLimitKey);
     const token = AuthService.generateToken({ userId: user.id, login: user.login, role: user.role, storeId: user.storeId });
 
     await prisma.auditLog.create({
@@ -322,9 +363,24 @@ registerExchangeRateRoutes(app);
 registerStoreRoutes(app);
 registerReportRoutes(app);
 
-app.use((error: any, _req: Request, res: Response, _next: NextFunction) => {
+app.use((error: any, req: Request, res: Response, _next: NextFunction) => {
+  // Every error that reaches here gets logged server-side, regardless of what the client
+  // ends up seeing — previously nothing was logged at all, so a production failure left no
+  // diagnostic trail.
+  console.error(`[${req.method} ${req.originalUrl}]`, error);
+
   if (error && typeof error === 'object' && 'code' in error && error.code === 'P2002') {
     res.status(409).json({ message: 'Запись с такими уникальными данными уже существует' });
+    return;
+  }
+
+  // Any other Prisma/DB error (P2003 FK violations, P2025 not-found, connection errors,
+  // raw SQL messages, ...) carries technical internals that must never reach the client —
+  // only this app's OWN deliberately-worded `throw new Error('...')` calls (used throughout
+  // every service for user-facing Russian messages) are safe to forward as-is below.
+  const isPrismaError = error && typeof error === 'object' && typeof error.name === 'string' && error.name.startsWith('Prisma');
+  if (isPrismaError) {
+    res.status(400).json({ message: 'Некорректный запрос' });
     return;
   }
 

@@ -20,6 +20,29 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
+    # A real Postgres instance to run migrations, seed, and the e2e business-flow suite
+    # against — those exercise auth, RBAC, store isolation, transfers, sales, refunds and
+    # more end-to-end, which the unit tests alone don't cover, and which previously never
+    # ran in CI at all.
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: mobile_shop_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/mobile_shop_ci?schema=public
+      JWT_SECRET: ci-only-throwaway-secret-not-used-anywhere-else
+
     steps:
       - name: Checkout Source Code
         uses: actions/checkout@v4
@@ -39,8 +62,17 @@ jobs:
       - name: TypeScript Type Check
         run: npm run lint
 
-      - name: Run Test Suite
+      - name: Run Unit Test Suite
         run: npm test
+
+      - name: Apply Database Migrations
+        run: npx prisma migrate deploy
+
+      - name: Seed Reference Data
+        run: npx prisma db seed
+
+      - name: Run End-to-End Business Flow Suite
+        run: npm run test:e2e
 
       - name: Build Production Bundle
         run: npm run build

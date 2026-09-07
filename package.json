@@ -16,6 +16,7 @@
     "clean": "rm -rf dist server.js",
     "lint": "tsc --noEmit",
     "test": "vitest run",
+    "test:e2e": "tsx scripts/test-e2e-all.ts",
     "audit:system": "tsx scripts/audit-system.ts",
     "db:clean": "tsx scripts/clear-data-keep-users.ts",
     "server": "tsx watch server/src/index.ts"
