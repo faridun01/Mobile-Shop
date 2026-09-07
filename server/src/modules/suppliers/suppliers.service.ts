@@ -279,17 +279,11 @@ export class SuppliersService {
           });
         }
       } else if (input.bonusType === 'CASH_DISCOUNT' && input.amountUsd) {
+        // Booked purely as accrued profit, not a movement through any store's cash register —
+        // per the user (2026-09-07), this is realized straight into net profit, deliberately
+        // kept separate from the main warehouse's operating till (same profit/capital split
+        // already established for owner payout — see the domain-total-invested-capital memory).
         const bonusAmountUsd = input.amountUsd;
-
-        // A cash bonus is real money the supplier hands over (or a phone, handled in the
-        // FREE_DEVICES branch above) — it must land in an actual register, same as any other
-        // cash inflow, or the profit it credits below has nothing backing it and a later owner
-        // payout could fail for "insufficient cash" despite the books showing profit available.
-        const mainWarehouse = await tx.store.findFirst({ where: { isMainWarehouse: true } });
-        if (!mainWarehouse) throw new Error('Главный склад не найден');
-        const bonusAmountTjs = roundMoney(bonusAmountUsd * exchangeRate);
-        await tx.store.update({ where: { id: mainWarehouse.id }, data: { cashBalanceTjs: { increment: bonusAmountTjs } } });
-
         const owners = await tx.owner.findMany();
         await Promise.all(owners.map((owner) => {
           const delta = roundMoney(bonusAmountUsd * (owner.profitSharePercent / 100));
@@ -303,10 +297,7 @@ export class SuppliersService {
             type: 'SUPPLIER_BONUS',
             description: `Денежный бонус от ${supplier.name}: +$${input.amountUsd}`,
             amountUsd: input.amountUsd,
-            amountTjs: bonusAmountTjs,
             exchangeRate,
-            storeId: mainWarehouse.id,
-            storeName: mainWarehouse.name,
             userName: actor.name,
             referenceId: bonus.id,
           },

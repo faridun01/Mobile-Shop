@@ -31,7 +31,7 @@ async function main() {
   }).map((device) => device.id));
 
   add('SALE_PAYMENT_TOTAL_MISMATCH', sales.filter((sale) => sale.status !== 'REFUNDED' && !close(sale.cashAmountTjs + sale.cardAmountTjs, sale.totalTjs)).map((sale) => sale.id));
-  add('COMPLETED_SALE_ITEM_TOTAL_MISMATCH', sales.filter((sale) => sale.status === 'COMPLETED' && !close(sale.saleItems.reduce((sum, item) => sum + item.salePriceTjs, 0), sale.totalTjs)).map((sale) => sale.id));
+  add('COMPLETED_SALE_ITEM_TOTAL_MISMATCH', sales.filter((sale) => (sale.status === 'COMPLETED' || sale.status === 'EXCHANGED') && !close(sale.saleItems.reduce((sum, item) => sum + item.salePriceTjs, 0), sale.totalTjs)).map((sale) => sale.id));
   add('REFUND_TOTAL_MISMATCH', sales.filter((sale) => sale.status === 'REFUNDED' && !close((sale.actualRefundAmountTjs ?? 0) + (sale.penaltyFeeTjs ?? 0), sale.totalTjs)).map((sale) => sale.id));
   add('ACTIVE_SALE_DEVICE_NOT_SOLD', sales.filter((sale) => sale.status !== 'REFUNDED' && sale.saleItems.some((item) => deviceById.get(item.deviceId)?.status !== 'SOLD')).map((sale) => sale.id));
   add('REFUNDED_CURRENT_DEVICE_NOT_RESTOCKED', sales.filter((sale) => sale.status === 'REFUNDED' && sale.saleItems.some((item) => !['STORE_STOCK', 'IN_STOCK_AFTER_EXCHANGE'].includes(deviceById.get(item.deviceId)?.status ?? ''))).map((sale) => sale.id));

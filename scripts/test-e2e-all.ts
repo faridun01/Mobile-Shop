@@ -107,7 +107,13 @@ async function runE2ETests() {
       headers: { Authorization: `Bearer ${sellerToken}` }
     });
     const sellerStores = await sellerStoresRes.json();
-    assert(sellerStoresRes.ok && Array.isArray(sellerStores) && sellerStores.length === 1 && sellerStores[0].id === 'store-siyoma', 'SELLER fetches ONLY assigned store');
+    // A SELLER sees their own store plus the main warehouse (needed to request transfers
+    // pulling stock from it into their store) — but no other retail store.
+    assert(
+      sellerStoresRes.ok && Array.isArray(sellerStores) && sellerStores.length === 2 &&
+      sellerStores.some((s: any) => s.id === 'store-siyoma') && sellerStores.some((s: any) => s.isMainWarehouse === true),
+      'SELLER fetches only their own store + the main warehouse'
+    );
 
     const newStoreName = `Филиал Аудит ${Date.now()}`;
     const createStoreRes = await fetch(`${API_BASE}/stores`, {
