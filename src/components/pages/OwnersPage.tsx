@@ -121,6 +121,8 @@ export const OwnersPage: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [typeFilter, setTypeFilter] = useState<'ALL' | 'PROFIT_PAYOUT' | 'INVESTMENT' | 'WITHDRAWAL' | 'REINVEST'>('ALL');
   const [selectedOwnerFilter, setSelectedOwnerFilter] = useState<string>('ALL');
+  const TRANSACTIONS_PAGE_SIZE = 15;
+  const [transactionsPage, setTransactionsPage] = useState(1);
 
   const [statusBanner, setStatusBanner] = useState<StatusMessage | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -149,6 +151,18 @@ export const OwnersPage: React.FC = () => {
       return true;
     }).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
   }, [ownerTransactions, typeFilter, selectedOwnerFilter, searchQuery]);
+
+  // Changing a filter can leave the current page past the end of the new
+  // (shorter) result set — snap back to page 1 whenever the filters change.
+  useEffect(() => {
+    setTransactionsPage(1);
+  }, [typeFilter, selectedOwnerFilter, searchQuery]);
+
+  const totalTransactionsPages = Math.max(1, Math.ceil(filteredTransactions.length / TRANSACTIONS_PAGE_SIZE));
+  const paginatedTransactions = useMemo(() => {
+    const start = (transactionsPage - 1) * TRANSACTIONS_PAGE_SIZE;
+    return filteredTransactions.slice(start, start + TRANSACTIONS_PAGE_SIZE);
+  }, [filteredTransactions, transactionsPage]);
 
   const totalCapitalInvested = useMemo(() => owners.reduce((acc, o) => acc + (o.capitalBalanceUsd ?? 0), 0), [owners]);
   // Money that has actually left the main-warehouse cash register to pay suppliers for
@@ -722,7 +736,7 @@ export const OwnersPage: React.FC = () => {
                 <p className="uppercase font-bold tracking-wider">История транзакций пуста</p>
               </div>
             ) : (
-              filteredTransactions.map((tx) => {
+              paginatedTransactions.map((tx) => {
                 const isDeposit = tx.type === 'INVESTMENT';
                 const isReinvest = tx.type === 'REINVEST';
                 const isPayout = tx.type === 'PROFIT_PAYOUT';
@@ -789,6 +803,34 @@ export const OwnersPage: React.FC = () => {
               })
             )}
           </div>
+
+          {/* Pagination */}
+          {totalTransactionsPages > 1 && (
+            <div className="flex items-center justify-between gap-2 pt-3 border-t border-border text-xs">
+              <span className="text-fg-subtle">
+                Страница <strong className="text-fg">{transactionsPage}</strong> из <strong className="text-fg">{totalTransactionsPages}</strong>
+                <span className="hidden sm:inline"> · {filteredTransactions.length} событий всего</span>
+              </span>
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => setTransactionsPage(p => Math.max(1, p - 1))}
+                  disabled={transactionsPage === 1}
+                  className="px-3 py-1.5 rounded-lg bg-surface-raised hover:bg-surface border border-border text-fg-muted hover:text-fg font-bold disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                >
+                  ← Назад
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setTransactionsPage(p => Math.min(totalTransactionsPages, p + 1))}
+                  disabled={transactionsPage === totalTransactionsPages}
+                  className="px-3 py-1.5 rounded-lg bg-surface-raised hover:bg-surface border border-border text-fg-muted hover:text-fg font-bold disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                >
+                  Вперед →
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 

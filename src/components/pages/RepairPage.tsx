@@ -38,6 +38,7 @@ export const RepairPage: React.FC = () => {
   const [clientPhone, setClientPhone] = useState('');
   const [deviceModel, setDeviceModel] = useState('');
   const [imei, setImei] = useState('');
+  const [imei2, setImei2] = useState('');
   const [defectDescription, setDefectDescription] = useState('');
   const [estimatedCostTjs, setEstimatedCostTjs] = useState<string>('0');
   const [prepaymentTjs, setPrepaymentTjs] = useState<string>('0');
@@ -112,7 +113,8 @@ export const RepairPage: React.FC = () => {
           (t.customerPhone && t.customerPhone.toLowerCase().includes(q)) ||
           (t.deviceModel && t.deviceModel.toLowerCase().includes(q)) ||
           (t.model && t.model.toLowerCase().includes(q)) ||
-          (t.imei && t.imei.toLowerCase().includes(q));
+          (t.imei && t.imei.toLowerCase().includes(q)) ||
+          (t.imei2 && t.imei2.toLowerCase().includes(q));
         if (!matches) return false;
       }
 
@@ -134,21 +136,24 @@ export const RepairPage: React.FC = () => {
         if (item) {
           setDeviceModel(`${item.brand} ${item.model} ${item.storage}`);
           if (item.imei) setImei(item.imei);
+          setImei2(item.imei2 || '');
           if (matched.customerName) setClientName(matched.customerName);
           setStatusMessage({ type: 'success', text: `Данные из чека #${code} автоматически подставлены` });
           return;
         }
       }
 
-      const devMatch = devices.find(d => d.imei === code);
+      const devMatch = devices.find(d => d.imei === code || d.imei2 === code);
       if (devMatch) {
         setDeviceModel(`${devMatch.brand} ${devMatch.model} ${devMatch.storage}`);
         if (devMatch.imei) setImei(devMatch.imei);
+        setImei2(devMatch.imei2 || '');
         setStatusMessage({ type: 'success', text: `Данные устройства ${devMatch.brand} ${devMatch.model} подставлены` });
         return;
       }
 
       setImei(code);
+      setImei2('');
     });
   };
 
@@ -162,6 +167,7 @@ export const RepairPage: React.FC = () => {
         if (item) {
           setDeviceModel(`${item.brand} ${item.model} ${item.storage}`);
           if (item.imei) setImei(item.imei);
+          setImei2(item.imei2 || '');
           if (sale.customerName) setClientName(sale.customerName);
           setStatusMessage({ type: 'success', text: `Найдена покупка по чеку #${sale.receiptNumber}` });
           return;
@@ -171,6 +177,7 @@ export const RepairPage: React.FC = () => {
         if (item.imei.toLowerCase() === q || (item.imei2 && item.imei2.toLowerCase() === q)) {
           setDeviceModel(`${item.brand} ${item.model} ${item.storage}`);
           if (item.imei) setImei(item.imei);
+          setImei2(item.imei2 || '');
           if (sale.customerName) setClientName(sale.customerName);
           setStatusMessage({ type: 'success', text: `Найдено устройство по IMEI` });
           return;
@@ -182,6 +189,7 @@ export const RepairPage: React.FC = () => {
     if (devMatch) {
       setDeviceModel(`${devMatch.brand} ${devMatch.model} ${devMatch.storage}`);
       if (devMatch.imei) setImei(devMatch.imei);
+      setImei2(devMatch.imei2 || '');
       setStatusMessage({ type: 'success', text: `Устройство найдено в каталоге` });
       return;
     }
@@ -205,6 +213,7 @@ export const RepairPage: React.FC = () => {
     try {
       const res = await createRepairTicket({
         imei: imei.trim() || 'N/A',
+        imei2: imei2.trim() || undefined,
         brand,
         model,
         storage: 'N/A',
@@ -225,6 +234,7 @@ export const RepairPage: React.FC = () => {
         setClientPhone('');
         setDeviceModel('');
         setImei('');
+        setImei2('');
         setDefectDescription('');
         setEstimatedCostTjs('0');
         setPrepaymentTjs('0');
@@ -484,15 +494,27 @@ export const RepairPage: React.FC = () => {
                   />
                 </div>
 
-                <div>
-                  <label className="block text-fg-subtle mb-1 text-[11px] uppercase">IMEI устройства</label>
-                  <input
-                    type="text"
-                    value={imei ?? ''}
-                    onChange={(e) => setImei(e.target.value)}
-                    placeholder="354891100234561"
-                    className="w-full rounded-xl bg-surface-raised border border-border px-3 py-2 text-fg focus:border-accent focus:outline-none"
-                  />
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-fg-subtle mb-1 text-[11px] uppercase">IMEI 1</label>
+                    <input
+                      type="text"
+                      value={imei ?? ''}
+                      onChange={(e) => setImei(e.target.value)}
+                      placeholder="354891100234561"
+                      className="w-full rounded-xl bg-surface-raised border border-border px-3 py-2 text-fg focus:border-accent focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-fg-subtle mb-1 text-[11px] uppercase">IMEI 2 (опционально / по желанию)</label>
+                    <input
+                      type="text"
+                      value={imei2 ?? ''}
+                      onChange={(e) => setImei2(e.target.value)}
+                      placeholder="354891100234562 (по желанию)"
+                      className="w-full rounded-xl bg-surface-raised border border-border px-3 py-2 text-fg focus:border-accent focus:outline-none"
+                    />
+                  </div>
                 </div>
 
                 <div>
