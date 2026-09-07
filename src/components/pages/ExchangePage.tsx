@@ -87,7 +87,7 @@ export const ExchangePage: React.FC = () => {
 
   const handlePickReceiptItem = (sale: Sale, item: SaleItem) => {
     setSelectedOldDevice(resolveOldDeviceFromItem(sale, item));
-    setExchangeInValueTjs(item.salePriceTjs ? Math.round(item.salePriceTjs * 0.7) : 0);
+    setExchangeInValueTjs(item.salePriceTjs || 0);
     setReceiptChoice(null);
     setStatus({ tone: 'success', text: `Устройство ${item.brand} ${item.model} выбрано из чека #${sale.receiptNumber}` });
   };
@@ -122,7 +122,7 @@ export const ExchangePage: React.FC = () => {
           (item.imei2 && item.imei2.toLowerCase() === q)
         ) {
           setSelectedOldDevice(resolveOldDeviceFromItem(sale, item));
-          setExchangeInValueTjs(item.salePriceTjs ? Math.round(item.salePriceTjs * 0.7) : 0);
+          setExchangeInValueTjs(item.salePriceTjs || 0);
           setStatus({ tone: 'success', text: `Устройство ${item.brand} ${item.model} найдено в истории продаж` });
           return;
         }

@@ -31,7 +31,8 @@ export const SalesHistoryPage: React.FC = () => {
     openScanner,
     setActivePage,
     processRefund,
-    isInitialLoading
+    isInitialLoading,
+    selectedStoreId: globalSelectedStoreId
   } = useApp();
 
   // Defaults to "today" — this is a same-shift lookup tool far more often than a monthly report.
@@ -40,9 +41,15 @@ export const SalesHistoryPage: React.FC = () => {
 
   const retailStores = useMemo(() => stores.filter((s) => !s.isMainWarehouse), [stores]);
 
+  // Defaults to whichever store is currently active on the POS Terminal page —
+  // an admin picking a store there should see that same store here without
+  // re-picking it; they can still switch it locally afterward.
   const [selectedStoreId, setSelectedStoreId] = useState<string>(() => {
     if (currentUser?.storeId) {
       return currentUser.storeId;
+    }
+    if (globalSelectedStoreId && globalSelectedStoreId !== 'all') {
+      return globalSelectedStoreId;
     }
     return retailStores[0]?.id || '';
   });

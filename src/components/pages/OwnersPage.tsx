@@ -21,10 +21,10 @@ import { StatusBanner, StatusMessage } from '../ui/StatusBanner';
 // The operation is now fixed by which button opened the modal, not chosen inside it —
 // this just labels the modal so the user still sees what they're about to do.
 const TX_TYPE_LABELS: Record<'INVESTMENT' | 'WITHDRAWAL' | 'PROFIT_PAYOUT' | 'REINVEST', string> = {
-  INVESTMENT: '📥 Внесение капитала (Личные внешние средства)',
-  REINVEST: '🔄 Реинвестирование в бизнес (Из Остатка к выплате)',
-  PROFIT_PAYOUT: '📤 Выплата чистой прибыли / дивидендов ($)',
-  WITHDRAWAL: '🏦 Изъятие / Вывод капитала ($)',
+  INVESTMENT: 'Внесение капитала',
+  REINVEST: 'Реинвестирование в бизнес',
+  PROFIT_PAYOUT: 'Выплата чистой прибыли',
+  WITHDRAWAL: 'Изъятие / Вывод капитала',
 };
 
 export const OwnersPage: React.FC = () => {
@@ -582,7 +582,7 @@ export const OwnersPage: React.FC = () => {
                         className="px-2.5 py-1 rounded-lg bg-warning/20 hover:bg-warning/30 text-warning border border-warning/40 text-xs font-bold transition-colors flex items-center space-x-1"
                         title="Реинвестировать остаток к выплате в бизнес"
                       >
-                        <span>🔄 ВЛОЖИТЬ ОСТАТОК</span>
+                        <span>ВЛОЖИТЬ ОСТАТОК</span>
                       </button>
                       <button
                         onClick={() => openTxModalForOwner(owner.id, 'PROFIT_PAYOUT')}
@@ -917,7 +917,7 @@ export const OwnersPage: React.FC = () => {
                 const currentOwner = owners.find(o => o.id === selectedOwnerId);
                 const availProfit = currentOwner?.availableProfitUsd ?? 0;
 
-                if (txType === 'REINVEST' || txType === 'INVESTMENT') {
+                if (txType === 'REINVEST' || txType === 'INVESTMENT' || txType === 'PROFIT_PAYOUT') {
                   return (
                     <div className="p-3 rounded-xl bg-warning/10 border border-warning/30 space-y-2 text-xs">
                       <div className="flex items-center justify-between text-xs">
@@ -928,18 +928,22 @@ export const OwnersPage: React.FC = () => {
                       {txType === 'REINVEST' && availProfit > 0 && (
                         <button
                           type="button"
-                          onClick={() => setAmountUsd(availProfit.toString())}
+                          onClick={() => setAmountUsd(Math.floor(availProfit).toString())}
                           className="w-full py-1.5 px-2 rounded-lg bg-warning/20 hover:bg-warning/30 text-warning text-xs font-bold border border-warning/40 flex items-center justify-center space-x-1 transition-colors"
                         >
-                          <span>⚡ ВЛОЖИТЬ ВЕСЬ ОСТАТОК (${availProfit.toLocaleString()})</span>
+                          <span>ВЛОЖИТЬ ВЕСЬ ОСТАТОК </span>
                         </button>
                       )}
 
-                      <p className="text-[11px] text-fg-subtle leading-snug">
-                        {txType === 'REINVEST'
-                          ? '★ Выбранный остаток к выплате будет зачислен в капитал бизнеса без выдачи наличных на руки.'
-                          : '★ Внесение дополнительных личных средств владельца.'}
-                      </p>
+                      {txType === 'PROFIT_PAYOUT' && availProfit > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => setAmountUsd(Math.floor(availProfit).toString())}
+                          className="w-full py-1.5 px-2 rounded-lg bg-warning/20 hover:bg-warning/30 text-warning text-xs font-bold border border-warning/40 flex items-center justify-center space-x-1 transition-colors"
+                        >
+                          <span>ВЫПЛАТИТЬ ВЕСЬ ОСТАТОК</span>
+                        </button>
+                      )}
                     </div>
                   );
                 }

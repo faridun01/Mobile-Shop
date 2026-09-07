@@ -66,7 +66,9 @@ export const TabletNavRail: React.FC = () => {
   const { currentUser, setActivePage, notifications, logout } = useApp();
 
   const userRole = currentUser?.role || 'SELLER';
-  const unreadNotifs = notifications.filter(n => !n.read && !n.resolved).length;
+  // `resolved` tracks whether an actionable notification has been handled, not whether
+  // the user has seen it — informational notifications are created already resolved.
+  const unreadNotifs = notifications.filter(n => !n.read).length;
   const visibleItems = TABLET_NAV_ITEMS.filter(item => item.roles.includes(userRole));
 
   return (

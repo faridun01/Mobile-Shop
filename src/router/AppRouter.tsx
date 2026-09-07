@@ -63,7 +63,7 @@ function MainLayout() {
   const location = useLocation();
   const { currentUser } = useAuthStore();
   const { isDailyRateModalOpen, setDailyRateModalOpen } = useUIStore();
-  const { isRateModalOpen, activePage, setActivePage } = useApp();
+  const { isRateModalOpen, activePage, setActivePage, selectedStoreId, stores } = useApp();
 
   React.useEffect(() => {
     const matched = Object.entries(PAGE_ROUTES).find(([_, path]) => path === location.pathname);
@@ -78,6 +78,12 @@ function MainLayout() {
   if (!currentUser) {
     return <Navigate to="/login" replace />;
   }
+
+  // Sellers are pinned to their own store; for admin/partner this reflects whichever
+  // store is currently active (set on the POS Terminal page), instead of a hardcoded label.
+  const activeStoreLabel = currentUser.storeName
+    || (selectedStoreId && selectedStoreId !== 'all' ? stores.find(s => s.id === selectedStoreId)?.name : undefined)
+    || 'Все магазины';
 
   return (
     <div className="flex h-dvh max-h-dvh w-screen overflow-hidden bg-bg text-fg antialiased selection:bg-accent selection:text-accent-fg">
@@ -121,7 +127,7 @@ function MainLayout() {
               <span className="text-fg-muted font-medium">Система активна</span>
             </span>
             <span>·</span>
-            <span>Точка: {currentUser?.storeName || 'Главный склад'}</span>
+            <span>Точка: {activeStoreLabel}</span>
             <span>·</span>
             <span>{currentUser?.name}</span>
           </div>

@@ -24,7 +24,8 @@ export const TransferPage: React.FC = () => {
     createTransferRequest,
     approveTransfer,
     rejectTransfer,
-    openScanner
+    openScanner,
+    selectedStoreId: globalSelectedStoreId
   } = useApp();
 
   const isSeller = currentUser?.role === 'SELLER';
@@ -37,7 +38,12 @@ export const TransferPage: React.FC = () => {
   const [selectedDeviceIds, setSelectedDeviceIds] = useState<string[]>([]);
 
   const [activeTab, setActiveTab] = useState<'create' | 'list'>('create');
-  const [historyFilterStoreId, setHistoryFilterStoreId] = useState<string>('ALL');
+  // Defaults to whichever store is currently active on the POS Terminal page —
+  // an admin picking a store there should see that same store here without
+  // re-picking it; they can still switch it locally afterward.
+  const [historyFilterStoreId, setHistoryFilterStoreId] = useState<string>(
+    globalSelectedStoreId && globalSelectedStoreId !== 'all' ? globalSelectedStoreId : 'ALL'
+  );
   const [statusMessage, setStatusMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [statusBanner, setStatusBanner] = useState<StatusMessage | null>(null);
 

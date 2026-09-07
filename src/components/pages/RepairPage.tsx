@@ -9,7 +9,8 @@ import {
   PackageCheck,
   X,
   FileText,
-  Loader2
+  Loader2,
+  Scan
 } from 'lucide-react';
 import { StatusBanner, StatusMessage } from '../ui/StatusBanner';
 
@@ -22,7 +23,8 @@ export const RepairPage: React.FC = () => {
     stores,
     createRepairTicket,
     updateRepairStatus,
-    openScanner
+    openScanner,
+    selectedStoreId: globalSelectedStoreId
   } = useApp();
 
   const [activeTab, setActiveTab] = useState<'list' | 'create'>('list');
@@ -55,7 +57,12 @@ export const RepairPage: React.FC = () => {
     return stores.filter(s => !s.isMainWarehouse);
   }, [stores]);
 
-  const [selectedStoreId, setSelectedStoreId] = useState<string>('ALL');
+  // Defaults to whichever store is currently active on the POS Terminal page —
+  // an admin picking a store there should see that same store here without
+  // re-picking it; they can still switch it locally afterward.
+  const [selectedStoreId, setSelectedStoreId] = useState<string>(
+    globalSelectedStoreId && globalSelectedStoreId !== 'all' ? globalSelectedStoreId : 'ALL'
+  );
   const [createTicketStoreId, setCreateTicketStoreId] = useState<string>('');
 
   useEffect(() => {
@@ -161,7 +168,7 @@ export const RepairPage: React.FC = () => {
         }
       }
       for (const item of sale.items) {
-        if (item.imei.toLowerCase() === q) {
+        if (item.imei.toLowerCase() === q || (item.imei2 && item.imei2.toLowerCase() === q)) {
           setDeviceModel(`${item.brand} ${item.model} ${item.storage}`);
           if (item.imei) setImei(item.imei);
           if (sale.customerName) setClientName(sale.customerName);
@@ -171,7 +178,7 @@ export const RepairPage: React.FC = () => {
       }
     }
 
-    const devMatch = devices.find(d => d.imei.toLowerCase() === q);
+    const devMatch = devices.find(d => d.imei.toLowerCase() === q || (d.imei2 && d.imei2.toLowerCase() === q));
     if (devMatch) {
       setDeviceModel(`${devMatch.brand} ${devMatch.model} ${devMatch.storage}`);
       if (devMatch.imei) setImei(devMatch.imei);
@@ -418,7 +425,7 @@ export const RepairPage: React.FC = () => {
                     className="px-3 py-1.5 bg-surface hover:bg-surface-raised text-accent rounded-lg border border-border"
                     title="Сканировать"
                   >
-                    СКАНИРОВАТЬ
+                    <Scan className="w-4 h-4" />
                   </button>
                 </div>
               </div>
@@ -500,40 +507,6 @@ export const RepairPage: React.FC = () => {
                   />
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
-                  <div>
-                    <label className="block text-fg-subtle mb-1 text-[11px] uppercase">Предварительная стоимость (TJS)</label>
-                    <input
-                      type="number"
-                      min="0"
-                      value={estimatedCostTjs}
-                      onChange={(e) => setEstimatedCostTjs(e.target.value)}
-                      className="w-full rounded-xl bg-surface-raised border border-border px-3 py-2 text-warning font-bold focus:border-accent focus:outline-none"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-fg-subtle mb-1 text-[11px] uppercase">Предоплата (TJS)</label>
-                    <input
-                      type="number"
-                      min="0"
-                      value={prepaymentTjs}
-                      onChange={(e) => setPrepaymentTjs(e.target.value)}
-                      className="w-full rounded-xl bg-surface-raised border border-border px-3 py-2 text-fg focus:border-accent focus:outline-none"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-fg-subtle mb-1 text-[11px] uppercase">Заметка мастера / Сервиса</label>
-                  <input
-                    type="text"
-                    value={masterNote ?? ''}
-                    onChange={(e) => setMasterNote(e.target.value)}
-                    placeholder="Запчасти заказаны..."
-                    className="w-full rounded-xl bg-surface-raised border border-border px-3 py-2 text-fg focus:border-accent focus:outline-none"
-                  />
-                </div>
               </div>
 
               <button

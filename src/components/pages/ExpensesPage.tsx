@@ -85,7 +85,7 @@ function getCategoryIcon(key: string): React.ElementType {
 }
 
 export const ExpensesPage: React.FC = () => {
-  const { currentUser, expenses, stores, users, todayRate, createExpense, updateExpense, deleteExpense, isInitialLoading } = useApp();
+  const { currentUser, expenses, stores, users, todayRate, createExpense, updateExpense, deleteExpense, isInitialLoading, selectedStoreId: globalSelectedStoreId } = useApp();
 
   const isSeller = currentUser?.role === 'SELLER';
   const canAddCategory = currentUser?.role === 'ADMIN' || currentUser?.role === 'PARTNER';
@@ -119,7 +119,12 @@ export const ExpensesPage: React.FC = () => {
   const [selectedMonth, setSelectedMonth] = useState<string>(new Date().toISOString().substring(0, 7));
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategoryTab, setSelectedCategoryTab] = useState('ALL');
-  const [selectedStoreFilter, setSelectedStoreFilter] = useState('ALL');
+  // Defaults to whichever store is currently active on the POS Terminal page —
+  // an admin picking a store there should see that same store here without
+  // re-picking it; they can still switch it locally afterward.
+  const [selectedStoreFilter, setSelectedStoreFilter] = useState(
+    globalSelectedStoreId && globalSelectedStoreId !== 'all' ? globalSelectedStoreId : 'ALL'
+  );
 
   const [customCategories, setCustomCategories] = useState<CustomCategory[]>(() => {
     try {
@@ -551,9 +556,9 @@ export const ExpensesPage: React.FC = () => {
             </FormField>
           )}
 
-          <FormField label="Описание / обоснование" required>
+          <FormField label="Описание / обоснование">
             <input
-              type="text" required value={description} onChange={(e) => setDescription(e.target.value)}
+              type="text" value={description} onChange={(e) => setDescription(e.target.value)}
               placeholder="Оплата аренды за текущий месяц"
               className="w-full h-11 rounded-lg bg-bg border border-border px-3 text-sm text-fg focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent"
             />

@@ -7,7 +7,9 @@ import {
   Download,
   FileSpreadsheet,
   Package,
-  Wallet
+  Wallet,
+  Store as StoreIcon,
+  Gift
 } from 'lucide-react';
 import {
   exportSalesReport, exportInventoryReport, exportExpensesReport, exportRepairsReport,
@@ -26,12 +28,16 @@ export const ReportsPage: React.FC = () => {
     suppliers,
     stores,
     supplierBonuses,
-    todayRate
+    todayRate,
+    selectedStoreId: globalSelectedStoreId
   } = useApp();
 
   const [period, setPeriod] = useState<'TODAY' | 'MONTH' | 'SPECIFIC_MONTH' | 'ALL'>('TODAY');
   const [selectedMonth, setSelectedMonth] = useState<string>(new Date().toISOString().substring(0, 7));
-  const [selectedStore, setSelectedStore] = useState<string>('all');
+  // Defaults to whichever store is currently active on the POS Terminal page —
+  // an admin picking a store there should see that same store here without
+  // re-picking it; they can still switch it locally afterward.
+  const [selectedStore, setSelectedStore] = useState<string>(globalSelectedStoreId || 'all');
   const [previewReport, setPreviewReport] = useState<null | 'sales' | 'inventory' | 'expenses' | 'repairs'>(null);
 
   const rate = todayRate?.rate || 9.50;
@@ -138,6 +144,12 @@ export const ReportsPage: React.FC = () => {
     let unitsSold = 0;
     const modelCounts: Record<string, { count: number; revenueUsd: number; cogsUsd: number; profitUsd: number }> = {};
 
+    // Gift devices from supplier bonuses always carry a $0 cost basis, so any sold item
+    // with no cost basis is, by construction, a bonus phone realizing 100% profit.
+    let giftDeviceUnitsSold = 0;
+    let giftDeviceProfitUsd = 0;
+    let giftDeviceProfitTjs = 0;
+
     periodSales.forEach(sale => {
       const saleRate = sale.exchangeRate || rate;
       const saleRevenueUsd = sale.totalUsd || +(sale.totalTjs / saleRate).toFixed(2);
@@ -166,6 +178,12 @@ export const ReportsPage: React.FC = () => {
         modelCounts[modelKey].revenueUsd += itemPriceUsd;
         modelCounts[modelKey].cogsUsd += itemCostUsd;
         modelCounts[modelKey].profitUsd += itemProfitUsd;
+
+        if (!itemCostUsd) {
+          giftDeviceUnitsSold += 1;
+          giftDeviceProfitUsd += itemPriceUsd;
+          giftDeviceProfitTjs += item.salePriceTjs || itemPriceUsd * saleRate;
+        }
       });
     });
 
@@ -203,6 +221,22 @@ export const ReportsPage: React.FC = () => {
         return true;
       })
       .reduce((acc, b) => acc + (b.amountUsd || 0) * b.exchangeRate, 0);
+
+    // Free-device (gift phone) bonuses received in the period — their profit only
+    // materializes once sold (tracked above via giftDeviceProfitUsd), this just counts
+    // how many arrived so the two figures can be shown side by side.
+    const periodFreeDeviceBonusesReceived = (supplierBonuses || [])
+      .filter(b => {
+        if (b.bonusType !== 'FREE_DEVICES') return false;
+        const bDate = b.dateReceived || b.date;
+        if (!bDate) return true;
+        if (period === 'TODAY') return bDate.startsWith(todayStr);
+        if (period === 'MONTH') return bDate.startsWith(currentMonthStr);
+        if (period === 'SPECIFIC_MONTH') return bDate.startsWith(selectedMonth);
+        return true;
+      }).length;
+    const freeDeviceBonusesInStock = (supplierBonuses || [])
+      .filter(b => b.bonusType === 'FREE_DEVICES' && b.status !== 'SOLD').length;
 
     // Refund penalties in period count 100% towards Net Profit
     const periodRefundPenaltiesUsd = (sales || [])
@@ -332,6 +366,13 @@ export const ReportsPage: React.FC = () => {
       expensesUsd,
       netProfitUsd,
       netProfitTjs,
+      periodCashBonusesUsd: +periodCashBonusesUsd.toFixed(2),
+      periodCashBonusesTjs: Math.round(periodCashBonusesTjs),
+      giftDeviceUnitsSold,
+      giftDeviceProfitUsd: +giftDeviceProfitUsd.toFixed(2),
+      giftDeviceProfitTjs: Math.round(giftDeviceProfitTjs),
+      periodFreeDeviceBonusesReceived,
+      freeDeviceBonusesInStock,
       totalSupplierDebtUsd: +totalSupplierDebtUsd.toFixed(2),
       totalSupplierDebtTjs,
       mainWarehouseStockCount: mainWarehouseStock.length,
@@ -483,6 +524,133 @@ export const ReportsPage: React.FC = () => {
               </p>
               <p className="text-[10px] text-fg-subtle">
                 ≈ {filteredData.totalSupplierDebtTjs.toLocaleString()} TJS (долги)
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* RETAIL STORES: same card layout as the main warehouse, one per store */}
+        {filteredData.storeBreakdown.map(store => (
+          <div key={store.storeId}>
+            <h4 className="text-[10px] font-bold text-fg-subtle uppercase tracking-wider mb-2 flex items-center space-x-1.5">
+              <StoreIcon className="w-3.5 h-3.5 text-accent" />
+              <span>{store.storeName}</span>
+              <span className="text-[9px] font-normal normal-case text-fg-subtle">(остатки, касса и прибыль за выбранный период)</span>
+            </h4>
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3">
+              <div className="p-3 sm:p-4 rounded-xl bg-surface border border-border space-y-1">
+                <div className="flex items-center justify-between text-fg-subtle text-[10px] uppercase">
+                  <span>ТОВАРОВ В МАГАЗИНЕ</span>
+                  <Smartphone className="w-3.5 h-3.5 text-accent" />
+                </div>
+                <p className="text-base sm:text-lg font-bold text-accent">
+                  {store.stockCount.toLocaleString()} шт.
+                </p>
+                <p className="text-[10px] text-fg-subtle">
+                  Доступно и хранится в магазине
+                </p>
+              </div>
+
+              <div className="p-3 sm:p-4 rounded-xl bg-surface border border-border space-y-1">
+                <div className="flex items-center justify-between text-fg-subtle text-[10px] uppercase">
+                  <span>СЕБЕСТОИМОСТЬ ТОВАРА</span>
+                  <Package className="w-3.5 h-3.5 text-fg-subtle" />
+                </div>
+                <p className="text-base sm:text-lg font-bold text-fg">
+                  ${store.stockCostUsd.toLocaleString()}
+                </p>
+                <p className="text-[10px] text-fg-subtle">
+                  ≈ {store.stockCostTjs.toLocaleString()} TJS
+                </p>
+              </div>
+
+              <div className="p-3 sm:p-4 rounded-xl bg-surface border border-border space-y-1">
+                <div className="flex items-center justify-between text-fg-subtle text-[10px] uppercase">
+                  <span>КАССА МАГАЗИНА</span>
+                  <Wallet className="w-3.5 h-3.5 text-accent" />
+                </div>
+                <p className="text-base sm:text-lg font-bold text-fg">
+                  {store.cashTjs.toLocaleString()} TJS
+                </p>
+                <p className="text-[10px] text-fg-subtle">
+                  ≈ ${(store.cashTjs / rate).toFixed(2)}
+                </p>
+              </div>
+
+              <div className="p-3 sm:p-4 rounded-xl bg-surface border border-border space-y-1">
+                <div className="flex items-center justify-between text-fg-subtle text-[10px] uppercase">
+                  <span>ПРИБЫЛЬ ЗА ПЕРИОД</span>
+                  <BarChart3 className="w-3.5 h-3.5 text-accent" />
+                </div>
+                <p className={`text-base sm:text-lg font-bold ${store.profitUsd >= 0 ? 'text-accent' : 'text-danger'}`}>
+                  ${store.profitUsd.toLocaleString()}
+                </p>
+                <p className="text-[10px] text-fg-subtle">
+                  ≈ {store.profitTjs.toLocaleString()} TJS ({store.salesCount} чеков)
+                </p>
+              </div>
+            </div>
+          </div>
+        ))}
+
+        {/* SUPPLIER BONUSES: cash bonuses count 100% toward net profit; gift phones
+            carry $0 cost basis, so their profit only shows once actually sold. */}
+        <div>
+          <h4 className="text-[10px] font-bold text-fg-subtle uppercase tracking-wider mb-2 flex items-center space-x-1.5">
+            <Gift className="w-3.5 h-3.5 text-accent" />
+            <span>БОНУСЫ ОТ ПОСТАВЩИКОВ</span>
+            <span className="text-[9px] font-normal normal-case text-fg-subtle">(денежные — сразу в прибыль; телефоны — 100% прибыль после продажи)</span>
+          </h4>
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3">
+            <div className="p-3 sm:p-4 rounded-xl bg-surface border border-border space-y-1">
+              <div className="flex items-center justify-between text-fg-subtle text-[10px] uppercase">
+                <span>ДЕНЕЖНЫЕ БОНУСЫ</span>
+                <BarChart3 className="w-3.5 h-3.5 text-accent" />
+              </div>
+              <p className="text-base sm:text-lg font-bold text-accent">
+                ${filteredData.periodCashBonusesUsd.toLocaleString()}
+              </p>
+              <p className="text-[10px] text-fg-subtle">
+                ≈ {filteredData.periodCashBonusesTjs.toLocaleString()} TJS · уже в чистой прибыли
+              </p>
+            </div>
+
+            <div className="p-3 sm:p-4 rounded-xl bg-surface border border-border space-y-1">
+              <div className="flex items-center justify-between text-fg-subtle text-[10px] uppercase">
+                <span>ПОЛУЧЕНО ТЕЛЕФОНОВ</span>
+                <Gift className="w-3.5 h-3.5 text-fg-subtle" />
+              </div>
+              <p className="text-base sm:text-lg font-bold text-fg">
+                {filteredData.periodFreeDeviceBonusesReceived.toLocaleString()} шт.
+              </p>
+              <p className="text-[10px] text-fg-subtle">
+                Бонусных устройств за период
+              </p>
+            </div>
+
+            <div className="p-3 sm:p-4 rounded-xl bg-surface border border-border space-y-1">
+              <div className="flex items-center justify-between text-fg-subtle text-[10px] uppercase">
+                <span>ПРОДАНО (100% ПРИБЫЛЬ)</span>
+                <Smartphone className="w-3.5 h-3.5 text-accent" />
+              </div>
+              <p className="text-base sm:text-lg font-bold text-accent">
+                ${filteredData.giftDeviceProfitUsd.toLocaleString()}
+              </p>
+              <p className="text-[10px] text-fg-subtle">
+                ≈ {filteredData.giftDeviceProfitTjs.toLocaleString()} TJS ({filteredData.giftDeviceUnitsSold} шт.)
+              </p>
+            </div>
+
+            <div className="p-3 sm:p-4 rounded-xl bg-surface border border-border space-y-1">
+              <div className="flex items-center justify-between text-fg-subtle text-[10px] uppercase">
+                <span>ЕЩЕ В НАЛИЧИИ</span>
+                <Package className="w-3.5 h-3.5 text-fg-subtle" />
+              </div>
+              <p className="text-base sm:text-lg font-bold text-fg">
+                {filteredData.freeDeviceBonusesInStock.toLocaleString()} шт.
+              </p>
+              <p className="text-[10px] text-fg-subtle">
+                Ожидают продажи (не за период)
               </p>
             </div>
           </div>

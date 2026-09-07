@@ -96,7 +96,9 @@ export const Sidebar: React.FC = () => {
   const { currentUser, setActivePage, logout, notifications } = useApp();
 
   const userRole = currentUser?.role || 'SELLER';
-  const unreadNotifs = notifications.filter(n => !n.read && !n.resolved).length;
+  // `resolved` tracks whether an actionable notification has been handled, not whether
+  // the user has seen it — informational notifications are created already resolved.
+  const unreadNotifs = notifications.filter(n => !n.read).length;
 
   return (
     <aside className="hidden lg:flex flex-col w-60 border-r border-border bg-surface text-fg-muted select-none shrink-0 h-screen sticky top-0">

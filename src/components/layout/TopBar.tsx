@@ -13,7 +13,11 @@ export const TopBar: React.FC = () => {
     stores
   } = useApp();
 
-  const unreadNotifsCount = notifications.filter(n => !n.read && !n.resolved).length;
+  // `resolved` tracks whether an actionable notification (e.g. an approval) has been
+  // handled — it says nothing about whether the user has actually seen it. Purely
+  // informational notifications are created already resolved, so counting only `read`
+  // is what makes the badge reflect "new to you", not "still needs action".
+  const unreadNotifsCount = notifications.filter(n => !n.read).length;
   const userStoreName = currentUser?.storeId ? (stores.find(s => s.id === currentUser.storeId)?.name || currentUser.storeName) : currentUser?.storeName;
 
   const getPageTitle = () => {

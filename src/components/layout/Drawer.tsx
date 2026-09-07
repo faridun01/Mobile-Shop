@@ -108,7 +108,9 @@ export const Drawer: React.FC = () => {
   if (!drawerOpen) return null;
 
   const userRole = currentUser?.role || 'SELLER';
-  const unreadNotifs = notifications.filter(n => !n.read && !n.resolved).length;
+  // `resolved` tracks whether an actionable notification has been handled, not whether
+  // the user has seen it — informational notifications are created already resolved.
+  const unreadNotifs = notifications.filter(n => !n.read).length;
   const userStoreName = currentUser?.storeId ? (stores.find(s => s.id === currentUser.storeId)?.name || currentUser.storeName) : currentUser?.storeName;
 
   return (

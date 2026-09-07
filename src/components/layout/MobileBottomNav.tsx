@@ -41,7 +41,9 @@ export const MobileBottomNav: React.FC = () => {
   } = useApp();
 
   const userRole = currentUser?.role || 'SELLER';
-  const unreadNotifs = notifications.filter(n => !n.read && !n.resolved).length;
+  // `resolved` tracks whether an actionable notification has been handled, not whether
+  // the user has seen it — informational notifications are created already resolved.
+  const unreadNotifs = notifications.filter(n => !n.read).length;
   // Route pathname alone is the source of truth for what's on screen — activePage is
   // plain component state that resets to its 'SALE' default on every mount/reload, so
   // relying on it here made the POS button stay lit after navigating (or reloading)

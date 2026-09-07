@@ -107,9 +107,14 @@ const StoreCard: React.FC<StoreCardProps> = ({ store, unitCount, valueUsd, showV
 );
 
 export const InventoryPage: React.FC = () => {
-  const { currentUser, devices, stores, openScanner, isInitialLoading } = useApp();
+  const { currentUser, devices, stores, openScanner, isInitialLoading, selectedStoreId: globalSelectedStoreId } = useApp();
 
-  const [pickedStoreId, setPickedStoreId] = useState<string | null>(null);
+  // Defaults to whichever store is currently active on the POS Terminal page —
+  // an admin picking a store there should land here already on that store instead
+  // of hitting the store-picker screen again; they can still switch it locally.
+  const [pickedStoreId, setPickedStoreId] = useState<string | null>(
+    globalSelectedStoreId && globalSelectedStoreId !== 'all' ? globalSelectedStoreId : null
+  );
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedBrand, setSelectedBrand] = useState<string>('ALL');
   const [selectedDevice, setSelectedDevice] = useState<Device | null>(null);
