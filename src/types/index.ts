@@ -323,30 +323,6 @@ export interface Supplier {
   createdAt?: string;
 }
 
-export interface Customer {
-  id: string;
-  name: string;
-  phone?: string;
-  totalDebtTjs: number;
-  totalPaidTjs: number;
-  createdAt?: string;
-}
-
-export interface CustomerPayment {
-  id: string;
-  customerId: string;
-  amountTjs: number;
-  exchangeRate: number;
-  sourceAccount: 'MAIN_ACCOUNT' | 'STORE_CASH';
-  storeId?: string;
-  date: string;
-  appliedToSales: {
-    saleId: string;
-    receiptNumber: number;
-    allocatedAmountTjs: number;
-  }[];
-}
-
 export interface SupplierBonus {
   id: string;
   supplierId: string;

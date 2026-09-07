@@ -10,8 +10,15 @@ function nextTransferNumber(): string {
   return `TR-${stamp}-${crypto.randomBytes(2).toString('hex').toUpperCase()}`;
 }
 
-function statusForStore(storeId: string): 'MAIN_WAREHOUSE' | 'STORE_STOCK' {
-  return storeId === 'main-warehouse' ? 'MAIN_WAREHOUSE' : 'STORE_STOCK';
+function destinationStatusForStore(isMainWarehouse: boolean): 'MAIN_WAREHOUSE' | 'STORE_STOCK' {
+  return isMainWarehouse ? 'MAIN_WAREHOUSE' : 'STORE_STOCK';
+}
+
+// A retail store's available stock includes devices returned via Trade-In (they never left
+// the store, just changed status) — matching TransferPage's own "available to pick" filter.
+// The main warehouse only ever holds devices with MAIN_WAREHOUSE status.
+function sourceStatusesForStore(isMainWarehouse: boolean): ('MAIN_WAREHOUSE' | 'STORE_STOCK' | 'IN_STOCK_AFTER_EXCHANGE')[] {
+  return isMainWarehouse ? ['MAIN_WAREHOUSE'] : ['STORE_STOCK', 'IN_STOCK_AFTER_EXCHANGE'];
 }
 
 export class TransfersService {
@@ -37,9 +44,9 @@ export class TransfersService {
         throw new Error('Магазин отправления и назначения не могут совпадать');
       }
 
-      const sourceStatus = fromStore.isMainWarehouse ? 'MAIN_WAREHOUSE' : 'STORE_STOCK';
+      const sourceStatuses = sourceStatusesForStore(fromStore.isMainWarehouse);
       const devices = await tx.device.findMany({
-        where: { id: { in: input.deviceIds }, storeId: input.fromStoreId, status: sourceStatus },
+        where: { id: { in: input.deviceIds }, storeId: input.fromStoreId, status: { in: sourceStatuses } },
       });
       if (devices.length !== input.deviceIds.length) {
         throw new Error('Одно или несколько устройств недоступны для перемещения (уже перемещаются, проданы или в ремонте)');
@@ -59,7 +66,7 @@ export class TransfersService {
       });
 
       const holdResult = await tx.device.updateMany({
-        where: { id: { in: input.deviceIds }, storeId: input.fromStoreId, status: sourceStatus },
+        where: { id: { in: input.deviceIds }, storeId: input.fromStoreId, status: { in: sourceStatuses } },
         data: { status: 'TRANSFER_PENDING' },
       });
       if (holdResult.count !== input.deviceIds.length) {
@@ -120,11 +127,16 @@ export class TransfersService {
 
     return prisma.$transaction(async (tx) => {
       const actor = await resolveActor(tx, input.requestedByUserId);
-      const sourceStatus = statusForStore(input.fromStoreId);
-      const destStatus = statusForStore(input.toStoreId);
+      const fromStore = await tx.store.findUnique({ where: { id: input.fromStoreId } });
+      const toStore = await tx.store.findUnique({ where: { id: input.toStoreId } });
+      if (!fromStore || !toStore) {
+        throw new Error('Магазин отправления или назначения не найден в базе данных');
+      }
+      const sourceStatuses = sourceStatusesForStore(fromStore.isMainWarehouse);
+      const destStatus = destinationStatusForStore(toStore.isMainWarehouse);
 
       const devices = await tx.device.findMany({
-        where: { id: { in: input.deviceIds }, storeId: input.fromStoreId, status: sourceStatus },
+        where: { id: { in: input.deviceIds }, storeId: input.fromStoreId, status: { in: sourceStatuses } },
       });
       if (devices.length !== input.deviceIds.length) {
         throw new Error('Одно или несколько устройств недоступны для перемещения');
@@ -145,7 +157,7 @@ export class TransfersService {
       });
 
       const moveResult = await tx.device.updateMany({
-        where: { id: { in: input.deviceIds }, storeId: input.fromStoreId, status: sourceStatus },
+        where: { id: { in: input.deviceIds }, storeId: input.fromStoreId, status: { in: sourceStatuses } },
         data: { storeId: input.toStoreId, status: destStatus },
       });
       if (moveResult.count !== input.deviceIds.length) {
@@ -194,7 +206,7 @@ export class TransfersService {
       if (transfer.status !== 'PENDING_APPROVAL') throw new Error('Этот запрос уже обработан');
 
       const deviceIds = transfer.items.map((i) => i.deviceId);
-      const destStatus = transfer.toStore.isMainWarehouse ? 'MAIN_WAREHOUSE' : 'STORE_STOCK';
+      const destStatus = destinationStatusForStore(transfer.toStore.isMainWarehouse);
 
       const moveResult = await tx.device.updateMany({
         where: { id: { in: deviceIds }, status: 'TRANSFER_PENDING' },
@@ -257,7 +269,10 @@ export class TransfersService {
       if (transfer.status !== 'PENDING_APPROVAL') throw new Error('Этот запрос уже обработан');
 
       const deviceIds = transfer.items.map((i) => i.deviceId);
-      const revertStatus = transfer.fromStore.isMainWarehouse ? 'MAIN_WAREHOUSE' : 'STORE_STOCK';
+      // Reverts to the generic in-stock status for that store type — a device that was
+      // IN_STOCK_AFTER_EXCHANGE before the request comes back as STORE_STOCK, which is fine:
+      // both statuses are treated identically everywhere else (sale/transfer eligibility).
+      const revertStatus = destinationStatusForStore(transfer.fromStore.isMainWarehouse);
 
       // Revert both status AND location — this closes the latent inconsistency in the
       // original mock logic where rejection reverted status but left location stale.

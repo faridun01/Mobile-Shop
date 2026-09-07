@@ -251,8 +251,15 @@ export class SuppliersService {
         const existing = await tx.device.findFirst({ where: { OR: imeis.flatMap((imei) => [{ imei }, { imei2: imei }]) } });
         if (existing) throw new Error(`IMEI ${existing.imei} уже зарегистрирован`);
 
-        const targetStatus = input.destinationStoreId ? ('STORE_STOCK' as const) : ('MAIN_WAREHOUSE' as const);
+        // Bug: this used to infer status from whether destinationStoreId was merely PROVIDED,
+        // not from what it actually points at — so explicitly picking "Главный склад" as the
+        // destination (a valid dropdown option, not just the default) produced a device stuck
+        // at the main warehouse with STORE_STOCK status, which every consumer keys off store
+        // type for (sale eligibility, transfer source matching, inventory grouping...).
         const storeId = input.destinationStoreId ?? 'main-warehouse';
+        const destinationStore = await tx.store.findUnique({ where: { id: storeId } });
+        if (!destinationStore) throw new Error('Склад назначения не найден');
+        const targetStatus = destinationStore.isMainWarehouse ? ('MAIN_WAREHOUSE' as const) : ('STORE_STOCK' as const);
 
         for (const device of input.freeDevices) {
           const costBasisUsd = requireNonNegativeMoney(device.costBasisUsd, 'Себестоимость бонусного устройства');

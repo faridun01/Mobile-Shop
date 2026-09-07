@@ -7,11 +7,20 @@ export function registerNotificationRoutes(app: Express) {
   app.get('/api/notifications', authenticateJwt, async (req: AuthenticatedRequest, res, next) => {
     try {
       const user = req.user!;
+      // Unbounded before: this ran on every login and every realtime resync, so it only got
+      // slower as the business operated longer. Anything still unresolved stays visible no
+      // matter its age (a pending transfer approval shouldn't silently vanish), but resolved/
+      // read notifications older than a day are dropped, with a hard cap as a final backstop.
+      const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
       const notifications = await prisma.notification.findMany({
         where: {
-          OR: [{ targetUserId: user.userId }, { targetRole: user.role }, { AND: [{ targetUserId: null }, { targetRole: null }] }],
+          AND: [
+            { OR: [{ targetUserId: user.userId }, { targetRole: user.role }, { AND: [{ targetUserId: null }, { targetRole: null }] }] },
+            { OR: [{ resolved: false }, { createdAt: { gte: oneDayAgo } }] },
+          ],
         },
         orderBy: { createdAt: 'desc' },
+        take: 200,
       });
       res.json(notifications);
     } catch (error) {

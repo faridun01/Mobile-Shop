@@ -46,21 +46,15 @@ export function registerTransferRoutes(app: Express) {
           res.status(403).json({ message: 'Вы можете перемещать товары только из своего магазина или с главного склада в свой магазин' });
           return;
         }
-      }
-      const transfer = await TransfersService.create({ fromStoreId, toStoreId, deviceIds, requestedByUserId: req.user!.userId });
-      res.status(201).json(transfer);
-    } catch (error) {
-      next(error);
-    }
-  });
-
-  app.post('/api/transfers/direct', authenticateJwt, requireRoles('ADMIN', 'PARTNER'), async (req: AuthenticatedRequest, res, next) => {
-    try {
-      const { fromStoreId, toStoreId, deviceIds } = req.body ?? {};
-      if (!fromStoreId || !toStoreId || !Array.isArray(deviceIds)) {
-        res.status(400).json({ message: 'fromStoreId, toStoreId и deviceIds обязательны' });
+        // A SELLER can only request — an ADMIN/PARTNER still has to approve before stock
+        // actually moves.
+        const transfer = await TransfersService.create({ fromStoreId, toStoreId, deviceIds, requestedByUserId: req.user!.userId });
+        res.status(201).json(transfer);
         return;
       }
+
+      // An ADMIN/PARTNER doing the transfer themselves needs no separate approval step —
+      // they're already the ones who'd approve it, so it just moves immediately.
       const transfer = await TransfersService.createDirect({ fromStoreId, toStoreId, deviceIds, requestedByUserId: req.user!.userId });
       res.status(201).json(transfer);
     } catch (error) {

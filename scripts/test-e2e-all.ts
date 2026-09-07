@@ -185,9 +185,11 @@ async function runE2ETests() {
     // 5. TRANSFERS BETWEEN STORES
     console.log('\n--- 5. TRANSFERS & WAREHOUSE MOVEMENTS ---');
     if (createdDeviceId) {
+      // A SELLER pulling stock from the main warehouse into their own store can only ever
+      // request it — an ADMIN/PARTNER must approve before it actually moves.
       const transferRes = await fetch(`${API_BASE}/transfers`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${adminToken}` },
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${sellerToken}` },
         body: JSON.stringify({
           fromStoreId: 'main-warehouse',
           toStoreId: 'store-siyoma',
@@ -195,7 +197,7 @@ async function runE2ETests() {
         })
       });
       const transferData = await transferRes.json();
-      assert(transferRes.status === 201 && transferData.status === 'PENDING_APPROVAL', 'Create transfer request from main warehouse to Siyoma store');
+      assert(transferRes.status === 201 && transferData.status === 'PENDING_APPROVAL', 'SELLER transfer request from main warehouse to Siyoma store stays pending');
 
       if (transferData.id) {
         const approveRes = await fetch(`${API_BASE}/transfers/${transferData.id}/approve`, {
@@ -203,7 +205,40 @@ async function runE2ETests() {
           headers: { Authorization: `Bearer ${adminToken}` }
         });
         const approvedData = await approveRes.json();
-        assert(approveRes.ok && approvedData.status === 'APPROVED', 'Approve transfer request (moves device to store stock)');
+        assert(approveRes.ok && approvedData.status === 'APPROVED', 'ADMIN approves the pending transfer (moves device to store stock)');
+      }
+
+      // An ADMIN doing the transfer themselves needs no separate approval — it moves immediately.
+      const secondPurchaseRes = await fetch(`${API_BASE}/purchases`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${adminToken}` },
+        body: JSON.stringify({
+          supplierId,
+          invoiceNumber: `INV-AUDIT2-${Date.now().toString().slice(-4)}`,
+          date: new Date().toISOString(),
+          storeId: 'main-warehouse',
+          groups: [{
+            brand: 'Samsung',
+            model: 'Galaxy S24 Audit',
+            storage: '256GB',
+            color: 'Black',
+            purchasePriceUsd: 700,
+            items: [{ imei: `777${Date.now().toString().slice(-12)}` }]
+          }]
+        })
+      });
+      const secondPurchaseData = await secondPurchaseRes.json();
+      const secondDeviceId = secondPurchaseData.devices?.[0]?.id;
+      if (secondDeviceId) {
+        const directTransferRes = await fetch(`${API_BASE}/transfers`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${adminToken}` },
+          body: JSON.stringify({ fromStoreId: 'main-warehouse', toStoreId: 'store-siyoma', deviceIds: [secondDeviceId] })
+        });
+        const directTransferData = await directTransferRes.json();
+        assert(directTransferRes.status === 201 && directTransferData.status === 'APPROVED', 'ADMIN transfer executes immediately, no approval needed');
+      } else {
+        assert(false, 'ADMIN direct transfer (second purchase failed)');
       }
     } else {
       assert(false, 'Transfer request execution (no device created)');

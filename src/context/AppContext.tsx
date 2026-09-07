@@ -8,7 +8,6 @@ import {
   Supplier,
   SupplierInvoice,
   SupplierBonus,
-  Customer,
   Expense,
   Owner,
   OwnerTransaction,
@@ -17,7 +16,6 @@ import {
   TransferRequest,
   NotificationItem,
   AuditLogEntry,
-  LedgerEntry,
   DailyRate,
   PageId,
   PaymentMethod,
@@ -38,7 +36,6 @@ import {
   mapSupplier,
   mapSupplierInvoice,
   mapSupplierBonus,
-  mapCustomer,
   mapExpense,
   mapOwner,
   mapOwnerTransaction,
@@ -46,7 +43,6 @@ import {
   mapStore,
   mapNotification,
   mapAuditLog,
-  mapLedgerEntry,
   mapDailyRate,
 } from '../api/mappers';
 
@@ -65,14 +61,12 @@ interface AppContextType {
   supplierInvoices: SupplierInvoice[];
   bonuses: SupplierBonus[];
   supplierBonuses: SupplierBonus[];
-  customers: Customer[];
   expenses: Expense[];
   owners: Owner[];
   ownerTransactions: OwnerTransaction[];
   users: User[];
   notifications: NotificationItem[];
   auditLogs: AuditLogEntry[];
-  ledger: LedgerEntry[];
   isInitialLoading: boolean;
 
   // UI states
@@ -172,7 +166,6 @@ interface AppContextType {
   }) => Promise<{ success: boolean; message?: string }>;
 
   createTransferRequest: (toLocationIdOrParams: string | { fromLocationId?: string; toLocationId: string; deviceIds: string[] }, deviceIds?: string[]) => Promise<{ success: boolean; message?: string }>;
-  directTransfer: (fromLocationId: string, toLocationId: string, deviceIds: string[]) => Promise<{ success: boolean; message?: string }>;
   approveTransfer: (transferId: string) => Promise<{ success: boolean; message?: string }>;
   approveTransferRequest: (transferId: string) => Promise<{ success: boolean; message?: string }>;
   rejectTransfer: (transferId: string, reason: string) => Promise<{ success: boolean; message?: string }>;
@@ -213,15 +206,6 @@ interface AppContextType {
   paySupplierInvoice: (params: {
     invoiceId: string;
     amountUsd: number;
-    sourceAccountId?: string;
-    storeId?: string;
-  }) => Promise<{ success: boolean; message?: string }>;
-
-  updateCustomer: (id: string, data: { name?: string; phone?: string }) => Promise<{ success: boolean; message?: string }>;
-
-  payCustomerDebt: (params: {
-    customerId: string;
-    amountTjs: number;
     sourceAccountId?: string;
     storeId?: string;
   }) => Promise<{ success: boolean; message?: string }>;
@@ -284,21 +268,6 @@ interface AppContextType {
 
 const AppContext = createContext<AppContextType | null>(null);
 
-const TWENTY_FOUR_HOURS_MS = 24 * 60 * 60 * 1000;
-
-export function isNotificationExpired(n: NotificationItem): boolean {
-  const isDone = Boolean(n.read || n.isRead || n.resolved);
-  if (!isDone) return false;
-
-  const actionTimeStr = n.resolvedAt || n.readAt || n.timestamp || n.date;
-  if (!actionTimeStr) return false;
-
-  const actionTime = new Date(actionTimeStr).getTime();
-  if (isNaN(actionTime)) return false;
-
-  return (Date.now() - actionTime) > TWENTY_FOUR_HOURS_MS;
-}
-
 function errorMessage(err: unknown, fallback: string): string {
   return err instanceof Error ? err.message : fallback;
 }
@@ -332,13 +301,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [transfers, setTransfers] = useState<TransferRequest[]>([]);
   const [repairs, setRepairs] = useState<RepairTicket[]>([]);
   const [bonuses, setBonuses] = useState<SupplierBonus[]>([]);
-  const [customers, setCustomers] = useState<Customer[]>([]);
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [owners, setOwners] = useState<Owner[]>([]);
   const [ownerTransactions, setOwnerTransactions] = useState<OwnerTransaction[]>([]);
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [auditLogs, setAuditLogs] = useState<AuditLogEntry[]>([]);
-  const [ledger, setLedger] = useState<LedgerEntry[]>([]);
   const [isInitialLoading, setIsInitialLoading] = useState(true);
 
   const [isRateModalOpen, setIsRateModalOpen] = useState(false);
@@ -456,15 +423,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   }, []);
 
-  const fetchCustomers = useCallback(async () => {
-    try {
-      const raw = await apiClient<any[]>('/customers');
-      setCustomers(raw.map(mapCustomer));
-    } catch {
-      // ADMIN/PARTNER only — leave empty for SELLER users
-    }
-  }, []);
-
   const fetchExpenses = useCallback(async () => {
     const raw = await apiClient<any[]>('/expenses');
     setExpenses(raw.map((e) => mapExpense(e, namesRef.current)).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
@@ -521,13 +479,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       // 2. Secondary modules batched to avoid connection pool saturation
       await Promise.all([fetchSales(), fetchTransfers(), fetchRepairs(), fetchExpenses()]);
       await Promise.all([fetchSuppliers(), fetchInvoices(), fetchBonuses(), fetchOwners()]);
-      await Promise.all([fetchCustomers(), fetchOwnerTransactions(), fetchNotifications(), fetchAuditLogs()]);
+      await Promise.all([fetchOwnerTransactions(), fetchNotifications(), fetchAuditLogs()]);
     })();
     refetchInFlight.current = task;
     const clear = () => { if (refetchInFlight.current === task) refetchInFlight.current = null; };
     task.then(clear, clear);
     return task;
-  }, [fetchUsers, fetchStores, fetchDevices, fetchSales, fetchTransfers, fetchRepairs, fetchSuppliers, fetchInvoices, fetchBonuses, fetchCustomers, fetchExpenses, fetchOwners, fetchOwnerTransactions, fetchNotifications, fetchAuditLogs, fetchExchangeRate]);
+  }, [fetchUsers, fetchStores, fetchDevices, fetchSales, fetchTransfers, fetchRepairs, fetchSuppliers, fetchInvoices, fetchBonuses, fetchExpenses, fetchOwners, fetchOwnerTransactions, fetchNotifications, fetchAuditLogs, fetchExchangeRate]);
 
   // Load catalog immediately (fast-path) and fetch secondary modules in background
   useEffect(() => {
@@ -546,7 +504,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           fetchSuppliers(),
           fetchInvoices(),
           fetchBonuses(),
-          fetchCustomers(),
           fetchOwners(),
           fetchOwnerTransactions(),
           fetchNotifications(),
@@ -824,19 +781,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
-  const directTransfer: AppContextType['directTransfer'] = async (fromLocationId, toLocationId, deviceIds) => {
-    try {
-      await apiClient('/transfers/direct', {
-        method: 'POST',
-        body: JSON.stringify({ fromStoreId: fromLocationId, toStoreId: toLocationId, deviceIds }),
-      });
-      await refetchAll();
-      return { success: true };
-    } catch (err) {
-      return { success: false, message: errorMessage(err, 'Не удалось выполнить перемещение') };
-    }
-  };
-
   const approveTransfer: AppContextType['approveTransfer'] = async (transferId) => {
     try {
       await apiClient(`/transfers/${transferId}/approve`, { method: 'POST' });
@@ -920,34 +864,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return { success: true };
     } catch (err) {
       return { success: false, message: errorMessage(err, 'Не удалось провести оплату по накладной') };
-    }
-  };
-
-  const updateCustomer: AppContextType['updateCustomer'] = async (id, data) => {
-    try {
-      await apiClient(`/customers/${id}`, { method: 'PUT', body: JSON.stringify(data) });
-      await fetchCustomers();
-      return { success: true };
-    } catch (err) {
-      return { success: false, message: errorMessage(err, 'Не удалось обновить данные клиента') };
-    }
-  };
-
-  const payCustomerDebt: AppContextType['payCustomerDebt'] = async ({ customerId, amountTjs, storeId, sourceAccountId }) => {
-    const resolvedStoreId = storeId || (sourceAccountId && sourceAccountId !== 'owner-funds' ? sourceAccountId : undefined);
-    try {
-      await apiClient(`/customers/${customerId}/payments`, {
-        method: 'POST',
-        body: JSON.stringify({
-          amountTjs,
-          sourceAccount: resolvedStoreId ? 'STORE_CASH' : 'MAIN_ACCOUNT',
-          storeId: resolvedStoreId,
-        }),
-      });
-      await refetchAll();
-      return { success: true };
-    } catch (err) {
-      return { success: false, message: errorMessage(err, 'Не удалось принять оплату долга') };
     }
   };
 
@@ -1277,14 +1193,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         supplierInvoices: invoices,
         bonuses,
         supplierBonuses: bonuses,
-        customers,
         expenses,
         owners,
         ownerTransactions,
         users,
         notifications,
         auditLogs,
-        ledger,
         isInitialLoading,
         isRateModalOpen,
         isScannerOpen,
@@ -1310,7 +1224,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         deleteSupplierInvoice,
         createSupplierBonus,
         createTransferRequest,
-        directTransfer,
         approveTransfer,
         approveTransferRequest: approveTransfer,
         rejectTransfer,
@@ -1319,8 +1232,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         updateRepairStatus,
         paySupplier,
         paySupplierInvoice,
-        updateCustomer,
-        payCustomerDebt,
         createExpense,
         updateExpense,
         deleteExpense,
@@ -1355,8 +1266,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         toggleTheme
   }), [
     resolvedCurrentUser, todayRate, activePage, selectedStoreId, stores, devices, sales,
-    transfers, repairs, suppliers, invoices, bonuses, customers, expenses, owners,
-    ownerTransactions, users, notifications, auditLogs, ledger, isInitialLoading,
+    transfers, repairs, suppliers, invoices, bonuses, expenses, owners,
+    ownerTransactions, users, notifications, auditLogs, isInitialLoading,
     isRateModalOpen, isScannerOpen, scannerCallback, drawerOpen, theme, authToken,
   ]);
 

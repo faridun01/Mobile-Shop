@@ -158,7 +158,9 @@ export const TransferPage: React.FC = () => {
         setConfirmTransferModal(false);
         setStatusBanner({
           tone: 'success',
-          text: `Заявка на перемещение (${selectedDeviceIds.length} шт.) отправлена и ожидает подтверждения администратора.`
+          text: isSeller
+            ? `Заявка на перемещение (${selectedDeviceIds.length} шт.) отправлена и ожидает подтверждения администратора.`
+            : `Перемещение (${selectedDeviceIds.length} шт.) выполнено.`
         });
         setSelectedDeviceIds([]);
         setActiveTab('list');

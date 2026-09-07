@@ -7,7 +7,6 @@ import type {
   Supplier,
   SupplierInvoice,
   SupplierBonus,
-  Customer,
   Expense,
   Owner,
   OwnerTransaction,
@@ -17,7 +16,6 @@ import type {
   Store,
   NotificationItem,
   AuditLogEntry,
-  LedgerEntry,
   DailyRate,
 } from '../types';
 
@@ -217,17 +215,6 @@ export function mapSupplier(s: any): Supplier {
   };
 }
 
-export function mapCustomer(c: any): Customer {
-  return {
-    id: c.id,
-    name: c.name,
-    phone: c.phone ?? undefined,
-    totalDebtTjs: c.totalDebtTjs,
-    totalPaidTjs: c.totalPaidTjs,
-    createdAt: c.createdAt,
-  };
-}
-
 export function mapSupplierInvoice(inv: any): SupplierInvoice {
   return {
     id: inv.id,
@@ -409,21 +396,6 @@ export function mapAuditLog(a: any): AuditLogEntry {
   };
 }
 
-export function mapLedgerEntry(l: any): LedgerEntry {
-  return {
-    id: l.id,
-    timestamp: l.createdAt,
-    type: l.type,
-    description: l.description,
-    amountTjs: l.amountTjs ?? undefined,
-    amountUsd: l.amountUsd ?? undefined,
-    exchangeRate: l.exchangeRate ?? undefined,
-    storeId: l.storeId ?? undefined,
-    storeName: l.storeName ?? undefined,
-    referenceId: l.referenceId ?? undefined,
-    userName: l.userName ?? '',
-  };
-}
 
 export function mapDailyRate(r: any): DailyRate | null {
   if (!r) return null;
