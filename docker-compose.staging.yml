@@ -27,6 +27,7 @@ services:
     environment:
       DATABASE_URL: "postgresql://postgres:staging_pw_only@db:5432/mobile_shop_db?schema=public"
       JWT_SECRET: "staging-only-jwt-secret-not-for-prod"
+      APP_URL: "${STAGING_APP_URL:-http://localhost:18091,http://localhost:13099}"
       NODE_ENV: "production"
       PORT: "3000"
     ports:

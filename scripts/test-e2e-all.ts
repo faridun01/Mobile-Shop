@@ -2,7 +2,7 @@ import { app } from '../server/src/app';
 import { prisma } from '../server/src/prisma/prisma.service';
 
 async function runE2ETests() {
-  console.log('🚀 STARTING IN-MEMORY E2E AUDIT SUITE...\n');
+  console.log('🚀 STARTING DATABASE-BACKED E2E AUDIT SUITE...\n');
   const server = await new Promise<import('node:http').Server>((resolve) => {
     const s = app.listen(0, '127.0.0.1', () => resolve(s));
   });
@@ -38,6 +38,24 @@ async function runE2ETests() {
     const adminData = await adminRes.json();
     assert(adminRes.ok && !!adminData.token, 'Login ADMIN (admin / admin123)');
     adminToken = adminData.token;
+    if (!adminRes.ok || !adminToken) {
+      throw new Error('E2E setup failed: admin login is required to initialize the exchange rate');
+    }
+
+    // Seed intentionally leaves the daily rate unset. Set it through the real API
+    // so the server uses the configured business timezone and records the actor.
+    const testExchangeRate = 10.5;
+    const setRateRes = await fetch(`${API_BASE}/exchange-rate/today`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${adminToken}` },
+      body: JSON.stringify({ rate: testExchangeRate }),
+    });
+    const initializedRate = await setRateRes.json();
+    const rateInitialized = setRateRes.ok && initializedRate?.rate === testExchangeRate;
+    assert(rateInitialized, 'Initialize today exchange rate before financial operations');
+    if (!rateInitialized) {
+      throw new Error(`E2E setup failed: exchange rate initialization returned HTTP ${setRateRes.status}`);
+    }
 
     const partnerRes = await fetch(`${API_BASE}/auth/login`, {
       method: 'POST',
@@ -336,7 +354,7 @@ async function runE2ETests() {
       headers: { Authorization: `Bearer ${adminToken}` }
     });
     const rateData = await rateRes.json();
-    assert(rateRes.ok && !!rateData.rate, 'Fetch today exchange rate');
+    assert(rateRes.ok && rateData?.rate === testExchangeRate, 'Fetch today exchange rate');
 
     // Cleanup created test device & purchase invoice
     if (createdDeviceId) {
@@ -347,7 +365,9 @@ async function runE2ETests() {
       await prisma.device.deleteMany({ where: { id: createdDeviceId } });
     }
   } finally {
-    server.close();
+    await new Promise<void>((resolve, reject) => {
+      server.close((error) => error ? reject(error) : resolve());
+    }).finally(() => prisma.$disconnect());
   }
 
   console.log(`\n==================================================`);

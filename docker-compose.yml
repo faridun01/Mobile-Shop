@@ -33,6 +33,7 @@ services:
       # Docker harness (see docker-compose.prod.yml for the real production config, which
       # fails to boot instead of falling back to a hardcoded secret).
       JWT_SECRET: "local-docker-dev-only-jwt-secret-do-not-use-in-real-production"
+      APP_URL: "${APP_URL:-http://localhost:8081}"
       NODE_ENV: "production"
       PORT: "3000"
     healthcheck:

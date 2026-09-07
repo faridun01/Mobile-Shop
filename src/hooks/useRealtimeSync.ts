@@ -20,22 +20,62 @@ export function useRealtimeSync(token: string | null, onEvent: (type: string, pa
     }
 
     let socket: WebSocket | null = null;
-    try {
-      socket = new WebSocket(wsUrl);
-      socket.onmessage = (event) => {
-        try {
-          const data = JSON.parse(event.data);
-          onEventRef.current(data.type, data.payload);
-        } catch (e) {
-          console.error('[Realtime Sync Parse Error]:', e);
-        }
-      };
-    } catch {
-      // Graceful fallback if the WebSocket server is unreachable
+    let stopped = false;
+    let retryTimer: ReturnType<typeof setTimeout> | undefined;
+    let retryDelay = 1000;
+    let hasConnected = false;
+
+    function scheduleReconnect() {
+      if (stopped || retryTimer !== undefined) return;
+      retryTimer = setTimeout(() => {
+        retryTimer = undefined;
+        connect();
+      }, retryDelay);
+      retryDelay = Math.min(retryDelay * 2, 30000);
     }
 
+    function connect() {
+      if (stopped) return;
+      try {
+        const connection = new WebSocket(wsUrl);
+        socket = connection;
+        connection.onopen = () => {
+          retryDelay = 1000;
+          if (hasConnected) onEventRef.current('RECONNECTED', null);
+          hasConnected = true;
+        };
+        connection.onmessage = (event) => {
+          if (stopped) return;
+          try {
+            const data = JSON.parse(event.data);
+            onEventRef.current(data.type, data.payload);
+          } catch (e) {
+            console.error('[Realtime Sync Parse Error]:', e);
+          }
+        };
+        connection.onclose = (event) => {
+          // Authorization failures require a new token, not repeated connections.
+          if (event.code !== 1008) scheduleReconnect();
+        };
+        // Failed connections also emit close; keep retries in one place.
+        connection.onerror = () => connection.close();
+      } catch {
+        scheduleReconnect();
+      }
+    }
+
+    connect();
+
     return () => {
-      socket?.close();
+      stopped = true;
+      clearTimeout(retryTimer);
+      if (socket) {
+        socket.onopen = null;
+        socket.onmessage = null;
+        socket.onclose = null;
+        socket.onerror = null;
+        socket.close();
+      }
     };
   }, [token]);
 }

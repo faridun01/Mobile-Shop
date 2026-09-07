@@ -1,0 +1,76 @@
+- generic [ref=e50]:
+  - complementary [ref=e51]:
+    - generic [ref=e52]:
+      - generic [ref=e53]: Mobile Shop
+      - generic [ref=e56]: POS
+    - navigation [ref=e57]:
+      - generic [ref=e58]:
+        - text: Основное
+        - generic [ref=e59]:
+          - button "POS Терминал" [ref=e60]
+          - button "История продаж" [ref=e66]
+          - button "Обмен Trade-In" [ref=e73]
+          - button "Сервис и ремонт" [ref=e81]
+      - generic [ref=e86]:
+        - text: Склад
+        - generic [ref=e87]:
+          - button "Склад товаров" [ref=e88]
+          - button "Приходы (партии)" [ref=e95]
+          - button "Перемещение" [ref=e100]
+          - button "Поставщики" [ref=e106]
+      - generic [ref=e114]:
+        - text: Финансы
+        - generic [ref=e115]:
+          - button "Финансовые отчёты" [ref=e116]
+          - button "Расходы" [ref=e121]
+          - button "Бонусы" [ref=e127]
+          - button "Партнеры и капитал" [ref=e134]
+      - generic [ref=e142]:
+        - text: Управление
+        - generic [ref=e143]:
+          - button "Сотрудники" [ref=e144]
+          - button "Журнал аудита" [ref=e151]
+          - button "Уведомления" [ref=e157]
+          - button "Настройки" [ref=e163]
+    - generic [ref=e169]:
+      - generic [ref=e170]: ДА
+      - generic [ref=e171]:
+        - paragraph [ref=e172]: Далер
+        - paragraph [ref=e173]: Администратор
+    - button "Выход" [ref=e175]
+  - generic [ref=e180]:
+    - banner [ref=e181]:
+      - generic [ref=e183]:
+        - heading "POS Терминал" [level=1] [ref=e184]
+        - paragraph [ref=e185]:
+          - generic [ref=e190]: Все филиалы
+      - button "Уведомления" [ref=e192]
+    - main [ref=e196]:
+      - generic [ref=e197]:
+        - generic [ref=e198]:
+          - generic [ref=e199]:
+            - generic [ref=e200]: "Точка продажи:"
+            - combobox [ref=e205]:
+              - option "Сиёма" [selected]
+          - generic [ref=e206]:
+            - textbox "Поиск по IMEI / штрихкоду / модели..." [ref=e208]
+            - button "Сканировать" [ref=e209]
+          - generic [ref=e215]:
+            - button "Все бренды" [ref=e216]
+            - button "Samsung" [ref=e217]
+        - button "Samsung Galaxy S24 Audit 256GB · Black 1 шт." [ref=e220]:
+          - generic [ref=e221]:
+            - paragraph [ref=e223]: Samsung Galaxy S24 Audit
+            - paragraph [ref=e224]: 256GB · Black
+          - generic [ref=e225]: 1 шт.
+    - contentinfo [ref=e229]:
+      - generic [ref=e230]:
+        - generic [ref=e231]: Система активна
+        - generic [ref=e234]: ·
+        - generic [ref=e235]: "Точка: Все магазины"
+        - generic [ref=e236]: ·
+        - generic [ref=e237]: Далер
+      - generic [ref=e238]:
+        - generic [ref=e239]: USD / TJS
+        - generic [ref=e240]: ·
+        - generic [ref=e241]: Синхронизация онлайн
