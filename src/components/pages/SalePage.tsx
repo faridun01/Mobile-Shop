@@ -439,7 +439,6 @@ export const SalePage: React.FC = () => {
               Добавить ещё
             </Button>
             <Button
-              fullWidth
               size="lg"
               leftIcon={CheckCircle2}
               loading={isSubmittingSale}

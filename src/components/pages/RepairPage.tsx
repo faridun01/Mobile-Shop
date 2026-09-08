@@ -351,12 +351,12 @@ export const RepairPage: React.FC = () => {
             />
           </div>
 
-          <div className="flex flex-wrap items-center gap-2 text-xs">
+          <div className="flex items-center gap-2 text-xs overflow-x-auto scrollbar-none">
             {!isSeller && (
               <select
                 value={selectedStoreId}
                 onChange={(e) => setSelectedStoreId(e.target.value)}
-                className="bg-surface border border-border text-fg text-xs font-semibold rounded-xl px-3 py-1.5 focus:outline-none focus:border-accent"
+                className="shrink-0 bg-surface border border-border text-fg text-xs font-semibold rounded-xl px-3 py-1.5 focus:outline-none focus:border-accent"
               >
                 <option value="ALL">Все магазины (Розница)</option>
                 {retailStores.map(s => (
@@ -365,20 +365,18 @@ export const RepairPage: React.FC = () => {
               </select>
             )}
 
-            <div className="flex items-center space-x-1.5">
-              <input
-                type="month"
-                value={selectedMonth}
-                onChange={(e) => e.target.value && setSelectedMonth(e.target.value)}
-                className="px-3 py-1.5 rounded-xl border border-border text-fg text-xs font-semibold transition-colors bg-surface focus:outline-none focus:border-accent cursor-pointer"
-                title="Динамический выбор месяца"
-              />
-            </div>
+            <input
+              type="month"
+              value={selectedMonth}
+              onChange={(e) => e.target.value && setSelectedMonth(e.target.value)}
+              className="shrink-0 px-3 py-1.5 rounded-xl border border-border text-fg text-xs font-semibold transition-colors bg-surface focus:outline-none focus:border-accent cursor-pointer"
+              title="Динамический выбор месяца"
+            />
 
             <select
               value={statusFilter ?? 'ALL'}
               onChange={(e) => setStatusFilter(e.target.value)}
-              className="bg-surface border border-border text-fg text-xs font-semibold rounded-xl px-3 py-1.5 focus:outline-none focus:border-accent"
+              className="shrink-0 bg-surface border border-border text-fg text-xs font-semibold rounded-xl px-3 py-1.5 focus:outline-none focus:border-accent"
             >
               <option value="ALL">Все ремонты за месяц</option>
               <option value="ACTIVE">Активные ремонты</option>
