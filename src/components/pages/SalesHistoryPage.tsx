@@ -260,10 +260,19 @@ export const SalesHistoryPage: React.FC = () => {
 
                 <div className="text-right shrink-0 flex items-center gap-2">
                   <div>
-                    <p className="text-sm font-semibold text-fg">{sale.totalTjs.toLocaleString()} TJS</p>
-                    <p className={`text-xs ${sale.paymentMethod === 'DEBT' && (sale.debtAmountTjs ?? 0) > 0 ? 'text-danger font-semibold' : 'text-fg-subtle'}`}>
-                      {sale.paymentMethod === 'CASH' ? 'Наличные' : sale.paymentMethod === 'CARD' ? 'Карта' : sale.paymentMethod === 'DEBT' ? ((sale.debtAmountTjs ?? 0) > 0 ? `В долг (${(sale.debtAmountTjs ?? 0).toLocaleString()} TJS)` : 'В долг (погашено)') : 'Смешанная'}
-                    </p>
+                    {sale.status === 'REFUNDED' ? (
+                      <>
+                        <p className="text-sm font-semibold line-through text-fg-subtle">{sale.totalTjs.toLocaleString()} TJS</p>
+                        <p className="text-xs text-danger font-semibold">Возвращено: {(sale.actualRefundAmountTjs ?? sale.totalTjs).toLocaleString()} TJS</p>
+                      </>
+                    ) : (
+                      <>
+                        <p className="text-sm font-semibold text-fg">{sale.totalTjs.toLocaleString()} TJS</p>
+                        <p className={`text-xs ${sale.paymentMethod === 'DEBT' && (sale.debtAmountTjs ?? 0) > 0 ? 'text-danger font-semibold' : 'text-fg-subtle'}`}>
+                          {sale.paymentMethod === 'CASH' ? 'Наличные' : sale.paymentMethod === 'CARD' ? 'Карта' : sale.paymentMethod === 'DEBT' ? ((sale.debtAmountTjs ?? 0) > 0 ? `В долг (${(sale.debtAmountTjs ?? 0).toLocaleString()} TJS)` : 'В долг (погашено)') : 'Смешанная'}
+                        </p>
+                      </>
+                    )}
                   </div>
                   <ChevronRight className="w-4 h-4 text-fg-subtle" />
                 </div>
@@ -389,6 +398,29 @@ export const SalesHistoryPage: React.FC = () => {
                 <span className="text-accent text-base">{selectedSale.totalTjs.toLocaleString()} TJS</span>
               </div>
             </div>
+
+            {selectedSale.status === 'REFUNDED' && (
+              <div className="bg-danger/10 border border-danger/30 p-3 rounded-lg space-y-1.5 text-sm">
+                <p className="text-xs font-semibold text-danger uppercase tracking-wide">
+                  Возврат {selectedSale.refundedAt ? `от ${new Date(selectedSale.refundedAt).toLocaleString('ru-RU')}` : ''}
+                </p>
+                {selectedSale.refundReason && (
+                  <p className="text-xs text-fg-subtle">Причина: {selectedSale.refundReason}</p>
+                )}
+                {(selectedSale.penaltyFeeTjs ?? 0) > 0 && (
+                  <div className="flex justify-between text-xs">
+                    <span className="text-fg-subtle uppercase">Штраф удержан</span>
+                    <span className="text-warning font-semibold">{(selectedSale.penaltyFeeTjs ?? 0).toLocaleString()} TJS</span>
+                  </div>
+                )}
+                <div className="flex justify-between pt-1.5 border-t border-danger/20 font-semibold">
+                  <span className="text-fg uppercase text-xs">Возвращено клиенту</span>
+                  <span className="text-danger text-base">
+                    {(selectedSale.actualRefundAmountTjs ?? selectedSale.totalTjs).toLocaleString()} TJS
+                  </span>
+                </div>
+              </div>
+            )}
           </div>
         ) : dialogView === 'refund' ? (
           <div className="space-y-3.5">

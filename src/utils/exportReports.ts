@@ -107,7 +107,9 @@ export function buildSalesReportTable(sales: Sale[], rate: number = 9.5): Report
       const costUsd = item.costBasisUsd || 0;
       const priceUsd = item.salePriceUsd || +(item.salePriceTjs / operationRate).toFixed(2);
       const priceTjs = item.salePriceTjs || +(item.salePriceUsd * operationRate).toFixed(2);
-      const profitUsd = +(priceUsd - costUsd).toFixed(2);
+      // A refunded sale's original margin is void — it never counts toward totals, and
+      // showing the stale pre-refund number here would misleadingly suggest it still does.
+      const profitUsd = isRefunded ? 0 : +(priceUsd - costUsd).toFixed(2);
 
       if (!isRefunded) {
         totalCostBasisUsd += costUsd;
@@ -131,6 +133,30 @@ export function buildSalesReportTable(sales: Sale[], rate: number = 9.5): Report
         isRefunded ? 'ВОЗВРАТ' : 'ЗАВЕРШЕНА'
       ]);
     });
+
+    // The only profit a refunded sale actually leaves behind is the withheld penalty —
+    // recorded as its own line so it shows up in the history and counts toward the total,
+    // instead of silently vanishing along with the reversed original sale.
+    if (isRefunded && (sale.penaltyFeeUsd ?? 0) > 0) {
+      const penaltyUsd = sale.penaltyFeeUsd ?? 0;
+      const penaltyTjs = sale.penaltyFeeTjs ?? 0;
+      totalProfitUsd += penaltyUsd;
+
+      rows.push([
+        sale.receiptNumber,
+        dateFormatted,
+        sale.storeName,
+        sale.sellerName,
+        'Штраф за возврат (прибыль)',
+        '',
+        '',
+        '',
+        penaltyTjs.toFixed(2),
+        penaltyUsd.toFixed(2),
+        sale.paymentMethod === 'CASH' ? 'Наличные' : sale.paymentMethod === 'CARD' ? 'Карта' : 'Раздельная',
+        'ВОЗВРАТ (ШТРАФ)'
+      ]);
+    }
   });
 
   const totalsRow = [

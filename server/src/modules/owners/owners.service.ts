@@ -180,17 +180,33 @@ export class OwnersService {
       // the yet-unclaimed availableProfitUsd is affected, and only if the admin opts
       // to sweep it into capital instead of leaving it payable into next quarter.
       if (transferRemainingToCapital) {
-        await Promise.all(owners.filter((owner) => (owner.availableProfitUsd || 0) > 0).map((owner) => {
-          const remaining = owner.availableProfitUsd || 0;
-          return tx.owner.update({
-            where: { id: owner.id },
-            data: {
-              capitalBalanceUsd: { increment: remaining },
-              totalReinvestedUsd: { increment: remaining },
-              availableProfitUsd: 0,
-            },
-          });
-        }));
+        const sweptOwners = owners.filter((owner) => (owner.availableProfitUsd || 0) > 0);
+        if (sweptOwners.length > 0) {
+          const exchangeRate = await requireTodayRate(tx);
+          await Promise.all(sweptOwners.map(async (owner) => {
+            const remaining = owner.availableProfitUsd || 0;
+            await tx.owner.update({
+              where: { id: owner.id },
+              data: {
+                capitalBalanceUsd: { increment: remaining },
+                totalReinvestedUsd: { increment: remaining },
+                availableProfitUsd: 0,
+              },
+            });
+            // Mirrors what a manual REINVEST produces — without this, capital visibly
+            // grows with no matching entry in the transaction history feed.
+            await tx.ownerTransaction.create({
+              data: {
+                ownerId: owner.id,
+                type: 'REINVEST',
+                amountUsd: remaining,
+                exchangeRate,
+                createdByUserId: actor.id,
+                note: `Автоматическое реинвестирование остатка при закрытии квартала ${quarterName}`,
+              },
+            });
+          }));
+        }
       }
 
       await tx.auditLog.create({

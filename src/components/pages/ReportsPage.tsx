@@ -9,10 +9,7 @@ import {
   ArrowDownRight,
   Download,
   FileSpreadsheet,
-  Package,
-  Wallet,
   Store as StoreIcon,
-  Gift,
   Receipt
 } from 'lucide-react';
 import {
@@ -69,13 +66,16 @@ export const ReportsPage: React.FC = () => {
     selectedStoreId: globalSelectedStoreId
   } = useApp();
 
-  const [period, setPeriod] = useState<Period>('TODAY');
+  const [period, setPeriod] = useState<Period>('SPECIFIC_MONTH');
   const [selectedMonth, setSelectedMonth] = useState<string>(new Date().toISOString().substring(0, 7));
   // Defaults to whichever store is currently active on the POS Terminal page —
   // an admin picking a store there should see that same store here without
   // re-picking it; they can still switch it locally afterward.
   const [selectedStore, setSelectedStore] = useState<string>(globalSelectedStoreId || 'all');
-  const [previewReport, setPreviewReport] = useState<null | 'sales' | 'inventory' | 'expenses' | 'repairs'>(null);
+  const [previewReport, setPreviewReport] = useState<null | 'inventory' | 'expenses' | 'repairs'>(null);
+  // Which store's "Отчет по продажам" preview/download modal is open — 'all' for the
+  // combined report across every store, a store id for a single one, null when closed.
+  const [salesReportStoreId, setSalesReportStoreId] = useState<string | null>(null);
 
   const rate = todayRate?.rate || 9.50;
   const isSeller = currentUser?.role === 'SELLER';
@@ -83,6 +83,7 @@ export const ReportsPage: React.FC = () => {
 
   const selectedStoreName = selectedStore === 'all' ? 'все магазины' : (stores.find(s => s.id === selectedStore)?.name || selectedStore);
   const periodLabel = period === 'TODAY' ? 'сегодня' : period === 'MONTH' ? 'текущий месяц' : period === 'SPECIFIC_MONTH' ? selectedMonth : 'весь период';
+  const retailStores = useMemo(() => stores.filter((s) => !s.isMainWarehouse), [stores]);
 
   // Everything below used to be derived client-side from the FULL sales/expenses/repairs
   // history fetched on every login — as that history grows over months/years this only got
@@ -142,19 +143,37 @@ export const ReportsPage: React.FC = () => {
   }, [devices, selectedStore]);
 
   const previewTable = useMemo(() => {
-    if (previewReport === 'sales') return buildSalesReportTable(exportSales, rate);
     if (previewReport === 'inventory') return buildInventoryReportTable(exportDevices, stores, rate);
     if (previewReport === 'expenses') return buildExpensesReportTable(exportExpenses, rate);
     if (previewReport === 'repairs') return buildRepairsReportTable(exportRepairs);
     return null;
-  }, [previewReport, exportSales, exportDevices, exportExpenses, exportRepairs, stores, rate]);
+  }, [previewReport, exportDevices, exportExpenses, exportRepairs, stores, rate]);
 
-  const previewMeta: Record<'sales' | 'inventory' | 'expenses' | 'repairs', { title: string; download: () => void }> = {
-    sales: { title: 'Отчет по продажам', download: () => exportSalesReport(exportSales, rate) },
+  const previewMeta: Record<'inventory' | 'expenses' | 'repairs', { title: string; download: () => void }> = {
     inventory: { title: 'Остатки склада', download: () => exportInventoryReport(exportDevices, stores, rate) },
     expenses: { title: 'Отчет по расходам', download: () => exportExpensesReport(exportExpenses, rate) },
     repairs: { title: 'Журнал ремонтов', download: () => exportRepairsReport(exportRepairs) },
   };
+
+  // Per-store "Отчет по продажам": each store gets its own totals and its own
+  // preview/download, instead of one combined report that mixes every branch together.
+  const salesByStore = useMemo(() => {
+    const map = new Map<string, Sale[]>();
+    map.set('all', exportSales);
+    for (const store of retailStores) {
+      map.set(store.id, exportSales.filter((s) => s.storeId === store.id));
+    }
+    return map;
+  }, [exportSales, retailStores]);
+
+  const salesReportTable = useMemo(() => {
+    if (!salesReportStoreId) return null;
+    return buildSalesReportTable(salesByStore.get(salesReportStoreId) ?? [], rate);
+  }, [salesReportStoreId, salesByStore, rate]);
+
+  const salesReportStoreName = salesReportStoreId === 'all'
+    ? 'Все магазины'
+    : (retailStores.find((s) => s.id === salesReportStoreId)?.name || '');
 
   const filteredData: ReportsSummary = summary ?? {
     unitsSold: 0, revenueUsd: 0, revenueTjs: 0, cogsUsd: 0, cogsTjs: 0,
@@ -190,38 +209,21 @@ export const ReportsPage: React.FC = () => {
         </div>
 
         <div className="flex flex-wrap items-center gap-2 text-xs">
-          {/* Period selector */}
-          <div className="flex items-center space-x-2 overflow-x-auto">
-            <button
-              type="button"
-              onClick={() => setPeriod('TODAY')}
-              className={`px-3 py-1.5 rounded-lg border text-xs font-bold uppercase tracking-wider transition-colors ${
-                period === 'TODAY'
-                  ? 'border-accent bg-accent/10 text-accent'
-                  : 'border-border bg-surface-raised text-fg-muted hover:text-fg'
-              }`}
-            >
-              СЕГОДНЯ
-            </button>
-            <div className="flex items-center space-x-1 pl-1 border-l border-border">
-              <span className="text-[10px] text-fg-subtle font-bold uppercase hidden md:inline">ВЫБОР МЕСЯЦА:</span>
-              <input
-                type="month"
-                value={selectedMonth}
-                onChange={(e) => {
-                  if (e.target.value) {
-                    setSelectedMonth(e.target.value);
-                    setPeriod('SPECIFIC_MONTH');
-                  }
-                }}
-                className={`px-2 py-1 rounded-lg border text-xs font-bold transition-colors bg-surface-raised focus:outline-none ${
-                  period === 'SPECIFIC_MONTH'
-                    ? 'border-accent text-accent'
-                    : 'border-border text-fg-muted'
-                }`}
-                title="Выберите любой конкретный месяц для отчета"
-              />
-            </div>
+          {/* Period selector — just the month; picking one shows every report for it. */}
+          <div className="flex items-center space-x-1.5">
+            <span className="text-[10px] text-fg-subtle font-bold uppercase hidden md:inline">ВЫБОР МЕСЯЦА:</span>
+            <input
+              type="month"
+              value={selectedMonth}
+              onChange={(e) => {
+                if (e.target.value) {
+                  setSelectedMonth(e.target.value);
+                  setPeriod('SPECIFIC_MONTH');
+                }
+              }}
+              className="px-2 py-1 rounded-lg border border-accent text-accent text-xs font-bold bg-surface-raised focus:outline-none"
+              title="Выберите месяц — отчеты покажут все операции за него"
+            />
           </div>
 
           {/* Store selector */}
@@ -241,205 +243,54 @@ export const ReportsPage: React.FC = () => {
       {/* Main Content Area */}
       <div className={`flex-1 overflow-y-auto p-3 sm:p-4 space-y-4 transition-opacity ${summaryLoading ? 'opacity-60' : ''}`}>
 
-        {/* MAIN WAREHOUSE: stock storage, cash register and supplier obligations */}
+        {/* SALES REPORT PER STORE: replaces the old multi-metric card dashboard — just the
+            report that matters (revenue, profit, receipt count) plus a download button,
+            one panel per store and one for every store combined. */}
         <div>
           <h4 className="text-[10px] font-bold text-fg-subtle uppercase tracking-wider mb-2 flex items-center space-x-1.5">
-            <Package className="w-3.5 h-3.5 text-accent" />
-            <span>ГЛАВНЫЙ СКЛАД</span>
-            <span className="text-[9px] font-normal normal-case text-fg-subtle">(хранение товара, касса и обязательства перед поставщиками)</span>
+            <Receipt className="w-3.5 h-3.5 text-accent" />
+            <span>ОТЧЕТ ПО ПРОДАЖАМ</span>
+            <span className="text-[9px] font-normal normal-case text-fg-subtle">({periodLabel})</span>
           </h4>
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3">
-            <div className="p-3 sm:p-4 rounded-xl bg-surface border border-border space-y-1">
-              <div className="flex items-center justify-between text-fg-subtle text-[10px] uppercase">
-                <span>ТОВАРОВ НА ГЛАВНОМ СКЛАДЕ</span>
-                <Smartphone className="w-3.5 h-3.5 text-accent" />
-              </div>
-              <p className="text-base sm:text-lg font-bold text-accent">
-                {filteredData.mainWarehouseStockCount.toLocaleString()} шт.
-              </p>
-              <p className="text-[10px] text-fg-subtle">
-                Доступно и хранится на главном складе
-              </p>
-            </div>
-
-            <div className="p-3 sm:p-4 rounded-xl bg-surface border border-border space-y-1">
-              <div className="flex items-center justify-between text-fg-subtle text-[10px] uppercase">
-                <span>ОБЩАЯ СЕБЕСТОИМОСТЬ ТОВАРА</span>
-                <Package className="w-3.5 h-3.5 text-fg-subtle" />
-              </div>
-              <p className="text-base sm:text-lg font-bold text-fg">
-                ${filteredData.mainWarehouseStockCostUsd.toLocaleString()}
-              </p>
-              <p className="text-[10px] text-fg-subtle">
-                ≈ {filteredData.mainWarehouseStockCostTjs.toLocaleString()} TJS
-              </p>
-            </div>
-
-            <div className="p-3 sm:p-4 rounded-xl bg-surface border border-border space-y-1">
-              <div className="flex items-center justify-between text-fg-subtle text-[10px] uppercase">
-                <span>КАССА ГЛАВНОГО СКЛАДА</span>
-                <Wallet className="w-3.5 h-3.5 text-accent" />
-              </div>
-              <p className="text-base sm:text-lg font-bold text-fg">
-                ${filteredData.mainWarehouseCashUsd.toLocaleString()}
-              </p>
-              <p className="text-[10px] text-fg-subtle">
-                ≈ {filteredData.mainWarehouseCashTjs.toLocaleString()} TJS
-              </p>
-            </div>
-
-            <div className="p-3 sm:p-4 rounded-xl bg-surface border border-border space-y-1">
-              <div className="flex items-center justify-between text-fg-subtle text-[10px] uppercase">
-                <span>ДОЛГ ПОСТАВЩИКАМ</span>
-                <ArrowDownRight className="w-3.5 h-3.5 text-danger" />
-              </div>
-              <p className="text-base sm:text-lg font-bold text-danger">
-                ${filteredData.totalSupplierDebtUsd.toLocaleString()}
-              </p>
-              <p className="text-[10px] text-fg-subtle">
-                ≈ {filteredData.totalSupplierDebtTjs.toLocaleString()} TJS (долги)
-              </p>
-            </div>
-          </div>
-        </div>
-
-        {/* RETAIL STORES: same card layout as the main warehouse, one per store */}
-        {filteredData.storeBreakdown.map(store => (
-          <div key={store.storeId}>
-            <h4 className="text-[10px] font-bold text-fg-subtle uppercase tracking-wider mb-2 flex items-center space-x-1.5">
-              <StoreIcon className="w-3.5 h-3.5 text-accent" />
-              <span>{store.storeName}</span>
-              <span className="text-[9px] font-normal normal-case text-fg-subtle">(остатки, касса и прибыль за выбранный период)</span>
-            </h4>
-            <div className="grid grid-cols-2 lg:grid-cols-5 gap-2.5 sm:gap-3">
-              <div className="p-3 sm:p-4 rounded-xl bg-surface border border-border space-y-1">
-                <div className="flex items-center justify-between text-fg-subtle text-[10px] uppercase">
-                  <span>ТОВАРОВ В МАГАЗИНЕ</span>
-                  <Smartphone className="w-3.5 h-3.5 text-accent" />
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5 sm:gap-3">
+            {[{ id: 'all', name: 'Все магазины' }, ...retailStores].map((store) => {
+              const storeSales = salesByStore.get(store.id) ?? [];
+              const table = buildSalesReportTable(storeSales, rate);
+              const revenueTjs = table.totalsRow[8] as string;
+              const profitUsd = Number(table.totalsRow[9]);
+              return (
+                <div key={store.id} className="p-3.5 rounded-xl bg-surface border border-border space-y-2.5 flex flex-col">
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-fg text-sm flex items-center gap-1.5">
+                      <StoreIcon className="w-3.5 h-3.5 text-accent" />
+                      {store.name}
+                    </span>
+                    <span className="text-[10px] text-accent bg-accent/10 px-1.5 py-0.5 rounded-md border border-accent/20">
+                      {storeSales.length} чеков
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <p className="text-fg-subtle text-[10px] uppercase">Выручка</p>
+                      <p className="font-bold text-fg text-sm">{Number(revenueTjs).toLocaleString()} TJS</p>
+                    </div>
+                    <div>
+                      <p className="text-fg-subtle text-[10px] uppercase">Прибыль (с учетом возвратов)</p>
+                      <p className={`font-bold text-sm ${profitUsd >= 0 ? 'text-accent' : 'text-danger'}`}>
+                        {profitUsd >= 0 ? '+' : ''}${profitUsd.toLocaleString()}
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setSalesReportStoreId(store.id)}
+                    className="w-full py-2 px-3 rounded-lg bg-accent hover:bg-accent-strong text-accent-fg font-bold text-xs flex items-center justify-center space-x-2 transition-colors mt-auto"
+                  >
+                    <Download className="w-3.5 h-3.5" />
+                    <span>ПРОСМОТР И СКАЧИВАНИЕ</span>
+                  </button>
                 </div>
-                <p className="text-base sm:text-lg font-bold text-accent">
-                  {store.stockCount.toLocaleString()} шт.
-                </p>
-                <p className="text-[10px] text-fg-subtle">
-                  Доступно и хранится в магазине
-                </p>
-              </div>
-
-              <div className="p-3 sm:p-4 rounded-xl bg-surface border border-border space-y-1">
-                <div className="flex items-center justify-between text-fg-subtle text-[10px] uppercase">
-                  <span>СЕБЕСТОИМОСТЬ ТОВАРА</span>
-                  <Package className="w-3.5 h-3.5 text-fg-subtle" />
-                </div>
-                <p className="text-base sm:text-lg font-bold text-fg">
-                  ${store.stockCostUsd.toLocaleString()}
-                </p>
-                <p className="text-[10px] text-fg-subtle">
-                  ≈ {store.stockCostTjs.toLocaleString()} TJS
-                </p>
-              </div>
-
-              <div className="p-3 sm:p-4 rounded-xl bg-surface border border-border space-y-1">
-                <div className="flex items-center justify-between text-fg-subtle text-[10px] uppercase">
-                  <span>СЕБЕСТОИМОСТЬ ПРОДАЖИ</span>
-                  <Receipt className="w-3.5 h-3.5 text-fg-subtle" />
-                </div>
-                <p className="text-base sm:text-lg font-bold text-fg">
-                  ${store.cogsUsd.toLocaleString()}
-                </p>
-                <p className="text-[10px] text-fg-subtle">
-                  ≈ {store.cogsTjs.toLocaleString()} TJS · за период
-                </p>
-              </div>
-
-              <div className="p-3 sm:p-4 rounded-xl bg-surface border border-border space-y-1">
-                <div className="flex items-center justify-between text-fg-subtle text-[10px] uppercase">
-                  <span>КАССА МАГАЗИНА</span>
-                  <Wallet className="w-3.5 h-3.5 text-accent" />
-                </div>
-                <p className="text-base sm:text-lg font-bold text-fg">
-                  ${(store.cashTjs / rate).toFixed(2)}
-                </p>
-                <p className="text-[10px] text-fg-subtle">
-                  ≈ {store.cashTjs.toLocaleString()} TJS
-                </p>
-              </div>
-
-              <div className="p-3 sm:p-4 rounded-xl bg-surface border border-border space-y-1">
-                <div className="flex items-center justify-between text-fg-subtle text-[10px] uppercase">
-                  <span>ПРИБЫЛЬ ЗА ПЕРИОД</span>
-                  <BarChart3 className="w-3.5 h-3.5 text-accent" />
-                </div>
-                <p className={`text-base sm:text-lg font-bold ${store.profitUsd >= 0 ? 'text-accent' : 'text-danger'}`}>
-                  ${store.profitUsd.toLocaleString()}
-                </p>
-                <p className="text-[10px] text-fg-subtle">
-                  ≈ {store.profitTjs.toLocaleString()} TJS ({store.salesCount} чеков)
-                </p>
-              </div>
-            </div>
-          </div>
-        ))}
-
-        {/* SUPPLIER BONUSES: cash bonuses count 100% toward net profit; gift phones
-            carry $0 cost basis, so their profit only shows once actually sold. */}
-        <div>
-          <h4 className="text-[10px] font-bold text-fg-subtle uppercase tracking-wider mb-2 flex items-center space-x-1.5">
-            <Gift className="w-3.5 h-3.5 text-accent" />
-            <span>БОНУСЫ ОТ ПОСТАВЩИКОВ</span>
-            <span className="text-[9px] font-normal normal-case text-fg-subtle">(денежные — сразу в прибыль; телефоны — 100% прибыль после продажи)</span>
-          </h4>
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3">
-            <div className="p-3 sm:p-4 rounded-xl bg-surface border border-border space-y-1">
-              <div className="flex items-center justify-between text-fg-subtle text-[10px] uppercase">
-                <span>ДЕНЕЖНЫЕ БОНУСЫ</span>
-                <BarChart3 className="w-3.5 h-3.5 text-accent" />
-              </div>
-              <p className="text-base sm:text-lg font-bold text-accent">
-                ${filteredData.periodCashBonusesUsd.toLocaleString()}
-              </p>
-              <p className="text-[10px] text-fg-subtle">
-                ≈ {filteredData.periodCashBonusesTjs.toLocaleString()} TJS · уже в чистой прибыли
-              </p>
-            </div>
-
-            <div className="p-3 sm:p-4 rounded-xl bg-surface border border-border space-y-1">
-              <div className="flex items-center justify-between text-fg-subtle text-[10px] uppercase">
-                <span>ПОЛУЧЕНО ТЕЛЕФОНОВ</span>
-                <Gift className="w-3.5 h-3.5 text-fg-subtle" />
-              </div>
-              <p className="text-base sm:text-lg font-bold text-fg">
-                {filteredData.periodFreeDeviceBonusesReceived.toLocaleString()} шт.
-              </p>
-              <p className="text-[10px] text-fg-subtle">
-                Бонусных устройств за период
-              </p>
-            </div>
-
-            <div className="p-3 sm:p-4 rounded-xl bg-surface border border-border space-y-1">
-              <div className="flex items-center justify-between text-fg-subtle text-[10px] uppercase">
-                <span>ПРОДАНО (100% ПРИБЫЛЬ)</span>
-                <Smartphone className="w-3.5 h-3.5 text-accent" />
-              </div>
-              <p className="text-base sm:text-lg font-bold text-accent">
-                ${filteredData.giftDeviceProfitUsd.toLocaleString()}
-              </p>
-              <p className="text-[10px] text-fg-subtle">
-                ≈ {filteredData.giftDeviceProfitTjs.toLocaleString()} TJS ({filteredData.giftDeviceUnitsSold} шт.)
-              </p>
-            </div>
-
-            <div className="p-3 sm:p-4 rounded-xl bg-surface border border-border space-y-1">
-              <div className="flex items-center justify-between text-fg-subtle text-[10px] uppercase">
-                <span>ЕЩЕ В НАЛИЧИИ</span>
-                <Package className="w-3.5 h-3.5 text-fg-subtle" />
-              </div>
-              <p className="text-base sm:text-lg font-bold text-fg">
-                {filteredData.freeDeviceBonusesInStock.toLocaleString()} шт.
-              </p>
-              <p className="text-[10px] text-fg-subtle">
-                Ожидают продажи (не за период)
-              </p>
-            </div>
+              );
+            })}
           </div>
         </div>
 
@@ -538,29 +389,7 @@ export const ReportsPage: React.FC = () => {
             Отчеты ниже учитывают выбранный период и магазин ({periodLabel} · {selectedStoreName}). Нажмите на карточку, чтобы посмотреть данные перед скачиванием.
           </p>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
-            {/* Sales Report Download Card */}
-            <div className="p-3 rounded-xl bg-surface-raised border border-border space-y-2 flex flex-col justify-between">
-              <div className="space-y-1.5">
-                <div className="flex items-center justify-between">
-                  <span className="font-bold text-fg text-xs">Отчет по продажам</span>
-                  <span className="text-[10px] text-accent bg-accent/10 px-1.5 py-0.5 rounded-md border border-accent/20">
-                    {exportSales.length} чеков
-                  </span>
-                </div>
-                <p className="text-[11px] text-fg-subtle">
-                  Номер чека, дата, кассир, магазин, товар, IMEI 1/2, цена, себестоимость, прибыль и статус.
-                </p>
-              </div>
-              <button
-                onClick={() => setPreviewReport('sales')}
-                className="w-full py-2 px-3 rounded-lg bg-accent hover:bg-accent-strong text-accent-fg font-bold text-xs flex items-center justify-center space-x-2 transition-colors shadow-xs mt-2"
-              >
-                <Download className="w-3.5 h-3.5" />
-                <span>ПРОСМОТР И СКАЧИВАНИЕ</span>
-              </button>
-            </div>
-
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             {/* Inventory Report Download Card */}
             <div className="p-3 rounded-xl bg-surface-raised border border-border space-y-2 flex flex-col justify-between">
               <div className="space-y-1.5">
@@ -637,6 +466,15 @@ export const ReportsPage: React.FC = () => {
         subtitle={`${periodLabel} · ${selectedStoreName}`}
         table={previewTable}
         onDownload={() => previewReport && previewMeta[previewReport].download()}
+      />
+
+      <ReportPreviewModal
+        open={salesReportStoreId !== null}
+        onClose={() => setSalesReportStoreId(null)}
+        title={`Отчет по продажам — ${salesReportStoreName}`}
+        subtitle={periodLabel}
+        table={salesReportTable}
+        onDownload={() => salesReportStoreId && exportSalesReport(salesByStore.get(salesReportStoreId) ?? [], rate)}
       />
     </div>
   );

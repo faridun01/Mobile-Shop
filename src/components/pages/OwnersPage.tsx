@@ -18,6 +18,16 @@ import {
 } from 'lucide-react';
 import { StatusBanner, StatusMessage } from '../ui/StatusBanner';
 
+// Standard Russian noun pluralization (1 -> singular, 2-4 -> few, else -> many),
+// so the header stays correct whether the business has 2 partners or a third is added.
+function ownerCountLabel(count: number): string {
+  const mod10 = count % 10;
+  const mod100 = count % 100;
+  if (mod10 === 1 && mod100 !== 11) return 'учредитель';
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 10 || mod100 >= 20)) return 'учредителя';
+  return 'учредителей';
+}
+
 // The operation is now fixed by which button opened the modal, not chosen inside it —
 // this just labels the modal so the user still sees what they're about to do.
 const TX_TYPE_LABELS: Record<'INVESTMENT' | 'WITHDRAWAL' | 'PROFIT_PAYOUT' | 'REINVEST', string> = {
@@ -267,7 +277,10 @@ export const OwnersPage: React.FC = () => {
 
     setIsSubmitting(true);
     try {
-      const res = await updateOwnerProfitShares(payload[0]?.sharePercent || 0, payload[1]?.sharePercent || 0);
+      // Pass the full per-owner payload — the (owner1Share, owner2Share) positional
+      // overload only ever covers the first two owners and silently drops the rest,
+      // which the backend then rejects for having fewer shares than owners exist.
+      const res = await updateOwnerProfitShares(payload);
       if (res.success) {
         setIsSharesModalOpen(false);
         setStatusBanner({
@@ -487,7 +500,7 @@ export const OwnersPage: React.FC = () => {
               <Briefcase className="w-4 h-4 text-accent" />
               <span>СОБСТВЕННИКИ И ВЛОЖЕНИЯ</span>
             </span>
-            <span className="text-xs text-fg-subtle">2 учредителя бизнеса</span>
+            <span className="text-xs text-fg-subtle">{owners.length} {ownerCountLabel(owners.length)} бизнеса</span>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
