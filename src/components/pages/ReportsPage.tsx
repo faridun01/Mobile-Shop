@@ -132,7 +132,7 @@ export const ReportsPage: React.FC = () => {
       });
 
     return () => { cancelled = true; };
-  }, [isSeller, period, selectedMonth, selectedStore, namesLookup, devices]);
+  }, [isSeller, period, selectedMonth, selectedStore, namesLookup]);
 
   // Inventory is a point-in-time snapshot (no created-date period makes sense for
   // "what's on the shelf right now"), so only the store filter applies — this one still
