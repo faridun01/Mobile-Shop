@@ -1018,7 +1018,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         method: 'PATCH',
         body: JSON.stringify({
           login: userData.login,
-          password: userData.passwordHash && userData.passwordHash.trim() ? userData.passwordHash.trim() : undefined,
+          password: userData.passwordHash !== '' ? userData.passwordHash : undefined,
           name: userData.name,
           role: userData.role,
           storeId: userData.storeId ?? null,

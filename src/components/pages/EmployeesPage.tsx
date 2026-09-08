@@ -62,19 +62,22 @@ export const EmployeesPage: React.FC = () => {
   const [selectedPayrollMonth, setSelectedPayrollMonth] = useState<string>(new Date().toISOString().substring(0, 7));
 
   // Form fields
+  const canManageUsers = currentUser?.role === 'ADMIN';
+  const sellerStores = stores.filter(store => store.active && !store.isMainWarehouse);
   const [name, setName] = useState('');
   const [login, setLogin] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [role, setRole] = useState<Role>('SELLER');
-  const [storeId, setStoreId] = useState<string>(stores[0]?.id || '');
+  const [storeId, setStoreId] = useState<string>(sellerStores[0]?.id || '');
   const [isActive, setIsActive] = useState(true);
 
   // Stores load asynchronously from the API — resync once they arrive rather than
   // being permanently stuck on the empty initial value.
   useEffect(() => {
-    if (!storeId && stores.length > 0) {
-      setStoreId(stores[0].id);
+    const firstStore = stores.find(store => store.active && !store.isMainWarehouse);
+    if (!storeId && firstStore) {
+      setStoreId(firstStore.id);
     }
   }, [stores, storeId]);
   const [baseSalaryTjs, setBaseSalaryTjs] = useState<string>('');
@@ -119,13 +122,15 @@ export const EmployeesPage: React.FC = () => {
   }
 
   const handleOpenAdd = () => {
+    if (!canManageUsers) return;
+    setStatusMessage(null);
     setEditingUser(null);
     setName('');
     setLogin('');
     setPassword('');
     setShowPassword(false);
     setRole('SELLER');
-    setStoreId(stores[0]?.id || '');
+    setStoreId(sellerStores[0]?.id || '');
     setIsActive(true);
     setBaseSalaryTjs('');
     setSalesCommissionPercent('');
@@ -133,13 +138,15 @@ export const EmployeesPage: React.FC = () => {
   };
 
   const handleOpenEdit = (u: User) => {
+    if (!canManageUsers) return;
+    setStatusMessage(null);
     setEditingUser(u);
     setName(u.name);
     setLogin(u.login);
     setPassword('');
     setShowPassword(false);
     setRole(u.role);
-    setStoreId(u.storeId || stores[0]?.id || '');
+    setStoreId(u.storeId || sellerStores[0]?.id || '');
     setIsActive(u.isActive ?? u.active);
     setBaseSalaryTjs(u.baseSalaryTjs?.toString() || '');
     setSalesCommissionPercent(u.salesCommissionPercent?.toString() || '');
@@ -148,7 +155,7 @@ export const EmployeesPage: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (isSubmitting) return;
+    if (isSubmitting || !canManageUsers) return;
     setStatusMessage(null);
 
     if (!name.trim() || !login.trim()) {
@@ -156,21 +163,25 @@ export const EmployeesPage: React.FC = () => {
       return;
     }
 
-    if (!editingUser && !password.trim()) {
-      setStatusMessage({ type: 'error', text: 'Укажите пароль для входа нового сотрудника' });
+    if ((!editingUser || password !== '') && password.trim().length < 6) {
+      setStatusMessage({ type: 'error', text: 'Пароль должен содержать не менее 6 символов' });
       return;
     }
 
-    if (role === 'SELLER' && (!storeId || !storeId.trim())) {
-      setStatusMessage({ type: 'error', text: 'Для продавца привязка к магазину обязательна (*)' });
+    if (role === 'SELLER' && !sellerStores.some(store => store.id === storeId)) {
+      setStatusMessage({ type: 'error', text: 'Выберите активный торговый магазин для продавца' });
       return;
     }
 
     // Salary/commission only apply to sellers — admins and partners are compensated
     // via profit share (Owners), not a salary, so their form fields are hidden and
     // any stale leftover values must never be persisted.
-    const baseSal = role === 'SELLER' ? parseFloat(baseSalaryTjs) || 0 : 0;
-    const commPct = role === 'SELLER' ? parseFloat(salesCommissionPercent) || 0 : 0;
+    const baseSal = role === 'SELLER' ? Number(baseSalaryTjs) : 0;
+    const commPct = role === 'SELLER' ? Number(salesCommissionPercent) : 0;
+    if (!Number.isFinite(baseSal) || baseSal < 0 || !Number.isFinite(commPct) || commPct < 0 || commPct > 100) {
+      setStatusMessage({ type: 'error', text: 'Оклад должен быть неотрицательным, комиссия — от 0 до 100%' });
+      return;
+    }
 
     setIsSubmitting(true);
     try {
@@ -179,7 +190,7 @@ export const EmployeesPage: React.FC = () => {
           ...editingUser,
           name: name.trim(),
           login: login.trim(),
-          passwordHash: password.trim() ? password.trim() : editingUser.passwordHash,
+          passwordHash: password !== '' ? password : undefined,
           role,
           storeId: role === 'SELLER' ? storeId : undefined,
           isActive,
@@ -197,7 +208,7 @@ export const EmployeesPage: React.FC = () => {
         const res = await createUser({
           name: name.trim(),
           login: login.trim(),
-          passwordHash: password.trim(),
+          passwordHash: password,
           role,
           storeId: role === 'SELLER' ? storeId : undefined,
           active: true,
@@ -541,7 +552,7 @@ export const EmployeesPage: React.FC = () => {
                   </button>
                 </div>
 
-                <div className="flex space-x-1.5">
+                {canManageUsers && <div className="flex space-x-1.5">
                   <button
                     onClick={() => handleOpenEdit(u)}
                     className="flex-1 py-1.5 rounded-lg bg-surface-raised hover:bg-surface border border-border text-[11px] font-bold text-fg hover:text-accent flex items-center justify-center space-x-1 transition-colors"
@@ -558,7 +569,7 @@ export const EmployeesPage: React.FC = () => {
                       <Trash2 className="w-3 h-3" />
                     </button>
                   )}
-                </div>
+                </div>}
               </div>
             </div>
     );
@@ -585,13 +596,13 @@ export const EmployeesPage: React.FC = () => {
             <span className="hidden md:inline">ЗАРПЛАТНЫЙ ОТЧЕТ</span>
           </button>
 
-          <button
+          {canManageUsers && <button
             onClick={handleOpenAdd}
             className="px-3.5 py-2 rounded-xl bg-accent hover:bg-accent-strong text-xs font-bold text-accent-fg uppercase tracking-wider flex items-center space-x-1.5 transition-colors shadow-xs shrink-0"
           >
             <Plus className="w-4 h-4" />
             <span className="hidden sm:inline">ДОБАВИТЬ СОТРУДНИКА</span>
-          </button>
+          </button>}
         </div>
       </div>
 
@@ -636,7 +647,7 @@ export const EmployeesPage: React.FC = () => {
       </div>
 
       {/* MODAL: Add / Edit User */}
-      {isModalOpen && (
+      {isModalOpen && canManageUsers && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-xs">
           <form onSubmit={handleSubmit} className="w-full max-w-md rounded-2xl bg-surface border border-border p-5 text-fg shadow-2xl space-y-3.5">
             <div className="flex items-center justify-between pb-3 border-b border-border">
@@ -653,6 +664,11 @@ export const EmployeesPage: React.FC = () => {
               </button>
             </div>
 
+            {statusMessage?.type === 'error' && (
+              <div role="alert" className="rounded-lg border border-danger/30 bg-danger/10 p-2.5 text-xs text-danger">
+                {statusMessage.text}
+              </div>
+            )}
             <div className="text-xs space-y-3">
               <div>
                 <label className="block text-fg-subtle text-[10px] uppercase mb-1">ФИО СОТРУДНИКА *</label>
@@ -734,7 +750,7 @@ export const EmployeesPage: React.FC = () => {
                     className="w-full rounded-lg bg-surface-raised border border-warning/40 px-3 py-2 text-fg font-bold focus:border-warning focus:outline-none"
                   >
                     <option value="" disabled>-- ВЫБЕРИТЕ МАГАЗИН --</option>
-                    {stores.filter(s => !s.isMainWarehouse).map(s => (
+                    {sellerStores.map(s => (
                       <option key={s.id} value={s.id}>{s.name}</option>
                     ))}
                   </select>

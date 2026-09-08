@@ -18,6 +18,8 @@
     "test": "vitest run",
     "test:e2e": "tsx scripts/test-e2e-all.ts",
     "test:profit-refund": "tsx scripts/test-profit-share-refund.ts",
+    "test:bonus-stock": "tsx scripts/test-bonus-stock.ts",
+    "test:user-auth": "tsx scripts/test-user-auth.ts",
     "audit:system": "tsx scripts/audit-system.ts",
     "db:clean": "tsx scripts/clear-data-keep-users.ts",
     "server": "tsx watch server/src/index.ts"

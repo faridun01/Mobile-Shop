@@ -144,8 +144,18 @@ export async function computeReportsSummary(input: ReportsSummaryInput) {
   const periodCashBonusesUsd = periodCashBonuses.reduce((acc, b) => acc + (b.amountUsd || 0), 0);
   const periodCashBonusesTjs = periodCashBonuses.reduce((acc, b) => acc + (b.amountUsd || 0) * b.exchangeRate, 0);
 
-  const periodFreeDeviceBonusesReceived = allBonuses.filter((b) => b.bonusType === 'FREE_DEVICES' && dateWithinRange(b.dateReceived, dateRange)).length;
-  const freeDeviceBonusesInStock = allBonuses.filter((b) => b.bonusType === 'FREE_DEVICES' && b.status !== 'SOLD').length;
+  const periodFreeDeviceBonusesReceived = allBonuses
+    .filter((b) => b.bonusType === 'FREE_DEVICES' && dateWithinRange(b.dateReceived, dateRange))
+    .reduce((count, bonus) => count + bonus.freeDevices.length, 0);
+  // Bonus records describe receipts, not live stock: a receipt can contain several
+  // phones and its status does not change when an individual phone is sold/returned.
+  const freeDeviceBonusesInStock = await prisma.device.count({
+    where: {
+      isBonus: true,
+      status: { not: 'SOLD' },
+      ...(storeFilter ? { storeId: storeFilter } : {}),
+    },
+  });
 
   const refundedSales = await prisma.sale.findMany({
     where: {
