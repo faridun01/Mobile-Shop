@@ -171,6 +171,18 @@ export const ReportsPage: React.FC = () => {
     return buildSalesReportTable(salesByStore.get(salesReportStoreId) ?? [], rate);
   }, [salesReportStoreId, salesByStore, rate]);
 
+  // Same table (and therefore the same numbers) as the matching "Отчет по продажам" card
+  // for the current store filter — revenue/profit must never be computed twice, independently,
+  // or the two cards silently disagree (profit here already accounts for refund penalties,
+  // same as buildSalesReportTable does).
+  const analysisTable = useMemo(
+    () => buildSalesReportTable(salesByStore.get(selectedStore) ?? [], rate),
+    [salesByStore, selectedStore, rate]
+  );
+  const analysisRevenueUsd = Number(analysisTable.totalsRow[7]);
+  const analysisRevenueTjs = Number(analysisTable.totalsRow[8]);
+  const analysisProfitUsd = Number(analysisTable.totalsRow[9]);
+
   const salesReportStoreName = salesReportStoreId === 'all'
     ? 'Все магазины'
     : (retailStores.find((s) => s.id === salesReportStoreId)?.name || '');
@@ -242,6 +254,54 @@ export const ReportsPage: React.FC = () => {
 
       {/* Main Content Area */}
       <div className={`flex-1 overflow-y-auto p-3 sm:p-4 space-y-4 transition-opacity ${summaryLoading ? 'opacity-60' : ''}`}>
+
+        {/* OVERALL ANALYSIS: styled exactly like the "Отчет по продажам" cards below it —
+            same card shell, same header/stat layout — instead of a separate, bigger design.
+            Revenue/profit here are the SAME buildSalesReportTable totals as those cards use,
+            so the two never show different numbers for the same store/period again. */}
+        <div className="p-2.5 rounded-xl bg-surface border border-border space-y-2 flex flex-col max-w-sm">
+          <div className="flex items-center justify-between">
+            <span className="font-bold text-fg text-xs flex items-center gap-1.5">
+              <BarChart3 className="w-3 h-3 text-accent" />
+              ОБЩИЙ АНАЛИЗ · {selectedStoreName}
+            </span>
+            <span className="text-[9px] text-accent bg-accent/10 px-1.5 py-0.5 rounded-md border border-accent/20">
+              {(salesByStore.get(selectedStore) ?? []).length} чеков
+            </span>
+          </div>
+          <div className="grid grid-cols-2 gap-1.5">
+            <div>
+              <p className="text-fg-subtle text-[9px] uppercase">Выручка</p>
+              <p className="font-bold text-fg text-xs">{analysisRevenueTjs.toLocaleString()} TJS</p>
+            </div>
+
+            <div>
+              <p className="text-fg-subtle text-[9px] uppercase">Прибыль (с учетом возвратов)</p>
+              <p className={`font-bold text-xs ${analysisProfitUsd >= 0 ? 'text-accent' : 'text-danger'}`}>
+                {analysisProfitUsd >= 0 ? '+' : ''}${analysisProfitUsd.toLocaleString()}
+              </p>
+            </div>
+
+            <div>
+              <p className="text-fg-subtle text-[9px] uppercase">Расход</p>
+              <p className="font-bold text-danger text-xs">${filteredData.expensesUsd.toLocaleString()}</p>
+            </div>
+
+            <div>
+              <p className="text-fg-subtle text-[9px] uppercase">Чистая прибыль</p>
+              <p className={`font-bold text-xs ${filteredData.netProfitUsd >= 0 ? 'text-warning' : 'text-danger'}`}>
+                ${filteredData.netProfitUsd.toLocaleString()}
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={() => setSalesReportStoreId(selectedStore)}
+            className="w-full py-1.5 px-2.5 rounded-lg bg-accent hover:bg-accent-strong text-accent-fg font-bold text-[11px] flex items-center justify-center space-x-1.5 transition-colors mt-auto"
+          >
+            <Download className="w-3 h-3" />
+            <span>ПРОСМОТР И СКАЧИВАНИЕ</span>
+          </button>
+        </div>
 
         {/* SALES REPORT PER STORE: replaces the old multi-metric card dashboard — just the
             report that matters (revenue, profit, receipt count) plus a download button,

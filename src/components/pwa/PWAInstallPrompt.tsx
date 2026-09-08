@@ -107,7 +107,7 @@ export const PWAInstallPrompt: React.FC = () => {
     <>
       {/* ANDROID / DESKTOP PWA INSTALL BOTTOM BANNER */}
       {showAndroidBanner && deferredPrompt && (
-        <div className="fixed bottom-16 sm:bottom-4 left-3 right-3 z-50 max-w-md mx-auto bg-[#0F1219] border border-emerald-500/40 p-4 rounded-2xl shadow-[0_10px_35px_rgba(0,0,0,0.8)] backdrop-blur-xl text-slate-100 font-mono space-y-3 animate-in slide-in-from-bottom-5 duration-300">
+        <div className="fixed bottom-16 sm:bottom-4 left-3 right-3 z-50 max-w-md mx-auto bg-surface border border-emerald-500/40 p-4 rounded-2xl shadow-[0_10px_35px_rgba(0,0,0,0.8)] backdrop-blur-xl text-slate-100 font-mono space-y-3 animate-in slide-in-from-bottom-5 duration-300">
           <div className="flex items-start justify-between">
             <div className="flex items-center space-x-3">
               <div className="w-11 h-11 rounded-xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shrink-0 shadow-inner">
@@ -151,7 +151,7 @@ export const PWAInstallPrompt: React.FC = () => {
       {/* iPHONE / iOS SAFARI INSTALLATION GUIDE MODAL */}
       {showIOSGuide && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md font-mono animate-in fade-in duration-200">
-          <div className="w-full max-w-sm rounded-2xl bg-[#0F1219] border border-amber-500/40 p-5 text-slate-200 shadow-2xl space-y-4">
+          <div className="w-full max-w-sm rounded-2xl bg-surface border border-amber-500/40 p-5 text-slate-200 shadow-2xl space-y-4">
             <div className="flex items-center justify-between pb-3 border-b border-slate-800">
               <div className="flex items-center space-x-2">
                 <Smartphone className="w-5 h-5 text-amber-400" />
@@ -179,7 +179,7 @@ export const PWAInstallPrompt: React.FC = () => {
                   Добавьте Mobile Shop на экран Домой для работы в режиме приложения:
                 </p>
 
-                <div className="space-y-2 bg-[#0B0E14] p-3 rounded-xl border border-slate-800 text-[11px]">
+                <div className="space-y-2 bg-bg p-3 rounded-xl border border-slate-800 text-[11px]">
                   <div className="flex items-start space-x-2.5">
                     <span className="w-5 h-5 rounded-full bg-amber-500/20 text-amber-400 font-bold flex items-center justify-center shrink-0">1</span>
                     <span>Внизу экрана нажмите кнопку <strong>«Поделиться»</strong> <Share className="w-3.5 h-3.5 inline text-sky-400 ml-0.5" /></span>

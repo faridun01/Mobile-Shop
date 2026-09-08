@@ -335,12 +335,8 @@ export const SalePage: React.FC = () => {
 
                   <div className="text-right shrink-0 flex items-center gap-2">
                     <Badge tone="neutral">{variant.devices.length} шт.</Badge>
-                    {variant.devices.length > 1 ? (
+                    {variant.devices.length > 1 && (
                       <ChevronDown className={`w-4 h-4 text-fg-subtle transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
-                    ) : (
-                      <span className="w-8 h-8 rounded-lg bg-accent/10 text-accent flex items-center justify-center">
-                        <Plus className="w-4 h-4" />
-                      </span>
                     )}
                   </div>
                 </button>
