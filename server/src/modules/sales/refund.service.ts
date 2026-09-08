@@ -2,7 +2,7 @@ import { prisma } from '../../prisma/prisma.service';
 import { resolveActor } from '../../common/actor';
 import { getRateForDate } from '../exchange-rate/exchange-rate.service';
 import { moneyEquals, requireNonNegativeMoney, roundMoney } from '../../common/money';
-import { calculateRecognizedProfit } from './profit';
+import { refundOwnerProfit } from './profit';
 
 export interface RefundInput {
   saleId: string;
@@ -41,13 +41,12 @@ export class RefundService {
       }
       const penaltyUsd = roundMoney(penaltyFeeTjs / rate);
       const actualRefundTjs = requestedRefundTjs;
-      const totalCostUsd = sale.saleItems.reduce((sum, item) => sum + item.costBasisUsd, 0);
       const profitLogs = await tx.auditLog.findMany({
         where: { targetId: sale.id, action: { in: ['SALE', 'SALE_BELOW_COST', 'EXCHANGE'] } },
         select: { action: true, financialDetails: true },
       });
-      const originalProfitUsd = calculateRecognizedProfit(profitLogs, sale.totalUsd - totalCostUsd);
-      const netProfitImpactUsd = -originalProfitUsd + penaltyUsd;
+      const owners = await tx.owner.findMany();
+      const ownerProfitAllocations = refundOwnerProfit(profitLogs, owners, penaltyUsd);
 
       const updatedSale = await tx.sale.update({
         where: { id: input.saleId },
@@ -95,11 +94,9 @@ export class RefundService {
         if (cashGuard.count !== 1) throw new Error('В кассе недостаточно наличных для возврата');
       }
 
-      const owners = await tx.owner.findMany();
-      await Promise.all(owners.map((owner) => {
-        const delta = roundMoney(netProfitImpactUsd * (owner.profitSharePercent / 100));
+      await Promise.all(ownerProfitAllocations.map(({ ownerId, amountUsd: delta }) => {
         return tx.owner.update({
-          where: { id: owner.id },
+          where: { id: ownerId },
           data: { totalAccruedProfitUsd: { increment: delta }, availableProfitUsd: { increment: delta } },
         });
       }));
@@ -140,7 +137,7 @@ export class RefundService {
           userRole: actor.role,
           action: 'REFUND',
           details: `Чек #${sale.receiptNumber}: возврат на сумму ${actualRefundTjs} TJS. ${penaltyFeeTjs > 0 ? `Удержан штраф: ${penaltyFeeTjs} TJS.` : ''} Причина: ${input.reason}`,
-          financialDetails: { amountTjs: actualRefundTjs, penaltyTjs: penaltyFeeTjs, penaltyUsd },
+          financialDetails: { amountTjs: actualRefundTjs, penaltyTjs: penaltyFeeTjs, penaltyUsd, ownerProfitAllocations },
           receiptNumber: sale.receiptNumber,
           targetId: sale.id,
         },

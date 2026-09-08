@@ -2,6 +2,7 @@ import { prisma } from '../../prisma/prisma.service';
 import type { TransactionClient } from '../../prisma/prisma.service';
 import { getRateForDate } from '../exchange-rate/exchange-rate.service';
 import { moneyEquals, requireNonNegativeMoney, requirePositiveMoney, roundMoney } from '../../common/money';
+import { allocateOwnerProfit } from './profit';
 
 export interface CreateSaleInput {
   storeId: string;
@@ -139,10 +140,10 @@ export class SalesService {
 
       const saleProfitUsd = roundMoney(totalUsd - totalCostUsd);
       const owners = await tx.owner.findMany();
-      await Promise.all(owners.map((owner) => {
-        const delta = roundMoney(saleProfitUsd * (owner.profitSharePercent / 100));
+      const ownerProfitAllocations = allocateOwnerProfit(saleProfitUsd, owners);
+      await Promise.all(ownerProfitAllocations.map(({ ownerId, amountUsd: delta }) => {
         return tx.owner.update({
-          where: { id: owner.id },
+          where: { id: ownerId },
           data: { totalAccruedProfitUsd: { increment: delta }, availableProfitUsd: { increment: delta } },
         });
       }));
@@ -165,7 +166,7 @@ export class SalesService {
           userId: input.userId,
           action: hasBelowCostItem ? 'SALE_BELOW_COST' : 'SALE',
           details: `Чек #${sale.receiptNumber}: продажа ${saleItemsData.length} устройств на сумму ${totalTjs} TJS ($${totalUsd})`,
-          financialDetails: { amountTjs: totalTjs, amountUsd: totalUsd, exchangeRate: rate, recognizedProfitUsd: saleProfitUsd },
+          financialDetails: { amountTjs: totalTjs, amountUsd: totalUsd, exchangeRate: rate, recognizedProfitUsd: saleProfitUsd, ownerProfitAllocations },
           receiptNumber: sale.receiptNumber,
           targetId: sale.id,
         },

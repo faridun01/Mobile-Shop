@@ -2,6 +2,7 @@ import { prisma } from '../../prisma/prisma.service';
 import { resolveActor } from '../../common/actor';
 import { getRateForDate } from '../exchange-rate/exchange-rate.service';
 import { moneyEquals, requireFiniteNumber, requireNonNegativeMoney, requirePositiveMoney, roundMoney } from '../../common/money';
+import { allocateOwnerProfit } from '../sales/profit';
 
 export interface ExchangeInput {
   saleId: string;
@@ -172,10 +173,10 @@ export class ExchangesService {
       // The original sale profit remains booked; the returned device comes back as an
       // asset at the agreed trade-in value, which offsets the customer's trade-in credit.
       const owners = await tx.owner.findMany();
-      await Promise.all(owners.map((owner) => {
-        const delta = roundMoney(exchangeProfitUsd * (owner.profitSharePercent / 100));
+      const ownerProfitAllocations = allocateOwnerProfit(exchangeProfitUsd, owners);
+      await Promise.all(ownerProfitAllocations.map(({ ownerId, amountUsd: delta }) => {
         return tx.owner.update({
-          where: { id: owner.id },
+          where: { id: ownerId },
           data: { totalAccruedProfitUsd: { increment: delta }, availableProfitUsd: { increment: delta } },
         });
       }));
@@ -201,7 +202,7 @@ export class ExchangesService {
           userRole: actor.role,
           action: 'EXCHANGE',
           details: `Чек #${sale.receiptNumber}: обмен ${returnedDevice.model} (IMEI ${returnedDevice.imei}) на ${replacementDevice.model} (IMEI ${replacementDevice.imei}). Расчет: ${diffTjs >= 0 ? '+' : ''}${diffTjs} TJS`,
-          financialDetails: { exchangeInValueTjs, exchangeInValueUsd, newPriceTjs, newPriceUsd, differenceTjs: diffTjs, exchangeProfitUsd },
+          financialDetails: { exchangeInValueTjs, exchangeInValueUsd, newPriceTjs, newPriceUsd, differenceTjs: diffTjs, exchangeProfitUsd, ownerProfitAllocations },
           receiptNumber: sale.receiptNumber,
           targetId: sale.id,
         },
