@@ -299,7 +299,14 @@ export const ExpensesPage: React.FC = () => {
   }, [expenses, isSeller, currentUser, periodFilter, selectedMonth, selectedStoreFilter, selectedCategoryTab, searchQuery, customCategories]);
 
   const totalExpensesTjs = useMemo(() => filteredExpenses.reduce((acc, e) => acc + (e.amountTjs || 0), 0), [filteredExpenses]);
-  const totalExpensesUsd = +(totalExpensesTjs / rate).toFixed(2);
+  // Each expense keeps the USD amount computed at its own day's exchange rate — summing those
+  // (falling back to that record's own rate, never today's, when amountUsd wasn't stored) is
+  // what keeps this in sync with the reports page, instead of re-converting the TJS total at
+  // today's rate and drifting whenever the rate has moved since the expense was recorded.
+  const totalExpensesUsd = useMemo(
+    () => +filteredExpenses.reduce((acc, e) => acc + (e.amountUsd ?? ((e.amountTjs || 0) / (e.exchangeRate || rate))), 0).toFixed(2),
+    [filteredExpenses, rate]
+  );
 
   const allCategoryOptions = [...STANDARD_CATEGORIES, ...customCategories];
   const hasActiveFilters = periodFilter !== 'SPECIFIC_MONTH' || selectedStoreFilter !== 'ALL' || selectedCategoryTab !== 'ALL';
@@ -313,7 +320,7 @@ export const ExpensesPage: React.FC = () => {
   }
 
   return (
-    <div className="flex-1 flex flex-col h-full overflow-hidden bg-bg text-fg">
+    <div className="flex-1 flex flex-col h-full overflow-hidden bg-bg text-fg-muted">
       <StatusBanner message={status} onDismiss={() => setStatus(null)} />
 
       <div className="border-b border-border bg-bg shrink-0">
@@ -406,7 +413,7 @@ export const ExpensesPage: React.FC = () => {
               const Icon = getCategoryIcon(exp.category);
               const label = getCategoryLabel(exp.category, customCategories);
               const formattedDate = exp.date ? new Date(exp.date).toLocaleDateString('ru-RU') : '—';
-              const costUsd = exp.amountUsd || +(exp.amountTjs / rate).toFixed(2);
+              const costUsd = exp.amountUsd ?? +(exp.amountTjs / (exp.exchangeRate || rate)).toFixed(2);
 
               return (
                 <div key={exp.id} className="p-4 flex items-start gap-3">
@@ -416,7 +423,7 @@ export const ExpensesPage: React.FC = () => {
 
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-1.5">
-                      <span className="text-sm font-semibold text-fg">{label}</span>
+                      <span className="text-sm font-semibold text-fg-muted">{label}</span>
                       {exp.sourceAccount?.toLowerCase().includes('касса') && <Badge tone="neutral">Из кассы</Badge>}
                       {exp.employeeName && <Badge tone="accent">{exp.employeeName}</Badge>}
                     </div>
@@ -495,7 +502,7 @@ export const ExpensesPage: React.FC = () => {
             <input
               type="text" value={editDescription} onChange={(e) => setEditDescription(e.target.value)}
               placeholder="Примечание к расходу..."
-              className="w-full h-11 rounded-lg bg-bg border border-border px-3 text-sm text-fg focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent"
+              className="w-full h-11 rounded-lg bg-bg border border-border px-3 text-sm text-fg-muted focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent"
             />
           </FormField>
         </form>
@@ -560,7 +567,7 @@ export const ExpensesPage: React.FC = () => {
             <input
               type="text" value={description} onChange={(e) => setDescription(e.target.value)}
               placeholder="Оплата аренды за текущий месяц"
-              className="w-full h-11 rounded-lg bg-bg border border-border px-3 text-sm text-fg focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent"
+              className="w-full h-11 rounded-lg bg-bg border border-border px-3 text-sm text-fg-muted focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent"
             />
           </FormField>
 
@@ -589,7 +596,7 @@ export const ExpensesPage: React.FC = () => {
             <input
               type="text" required value={newCategoryName} onChange={(e) => setNewCategoryName(e.target.value)}
               placeholder="Например: Логистика, Оборудование..."
-              className="w-full h-11 rounded-lg bg-bg border border-border px-3 text-sm text-fg focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent"
+              className="w-full h-11 rounded-lg bg-bg border border-border px-3 text-sm text-fg-muted focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent"
             />
           </FormField>
         </form>

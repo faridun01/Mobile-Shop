@@ -55,7 +55,7 @@ export const NotificationsPage: React.FC = () => {
   const hasUnread = visibleNotifications.some(n => !(n.read ?? n.isRead));
 
   return (
-    <div className="flex-1 flex flex-col h-full overflow-hidden bg-bg text-fg">
+    <div className="flex-1 flex flex-col h-full overflow-hidden bg-bg text-fg-muted">
       <PageHeader
         icon={Bell}
         title="Уведомления"
@@ -87,7 +87,7 @@ export const NotificationsPage: React.FC = () => {
               >
                 <div className="min-w-0 space-y-1">
                   <div className="flex items-center gap-2">
-                    <span className={`text-sm font-semibold ${isUnread ? 'text-fg' : 'text-fg-muted'}`}>{n.title}</span>
+                    <span className="text-sm font-semibold text-fg-muted">{n.title}</span>
                     {isUnread && <span className="w-2 h-2 rounded-full bg-accent shrink-0" />}
                   </div>
                   <p className="text-sm text-fg-muted">{(n.message || '').replace(/^TR-[^:]*:\s*/i, '')}</p>

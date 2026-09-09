@@ -260,7 +260,7 @@ export const SalePage: React.FC = () => {
   };
 
   return (
-    <div className="flex-1 flex flex-col h-full overflow-hidden bg-bg text-fg relative">
+    <div className="flex-1 flex flex-col h-full overflow-hidden bg-bg text-fg-muted relative">
       <StatusBanner message={paymentStatus} onDismiss={() => setPaymentStatus(null)} />
 
       {/* Filter bar */}
@@ -321,7 +321,7 @@ export const SalePage: React.FC = () => {
                 >
                   <div className="min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <p className="text-sm font-semibold text-fg truncate">{variant.brand} {variant.model}</p>
+                      <p className="text-sm font-semibold text-fg-muted truncate">{variant.brand} {variant.model}</p>
                       {hasCostVariance && (
                         <Badge tone="warning">
                           <Flame className="w-3 h-3 mr-1 inline" />${minCost}–${maxCost}
@@ -358,7 +358,7 @@ export const SalePage: React.FC = () => {
                           }`}
                         >
                           <div className="min-w-0">
-                            <p className="text-xs font-semibold text-fg">
+                            <p className="text-xs font-semibold text-fg-muted">
                               IMEI: {dev.imei}{dev.imei2 ? ` / ${dev.imei2}` : ''}
                             </p>
                             <p className="text-xs text-fg-subtle mt-0.5">
@@ -428,6 +428,7 @@ export const SalePage: React.FC = () => {
             <Button
               variant="secondary"
               size="lg"
+              fullWidth
               leftIcon={Plus}
               disabled={isSubmittingSale}
               onClick={handleAddMore}
@@ -436,12 +437,13 @@ export const SalePage: React.FC = () => {
             </Button>
             <Button
               size="lg"
+              fullWidth
               leftIcon={CheckCircle2}
               loading={isSubmittingSale}
               disabled={hasEmptyPrice || totalTjs <= 0}
               onClick={handleFinishPayment}
             >
-              {isSubmittingSale ? 'Оформление…' : hasEmptyPrice ? 'Укажите цену продажи' : `Оплата `}
+              {isSubmittingSale ? 'Оформление…' : hasEmptyPrice ? 'Укажите цену' : `Оплата `}
             </Button>
           </div>
         }
@@ -455,7 +457,7 @@ export const SalePage: React.FC = () => {
               <div key={`${item.device.id}-${idx}`} className="p-3 rounded-lg border border-border bg-surface">
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
-                    <p className="text-sm font-semibold text-fg">{item.device.brand} {item.device.model}</p>
+                    <p className="text-sm font-semibold text-fg-muted">{item.device.brand} {item.device.model}</p>
                     <p className="text-xs text-fg-subtle">{item.device.storage} · {item.device.color}</p>
                     <p className="text-xs text-fg-subtle mt-0.5">
                       IMEI: {item.device.imei}{item.device.imei2 ? ` / ${item.device.imei2}` : ''}
@@ -514,7 +516,7 @@ export const SalePage: React.FC = () => {
               value={customerNameInput}
               onChange={(e) => setCustomerNameInput(e.target.value)}
               placeholder="Имя или номер телефона"
-              className="w-full h-11 rounded-lg bg-bg border border-border px-3 text-sm text-fg focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent"
+              className="w-full h-11 rounded-lg bg-bg border border-border px-3 text-sm text-fg-muted focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent"
             />
           </div>
 
@@ -564,7 +566,7 @@ export const SalePage: React.FC = () => {
                       setCardAmountInput(totalTjs.toString());
                     }
                   }}
-                  className="w-full h-11 rounded-lg bg-bg border border-border px-3 text-sm font-semibold text-fg focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent"
+                  className="w-full h-11 rounded-lg bg-bg border border-border px-3 text-sm font-semibold text-fg-muted focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent"
                 />
               </div>
               <div>
@@ -586,7 +588,7 @@ export const SalePage: React.FC = () => {
                       setCashAmountInput(totalTjs.toString());
                     }
                   }}
-                  className="w-full h-11 rounded-lg bg-bg border border-border px-3 text-sm font-semibold text-fg focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent"
+                  className="w-full h-11 rounded-lg bg-bg border border-border px-3 text-sm font-semibold text-fg-muted focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent"
                 />
               </div>
             </div>
@@ -609,7 +611,7 @@ export const SalePage: React.FC = () => {
           <p className="text-sm font-semibold text-accent">Чек #{completedReceiptNumber}</p>
 
           <div className="my-3 p-3 bg-bg rounded-lg border border-border text-left space-y-1 text-xs">
-            <div className="text-fg font-medium">{new Date().toLocaleString('ru-RU')}</div>
+            <div className="text-fg-muted font-medium">{new Date().toLocaleString('ru-RU')}</div>
             <div className="text-fg-muted">{activeStoreName}</div>
             <div className="text-accent font-semibold">Оператор: {currentUser?.name || 'Администратор'}</div>
           </div>

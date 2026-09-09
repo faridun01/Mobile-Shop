@@ -55,7 +55,7 @@ const DeviceRow: React.FC<DeviceRowProps> = ({ device, isAdminOrPartner, onClick
   <button onClick={onClick} className="w-full text-left px-4 py-3 active:bg-surface-raised flex items-center justify-between gap-3 transition-colors">
     <div className="min-w-0">
       <div className="flex items-center gap-2 flex-wrap">
-        <p className="text-sm font-semibold text-fg truncate">{device.brand} {device.model}</p>
+        <p className="text-sm font-semibold text-fg-muted truncate">{device.brand} {device.model}</p>
         <Badge tone="neutral">{device.storage}</Badge>
         <Badge tone="neutral">{device.color}</Badge>
       </div>
@@ -94,7 +94,7 @@ const StoreCard: React.FC<StoreCardProps> = ({ store, unitCount, valueUsd, showV
         {store.isMainWarehouse ? <Warehouse className="w-4.5 h-4.5" /> : <Store className="w-4.5 h-4.5" />}
       </span>
       <div className="min-w-0">
-        <p className="text-sm font-semibold text-fg truncate">{store.name}</p>
+        <p className="text-sm font-semibold text-fg-muted truncate">{store.name}</p>
         {store.isMainWarehouse && <p className="text-[11px] text-fg-subtle">Главный склад</p>}
       </div>
       <ChevronRight className="w-4 h-4 text-fg-subtle ml-auto shrink-0" />
@@ -206,7 +206,7 @@ export const InventoryPage: React.FC = () => {
   if (showPicker) {
     const activeStores = stores.filter(s => s.active);
     return (
-      <div className="flex-1 flex flex-col h-full overflow-hidden bg-bg text-fg">
+      <div className="flex-1 flex flex-col h-full overflow-hidden bg-bg text-fg-muted">
         <div className="flex-1 overflow-y-auto p-3">
           {activeStores.length === 0 ? (
             <EmptyState icon={Package} title="Нет активных складов" description="Добавьте магазин в настройках" />
@@ -233,7 +233,7 @@ export const InventoryPage: React.FC = () => {
   }
 
   return (
-    <div className="flex-1 flex flex-col h-full overflow-hidden bg-bg text-fg">
+    <div className="flex-1 flex flex-col h-full overflow-hidden bg-bg text-fg-muted">
       <div className="p-2.5 sm:p-3 border-b border-border bg-surface space-y-2 shrink-0">
         {/* Row 1: current store + back (admin/partner only) */}
         <div className="flex items-center gap-2">
@@ -241,13 +241,13 @@ export const InventoryPage: React.FC = () => {
             <button
               type="button"
               onClick={handleBackToPicker}
-              className="flex items-center gap-1 h-8 px-2 rounded-lg text-fg-subtle hover:text-fg shrink-0 transition-colors"
+              className="flex items-center gap-1 h-8 px-2 rounded-lg text-fg-subtle hover:text-fg-muted shrink-0 transition-colors"
               aria-label="Выбрать другой склад"
             >
               <ChevronLeft className="w-4 h-4" />
             </button>
           )}
-          <span className="flex items-center gap-1.5 text-sm font-semibold text-fg truncate">
+          <span className="flex items-center gap-1.5 text-sm font-semibold text-fg-muted truncate">
             {activeStore?.isMainWarehouse ? <Warehouse className="w-4 h-4 text-accent shrink-0" /> : <Store className="w-4 h-4 text-accent shrink-0" />}
             {isSeller ? (currentUser?.storeName || 'Мой магазин') : (activeStore?.name || 'Склад')}
           </span>
@@ -272,7 +272,7 @@ export const InventoryPage: React.FC = () => {
             type="button"
             onClick={() => setGroupByModel((prev) => !prev)}
             title={groupByModel ? 'Показать полным списком' : 'Сгруппировать по модели'}
-            className="flex items-center gap-1 h-8 px-2.5 rounded-lg border border-border bg-surface-raised text-[11px] font-medium text-fg-muted hover:text-fg shrink-0 whitespace-nowrap transition-colors"
+            className="flex items-center gap-1 h-8 px-2.5 rounded-lg border border-border bg-surface-raised text-[11px] font-medium text-fg-muted hover:text-fg-muted shrink-0 whitespace-nowrap transition-colors"
           >
             {groupByModel ? <List className="w-3.5 h-3.5 text-accent" /> : <Layers className="w-3.5 h-3.5 text-accent" />}
             <span className="hidden sm:inline">{groupByModel ? 'Список' : 'Группы'}</span>
@@ -309,7 +309,7 @@ export const InventoryPage: React.FC = () => {
                     <div className="flex items-center gap-2.5 min-w-0">
                       <Smartphone className="w-4 h-4 text-accent shrink-0" />
                       <div className="min-w-0 text-left">
-                        <p className="text-sm font-semibold text-fg truncate">{group.brand} {group.model}</p>
+                        <p className="text-sm font-semibold text-fg-muted truncate">{group.brand} {group.model}</p>
                         <div className="flex items-center gap-1 flex-wrap mt-1">
                           {group.storageGroups.map((sg) => (
                             <span
@@ -354,7 +354,7 @@ export const InventoryPage: React.FC = () => {
             <div className="grid grid-cols-2 gap-3 text-sm bg-surface p-3 rounded-lg border border-border">
               <div>
                 <span className="text-fg-subtle block text-xs uppercase">Память / цвет</span>
-                <span className="font-semibold text-fg">{selectedDevice.storage} · {selectedDevice.color}</span>
+                <span className="font-semibold text-fg-muted">{selectedDevice.storage} · {selectedDevice.color}</span>
               </div>
               <div>
                 <span className="text-fg-subtle block text-xs uppercase">Локация</span>
@@ -366,11 +366,11 @@ export const InventoryPage: React.FC = () => {
 
               <div className="col-span-2 pt-2 border-t border-border">
                 <span className="text-fg-subtle block text-xs uppercase">IMEI 1</span>
-                <span className="text-sm font-semibold text-fg select-all break-all">{selectedDevice.imei}</span>
+                <span className="text-sm font-semibold text-fg-muted select-all break-all">{selectedDevice.imei}</span>
               </div>
               <div className="col-span-2 pt-2 border-t border-border">
                 <span className="text-fg-subtle block text-xs uppercase">IMEI 2</span>
-                <span className={`text-sm font-semibold select-all break-all ${selectedDevice.imei2 ? 'text-fg' : 'text-fg-subtle font-normal'}`}>
+                <span className={`text-sm font-semibold select-all break-all ${selectedDevice.imei2 ? 'text-fg-muted' : 'text-fg-subtle font-normal'}`}>
                   {selectedDevice.imei2 || '— не указан'}
                 </span>
               </div>
@@ -389,11 +389,11 @@ export const InventoryPage: React.FC = () => {
                 <div className="grid grid-cols-2 gap-2 text-sm">
                   <div>
                     <span className="text-fg-subtle block text-xs uppercase">Поставщик</span>
-                    <span className="text-fg truncate block">{selectedDevice.supplierName || '—'}</span>
+                    <span className="text-fg-muted truncate block">{selectedDevice.supplierName || '—'}</span>
                   </div>
                   <div>
                     <span className="text-fg-subtle block text-xs uppercase">Накладная</span>
-                    <span className="text-fg truncate block">{selectedDevice.invoiceNumber || '—'}</span>
+                    <span className="text-fg-muted truncate block">{selectedDevice.invoiceNumber || '—'}</span>
                   </div>
                   <div>
                     <span className="text-fg-subtle block text-xs uppercase">Цена закупки</span>
@@ -401,7 +401,7 @@ export const InventoryPage: React.FC = () => {
                   </div>
                   <div>
                     <span className="text-fg-subtle block text-xs uppercase">Себестоимость</span>
-                    <span className="font-semibold text-fg">${selectedDevice.costBasisUsd}</span>
+                    <span className="font-semibold text-fg-muted">${selectedDevice.costBasisUsd}</span>
                   </div>
                 </div>
                 {selectedDevice.isBonus && <Badge tone="accent">Бонус поставщика</Badge>}
@@ -420,7 +420,7 @@ export const InventoryPage: React.FC = () => {
                       <div className="absolute left-0 top-1.5 w-2 h-2 rounded-full bg-accent" />
                       <div className="text-sm">
                         <div className="flex items-baseline justify-between gap-2">
-                          <span className="font-semibold text-fg text-xs uppercase">{event.type}</span>
+                          <span className="font-semibold text-fg-muted text-xs uppercase">{event.type}</span>
                           <span className="text-xs text-fg-subtle shrink-0">{event.date}</span>
                         </div>
                         <p className="text-fg-subtle text-xs mt-0.5">{event.description}</p>

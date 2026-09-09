@@ -302,7 +302,7 @@ export const RepairPage: React.FC = () => {
   };
 
   return (
-    <div className="flex-1 flex flex-col h-full overflow-hidden bg-bg text-fg">
+    <div className="flex-1 flex flex-col h-full overflow-hidden bg-bg text-fg-muted">
       <StatusBanner message={statusBanner} onDismiss={() => setStatusBanner(null)} />
 
       {/* Row 1: Header Tabs Bar */}
@@ -347,7 +347,7 @@ export const RepairPage: React.FC = () => {
               value={searchQuery ?? ''}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Квитанция / ФИО / IMEI..."
-              className="w-full rounded-xl bg-surface border border-border pl-9 pr-3 py-2 text-xs text-fg placeholder-fg-subtle focus:border-accent focus:outline-none transition-colors"
+              className="w-full rounded-xl bg-surface border border-border pl-9 pr-3 py-2 text-xs text-fg-muted placeholder-fg-subtle focus:border-accent focus:outline-none transition-colors"
             />
           </div>
 
@@ -356,7 +356,7 @@ export const RepairPage: React.FC = () => {
               <select
                 value={selectedStoreId}
                 onChange={(e) => setSelectedStoreId(e.target.value)}
-                className="shrink-0 bg-surface border border-border text-fg text-xs font-semibold rounded-xl px-3 py-1.5 focus:outline-none focus:border-accent"
+                className="shrink-0 bg-surface border border-border text-fg-muted text-xs font-semibold rounded-xl px-3 py-1.5 focus:outline-none focus:border-accent"
               >
                 <option value="ALL">Все магазины (Розница)</option>
                 {retailStores.map(s => (
@@ -369,14 +369,14 @@ export const RepairPage: React.FC = () => {
               type="month"
               value={selectedMonth}
               onChange={(e) => e.target.value && setSelectedMonth(e.target.value)}
-              className="shrink-0 px-3 py-1.5 rounded-xl border border-border text-fg text-xs font-semibold transition-colors bg-surface focus:outline-none focus:border-accent cursor-pointer"
+              className="shrink-0 px-3 py-1.5 rounded-xl border border-border text-fg-muted text-xs font-semibold transition-colors bg-surface focus:outline-none focus:border-accent cursor-pointer"
               title="Динамический выбор месяца"
             />
 
             <select
               value={statusFilter ?? 'ALL'}
               onChange={(e) => setStatusFilter(e.target.value)}
-              className="shrink-0 bg-surface border border-border text-fg text-xs font-semibold rounded-xl px-3 py-1.5 focus:outline-none focus:border-accent"
+              className="shrink-0 bg-surface border border-border text-fg-muted text-xs font-semibold rounded-xl px-3 py-1.5 focus:outline-none focus:border-accent"
             >
               <option value="ALL">Все ремонты за месяц</option>
               <option value="ACTIVE">Активные ремонты</option>
@@ -407,7 +407,7 @@ export const RepairPage: React.FC = () => {
         {activeTab === 'create' ? (
           <form onSubmit={handleCreateTicket} className="max-w-xl mx-auto space-y-4">
             <div className="border border-border rounded-xl bg-surface p-5 space-y-4 shadow-xs">
-              <h3 className="text-xs md:text-sm font-bold uppercase tracking-wide text-fg flex items-center space-x-2 border-b border-border pb-3">
+              <h3 className="text-xs md:text-sm font-bold uppercase tracking-wide text-fg-muted flex items-center space-x-2 border-b border-border pb-3">
                 <Wrench className="w-4 h-4 text-accent" />
                 <span>ОФОРМЛЕНИЕ ПРИЕМА НА ГАРАНТИЙНЫЙ РЕМОНТ</span>
               </h3>
@@ -423,7 +423,7 @@ export const RepairPage: React.FC = () => {
                     value={receiptSearch ?? ''}
                     onChange={(e) => setReceiptSearch(e.target.value)}
                     placeholder="Введите номер чека или IMEI..."
-                    className="flex-1 rounded-lg bg-surface border border-border px-3 py-1.5 text-xs text-fg placeholder-fg-subtle focus:border-accent focus:outline-none"
+                    className="flex-1 rounded-lg bg-surface border border-border px-3 py-1.5 text-xs text-fg-muted placeholder-fg-subtle focus:border-accent focus:outline-none"
                   />
                   <button
                     type="button"
@@ -449,7 +449,7 @@ export const RepairPage: React.FC = () => {
                   <select
                     value={createTicketStoreId}
                     onChange={(e) => setCreateTicketStoreId(e.target.value)}
-                    className="w-full rounded-xl bg-surface-raised border border-border px-3 py-2 text-fg text-xs font-semibold focus:border-accent focus:outline-none"
+                    className="w-full rounded-xl bg-surface-raised border border-border px-3 py-2 text-fg-muted text-xs font-semibold focus:border-accent focus:outline-none"
                   >
                     {retailStores.map(s => (
                       <option key={s.id} value={s.id}>{s.name}</option>
@@ -467,7 +467,7 @@ export const RepairPage: React.FC = () => {
                     value={clientName ?? ''}
                     onChange={(e) => setClientName(e.target.value)}
                     placeholder="Иван Иванов"
-                    className="w-full rounded-xl bg-surface-raised border border-border px-3 py-2 text-fg focus:border-accent focus:outline-none"
+                    className="w-full rounded-xl bg-surface-raised border border-border px-3 py-2 text-fg-muted focus:border-accent focus:outline-none"
                   />
                 </div>
 
@@ -479,7 +479,7 @@ export const RepairPage: React.FC = () => {
                     value={clientPhone ?? ''}
                     onChange={(e) => setClientPhone(e.target.value)}
                     placeholder="+992 900 000 000"
-                    className="w-full rounded-xl bg-surface-raised border border-border px-3 py-2 text-fg focus:border-accent focus:outline-none"
+                    className="w-full rounded-xl bg-surface-raised border border-border px-3 py-2 text-fg-muted focus:border-accent focus:outline-none"
                   />
                 </div>
               </div>
@@ -493,7 +493,7 @@ export const RepairPage: React.FC = () => {
                     value={deviceModel ?? ''}
                     onChange={(e) => setDeviceModel(e.target.value)}
                     placeholder="iPhone 15 Pro Max 256GB"
-                    className="w-full rounded-xl bg-surface-raised border border-border px-3 py-2 text-fg focus:border-accent focus:outline-none"
+                    className="w-full rounded-xl bg-surface-raised border border-border px-3 py-2 text-fg-muted focus:border-accent focus:outline-none"
                   />
                 </div>
 
@@ -505,7 +505,7 @@ export const RepairPage: React.FC = () => {
                       value={imei ?? ''}
                       onChange={(e) => setImei(e.target.value)}
                       placeholder="354891100234561"
-                      className="w-full rounded-xl bg-surface-raised border border-border px-3 py-2 text-fg focus:border-accent focus:outline-none"
+                      className="w-full rounded-xl bg-surface-raised border border-border px-3 py-2 text-fg-muted focus:border-accent focus:outline-none"
                     />
                   </div>
                   <div>
@@ -515,7 +515,7 @@ export const RepairPage: React.FC = () => {
                       value={imei2 ?? ''}
                       onChange={(e) => setImei2(e.target.value)}
                       placeholder="354891100234562 (по желанию)"
-                      className="w-full rounded-xl bg-surface-raised border border-border px-3 py-2 text-fg focus:border-accent focus:outline-none"
+                      className="w-full rounded-xl bg-surface-raised border border-border px-3 py-2 text-fg-muted focus:border-accent focus:outline-none"
                     />
                   </div>
                 </div>
@@ -528,7 +528,7 @@ export const RepairPage: React.FC = () => {
                     value={defectDescription ?? ''}
                     onChange={(e) => setDefectDescription(e.target.value)}
                     placeholder="Не заряжается, разбито стекло дисплея..."
-                    className="w-full rounded-xl bg-surface-raised border border-border px-3 py-2 text-fg placeholder-fg-subtle focus:border-accent focus:outline-none"
+                    className="w-full rounded-xl bg-surface-raised border border-border px-3 py-2 text-fg-muted placeholder-fg-subtle focus:border-accent focus:outline-none"
                   />
                 </div>
 
@@ -552,7 +552,7 @@ export const RepairPage: React.FC = () => {
                 ПЕРИОД: <strong className="text-accent uppercase font-bold">{selectedMonth === 'ALL' ? 'Все время' : selectedMonth}</strong>
               </div>
               <div className="flex flex-wrap items-center gap-x-5 gap-y-1.5 text-xs">
-                <span>Всего ремонтов: <strong className="text-fg font-bold">{totalRepairsCount}</strong></span>
+                <span>Всего ремонтов: <strong className="text-fg-muted font-bold">{totalRepairsCount}</strong></span>
                 <span>Отремонтировано / Готово: <strong className="text-accent font-bold">{readyRepairsCount}</strong></span>
                 <span>Затраты (Расходы): <strong className="text-accent font-bold">{totalExpensesTjs.toLocaleString()} TJS</strong></span>
               </div>
@@ -587,9 +587,9 @@ export const RepairPage: React.FC = () => {
                         </div>
 
                         <div>
-                          <h4 className="text-sm font-bold text-fg">{ticket.deviceModel || `${ticket.brand || ''} ${ticket.model || ''}`}</h4>
+                          <h4 className="text-sm font-bold text-fg-muted">{ticket.deviceModel || `${ticket.brand || ''} ${ticket.model || ''}`}</h4>
                           <p className="text-xs text-fg-muted mt-0.5">
-                            Клиент: <strong className="text-fg">{ticket.customerName || 'Клиент'}</strong> ({ticket.customerPhone || 'N/A'})
+                            Клиент: <strong className="text-fg-muted">{ticket.customerName || 'Клиент'}</strong> ({ticket.customerPhone || 'N/A'})
                           </p>
                           <p className="text-xs text-danger/90 mt-0.5">
                             Дефект: {ticket.problemDescription}
@@ -648,19 +648,19 @@ export const RepairPage: React.FC = () => {
       {/* MODAL: ISSUE REPAIR TICKET */}
       {selectedTicket && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-xs">
-          <div className="w-full max-w-md rounded-2xl bg-surface border border-border p-5 text-fg shadow-2xl space-y-4 text-xs">
+          <div className="w-full max-w-md rounded-2xl bg-surface border border-border p-5 text-fg-muted shadow-2xl space-y-4 text-xs">
             <div className="flex items-center justify-between border-b border-border pb-3">
-              <h3 className="text-sm font-bold uppercase text-fg flex items-center space-x-2">
+              <h3 className="text-sm font-bold uppercase text-fg-muted flex items-center space-x-2">
                 <PackageCheck className="w-4 h-4 text-accent" />
                 <span>ВЫДАЧА РЕМОНТА КЛИЕНТУ</span>
               </h3>
-              <button onClick={() => setSelectedTicket(null)} className="text-fg-subtle hover:text-fg">
+              <button onClick={() => setSelectedTicket(null)} className="text-fg-subtle hover:text-fg-muted">
                 <X className="w-4 h-4" />
               </button>
             </div>
 
             <div className="p-3 bg-surface-raised rounded-xl border border-border space-y-1">
-              <p className="font-bold text-fg">Квитанция #{selectedTicket.ticketNumber}</p>
+              <p className="font-bold text-fg-muted">Квитанция #{selectedTicket.ticketNumber}</p>
               <p className="text-fg-muted">{selectedTicket.deviceModel || selectedTicket.model}</p>
               <p className="text-fg-subtle">Клиент: {selectedTicket.customerName} ({selectedTicket.customerPhone})</p>
             </div>
@@ -712,18 +712,18 @@ export const RepairPage: React.FC = () => {
       {/* MODAL: VIEW REPAIR CARD DETAILS */}
       {viewingTicket && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-xs">
-          <div className="w-full max-w-lg rounded-2xl bg-surface border border-border p-5 text-fg shadow-2xl space-y-4 text-xs max-h-[90vh] overflow-y-auto">
+          <div className="w-full max-w-lg rounded-2xl bg-surface border border-border p-5 text-fg-muted shadow-2xl space-y-4 text-xs max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between border-b border-border pb-3">
               <div className="flex items-center space-x-2">
                 <FileText className="w-4 h-4 text-accent" />
-                <h3 className="text-sm font-bold uppercase text-fg">
+                <h3 className="text-sm font-bold uppercase text-fg-muted">
                   Квитанция на ремонт #{viewingTicket.ticketNumber}
                 </h3>
                 <span className={`text-[10px] px-2 py-0.5 rounded-md font-bold uppercase border ${getStatusBadge(viewingTicket.status).color}`}>
                   {getStatusBadge(viewingTicket.status).label}
                 </span>
               </div>
-              <button onClick={() => setViewingTicket(null)} className="text-fg-subtle hover:text-fg">
+              <button onClick={() => setViewingTicket(null)} className="text-fg-subtle hover:text-fg-muted">
                 <X className="w-4 h-4" />
               </button>
             </div>
@@ -731,17 +731,17 @@ export const RepairPage: React.FC = () => {
             {/* Device Info */}
             <div className="p-3 bg-surface-raised rounded-xl border border-border space-y-2">
               <div className="flex items-center justify-between">
-                <span className="font-bold text-fg text-sm">{viewingTicket.deviceModel || `${viewingTicket.brand || ''} ${viewingTicket.model || ''}`}</span>
+                <span className="font-bold text-fg-muted text-sm">{viewingTicket.deviceModel || `${viewingTicket.brand || ''} ${viewingTicket.model || ''}`}</span>
                 <span className="text-fg-subtle text-[11px]">{new Date(viewingTicket.createdAt).toLocaleString('ru-RU')}</span>
               </div>
               <div className="grid grid-cols-2 gap-2 text-fg-muted text-xs">
                 <div>
                   <span className="text-fg-subtle block text-[10px] uppercase font-semibold">IMEI</span>
-                  <span className="font-mono text-fg">{viewingTicket.imei || 'N/A'}</span>
+                  <span className="font-mono text-fg-muted">{viewingTicket.imei || 'N/A'}</span>
                 </div>
                 <div>
                   <span className="text-fg-subtle block text-[10px] uppercase font-semibold">Магазин / Точка</span>
-                  <span className="text-fg">{viewingTicket.storeName || 'Магазин'}</span>
+                  <span className="text-fg-muted">{viewingTicket.storeName || 'Магазин'}</span>
                 </div>
               </div>
             </div>
@@ -750,7 +750,7 @@ export const RepairPage: React.FC = () => {
             <div className="p-3 bg-surface-raised rounded-xl border border-border space-y-1">
               <span className="text-fg-subtle block text-[10px] uppercase font-semibold">Данные клиента</span>
               <div className="flex items-center justify-between text-xs">
-                <span className="font-bold text-fg">{viewingTicket.customerName || 'Не указано'}</span>
+                <span className="font-bold text-fg-muted">{viewingTicket.customerName || 'Не указано'}</span>
                 <span className="text-accent font-semibold">{viewingTicket.customerPhone || 'N/A'}</span>
               </div>
             </div>
@@ -758,7 +758,7 @@ export const RepairPage: React.FC = () => {
             {/* Problem / Defect Description */}
             <div className="p-3 bg-danger/10 border border-danger/20 rounded-xl space-y-1">
               <span className="text-danger font-semibold block text-[10px] uppercase">Заявленная неисправность</span>
-              <p className="text-fg text-xs font-medium leading-relaxed">{viewingTicket.problemDescription}</p>
+              <p className="text-fg-muted text-xs font-medium leading-relaxed">{viewingTicket.problemDescription}</p>
             </div>
 
             {/* Visual Condition, Equipment & Note */}
@@ -767,19 +767,19 @@ export const RepairPage: React.FC = () => {
                 {viewingTicket.visualCondition && (
                   <div>
                     <span className="text-fg-subtle block text-[10px] uppercase font-semibold">Внешнее состояние</span>
-                    <span className="text-fg">{viewingTicket.visualCondition}</span>
+                    <span className="text-fg-muted">{viewingTicket.visualCondition}</span>
                   </div>
                 )}
                 {viewingTicket.equipmentPackage && (
                   <div>
                     <span className="text-fg-subtle block text-[10px] uppercase font-semibold">Комплектация</span>
-                    <span className="text-fg">{viewingTicket.equipmentPackage}</span>
+                    <span className="text-fg-muted">{viewingTicket.equipmentPackage}</span>
                   </div>
                 )}
                 {viewingTicket.comment && (
                   <div>
                     <span className="text-fg-subtle block text-[10px] uppercase font-semibold">Примечание мастера</span>
-                    <span className="text-fg">{viewingTicket.comment}</span>
+                    <span className="text-fg-muted">{viewingTicket.comment}</span>
                   </div>
                 )}
               </div>
@@ -791,7 +791,7 @@ export const RepairPage: React.FC = () => {
               <div className="grid grid-cols-2 gap-2 text-xs">
                 <div>
                   <span className="text-fg-subtle block text-[10px]">Ориентировочная стоимость:</span>
-                  <span className="font-bold text-fg">{viewingTicket.estimatedCostTjs || 0} TJS</span>
+                  <span className="font-bold text-fg-muted">{viewingTicket.estimatedCostTjs || 0} TJS</span>
                 </div>
                 {viewingTicket.prepaymentTjs ? (
                   <div>

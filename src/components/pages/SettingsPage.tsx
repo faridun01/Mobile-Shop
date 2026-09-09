@@ -185,7 +185,7 @@ export const SettingsPage: React.FC = () => {
   };
 
   return (
-    <div className="flex-1 flex flex-col h-full overflow-hidden bg-bg text-fg">
+    <div className="flex-1 flex flex-col h-full overflow-hidden bg-bg text-fg-muted">
       {/* Header */}
       <div className="p-3 sm:p-4 border-b border-border bg-surface flex items-center justify-between shrink-0">
         <div className="flex items-center space-x-2">
@@ -212,7 +212,7 @@ export const SettingsPage: React.FC = () => {
               <div>
                 <div className="flex items-center space-x-2 pb-2 border-b border-border mb-3">
                   <Sparkles className="w-4 h-4 text-accent" />
-                  <h4 className="text-xs sm:text-sm font-bold text-fg uppercase">РЕЖИМ ОФОРМЛЕНИЯ</h4>
+                  <h4 className="text-xs sm:text-sm font-bold text-fg-muted uppercase">РЕЖИМ ОФОРМЛЕНИЯ</h4>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -231,7 +231,7 @@ export const SettingsPage: React.FC = () => {
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between">
-                        <span className="text-[11px] font-bold text-fg uppercase">СВЕТЛЫЙ</span>
+                        <span className="text-[11px] font-bold text-fg-muted uppercase">СВЕТЛЫЙ</span>
                         {theme === 'light' && (
                           <Check className="w-3 h-3 text-accent" />
                         )}
@@ -257,7 +257,7 @@ export const SettingsPage: React.FC = () => {
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between">
-                        <span className="text-[11px] font-bold text-fg uppercase">ТЁМНЫЙ</span>
+                        <span className="text-[11px] font-bold text-fg-muted uppercase">ТЁМНЫЙ</span>
                         {theme === 'dark' && (
                           <Check className="w-3 h-3 text-accent" />
                         )}
@@ -277,7 +277,7 @@ export const SettingsPage: React.FC = () => {
                 <div className="flex items-center justify-between pb-2 border-b border-border mb-3">
                   <div className="flex items-center space-x-2">
                     <DollarSign className="w-4 h-4 text-accent" />
-                    <h4 className="text-xs sm:text-sm font-bold text-fg uppercase">КУРС ВАЛЮТ (TJS / USD)</h4>
+                    <h4 className="text-xs sm:text-sm font-bold text-fg-muted uppercase">КУРС ВАЛЮТ (TJS / USD)</h4>
                   </div>
                   <button
                     type="button"
@@ -301,7 +301,7 @@ export const SettingsPage: React.FC = () => {
 
                   <div className="text-right text-xs">
                     <span className="text-[10px] text-fg-subtle uppercase block">ОБНОВЛЕНИЕ</span>
-                    <span className="text-fg font-bold mt-0.5 block text-[11px]">
+                    <span className="text-fg-muted font-bold mt-0.5 block text-[11px]">
                       {todayRate?.date}
                     </span>
                   </div>
@@ -319,7 +319,7 @@ export const SettingsPage: React.FC = () => {
             <div className="flex items-center justify-between pb-2 border-b border-border">
               <div className="flex items-center space-x-2">
                 <Store className="w-4 h-4 text-accent" />
-                <h4 className="text-xs sm:text-sm font-bold text-fg uppercase">ФИЛИАЛЫ И СКЛАДЫ ({stores.length})</h4>
+                <h4 className="text-xs sm:text-sm font-bold text-fg-muted uppercase">ФИЛИАЛЫ И СКЛАДЫ ({stores.length})</h4>
               </div>
 
               <div className="flex items-center space-x-2">
@@ -340,7 +340,7 @@ export const SettingsPage: React.FC = () => {
                     <div className="min-w-0 pr-2">
                       <div className="flex items-center space-x-2">
                         <Building className="w-3.5 h-3.5 text-accent shrink-0" />
-                        <span className="text-xs font-bold text-fg uppercase truncate">{s.name}</span>
+                        <span className="text-xs font-bold text-fg-muted uppercase truncate">{s.name}</span>
                       </div>
                       {s.address && (
                         <p className="text-[11px] text-fg-muted flex items-center space-x-1 mt-1 pl-5 truncate">
@@ -383,7 +383,7 @@ export const SettingsPage: React.FC = () => {
                       </button>
                       <button
                         onClick={() => handleEditStore(s)}
-                        className="p-1.5 rounded-lg hover:bg-surface text-fg-subtle hover:text-fg transition-colors"
+                        className="p-1.5 rounded-lg hover:bg-surface text-fg-subtle hover:text-fg-muted transition-colors"
                         title="Редактировать филиал"
                       >
                         <Pencil className="w-3.5 h-3.5" />
@@ -405,9 +405,9 @@ export const SettingsPage: React.FC = () => {
           {/* Row 3: Account & Session Section with Logout */}
           <div className="p-4 rounded-xl bg-surface border border-border flex flex-col sm:flex-row items-center justify-between gap-4">
             <div>
-              <h4 className="text-xs sm:text-sm font-bold text-fg uppercase">АККАУНТ И СЕССИЯ</h4>
+              <h4 className="text-xs sm:text-sm font-bold text-fg-muted uppercase">АККАУНТ И СЕССИЯ</h4>
               <p className="text-[11px] text-fg-muted mt-0.5">
-                Вы вошли как <strong className="text-fg">{currentUser?.name}</strong> ({currentUser?.role === 'ADMIN' ? 'Администратор' : currentUser?.role})
+                Вы вошли как <strong className="text-fg-muted">{currentUser?.name}</strong> ({currentUser?.role === 'ADMIN' ? 'Администратор' : currentUser?.role})
               </p>
             </div>
 
@@ -425,8 +425,8 @@ export const SettingsPage: React.FC = () => {
       {/* MODAL: Add Store */}
       {isAddStoreOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-xs">
-          <form onSubmit={handleAddStore} className="w-full max-w-sm rounded-2xl bg-surface border border-border p-5 text-fg shadow-2xl space-y-3">
-            <h4 className="text-sm font-bold text-fg mb-2 uppercase">НОВАЯ ТОРГОВАЯ ТОЧКА</h4>
+          <form onSubmit={handleAddStore} className="w-full max-w-sm rounded-2xl bg-surface border border-border p-5 text-fg-muted shadow-2xl space-y-3">
+            <h4 className="text-sm font-bold text-fg-muted mb-2 uppercase">НОВАЯ ТОРГОВАЯ ТОЧКА</h4>
 
             <div className="text-xs space-y-3">
               <div>
@@ -437,7 +437,7 @@ export const SettingsPage: React.FC = () => {
                   value={newStoreName ?? ''}
                   onChange={(e) => setNewStoreName(e.target.value)}
                   placeholder="Магазин №3 Садбарг"
-                  className="w-full rounded-xl bg-surface-raised border border-border px-3 py-2 text-fg focus:border-accent focus:outline-none"
+                  className="w-full rounded-xl bg-surface-raised border border-border px-3 py-2 text-fg-muted focus:border-accent focus:outline-none"
                 />
               </div>
 
@@ -448,7 +448,7 @@ export const SettingsPage: React.FC = () => {
                   value={newStoreAddress ?? ''}
                   onChange={(e) => setNewStoreAddress(e.target.value)}
                   placeholder="ул. Айни 48"
-                  className="w-full rounded-xl bg-surface-raised border border-border px-3 py-2 text-fg focus:border-accent focus:outline-none"
+                  className="w-full rounded-xl bg-surface-raised border border-border px-3 py-2 text-fg-muted focus:border-accent focus:outline-none"
                 />
               </div>
             </div>
@@ -475,8 +475,8 @@ export const SettingsPage: React.FC = () => {
       {/* MODAL: Edit Store */}
       {editingStore && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-xs">
-          <form onSubmit={handleSaveEditStore} className="w-full max-w-sm rounded-2xl bg-surface border border-border p-5 text-fg shadow-2xl space-y-3">
-            <h4 className="text-sm font-bold text-fg mb-2 uppercase">РЕДАКТИРОВАТЬ ФИЛИАЛ</h4>
+          <form onSubmit={handleSaveEditStore} className="w-full max-w-sm rounded-2xl bg-surface border border-border p-5 text-fg-muted shadow-2xl space-y-3">
+            <h4 className="text-sm font-bold text-fg-muted mb-2 uppercase">РЕДАКТИРОВАТЬ ФИЛИАЛ</h4>
 
             <div className="text-xs space-y-3">
               <div>
@@ -486,7 +486,7 @@ export const SettingsPage: React.FC = () => {
                   required
                   value={editName ?? ''}
                   onChange={(e) => setEditName(e.target.value)}
-                  className="w-full rounded-xl bg-surface-raised border border-border px-3 py-2 text-fg focus:border-accent focus:outline-none"
+                  className="w-full rounded-xl bg-surface-raised border border-border px-3 py-2 text-fg-muted focus:border-accent focus:outline-none"
                 />
               </div>
 
@@ -496,7 +496,7 @@ export const SettingsPage: React.FC = () => {
                   type="text"
                   value={editAddress ?? ''}
                   onChange={(e) => setEditAddress(e.target.value)}
-                  className="w-full rounded-xl bg-surface-raised border border-border px-3 py-2 text-fg focus:border-accent focus:outline-none"
+                  className="w-full rounded-xl bg-surface-raised border border-border px-3 py-2 text-fg-muted focus:border-accent focus:outline-none"
                 />
               </div>
             </div>
@@ -523,19 +523,19 @@ export const SettingsPage: React.FC = () => {
       {/* MODAL: DELETE STORE CONFIRMATION */}
       {deletingStoreConfirm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-xs">
-          <div className="w-full max-w-md rounded-2xl bg-surface border border-danger/40 p-5 shadow-2xl space-y-4 text-fg">
+          <div className="w-full max-w-md rounded-2xl bg-surface border border-danger/40 p-5 shadow-2xl space-y-4 text-fg-muted">
             <div className="flex items-center space-x-3 text-danger border-b border-border pb-3">
               <div className="p-2 rounded-xl bg-danger/15 text-danger shrink-0 border border-danger/20">
                 <Trash2 className="w-5 h-5" />
               </div>
               <div>
-                <h3 className="text-sm font-bold uppercase text-fg">УДАЛЕНИЕ ФИЛИАЛА</h3>
+                <h3 className="text-sm font-bold uppercase text-fg-muted">УДАЛЕНИЕ ФИЛИАЛА</h3>
                 <p className="text-[11px] text-fg-muted mt-0.5">{deletingStoreConfirm.name}</p>
               </div>
             </div>
 
             <div className="p-3 rounded-xl bg-surface-raised border border-border text-xs space-y-2">
-              <p className="text-fg font-semibold">
+              <p className="text-fg-muted font-semibold">
                 Вы действительно хотите удалить филиал «<span className="text-danger">{deletingStoreConfirm.name}</span>»?
               </p>
               <p className="text-[11px] text-accent flex items-start space-x-1.5 pt-1">
@@ -567,25 +567,25 @@ export const SettingsPage: React.FC = () => {
       {/* MODAL: MERGE STORES */}
       {mergingStore && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-xs">
-          <div className="w-full max-w-md rounded-2xl bg-surface border border-accent/40 p-5 shadow-2xl space-y-4 text-fg">
+          <div className="w-full max-w-md rounded-2xl bg-surface border border-accent/40 p-5 shadow-2xl space-y-4 text-fg-muted">
             <div className="flex items-center space-x-3 text-accent border-b border-border pb-3">
               <div className="p-2 rounded-xl bg-accent/15 text-accent shrink-0 border border-accent/20">
                 <Combine className="w-5 h-5" />
               </div>
               <div>
-                <h3 className="text-sm font-bold uppercase text-fg">ОБЪЕДИНЕНИЕ ФИЛИАЛОВ</h3>
+                <h3 className="text-sm font-bold uppercase text-fg-muted">ОБЪЕДИНЕНИЕ ФИЛИАЛОВ</h3>
                 <p className="text-[11px] text-fg-muted mt-0.5">{mergingStore.name}</p>
               </div>
             </div>
 
             <div className="p-3 rounded-xl bg-surface-raised border border-border text-xs space-y-3">
-              <p className="text-fg">
-                Все товары, продажи, ремонты, расходы, перемещения и касса филиала «<strong className="text-fg">{mergingStore.name}</strong>» ({(mergingStore.cashBalanceTjs ?? 0).toLocaleString()} TJS) будут перенесены в:
+              <p className="text-fg-muted">
+                Все товары, продажи, ремонты, расходы, перемещения и касса филиала «<strong className="text-fg-muted">{mergingStore.name}</strong>» ({(mergingStore.cashBalanceTjs ?? 0).toLocaleString()} TJS) будут перенесены в:
               </p>
               <select
                 value={mergeTargetId}
                 onChange={(e) => setMergeTargetId(e.target.value)}
-                className="w-full rounded-lg bg-surface border border-border px-3 py-2 text-fg focus:outline-none focus:border-accent"
+                className="w-full rounded-lg bg-surface border border-border px-3 py-2 text-fg-muted focus:outline-none focus:border-accent"
               >
                 {stores.filter(s => s.id !== mergingStore.id && !s.isMainWarehouse).map(s => (
                   <option key={s.id} value={s.id}>{s.name} (Остаток: {(s.cashBalanceTjs ?? 0).toLocaleString()} TJS)</option>
@@ -623,13 +623,13 @@ export const SettingsPage: React.FC = () => {
       {/* MODAL: ADJUST CASH BALANCE */}
       {adjustingStore && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-xs">
-          <form onSubmit={handleConfirmAdjust} className="w-full max-w-sm rounded-2xl bg-surface border border-warning/40 p-5 shadow-2xl space-y-4 text-fg">
+          <form onSubmit={handleConfirmAdjust} className="w-full max-w-sm rounded-2xl bg-surface border border-warning/40 p-5 shadow-2xl space-y-4 text-fg-muted">
             <div className="flex items-center space-x-3 text-warning border-b border-border pb-3">
               <div className="p-2 rounded-xl bg-warning/15 text-warning shrink-0 border border-warning/20">
                 <Wrench className="w-5 h-5" />
               </div>
               <div>
-                <h3 className="text-sm font-bold uppercase text-fg">КОРРЕКТИРОВКА КАССЫ</h3>
+                <h3 className="text-sm font-bold uppercase text-fg-muted">КОРРЕКТИРОВКА КАССЫ</h3>
                 <p className="text-[11px] text-fg-muted mt-0.5">{adjustingStore.name}</p>
               </div>
             </div>
@@ -646,7 +646,7 @@ export const SettingsPage: React.FC = () => {
                   value={adjustNewBalance}
                   onChange={(e) => setAdjustNewBalance(e.target.value)}
                   required
-                  className="w-full rounded-lg bg-surface-raised border border-border px-3 py-2 text-fg font-bold focus:outline-none focus:border-warning"
+                  className="w-full rounded-lg bg-surface-raised border border-border px-3 py-2 text-fg-muted font-bold focus:outline-none focus:border-warning"
                 />
               </div>
               <div>
@@ -657,7 +657,7 @@ export const SettingsPage: React.FC = () => {
                   onChange={(e) => setAdjustReason(e.target.value)}
                   placeholder="Например: исправление исторической ошибки в остатке"
                   required
-                  className="w-full rounded-lg bg-surface-raised border border-border px-3 py-2 text-fg focus:outline-none focus:border-warning"
+                  className="w-full rounded-lg bg-surface-raised border border-border px-3 py-2 text-fg-muted focus:outline-none focus:border-warning"
                 />
               </div>
               <p className="text-[11px] text-fg-subtle">

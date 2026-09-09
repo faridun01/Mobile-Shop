@@ -217,7 +217,7 @@ export const TransferPage: React.FC = () => {
   const pendingCount = visibleTransfers.filter((t: TransferRequest) => t.status === 'PENDING_APPROVAL').length;
 
   return (
-    <div className="flex-1 flex flex-col h-full overflow-hidden bg-bg text-fg">
+    <div className="flex-1 flex flex-col h-full overflow-hidden bg-bg text-fg-muted">
       <StatusBanner message={statusBanner} onDismiss={() => setStatusBanner(null)} />
 
 
@@ -229,7 +229,7 @@ export const TransferPage: React.FC = () => {
             {statusMessage.type === 'success' ? <CheckCircle2 className="w-4 h-4 shrink-0" /> : <AlertCircle className="w-4 h-4 shrink-0" />}
             <span>{statusMessage.text}</span>
           </div>
-          <button onClick={() => setStatusMessage(null)} className="text-fg-subtle hover:text-fg ml-2">
+          <button onClick={() => setStatusMessage(null)} className="text-fg-subtle hover:text-fg-muted ml-2">
             <X className="w-4 h-4" />
           </button>
         </div>
@@ -279,13 +279,13 @@ export const TransferPage: React.FC = () => {
                       <select
                         value={fromLocationId ?? ''}
                         onChange={(e) => handleSellerFromChange(e.target.value)}
-                        className="w-full rounded-xl bg-surface-raised border border-border px-3 py-2 text-xs text-fg focus:border-accent focus:outline-none"
+                        className="w-full rounded-xl bg-surface-raised border border-border px-3 py-2 text-xs text-fg-muted focus:border-accent focus:outline-none"
                       >
                         <option value={mainWarehouse.id}>{mainWarehouse.name}</option>
                         <option value={currentUser?.storeId || ''}>{currentUser?.storeName || 'Мой магазин'}</option>
                       </select>
                     ) : (
-                      <div className="p-2.5 rounded-xl bg-surface-raised border border-border text-fg font-bold flex items-center space-x-2">
+                      <div className="p-2.5 rounded-xl bg-surface-raised border border-border text-fg-muted font-bold flex items-center space-x-2">
                         <StoreIcon className="w-4 h-4 text-accent" />
                         <span>{currentUser?.storeName || 'Мой магазин'}</span>
                       </div>
@@ -297,7 +297,7 @@ export const TransferPage: React.FC = () => {
                         setFromLocationId(e.target.value);
                         setSelectedDeviceIds([]);
                       }}
-                      className="w-full rounded-xl bg-surface-raised border border-border px-3 py-2 text-xs text-fg focus:border-accent focus:outline-none"
+                      className="w-full rounded-xl bg-surface-raised border border-border px-3 py-2 text-xs text-fg-muted focus:border-accent focus:outline-none"
                     >
                       {stores.map(s => (
                         <option key={s.id} value={s.id}>{s.name}</option>
@@ -309,7 +309,7 @@ export const TransferPage: React.FC = () => {
                 <div>
                   <label className="block text-fg-subtle mb-1 text-[11px] uppercase font-bold">Куда (Получатель):</label>
                   {isSeller && mainWarehouse && fromLocationId === mainWarehouse.id ? (
-                    <div className="p-2.5 rounded-xl bg-surface-raised border border-border text-fg font-bold flex items-center space-x-2">
+                    <div className="p-2.5 rounded-xl bg-surface-raised border border-border text-fg-muted font-bold flex items-center space-x-2">
                       <StoreIcon className="w-4 h-4 text-accent" />
                       <span>{currentUser?.storeName || 'Мой магазин'}</span>
                     </div>
@@ -317,7 +317,7 @@ export const TransferPage: React.FC = () => {
                   <select
                     value={toLocationId ?? ''}
                     onChange={(e) => setToLocationId(e.target.value)}
-                    className="w-full rounded-xl bg-surface-raised border border-border px-3 py-2 text-xs text-fg focus:border-accent focus:outline-none"
+                    className="w-full rounded-xl bg-surface-raised border border-border px-3 py-2 text-xs text-fg-muted focus:border-accent focus:outline-none"
                   >
                     {stores.filter(s => s.id !== fromLocationId).map(s => (
                       <option key={s.id} value={s.id}>{s.name}</option>
@@ -337,7 +337,7 @@ export const TransferPage: React.FC = () => {
                   value={searchQuery ?? ''}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder="Поиск устройства в этой точке (модель, IMEI)..."
-                  className="w-full rounded-xl bg-surface-raised border border-border pl-9 pr-3 py-1.5 text-xs text-fg placeholder-fg-subtle focus:border-accent focus:outline-none"
+                  className="w-full rounded-xl bg-surface-raised border border-border pl-9 pr-3 py-1.5 text-xs text-fg-muted placeholder-fg-subtle focus:border-accent focus:outline-none"
                 />
               </div>
 
@@ -390,7 +390,7 @@ export const TransferPage: React.FC = () => {
                           </div>
 
                           <div className="min-w-0">
-                            <h4 className="text-xs font-bold text-fg truncate">{dev.brand} {dev.model}</h4>
+                            <h4 className="text-xs font-bold text-fg-muted truncate">{dev.brand} {dev.model}</h4>
                             <p className="text-[11px] text-fg-muted truncate">{dev.ram ? `${dev.ram} • ` : ''}{dev.storage} • {dev.color}</p>
                             <p className="text-[10px] text-fg-subtle truncate">IMEI: {dev.imei}</p>
                           </div>
@@ -415,7 +415,7 @@ export const TransferPage: React.FC = () => {
                       {selectedDeviceIds.length}
                     </div>
                     <div>
-                      <p className="text-xs font-bold text-fg">
+                      <p className="text-xs font-bold text-fg-muted">
                         Выбрано: {selectedDeviceIds.length} устройств
                       </p>
                       <p className="text-[11px] text-fg-muted">
@@ -444,7 +444,7 @@ export const TransferPage: React.FC = () => {
                 <select
                   value={historyFilterStoreId}
                   onChange={(e) => setHistoryFilterStoreId(e.target.value)}
-                  className="bg-surface border border-border text-fg rounded-xl px-3 py-1.5 text-xs font-semibold focus:outline-none focus:border-accent"
+                  className="bg-surface border border-border text-fg-muted rounded-xl px-3 py-1.5 text-xs font-semibold focus:outline-none focus:border-accent"
                 >
                   <option value="ALL">Все склады</option>
                   {stores.map(s => (
@@ -464,7 +464,7 @@ export const TransferPage: React.FC = () => {
                   <div key={tr.id} className="p-4 rounded-xl bg-surface border border-border space-y-3 text-xs">
                     <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border pb-2.5">
                       <div className="flex items-center space-x-2">
-                        <span className="font-bold text-fg">Перемещение #{tr.id.slice(-6)}</span>
+                        <span className="font-bold text-fg-muted">Перемещение #{tr.id.slice(-6)}</span>
                         <span className={`text-[10px] px-2 py-0.5 rounded-md font-bold uppercase border ${
                           tr.status === 'APPROVED' ? 'bg-accent/15 text-accent border-accent/30' :
                           tr.status === 'PENDING_APPROVAL' ? 'bg-warning/15 text-warning border-warning/30' :
@@ -487,7 +487,7 @@ export const TransferPage: React.FC = () => {
                     <div className="p-2.5 rounded-xl bg-surface-raised border border-border space-y-1">
                       <span className="text-[10px] text-fg-subtle uppercase block">Передаваемые устройства ({(tr.deviceIds || []).length} шт.):</span>
                       {(tr.deviceModels || []).map((mod, idx) => (
-                        <div key={idx} className="flex items-center justify-between text-xs text-fg">
+                        <div key={idx} className="flex items-center justify-between text-xs text-fg-muted">
                           <span>{tr.deviceBrands?.[idx] ? `${tr.deviceBrands[idx]} ${mod}` : mod}</span>
                           <span className="text-fg-subtle text-[11px]">IMEI: {tr.deviceImeis?.[idx] || 'N/A'}</span>
                         </div>
@@ -526,13 +526,13 @@ export const TransferPage: React.FC = () => {
       {/* CONFIRMATION MODAL */}
       {confirmTransferModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-xs">
-          <div className="w-full max-w-md rounded-2xl bg-surface border border-border p-5 text-fg shadow-2xl space-y-4 text-xs">
-            <h3 className="text-sm font-bold uppercase text-fg border-b border-border pb-3">ПОДТВЕРЖДЕНИЕ ПЕРЕМЕЩЕНИЯ</h3>
+          <div className="w-full max-w-md rounded-2xl bg-surface border border-border p-5 text-fg-muted shadow-2xl space-y-4 text-xs">
+            <h3 className="text-sm font-bold uppercase text-fg-muted border-b border-border pb-3">ПОДТВЕРЖДЕНИЕ ПЕРЕМЕЩЕНИЯ</h3>
 
             <div className="p-3 bg-surface-raised rounded-xl border border-border space-y-1">
               <p className="text-fg-muted">Откуда: <strong className="text-accent">{fromStoreName}</strong></p>
               <p className="text-fg-muted">Куда: <strong className="text-accent">{toStoreName}</strong></p>
-              <p className="text-fg-muted">Устройств к передаче: <strong className="text-fg">{selectedDeviceIds.length} шт.</strong></p>
+              <p className="text-fg-muted">Устройств к передаче: <strong className="text-fg-muted">{selectedDeviceIds.length} шт.</strong></p>
             </div>
 
             <div className="flex space-x-2 pt-2">

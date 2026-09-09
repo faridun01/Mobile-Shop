@@ -507,7 +507,7 @@ export const PurchasePage: React.FC = () => {
   if (currentUser?.role === 'SELLER') {
     return (
       <div className="p-8 text-center text-fg-subtle">
-        <p className="text-sm font-medium text-fg">Доступ ограничен</p>
+        <p className="text-sm font-medium text-fg-muted">Доступ ограничен</p>
         <p className="text-xs mt-1">Оформление и просмотр приходов разрешены только Администраторам и Партнерам</p>
       </div>
     );
@@ -518,7 +518,7 @@ export const PurchasePage: React.FC = () => {
   // =========================================================================
   if (viewMode === 'list') {
     return (
-      <div className="flex-1 flex flex-col h-full overflow-hidden bg-bg text-fg">
+      <div className="flex-1 flex flex-col h-full overflow-hidden bg-bg text-fg-muted">
         {/* Search & Filters Bar */}
         <div className="p-3 border-b border-border bg-surface space-y-3 shrink-0">
           <div className="flex items-center gap-2">
@@ -530,12 +530,12 @@ export const PurchasePage: React.FC = () => {
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Поиск: № накладной / IMEI..."
-                className="w-full rounded-xl bg-surface-raised border border-border pl-9 pr-9 py-2 text-xs text-fg placeholder-fg-subtle focus:border-accent focus:outline-none transition-colors"
+                className="w-full rounded-xl bg-surface-raised border border-border pl-9 pr-9 py-2 text-xs text-fg-muted placeholder-fg-subtle focus:border-accent focus:outline-none transition-colors"
               />
               {searchQuery ? (
                 <button
                   onClick={() => setSearchQuery('')}
-                  className="absolute right-2.5 top-2.5 text-fg-subtle hover:text-fg"
+                  className="absolute right-2.5 top-2.5 text-fg-subtle hover:text-fg-muted"
                   title="Очистить"
                 >
                   <X className="w-3.5 h-3.5" />
@@ -600,7 +600,7 @@ export const PurchasePage: React.FC = () => {
             <select
               value={selectedSupplierFilter}
               onChange={(e) => setSelectedSupplierFilter(e.target.value)}
-              className="shrink-0 bg-surface border border-border text-fg text-xs font-semibold rounded-xl px-3 py-1.5 focus:outline-none focus:border-accent"
+              className="shrink-0 bg-surface border border-border text-fg-muted text-xs font-semibold rounded-xl px-3 py-1.5 focus:outline-none focus:border-accent"
             >
               <option value="all">Все поставщики</option>
               {suppliers.map(s => (
@@ -644,7 +644,7 @@ export const PurchasePage: React.FC = () => {
 
                     <div>
                       <div className="flex items-center space-x-2">
-                        <span className="text-xs font-bold text-fg">
+                        <span className="text-xs font-bold text-fg-muted">
                           {inv.invoiceNumber}
                         </span>
                         <span className={`text-[10px] px-2 py-0.5 rounded-md font-medium ${
@@ -655,7 +655,7 @@ export const PurchasePage: React.FC = () => {
                           {isPaid ? 'Оплачена' : isPartial ? 'Частично' : 'Не оплачена'}
                         </span>
                         {(inv.totalAmountUsd === 0 || inv.invoiceNumber.includes('BONUS')) && (
-                          <span className="text-[10px] px-2 py-0.5 rounded-md font-medium bg-purple-500/20 text-purple-400 border border-purple-500/40">
+                          <span className="text-[10px] px-2 py-0.5 rounded-md font-medium bg-highlight/20 text-highlight border border-highlight/40">
                             🎁 ПОДАРОК ($0)
                           </span>
                         )}
@@ -684,7 +684,7 @@ export const PurchasePage: React.FC = () => {
 
                   <div className="flex items-center justify-between sm:justify-end space-x-4 pl-11 sm:pl-0">
                     <div className="text-left sm:text-right">
-                      <div className="text-xs font-bold text-fg">
+                      <div className="text-xs font-bold text-fg-muted">
                         {inv.totalAmountUsd === 0 ? '$0 (БОНУС)' : `$${(inv.totalAmountUsd || 0).toLocaleString()}`}
                         {inv.totalAmountUsd > 0 && (
                           <span className="text-[10px] text-fg-subtle font-normal ml-1">
@@ -724,7 +724,7 @@ export const PurchasePage: React.FC = () => {
                       <button
                         type="button"
                         onClick={() => setSelectedInvoiceId(inv.id)}
-                        className="p-1.5 rounded-lg bg-surface-raised text-fg-subtle hover:text-fg border border-border"
+                        className="p-1.5 rounded-lg bg-surface-raised text-fg-subtle hover:text-fg-muted border border-border"
                         title="Подробнее"
                       >
                         <ChevronRight className="w-4 h-4" />
@@ -746,10 +746,10 @@ export const PurchasePage: React.FC = () => {
                 <div className="flex items-center space-x-2">
                   <FileText className="w-4 h-4 text-accent" />
                   <div>
-                    <h3 className="text-xs font-bold text-fg flex items-center space-x-2">
+                    <h3 className="text-xs font-bold text-fg-muted flex items-center space-x-2">
                       <span>НАКЛАДНАЯ {selectedInvoice.invoiceNumber}</span>
                       {(selectedInvoice.totalAmountUsd === 0 || selectedInvoice.invoiceNumber.includes('BONUS')) && (
-                        <span className="text-[10px] px-2 py-0.5 rounded bg-purple-500/20 text-purple-300 border border-purple-500/40 font-normal">
+                        <span className="text-[10px] px-2 py-0.5 rounded bg-highlight/20 text-highlight border border-highlight/40 font-normal">
                           🎯 Target Bonus ($0)
                         </span>
                       )}
@@ -781,7 +781,7 @@ export const PurchasePage: React.FC = () => {
                   )}
                   <button
                     onClick={() => setSelectedInvoiceId(null)}
-                    className="p-1.5 rounded-lg bg-surface-raised hover:bg-surface text-fg-subtle hover:text-fg border border-border transition-colors"
+                    className="p-1.5 rounded-lg bg-surface-raised hover:bg-surface text-fg-subtle hover:text-fg-muted border border-border transition-colors"
                   >
                     <X className="w-4 h-4" />
                   </button>
@@ -792,7 +792,7 @@ export const PurchasePage: React.FC = () => {
               <div className="p-3 bg-surface-raised border-b border-border grid grid-cols-3 gap-2 text-center text-xs font-mono">
                 <div className="bg-surface p-2.5 rounded-xl border border-border">
                   <span className="text-[10px] text-fg-subtle block font-semibold uppercase">СУММА НАКЛАДНОЙ</span>
-                  <strong className={selectedInvoice.totalAmountUsd === 0 ? "text-purple-400 font-bold" : "text-fg font-bold"}>
+                  <strong className={selectedInvoice.totalAmountUsd === 0 ? "text-highlight font-bold" : "text-fg-muted font-bold"}>
                     {selectedInvoice.totalAmountUsd === 0 ? '$0 (БОНУС)' : `$${(selectedInvoice.totalAmountUsd || 0).toLocaleString()}`}
                   </strong>
                 </div>
@@ -821,28 +821,28 @@ export const PurchasePage: React.FC = () => {
                     <div>
                       <div className="flex items-center space-x-2 flex-wrap gap-y-1">
                         <span className="text-fg-subtle text-[10px] font-bold">#{idx + 1}</span>
-                        <strong className="text-fg">{dev.brand} {dev.model}</strong>
+                        <strong className="text-fg-muted">{dev.brand} {dev.model}</strong>
                         <span className="text-fg-subtle text-[11px]">{dev.ram ? `${dev.ram} • ` : ''}{dev.storage} • {dev.color}</span>
                         {(dev.purchaseCostUsd === 0 || dev.isBonus) && (
-                          <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-purple-500/20 text-purple-400 border border-purple-500/40 font-medium">
+                          <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-highlight/20 text-highlight border border-highlight/40 font-medium">
                             🎁 ПОДАРОК ($0)
                           </span>
                         )}
                       </div>
                       <div className="text-[11px] text-fg-subtle mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 font-mono">
-                        <span>IMEI 1: <strong className="text-fg">{dev.imei}</strong></span>
-                        <span>IMEI 2: <strong className={dev.imei2 ? "text-fg" : "text-fg-subtle font-normal"}>{dev.imei2 || '—'}</strong></span>
-                        <span>Локация: <strong className="text-fg">{dev.locationName}</strong></span>
+                        <span>IMEI 1: <strong className="text-fg-muted">{dev.imei}</strong></span>
+                        <span>IMEI 2: <strong className={dev.imei2 ? "text-fg-muted" : "text-fg-subtle font-normal"}>{dev.imei2 || '—'}</strong></span>
+                        <span>Локация: <strong className="text-fg-muted">{dev.locationName}</strong></span>
                       </div>
                       {dev.bonusCampaign && (
-                        <p className="text-[10px] text-purple-400 mt-0.5">
+                        <p className="text-[10px] text-highlight mt-0.5">
                           {dev.bonusCampaign}
                         </p>
                       )}
                     </div>
 
                     <div className="text-right shrink-0">
-                      <span className={`text-xs font-bold font-mono ${dev.purchaseCostUsd === 0 ? 'text-purple-400' : 'text-accent'}`}>
+                      <span className={`text-xs font-bold font-mono ${dev.purchaseCostUsd === 0 ? 'text-highlight' : 'text-accent'}`}>
                         {dev.purchaseCostUsd === 0 ? '$0 (ПОДАРОК)' : `$${dev.purchaseCostUsd}`}
                       </span>
                       <span className={`block text-[10px] px-1.5 py-0.2 rounded-md font-bold mt-0.5 ${
@@ -873,7 +873,7 @@ export const PurchasePage: React.FC = () => {
 
                 return (
                   <>
-                    <div className="p-3 bg-surface-raised border-b border-border flex items-center justify-between text-xs font-mono font-bold text-fg shrink-0">
+                    <div className="p-3 bg-surface-raised border-b border-border flex items-center justify-between text-xs font-mono font-bold text-fg-muted shrink-0">
                       <span>Устройства в накладной</span>
                       <span className="text-accent">
                         {containedDevices.length} шт.
@@ -893,7 +893,7 @@ export const PurchasePage: React.FC = () => {
                                 className="w-full p-2.5 flex items-center justify-between text-xs hover:bg-surface transition-colors"
                               >
                                 <div className="text-left">
-                                  <strong className="text-fg">{group.brand} {group.model}</strong>
+                                  <strong className="text-fg-muted">{group.brand} {group.model}</strong>
                                   <span className="text-fg-subtle text-[11px] ml-2">{group.ram ? `${group.ram} • ` : ''}{group.storage} • {group.color}</span>
                                 </div>
                                 <div className="flex items-center gap-2 shrink-0">
@@ -928,7 +928,7 @@ export const PurchasePage: React.FC = () => {
               <div className="p-3 border-t border-border bg-surface flex justify-end shrink-0">
                 <button
                   onClick={() => setSelectedInvoiceId(null)}
-                  className="px-4 py-2 rounded-xl bg-surface-raised hover:bg-surface border border-border text-xs font-bold text-fg transition-colors font-mono uppercase"
+                  className="px-4 py-2 rounded-xl bg-surface-raised hover:bg-surface border border-border text-xs font-bold text-fg-muted transition-colors font-mono uppercase"
                 >
                   ЗАКРЫТЬ
                 </button>
@@ -942,11 +942,11 @@ export const PurchasePage: React.FC = () => {
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
             <div className="w-full max-w-md rounded-2xl bg-surface border border-border shadow-2xl p-5 space-y-4 font-mono">
               <div className="flex items-center justify-between border-b border-border pb-3">
-                <h3 className="text-xs font-bold text-fg uppercase">РЕДАКТИРОВАНИЕ НАКЛАДНОЙ</h3>
+                <h3 className="text-xs font-bold text-fg-muted uppercase">РЕДАКТИРОВАНИЕ НАКЛАДНОЙ</h3>
                 <button
                   type="button"
                   onClick={() => setEditingInvoiceModal(null)}
-                  className="text-fg-subtle hover:text-fg"
+                  className="text-fg-subtle hover:text-fg-muted"
                 >
                   <X className="w-4 h-4" />
                 </button>
@@ -960,7 +960,7 @@ export const PurchasePage: React.FC = () => {
                     required
                     value={editInvoiceNum}
                     onChange={(e) => setEditInvoiceNum(e.target.value)}
-                    className="w-full rounded-xl bg-surface-raised border border-border px-3 py-2 text-fg font-bold focus:border-accent focus:outline-none"
+                    className="w-full rounded-xl bg-surface-raised border border-border px-3 py-2 text-fg-muted font-bold focus:border-accent focus:outline-none"
                   />
                 </div>
 
@@ -971,7 +971,7 @@ export const PurchasePage: React.FC = () => {
                     required
                     value={editInvoiceDateStr}
                     onChange={(e) => setEditInvoiceDateStr(e.target.value)}
-                    className="w-full rounded-xl bg-surface-raised border border-border px-3 py-2 text-fg focus:border-accent focus:outline-none"
+                    className="w-full rounded-xl bg-surface-raised border border-border px-3 py-2 text-fg-muted focus:border-accent focus:outline-none"
                   />
                 </div>
 
@@ -993,7 +993,7 @@ export const PurchasePage: React.FC = () => {
                     type="button"
                     disabled={isSubmitting}
                     onClick={() => setEditingInvoiceModal(null)}
-                    className="flex-1 py-2 rounded-xl bg-surface-raised hover:bg-surface border border-border text-fg-subtle hover:text-fg font-bold disabled:opacity-50"
+                    className="flex-1 py-2 rounded-xl bg-surface-raised hover:bg-surface border border-border text-fg-subtle hover:text-fg-muted font-bold disabled:opacity-50"
                   >
                     ОТМЕНА
                   </button>
@@ -1018,7 +1018,7 @@ export const PurchasePage: React.FC = () => {
   // VIEW: NEW PURCHASE FORM (ФОРМА НОВОГО ПРИХОДА)
   // =========================================================================
   return (
-    <div className="flex-1 flex flex-col h-full overflow-y-auto bg-bg text-fg min-h-0">
+    <div className="flex-1 flex flex-col h-full overflow-y-auto bg-bg text-fg-muted min-h-0">
       <form onSubmit={handleSubmitPurchase} className="flex-1 flex flex-col min-h-full">
         {/* Top Header with Back Button */}
         <div className="p-3.5 sm:p-4 border-b border-border bg-surface space-y-3 shrink-0">
@@ -1030,13 +1030,13 @@ export const PurchasePage: React.FC = () => {
                   setStatusMessage(null);
                   setViewMode('list');
                 }}
-                className="flex items-center space-x-1 px-2.5 py-1.5 rounded-lg bg-surface-raised hover:bg-surface text-fg-muted hover:text-fg text-xs font-bold transition-colors border border-border"
+                className="flex items-center space-x-1 px-2.5 py-1.5 rounded-lg bg-surface-raised hover:bg-surface text-fg-muted hover:text-fg-muted text-xs font-bold transition-colors border border-border"
               >
                 <ArrowLeft className="w-3.5 h-3.5" />
                 <span>СПИСОК ПРИХОДОВ</span>
               </button>
               <span className="text-fg-subtle">/</span>
-              <h3 className="text-xs font-bold text-fg uppercase tracking-wider">
+              <h3 className="text-xs font-bold text-fg-muted uppercase tracking-wider">
                 НОВЫЙ ПРИХОД ТОВАРОВ
               </h3>
             </div>
@@ -1048,7 +1048,7 @@ export const PurchasePage: React.FC = () => {
               <select
                 value={selectedSupplierId ?? ''}
                 onChange={(e) => setSelectedSupplierId(e.target.value)}
-                className="w-full rounded-lg bg-surface-raised border border-border px-3 py-2 text-xs text-fg focus:border-accent focus:outline-none"
+                className="w-full rounded-lg bg-surface-raised border border-border px-3 py-2 text-xs text-fg-muted focus:border-accent focus:outline-none"
               >
                 {suppliers.map(s => (
                   <option key={s.id} value={s.id}>{s.name} (Долг: ${s.totalDebtUsd})</option>
@@ -1092,7 +1092,7 @@ export const PurchasePage: React.FC = () => {
                 <select
                   value={storeId}
                   onChange={(e) => setStoreId(e.target.value)}
-                  className="rounded-lg bg-surface-raised border border-border px-3 py-1.5 text-xs text-fg focus:border-accent focus:outline-none"
+                  className="rounded-lg bg-surface-raised border border-border px-3 py-1.5 text-xs text-fg-muted focus:border-accent focus:outline-none"
                 >
                   {stores.filter(s => !s.isMainWarehouse).map(s => (
                     <option key={s.id} value={s.id}>{s.name}</option>
@@ -1111,7 +1111,7 @@ export const PurchasePage: React.FC = () => {
               className="rounded-xl border border-border bg-surface shadow-xs p-3.5 sm:p-4 space-y-3 relative"
             >
               <div className="flex items-center justify-between border-b border-border pb-2">
-                <span className="text-xs font-bold text-fg uppercase tracking-wider font-mono">
+                <span className="text-xs font-bold text-fg-muted uppercase tracking-wider font-mono">
                   Позиция #{groupIdx + 1}
                 </span>
 
@@ -1137,7 +1137,7 @@ export const PurchasePage: React.FC = () => {
                     list={`brand-suggestions-${groupIdx}`}
                     value={group.brand}
                     onChange={(e) => handleUpdateGroup(groupIdx, 'brand', e.target.value)}
-                    className="w-full rounded-lg bg-surface-raised border border-border px-2.5 py-1.5 text-xs text-fg focus:border-accent focus:outline-none"
+                    className="w-full rounded-lg bg-surface-raised border border-border px-2.5 py-1.5 text-xs text-fg-muted focus:border-accent focus:outline-none"
                     placeholder="Apple"
                   />
                   <datalist id={`brand-suggestions-${groupIdx}`}>
@@ -1155,7 +1155,7 @@ export const PurchasePage: React.FC = () => {
                     list={`model-suggestions-${groupIdx}`}
                     value={group.model}
                     onChange={(e) => handleUpdateGroup(groupIdx, 'model', e.target.value)}
-                    className="w-full rounded-lg bg-surface-raised border border-border px-2.5 py-1.5 text-xs text-fg focus:border-accent focus:outline-none"
+                    className="w-full rounded-lg bg-surface-raised border border-border px-2.5 py-1.5 text-xs text-fg-muted focus:border-accent focus:outline-none"
                     placeholder="iPhone 16 Pro"
                   />
                   <datalist id={`model-suggestions-${groupIdx}`}>
@@ -1172,7 +1172,7 @@ export const PurchasePage: React.FC = () => {
                     list={`ram-suggestions-${groupIdx}`}
                     value={group.ram || ''}
                     onChange={(e) => handleUpdateGroup(groupIdx, 'ram', e.target.value)}
-                    className="w-full rounded-lg bg-surface-raised border border-border px-2.5 py-1.5 text-xs text-fg focus:border-accent focus:outline-none"
+                    className="w-full rounded-lg bg-surface-raised border border-border px-2.5 py-1.5 text-xs text-fg-muted focus:border-accent focus:outline-none"
                     placeholder="8 GB"
                   />
                   <datalist id={`ram-suggestions-${groupIdx}`}>
@@ -1189,7 +1189,7 @@ export const PurchasePage: React.FC = () => {
                     list={`storage-suggestions-${groupIdx}`}
                     value={group.storage}
                     onChange={(e) => handleUpdateGroup(groupIdx, 'storage', e.target.value)}
-                    className="w-full rounded-lg bg-surface-raised border border-border px-2.5 py-1.5 text-xs text-fg focus:border-accent focus:outline-none"
+                    className="w-full rounded-lg bg-surface-raised border border-border px-2.5 py-1.5 text-xs text-fg-muted focus:border-accent focus:outline-none"
                     placeholder="256 GB"
                   />
                   <datalist id={`storage-suggestions-${groupIdx}`}>
@@ -1206,7 +1206,7 @@ export const PurchasePage: React.FC = () => {
                     list={`color-suggestions-${groupIdx}`}
                     value={group.color}
                     onChange={(e) => handleUpdateGroup(groupIdx, 'color', e.target.value)}
-                    className="w-full rounded-lg bg-surface-raised border border-border px-2.5 py-1.5 text-xs text-fg focus:border-accent focus:outline-none"
+                    className="w-full rounded-lg bg-surface-raised border border-border px-2.5 py-1.5 text-xs text-fg-muted focus:border-accent focus:outline-none"
                     placeholder="Black Titanium"
                   />
                   <datalist id={`color-suggestions-${groupIdx}`}>
@@ -1235,7 +1235,7 @@ export const PurchasePage: React.FC = () => {
               <div className="pt-2 border-t border-border space-y-2">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-2">
-                    <span className="text-xs font-semibold text-fg font-mono">
+                    <span className="text-xs font-semibold text-fg-muted font-mono">
                       Список IMEI ({group.items.filter(i => i.imei.trim().length > 0).length} шт.)
                     </span>
                     <span className="text-[10px] text-fg-subtle font-mono">
@@ -1247,7 +1247,7 @@ export const PurchasePage: React.FC = () => {
                     <button
                       type="button"
                       onClick={() => handleAddImeiToGroup(groupIdx)}
-                      className="px-2.5 py-1 rounded-lg bg-surface-raised hover:bg-surface border border-border text-fg text-xs font-mono font-medium flex items-center space-x-1 transition-colors"
+                      className="px-2.5 py-1 rounded-lg bg-surface-raised hover:bg-surface border border-border text-fg-muted text-xs font-mono font-medium flex items-center space-x-1 transition-colors"
                     >
                       <Plus className="w-3 h-3" />
                       <span>Добавить устройство</span>
@@ -1273,7 +1273,7 @@ export const PurchasePage: React.FC = () => {
                         e.target.value = '';
                       }
                     }}
-                    className="w-full rounded-lg bg-surface-raised border border-dashed border-border px-3 py-1 text-[11px] font-mono text-fg placeholder-fg-subtle focus:border-accent focus:outline-none"
+                    className="w-full rounded-lg bg-surface-raised border border-dashed border-border px-3 py-1 text-[11px] font-mono text-fg-muted placeholder-fg-subtle focus:border-accent focus:outline-none"
                   />
                 </div>
 
@@ -1292,7 +1292,7 @@ export const PurchasePage: React.FC = () => {
                               value={imei1}
                               onChange={(e) => handleUpdateImei(groupIdx, itemIdx, `${e.target.value} / ${imei2}`.replace(/ \/ $/, ''))}
                               placeholder="IMEI 1"
-                              className="w-full rounded-lg bg-surface-raised border border-border px-2.5 py-1.5 text-xs text-fg font-mono focus:border-accent focus:outline-none pr-8"
+                              className="w-full rounded-lg bg-surface-raised border border-border px-2.5 py-1.5 text-xs text-fg-muted font-mono focus:border-accent focus:outline-none pr-8"
                             />
                             <button
                               type="button"
@@ -1315,7 +1315,7 @@ export const PurchasePage: React.FC = () => {
                                 value={imei2}
                                 onChange={(e) => handleUpdateImei2(groupIdx, itemIdx, e.target.value)}
                                 placeholder="IMEI 2 (необязательно)"
-                                className="w-full rounded-lg bg-surface-raised border border-border px-2.5 py-1.5 text-xs text-fg font-mono focus:border-accent focus:outline-none pr-8"
+                                className="w-full rounded-lg bg-surface-raised border border-border px-2.5 py-1.5 text-xs text-fg-muted font-mono focus:border-accent focus:outline-none pr-8"
                               />
                               <button
                                 type="button"
@@ -1370,7 +1370,7 @@ export const PurchasePage: React.FC = () => {
             </div>
           ) : (
             <div className="text-xs text-fg-subtle">
-              Позиций: <strong className="text-fg">{groups.length}</strong> • 
+              Позиций: <strong className="text-fg-muted">{groups.length}</strong> • 
               Устройств: <strong className="text-accent font-bold text-sm ml-1">{totalFormUnits} шт.</strong>
             </div>
           )}
@@ -1390,7 +1390,7 @@ export const PurchasePage: React.FC = () => {
                 setStatusMessage(null);
                 setViewMode('list');
               }}
-              className="px-3 py-2 rounded-xl bg-surface-raised hover:bg-surface border border-border text-fg text-xs font-semibold transition-colors disabled:opacity-50"
+              className="px-3 py-2 rounded-xl bg-surface-raised hover:bg-surface border border-border text-fg-muted text-xs font-semibold transition-colors disabled:opacity-50"
             >
               Отмена
             </button>
@@ -1416,13 +1416,13 @@ export const PurchasePage: React.FC = () => {
                 <div className="p-2 rounded-lg bg-accent/15 text-accent border border-accent/30">
                   <FileText className="w-4 h-4" />
                 </div>
-                <h3 className="text-sm font-bold text-fg uppercase">ЧЕК ПРИХОДА — ПРОВЕРЬТЕ ПЕРЕД СОХРАНЕНИЕМ</h3>
+                <h3 className="text-sm font-bold text-fg-muted uppercase">ЧЕК ПРИХОДА — ПРОВЕРЬТЕ ПЕРЕД СОХРАНЕНИЕМ</h3>
               </div>
               <button
                 type="button"
                 disabled={isSubmitting}
                 onClick={() => setPreviewInvoice(null)}
-                className="p-1 rounded text-fg-subtle hover:text-fg disabled:opacity-50"
+                className="p-1 rounded text-fg-subtle hover:text-fg-muted disabled:opacity-50"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -1432,19 +1432,19 @@ export const PurchasePage: React.FC = () => {
               <div className="grid grid-cols-2 gap-3 p-3 rounded-xl bg-surface-raised border border-border">
                 <div>
                   <span className="block text-[10px] uppercase text-fg-subtle">Поставщик</span>
-                  <span className="font-bold text-fg">{suppliers.find(s => s.id === previewInvoice.supplierId)?.name || '—'}</span>
+                  <span className="font-bold text-fg-muted">{suppliers.find(s => s.id === previewInvoice.supplierId)?.name || '—'}</span>
                 </div>
                 <div>
                   <span className="block text-[10px] uppercase text-fg-subtle">Накладная</span>
-                  <span className="font-bold text-fg">{previewInvoice.invoiceNumber}</span>
+                  <span className="font-bold text-fg-muted">{previewInvoice.invoiceNumber}</span>
                 </div>
                 <div>
                   <span className="block text-[10px] uppercase text-fg-subtle">Дата</span>
-                  <span className="font-bold text-fg">{previewInvoice.date}</span>
+                  <span className="font-bold text-fg-muted">{previewInvoice.date}</span>
                 </div>
                 <div>
                   <span className="block text-[10px] uppercase text-fg-subtle">Назначение</span>
-                  <span className="font-bold text-fg">
+                  <span className="font-bold text-fg-muted">
                     {previewInvoice.isStorePurchase
                       ? (stores.find(s => s.id === previewInvoice.storeId)?.name || 'Магазин')
                       : 'Главный склад'}
@@ -1456,7 +1456,7 @@ export const PurchasePage: React.FC = () => {
                 {previewInvoice.groups.map((g, idx) => (
                   <div key={idx} className="p-3 flex items-center justify-between gap-2">
                     <div className="min-w-0">
-                      <p className="font-bold text-fg truncate">{g.brand} {g.model}</p>
+                      <p className="font-bold text-fg-muted truncate">{g.brand} {g.model}</p>
                       <p className="text-[11px] text-fg-muted mt-0.5">{[g.ram, g.storage, g.color].filter(Boolean).join(' • ')}</p>
                       <p className="text-[10px] text-fg-subtle mt-0.5">{g.items.length} шт. × ${g.purchasePriceUsd}</p>
                     </div>
@@ -1467,7 +1467,7 @@ export const PurchasePage: React.FC = () => {
 
               <div className="flex items-center justify-between p-3 rounded-xl bg-surface-raised border border-border">
                 <span className="text-fg-muted">
-                  Устройств: <strong className="text-fg">{previewInvoice.groups.reduce((a, b) => a + b.items.length, 0)} шт.</strong>
+                  Устройств: <strong className="text-fg-muted">{previewInvoice.groups.reduce((a, b) => a + b.items.length, 0)} шт.</strong>
                 </span>
                 <span className="text-sm font-bold text-accent">
                   ${previewInvoice.groups.reduce((a, b) => a + b.items.length * b.purchasePriceUsd, 0).toLocaleString()}
@@ -1480,7 +1480,7 @@ export const PurchasePage: React.FC = () => {
                 type="button"
                 disabled={isSubmitting}
                 onClick={() => setPreviewInvoice(null)}
-                className="flex-1 py-2 rounded-xl bg-surface-raised hover:bg-surface border border-border text-fg-subtle hover:text-fg font-bold disabled:opacity-50"
+                className="flex-1 py-2 rounded-xl bg-surface-raised hover:bg-surface border border-border text-fg-subtle hover:text-fg-muted font-bold disabled:opacity-50"
               >
                 ИЗМЕНИТЬ
               </button>
@@ -1501,15 +1501,15 @@ export const PurchasePage: React.FC = () => {
       {/* Edit Invoice Modal */}
       {editingInvoiceModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 font-mono">
-          <div className="w-full max-w-md rounded-2xl bg-surface border border-border p-5 text-fg shadow-2xl space-y-4">
+          <div className="w-full max-w-md rounded-2xl bg-surface border border-border p-5 text-fg-muted shadow-2xl space-y-4">
             <div className="flex items-center justify-between pb-3 border-b border-border">
               <div className="flex items-center space-x-2">
                 <div className="p-2 rounded-lg bg-accent/15 text-accent border border-accent/30">
                   <Edit2 className="w-4 h-4" />
                 </div>
-                <h3 className="text-sm font-bold text-fg uppercase">РЕДАКТИРОВАТЬ НАКЛАДНУЮ</h3>
+                <h3 className="text-sm font-bold text-fg-muted uppercase">РЕДАКТИРОВАТЬ НАКЛАДНУЮ</h3>
               </div>
-              <button onClick={() => setEditingInvoiceModal(null)} className="p-1 rounded text-fg-subtle hover:text-fg">
+              <button onClick={() => setEditingInvoiceModal(null)} className="p-1 rounded text-fg-subtle hover:text-fg-muted">
                 <X className="w-4 h-4" />
               </button>
             </div>
@@ -1522,7 +1522,7 @@ export const PurchasePage: React.FC = () => {
                   required
                   value={editInvoiceNum}
                   onChange={(e) => setEditInvoiceNum(e.target.value)}
-                  className="w-full rounded-xl bg-surface-raised border border-border px-3 py-2 text-fg font-bold focus:border-accent focus:outline-none"
+                  className="w-full rounded-xl bg-surface-raised border border-border px-3 py-2 text-fg-muted font-bold focus:border-accent focus:outline-none"
                 />
               </div>
 
@@ -1533,7 +1533,7 @@ export const PurchasePage: React.FC = () => {
                   required
                   value={editInvoiceDateStr}
                   onChange={(e) => setEditInvoiceDateStr(e.target.value)}
-                  className="w-full rounded-xl bg-surface-raised border border-border px-3 py-2 text-fg focus:border-accent focus:outline-none"
+                  className="w-full rounded-xl bg-surface-raised border border-border px-3 py-2 text-fg-muted focus:border-accent focus:outline-none"
                 />
               </div>
 
@@ -1555,7 +1555,7 @@ export const PurchasePage: React.FC = () => {
                   type="button"
                   disabled={isSubmitting}
                   onClick={() => setEditingInvoiceModal(null)}
-                  className="flex-1 py-2 rounded-xl bg-surface-raised hover:bg-surface border border-border text-fg-subtle hover:text-fg font-bold disabled:opacity-50"
+                  className="flex-1 py-2 rounded-xl bg-surface-raised hover:bg-surface border border-border text-fg-subtle hover:text-fg-muted font-bold disabled:opacity-50"
                 >
                   ОТМЕНА
                 </button>

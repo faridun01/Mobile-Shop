@@ -51,13 +51,13 @@ export const ReportPreviewModal: React.FC<ReportPreviewModalProps> = ({ open, on
               {table.rows.map((row, ri) => (
                 <tr key={ri} className="hover:bg-surface-raised transition-colors">
                   {row.map((cell, ci) => (
-                    <td key={ci} className="py-2 px-3 text-fg">{cell}</td>
+                    <td key={ci} className="py-2 px-3 text-fg-muted">{cell}</td>
                   ))}
                 </tr>
               ))}
             </tbody>
             <tfoot>
-              <tr className="border-t-2 border-border font-bold text-fg">
+              <tr className="border-t-2 border-border font-bold text-fg-muted">
                 {table.totalsRow.map((cell, ci) => (
                   <td key={ci} className="py-2 px-3">{cell}</td>
                 ))}

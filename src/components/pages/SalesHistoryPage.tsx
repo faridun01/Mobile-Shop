@@ -179,7 +179,7 @@ export const SalesHistoryPage: React.FC = () => {
   const canRefund = currentUser?.role === 'ADMIN' || currentUser?.role === 'PARTNER';
 
   return (
-    <div className="flex-1 flex flex-col h-full overflow-hidden bg-bg text-fg">
+    <div className="flex-1 flex flex-col h-full overflow-hidden bg-bg text-fg-muted">
       <StatusBanner message={status} onDismiss={() => setStatus(null)} />
 
       <div className="p-3 border-b border-border bg-bg space-y-2.5 shrink-0">
@@ -216,7 +216,7 @@ export const SalesHistoryPage: React.FC = () => {
             />
 
             {currentUser?.role !== 'SELLER' && retailStores.length > 0 && (
-              <Select value={activeStoreId} onChange={(e) => setSelectedStoreId(e.target.value)} className="h-9 py-0 w-auto">
+              <Select value={activeStoreId} onChange={(e) => setSelectedStoreId(e.target.value)} className="h-9 min-h-0 py-0 w-auto">
                 {retailStores.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
               </Select>
             )}
@@ -247,7 +247,7 @@ export const SalesHistoryPage: React.FC = () => {
                     {sale.status === 'EXCHANGED' && <Badge tone="accent">Обмен</Badge>}
                     {sale.status === 'REFUNDED' && <Badge tone="danger">Возврат</Badge>}
                   </div>
-                  <p className="text-sm font-medium text-fg mt-0.5 truncate">
+                  <p className="text-sm font-medium text-fg-muted mt-0.5 truncate">
                     {sale.items.map(i => `${i.brand} ${i.model}`).join(', ')}
                   </p>
                   <div className="flex items-center gap-1.5 text-xs text-fg-subtle mt-0.5">
@@ -267,7 +267,7 @@ export const SalesHistoryPage: React.FC = () => {
                       </>
                     ) : (
                       <>
-                        <p className="text-sm font-semibold text-fg">{sale.totalTjs.toLocaleString()} TJS</p>
+                        <p className="text-sm font-semibold text-fg-muted">{sale.totalTjs.toLocaleString()} TJS</p>
                         <p className={`text-xs ${sale.paymentMethod === 'DEBT' && (sale.debtAmountTjs ?? 0) > 0 ? 'text-danger font-semibold' : 'text-fg-subtle'}`}>
                           {sale.paymentMethod === 'CASH' ? 'Наличные' : sale.paymentMethod === 'CARD' ? 'Карта' : sale.paymentMethod === 'DEBT' ? ((sale.debtAmountTjs ?? 0) > 0 ? `В долг (${(sale.debtAmountTjs ?? 0).toLocaleString()} TJS)` : 'В долг (погашено)') : 'Смешанная'}
                         </p>
@@ -322,7 +322,7 @@ export const SalesHistoryPage: React.FC = () => {
         {!selectedSale ? null : dialogView === 'details' ? (
           <div className="space-y-3.5">
             <div className="bg-surface p-3 rounded-lg border border-border space-y-1 text-sm">
-              <div className="text-fg">{selectedSale.storeName}</div>
+              <div className="text-fg-muted">{selectedSale.storeName}</div>
               <div className="text-accent font-semibold">Оператор: {selectedSale.sellerName}</div>
               {selectedSale.customerName && (
                 <div className="text-fg-subtle text-xs pt-1 border-t border-border mt-1">Клиент: {selectedSale.customerName}</div>
@@ -335,14 +335,14 @@ export const SalesHistoryPage: React.FC = () => {
                 {selectedSale.items.map((item, i) => (
                   <div key={i} className="p-3 flex items-center justify-between gap-2">
                     <div className="min-w-0">
-                      <p className="text-sm font-semibold text-fg">{item.brand} {item.model}</p>
+                      <p className="text-sm font-semibold text-fg-muted">{item.brand} {item.model}</p>
                       <p className="text-xs text-fg-subtle">{item.storage} · {item.color}</p>
                       <p className="text-xs text-fg-subtle mt-0.5">
                         IMEI: {item.imei}{item.imei2 ? ` / ${item.imei2}` : ''}
                       </p>
                     </div>
                     <div className="text-right shrink-0">
-                      <p className="text-sm font-semibold text-fg">{item.salePriceTjs.toLocaleString()} TJS</p>
+                      <p className="text-sm font-semibold text-fg-muted">{item.salePriceTjs.toLocaleString()} TJS</p>
                       <p className="text-xs text-fg-subtle">≈ ${item.salePriceUsd}</p>
                     </div>
                   </div>
@@ -371,7 +371,7 @@ export const SalesHistoryPage: React.FC = () => {
             <div className="bg-surface p-3 rounded-lg border border-border space-y-1.5 text-sm">
               <div className="flex justify-between">
                 <span className="text-fg-subtle text-xs uppercase">Способ оплаты</span>
-                <span className="font-semibold text-fg">
+                <span className="font-semibold text-fg-muted">
                   {selectedSale.paymentMethod === 'CASH' ? 'Наличные' : selectedSale.paymentMethod === 'CARD' ? 'Карта' : selectedSale.paymentMethod === 'DEBT' ? 'В долг' : 'Смешанная'}
                 </span>
               </div>
@@ -394,7 +394,7 @@ export const SalesHistoryPage: React.FC = () => {
                 </div>
               )}
               <div className="flex justify-between pt-2 border-t border-border font-semibold">
-                <span className="text-fg uppercase text-xs">Итого</span>
+                <span className="text-fg-muted uppercase text-xs">Итого</span>
                 <span className="text-accent text-base">{selectedSale.totalTjs.toLocaleString()} TJS</span>
               </div>
             </div>
@@ -414,7 +414,7 @@ export const SalesHistoryPage: React.FC = () => {
                   </div>
                 )}
                 <div className="flex justify-between pt-1.5 border-t border-danger/20 font-semibold">
-                  <span className="text-fg uppercase text-xs">Возвращено клиенту</span>
+                  <span className="text-fg-muted uppercase text-xs">Возвращено клиенту</span>
                   <span className="text-danger text-base">
                     {(selectedSale.actualRefundAmountTjs ?? selectedSale.totalTjs).toLocaleString()} TJS
                   </span>
@@ -433,7 +433,7 @@ export const SalesHistoryPage: React.FC = () => {
                 value={refundReason}
                 onChange={(e) => setRefundReason(e.target.value)}
                 placeholder="Брак / Отказ покупателя / Ошибка"
-                className="w-full h-11 rounded-lg bg-bg border border-border px-3 text-sm text-fg focus:outline-none focus:border-danger focus:ring-1 focus:ring-danger"
+                className="w-full h-11 rounded-lg bg-bg border border-border px-3 text-sm text-fg-muted focus:outline-none focus:border-danger focus:ring-1 focus:ring-danger"
               />
             </div>
 
@@ -467,7 +467,7 @@ export const SalesHistoryPage: React.FC = () => {
               <div className="p-3 rounded-lg bg-surface border border-border space-y-1 text-xs">
                 <div className="flex justify-between">
                   <span className="text-fg-subtle">Сумма в чеке</span>
-                  <span className="text-fg">{selectedSale.totalTjs.toLocaleString()} TJS</span>
+                  <span className="text-fg-muted">{selectedSale.totalTjs.toLocaleString()} TJS</span>
                 </div>
                 {(selectedSale.debtAmountTjs ?? 0) > 0 && (
                   <div className="flex justify-between text-danger">
@@ -476,7 +476,7 @@ export const SalesHistoryPage: React.FC = () => {
                   </div>
                 )}
                 <div className="flex justify-between font-semibold">
-                  <span className="text-fg">Возврат покупателю</span>
+                  <span className="text-fg-muted">Возврат покупателю</span>
                   <span className="text-accent">{Math.max(0, (selectedSale.totalTjs - (selectedSale.debtAmountTjs ?? 0)) - (parseFloat(penaltyFeeTjs) || 0)).toLocaleString()} TJS</span>
                 </div>
                 {(parseFloat(penaltyFeeTjs) || 0) > 0 && (
@@ -508,7 +508,7 @@ export const SalesHistoryPage: React.FC = () => {
                 className="w-full p-3 rounded-lg border border-border bg-surface active:bg-surface-raised text-left flex items-center justify-between gap-2"
               >
                 <div className="min-w-0">
-                  <p className="text-sm font-semibold text-fg">{item.brand} {item.model}</p>
+                  <p className="text-sm font-semibold text-fg-muted">{item.brand} {item.model}</p>
                   <p className="text-xs text-fg-subtle">{item.storage} · {item.color} · IMEI: {item.imei}</p>
                 </div>
                 <ChevronRight className="w-4 h-4 text-fg-subtle shrink-0" />

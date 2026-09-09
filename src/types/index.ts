@@ -264,6 +264,10 @@ export interface RepairTicket {
   estimatedCostTjs?: number;
   finalCostTjs?: number;
   repairCostTjs?: number;
+  /** USD equivalents, converted at the daily rate in effect on the ticket's own date (not today's). */
+  estimatedCostUsd?: number;
+  finalCostUsd?: number;
+  exchangeRate?: number;
 }
 
 export interface InvoiceGroup {

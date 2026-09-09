@@ -40,7 +40,7 @@ export const LoginPage: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-bg flex flex-col items-center justify-center p-4 text-fg relative">
+    <div className="min-h-screen bg-bg flex flex-col items-center justify-center p-4 text-fg-muted relative">
       <div className="w-full max-w-sm">
         {/* Brand header */}
         <div className="text-center mb-6">
@@ -49,7 +49,7 @@ export const LoginPage: React.FC = () => {
           </div>
           <div className="flex items-center justify-center space-x-2">
             <span className="w-2.5 h-2.5 rounded-full bg-accent animate-pulse" />
-            <h1 className="text-lg font-bold tracking-wider text-fg uppercase">MOBILE SHOP OS</h1>
+            <h1 className="text-lg font-bold tracking-wider text-fg-muted uppercase">MOBILE SHOP OS</h1>
           </div>
           <p className="text-[11px] text-fg-subtle mt-1 uppercase tracking-widest">
             СИСТЕМА УЧЕТА И КАССОВЫЙ ТЕРМИНАЛ
@@ -82,7 +82,7 @@ export const LoginPage: React.FC = () => {
                   disabled={isLoading}
                   autoFocus
                   required
-                  className="w-full rounded-xl bg-surface-raised border border-border pl-9 pr-3 py-2.5 text-xs text-fg placeholder-fg-subtle focus:border-accent focus:outline-none transition-colors disabled:opacity-60"
+                  className="w-full rounded-xl bg-surface-raised border border-border pl-9 pr-3 py-2.5 text-xs text-fg-muted placeholder-fg-subtle focus:border-accent focus:outline-none transition-colors disabled:opacity-60"
                 />
               </div>
             </div>
@@ -102,13 +102,13 @@ export const LoginPage: React.FC = () => {
                   placeholder="••••••••"
                   disabled={isLoading}
                   required
-                  className="w-full rounded-xl bg-surface-raised border border-border pl-9 pr-9 py-2.5 text-xs text-fg placeholder-fg-subtle focus:border-accent focus:outline-none transition-colors disabled:opacity-60"
+                  className="w-full rounded-xl bg-surface-raised border border-border pl-9 pr-9 py-2.5 text-xs text-fg-muted placeholder-fg-subtle focus:border-accent focus:outline-none transition-colors disabled:opacity-60"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
                   disabled={isLoading}
-                  className="absolute inset-y-0 right-0 flex items-center pr-3 text-fg-subtle hover:text-fg disabled:opacity-60"
+                  className="absolute inset-y-0 right-0 flex items-center pr-3 text-fg-subtle hover:text-fg-muted disabled:opacity-60"
                   title={showPassword ? 'Скрыть пароль' : 'Показать пароль'}
                 >
                   {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}

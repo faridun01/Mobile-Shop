@@ -1,7 +1,8 @@
 import { prisma } from '../../prisma/prisma.service';
 import { resolveActor } from '../../common/actor';
 import { createExpense } from '../expenses/expenses.service';
-import { requireNonNegativeMoney } from '../../common/money';
+import { requireNonNegativeMoney, roundMoney } from '../../common/money';
+import { getRateForDate } from '../exchange-rate/exchange-rate.service';
 
 export interface CreateRepairInput {
   storeId: string;
@@ -33,6 +34,17 @@ export class RepairsService {
         where: { imei: input.imei },
       });
 
+      // Snapshot the intake quote in USD right now, at today's rate — same as every other
+      // money-in-TJS operation in the app — instead of leaving it to be reconstructed later
+      // from whatever the rate happens to be at read time.
+      let estimatedCostUsd: number | undefined;
+      let intakeRate: number | undefined;
+      if (input.estimatedCostTjs) {
+        intakeRate = (await getRateForDate(new Date())) ?? undefined;
+        if (!intakeRate) throw new Error('Сначала задайте курс валют на сегодня');
+        estimatedCostUsd = roundMoney(input.estimatedCostTjs / intakeRate);
+      }
+
       const ticket = await tx.repairTicket.create({
         data: {
           storeId: input.storeId,
@@ -53,6 +65,8 @@ export class RepairsService {
           equipmentPackage: input.equipmentPackage,
           comment: input.comment,
           estimatedCostTjs: input.estimatedCostTjs,
+          estimatedCostUsd,
+          exchangeRate: intakeRate,
           prepaymentTjs: input.prepaymentTjs !== undefined ? requireNonNegativeMoney(input.prepaymentTjs, 'Предоплата') : undefined,
           statusHistory: {
             create: [{ status: 'ACCEPTED', updatedByUserId: input.userId, note: 'Прием телефона на ремонт' }],
@@ -109,11 +123,27 @@ export class RepairsService {
 
       const costVal = finalCostTjs !== undefined && finalCostTjs !== null ? Number(finalCostTjs) : (ticket.finalCostTjs || ticket.estimatedCostTjs || 0);
 
+      // Snapshot in USD only when the final cost is actually being decided right now — an
+      // explicit new value, or the first time it's ever being set (e.g. carried over from the
+      // estimate). A later status change that just carries the same already-snapshotted final
+      // cost forward must not re-price it at whatever the rate happens to be that day.
+      const explicitOverride = finalCostTjs !== undefined && finalCostTjs !== null && Number(finalCostTjs) > 0;
+      const needsUsdSnapshot = costVal > 0 && (explicitOverride || ticket.finalCostUsd == null);
+      let finalCostUsd = ticket.finalCostUsd ?? undefined;
+      let operationRate = ticket.exchangeRate ?? undefined;
+      if (needsUsdSnapshot) {
+        operationRate = (await getRateForDate(new Date())) ?? undefined;
+        if (!operationRate) throw new Error('Сначала задайте курс валют на сегодня');
+        finalCostUsd = roundMoney(costVal / operationRate);
+      }
+
       const updated = await tx.repairTicket.update({
         where: { id: ticketId },
         data: {
           status: newStatus as any,
           finalCostTjs: costVal > 0 ? costVal : ticket.finalCostTjs,
+          finalCostUsd: costVal > 0 ? finalCostUsd : ticket.finalCostUsd,
+          exchangeRate: costVal > 0 ? operationRate : ticket.exchangeRate,
           statusHistory: { create: [{ status: newStatus as any, updatedByUserId, note }] },
         },
       });

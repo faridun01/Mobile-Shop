@@ -72,11 +72,11 @@ export const PWAUpdateNotifier: React.FC = () => {
     <>
       {/* Service Worker Update Toast */}
       {needRefresh && (
-        <div className="fixed top-14 sm:top-16 left-3 right-3 z-50 max-w-md mx-auto bg-[#0F1219] border border-sky-500/50 p-3 rounded-xl shadow-2xl backdrop-blur-xl text-slate-100 font-mono flex items-center justify-between space-x-3 animate-in slide-in-from-top-4 duration-300">
+        <div className="fixed top-14 sm:top-16 left-3 right-3 z-50 max-w-md mx-auto bg-[#0F1219] border border-sky-500/50 p-3 rounded-xl shadow-2xl backdrop-blur-xl text-fg-muted font-mono flex items-center justify-between space-x-3 animate-in slide-in-from-top-4 duration-300">
           <div className="flex items-center space-x-2.5 min-w-0">
             <RefreshCw className="w-5 h-5 text-sky-400 animate-spin shrink-0" />
             <div className="min-w-0">
-              <p className="text-xs font-bold text-slate-100 truncate">Доступно обновление версии PWA</p>
+              <p className="text-xs font-bold text-fg-muted truncate">Доступно обновление версии PWA</p>
               <p className="text-[10px] text-slate-400 truncate">Нажмите, чтобы перезагрузить приложение</p>
             </div>
           </div>

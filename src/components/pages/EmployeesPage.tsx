@@ -23,7 +23,7 @@ import {
 
 const ROLE_CONFIG: Record<Role, { label: string; bg: string; color: string; border: string }> = {
   ADMIN: { label: 'Администратор', bg: 'bg-accent/15', color: 'text-accent', border: 'border-accent/30' },
-  PARTNER: { label: 'Партнер (Владелец)', bg: 'bg-sky-500/15', color: 'text-sky-500', border: 'border-sky-500/30' },
+  PARTNER: { label: 'Партнер (Владелец)', bg: 'bg-info/15', color: 'text-info', border: 'border-info/30' },
   SELLER: { label: 'Продавец-кассир', bg: 'bg-surface-raised', color: 'text-fg-subtle', border: 'border-border' }
 };
 
@@ -112,7 +112,7 @@ export const EmployeesPage: React.FC = () => {
   if (currentUser?.role !== 'ADMIN' && currentUser?.role !== 'PARTNER') {
     return (
       <div className="p-8 text-center text-fg-subtle text-xs">
-        <p className="font-bold text-fg">ДОСТУП ОГРАНИЧЕН</p>
+        <p className="font-bold text-fg-muted">ДОСТУП ОГРАНИЧЕН</p>
         <p className="mt-1">Раздел управления сотрудниками доступен только Администраторам и Партнерам</p>
       </div>
     );
@@ -376,14 +376,14 @@ export const EmployeesPage: React.FC = () => {
                 <div className="flex items-center space-x-3 min-w-0">
                   <div className={`w-11 h-11 rounded-xl flex items-center justify-center font-bold text-base shrink-0 border shadow-inner ${
                     u.role === 'ADMIN' ? 'bg-accent/10 text-accent border-accent/30' :
-                    u.role === 'PARTNER' ? 'bg-sky-500/10 text-sky-500 border-sky-500/30' :
-                    'bg-surface-raised text-fg border-border'
+                    u.role === 'PARTNER' ? 'bg-info/10 text-info border-info/30' :
+                    'bg-surface-raised text-fg-muted border-border'
                   }`}>
                     {u.name.charAt(0).toUpperCase()}
                   </div>
 
                   <div className="min-w-0">
-                    <h4 className="text-sm font-bold text-fg truncate group-hover:text-accent transition-colors">
+                    <h4 className="text-sm font-bold text-fg-muted truncate group-hover:text-accent transition-colors">
                       {u.name}
                     </h4>
                     <span className={`inline-block text-[10px] px-2 py-0.5 rounded font-medium border mt-1 ${roleConf.bg} ${roleConf.color} ${roleConf.border}`}>
@@ -395,7 +395,7 @@ export const EmployeesPage: React.FC = () => {
                 <div className="flex items-center space-x-1 shrink-0">
                   <button
                     onClick={() => handleOpenEdit(u)}
-                    className="p-2 rounded-xl bg-surface-raised hover:bg-surface text-fg-subtle hover:text-fg border border-border transition-colors"
+                    className="p-2 rounded-xl bg-surface-raised hover:bg-surface text-fg-subtle hover:text-fg-muted border border-border transition-colors"
                     title="Редактировать сотрудника"
                   >
                     <Edit2 className="w-3.5 h-3.5" />
@@ -416,12 +416,12 @@ export const EmployeesPage: React.FC = () => {
               <div className="space-y-2 text-xs bg-bg p-3 rounded-lg border border-border">
                 <div className="flex items-center justify-between">
                   <span className="text-[10px] text-fg-subtle uppercase">ЛОГИН:</span>
-                  <strong className="text-fg font-mono font-semibold">{u.login}</strong>
+                  <strong className="text-fg-muted font-mono font-semibold">{u.login}</strong>
                 </div>
 
                 <div className="flex items-center justify-between">
                   <span className="text-[10px] text-fg-subtle uppercase">ПАРОЛЬ ВХОДА:</span>
-                  <strong className="text-fg text-xs font-mono">••••••••</strong>
+                  <strong className="text-fg-muted text-xs font-mono">••••••••</strong>
                 </div>
 
                 <div className="flex items-center justify-between">
@@ -464,14 +464,14 @@ export const EmployeesPage: React.FC = () => {
                       {u.role === 'SELLER' && (
                         <div className="flex items-center justify-between">
                           <span className="text-[10px] text-fg-subtle">ПРОДАЖИ:</span>
-                          <span className="font-mono text-fg font-bold">
+                          <span className="font-mono text-fg-muted font-bold">
                             {salesRevTjs.toLocaleString()} TJS ({unitsSold} шт)
                           </span>
                         </div>
                       )}
                       <div className="flex items-center justify-between">
                         <span className="text-[10px] text-fg-subtle">АВАНСЫ / ВЫЧЕТЫ:</span>
-                        <span className={`font-mono font-bold ${totalAdvances > 0 ? 'text-amber-500' : 'text-fg-subtle'}`}>
+                        <span className={`font-mono font-bold ${totalAdvances > 0 ? 'text-warning' : 'text-fg-subtle'}`}>
                           {totalAdvances.toLocaleString()} TJS
                         </span>
                       </div>
@@ -504,7 +504,7 @@ export const EmployeesPage: React.FC = () => {
                       setAdvanceAmountInput('');
                       setAdvanceNoteInput('');
                     }}
-                    className="py-1.5 px-1.5 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/30 text-[10px] font-bold flex items-center justify-center space-x-1 transition-colors"
+                    className="py-1.5 px-1.5 rounded-lg bg-warning/10 hover:bg-warning/20 text-warning border border-warning/30 text-[10px] font-bold flex items-center justify-center space-x-1 transition-colors"
                   >
                     <Plus className="w-3 h-3" />
                     <span>АВАНС</span>
@@ -525,7 +525,7 @@ export const EmployeesPage: React.FC = () => {
                       setPayoutNote('');
                       setDeductAdvancesChecked(true);
                     }}
-                    className="py-1.5 px-1.5 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-[10px] font-bold flex items-center justify-center space-x-1 transition-colors"
+                    className="py-1.5 px-1.5 rounded-lg bg-accent/10 hover:bg-accent/20 text-accent border border-accent/30 text-[10px] font-bold flex items-center justify-center space-x-1 transition-colors"
                   >
                     <DollarSign className="w-3 h-3" />
                     <span>ЗАРПЛАТА</span>
@@ -533,7 +533,7 @@ export const EmployeesPage: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => setFinancialHistoryUser(u)}
-                    className="py-1.5 px-1.5 rounded-lg bg-sky-500/10 hover:bg-sky-500/20 text-sky-400 border border-sky-500/30 text-[10px] font-bold flex items-center justify-center space-x-1 transition-colors"
+                    className="py-1.5 px-1.5 rounded-lg bg-info/10 hover:bg-info/20 text-info border border-info/30 text-[10px] font-bold flex items-center justify-center space-x-1 transition-colors"
                     title="Финансовая история выплат и авансов"
                   >
                     <Receipt className="w-3 h-3" />
@@ -544,7 +544,7 @@ export const EmployeesPage: React.FC = () => {
                 <div className="flex space-x-1.5">
                   <button
                     onClick={() => handleOpenEdit(u)}
-                    className="flex-1 py-1.5 rounded-lg bg-surface-raised hover:bg-surface border border-border text-[11px] font-bold text-fg hover:text-accent flex items-center justify-center space-x-1 transition-colors"
+                    className="flex-1 py-1.5 rounded-lg bg-surface-raised hover:bg-surface border border-border text-[11px] font-bold text-fg-muted hover:text-accent flex items-center justify-center space-x-1 transition-colors"
                   >
                     <Edit2 className="w-3 h-3 text-accent" />
                     <span>ИЗМЕНИТЬ</span>
@@ -565,11 +565,11 @@ export const EmployeesPage: React.FC = () => {
   };
 
   return (
-    <div className="flex-1 flex flex-col h-full overflow-hidden bg-bg text-fg">
+    <div className="flex-1 flex flex-col h-full overflow-hidden bg-bg text-fg-muted">
       {/* Header Bar */}
       <div className="p-3.5 border-b border-border bg-surface flex items-center justify-between shrink-0">
         <div>
-          <h3 className="text-xs sm:text-sm font-bold text-fg flex items-center space-x-2 uppercase">
+          <h3 className="text-xs sm:text-sm font-bold text-fg-muted flex items-center space-x-2 uppercase">
             <Users className="w-4 h-4 text-accent" />
             <span>Сотрудники и оклады</span>
           </h3>
@@ -578,10 +578,10 @@ export const EmployeesPage: React.FC = () => {
         <div className="flex items-center space-x-2">
           <button
             onClick={() => setIsPayrollReportModalOpen(true)}
-            className="flex items-center space-x-1.5 px-3 py-2 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-500 text-xs font-bold transition-colors"
+            className="flex items-center space-x-1.5 px-3 py-2 rounded-xl bg-warning/10 hover:bg-warning/20 border border-warning/30 text-warning text-xs font-bold transition-colors"
             title="Ежемесячная ведомость зарплат сотрудников"
           >
-            <Briefcase className="w-4 h-4 text-amber-500" />
+            <Briefcase className="w-4 h-4 text-warning" />
             <span className="hidden md:inline">ЗАРПЛАТНЫЙ ОТЧЕТ</span>
           </button>
 
@@ -638,16 +638,16 @@ export const EmployeesPage: React.FC = () => {
       {/* MODAL: Add / Edit User */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-xs">
-          <form onSubmit={handleSubmit} className="w-full max-w-md rounded-2xl bg-surface border border-border p-5 text-fg shadow-2xl space-y-3.5">
+          <form onSubmit={handleSubmit} className="w-full max-w-md rounded-2xl bg-surface border border-border p-5 text-fg-muted shadow-2xl space-y-3.5">
             <div className="flex items-center justify-between pb-3 border-b border-border">
-              <h4 className="text-xs font-bold text-fg uppercase tracking-wider flex items-center space-x-2">
+              <h4 className="text-xs font-bold text-fg-muted uppercase tracking-wider flex items-center space-x-2">
                 <Users className="w-4 h-4 text-accent" />
                 <span>{editingUser ? 'РЕДАКТИРОВАНИЕ СОТРУДНИКА' : 'НОВЫЙ СОТРУДНИК'}</span>
               </h4>
               <button
                 type="button"
                 onClick={() => setIsModalOpen(false)}
-                className="text-fg-subtle hover:text-fg"
+                className="text-fg-subtle hover:text-fg-muted"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -662,7 +662,7 @@ export const EmployeesPage: React.FC = () => {
                   value={name ?? ''}
                   onChange={(e) => setName(e.target.value)}
                   placeholder="Саид Каримов"
-                  className="w-full rounded-lg bg-surface-raised border border-border px-3 py-2 text-fg focus:border-accent focus:outline-none"
+                  className="w-full rounded-lg bg-surface-raised border border-border px-3 py-2 text-fg-muted focus:border-accent focus:outline-none"
                 />
               </div>
 
@@ -674,7 +674,7 @@ export const EmployeesPage: React.FC = () => {
                   value={login ?? ''}
                   onChange={(e) => setLogin(e.target.value)}
                   placeholder="seller3"
-                  className="w-full rounded-lg bg-surface-raised border border-border px-3 py-2 text-fg focus:border-accent focus:outline-none"
+                  className="w-full rounded-lg bg-surface-raised border border-border px-3 py-2 text-fg-muted focus:border-accent focus:outline-none"
                 />
               </div>
 
@@ -689,12 +689,12 @@ export const EmployeesPage: React.FC = () => {
                     value={password ?? ''}
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder={editingUser ? 'Оставьте пустым, чтобы не менять пароль' : 'Пароль для входа в систему'}
-                    className="w-full rounded-lg bg-surface-raised border border-border pl-3 pr-10 py-2 text-fg focus:border-accent focus:outline-none font-mono text-xs"
+                    className="w-full rounded-lg bg-surface-raised border border-border pl-3 pr-10 py-2 text-fg-muted focus:border-accent focus:outline-none font-mono text-xs"
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute inset-y-0 right-0 flex items-center pr-3 text-fg-subtle hover:text-fg transition-colors"
+                    className="absolute inset-y-0 right-0 flex items-center pr-3 text-fg-subtle hover:text-fg-muted transition-colors"
                     title={showPassword ? 'Скрыть пароль' : 'Показать пароль сотрудника'}
                   >
                     {showPassword ? <EyeOff className="w-4 h-4 text-accent" /> : <Eye className="w-4 h-4 text-fg-subtle hover:text-accent" />}
@@ -713,7 +713,7 @@ export const EmployeesPage: React.FC = () => {
                   <select
                     value={role ?? 'SELLER'}
                     onChange={(e) => setRole(e.target.value as Role)}
-                    className="w-full rounded-lg bg-surface-raised border border-border px-3 py-2 text-fg focus:border-accent focus:outline-none"
+                    className="w-full rounded-lg bg-surface-raised border border-border px-3 py-2 text-fg-muted focus:border-accent focus:outline-none"
                   >
                     <option value="SELLER">Продавец (ограничен своим магазином, без себестоимости)</option>
                     <option value="PARTNER">Партнер (все магазины, финансы, отчеты)</option>
@@ -731,7 +731,7 @@ export const EmployeesPage: React.FC = () => {
                     required
                     value={storeId ?? ''}
                     onChange={(e) => setStoreId(e.target.value)}
-                    className="w-full rounded-lg bg-surface-raised border border-warning/40 px-3 py-2 text-fg font-bold focus:border-warning focus:outline-none"
+                    className="w-full rounded-lg bg-surface-raised border border-warning/40 px-3 py-2 text-fg-muted font-bold focus:border-warning focus:outline-none"
                   >
                     <option value="" disabled>-- ВЫБЕРИТЕ МАГАЗИН --</option>
                     {stores.filter(s => !s.isMainWarehouse).map(s => (
@@ -753,7 +753,7 @@ export const EmployeesPage: React.FC = () => {
                       value={baseSalaryTjs}
                       onChange={(e) => setBaseSalaryTjs(e.target.value)}
                       placeholder="1500"
-                      className="w-full rounded-lg bg-surface border border-border px-3 py-1.5 text-fg font-mono text-xs focus:border-accent focus:outline-none"
+                      className="w-full rounded-lg bg-surface border border-border px-3 py-1.5 text-fg-muted font-mono text-xs focus:border-accent focus:outline-none"
                     />
                   </div>
                   <div>
@@ -766,7 +766,7 @@ export const EmployeesPage: React.FC = () => {
                       value={salesCommissionPercent}
                       onChange={(e) => setSalesCommissionPercent(e.target.value)}
                       placeholder="2.5"
-                      className="w-full rounded-lg bg-surface border border-border px-3 py-1.5 text-fg font-mono text-xs focus:border-accent focus:outline-none"
+                      className="w-full rounded-lg bg-surface border border-border px-3 py-1.5 text-fg-muted font-mono text-xs focus:border-accent focus:outline-none"
                     />
                   </div>
                 </div>
@@ -812,23 +812,23 @@ export const EmployeesPage: React.FC = () => {
       {/* MODAL: DELETE USER CONFIRMATION */}
       {deletingUserConfirm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-xs">
-          <div className="w-full max-w-md rounded-2xl bg-surface border border-danger/40 p-5 shadow-2xl space-y-4 text-fg">
+          <div className="w-full max-w-md rounded-2xl bg-surface border border-danger/40 p-5 shadow-2xl space-y-4 text-fg-muted">
             <div className="flex items-center space-x-3 text-danger border-b border-border pb-3">
               <div className="p-2 rounded-lg bg-danger/15 text-danger shrink-0">
                 <Trash2 className="w-5 h-5" />
               </div>
               <div>
-                <h3 className="text-sm font-bold uppercase text-fg">УДАЛЕНИЕ СОТРУДНИКА</h3>
+                <h3 className="text-sm font-bold uppercase text-fg-muted">УДАЛЕНИЕ СОТРУДНИКА</h3>
                 <p className="text-[11px] text-fg-subtle mt-0.5">{deletingUserConfirm.name} ({deletingUserConfirm.login})</p>
               </div>
             </div>
 
             <div className="p-3 rounded-lg bg-bg border border-border text-xs space-y-2">
-              <p className="text-fg font-semibold">
+              <p className="text-fg-muted font-semibold">
                 Вы действительно хотите навсегда удалить учетную запись сотрудника «<span className="text-danger">{deletingUserConfirm.name}</span>»?
               </p>
               <p className="text-[11px] text-fg-subtle">
-                Логин для входа: <strong className="text-fg">{deletingUserConfirm.login}</strong> | Роль: <strong className="text-fg">{deletingUserConfirm.role}</strong>
+                Логин для входа: <strong className="text-fg-muted">{deletingUserConfirm.login}</strong> | Роль: <strong className="text-fg-muted">{deletingUserConfirm.role}</strong>
               </p>
             </div>
 
@@ -858,13 +858,13 @@ export const EmployeesPage: React.FC = () => {
       {/* MODAL: ISSUE ADVANCE TO EMPLOYEE */}
       {advanceIssueUser && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-xs">
-          <form onSubmit={handleIssueAdvance} className="w-full max-w-sm rounded-2xl bg-surface border border-warning/40 p-5 text-fg shadow-2xl space-y-3.5">
+          <form onSubmit={handleIssueAdvance} className="w-full max-w-sm rounded-2xl bg-surface border border-warning/40 p-5 text-fg-muted shadow-2xl space-y-3.5">
             <div className="flex items-center justify-between pb-3 border-b border-border">
               <h4 className="text-xs font-bold text-warning uppercase tracking-wider flex items-center space-x-2">
                 <Plus className="w-4 h-4 text-warning" />
                 <span>ВЫДАЧА АВАНСА / РАСХОДА</span>
               </h4>
-              <button type="button" onClick={() => setAdvanceIssueUser(null)} className="text-fg-subtle hover:text-fg">
+              <button type="button" onClick={() => setAdvanceIssueUser(null)} className="text-fg-subtle hover:text-fg-muted">
                 <X className="w-4 h-4" />
               </button>
             </div>
@@ -872,7 +872,7 @@ export const EmployeesPage: React.FC = () => {
             <div className="text-xs space-y-3">
               <div className="p-2.5 rounded-lg bg-bg border border-border space-y-1">
                 <span className="text-[10px] text-fg-subtle uppercase block">Сотрудник:</span>
-                <strong className="text-sm text-fg">{advanceIssueUser.name}</strong>
+                <strong className="text-sm text-fg-muted">{advanceIssueUser.name}</strong>
                 <p className="text-[10px] text-fg-subtle">{advanceIssueUser.storeName || 'Магазин'}</p>
               </div>
 
@@ -899,7 +899,7 @@ export const EmployeesPage: React.FC = () => {
                   value={advanceNoteInput}
                   onChange={(e) => setAdvanceNoteInput(e.target.value)}
                   placeholder="В счет зарплаты / На личные расходы"
-                  className="w-full rounded-lg bg-bg border border-border px-3 py-2 text-fg text-xs focus:border-warning focus:outline-none"
+                  className="w-full rounded-lg bg-bg border border-border px-3 py-2 text-fg-muted text-xs focus:border-warning focus:outline-none"
                 />
               </div>
 
@@ -933,13 +933,13 @@ export const EmployeesPage: React.FC = () => {
       {/* MODAL: SALARY PAYOUT */}
       {salaryPayoutUser && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-xs">
-          <form onSubmit={handleExecuteSalaryPayout} className="w-full max-w-md rounded-2xl bg-surface border border-accent/40 p-5 text-fg shadow-2xl space-y-3.5">
+          <form onSubmit={handleExecuteSalaryPayout} className="w-full max-w-md rounded-2xl bg-surface border border-accent/40 p-5 text-fg-muted shadow-2xl space-y-3.5">
             <div className="flex items-center justify-between pb-3 border-b border-border">
               <h4 className="text-xs font-bold text-accent uppercase tracking-wider flex items-center space-x-2">
                 <DollarSign className="w-4 h-4 text-accent" />
                 <span>ВЫПЛАТА ЗАРПЛАТЫ СОТРУДНИКУ</span>
               </h4>
-              <button type="button" onClick={() => setSalaryPayoutUser(null)} className="text-fg-subtle hover:text-fg">
+              <button type="button" onClick={() => setSalaryPayoutUser(null)} className="text-fg-subtle hover:text-fg-muted">
                 <X className="w-4 h-4" />
               </button>
             </div>
@@ -969,7 +969,7 @@ export const EmployeesPage: React.FC = () => {
                   <div className="p-3 rounded-lg bg-bg border border-border space-y-2">
                     <div className="flex items-center justify-between">
                       <div>
-                        <strong className="text-sm text-fg block">{salaryPayoutUser.name}</strong>
+                        <strong className="text-sm text-fg-muted block">{salaryPayoutUser.name}</strong>
                         <span className="text-[10px] text-fg-subtle">{salaryPayoutUser.storeName || 'Магазин'}</span>
                       </div>
                       <div className="text-right">
@@ -981,7 +981,7 @@ export const EmployeesPage: React.FC = () => {
                     <div className="pt-2 border-t border-border text-[11px] space-y-1">
                       <div className="flex justify-between text-fg-subtle">
                         <span>Оклад (фикс):</span>
-                        <span className="text-fg">{baseSal.toLocaleString()} TJS</span>
+                        <span className="text-fg-muted">{baseSal.toLocaleString()} TJS</span>
                       </div>
                       <div className="flex justify-between text-fg-subtle">
                         <span>Продажи ({salesRevTjs.toLocaleString()} TJS × {commPct}%):</span>
@@ -1022,7 +1022,7 @@ export const EmployeesPage: React.FC = () => {
 
                   {totalAdvances > 0 && (
                     <div className="p-2.5 rounded-lg bg-warning/10 border border-warning/20 space-y-1">
-                      <label className="flex items-center space-x-2 cursor-pointer text-fg">
+                      <label className="flex items-center space-x-2 cursor-pointer text-fg-muted">
                         <input
                           type="checkbox"
                           checked={deductAdvancesChecked}
@@ -1057,7 +1057,7 @@ export const EmployeesPage: React.FC = () => {
                       value={payoutNote}
                       onChange={(e) => setPayoutNote(e.target.value)}
                       placeholder="Выплата за текущий месяц"
-                      className="w-full rounded-lg bg-bg border border-border px-3 py-2 text-fg text-xs focus:border-accent focus:outline-none"
+                      className="w-full rounded-lg bg-bg border border-border px-3 py-2 text-fg-muted text-xs focus:border-accent focus:outline-none"
                     />
                   </div>
 
@@ -1089,7 +1089,7 @@ export const EmployeesPage: React.FC = () => {
       {/* MODAL: Employee Financial History */}
       {financialHistoryUser && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-xs">
-          <div className="w-full max-w-3xl rounded-2xl bg-surface border border-info/40 p-5 text-fg shadow-2xl space-y-4">
+          <div className="w-full max-w-3xl rounded-2xl bg-surface border border-info/40 p-5 text-fg-muted shadow-2xl space-y-4">
             <div className="flex items-center justify-between pb-3 border-b border-border">
               <div>
                 <h4 className="text-xs sm:text-sm font-bold text-info uppercase tracking-wider flex items-center space-x-2">
@@ -1098,7 +1098,7 @@ export const EmployeesPage: React.FC = () => {
                 </h4>
                 <span className="text-[10px] text-fg-subtle">{financialHistoryUser.storeName || 'Все филиалы'}</span>
               </div>
-              <button type="button" onClick={() => setFinancialHistoryUser(null)} className="text-fg-subtle hover:text-fg">
+              <button type="button" onClick={() => setFinancialHistoryUser(null)} className="text-fg-subtle hover:text-fg-muted">
                 <X className="w-4 h-4" />
               </button>
             </div>
@@ -1147,7 +1147,7 @@ export const EmployeesPage: React.FC = () => {
                       className={`px-2.5 py-1 rounded-md text-[10px] font-bold transition-colors ${
                         selectedHistoryMonth === 'ALL'
                           ? 'bg-warning text-black'
-                          : 'bg-surface-raised text-fg-muted hover:bg-surface hover:text-fg border border-border'
+                          : 'bg-surface-raised text-fg-muted hover:bg-surface hover:text-fg-muted border border-border'
                       }`}
                     >
                       🌐 ВСЕ МЕСЯЦЫ
@@ -1160,7 +1160,7 @@ export const EmployeesPage: React.FC = () => {
                         className={`px-2.5 py-1 rounded-md text-[10px] font-bold transition-colors ${
                           selectedHistoryMonth === m
                             ? 'bg-warning text-black'
-                            : 'bg-surface-raised text-fg-muted hover:bg-surface hover:text-fg border border-border'
+                            : 'bg-surface-raised text-fg-muted hover:bg-surface hover:text-fg-muted border border-border'
                         }`}
                       >
                         📅 {m}
@@ -1209,7 +1209,7 @@ export const EmployeesPage: React.FC = () => {
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 bg-bg p-3 rounded-lg border border-border text-xs">
                     <div>
                       <span className="text-[10px] text-fg-subtle uppercase block">ВЫРУЧКА ПРОДАЖ:</span>
-                      <strong className="text-fg text-xs font-bold">{totalSalesRev.toLocaleString()} TJS ({filteredSales.length} шт)</strong>
+                      <strong className="text-fg-muted text-xs font-bold">{totalSalesRev.toLocaleString()} TJS ({filteredSales.length} шт)</strong>
                     </div>
                     <div>
                       <span className="text-[10px] text-fg-subtle uppercase block">НАЧИСЛЕНО (ОКЛАД+PROFIT):</span>
@@ -1227,7 +1227,7 @@ export const EmployeesPage: React.FC = () => {
 
                   <div className="space-y-1.5">
                     <div className="flex items-center justify-between text-xs">
-                      <span className="font-bold text-fg uppercase">
+                      <span className="font-bold text-fg-muted uppercase">
                         Все операции за {selectedHistoryMonth === 'ALL' ? 'весь период' : `месяц ${selectedHistoryMonth}`} ({filteredExpenses.length + filteredSales.length}):
                       </span>
                     </div>
@@ -1270,7 +1270,7 @@ export const EmployeesPage: React.FC = () => {
                                 <td className="p-2 text-fg-muted truncate max-w-55">
                                   {op.data.items.map(i => `${i.brand} ${i.model}`).join(', ')} ({op.data.customerName || 'Покупатель'})
                                 </td>
-                                <td className="p-2 text-right font-bold text-fg">
+                                <td className="p-2 text-right font-bold text-fg-muted">
                                   +{op.data.totalTjs.toLocaleString()} TJS
                                 </td>
                               </tr>
@@ -1300,13 +1300,13 @@ export const EmployeesPage: React.FC = () => {
       {/* MODAL: Monthly Payroll Summary Report */}
       {isPayrollReportModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-xs">
-          <div className="w-full max-w-4xl rounded-2xl bg-surface border border-warning/40 p-5 text-fg shadow-2xl space-y-4">
+          <div className="w-full max-w-4xl rounded-2xl bg-surface border border-warning/40 p-5 text-fg-muted shadow-2xl space-y-4">
             <div className="flex items-center justify-between pb-3 border-b border-border">
               <h4 className="text-xs sm:text-sm font-bold text-warning uppercase tracking-wider flex items-center space-x-2">
                 <Briefcase className="w-4 h-4 text-warning" />
                 <span>📊 ЕЖЕМЕСЯЧНАЯ ЗАРПЛАТНАЯ ВЕДОМОСТЬ СОТРУДНИКОВ</span>
               </h4>
-              <button type="button" onClick={() => setIsPayrollReportModalOpen(false)} className="text-fg-subtle hover:text-fg">
+              <button type="button" onClick={() => setIsPayrollReportModalOpen(false)} className="text-fg-subtle hover:text-fg-muted">
                 <X className="w-4 h-4" />
               </button>
             </div>
@@ -1364,12 +1364,12 @@ export const EmployeesPage: React.FC = () => {
                         className="hover:bg-surface-raised cursor-pointer transition-colors"
                         title="Нажмите, чтобы открыть подробные операции за этот месяц"
                       >
-                        <td className="p-2.5 font-bold text-fg">{u.name}</td>
+                        <td className="p-2.5 font-bold text-fg-muted">{u.name}</td>
                         <td className="p-2.5 text-fg-subtle">{u.storeName || 'Все точки'}</td>
                         <td className="p-2.5 text-right">{baseSal.toLocaleString()}</td>
-                        <td className="p-2.5 text-right font-semibold text-fg">{salesRev.toLocaleString()}</td>
+                        <td className="p-2.5 text-right font-semibold text-fg-muted">{salesRev.toLocaleString()}</td>
                         <td className="p-2.5 text-right text-warning">{commAmt.toLocaleString()} ({commPct}%)</td>
-                        <td className="p-2.5 text-right font-bold text-fg">{grossAccrued.toLocaleString()}</td>
+                        <td className="p-2.5 text-right font-bold text-fg-muted">{grossAccrued.toLocaleString()}</td>
                         <td className="p-2.5 text-right font-bold text-warning">-{advances.toLocaleString()}</td>
                         <td className="p-2.5 text-right font-bold text-info">{paidSalary.toLocaleString()}</td>
                         <td className="p-2.5 text-right font-bold text-accent">{netPayable.toLocaleString()} TJS</td>

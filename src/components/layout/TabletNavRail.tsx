@@ -93,7 +93,7 @@ export const TabletNavRail: React.FC = () => {
                 navigate(routePath);
               }}
               className={`w-full min-h-11 py-2 rounded-lg flex flex-col items-center justify-center transition-colors relative ${
-                isActive ? 'bg-accent/10 text-accent' : 'text-fg-subtle hover:text-fg hover:bg-surface-raised'
+                isActive ? 'bg-accent/10 text-accent' : 'text-fg-subtle hover:text-fg-muted hover:bg-surface-raised'
               }`}
               title={item.label}
             >

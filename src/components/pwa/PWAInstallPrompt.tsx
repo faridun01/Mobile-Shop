@@ -107,14 +107,14 @@ export const PWAInstallPrompt: React.FC = () => {
     <>
       {/* ANDROID / DESKTOP PWA INSTALL BOTTOM BANNER */}
       {showAndroidBanner && deferredPrompt && (
-        <div className="fixed bottom-16 sm:bottom-4 left-3 right-3 z-50 max-w-md mx-auto bg-surface border border-emerald-500/40 p-4 rounded-2xl shadow-[0_10px_35px_rgba(0,0,0,0.8)] backdrop-blur-xl text-slate-100 font-mono space-y-3 animate-in slide-in-from-bottom-5 duration-300">
+        <div className="fixed bottom-16 sm:bottom-4 left-3 right-3 z-50 max-w-md mx-auto bg-surface border border-emerald-500/40 p-4 rounded-2xl shadow-[0_10px_35px_rgba(0,0,0,0.8)] backdrop-blur-xl text-fg-muted font-mono space-y-3 animate-in slide-in-from-bottom-5 duration-300">
           <div className="flex items-start justify-between">
             <div className="flex items-center space-x-3">
               <div className="w-11 h-11 rounded-xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shrink-0 shadow-inner">
                 <Smartphone className="w-6 h-6" />
               </div>
               <div>
-                <h4 className="text-xs sm:text-sm font-bold text-slate-100 uppercase tracking-tight">
+                <h4 className="text-xs sm:text-sm font-bold text-fg-muted uppercase tracking-tight">
                   Mobile Shop POS & ERP
                 </h4>
                 <p className="text-[11px] text-slate-400 mt-0.5">
@@ -151,7 +151,7 @@ export const PWAInstallPrompt: React.FC = () => {
       {/* iPHONE / iOS SAFARI INSTALLATION GUIDE MODAL */}
       {showIOSGuide && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md font-mono animate-in fade-in duration-200">
-          <div className="w-full max-w-sm rounded-2xl bg-surface border border-amber-500/40 p-5 text-slate-200 shadow-2xl space-y-4">
+          <div className="w-full max-w-sm rounded-2xl bg-surface border border-amber-500/40 p-5 text-fg-muted shadow-2xl space-y-4">
             <div className="flex items-center justify-between pb-3 border-b border-slate-800">
               <div className="flex items-center space-x-2">
                 <Smartphone className="w-5 h-5 text-amber-400" />

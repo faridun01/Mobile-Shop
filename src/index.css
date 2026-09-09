@@ -17,13 +17,17 @@
   --color-fg: #F1F5F9;
   --color-fg-muted: #94A3B8;
   --color-fg-subtle: #64748B;
-  --color-accent: #22C55E;
-  --color-accent-strong: #16A34A;
+  --color-accent: #16A34A;
+  --color-accent-strong: #15803D;
   --color-accent-fg: #052E1A;
   --color-success: #22C55E;
   --color-warning: #F59E0B;
   --color-danger: #F43F5E;
   --color-info: #38BDF8;
+  /* Bonus/gift/free-item callouts (supplier bonus devices, TRANSFER audit entries) — the
+     one recurring category that doesn't map to any outcome-style token above (not a
+     success/warning/danger/info state, just "this one's special/free"). */
+  --color-highlight: #A855F7;
 }
 
 [data-theme="light"] {
@@ -41,6 +45,7 @@
   --color-warning: #D97706;
   --color-danger: #E11D48;
   --color-info: #0284C7;
+  --color-highlight: #9333EA;
 }
 
 @layer base {

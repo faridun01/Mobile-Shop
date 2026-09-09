@@ -147,17 +147,26 @@ export async function computeReportsSummary(input: ReportsSummaryInput) {
   const periodFreeDeviceBonusesReceived = allBonuses.filter((b) => b.bonusType === 'FREE_DEVICES' && dateWithinRange(b.dateReceived, dateRange)).length;
   const freeDeviceBonusesInStock = allBonuses.filter((b) => b.bonusType === 'FREE_DEVICES' && b.status !== 'SOLD').length;
 
-  const refundedSales = await prisma.sale.findMany({
+  // Fetched across all stores (not just storeFilter) so the per-store breakdown below can
+  // fold each store's own penalties into its "Прибыль" the same way the overall total does —
+  // otherwise a refund's retained penalty would only ever show up in the all-stores figure.
+  const refundedSalesAllStores = await prisma.sale.findMany({
     where: {
       status: 'REFUNDED',
       penaltyFeeUsd: { not: null },
-      ...(storeFilter ? { storeId: storeFilter } : {}),
       ...(dateRange ? { refundedAt: dateRange } : {}),
     },
-    select: { penaltyFeeUsd: true, penaltyFeeTjs: true },
+    select: { storeId: true, penaltyFeeUsd: true, penaltyFeeTjs: true },
   });
+  const refundedSales = storeFilter ? refundedSalesAllStores.filter((s) => s.storeId === storeFilter) : refundedSalesAllStores;
   const periodRefundPenaltiesUsd = refundedSales.reduce((acc, s) => acc + (s.penaltyFeeUsd || 0), 0);
   const periodRefundPenaltiesTjs = refundedSales.reduce((acc, s) => acc + (s.penaltyFeeTjs || 0), 0);
+  const refundPenaltiesByStore = new Map<string, { usd: number; tjs: number }>();
+  for (const s of refundedSalesAllStores) {
+    if (!s.storeId) continue;
+    const prev = refundPenaltiesByStore.get(s.storeId) || { usd: 0, tjs: 0 };
+    refundPenaltiesByStore.set(s.storeId, { usd: prev.usd + (s.penaltyFeeUsd || 0), tjs: prev.tjs + (s.penaltyFeeTjs || 0) });
+  }
 
   const netProfitUsd = +(grossProfitUsd - expensesUsd + periodCashBonusesUsd + periodRefundPenaltiesUsd).toFixed(2);
   const netProfitTjs = Math.round(grossProfitTjs - expensesTjs + periodCashBonusesTjs + periodRefundPenaltiesTjs);
@@ -212,6 +221,9 @@ export async function computeReportsSummary(input: ReportsSummaryInput) {
       });
       const stock = retailStock.filter((d) => d.storeId === store.id);
       const stockCostUsd = stock.reduce((sum, d) => sum + (d.costBasisUsd || d.purchasePriceUsd || 0), 0);
+      // Same "с учетом возвратов" treatment as the overall totals: a refund's original
+      // margin is gone, but the withheld penalty is real retained profit and counts here.
+      const storePenalty = refundPenaltiesByStore.get(store.id) || { usd: 0, tjs: 0 };
       return {
         storeId: store.id,
         storeName: store.name,
@@ -219,8 +231,8 @@ export async function computeReportsSummary(input: ReportsSummaryInput) {
         revenueTjs: Math.round(storeRevenueTjs),
         cogsUsd: +storeCogsUsd.toFixed(2),
         cogsTjs: Math.round(storeCogsTjs),
-        profitUsd: +storeProfitUsd.toFixed(2),
-        profitTjs: Math.round(storeProfitTjs),
+        profitUsd: +(storeProfitUsd + storePenalty.usd).toFixed(2),
+        profitTjs: Math.round(storeProfitTjs + storePenalty.tjs),
         unitsSold: storeUnits,
         salesCount: storeSales.length,
         cashTjs: store.cashBalanceTjs,
@@ -244,8 +256,15 @@ export async function computeReportsSummary(input: ReportsSummaryInput) {
     grossProfitUsd: +grossProfitUsd.toFixed(2),
     grossProfitTjs,
     grossMarginPercent,
+    // "Прибыль (с учетом возвратов)" — the single recognized-profit figure the summary card,
+    // the per-store cards (storeBreakdown.profitUsd/Tjs below) and netProfitUsd/Tjs all build
+    // on, so they can no longer disagree the way the old client-side per-item calc did.
+    profitUsd: +(grossProfitUsd + periodRefundPenaltiesUsd).toFixed(2),
+    profitTjs: Math.round(grossProfitTjs + periodRefundPenaltiesTjs),
     expensesTjs,
     expensesUsd,
+    periodRefundPenaltiesUsd: roundMoney(periodRefundPenaltiesUsd),
+    periodRefundPenaltiesTjs: Math.round(periodRefundPenaltiesTjs),
     netProfitUsd,
     netProfitTjs,
     periodCashBonusesUsd: roundMoney(periodCashBonusesUsd),

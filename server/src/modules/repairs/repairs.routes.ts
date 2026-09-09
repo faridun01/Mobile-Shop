@@ -16,6 +16,10 @@ export function registerRepairRoutes(app: Express) {
       const period = VALID_PERIODS.includes(req.query.period as ReportPeriod) ? (req.query.period as ReportPeriod) : 'ALL';
       const month = typeof req.query.month === 'string' ? req.query.month : undefined;
       const dateRange = dateRangeForPeriod(period, month);
+      // estimatedCostUsd/finalCostUsd/exchangeRate are snapshotted directly on the ticket when
+      // each cost is actually set (RepairsService.create / updateStatus), at that day's rate —
+      // no per-request conversion needed here, unlike the old approach that re-derived them
+      // from rate history on every read.
       const repairs = await prisma.repairTicket.findMany({
         where: { ...(storeScopeId ? { storeId: storeScopeId } : {}), ...(dateRange ? { createdAt: dateRange } : {}) },
         include: { statusHistory: { orderBy: { updatedAt: 'asc' } }, store: true, user: true },

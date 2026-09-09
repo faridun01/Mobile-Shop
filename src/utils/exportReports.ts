@@ -74,7 +74,7 @@ function formatImeiForCsv(imei?: string): string {
  * Builds the sales report table (headers/rows/totals) shared by the on-screen
  * preview and the CSV export, so what the user previews is exactly what downloads.
  */
-export function buildSalesReportTable(sales: Sale[], rate: number = 9.5): ReportTable {
+export function buildSalesReportTable(sales: Sale[], rate: number = 9.5, cashBonusesUsd: number = 0): ReportTable {
   const headers = [
     '№ Чека',
     'Дата и время',
@@ -101,6 +101,7 @@ export function buildSalesReportTable(sales: Sale[], rate: number = 9.5): Report
     const isRefunded = sale.status === 'REFUNDED';
     const dateFormatted = new Date(sale.date).toLocaleString('ru-RU');
     const operationRate = sale.exchangeRate || rate;
+    let saleNaiveProfitUsd = 0;
 
     sale.items.forEach((item) => {
       totalUnits += 1;
@@ -110,12 +111,12 @@ export function buildSalesReportTable(sales: Sale[], rate: number = 9.5): Report
       // A refunded sale's original margin is void — it never counts toward totals, and
       // showing the stale pre-refund number here would misleadingly suggest it still does.
       const profitUsd = isRefunded ? 0 : +(priceUsd - costUsd).toFixed(2);
+      saleNaiveProfitUsd += profitUsd;
 
       if (!isRefunded) {
         totalCostBasisUsd += costUsd;
         totalRevenueUsd += priceUsd;
         totalRevenueTjs += priceTjs;
-        totalProfitUsd += profitUsd;
       }
 
       rows.push([
@@ -133,6 +134,15 @@ export function buildSalesReportTable(sales: Sale[], rate: number = 9.5): Report
         isRefunded ? 'ВОЗВРАТ' : 'ЗАВЕРШЕНА'
       ]);
     });
+
+    // Recognized profit is a sale-level figure (accounts for below-cost sign-off and
+    // exchange corrections that don't split cleanly across items), so the total is summed
+    // once per sale from it — not from the naive per-item price-minus-cost rows above —
+    // to match every other recognized-profit figure in Reports (see reports.service.ts).
+    // Falls back to the naive sum only for older sales with no recognizedProfitUsd on record.
+    if (!isRefunded) {
+      totalProfitUsd += sale.recognizedProfitUsd ?? saleNaiveProfitUsd;
+    }
 
     // The only profit a refunded sale actually leaves behind is the withheld penalty —
     // recorded as its own line so it shows up in the history and counts toward the total,
@@ -159,6 +169,20 @@ export function buildSalesReportTable(sales: Sale[], rate: number = 9.5): Report
     }
   });
 
+  // Supplier cash bonuses are tied to the supplier/main warehouse, not any one store, so
+  // this isn't this store's own money — it's appended once, clearly labeled, rather than
+  // silently folded into totalProfitUsd where it would look like the store earned it.
+  if (cashBonusesUsd !== 0) {
+    totalProfitUsd += cashBonusesUsd;
+    rows.push([
+      '', '', '', '',
+      'Бонусы поставщиков за период (наличными, по всему бизнесу)',
+      '', '', '', '',
+      cashBonusesUsd.toFixed(2),
+      '', 'БОНУС'
+    ]);
+  }
+
   const totalsRow = [
     'ИТОГО:', '', '', '',
     `Всего позиций: ${rows.length}`,
@@ -176,8 +200,8 @@ export function buildSalesReportTable(sales: Sale[], rate: number = 9.5): Report
 /**
  * Exports sales report with detailed items breakdown, IMEI numbers and comprehensive summary totals.
  */
-export function exportSalesReport(sales: Sale[], rate: number = 9.5) {
-  const table = buildSalesReportTable(sales, rate);
+export function exportSalesReport(sales: Sale[], rate: number = 9.5, cashBonusesUsd: number = 0) {
+  const table = buildSalesReportTable(sales, rate, cashBonusesUsd);
   const fileName = `otchet_prodazhi_${new Date().toISOString().split('T')[0]}.csv`;
   downloadCsv(tableToCsv(table), fileName);
 }
@@ -276,14 +300,15 @@ export function buildExpensesReportTable(expenses: Expense[], rate: number = 9.5
   let totalUsd = 0;
 
   expenses.forEach((e) => {
+    const amountUsd = e.amountUsd ?? ((e.amountTjs || 0) / (e.exchangeRate || rate));
     totalTjs += e.amountTjs || 0;
-    totalUsd += e.amountUsd || 0;
+    totalUsd += amountUsd;
     rows.push([
       e.date,
       EXPENSE_CATEGORY_LABELS[e.category as string] || e.category,
       (e.amountTjs || 0).toFixed(2),
       e.exchangeRate || rate,
-      (e.amountUsd || 0).toFixed(2),
+      amountUsd.toFixed(2),
       e.targetType || 'STORE',
       e.storeName || 'Бизнес',
       e.sourceAccount || 'Касса',
@@ -312,7 +337,7 @@ export function exportExpensesReport(expenses: Expense[], rate: number = 9.5) {
 /**
  * Builds the repair tickets journal report table.
  */
-export function buildRepairsReportTable(repairs: RepairTicket[]): ReportTable {
+export function buildRepairsReportTable(repairs: RepairTicket[], rate: number = 9.5): ReportTable {
   const headers = [
     '№ Квитанции',
     'Дата приема',
@@ -325,15 +350,24 @@ export function buildRepairsReportTable(repairs: RepairTicket[]): ReportTable {
     'IMEI',
     'Неисправность',
     'Статус',
-    'Финальная стоимость (TJS)'
+    'Курс валюты',
+    'Финальная стоимость (TJS)',
+    'Финальная стоимость ($)'
   ];
 
   const rows: (string | number)[][] = [];
   let totalCostTjs = 0;
+  let totalCostUsd = 0;
 
   repairs.forEach((r) => {
-    const cost = r.finalCostTjs || r.estimatedCostTjs || 0;
-    totalCostTjs += cost;
+    const costTjs = r.finalCostTjs || r.estimatedCostTjs || 0;
+    // Ticket never stored its own rate for the general case, so this falls back to
+    // whatever the caller passed in (today's rate) only when no historical rate could
+    // be resolved server-side — same amountUsd-first pattern as expenses.
+    const operationRate = r.exchangeRate || rate;
+    const costUsd = r.finalCostUsd ?? r.estimatedCostUsd ?? +(costTjs / operationRate).toFixed(2);
+    totalCostTjs += costTjs;
+    totalCostUsd += costUsd;
     rows.push([
       r.ticketNumber,
       r.createdAt ? r.createdAt.split('T')[0] : '-',
@@ -346,14 +380,18 @@ export function buildRepairsReportTable(repairs: RepairTicket[]): ReportTable {
       formatImeiForCsv(r.imei),
       r.issueDescription || r.problemDescription || '-',
       REPAIR_STATUS_LABELS[r.status as string] || r.status,
-      (r.finalCostTjs || 0).toFixed(2)
+      operationRate,
+      costTjs.toFixed(2),
+      costUsd.toFixed(2)
     ]);
   });
 
   const totalsRow = [
     'ИТОГО:', '', '', '', '', '', '', '', '', '',
     `Всего квитанций: ${repairs.length}`,
-    totalCostTjs.toFixed(2)
+    '',
+    totalCostTjs.toFixed(2),
+    totalCostUsd.toFixed(2)
   ];
 
   return { headers, rows, totalsRow };
@@ -362,8 +400,8 @@ export function buildRepairsReportTable(repairs: RepairTicket[]): ReportTable {
 /**
  * Exports repair tickets journal report.
  */
-export function exportRepairsReport(repairs: RepairTicket[]) {
-  const table = buildRepairsReportTable(repairs);
+export function exportRepairsReport(repairs: RepairTicket[], rate: number = 9.5) {
+  const table = buildRepairsReportTable(repairs, rate);
   const fileName = `otchet_remonty_${new Date().toISOString().split('T')[0]}.csv`;
   downloadCsv(tableToCsv(table), fileName);
 }

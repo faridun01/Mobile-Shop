@@ -105,7 +105,7 @@ export const Sidebar: React.FC = () => {
       <div className="h-14 flex items-center px-4 border-b border-border justify-between shrink-0">
         <div className="flex items-center gap-2.5">
           <div className="w-2.5 h-2.5 rounded-sm bg-accent" />
-          <span className="font-bold text-xs tracking-wider text-fg uppercase">Mobile Shop</span>
+          <span className="font-bold text-xs tracking-wider text-fg-muted uppercase">Mobile Shop</span>
         </div>
         <span className="text-[10px] px-1.5 py-0.5 rounded bg-surface-raised border border-border text-fg-subtle font-semibold">
           POS
@@ -119,7 +119,7 @@ export const Sidebar: React.FC = () => {
 
           return (
             <div key={gIdx} className="space-y-0.5">
-              <span className="text-[10px] font-semibold text-fg-subtle tracking-wide px-2 uppercase">
+              <span className="text-[10px] font-semibold text-fg-muted tracking-wide px-2 uppercase">
                 {group.title}
               </span>
               <div className="space-y-0.5">
@@ -164,7 +164,7 @@ export const Sidebar: React.FC = () => {
           {currentUser?.name ? currentUser.name.substring(0, 2).toUpperCase() : 'US'}
         </div>
         <div className="min-w-0 flex-1">
-          <p className="text-xs font-semibold text-fg truncate">{currentUser?.name || 'Пользователь'}</p>
+          <p className="text-xs font-semibold text-fg-muted truncate">{currentUser?.name || 'Пользователь'}</p>
           {currentUser?.role === 'ADMIN' && (
             <p className="text-[10px] text-fg-subtle truncate">Администратор</p>
           )}

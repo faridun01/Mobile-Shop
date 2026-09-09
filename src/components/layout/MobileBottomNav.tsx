@@ -125,7 +125,7 @@ export const MobileBottomNav: React.FC = () => {
 
       <button
         onClick={() => setDrawerOpen(true)}
-        className="flex-1 h-full min-h-11 flex flex-col items-center justify-center gap-0.5 text-fg-subtle active:text-fg transition-colors"
+        className="flex-1 h-full min-h-11 flex flex-col items-center justify-center gap-0.5 text-fg-subtle active:text-fg-muted transition-colors"
       >
         <div className="relative">
           <Menu className="w-5 h-5" />

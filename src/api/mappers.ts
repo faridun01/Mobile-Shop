@@ -198,6 +198,9 @@ export function mapRepair(r: any, names: NameLookup): RepairTicket {
     estimatedCostTjs: r.estimatedCostTjs ?? undefined,
     finalCostTjs: r.finalCostTjs ?? undefined,
     repairCostTjs: r.finalCostTjs ?? r.estimatedCostTjs ?? undefined,
+    estimatedCostUsd: r.estimatedCostUsd ?? undefined,
+    finalCostUsd: r.finalCostUsd ?? undefined,
+    exchangeRate: r.exchangeRate ?? undefined,
   };
 }
 

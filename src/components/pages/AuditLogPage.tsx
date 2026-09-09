@@ -102,7 +102,7 @@ export const AuditLogPage: React.FC = () => {
       case 'PURCHASE':
         return 'bg-info/15 text-info border-info/30';
       case 'TRANSFER':
-        return 'bg-purple-500/15 text-purple-400 border-purple-500/30';
+        return 'bg-highlight/15 text-highlight border-highlight/30';
       case 'REPAIR':
         return 'bg-amber-500/15 text-amber-400 border-amber-500/30';
       case 'AUTH':
@@ -126,7 +126,7 @@ export const AuditLogPage: React.FC = () => {
   };
 
   return (
-    <div className="flex-1 flex flex-col h-full overflow-hidden bg-bg text-fg">
+    <div className="flex-1 flex flex-col h-full overflow-hidden bg-bg text-fg-muted">
       {/* Header Bar */}
       <div className="p-3.5 border-b border-border bg-surface flex items-center justify-between gap-3 shrink-0">
         <div>
@@ -143,7 +143,7 @@ export const AuditLogPage: React.FC = () => {
             type="button"
             onClick={() => exportAuditLogsReport(filteredLogs)}
             disabled={filteredLogs.length === 0}
-            className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-surface-raised hover:bg-surface border border-border text-fg text-xs font-bold transition-colors disabled:opacity-40"
+            className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-surface-raised hover:bg-surface border border-border text-fg-muted text-xs font-bold transition-colors disabled:opacity-40"
           >
             <Download className="w-3.5 h-3.5 text-accent" />
             <span className="hidden sm:inline">Экспорт (CSV)</span>
@@ -164,7 +164,7 @@ export const AuditLogPage: React.FC = () => {
               className={`px-3 py-1.5 rounded-xl border text-xs font-bold uppercase flex items-center space-x-1.5 transition-all ${
                 dateFilterMode === 'TODAY'
                   ? 'border-accent text-accent bg-accent/15'
-                  : 'border-border text-fg-muted hover:text-fg bg-surface'
+                  : 'border-border text-fg-muted hover:text-fg-muted bg-surface'
               }`}
             >
               <Calendar className="w-3.5 h-3.5" />
@@ -184,7 +184,7 @@ export const AuditLogPage: React.FC = () => {
                   setSelectedDate(e.target.value);
                   setDateFilterMode('SPECIFIC');
                 }}
-                className="bg-transparent text-fg text-xs font-semibold focus:outline-none cursor-pointer"
+                className="bg-transparent text-fg-muted text-xs font-semibold focus:outline-none cursor-pointer"
               />
             </div>
 
@@ -194,7 +194,7 @@ export const AuditLogPage: React.FC = () => {
               className={`px-3 py-1.5 rounded-xl border text-xs font-bold uppercase transition-all ${
                 dateFilterMode === 'ALL'
                   ? 'border-accent text-accent bg-accent/15'
-                  : 'border-border text-fg-muted hover:text-fg bg-surface'
+                  : 'border-border text-fg-muted hover:text-fg-muted bg-surface'
               }`}
             >
               <span>За все время</span>
@@ -204,7 +204,7 @@ export const AuditLogPage: React.FC = () => {
             <button
               type="button"
               onClick={() => setSortOrder(prev => prev === 'DESC' ? 'ASC' : 'DESC')}
-              className="px-3 py-1.5 rounded-xl border border-border bg-surface hover:bg-surface-raised text-fg text-xs font-bold uppercase flex items-center space-x-1.5 transition-all ml-1"
+              className="px-3 py-1.5 rounded-xl border border-border bg-surface hover:bg-surface-raised text-fg-muted text-xs font-bold uppercase flex items-center space-x-1.5 transition-all ml-1"
               title="Переключить порядок сортировки по дате"
             >
               {sortOrder === 'DESC' ? <ArrowDown className="w-3.5 h-3.5 text-accent" /> : <ArrowUp className="w-3.5 h-3.5 text-accent" />}
@@ -220,12 +220,12 @@ export const AuditLogPage: React.FC = () => {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Поиск по событию / сотруднику / IMEI..."
-              className="w-full rounded-xl bg-surface border border-border pl-9 pr-8 py-1.5 text-xs text-fg placeholder-fg-subtle focus:border-accent focus:outline-none transition-colors"
+              className="w-full rounded-xl bg-surface border border-border pl-9 pr-8 py-1.5 text-xs text-fg-muted placeholder-fg-subtle focus:border-accent focus:outline-none transition-colors"
             />
             {searchQuery && (
               <button
                 onClick={() => setSearchQuery('')}
-                className="absolute right-2.5 top-2.5 text-fg-subtle hover:text-fg"
+                className="absolute right-2.5 top-2.5 text-fg-subtle hover:text-fg-muted"
               >
                 <X className="w-3.5 h-3.5" />
               </button>
@@ -276,7 +276,7 @@ export const AuditLogPage: React.FC = () => {
                     </span>
 
                     <div className="min-w-0 flex-1">
-                      <p className="font-bold text-fg truncate">{log.action}</p>
+                      <p className="font-bold text-fg-muted truncate">{log.action}</p>
                       {log.details && (
                         <p className="text-xs text-fg-muted mt-0.5 line-clamp-2">{log.details}</p>
                       )}
@@ -285,7 +285,7 @@ export const AuditLogPage: React.FC = () => {
 
                   <div className="flex items-center justify-between sm:justify-end space-x-4 text-xs shrink-0 border-t sm:border-t-0 border-border pt-2 sm:pt-0">
                     <div className="text-left sm:text-right">
-                      <span className="font-bold text-fg block">{log.userName || 'Система'}</span>
+                      <span className="font-bold text-fg-muted block">{log.userName || 'Система'}</span>
                       <span className="text-[10px] text-fg-subtle uppercase block">{log.userRole || 'SYSTEM'}</span>
                     </div>
 

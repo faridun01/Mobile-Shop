@@ -254,6 +254,18 @@ export const decimalExtension = Prisma.defineExtension({
         needs: { finalCostTjs: true },
         compute: (data) => d2n(data.finalCostTjs),
       },
+      estimatedCostUsd: {
+        needs: { estimatedCostUsd: true },
+        compute: (data) => d2n(data.estimatedCostUsd),
+      },
+      finalCostUsd: {
+        needs: { finalCostUsd: true },
+        compute: (data) => d2n(data.finalCostUsd),
+      },
+      exchangeRate: {
+        needs: { exchangeRate: true },
+        compute: (data) => d2n(data.exchangeRate),
+      },
     },
     expense: {
       amountTjs: {

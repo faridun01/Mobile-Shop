@@ -513,6 +513,12 @@ model RepairTicket {
   status             RepairStatus @default(ACCEPTED)
   estimatedCostTjs   Decimal?     @db.Decimal(14, 2)
   finalCostTjs       Decimal?     @db.Decimal(14, 2)
+  // Snapshotted in USD at the moment each cost is actually set (intake quote, final cost),
+  // using that day's rate — same pattern as sales/expenses — instead of being recomputed
+  // from TJS at read time with whatever rate happens to be current then.
+  estimatedCostUsd   Decimal?     @db.Decimal(14, 2)
+  finalCostUsd       Decimal?     @db.Decimal(14, 2)
+  exchangeRate       Decimal?     @db.Decimal(10, 4)
   createdAt          DateTime     @default(now())
   updatedAt          DateTime     @updatedAt
 

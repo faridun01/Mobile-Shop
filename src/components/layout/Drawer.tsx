@@ -114,7 +114,7 @@ export const Drawer: React.FC = () => {
   const userStoreName = currentUser?.storeId ? (stores.find(s => s.id === currentUser.storeId)?.name || currentUser.storeName) : currentUser?.storeName;
 
   return (
-    <div className="fixed inset-0 z-50 flex md:hidden flex-col bg-bg text-fg w-full h-full overflow-hidden">
+    <div className="fixed inset-0 z-50 flex md:hidden flex-col bg-bg text-fg-muted w-full h-full overflow-hidden">
       {/* Header */}
       <div className="p-4 border-b border-border bg-surface flex items-center justify-between shrink-0">
         <div className="flex items-center gap-3 min-w-0">
@@ -122,7 +122,7 @@ export const Drawer: React.FC = () => {
             {currentUser?.name ? currentUser.name.substring(0, 2).toUpperCase() : 'US'}
           </div>
           <div className="min-w-0">
-            <h2 className="text-sm font-bold text-fg truncate">
+            <h2 className="text-sm font-bold text-fg-muted truncate">
               {currentUser?.name || 'Пользователь'}
             </h2>
             <p className="text-xs font-medium text-accent truncate">
@@ -135,7 +135,7 @@ export const Drawer: React.FC = () => {
           type="button"
           onClick={() => setDrawerOpen(false)}
           aria-label="Закрыть меню"
-          className="w-10 h-10 flex items-center justify-center rounded-xl bg-surface-raised text-fg-muted hover:text-fg border border-border transition-colors"
+          className="w-10 h-10 flex items-center justify-center rounded-xl bg-surface-raised text-fg-muted hover:text-fg-muted border border-border transition-colors"
         >
           <X className="w-5 h-5" />
         </button>
@@ -171,7 +171,7 @@ export const Drawer: React.FC = () => {
                       className={`w-full flex items-center justify-between px-3.5 py-3 rounded-xl border text-left transition-all active:scale-[0.99] ${
                         isActive
                           ? 'bg-accent/10 text-accent border-accent/40 font-semibold shadow-xs'
-                          : 'bg-surface hover:bg-surface-raised text-fg border-border/80'
+                          : 'bg-surface hover:bg-surface-raised text-fg-muted border-border/80'
                       }`}
                     >
                       <div className="flex items-center gap-3 min-w-0">

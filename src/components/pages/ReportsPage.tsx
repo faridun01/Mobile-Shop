@@ -29,8 +29,14 @@ interface ReportsSummary {
   grossProfitUsd: number;
   grossProfitTjs: number;
   grossMarginPercent: number;
+  /** "Прибыль (с учетом возвратов)" — recognized profit plus retained refund penalties; the
+   *  one profit figure the summary card, per-store cards, and netProfitUsd/Tjs all share. */
+  profitUsd: number;
+  profitTjs: number;
   expensesTjs: number;
   expensesUsd: number;
+  periodRefundPenaltiesUsd: number;
+  periodRefundPenaltiesTjs: number;
   netProfitUsd: number;
   netProfitTjs: number;
   periodCashBonusesUsd: number;
@@ -68,10 +74,18 @@ export const ReportsPage: React.FC = () => {
 
   const [period, setPeriod] = useState<Period>('SPECIFIC_MONTH');
   const [selectedMonth, setSelectedMonth] = useState<string>(new Date().toISOString().substring(0, 7));
-  // Defaults to whichever store is currently active on the POS Terminal page —
-  // an admin picking a store there should see that same store here without
-  // re-picking it; they can still switch it locally afterward.
-  const [selectedStore, setSelectedStore] = useState<string>(globalSelectedStoreId || 'all');
+  // Defaults to whichever store is currently ACTIVE on the POS Terminal page — not just
+  // the raw global selection. SalePage falls back to its first selectable store when an
+  // admin hasn't touched its dropdown yet (see SalePage's own effectiveStoreId), without
+  // ever writing that fallback back into shared context — so mirror the exact same
+  // fallback here, otherwise this would show "все магазины" while POS Terminal is quietly
+  // operating on a specific store the admin never explicitly chose.
+  const [selectedStore, setSelectedStore] = useState<string>(() => {
+    if (currentUser?.role === 'SELLER' && currentUser.storeId) return currentUser.storeId;
+    const retail = stores.filter((s) => !s.isMainWarehouse);
+    if (retail.some((s) => s.id === globalSelectedStoreId)) return globalSelectedStoreId;
+    return retail[0]?.id || 'all';
+  });
   const [previewReport, setPreviewReport] = useState<null | 'inventory' | 'expenses' | 'repairs'>(null);
   // Which store's "Отчет по продажам" preview/download modal is open — 'all' for the
   // combined report across every store, a store id for a single one, null when closed.
@@ -145,14 +159,14 @@ export const ReportsPage: React.FC = () => {
   const previewTable = useMemo(() => {
     if (previewReport === 'inventory') return buildInventoryReportTable(exportDevices, stores, rate);
     if (previewReport === 'expenses') return buildExpensesReportTable(exportExpenses, rate);
-    if (previewReport === 'repairs') return buildRepairsReportTable(exportRepairs);
+    if (previewReport === 'repairs') return buildRepairsReportTable(exportRepairs, rate);
     return null;
   }, [previewReport, exportDevices, exportExpenses, exportRepairs, stores, rate]);
 
   const previewMeta: Record<'inventory' | 'expenses' | 'repairs', { title: string; download: () => void }> = {
     inventory: { title: 'Остатки склада', download: () => exportInventoryReport(exportDevices, stores, rate) },
     expenses: { title: 'Отчет по расходам', download: () => exportExpensesReport(exportExpenses, rate) },
-    repairs: { title: 'Журнал ремонтов', download: () => exportRepairsReport(exportRepairs) },
+    repairs: { title: 'Журнал ремонтов', download: () => exportRepairsReport(exportRepairs, rate) },
   };
 
   // Per-store "Отчет по продажам": each store gets its own totals and its own
@@ -168,20 +182,11 @@ export const ReportsPage: React.FC = () => {
 
   const salesReportTable = useMemo(() => {
     if (!salesReportStoreId) return null;
-    return buildSalesReportTable(salesByStore.get(salesReportStoreId) ?? [], rate);
-  }, [salesReportStoreId, salesByStore, rate]);
-
-  // Same table (and therefore the same numbers) as the matching "Отчет по продажам" card
-  // for the current store filter — revenue/profit must never be computed twice, independently,
-  // or the two cards silently disagree (profit here already accounts for refund penalties,
-  // same as buildSalesReportTable does).
-  const analysisTable = useMemo(
-    () => buildSalesReportTable(salesByStore.get(selectedStore) ?? [], rate),
-    [salesByStore, selectedStore, rate]
-  );
-  const analysisRevenueUsd = Number(analysisTable.totalsRow[7]);
-  const analysisRevenueTjs = Number(analysisTable.totalsRow[8]);
-  const analysisProfitUsd = Number(analysisTable.totalsRow[9]);
+    // periodCashBonusesUsd isn't store-scoped on the backend (supplier bonuses aren't tied
+    // to a retail store), so it's the same figure regardless of which store's report this is —
+    // safe to reuse from filteredData even when salesReportStoreId differs from selectedStore.
+    return buildSalesReportTable(salesByStore.get(salesReportStoreId) ?? [], rate, summary?.periodCashBonusesUsd ?? 0);
+  }, [salesReportStoreId, salesByStore, rate, summary?.periodCashBonusesUsd]);
 
   const salesReportStoreName = salesReportStoreId === 'all'
     ? 'Все магазины'
@@ -190,7 +195,10 @@ export const ReportsPage: React.FC = () => {
   const filteredData: ReportsSummary = summary ?? {
     unitsSold: 0, revenueUsd: 0, revenueTjs: 0, cogsUsd: 0, cogsTjs: 0,
     grossProfitUsd: 0, grossProfitTjs: 0, grossMarginPercent: 0,
-    expensesTjs: 0, expensesUsd: 0, netProfitUsd: 0, netProfitTjs: 0,
+    profitUsd: 0, profitTjs: 0,
+    expensesTjs: 0, expensesUsd: 0,
+    periodRefundPenaltiesUsd: 0, periodRefundPenaltiesTjs: 0,
+    netProfitUsd: 0, netProfitTjs: 0,
     periodCashBonusesUsd: 0, periodCashBonusesTjs: 0,
     giftDeviceUnitsSold: 0, giftDeviceProfitUsd: 0, giftDeviceProfitTjs: 0,
     periodFreeDeviceBonusesReceived: 0, freeDeviceBonusesInStock: 0,
@@ -203,23 +211,16 @@ export const ReportsPage: React.FC = () => {
   if (currentUser?.role === 'SELLER') {
     return (
       <div className="p-8 text-center text-fg-subtle text-xs">
-        <p className="font-bold text-fg">ДОСТУП ОГРАНИЧЕН</p>
+        <p className="font-bold text-fg-muted">ДОСТУП ОГРАНИЧЕН</p>
         <p className="mt-1">Финансовые отчеты доступны только руководству</p>
       </div>
     );
   }
 
   return (
-    <div className="flex-1 flex flex-col h-full overflow-hidden bg-bg text-fg">
+    <div className="flex-1 flex flex-col h-full overflow-hidden bg-bg text-fg-muted">
       {/* Top Filter Bar */}
-      <div className="p-3 border-b border-border bg-surface flex flex-col lg:flex-row lg:items-center justify-between gap-2.5 shrink-0">
-        <div>
-          <h3 className="text-xs font-bold text-fg flex items-center space-x-1.5 uppercase">
-            <BarChart3 className="w-4 h-4 text-accent" />
-            <span>ФИНАНСОВЫЙ И БАЛАНСОВЫЙ ОТЧЕТ</span>
-          </h3>
-        </div>
-
+      <div className="p-3 border-b border-border bg-surface flex flex-col lg:flex-row lg:items-center justify-end gap-2.5 shrink-0">
         <div className="flex flex-wrap items-center gap-2 text-xs">
           {/* Period selector — just the month; picking one shows every report for it. */}
           <div className="flex items-center space-x-1.5">
@@ -242,7 +243,7 @@ export const ReportsPage: React.FC = () => {
           <select
             value={selectedStore}
             onChange={(e) => setSelectedStore(e.target.value)}
-            className="rounded-lg bg-surface-raised border border-border px-2.5 py-1.5 text-xs text-fg focus:outline-none focus:border-accent"
+            className="rounded-lg bg-surface-raised border border-border px-2.5 py-1.5 text-xs text-fg-muted focus:outline-none focus:border-accent"
           >
             <option value="all">ВСЕ МАГАЗИНЫ</option>
             {stores.filter(s => !s.isMainWarehouse).map(s => (
@@ -257,11 +258,12 @@ export const ReportsPage: React.FC = () => {
 
         {/* OVERALL ANALYSIS: styled exactly like the "Отчет по продажам" cards below it —
             same card shell, same header/stat layout — instead of a separate, bigger design.
-            Revenue/profit here are the SAME buildSalesReportTable totals as those cards use,
-            so the two never show different numbers for the same store/period again. */}
+            Revenue/profit/expenses/net-profit here all come from the same server-computed
+            summary (filteredData) as the per-store cards below (filteredData.storeBreakdown),
+            so the numbers on this card and on those cards never disagree with each other. */}
         <div className="p-2.5 rounded-xl bg-surface border border-border space-y-2 flex flex-col max-w-sm">
           <div className="flex items-center justify-between">
-            <span className="font-bold text-fg text-xs flex items-center gap-1.5">
+            <span className="font-bold text-fg-muted text-xs flex items-center gap-1.5">
               <BarChart3 className="w-3 h-3 text-accent" />
               ОБЩИЙ АНАЛИЗ · {selectedStoreName}
             </span>
@@ -272,13 +274,13 @@ export const ReportsPage: React.FC = () => {
           <div className="grid grid-cols-2 gap-1.5">
             <div>
               <p className="text-fg-subtle text-[9px] uppercase">Выручка</p>
-              <p className="font-bold text-fg text-xs">{analysisRevenueTjs.toLocaleString()} TJS</p>
+              <p className="font-bold text-fg-muted text-xs">{filteredData.revenueTjs.toLocaleString()} TJS</p>
             </div>
 
             <div>
               <p className="text-fg-subtle text-[9px] uppercase">Прибыль (с учетом возвратов)</p>
-              <p className={`font-bold text-xs ${analysisProfitUsd >= 0 ? 'text-accent' : 'text-danger'}`}>
-                {analysisProfitUsd >= 0 ? '+' : ''}${analysisProfitUsd.toLocaleString()}
+              <p className={`font-bold text-xs ${filteredData.profitUsd >= 0 ? 'text-accent' : 'text-danger'}`}>
+                {filteredData.profitUsd >= 0 ? '+' : ''}${filteredData.profitUsd.toLocaleString()}
               </p>
             </div>
 
@@ -293,6 +295,19 @@ export const ReportsPage: React.FC = () => {
                 ${filteredData.netProfitUsd.toLocaleString()}
               </p>
             </div>
+
+            {/* Only nonzero component of netProfit not already visible above (Прибыль already
+                folds in refund penalties) — shown so Прибыль − Расход + Бонусы = Чистая прибыль
+                actually reconciles on screen instead of netProfit silently including money the
+                card never mentions. */}
+            {filteredData.periodCashBonusesUsd !== 0 && (
+              <div className="col-span-2">
+                <p className="text-fg-subtle text-[9px] uppercase">Бонусы поставщиков (наличными)</p>
+                <p className="font-bold text-accent text-xs">
+                  +${filteredData.periodCashBonusesUsd.toLocaleString()}
+                </p>
+              </div>
+            )}
           </div>
           <button
             onClick={() => setSalesReportStoreId(selectedStore)}
@@ -313,15 +328,17 @@ export const ReportsPage: React.FC = () => {
             <span className="text-[9px] font-normal normal-case text-fg-subtle">({periodLabel})</span>
           </h4>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5 sm:gap-3">
-            {[{ id: 'all', name: 'Все магазины' }, ...retailStores].map((store) => {
+            {[...(selectedStore === 'all' ? [{ id: 'all', name: 'Все магазины' }] : []), ...retailStores].map((store) => {
               const storeSales = salesByStore.get(store.id) ?? [];
-              const table = buildSalesReportTable(storeSales, rate);
-              const revenueTjs = table.totalsRow[8] as string;
-              const profitUsd = Number(table.totalsRow[9]);
+              // Same recognized-profit figures as the summary card above (filteredData.storeBreakdown),
+              // instead of a second, independent per-item calculation that could disagree with it.
+              const breakdown = filteredData.storeBreakdown.find((b) => b.storeId === store.id);
+              const revenueTjs = store.id === 'all' ? filteredData.revenueTjs : (breakdown?.revenueTjs ?? 0);
+              const profitUsd = store.id === 'all' ? filteredData.profitUsd : (breakdown?.profitUsd ?? 0);
               return (
                 <div key={store.id} className="p-3.5 rounded-xl bg-surface border border-border space-y-2.5 flex flex-col">
                   <div className="flex items-center justify-between">
-                    <span className="font-bold text-fg text-sm flex items-center gap-1.5">
+                    <span className="font-bold text-fg-muted text-sm flex items-center gap-1.5">
                       <StoreIcon className="w-3.5 h-3.5 text-accent" />
                       {store.name}
                     </span>
@@ -332,7 +349,7 @@ export const ReportsPage: React.FC = () => {
                   <div className="grid grid-cols-2 gap-2">
                     <div>
                       <p className="text-fg-subtle text-[10px] uppercase">Выручка</p>
-                      <p className="font-bold text-fg text-sm">{Number(revenueTjs).toLocaleString()} TJS</p>
+                      <p className="font-bold text-fg-muted text-sm">{Number(revenueTjs).toLocaleString()} TJS</p>
                     </div>
                     <div>
                       <p className="text-fg-subtle text-[10px] uppercase">Прибыль (с учетом возвратов)</p>
@@ -340,6 +357,17 @@ export const ReportsPage: React.FC = () => {
                         {profitUsd >= 0 ? '+' : ''}${profitUsd.toLocaleString()}
                       </p>
                     </div>
+                    {/* Supplier bonuses are tied to the supplier/main warehouse, not a specific
+                        retail store — shown only on the combined "Все магазины" card so it
+                        never looks like one branch personally received the bonus. */}
+                    {store.id === 'all' && filteredData.periodCashBonusesUsd !== 0 && (
+                      <div className="col-span-2">
+                        <p className="text-fg-subtle text-[10px] uppercase">Бонусы поставщиков (наличными)</p>
+                        <p className="font-bold text-accent text-sm">
+                          +${filteredData.periodCashBonusesUsd.toLocaleString()}
+                        </p>
+                      </div>
+                    )}
                   </div>
                   <button
                     onClick={() => setSalesReportStoreId(store.id)}
@@ -376,9 +404,9 @@ export const ReportsPage: React.FC = () => {
                   {filteredData.topSuppliersByDebt.map((s, idx) => (
                     <tr key={s.id} className="hover:bg-surface-raised transition-colors">
                       <td className="py-2 px-3 text-fg-subtle font-bold">{idx + 1}</td>
-                      <td className="py-2 px-3 font-bold text-fg">{s.name}</td>
+                      <td className="py-2 px-3 font-bold text-fg-muted">{s.name}</td>
                       <td className="py-2 px-3 text-right text-fg-subtle">${s.totalPurchasedUsd.toLocaleString()}</td>
-                      <td className="py-2 px-3 text-right text-fg">${s.totalPaidUsd.toLocaleString()}</td>
+                      <td className="py-2 px-3 text-right text-fg-muted">${s.totalPaidUsd.toLocaleString()}</td>
                       <td className="py-2 px-3 text-right font-bold text-danger">${s.totalDebtUsd.toLocaleString()}</td>
                     </tr>
                   ))}
@@ -420,9 +448,9 @@ export const ReportsPage: React.FC = () => {
                     return (
                       <tr key={m.name} className="hover:bg-surface-raised transition-colors">
                         <td className="py-2 px-3 text-fg-subtle font-bold">{idx + 1}</td>
-                        <td className="py-2 px-3 font-bold text-fg">{m.name}</td>
+                        <td className="py-2 px-3 font-bold text-fg-muted">{m.name}</td>
                         <td className="py-2 px-3 text-center text-fg-muted font-bold">{m.count}</td>
-                        <td className="py-2 px-3 text-right text-fg">${m.revenueUsd.toFixed(2)}</td>
+                        <td className="py-2 px-3 text-right text-fg-muted">${m.revenueUsd.toFixed(2)}</td>
                         <td className="py-2 px-3 text-right text-fg-subtle">${m.cogsUsd.toFixed(2)}</td>
                         <td className={`py-2 px-3 text-right font-bold ${m.profitUsd >= 0 ? 'text-accent' : 'text-danger'}`}>
                           {m.profitUsd >= 0 ? '+' : ''}${m.profitUsd.toFixed(2)}
@@ -454,7 +482,7 @@ export const ReportsPage: React.FC = () => {
             <div className="p-3 rounded-xl bg-surface-raised border border-border space-y-2 flex flex-col justify-between">
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between">
-                  <span className="font-bold text-fg text-xs">Остатки склада</span>
+                  <span className="font-bold text-fg-muted text-xs">Остатки склада</span>
                   <span className="text-[10px] text-accent bg-accent/10 px-1.5 py-0.5 rounded-md border border-accent/20">
                     {exportDevices.length} устройств
                   </span>
@@ -465,7 +493,7 @@ export const ReportsPage: React.FC = () => {
               </div>
               <button
                 onClick={() => setPreviewReport('inventory')}
-                className="w-full py-2 px-3 rounded-lg bg-surface hover:bg-surface-raised text-fg border border-border font-bold text-xs flex items-center justify-center space-x-2 transition-colors mt-2"
+                className="w-full py-2 px-3 rounded-lg bg-surface hover:bg-surface-raised text-fg-muted border border-border font-bold text-xs flex items-center justify-center space-x-2 transition-colors mt-2"
               >
                 <Download className="w-3.5 h-3.5" />
                 <span>ПРОСМОТР И СКАЧИВАНИЕ</span>
@@ -476,7 +504,7 @@ export const ReportsPage: React.FC = () => {
             <div className="p-3 rounded-xl bg-surface-raised border border-border space-y-2 flex flex-col justify-between">
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between">
-                  <span className="font-bold text-fg text-xs">Отчет по расходам</span>
+                  <span className="font-bold text-fg-muted text-xs">Отчет по расходам</span>
                   <span className="text-[10px] text-danger bg-danger/10 px-1.5 py-0.5 rounded-md border border-danger/20">
                     {exportExpenses.length} записей
                   </span>
@@ -487,7 +515,7 @@ export const ReportsPage: React.FC = () => {
               </div>
               <button
                 onClick={() => setPreviewReport('expenses')}
-                className="w-full py-2 px-3 rounded-lg bg-surface hover:bg-surface-raised text-fg border border-border font-bold text-xs flex items-center justify-center space-x-2 transition-colors mt-2"
+                className="w-full py-2 px-3 rounded-lg bg-surface hover:bg-surface-raised text-fg-muted border border-border font-bold text-xs flex items-center justify-center space-x-2 transition-colors mt-2"
               >
                 <Download className="w-3.5 h-3.5" />
                 <span>ПРОСМОТР И СКАЧИВАНИЕ</span>
@@ -498,7 +526,7 @@ export const ReportsPage: React.FC = () => {
             <div className="p-3 rounded-xl bg-surface-raised border border-border space-y-2 flex flex-col justify-between">
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between">
-                  <span className="font-bold text-fg text-xs">Журнал ремонтов</span>
+                  <span className="font-bold text-fg-muted text-xs">Журнал ремонтов</span>
                   <span className="text-[10px] text-accent bg-accent/10 px-1.5 py-0.5 rounded-md border border-accent/20">
                     {exportRepairs.length} заказов
                   </span>
@@ -509,7 +537,7 @@ export const ReportsPage: React.FC = () => {
               </div>
               <button
                 onClick={() => setPreviewReport('repairs')}
-                className="w-full py-2 px-3 rounded-lg bg-surface hover:bg-surface-raised text-fg border border-border font-bold text-xs flex items-center justify-center space-x-2 transition-colors mt-2"
+                className="w-full py-2 px-3 rounded-lg bg-surface hover:bg-surface-raised text-fg-muted border border-border font-bold text-xs flex items-center justify-center space-x-2 transition-colors mt-2"
               >
                 <Download className="w-4 h-4" />
                 <span>ПРОСМОТР И СКАЧИВАНИЕ</span>
@@ -534,7 +562,7 @@ export const ReportsPage: React.FC = () => {
         title={`Отчет по продажам — ${salesReportStoreName}`}
         subtitle={periodLabel}
         table={salesReportTable}
-        onDownload={() => salesReportStoreId && exportSalesReport(salesByStore.get(salesReportStoreId) ?? [], rate)}
+        onDownload={() => salesReportStoreId && exportSalesReport(salesByStore.get(salesReportStoreId) ?? [], rate, filteredData.periodCashBonusesUsd)}
       />
     </div>
   );

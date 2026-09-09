@@ -11,12 +11,12 @@ import {
   Users,
   Search,
   Briefcase,
-  TrendingUp,
   CreditCard,
   Coins,
   Loader2
 } from 'lucide-react';
 import { StatusBanner, StatusMessage } from '../ui/StatusBanner';
+import { FilterPillGroup } from '../ui/FilterPillGroup';
 
 // Standard Russian noun pluralization (1 -> singular, 2-4 -> few, else -> many),
 // so the header stays correct whether the business has 2 partners or a third is added.
@@ -131,6 +131,11 @@ export const OwnersPage: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [typeFilter, setTypeFilter] = useState<'ALL' | 'PROFIT_PAYOUT' | 'INVESTMENT' | 'WITHDRAWAL' | 'REINVEST'>('ALL');
   const [selectedOwnerFilter, setSelectedOwnerFilter] = useState<string>('ALL');
+  // Defaults to showing every transaction ever recorded (matches the always-lifetime
+  // "Начислено прибыли" cards above) — a month filter is opt-in, not the default, so
+  // nothing that was visible before this filter existed suddenly disappears.
+  const [periodFilter, setPeriodFilter] = useState<'ALL' | 'SPECIFIC_MONTH'>('ALL');
+  const [selectedMonth, setSelectedMonth] = useState<string>(new Date().toISOString().substring(0, 7));
   const TRANSACTIONS_PAGE_SIZE = 15;
   const [transactionsPage, setTransactionsPage] = useState(1);
 
@@ -148,6 +153,9 @@ export const OwnersPage: React.FC = () => {
       if (selectedOwnerFilter !== 'ALL' && tx.ownerId !== selectedOwnerFilter) {
         return false;
       }
+      if (periodFilter === 'SPECIFIC_MONTH' && !(tx.date || '').split('T')[0].startsWith(selectedMonth)) {
+        return false;
+      }
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase().trim();
         const matchesOwner = (tx.ownerName || '').toLowerCase().includes(q);
@@ -160,13 +168,13 @@ export const OwnersPage: React.FC = () => {
       }
       return true;
     }).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-  }, [ownerTransactions, typeFilter, selectedOwnerFilter, searchQuery]);
+  }, [ownerTransactions, typeFilter, selectedOwnerFilter, periodFilter, selectedMonth, searchQuery]);
 
   // Changing a filter can leave the current page past the end of the new
   // (shorter) result set — snap back to page 1 whenever the filters change.
   useEffect(() => {
     setTransactionsPage(1);
-  }, [typeFilter, selectedOwnerFilter, searchQuery]);
+  }, [typeFilter, selectedOwnerFilter, periodFilter, selectedMonth, searchQuery]);
 
   const totalTransactionsPages = Math.max(1, Math.ceil(filteredTransactions.length / TRANSACTIONS_PAGE_SIZE));
   const paginatedTransactions = useMemo(() => {
@@ -179,14 +187,12 @@ export const OwnersPage: React.FC = () => {
   // goods — distinct from totalDebtUsd (still owed) and from stock already received but
   // not yet paid for, so it answers "how much of the invested capital is gone on inventory".
   const totalSpentOnGoodsUsd = useMemo(() => (suppliers || []).reduce((acc, s) => acc + (s.totalPaidUsd ?? 0), 0), [suppliers]);
-  const totalAccruedProfit = useMemo(() => owners.reduce((acc, o) => acc + (o.totalAccruedProfitUsd ?? 0), 0), [owners]);
-  const totalPayouts = useMemo(() => owners.reduce((acc, o) => acc + (o.totalPaidProfitUsd ?? 0), 0), [owners]);
   const totalAvailableProfit = useMemo(() => owners.reduce((acc, o) => acc + (o.availableProfitUsd ?? 0), 0), [owners]);
 
   if (currentUser?.role === 'SELLER') {
     return (
       <div className="p-8 text-center text-fg-muted text-xs">
-        <p className="font-bold text-fg uppercase">Доступ ограничен</p>
+        <p className="font-bold text-fg-muted uppercase">Доступ ограничен</p>
         <p className="mt-1 text-fg-subtle">Раздел собственников доступен только администраторам и партнерам</p>
       </div>
     );
@@ -201,7 +207,7 @@ export const OwnersPage: React.FC = () => {
             <Users className="w-6 h-6" />
           </div>
           <div>
-            <h3 className="font-bold text-fg uppercase text-sm">Владельцы не настроены</h3>
+            <h3 className="font-bold text-fg-muted uppercase text-sm">Владельцы не настроены</h3>
             <p className="mt-1 text-fg-subtle text-xs leading-relaxed">
               Инициализируйте владельцев в базе данных перед финансовыми операциями, вложениями и распределением прибыли.
             </p>
@@ -377,7 +383,7 @@ export const OwnersPage: React.FC = () => {
 
 
   return (
-    <div className="flex-1 flex flex-col h-full overflow-hidden bg-bg text-fg">
+    <div className="flex-1 flex flex-col h-full overflow-hidden bg-bg text-fg-muted">
       <StatusBanner message={statusBanner} onDismiss={() => setStatusBanner(null)} />
 
       {/* Row 1: Top Header Bar */}
@@ -392,7 +398,7 @@ export const OwnersPage: React.FC = () => {
               setStatusBanner(null);
               setIsQuarterModalOpen(true);
             }}
-            className="flex items-center space-x-1 px-2.5 py-1.5 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-500 text-[11px] font-bold transition-colors whitespace-nowrap shrink-0"
+            className="flex items-center space-x-1 px-2.5 py-1.5 rounded-xl bg-warning/10 hover:bg-warning/20 border border-warning/30 text-warning text-[11px] font-bold transition-colors whitespace-nowrap shrink-0"
             title="Сформировать квартальный отчёт партнеров и закрыть финансовый период"
           >
             <Briefcase className="w-3.5 h-3.5" />
@@ -401,7 +407,7 @@ export const OwnersPage: React.FC = () => {
 
           <button
             onClick={openSharesModal}
-            className="flex items-center space-x-1 px-2.5 py-1.5 rounded-xl bg-surface-raised hover:bg-surface border border-border text-fg text-[11px] font-bold transition-colors whitespace-nowrap shrink-0"
+            className="flex items-center space-x-1 px-2.5 py-1.5 rounded-xl bg-surface-raised hover:bg-surface border border-border text-fg-muted text-[11px] font-bold transition-colors whitespace-nowrap shrink-0"
           >
             <Percent className="w-3.5 h-3.5 text-accent" />
             <span>Доли партнеров</span>
@@ -412,13 +418,13 @@ export const OwnersPage: React.FC = () => {
       {/* Scrollable Main Content Container */}
       <div className="flex-1 overflow-y-auto p-3 sm:p-4 space-y-4 bg-bg">
         {/* KPI Cards Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {/* Card 1: Total Capital */}
           <div className="p-3.5 rounded-xl bg-surface border border-border flex items-start justify-between">
             <div>
               <span className="text-[10px] text-fg-subtle uppercase block font-semibold">Общий вложенный капитал</span>
               <div className="flex items-baseline space-x-1.5 mt-1">
-                <span className="text-xl font-bold text-fg">
+                <span className="text-xl font-bold text-fg-muted">
                   ${totalCapitalInvested.toLocaleString()}
                 </span>
                 <span className="text-xs text-fg-subtle font-medium">USD</span>
@@ -432,44 +438,6 @@ export const OwnersPage: React.FC = () => {
             </div>
             <div className="p-2 rounded-xl bg-accent/10 border border-accent/20 text-accent shrink-0">
               <Briefcase className="w-4 h-4" />
-            </div>
-          </div>
-
-          {/* Card 2: Accrued Profit */}
-          <div className="p-3.5 rounded-xl bg-surface border border-border flex items-start justify-between">
-            <div>
-              <span className="text-[10px] text-fg-subtle uppercase block font-semibold">Начислено прибыли</span>
-              <div className="flex items-baseline space-x-1.5 mt-1">
-                <span className="text-xl font-bold text-fg">
-                  ${totalAccruedProfit.toLocaleString()}
-                </span>
-                <span className="text-xs text-fg-subtle font-medium">USD</span>
-              </div>
-              <span className="text-[10px] text-fg-muted block mt-0.5">
-                ≈ {(Math.round(totalAccruedProfit * rate)).toLocaleString()} TJS
-              </span>
-            </div>
-            <div className="p-2 rounded-xl bg-info/10 border border-info/20 text-info shrink-0">
-              <TrendingUp className="w-4 h-4" />
-            </div>
-          </div>
-
-          {/* Card 3: Paid Profit */}
-          <div className="p-3.5 rounded-xl bg-surface border border-border flex items-start justify-between">
-            <div>
-              <span className="text-[10px] text-fg-subtle uppercase block font-semibold">Выплачено дивидендов</span>
-              <div className="flex items-baseline space-x-1.5 mt-1">
-                <span className="text-xl font-bold text-accent">
-                  ${totalPayouts.toLocaleString()}
-                </span>
-                <span className="text-xs text-fg-subtle font-medium">USD</span>
-              </div>
-              <span className="text-[10px] text-fg-muted block mt-0.5">
-                ≈ {(Math.round(totalPayouts * rate)).toLocaleString()} TJS
-              </span>
-            </div>
-            <div className="p-2 rounded-xl bg-accent/10 border border-accent/20 text-accent shrink-0">
-              <Coins className="w-4 h-4" />
             </div>
           </div>
 
@@ -496,7 +464,7 @@ export const OwnersPage: React.FC = () => {
         {/* Section 1: Owners Cards (2-Column Grid) */}
         <div className="p-4 rounded-xl bg-surface border border-border space-y-3.5 shadow-xs">
           <div className="flex items-center justify-between pb-2 border-b border-border">
-            <span className="text-xs font-bold text-fg uppercase tracking-wider flex items-center space-x-2">
+            <span className="text-xs font-bold text-fg-muted uppercase tracking-wider flex items-center space-x-2">
               <Briefcase className="w-4 h-4 text-accent" />
               <span>СОБСТВЕННИКИ И ВЛОЖЕНИЯ</span>
             </span>
@@ -521,7 +489,7 @@ export const OwnersPage: React.FC = () => {
                         </div>
                         <div>
                           <div className="flex items-center space-x-2 flex-wrap gap-y-1">
-                            <h4 className="text-xs sm:text-sm font-bold text-fg">{info.name}</h4>
+                            <h4 className="text-xs sm:text-sm font-bold text-fg-muted">{info.name}</h4>
                             <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-accent/15 border border-accent/30 text-accent uppercase tracking-wider">
                               {info.roleTag}
                             </span>
@@ -552,7 +520,7 @@ export const OwnersPage: React.FC = () => {
                         <span className="text-accent font-bold">ВЛОЖЕНИЕ</span>
                       </div>
                       <div className="flex items-baseline justify-between">
-                        <span className="text-base sm:text-lg text-fg font-bold">
+                        <span className="text-base sm:text-lg text-fg-muted font-bold">
                           ${(owner.capitalBalanceUsd ?? 0).toLocaleString()} USD
                         </span>
                         <span className="text-xs text-fg-subtle">
@@ -569,7 +537,7 @@ export const OwnersPage: React.FC = () => {
                         <div className="grid grid-cols-2 gap-2 text-xs">
                           <div className="p-2.5 rounded-xl bg-surface border border-border">
                             <span className="text-fg-subtle block text-[10px] uppercase">Чистая прибыль ({sharePct}%)</span>
-                            <span className="text-emerald-400 font-bold text-xs mt-0.5 block">
+                            <span className="text-accent font-bold text-xs mt-0.5 block">
                               ${ownerProfitUsd.toLocaleString()} USD
                             </span>
                             <span className="text-[10px] text-fg-muted block">
@@ -638,7 +606,7 @@ export const OwnersPage: React.FC = () => {
           <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border pb-3">
             <div className="flex items-center space-x-2">
               <CreditCard className="w-4 h-4 text-accent" />
-              <span className="font-bold text-xs text-fg uppercase tracking-wide">
+              <span className="font-bold text-xs text-fg-muted uppercase tracking-wide">
                 ИСТОРИЯ ФИНАНСОВЫХ ОПЕРАЦИЙ
               </span>
               <span className="text-[10px] px-2.5 py-0.5 rounded-full bg-accent/15 border border-accent/30 text-accent font-bold">
@@ -657,12 +625,12 @@ export const OwnersPage: React.FC = () => {
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder="Поиск по партнеру / примечанию / сумме..."
-                  className="w-full rounded-xl bg-surface-raised border border-border pl-9 pr-8 py-1.5 text-xs text-fg placeholder-fg-subtle focus:border-accent focus:outline-none transition-colors"
+                  className="w-full rounded-xl bg-surface-raised border border-border pl-9 pr-8 py-1.5 text-xs text-fg-muted placeholder-fg-subtle focus:border-accent focus:outline-none transition-colors"
                 />
                 {searchQuery && (
                   <button
                     onClick={() => setSearchQuery('')}
-                    className="absolute right-2.5 top-2.5 text-fg-subtle hover:text-fg"
+                    className="absolute right-2.5 top-2.5 text-fg-subtle hover:text-fg-muted"
                   >
                     <X className="w-3.5 h-3.5" />
                   </button>
@@ -672,13 +640,29 @@ export const OwnersPage: React.FC = () => {
               <select
                 value={selectedOwnerFilter}
                 onChange={(e) => setSelectedOwnerFilter(e.target.value)}
-                className="bg-surface-raised border border-border text-fg text-xs font-semibold rounded-xl px-3 py-1.5 focus:outline-none focus:border-accent shrink-0"
+                className="bg-surface-raised border border-border text-fg-muted text-xs font-semibold rounded-xl px-3 py-1.5 focus:outline-none focus:border-accent shrink-0"
               >
                 <option value="ALL">Все партнеры</option>
                 {displayOwners.map((o, idx) => (
                   <option key={o.id} value={o.id}>{getOwnerDetails(o).name}</option>
                 ))}
               </select>
+
+              <FilterPillGroup
+                options={[{ value: 'ALL', label: 'Все время' }, { value: 'SPECIFIC_MONTH', label: 'Месяц' }]}
+                value={periodFilter}
+                onChange={(v) => setPeriodFilter(v as typeof periodFilter)}
+                className="shrink-0"
+              />
+
+              {periodFilter === 'SPECIFIC_MONTH' && (
+                <input
+                  type="month"
+                  value={selectedMonth}
+                  onChange={(e) => e.target.value && setSelectedMonth(e.target.value)}
+                  className="h-9 px-2 rounded-lg border border-accent bg-surface text-[11px] font-semibold text-accent focus:outline-none shrink-0 cursor-pointer"
+                />
+              )}
             </div>
 
             {/* Category Filter Pills */}
@@ -784,7 +768,7 @@ export const OwnersPage: React.FC = () => {
                             {isReinvest ? '🔄 РЕИНВЕСТИРОВАНИЕ' : isDeposit ? '📥 ВНЕСЕНИЕ КАПИТАЛА' : isPayout ? '📤 ВЫПЛАТА ПРИБЫЛИ' : '🏦 ВЫВОД КАПИТАЛА'}
                           </span>
 
-                          <span className="text-xs font-bold text-fg">
+                          <span className="text-xs font-bold text-fg-muted">
                             {tx.ownerName}
                           </span>
                         </div>
@@ -798,7 +782,7 @@ export const OwnersPage: React.FC = () => {
                         <div className="flex items-center space-x-2 text-[10px] text-fg-subtle">
                           <span>{tx.date}</span>
                           <span>•</span>
-                          <span>Провел: <strong className="text-fg font-semibold">{tx.createdByName || 'Администратор'}</strong></span>
+                          <span>Провел: <strong className="text-fg-muted font-semibold">{tx.createdByName || 'Администратор'}</strong></span>
                         </div>
                       </div>
                     </div>
@@ -821,7 +805,7 @@ export const OwnersPage: React.FC = () => {
           {totalTransactionsPages > 1 && (
             <div className="flex items-center justify-between gap-2 pt-3 border-t border-border text-xs">
               <span className="text-fg-subtle">
-                Страница <strong className="text-fg">{transactionsPage}</strong> из <strong className="text-fg">{totalTransactionsPages}</strong>
+                Страница <strong className="text-fg-muted">{transactionsPage}</strong> из <strong className="text-fg-muted">{totalTransactionsPages}</strong>
                 <span className="hidden sm:inline"> · {filteredTransactions.length} событий всего</span>
               </span>
               <div className="flex items-center gap-1.5">
@@ -829,7 +813,7 @@ export const OwnersPage: React.FC = () => {
                   type="button"
                   onClick={() => setTransactionsPage(p => Math.max(1, p - 1))}
                   disabled={transactionsPage === 1}
-                  className="px-3 py-1.5 rounded-lg bg-surface-raised hover:bg-surface border border-border text-fg-muted hover:text-fg font-bold disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                  className="px-3 py-1.5 rounded-lg bg-surface-raised hover:bg-surface border border-border text-fg-muted hover:text-fg-muted font-bold disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                 >
                   ← Назад
                 </button>
@@ -837,7 +821,7 @@ export const OwnersPage: React.FC = () => {
                   type="button"
                   onClick={() => setTransactionsPage(p => Math.min(totalTransactionsPages, p + 1))}
                   disabled={transactionsPage === totalTransactionsPages}
-                  className="px-3 py-1.5 rounded-lg bg-surface-raised hover:bg-surface border border-border text-fg-muted hover:text-fg font-bold disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                  className="px-3 py-1.5 rounded-lg bg-surface-raised hover:bg-surface border border-border text-fg-muted hover:text-fg-muted font-bold disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                 >
                   Вперед →
                 </button>
@@ -850,16 +834,16 @@ export const OwnersPage: React.FC = () => {
       {/* MODAL: Edit Shares Percent */}
       {isSharesModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-xs">
-          <form onSubmit={handleSaveShares} className="w-full max-w-sm rounded-2xl bg-surface border border-border p-5 text-fg shadow-2xl space-y-4 text-xs">
+          <form onSubmit={handleSaveShares} className="w-full max-w-sm rounded-2xl bg-surface border border-border p-5 text-fg-muted shadow-2xl space-y-4 text-xs">
             <div className="flex items-center justify-between pb-3 border-b border-border">
-              <h4 className="text-sm font-bold text-fg uppercase tracking-wide flex items-center space-x-2">
+              <h4 className="text-sm font-bold text-fg-muted uppercase tracking-wide flex items-center space-x-2">
                 <Percent className="w-4 h-4 text-accent" />
                 <span>ДОЛИ ПАРТНЕРОВ В БИЗНЕСЕ</span>
               </h4>
               <button
                 type="button"
                 onClick={() => setIsSharesModalOpen(false)}
-                className="text-fg-subtle hover:text-fg"
+                className="text-fg-subtle hover:text-fg-muted"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -894,7 +878,7 @@ export const OwnersPage: React.FC = () => {
                       value={owner.userId ?? ''}
                       disabled={linkingOwnerId === owner.id}
                       onChange={(e) => handleChangeLinkedUser(owner.id, e.target.value)}
-                      className="w-full rounded-xl bg-surface-raised border border-border px-3 py-2 text-xs text-fg focus:border-accent focus:outline-none disabled:opacity-50"
+                      className="w-full rounded-xl bg-surface-raised border border-border px-3 py-2 text-xs text-fg-muted focus:border-accent focus:outline-none disabled:opacity-50"
                     >
                       <option value="">— не привязан —</option>
                       {users.filter(u => u.role === 'ADMIN' || u.role === 'PARTNER').map(u => (
@@ -931,16 +915,16 @@ export const OwnersPage: React.FC = () => {
       {/* MODAL: Capital Transaction */}
       {isTxModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-xs">
-          <form onSubmit={handleCreateTx} className="w-full max-w-sm rounded-2xl bg-surface border border-border p-5 text-fg shadow-2xl space-y-4 text-xs">
+          <form onSubmit={handleCreateTx} className="w-full max-w-sm rounded-2xl bg-surface border border-border p-5 text-fg-muted shadow-2xl space-y-4 text-xs">
             <div className="flex items-center justify-between pb-3 border-b border-border">
-              <h4 className="text-sm font-bold text-fg uppercase flex items-center space-x-2">
+              <h4 className="text-sm font-bold text-fg-muted uppercase flex items-center space-x-2">
                 <CreditCard className="w-4 h-4 text-accent" />
                 <span>ОПЕРАЦИЯ С КАПИТАЛОМ</span>
               </h4>
               <button
                 type="button"
                 onClick={() => setIsTxModalOpen(false)}
-                className="text-fg-subtle hover:text-fg"
+                className="text-fg-subtle hover:text-fg-muted"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -952,7 +936,7 @@ export const OwnersPage: React.FC = () => {
                 <select
                   value={selectedOwnerId ?? ''}
                   onChange={(e) => setSelectedOwnerId(e.target.value)}
-                  className="w-full rounded-xl bg-surface-raised border border-border px-3 py-2 text-fg text-xs font-semibold focus:border-accent focus:outline-none"
+                  className="w-full rounded-xl bg-surface-raised border border-border px-3 py-2 text-fg-muted text-xs font-semibold focus:border-accent focus:outline-none"
                 >
                   {displayOwners.map((o, idx) => (
                     <option key={o.id} value={o.id}>{getOwnerDetails(o).name}</option>
@@ -962,7 +946,7 @@ export const OwnersPage: React.FC = () => {
 
               <div>
                 <label className="block text-fg-subtle text-[11px] uppercase mb-1 font-semibold">Операция</label>
-                <div className="w-full rounded-xl bg-surface-raised border border-border px-3 py-2 text-fg text-xs font-semibold">
+                <div className="w-full rounded-xl bg-surface-raised border border-border px-3 py-2 text-fg-muted text-xs font-semibold">
                   {TX_TYPE_LABELS[txType]}
                 </div>
               </div>
@@ -1028,7 +1012,7 @@ export const OwnersPage: React.FC = () => {
                   value={note ?? ''}
                   onChange={(e) => setNote(e.target.value)}
                   placeholder="Необязательно"
-                  className="w-full rounded-xl bg-surface-raised border border-border px-3 py-2 text-fg text-xs focus:border-accent focus:outline-none"
+                  className="w-full rounded-xl bg-surface-raised border border-border px-3 py-2 text-fg-muted text-xs focus:border-accent focus:outline-none"
                 />
               </div>
             </div>
@@ -1058,13 +1042,13 @@ export const OwnersPage: React.FC = () => {
       {/* MODAL: Quarterly Report & Period Settlement */}
       {isQuarterModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-xs">
-          <div className="w-full max-w-2xl rounded-2xl bg-surface border border-warning/40 p-5 text-fg shadow-2xl space-y-4 text-xs">
+          <div className="w-full max-w-2xl rounded-2xl bg-surface border border-warning/40 p-5 text-fg-muted shadow-2xl space-y-4 text-xs">
             <div className="flex items-center justify-between pb-3 border-b border-border">
               <h4 className="text-sm font-bold text-warning uppercase tracking-wide flex items-center space-x-2">
                 <Briefcase className="w-4 h-4 text-warning" />
                 <span>📊 КВАРТАЛЬНЫЙ ОТЧЕТ И ЗАКРЫТИЕ ФИНАНСОВОГО ПЕРИОДА</span>
               </h4>
-              <button type="button" onClick={() => setIsQuarterModalOpen(false)} className="text-fg-subtle hover:text-fg">
+              <button type="button" onClick={() => setIsQuarterModalOpen(false)} className="text-fg-subtle hover:text-fg-muted">
                 <X className="w-4 h-4" />
               </button>
             </div>
@@ -1090,7 +1074,7 @@ export const OwnersPage: React.FC = () => {
                 <select
                   value={selectedQuarterYear}
                   onChange={(e) => setSelectedQuarterYear(parseInt(e.target.value))}
-                  className="w-full rounded-xl bg-surface border border-border px-3 py-2 text-xs text-fg font-bold focus:border-warning focus:outline-none"
+                  className="w-full rounded-xl bg-surface border border-border px-3 py-2 text-xs text-fg-muted font-bold focus:border-warning focus:outline-none"
                 >
                   <option value={2026}>2026 год</option>
                   <option value={2025}>2025 год</option>
@@ -1102,7 +1086,7 @@ export const OwnersPage: React.FC = () => {
             {/* Breakdown Table */}
             <div className="space-y-2">
               <div className="flex items-center justify-between text-xs">
-                <span className="font-bold text-fg uppercase">Сводная ведомость по партнерам:</span>
+                <span className="font-bold text-fg-muted uppercase">Сводная ведомость по партнерам:</span>
                 <span className="text-[11px] text-fg-subtle">Валюта отчета: USD ($)</span>
               </div>
 
@@ -1122,24 +1106,24 @@ export const OwnersPage: React.FC = () => {
                   <tbody className="divide-y divide-border text-xs">
                     {displayOwners.map((o, idx) => (
                       <tr key={o.id} className="hover:bg-surface/50">
-                        <td className="p-2.5 font-bold text-fg">{getOwnerDetails(o).name}</td>
+                        <td className="p-2.5 font-bold text-fg-muted">{getOwnerDetails(o).name}</td>
                         <td className="p-2.5 text-center text-fg-subtle">{o.profitSharePercent || 0}%</td>
-                        <td className="p-2.5 text-right font-semibold text-fg">${(o.totalAccruedProfitUsd || 0).toLocaleString()}</td>
+                        <td className="p-2.5 text-right font-semibold text-fg-muted">${(o.totalAccruedProfitUsd || 0).toLocaleString()}</td>
                         <td className="p-2.5 text-right text-info">${(o.totalPaidProfitUsd || 0).toLocaleString()}</td>
                         <td className="p-2.5 text-right text-accent">${(o.totalReinvestedUsd || 0).toLocaleString()}</td>
                         <td className="p-2.5 text-right font-bold text-warning">${(o.availableProfitUsd || 0).toLocaleString()}</td>
-                        <td className="p-2.5 text-right font-semibold text-fg">${(o.capitalBalanceUsd || 0).toLocaleString()}</td>
+                        <td className="p-2.5 text-right font-semibold text-fg-muted">${(o.capitalBalanceUsd || 0).toLocaleString()}</td>
                       </tr>
                     ))}
                   </tbody>
                   <tfoot className="bg-surface font-bold border-t border-border text-xs">
                     <tr>
                       <td colSpan={2} className="p-2.5 uppercase text-fg-subtle">ИТОГО КВАРТАЛ:</td>
-                      <td className="p-2.5 text-right text-fg">${displayOwners.reduce((sum, o) => sum + (o.totalAccruedProfitUsd || 0), 0).toLocaleString()}</td>
+                      <td className="p-2.5 text-right text-fg-muted">${displayOwners.reduce((sum, o) => sum + (o.totalAccruedProfitUsd || 0), 0).toLocaleString()}</td>
                       <td className="p-2.5 text-right text-info">${displayOwners.reduce((sum, o) => sum + (o.totalPaidProfitUsd || 0), 0).toLocaleString()}</td>
                       <td className="p-2.5 text-right text-accent">${displayOwners.reduce((sum, o) => sum + (o.totalReinvestedUsd || 0), 0).toLocaleString()}</td>
                       <td className="p-2.5 text-right text-warning">${displayOwners.reduce((sum, o) => sum + (o.availableProfitUsd || 0), 0).toLocaleString()}</td>
-                      <td className="p-2.5 text-right text-fg">${displayOwners.reduce((sum, o) => sum + (o.capitalBalanceUsd || 0), 0).toLocaleString()}</td>
+                      <td className="p-2.5 text-right text-fg-muted">${displayOwners.reduce((sum, o) => sum + (o.capitalBalanceUsd || 0), 0).toLocaleString()}</td>
                     </tr>
                   </tfoot>
                 </table>
@@ -1148,7 +1132,7 @@ export const OwnersPage: React.FC = () => {
 
             {/* Quarter Settlement Option Checkbox */}
             <div className="p-3 rounded-xl bg-warning/10 border border-warning/30 space-y-2">
-              <label className="flex items-start space-x-2.5 cursor-pointer text-fg text-xs">
+              <label className="flex items-start space-x-2.5 cursor-pointer text-fg-muted text-xs">
                 <input
                   type="checkbox"
                   checked={transferRemainingToCapital}

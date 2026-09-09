@@ -157,7 +157,7 @@ export const BonusesPage: React.FC = () => {
   if (currentUser?.role === 'SELLER') {
     return (
       <div className="p-8 text-center text-fg-subtle">
-        <p className="text-sm font-medium text-fg">Доступ ограничен</p>
+        <p className="text-sm font-medium text-fg-muted">Доступ ограничен</p>
         <p className="text-xs mt-1">Раздел бонусов доступен только руководству</p>
       </div>
     );
@@ -215,10 +215,10 @@ export const BonusesPage: React.FC = () => {
   };
 
   return (
-    <div className="flex-1 flex flex-col h-full overflow-hidden bg-bg text-fg">
+    <div className="flex-1 flex flex-col h-full overflow-hidden bg-bg text-fg-muted">
       {/* Header */}
       <div className="p-3 sm:p-4 border-b border-border bg-surface flex items-center justify-between gap-3 shrink-0">
-        <h3 className="text-xs sm:text-sm font-bold text-fg uppercase tracking-wide flex items-center space-x-1.5">
+        <h3 className="text-xs sm:text-sm font-bold text-fg-muted uppercase tracking-wide flex items-center space-x-1.5">
           <Gift className="w-4 h-4 text-warning" />
           <span>БОНУСЫ И ПРОМО-ПРОГРАММЫ ПОСТАВЩИКОВ</span>
         </h3>
@@ -258,7 +258,7 @@ export const BonusesPage: React.FC = () => {
             >
               <div className="space-y-1 min-w-0">
                 <div className="flex items-center space-x-2">
-                  <span className="text-xs font-semibold text-fg">{bonus.campaignTitle || bonus.campaignName || `Бонус от ${bonus.supplierName}`}</span>
+                  <span className="text-xs font-semibold text-fg-muted">{bonus.campaignTitle || bonus.campaignName || `Бонус от ${bonus.supplierName}`}</span>
                   <span className={`text-[10px] px-2 py-0.5 rounded-md font-medium ${
                     bonus.bonusType === 'FREE_DEVICES' || bonus.deviceId
                       ? 'bg-warning/15 text-warning border border-warning/30'
@@ -268,7 +268,7 @@ export const BonusesPage: React.FC = () => {
                   </span>
                 </div>
                 <p className="text-xs text-fg-muted">
-                  Поставщик: <strong className="text-fg">{bonus.supplierName}</strong> • {bonus.date || bonus.dateReceived || ''}
+                  Поставщик: <strong className="text-fg-muted">{bonus.supplierName}</strong> • {bonus.date || bonus.dateReceived || ''}
                 </p>
 
                 {bonus.freeDevices && (
@@ -305,9 +305,9 @@ export const BonusesPage: React.FC = () => {
       {/* MODAL: Register Bonus */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-xs">
-          <form onSubmit={handleCreateBonus} className="w-full max-w-md rounded-2xl bg-surface border border-border p-5 text-fg shadow-2xl space-y-4">
+          <form onSubmit={handleCreateBonus} className="w-full max-w-md rounded-2xl bg-surface border border-border p-5 text-fg-muted shadow-2xl space-y-4">
             <div>
-              <h4 className="text-sm font-bold text-fg flex items-center space-x-2">
+              <h4 className="text-sm font-bold text-fg-muted flex items-center space-x-2">
                 <Award className="w-4 h-4 text-warning" />
                 <span>Регистрация бонуса от поставщика</span>
               </h4>
@@ -322,7 +322,7 @@ export const BonusesPage: React.FC = () => {
                 <select
                   value={supplierId ?? ''}
                   onChange={(e) => setSupplierId(e.target.value)}
-                  className="w-full rounded-xl bg-surface-raised border border-border px-3 py-2 text-fg focus:border-accent focus:outline-none"
+                  className="w-full rounded-xl bg-surface-raised border border-border px-3 py-2 text-fg-muted focus:border-accent focus:outline-none"
                 >
                   {suppliers.map(s => (
                     <option key={s.id} value={s.id}>{s.name}</option>
@@ -361,7 +361,7 @@ export const BonusesPage: React.FC = () => {
                     <select
                       value={destinationLocationId}
                       onChange={(e) => setDestinationLocationId(e.target.value)}
-                      className="w-full rounded-lg bg-surface border border-border px-2 py-1.5 text-xs text-fg focus:border-accent focus:outline-none"
+                      className="w-full rounded-lg bg-surface border border-border px-2 py-1.5 text-xs text-fg-muted focus:border-accent focus:outline-none"
                     >
                       <option value="main-warehouse">Главный склад</option>
                       {stores.filter(s => !s.isMainWarehouse).map(s => (
@@ -378,7 +378,7 @@ export const BonusesPage: React.FC = () => {
                       value={bonusBrand ?? ''}
                       onChange={(e) => setBonusBrand(e.target.value)}
                       placeholder="Apple"
-                      className="rounded-lg bg-surface border border-border px-2 py-1.5 text-xs text-fg focus:border-accent focus:outline-none"
+                      className="rounded-lg bg-surface border border-border px-2 py-1.5 text-xs text-fg-muted focus:border-accent focus:outline-none"
                     />
                     <datalist id="bonus-brand-suggestions">
                       {brandOptions.map(b => <option key={b} value={b} />)}
@@ -389,7 +389,7 @@ export const BonusesPage: React.FC = () => {
                       value={bonusModel ?? ''}
                       onChange={(e) => setBonusModel(e.target.value)}
                       placeholder="iPhone 16"
-                      className="rounded-lg bg-surface border border-border px-2 py-1.5 text-xs text-fg focus:border-accent focus:outline-none"
+                      className="rounded-lg bg-surface border border-border px-2 py-1.5 text-xs text-fg-muted focus:border-accent focus:outline-none"
                     />
                     <datalist id="bonus-model-suggestions">
                       {getModelOptions(bonusBrand).map(m => <option key={m} value={m} />)}
@@ -400,7 +400,7 @@ export const BonusesPage: React.FC = () => {
                       value={bonusStorage ?? ''}
                       onChange={(e) => setBonusStorage(e.target.value)}
                       placeholder="128 GB"
-                      className="rounded-lg bg-surface border border-border px-2 py-1.5 text-xs text-fg focus:border-accent focus:outline-none"
+                      className="rounded-lg bg-surface border border-border px-2 py-1.5 text-xs text-fg-muted focus:border-accent focus:outline-none"
                     />
                     <datalist id="bonus-storage-suggestions">
                       {storageOptions.map(s => <option key={s} value={s} />)}
@@ -411,7 +411,7 @@ export const BonusesPage: React.FC = () => {
                       value={bonusColor ?? ''}
                       onChange={(e) => setBonusColor(e.target.value)}
                       placeholder="Black"
-                      className="rounded-lg bg-surface border border-border px-2 py-1.5 text-xs text-fg focus:border-accent focus:outline-none"
+                      className="rounded-lg bg-surface border border-border px-2 py-1.5 text-xs text-fg-muted focus:border-accent focus:outline-none"
                     />
                     <datalist id="bonus-color-suggestions">
                       {colorOptions.map(c => <option key={c} value={c} />)}
@@ -430,7 +430,7 @@ export const BonusesPage: React.FC = () => {
                           value={bonusImei ?? ''}
                           onChange={(e) => setBonusImei(e.target.value)}
                           placeholder="351234567890123"
-                          className="flex-1 rounded-lg bg-surface border border-border px-2 py-1.5 text-xs text-fg focus:border-accent focus:outline-none"
+                          className="flex-1 rounded-lg bg-surface border border-border px-2 py-1.5 text-xs text-fg-muted focus:border-accent focus:outline-none"
                         />
                         <button
                           type="button"
@@ -453,7 +453,7 @@ export const BonusesPage: React.FC = () => {
                           value={bonusImei2 ?? ''}
                           onChange={(e) => setBonusImei2(e.target.value)}
                           placeholder="351234567890124 (по желанию)"
-                          className="flex-1 rounded-lg bg-surface border border-border px-2.5 py-1.5 text-xs text-fg focus:border-accent focus:outline-none"
+                          className="flex-1 rounded-lg bg-surface border border-border px-2.5 py-1.5 text-xs text-fg-muted focus:border-accent focus:outline-none"
                         />
                         <button
                           type="button"
@@ -546,18 +546,18 @@ export const BonusesPage: React.FC = () => {
                   <Gift className="w-4 h-4" />
                 </div>
                 <div>
-                  <h3 className="text-xs font-bold text-fg uppercase">
+                  <h3 className="text-xs font-bold text-fg-muted uppercase">
                     {selectedBonus.campaignTitle || selectedBonus.campaignName || `БОНУС ОТ ${selectedBonus.supplierName.toUpperCase()}`}
                   </h3>
                   <p className="text-[11px] text-fg-subtle mt-0.5">
-                    Поставщик: <strong className="text-fg">{selectedBonus.supplierName}</strong> • {selectedBonus.date || selectedBonus.dateReceived || ''}
+                    Поставщик: <strong className="text-fg-muted">{selectedBonus.supplierName}</strong> • {selectedBonus.date || selectedBonus.dateReceived || ''}
                   </p>
                 </div>
               </div>
 
               <button
                 onClick={() => setSelectedBonus(null)}
-                className="p-1.5 rounded-lg bg-surface-raised hover:bg-surface text-fg-subtle hover:text-fg border border-border transition-colors"
+                className="p-1.5 rounded-lg bg-surface-raised hover:bg-surface text-fg-subtle hover:text-fg-muted border border-border transition-colors"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -582,17 +582,17 @@ export const BonusesPage: React.FC = () => {
                     <div className="flex items-center justify-between text-xs">
                       <div className="flex items-center space-x-2">
                         <Smartphone className="w-4 h-4 text-accent" />
-                        <strong className="text-fg font-bold">{dev.brand} {dev.model}</strong>
+                        <strong className="text-fg-muted font-bold">{dev.brand} {dev.model}</strong>
                         <span className="text-fg-subtle text-[11px]">{dev.storage} • {dev.color}</span>
                       </div>
-                      <span className="text-[10px] px-2 py-0.5 rounded-md bg-purple-500/20 text-purple-400 border border-purple-500/40 font-bold uppercase">
+                      <span className="text-[10px] px-2 py-0.5 rounded-md bg-highlight/20 text-highlight border border-highlight/40 font-bold uppercase">
                         $0 ПОДАРОК
                       </span>
                     </div>
 
                     <div className="text-[11px] text-fg-subtle grid grid-cols-2 gap-2 pt-1 border-t border-border">
-                      <div>IMEI: <strong className="text-fg">{dev.imei || '358901200778899'}</strong></div>
-                      <div>Локация: <strong className="text-fg">{dev.locationName || 'Главный склад'}</strong></div>
+                      <div>IMEI: <strong className="text-fg-muted">{dev.imei || '358901200778899'}</strong></div>
+                      <div>Локация: <strong className="text-fg-muted">{dev.locationName || 'Главный склад'}</strong></div>
                       <div>Себестоимость: <strong className="text-accent font-bold">$0.00 (БЕСПЛАТНО)</strong></div>
                       <div>Статус: <strong className={dev.status === 'SOLD' ? 'text-warning' : 'text-accent'}>{dev.status === 'SOLD' ? 'ПРОДАН' : 'НА СКЛАДЕ'}</strong></div>
                     </div>
@@ -602,7 +602,7 @@ export const BonusesPage: React.FC = () => {
                 <div className="p-3 rounded-xl bg-surface-raised border border-border text-xs text-fg-muted space-y-1">
                   <div className="flex items-center space-x-2">
                     <Smartphone className="w-4 h-4 text-accent" />
-                    <strong className="text-fg">{selectedBonus.brand || 'Apple'} {selectedBonus.model || 'iPhone 16'}</strong>
+                    <strong className="text-fg-muted">{selectedBonus.brand || 'Apple'} {selectedBonus.model || 'iPhone 16'}</strong>
                     <span className="text-fg-subtle">({selectedBonus.storage || '128 GB'})</span>
                   </div>
                   <p className="text-[11px] text-fg-subtle">IMEI: {selectedBonus.imei || '316513218151383'}</p>

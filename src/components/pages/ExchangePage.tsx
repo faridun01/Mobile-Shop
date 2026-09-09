@@ -255,7 +255,7 @@ export const ExchangePage: React.FC = () => {
   };
 
   return (
-    <div className="flex-1 flex flex-col h-full overflow-hidden bg-bg text-fg">
+    <div className="flex-1 flex flex-col h-full overflow-hidden bg-bg text-fg-muted">
       <StatusBanner message={status} onDismiss={() => setStatus(null)} />
 
       <form onSubmit={handleSubmitExchange} className="flex-1 flex flex-col overflow-hidden">
@@ -267,7 +267,7 @@ export const ExchangePage: React.FC = () => {
               <div className="w-6 h-6 rounded-lg bg-accent/15 text-accent border border-accent/30 flex items-center justify-center text-xs font-bold shrink-0">
                 1
               </div>
-              <h3 className="text-xs md:text-sm font-bold uppercase tracking-wide text-fg">СДАВАЕМОЕ УСТРОЙСТВО (КЛИЕНТ)</h3>
+              <h3 className="text-xs md:text-sm font-bold uppercase tracking-wide text-fg-muted">СДАВАЕМОЕ УСТРОЙСТВО (КЛИЕНТ)</h3>
             </div>
 
             {/* Receipt / IMEI search bar */}
@@ -284,7 +284,7 @@ export const ExchangePage: React.FC = () => {
                       value={receiptSearch ?? ''}
                       onChange={(e) => setReceiptSearch(e.target.value)}
                       placeholder="Номер чека или IMEI..."
-                      className="w-full rounded-xl bg-surface border border-border pl-9 pr-3 py-2 text-xs text-fg placeholder-fg-subtle focus:border-accent focus:outline-none transition-colors"
+                      className="w-full rounded-xl bg-surface border border-border pl-9 pr-3 py-2 text-xs text-fg-muted placeholder-fg-subtle focus:border-accent focus:outline-none transition-colors"
                     />
                   </div>
                   <button
@@ -315,7 +315,7 @@ export const ExchangePage: React.FC = () => {
                         className="w-full text-left p-3 hover:bg-surface-raised flex items-center justify-between text-xs transition-colors"
                       >
                         <div>
-                          <p className="font-bold text-fg">{item.brand} {item.model}</p>
+                          <p className="font-bold text-fg-muted">{item.brand} {item.model}</p>
                           <p className="text-[11px] text-fg-muted mt-0.5">{item.storage} • {item.color}</p>
                           <p className="text-[10px] text-fg-subtle mt-0.5">IMEI: {item.imei}</p>
                         </div>
@@ -333,7 +333,7 @@ export const ExchangePage: React.FC = () => {
                     setSelectedOldDevice(null);
                     setExchangeInValueTjs(0);
                   }}
-                  className="absolute right-3.5 top-3.5 text-fg-subtle hover:text-fg transition-colors"
+                  className="absolute right-3.5 top-3.5 text-fg-subtle hover:text-fg-muted transition-colors"
                   title="Отменить выбор"
                 >
                   <X className="w-4 h-4" />
@@ -341,7 +341,7 @@ export const ExchangePage: React.FC = () => {
 
                 <div>
                   <span className="text-[10px] text-accent uppercase font-bold tracking-wider block">ПРИНИМАЕМЫЙ АППАРАТ</span>
-                  <h4 className="text-sm font-bold text-fg mt-0.5">
+                  <h4 className="text-sm font-bold text-fg-muted mt-0.5">
                     {selectedOldDevice.brand} {selectedOldDevice.model}
                   </h4>
                   <p className="text-xs text-fg-muted mt-0.5">
@@ -380,7 +380,7 @@ export const ExchangePage: React.FC = () => {
               <div className="w-6 h-6 rounded-lg bg-accent/15 text-accent border border-accent/30 flex items-center justify-center text-xs font-bold shrink-0">
                 2
               </div>
-              <h3 className="text-xs md:text-sm font-bold uppercase tracking-wide text-fg">ВЫДАВАЕМОЕ УСТРОЙСТВО (СО СКЛАДА)</h3>
+              <h3 className="text-xs md:text-sm font-bold uppercase tracking-wide text-fg-muted">ВЫДАВАЕМОЕ УСТРОЙСТВО (СО СКЛАДА)</h3>
             </div>
 
             {replacementDevice ? (
@@ -391,7 +391,7 @@ export const ExchangePage: React.FC = () => {
                     setReplacementDevice(null);
                     setNewPriceTjs(0);
                   }}
-                  className="absolute right-3.5 top-3.5 text-fg-subtle hover:text-fg transition-colors"
+                  className="absolute right-3.5 top-3.5 text-fg-subtle hover:text-fg-muted transition-colors"
                   title="Отменить выбор"
                 >
                   <X className="w-4 h-4" />
@@ -399,7 +399,7 @@ export const ExchangePage: React.FC = () => {
 
                 <div>
                   <span className="text-[10px] text-accent uppercase font-bold tracking-wider block">ВЫДАВАЕМЫЙ АППАРАТ</span>
-                  <h4 className="text-sm font-bold text-fg mt-0.5">
+                  <h4 className="text-sm font-bold text-fg-muted mt-0.5">
                     {replacementDevice.brand} {replacementDevice.model}
                   </h4>
                   <p className="text-xs text-fg-muted mt-0.5">
@@ -439,7 +439,7 @@ export const ExchangePage: React.FC = () => {
                       value={deviceSearchQuery ?? ''}
                       onChange={(e) => setDeviceSearchQuery(e.target.value)}
                       placeholder="Поиск по наличию / IMEI..."
-                      className="w-full rounded-xl bg-surface border border-border pl-9 pr-3 py-2 text-xs text-fg placeholder-fg-subtle focus:border-accent focus:outline-none transition-colors"
+                      className="w-full rounded-xl bg-surface border border-border pl-9 pr-3 py-2 text-xs text-fg-muted placeholder-fg-subtle focus:border-accent focus:outline-none transition-colors"
                     />
                   </div>
                   <button
@@ -467,7 +467,7 @@ export const ExchangePage: React.FC = () => {
                         className="w-full text-left p-3 hover:bg-surface-raised flex items-center justify-between text-xs transition-colors group"
                       >
                         <div>
-                          <p className="font-bold text-fg group-hover:text-accent transition-colors">{d.brand} {d.model}</p>
+                          <p className="font-bold text-fg-muted group-hover:text-accent transition-colors">{d.brand} {d.model}</p>
                           <p className="text-[11px] text-fg-muted mt-0.5">{d.storage} • {d.color}</p>
                           <p className="text-[10px] text-fg-subtle mt-0.5">IMEI: {d.imei}</p>
                         </div>
@@ -489,7 +489,7 @@ export const ExchangePage: React.FC = () => {
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
               <div className="flex items-center space-x-2">
                 <Banknote className="w-4.5 h-4.5 text-accent" />
-                <h4 className="text-xs md:text-sm font-bold uppercase text-fg">
+                <h4 className="text-xs md:text-sm font-bold uppercase text-fg-muted">
                   РАСЧЕТ РАЗНИЦЫ ОБМЕНА
                 </h4>
               </div>
@@ -596,7 +596,7 @@ export const ExchangePage: React.FC = () => {
             <span>·</span>
             <span>Зачет: <strong className="text-accent">{exchangeInValueTjs} TJS</strong></span>
             <span>·</span>
-            <span className="font-bold text-fg">
+            <span className="font-bold text-fg-muted">
               {differenceTjs > 0 ? `Доплата: +${differenceTjs} TJS` : differenceTjs < 0 ? `Возврат: ${differenceTjs} TJS` : 'Равный обмен'}
             </span>
           </div>

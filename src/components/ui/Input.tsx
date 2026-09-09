@@ -3,7 +3,7 @@ import { Check } from 'lucide-react';
 import { cn } from '../../utils/cn';
 
 const fieldBase =
-  'min-h-11 rounded-lg bg-surface border border-border px-3 text-sm text-fg placeholder:text-fg-subtle focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent disabled:opacity-50 transition-colors';
+  'min-h-11 rounded-lg bg-surface border border-border px-3 text-sm text-fg-muted placeholder:text-fg-subtle focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent disabled:opacity-50 transition-colors';
 
 export const Input = React.forwardRef<HTMLInputElement, React.InputHTMLAttributes<HTMLInputElement>>(
   ({ className, ...rest }, ref) => (
