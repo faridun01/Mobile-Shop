@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { SearchBar } from '../ui/SearchBar';
 import { FilterPillGroup } from '../ui/FilterPillGroup';
+import { MonthPicker } from '../ui/MonthPicker';
 import { Select } from '../ui/Input';
 import { Button } from '../ui/Button';
 import { Badge } from '../ui/Badge';
@@ -200,19 +201,15 @@ export const SalesHistoryPage: React.FC = () => {
               onChange={(v) => setPeriodFilter(v as typeof periodFilter)}
             />
 
-            <input
-              type="month"
+            <MonthPicker
               value={selectedMonth}
-              onChange={(e) => {
-                if (e.target.value) {
-                  setSelectedMonth(e.target.value);
-                  setPeriodFilter('SPECIFIC_MONTH');
-                }
+              onChange={(v) => {
+                setSelectedMonth(v);
+                setPeriodFilter('SPECIFIC_MONTH');
               }}
-              className={`h-9 px-3 rounded-lg border text-xs font-semibold bg-surface focus:outline-none cursor-pointer ${
+              className={`h-9 px-3 rounded-lg border text-xs font-semibold bg-surface focus:outline-none ${
                 periodFilter === 'SPECIFIC_MONTH' ? 'border-accent text-accent' : 'border-border text-fg-muted'
               }`}
-              title="Выбрать конкретный месяц"
             />
 
             {currentUser?.role !== 'SELLER' && retailStores.length > 0 && (

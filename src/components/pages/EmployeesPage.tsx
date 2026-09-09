@@ -20,6 +20,7 @@ import {
   EyeOff,
   Loader2
 } from 'lucide-react';
+import { MonthPicker } from '../ui/MonthPicker';
 
 const ROLE_CONFIG: Record<Role, { label: string; bg: string; color: string; border: string }> = {
   ADMIN: { label: 'Администратор', bg: 'bg-accent/15', color: 'text-accent', border: 'border-accent/30' },
@@ -1111,10 +1112,9 @@ export const EmployeesPage: React.FC = () => {
                   <span>ФИЛЬТР ПО МЕСЯЦУ:</span>
                 </label>
                 <div className="flex items-center space-x-2">
-                  <input
-                    type="month"
+                  <MonthPicker
                     value={selectedHistoryMonth === 'ALL' ? '' : selectedHistoryMonth}
-                    onChange={(e) => setSelectedHistoryMonth(e.target.value || 'ALL')}
+                    onChange={setSelectedHistoryMonth}
                     className="rounded-lg bg-surface border border-border px-3 py-1 text-xs text-warning font-bold focus:border-warning focus:outline-none"
                   />
                   {selectedHistoryMonth !== 'ALL' && (
@@ -1314,10 +1314,9 @@ export const EmployeesPage: React.FC = () => {
             {/* Month Selector */}
             <div className="flex items-center space-x-3 bg-bg p-3 rounded-lg border border-border">
               <label className="text-xs font-bold text-fg-subtle uppercase">ОТЧЕТНЫЙ МЕСЯЦ:</label>
-              <input
-                type="month"
+              <MonthPicker
                 value={selectedPayrollMonth}
-                onChange={(e) => setSelectedPayrollMonth(e.target.value)}
+                onChange={setSelectedPayrollMonth}
                 className="rounded-lg bg-surface border border-border px-3 py-1.5 text-xs text-warning font-bold focus:border-warning focus:outline-none"
               />
             </div>

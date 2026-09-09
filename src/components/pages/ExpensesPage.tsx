@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { SearchBar } from '../ui/SearchBar';
 import { FilterPillGroup } from '../ui/FilterPillGroup';
+import { MonthPicker } from '../ui/MonthPicker';
 import { Select, ToggleRow } from '../ui/Input';
 import { FormField } from '../ui/FormField';
 import { Button } from '../ui/Button';
@@ -372,11 +373,10 @@ export const ExpensesPage: React.FC = () => {
               />
 
               {periodFilter === 'SPECIFIC_MONTH' && (
-                <input
-                  type="month"
+                <MonthPicker
                   value={selectedMonth}
-                  onChange={(e) => e.target.value && setSelectedMonth(e.target.value)}
-                  className="h-8 px-2 rounded-lg border border-accent bg-surface text-[11px] font-semibold text-accent focus:outline-none shrink-0 cursor-pointer"
+                  onChange={setSelectedMonth}
+                  className="h-8 px-2 rounded-lg border border-accent bg-surface text-[11px] font-semibold text-accent focus:outline-none"
                 />
               )}
 

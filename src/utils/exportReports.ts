@@ -115,6 +115,7 @@ export function buildSalesReportTable(sales: Sale[], rate: number = 9.5, cashBon
     'Себестоимость ($)',
     'Цена продажи ($)',
     'Сумма продажи (TJS)',
+    'Курс на момент продажи',
     'Прибыль ($)',
     'Способ оплаты',
     'Статус'
@@ -159,6 +160,7 @@ export function buildSalesReportTable(sales: Sale[], rate: number = 9.5, cashBon
         costUsd.toFixed(2),
         priceUsd.toFixed(2),
         priceTjs.toFixed(2),
+        operationRate.toFixed(2),
         profitUsd.toFixed(2),
         sale.paymentMethod === 'CASH' ? 'Наличные' : sale.paymentMethod === 'CARD' ? 'Карта' : 'Раздельная',
         isRefunded ? 'ВОЗВРАТ' : 'ЗАВЕРШЕНА'
@@ -192,6 +194,10 @@ export function buildSalesReportTable(sales: Sale[], rate: number = 9.5, cashBon
         '',
         '',
         penaltyTjs.toFixed(2),
+        // The penalty is converted at the refund's own rate, not this sale's original rate —
+        // back the implied rate out of the two amounts already shown instead of reusing
+        // operationRate, which would silently misstate it whenever the two days' rates differ.
+        penaltyUsd > 0 ? (penaltyTjs / penaltyUsd).toFixed(2) : '',
         penaltyUsd.toFixed(2),
         sale.paymentMethod === 'CASH' ? 'Наличные' : sale.paymentMethod === 'CARD' ? 'Карта' : 'Раздельная',
         'ВОЗВРАТ (ШТРАФ)'
@@ -207,7 +213,7 @@ export function buildSalesReportTable(sales: Sale[], rate: number = 9.5, cashBon
     rows.push([
       '', '', '', '',
       'Бонусы поставщиков за период (наличными, по всему бизнесу)',
-      '', '', '', '',
+      '', '', '', '', '',
       cashBonusesUsd.toFixed(2),
       '', 'БОНУС'
     ]);
@@ -220,6 +226,7 @@ export function buildSalesReportTable(sales: Sale[], rate: number = 9.5, cashBon
     totalCostBasisUsd.toFixed(2),
     totalRevenueUsd.toFixed(2),
     totalRevenueTjs.toFixed(2),
+    '',
     totalProfitUsd.toFixed(2),
     '', ''
   ];

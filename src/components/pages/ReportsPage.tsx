@@ -8,8 +8,13 @@ import {
   ArrowDownRight,
   Download,
   Store as StoreIcon,
-  Receipt
+  Receipt,
+  TrendingUp,
+  Wallet,
+  PiggyBank
 } from 'lucide-react';
+import { MonthPicker } from '../ui/MonthPicker';
+import { StatCard } from '../ui/StatCard';
 import {
   exportComprehensiveReport,
   buildSalesReportTable,
@@ -290,17 +295,13 @@ export const ReportsPage: React.FC = () => {
           {/* Period selector — just the month; picking one shows every report for it. */}
           <div className="flex items-center space-x-1.5">
             <span className="text-[10px] text-fg-subtle font-bold uppercase hidden md:inline">ВЫБОР МЕСЯЦА:</span>
-            <input
-              type="month"
+            <MonthPicker
               value={selectedMonth}
-              onChange={(e) => {
-                if (e.target.value) {
-                  setSelectedMonth(e.target.value);
-                  setPeriod('SPECIFIC_MONTH');
-                }
+              onChange={(v) => {
+                setSelectedMonth(v);
+                setPeriod('SPECIFIC_MONTH');
               }}
               className="px-2 py-1 rounded-lg border border-accent text-accent text-xs font-bold bg-surface-raised focus:outline-none"
-              title="Выберите месяц — отчеты покажут все операции за него"
             />
           </div>
 
@@ -320,6 +321,38 @@ export const ReportsPage: React.FC = () => {
 
       {/* Main Content Area */}
       <div className={`flex-1 overflow-y-auto p-3 sm:p-4 space-y-4 transition-opacity ${summaryLoading ? 'opacity-60' : ''}`}>
+
+        {/* KPI SUMMARY: revenue / profit / expenses / net profit for the current
+            period+store filter — all four straight from filteredData, so they always
+            agree with the per-store cards and tables below (same source of truth). */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3">
+          <StatCard
+            label="Выручка"
+            value={`${filteredData.revenueTjs.toLocaleString()} TJS`}
+            subvalue={`≈ $${filteredData.revenueUsd.toLocaleString()}`}
+            icon={Receipt}
+            tone="neutral"
+          />
+          <StatCard
+            label="Прибыль (с учетом возвратов)"
+            value={`${filteredData.profitUsd >= 0 ? '+' : ''}$${filteredData.profitUsd.toLocaleString()}`}
+            icon={TrendingUp}
+            tone={filteredData.profitUsd >= 0 ? 'accent' : 'danger'}
+          />
+          <StatCard
+            label="Общий расход"
+            value={`$${filteredData.expensesUsd.toLocaleString()}`}
+            icon={Wallet}
+            tone="danger"
+          />
+          <StatCard
+            label="Чистая прибыль"
+            value={`${filteredData.netProfitUsd >= 0 ? '+' : ''}$${filteredData.netProfitUsd.toLocaleString()}`}
+            subvalue="После вычета расходов"
+            icon={PiggyBank}
+            tone={filteredData.netProfitUsd >= 0 ? 'accent' : 'danger'}
+          />
+        </div>
 
         {/* SALES REPORT PER STORE: replaces the old multi-metric card dashboard — just the
             report that matters (revenue, profit, receipt count) plus a download button,

@@ -13,6 +13,7 @@ import {
   Scan
 } from 'lucide-react';
 import { StatusBanner, StatusMessage } from '../ui/StatusBanner';
+import { MonthPicker } from '../ui/MonthPicker';
 
 export const RepairPage: React.FC = () => {
   const {
@@ -365,12 +366,10 @@ export const RepairPage: React.FC = () => {
               </select>
             )}
 
-            <input
-              type="month"
+            <MonthPicker
               value={selectedMonth}
-              onChange={(e) => e.target.value && setSelectedMonth(e.target.value)}
-              className="shrink-0 px-3 py-1.5 rounded-xl border border-border text-fg-muted text-xs font-semibold transition-colors bg-surface focus:outline-none focus:border-accent cursor-pointer"
-              title="Динамический выбор месяца"
+              onChange={setSelectedMonth}
+              className="px-3 py-1.5 rounded-xl border border-border text-fg-muted text-xs font-semibold transition-colors bg-surface focus:outline-none focus:border-accent"
             />
 
             <select

@@ -16,9 +16,12 @@ import {
   Package,
   FileText,
   Edit2,
-  Loader2
+  Loader2,
+  Building
 } from 'lucide-react';
 import { soundEffects } from '../../utils/sound';
+import { MonthPicker } from '../ui/MonthPicker';
+import { Combobox } from '../ui/Combobox';
 
 interface PurchaseItem {
   imei: string;
@@ -66,6 +69,7 @@ export const PurchasePage: React.FC = () => {
     createPurchase,
     updateSupplierInvoice,
     deleteSupplierInvoice,
+    createSupplier,
     openScanner
   } = useApp();
 
@@ -135,6 +139,37 @@ export const PurchasePage: React.FC = () => {
 
   // Form states
   const [selectedSupplierId, setSelectedSupplierId] = useState<string>(suppliers[0]?.id || '');
+
+  // Inline "add new supplier" — lets a purchase be started even when the supplier doesn't
+  // exist yet, instead of forcing a detour to the Suppliers page and back.
+  const [isAddSupplierOpen, setIsAddSupplierOpen] = useState(false);
+  const [newSupplierName, setNewSupplierName] = useState('');
+  const [newSupplierPhone, setNewSupplierPhone] = useState('');
+  const [newSupplierContact, setNewSupplierContact] = useState('');
+  const [isSavingSupplier, setIsSavingSupplier] = useState(false);
+
+  const handleAddSupplierSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newSupplierName.trim() || isSavingSupplier) return;
+    setIsSavingSupplier(true);
+    try {
+      const res = await createSupplier({
+        name: newSupplierName.trim(),
+        phone: newSupplierPhone.trim() || undefined,
+        contactPerson: newSupplierContact.trim() || undefined,
+      });
+      if (res.success) {
+        setIsAddSupplierOpen(false);
+        setNewSupplierName('');
+        setNewSupplierPhone('');
+        setNewSupplierContact('');
+      } else {
+        setStatusMessage({ type: 'error', text: res.message || 'Ошибка добавления поставщика' });
+      }
+    } finally {
+      setIsSavingSupplier(false);
+    }
+  };
 
   // Auto-generate sequential invoice number
   const [invoiceNumber, setInvoiceNumber] = useState<string>(() => {
@@ -567,22 +602,17 @@ export const PurchasePage: React.FC = () => {
           {/* Period selector & Supplier Filter — kept on one scrollable row instead of
               wrapping to a second line on narrow/mobile screens. */}
           <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none text-xs">
-            <input
-              type="month"
+            <MonthPicker
               value={selectedMonth}
-              onChange={(e) => {
-                if (e.target.value) {
-                  setSelectedMonth(e.target.value);
-                  setPeriodFilter('SPECIFIC_MONTH');
-                }
+              onChange={(v) => {
+                setSelectedMonth(v);
+                setPeriodFilter('SPECIFIC_MONTH');
               }}
-              onClick={() => setPeriodFilter('SPECIFIC_MONTH')}
-              className={`shrink-0 px-3 py-1.5 rounded-xl border text-xs font-semibold transition-colors bg-surface focus:outline-none cursor-pointer ${
+              className={`px-3 py-1.5 rounded-xl border text-xs font-semibold transition-colors bg-surface focus:outline-none ${
                 periodFilter === 'SPECIFIC_MONTH'
                   ? 'border-accent text-accent font-bold'
                   : 'border-border text-fg-muted hover:border-fg-subtle'
               }`}
-              title="Выберите месяц"
             />
 
             <button
@@ -1045,15 +1075,26 @@ export const PurchasePage: React.FC = () => {
           <div className="text-xs">
             <div>
               <label className="block text-fg-subtle mb-1 font-medium">Поставщик</label>
-              <select
-                value={selectedSupplierId ?? ''}
-                onChange={(e) => setSelectedSupplierId(e.target.value)}
-                className="w-full rounded-lg bg-surface-raised border border-border px-3 py-2 text-xs text-fg-muted focus:border-accent focus:outline-none"
-              >
-                {suppliers.map(s => (
-                  <option key={s.id} value={s.id}>{s.name} (Долг: ${s.totalDebtUsd})</option>
-                ))}
-              </select>
+              <div className="flex items-center gap-2">
+                <select
+                  value={selectedSupplierId ?? ''}
+                  onChange={(e) => setSelectedSupplierId(e.target.value)}
+                  className="w-full rounded-lg bg-surface-raised border border-border px-3 py-2 text-xs text-fg-muted focus:border-accent focus:outline-none"
+                >
+                  {suppliers.length === 0 && <option value="">Нет поставщиков</option>}
+                  {suppliers.map(s => (
+                    <option key={s.id} value={s.id}>{s.name} (Долг: ${s.totalDebtUsd})</option>
+                  ))}
+                </select>
+                <button
+                  type="button"
+                  onClick={() => setIsAddSupplierOpen(true)}
+                  title="Добавить нового поставщика"
+                  className="shrink-0 p-2 rounded-lg bg-surface-raised hover:bg-surface border border-border text-fg-muted hover:text-accent hover:border-accent transition-colors"
+                >
+                  <Plus className="w-4 h-4" />
+                </button>
+              </div>
             </div>
             {/* Номер накладной и дата прихода формируются автоматически (INV-XXXX, сегодня) — не требуют ввода */}
           </div>
@@ -1131,89 +1172,59 @@ export const PurchasePage: React.FC = () => {
               <div className="grid grid-cols-2 sm:grid-cols-6 gap-2.5 text-xs font-mono">
                 <div>
                   <label className="block text-fg-subtle mb-1">Бренд</label>
-                  <input
-                    type="text"
+                  <Combobox
                     required
-                    list={`brand-suggestions-${groupIdx}`}
+                    options={brandOptions}
                     value={group.brand}
-                    onChange={(e) => handleUpdateGroup(groupIdx, 'brand', e.target.value)}
-                    className="w-full rounded-lg bg-surface-raised border border-border px-2.5 py-1.5 text-xs text-fg-muted focus:border-accent focus:outline-none"
+                    onChange={(v) => handleUpdateGroup(groupIdx, 'brand', v)}
+                    className="rounded-lg bg-surface-raised border border-border px-2.5 py-1.5 text-xs text-fg-muted focus:border-accent focus:outline-none"
                     placeholder="Apple"
                   />
-                  <datalist id={`brand-suggestions-${groupIdx}`}>
-                    {brandOptions.map(b => (
-                      <option key={b} value={b} />
-                    ))}
-                  </datalist>
                 </div>
 
                 <div>
                   <label className="block text-fg-subtle mb-1">Модель</label>
-                  <input
-                    type="text"
+                  <Combobox
                     required
-                    list={`model-suggestions-${groupIdx}`}
+                    options={getModelOptions(group.brand)}
                     value={group.model}
-                    onChange={(e) => handleUpdateGroup(groupIdx, 'model', e.target.value)}
-                    className="w-full rounded-lg bg-surface-raised border border-border px-2.5 py-1.5 text-xs text-fg-muted focus:border-accent focus:outline-none"
+                    onChange={(v) => handleUpdateGroup(groupIdx, 'model', v)}
+                    className="rounded-lg bg-surface-raised border border-border px-2.5 py-1.5 text-xs text-fg-muted focus:border-accent focus:outline-none"
                     placeholder="iPhone 16 Pro"
                   />
-                  <datalist id={`model-suggestions-${groupIdx}`}>
-                    {getModelOptions(group.brand).map(m => (
-                      <option key={m} value={m} />
-                    ))}
-                  </datalist>
                 </div>
 
                 <div>
                   <label className="block text-fg-subtle mb-1">RAM</label>
-                  <input
-                    type="text"
-                    list={`ram-suggestions-${groupIdx}`}
+                  <Combobox
+                    options={ramOptions}
                     value={group.ram || ''}
-                    onChange={(e) => handleUpdateGroup(groupIdx, 'ram', e.target.value)}
-                    className="w-full rounded-lg bg-surface-raised border border-border px-2.5 py-1.5 text-xs text-fg-muted focus:border-accent focus:outline-none"
+                    onChange={(v) => handleUpdateGroup(groupIdx, 'ram', v)}
+                    className="rounded-lg bg-surface-raised border border-border px-2.5 py-1.5 text-xs text-fg-muted focus:border-accent focus:outline-none"
                     placeholder="8 GB"
                   />
-                  <datalist id={`ram-suggestions-${groupIdx}`}>
-                    {ramOptions.map(r => (
-                      <option key={r} value={r} />
-                    ))}
-                  </datalist>
                 </div>
 
                 <div>
                   <label className="block text-fg-subtle mb-1">Память</label>
-                  <input
-                    type="text"
-                    list={`storage-suggestions-${groupIdx}`}
+                  <Combobox
+                    options={storageOptions}
                     value={group.storage}
-                    onChange={(e) => handleUpdateGroup(groupIdx, 'storage', e.target.value)}
-                    className="w-full rounded-lg bg-surface-raised border border-border px-2.5 py-1.5 text-xs text-fg-muted focus:border-accent focus:outline-none"
+                    onChange={(v) => handleUpdateGroup(groupIdx, 'storage', v)}
+                    className="rounded-lg bg-surface-raised border border-border px-2.5 py-1.5 text-xs text-fg-muted focus:border-accent focus:outline-none"
                     placeholder="256 GB"
                   />
-                  <datalist id={`storage-suggestions-${groupIdx}`}>
-                    {storageOptions.map(s => (
-                      <option key={s} value={s} />
-                    ))}
-                  </datalist>
                 </div>
 
                 <div>
                   <label className="block text-fg-subtle mb-1">Цвет</label>
-                  <input
-                    type="text"
-                    list={`color-suggestions-${groupIdx}`}
+                  <Combobox
+                    options={colorOptions}
                     value={group.color}
-                    onChange={(e) => handleUpdateGroup(groupIdx, 'color', e.target.value)}
-                    className="w-full rounded-lg bg-surface-raised border border-border px-2.5 py-1.5 text-xs text-fg-muted focus:border-accent focus:outline-none"
+                    onChange={(v) => handleUpdateGroup(groupIdx, 'color', v)}
+                    className="rounded-lg bg-surface-raised border border-border px-2.5 py-1.5 text-xs text-fg-muted focus:border-accent focus:outline-none"
                     placeholder="Black Titanium"
                   />
-                  <datalist id={`color-suggestions-${groupIdx}`}>
-                    {colorOptions.map(c => (
-                      <option key={c} value={c} />
-                    ))}
-                  </datalist>
                 </div>
 
                 <div>
@@ -1566,6 +1577,81 @@ export const PurchasePage: React.FC = () => {
                 >
                   {isSubmitting && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
                   {isSubmitting ? 'СОХРАНЕНИЕ…' : 'СОХРАНИТЬ'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {isAddSupplierOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4">
+          <div className="w-full max-w-md rounded-2xl bg-surface border border-border p-5 shadow-2xl text-xs">
+            <div className="flex items-center justify-between mb-4 border-b border-border pb-3">
+              <h3 className="text-sm font-bold text-fg-muted flex items-center space-x-2">
+                <Building className="w-4 h-4 text-accent" />
+                <span>Добавить нового поставщика</span>
+              </h3>
+              <button
+                onClick={() => setIsAddSupplierOpen(false)}
+                className="p-1 rounded text-fg-subtle hover:text-fg-muted"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleAddSupplierSubmit} className="space-y-4">
+              <div>
+                <label className="block text-fg-subtle mb-1">Название поставщика *</label>
+                <input
+                  type="text"
+                  required
+                  autoFocus
+                  value={newSupplierName}
+                  onChange={(e) => setNewSupplierName(e.target.value)}
+                  placeholder="Например: Xiaomi Tech Hub"
+                  className="w-full rounded-lg bg-surface-raised border border-border px-3 py-2 text-fg-muted focus:border-accent focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-fg-subtle mb-1">Контактное лицо</label>
+                <input
+                  type="text"
+                  value={newSupplierContact}
+                  onChange={(e) => setNewSupplierContact(e.target.value)}
+                  placeholder="Фарход"
+                  className="w-full rounded-lg bg-surface-raised border border-border px-3 py-2 text-fg-muted focus:border-accent focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-fg-subtle mb-1">Телефон</label>
+                <input
+                  type="tel"
+                  value={newSupplierPhone}
+                  onChange={(e) => setNewSupplierPhone(e.target.value)}
+                  placeholder="+992 90 000 0000"
+                  className="w-full rounded-lg bg-surface-raised border border-border px-3 py-2 text-fg-muted focus:border-accent focus:outline-none"
+                />
+              </div>
+
+              <div className="flex space-x-2 pt-2">
+                <button
+                  type="button"
+                  disabled={isSavingSupplier}
+                  onClick={() => setIsAddSupplierOpen(false)}
+                  className="flex-1 py-2.5 rounded-xl bg-surface-raised hover:bg-surface border border-border text-xs font-bold text-fg-muted uppercase disabled:opacity-50"
+                >
+                  Отмена
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSavingSupplier}
+                  className="flex-1 py-2.5 rounded-xl bg-accent hover:bg-accent-strong text-xs font-bold text-accent-fg uppercase disabled:opacity-60 flex items-center justify-center gap-1.5"
+                >
+                  {isSavingSupplier && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                  {isSavingSupplier ? 'СОХРАНЕНИЕ…' : 'ДОБАВИТЬ'}
                 </button>
               </div>
             </form>

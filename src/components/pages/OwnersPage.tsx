@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { StatusBanner, StatusMessage } from '../ui/StatusBanner';
 import { FilterPillGroup } from '../ui/FilterPillGroup';
+import { MonthPicker } from '../ui/MonthPicker';
 
 // Standard Russian noun pluralization (1 -> singular, 2-4 -> few, else -> many),
 // so the header stays correct whether the business has 2 partners or a third is added.
@@ -656,11 +657,10 @@ export const OwnersPage: React.FC = () => {
               />
 
               {periodFilter === 'SPECIFIC_MONTH' && (
-                <input
-                  type="month"
+                <MonthPicker
                   value={selectedMonth}
-                  onChange={(e) => e.target.value && setSelectedMonth(e.target.value)}
-                  className="h-9 px-2 rounded-lg border border-accent bg-surface text-[11px] font-semibold text-accent focus:outline-none shrink-0 cursor-pointer"
+                  onChange={setSelectedMonth}
+                  className="h-9 px-2 rounded-lg border border-accent bg-surface text-[11px] font-semibold text-accent focus:outline-none"
                 />
               )}
             </div>
@@ -737,6 +737,11 @@ export const OwnersPage: React.FC = () => {
                 const isDeposit = tx.type === 'INVESTMENT';
                 const isReinvest = tx.type === 'REINVEST';
                 const isPayout = tx.type === 'PROFIT_PAYOUT';
+                // INVESTMENT and REINVEST both add money to the business's capital — a
+                // reinvestment is just sourced from already-accrued profit instead of a
+                // fresh personal deposit, so it belongs on the same "+" side, not with
+                // PROFIT_PAYOUT/WITHDRAWAL which actually take money out to the owner.
+                const isCapitalIncrease = isDeposit || isReinvest;
                 const tjsVal = Math.round((tx.amountUsd || 0) * tx.exchangeRate);
 
                 return (
@@ -788,11 +793,11 @@ export const OwnersPage: React.FC = () => {
                     </div>
 
                     <div className="text-right shrink-0 border-t sm:border-t-0 border-border pt-2 sm:pt-0">
-                      <span className={`text-sm font-bold block ${isDeposit ? 'text-accent' : 'text-warning'}`}>
-                        {isDeposit ? '+' : '-'}${tx.amountUsd?.toLocaleString()} USD
+                      <span className={`text-sm font-bold block ${isCapitalIncrease ? 'text-accent' : 'text-warning'}`}>
+                        {isCapitalIncrease ? '+' : '-'}${tx.amountUsd?.toLocaleString()} USD
                       </span>
                       <span className="text-[10px] text-fg-subtle block">
-                        ≈ {isDeposit ? '+' : '-'}{tjsVal.toLocaleString()} TJS · курс {tx.exchangeRate}
+                        ≈ {isCapitalIncrease ? '+' : '-'}{tjsVal.toLocaleString()} TJS · курс {tx.exchangeRate}
                       </span>
                     </div>
                   </div>
