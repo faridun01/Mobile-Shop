@@ -478,7 +478,6 @@ export const OwnersPage: React.FC = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {displayOwners.map((owner, idx) => {
               const info = getOwnerDetails(owner);
-              const capitalTjs = Math.round((owner.capitalBalanceUsd ?? 0) * rate);
               return (
                 <div
                   key={owner.id}
@@ -523,40 +522,12 @@ export const OwnersPage: React.FC = () => {
                         <span>ЛИЧНО ВЛОЖЕНО В ОБОРОТ (КАПИТАЛ):</span>
                         <span className="text-accent font-bold">ВЛОЖЕНИЕ</span>
                       </div>
-                      <div className="flex items-baseline justify-between">
+                      <div className="flex items-baseline">
                         <span className="text-base sm:text-lg text-fg-muted font-bold">
                           ${(owner.capitalBalanceUsd ?? 0).toLocaleString()} USD
                         </span>
-                        <span className="text-xs text-fg-subtle">
-                          ≈ {capitalTjs.toLocaleString()} TJS
-                        </span>
                       </div>
                     </div>
-
-                    {/* Profit Breakdown Grid */}
-                    {(() => {
-                      const sharePct = owner.profitSharePercent ?? 50;
-                      const ownerProfitUsd = owner.totalAccruedProfitUsd ?? 0;
-                      return (
-                        <div className="grid grid-cols-2 gap-2 text-xs">
-                          <div className="p-2.5 rounded-xl bg-surface border border-border">
-                            <span className="text-fg-subtle block text-[10px] uppercase">Чистая прибыль ({sharePct}%)</span>
-                            <span className="text-accent font-bold text-xs mt-0.5 block">
-                              ${ownerProfitUsd.toLocaleString()} USD
-                            </span>
-                            <span className="text-[10px] text-fg-muted block">
-                              ≈ {(Math.round(ownerProfitUsd * rate)).toLocaleString()} TJS
-                            </span>
-                          </div>
-                          <div className="p-2.5 rounded-xl bg-surface border border-border">
-                            <span className="text-fg-subtle block text-[10px] uppercase">Выплачено дивидендов</span>
-                            <span className="text-accent font-bold text-xs mt-0.5 block">
-                              ${(owner.totalPaidProfitUsd ?? 0).toLocaleString()} USD
-                            </span>
-                          </div>
-                        </div>
-                      );
-                    })()}
                   </div>
 
                   {/* Available for Payout Banner */}

@@ -606,13 +606,11 @@ export class SuppliersService {
       if (!invoice) throw new Error('Накладная не найдена');
       if (invoice.paidAmountUsd > 0) throw new Error('Нельзя удалить уже оплаченную или частично оплаченную накладную');
 
+      // purchaseInvoiceId is the only reliable link — invoiceNumber has no uniqueness
+      // constraint (two invoices, even from different suppliers, can share one), so
+      // matching by it too would risk sweeping up and deleting another invoice's devices.
       const invoiceDevices = await tx.device.findMany({
-        where: {
-          OR: [
-            { purchaseInvoiceId: id },
-            { invoiceNumber: invoice.invoiceNumber }
-          ]
-        },
+        where: { purchaseInvoiceId: id },
         select: { id: true }
       });
       const invoiceDeviceIds = invoiceDevices.map((d) => d.id);
@@ -632,13 +630,17 @@ export class SuppliersService {
         await tx.device.deleteMany({ where: { id: { in: invoiceDeviceIds } } });
       }
 
-      await tx.supplier.update({
-        where: { id: invoice.supplierId },
+      // Atomic guarded decrement, not a read-then-write — matches create's atomic
+      // increment of these same fields (app.ts) and avoids a lost update if another
+      // change to this supplier's totals lands between the read and the write.
+      const supplierGuard = await tx.supplier.updateMany({
+        where: { id: invoice.supplierId, totalPurchasedUsd: { gte: invoice.totalAmountUsd }, totalDebtUsd: { gte: remainingDebtOnInvoice } },
         data: {
-          totalPurchasedUsd: Math.max(0, (await tx.supplier.findUnique({ where: { id: invoice.supplierId } }))!.totalPurchasedUsd - invoice.totalAmountUsd),
-          totalDebtUsd: Math.max(0, (await tx.supplier.findUnique({ where: { id: invoice.supplierId } }))!.totalDebtUsd - remainingDebtOnInvoice),
+          totalPurchasedUsd: { decrement: invoice.totalAmountUsd },
+          totalDebtUsd: { decrement: remainingDebtOnInvoice },
         },
       });
+      if (supplierGuard.count !== 1) throw new Error('Данные поставщика изменились, обновите страницу и повторите удаление');
 
       return tx.supplierInvoice.delete({ where: { id } });
     }, { maxWait: 10000, timeout: 25000 });
