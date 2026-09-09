@@ -53,6 +53,7 @@
     font-family: 'Plus Jakarta Sans', 'Roboto', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
     -webkit-tap-highlight-color: transparent;
     -webkit-text-size-adjust: 100%;
+    -webkit-touch-callout: none;
   }
 
   body {
@@ -86,6 +87,8 @@
   ::after {
     box-shadow: none !important;
     text-shadow: none !important;
+    -webkit-user-select: none;
+    user-select: none;
   }
 }
 
