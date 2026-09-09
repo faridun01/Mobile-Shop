@@ -427,7 +427,7 @@ body {
 [data-selected="true"],
 [data-active="true"] {
   background-color: transparent !important;
-  color: #22c55e !important;
+  color: var(--color-accent) !important;
 }
 
 [data-theme="light"] .is-selected,

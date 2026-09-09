@@ -51,7 +51,7 @@ export const ToggleRow: React.FC<ToggleRowProps> = ({ checked, onChange, label, 
     )}
   >
     <span className="min-w-0">
-      <span className={cn('block text-sm font-medium', checked ? 'text-accent' : 'text-fg')}>{label}</span>
+      <span className={cn('block text-sm font-medium', checked ? 'text-accent' : 'text-fg-muted')}>{label}</span>
       {description && <span className="block text-xs text-fg-subtle mt-0.5">{description}</span>}
     </span>
     <span

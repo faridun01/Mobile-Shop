@@ -72,7 +72,7 @@ export const Dialog: React.FC<DialogProps> = ({
 
         <div className="flex items-center justify-between gap-3 px-4 py-3 border-b border-border shrink-0">
           <div className="min-w-0">
-            <h2 className="text-sm font-semibold text-fg truncate">{title}</h2>
+            <h2 className="text-sm font-semibold text-fg-muted truncate">{title}</h2>
             {subtitle && <p className="text-xs text-fg-subtle truncate mt-0.5">{subtitle}</p>}
           </div>
           {dismissable && <IconButton icon={X} aria-label="Закрыть" onClick={onClose} size="sm" />}

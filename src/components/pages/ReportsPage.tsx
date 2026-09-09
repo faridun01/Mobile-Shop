@@ -1,21 +1,16 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useApp } from '../../context/AppContext';
 import { apiClient } from '../../api/client';
-import { mapSale, mapExpense, mapRepair, buildNameLookup } from '../../api/mappers';
-import { Sale, Expense, RepairTicket } from '../../types';
+import { mapSale, buildNameLookup } from '../../api/mappers';
+import { Sale } from '../../types';
 import {
-  BarChart3,
   Smartphone,
   ArrowDownRight,
   Download,
-  FileSpreadsheet,
   Store as StoreIcon,
   Receipt
 } from 'lucide-react';
-import {
-  exportSalesReport, exportInventoryReport, exportExpensesReport, exportRepairsReport,
-  buildSalesReportTable, buildInventoryReportTable, buildExpensesReportTable, buildRepairsReportTable
-} from '../../utils/exportReports';
+import { exportSalesReport, buildSalesReportTable } from '../../utils/exportReports';
 import { ReportPreviewModal } from '../common/ReportPreviewModal';
 
 type Period = 'TODAY' | 'MONTH' | 'SPECIFIC_MONTH' | 'ALL';
@@ -65,7 +60,6 @@ interface ReportsSummary {
 export const ReportsPage: React.FC = () => {
   const {
     currentUser,
-    devices,
     stores,
     users,
     todayRate,
@@ -86,7 +80,6 @@ export const ReportsPage: React.FC = () => {
     if (retail.some((s) => s.id === globalSelectedStoreId)) return globalSelectedStoreId;
     return retail[0]?.id || 'all';
   });
-  const [previewReport, setPreviewReport] = useState<null | 'inventory' | 'expenses' | 'repairs'>(null);
   // Which store's "Отчет по продажам" preview/download modal is open — 'all' for the
   // combined report across every store, a store id for a single one, null when closed.
   const [salesReportStoreId, setSalesReportStoreId] = useState<string | null>(null);
@@ -95,7 +88,6 @@ export const ReportsPage: React.FC = () => {
   const isSeller = currentUser?.role === 'SELLER';
   const namesLookup = useMemo(() => buildNameLookup(users), [users]);
 
-  const selectedStoreName = selectedStore === 'all' ? 'все магазины' : (stores.find(s => s.id === selectedStore)?.name || selectedStore);
   const periodLabel = period === 'TODAY' ? 'сегодня' : period === 'MONTH' ? 'текущий месяц' : period === 'SPECIFIC_MONTH' ? selectedMonth : 'весь период';
   const retailStores = useMemo(() => stores.filter((s) => !s.isMainWarehouse), [stores]);
 
@@ -108,8 +100,6 @@ export const ReportsPage: React.FC = () => {
   const [summary, setSummary] = useState<ReportsSummary | null>(null);
   const [summaryLoading, setSummaryLoading] = useState(true);
   const [exportSales, setExportSales] = useState<Sale[]>([]);
-  const [exportExpenses, setExportExpenses] = useState<Expense[]>([]);
-  const [exportRepairs, setExportRepairs] = useState<RepairTicket[]>([]);
 
   useEffect(() => {
     if (isSeller) return;
@@ -124,22 +114,16 @@ export const ReportsPage: React.FC = () => {
     Promise.all([
       apiClient<ReportsSummary>(`/reports/summary?${query}`),
       apiClient<any[]>(`/sales?${query}`),
-      apiClient<any[]>(`/expenses?${query}`),
-      apiClient<any[]>(`/repairs?${query}`),
     ])
-      .then(([summaryData, rawSales, rawExpenses, rawRepairs]) => {
+      .then(([summaryData, rawSales]) => {
         if (cancelled) return;
         setSummary(summaryData);
         setExportSales(rawSales.map((s) => mapSale(s, namesLookup)));
-        setExportExpenses(rawExpenses.map((e) => mapExpense(e, namesLookup)));
-        setExportRepairs(rawRepairs.map((r) => mapRepair(r, namesLookup)));
       })
       .catch(() => {
         if (cancelled) return;
         setSummary(null);
         setExportSales([]);
-        setExportExpenses([]);
-        setExportRepairs([]);
       })
       .finally(() => {
         if (!cancelled) setSummaryLoading(false);
@@ -147,27 +131,6 @@ export const ReportsPage: React.FC = () => {
 
     return () => { cancelled = true; };
   }, [isSeller, period, selectedMonth, selectedStore, namesLookup]);
-
-  // Inventory is a point-in-time snapshot (no created-date period makes sense for
-  // "what's on the shelf right now"), so only the store filter applies — this one still
-  // comes from the already-loaded device catalog, no extra fetch needed.
-  const exportDevices = useMemo(() => {
-    if (selectedStore === 'all') return devices;
-    return devices.filter(d => d.locationId === selectedStore);
-  }, [devices, selectedStore]);
-
-  const previewTable = useMemo(() => {
-    if (previewReport === 'inventory') return buildInventoryReportTable(exportDevices, stores, rate);
-    if (previewReport === 'expenses') return buildExpensesReportTable(exportExpenses, rate);
-    if (previewReport === 'repairs') return buildRepairsReportTable(exportRepairs, rate);
-    return null;
-  }, [previewReport, exportDevices, exportExpenses, exportRepairs, stores, rate]);
-
-  const previewMeta: Record<'inventory' | 'expenses' | 'repairs', { title: string; download: () => void }> = {
-    inventory: { title: 'Остатки склада', download: () => exportInventoryReport(exportDevices, stores, rate) },
-    expenses: { title: 'Отчет по расходам', download: () => exportExpensesReport(exportExpenses, rate) },
-    repairs: { title: 'Журнал ремонтов', download: () => exportRepairsReport(exportRepairs, rate) },
-  };
 
   // Per-store "Отчет по продажам": each store gets its own totals and its own
   // preview/download, instead of one combined report that mixes every branch together.
@@ -255,68 +218,6 @@ export const ReportsPage: React.FC = () => {
 
       {/* Main Content Area */}
       <div className={`flex-1 overflow-y-auto p-3 sm:p-4 space-y-4 transition-opacity ${summaryLoading ? 'opacity-60' : ''}`}>
-
-        {/* OVERALL ANALYSIS: styled exactly like the "Отчет по продажам" cards below it —
-            same card shell, same header/stat layout — instead of a separate, bigger design.
-            Revenue/profit/expenses/net-profit here all come from the same server-computed
-            summary (filteredData) as the per-store cards below (filteredData.storeBreakdown),
-            so the numbers on this card and on those cards never disagree with each other. */}
-        <div className="p-2.5 rounded-xl bg-surface border border-border space-y-2 flex flex-col max-w-sm">
-          <div className="flex items-center justify-between">
-            <span className="font-bold text-fg-muted text-xs flex items-center gap-1.5">
-              <BarChart3 className="w-3 h-3 text-accent" />
-              ОБЩИЙ АНАЛИЗ · {selectedStoreName}
-            </span>
-            <span className="text-[9px] text-accent bg-accent/10 px-1.5 py-0.5 rounded-md border border-accent/20">
-              {(salesByStore.get(selectedStore) ?? []).length} чеков
-            </span>
-          </div>
-          <div className="grid grid-cols-2 gap-1.5">
-            <div>
-              <p className="text-fg-subtle text-[9px] uppercase">Выручка</p>
-              <p className="font-bold text-fg-muted text-xs">{filteredData.revenueTjs.toLocaleString()} TJS</p>
-            </div>
-
-            <div>
-              <p className="text-fg-subtle text-[9px] uppercase">Прибыль (с учетом возвратов)</p>
-              <p className={`font-bold text-xs ${filteredData.profitUsd >= 0 ? 'text-accent' : 'text-danger'}`}>
-                {filteredData.profitUsd >= 0 ? '+' : ''}${filteredData.profitUsd.toLocaleString()}
-              </p>
-            </div>
-
-            <div>
-              <p className="text-fg-subtle text-[9px] uppercase">Расход</p>
-              <p className="font-bold text-danger text-xs">${filteredData.expensesUsd.toLocaleString()}</p>
-            </div>
-
-            <div>
-              <p className="text-fg-subtle text-[9px] uppercase">Чистая прибыль</p>
-              <p className={`font-bold text-xs ${filteredData.netProfitUsd >= 0 ? 'text-warning' : 'text-danger'}`}>
-                ${filteredData.netProfitUsd.toLocaleString()}
-              </p>
-            </div>
-
-            {/* Only nonzero component of netProfit not already visible above (Прибыль already
-                folds in refund penalties) — shown so Прибыль − Расход + Бонусы = Чистая прибыль
-                actually reconciles on screen instead of netProfit silently including money the
-                card never mentions. */}
-            {filteredData.periodCashBonusesUsd !== 0 && (
-              <div className="col-span-2">
-                <p className="text-fg-subtle text-[9px] uppercase">Бонусы поставщиков (наличными)</p>
-                <p className="font-bold text-accent text-xs">
-                  +${filteredData.periodCashBonusesUsd.toLocaleString()}
-                </p>
-              </div>
-            )}
-          </div>
-          <button
-            onClick={() => setSalesReportStoreId(selectedStore)}
-            className="w-full py-1.5 px-2.5 rounded-lg bg-accent hover:bg-accent-strong text-accent-fg font-bold text-[11px] flex items-center justify-center space-x-1.5 transition-colors mt-auto"
-          >
-            <Download className="w-3 h-3" />
-            <span>ПРОСМОТР И СКАЧИВАНИЕ</span>
-          </button>
-        </div>
 
         {/* SALES REPORT PER STORE: replaces the old multi-metric card dashboard — just the
             report that matters (revenue, profit, receipt count) plus a download button,
@@ -467,94 +368,7 @@ export const ReportsPage: React.FC = () => {
           </div>
         )}
 
-        {/* Export Reports Action Section */}
-        <div className="p-3.5 rounded-xl bg-surface border border-border space-y-2.5">
-          <h4 className="text-[10px] font-bold text-fg-subtle uppercase tracking-wider flex items-center space-x-1.5">
-            <FileSpreadsheet className="w-3.5 h-3.5 text-accent" />
-            <span>ЭКСПОРТ ДАННЫХ И ЭЛЕКТРОННЫЕ ОТЧЕТЫ (CSV / EXCEL)</span>
-          </h4>
-          <p className="text-[10px] text-fg-subtle">
-            Отчеты ниже учитывают выбранный период и магазин ({periodLabel} · {selectedStoreName}). Нажмите на карточку, чтобы посмотреть данные перед скачиванием.
-          </p>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-            {/* Inventory Report Download Card */}
-            <div className="p-3 rounded-xl bg-surface-raised border border-border space-y-2 flex flex-col justify-between">
-              <div className="space-y-1.5">
-                <div className="flex items-center justify-between">
-                  <span className="font-bold text-fg-muted text-xs">Остатки склада</span>
-                  <span className="text-[10px] text-accent bg-accent/10 px-1.5 py-0.5 rounded-md border border-accent/20">
-                    {exportDevices.length} устройств
-                  </span>
-                </div>
-                <p className="text-[11px] text-fg-subtle">
-                  Бренд, модель, память, цвет, IMEI 1/2, штрихкод, локация склада, статус и себестоимость.
-                </p>
-              </div>
-              <button
-                onClick={() => setPreviewReport('inventory')}
-                className="w-full py-2 px-3 rounded-lg bg-surface hover:bg-surface-raised text-fg-muted border border-border font-bold text-xs flex items-center justify-center space-x-2 transition-colors mt-2"
-              >
-                <Download className="w-3.5 h-3.5" />
-                <span>ПРОСМОТР И СКАЧИВАНИЕ</span>
-              </button>
-            </div>
-
-            {/* Expenses Report Download Card */}
-            <div className="p-3 rounded-xl bg-surface-raised border border-border space-y-2 flex flex-col justify-between">
-              <div className="space-y-1.5">
-                <div className="flex items-center justify-between">
-                  <span className="font-bold text-fg-muted text-xs">Отчет по расходам</span>
-                  <span className="text-[10px] text-danger bg-danger/10 px-1.5 py-0.5 rounded-md border border-danger/20">
-                    {exportExpenses.length} записей
-                  </span>
-                </div>
-                <p className="text-[11px] text-fg-subtle">
-                  Дата, категория, сумма в TJS и USD, филиал, касса списания, комментарий и ответственный.
-                </p>
-              </div>
-              <button
-                onClick={() => setPreviewReport('expenses')}
-                className="w-full py-2 px-3 rounded-lg bg-surface hover:bg-surface-raised text-fg-muted border border-border font-bold text-xs flex items-center justify-center space-x-2 transition-colors mt-2"
-              >
-                <Download className="w-3.5 h-3.5" />
-                <span>ПРОСМОТР И СКАЧИВАНИЕ</span>
-              </button>
-            </div>
-
-            {/* Repairs Report Download Card */}
-            <div className="p-3 rounded-xl bg-surface-raised border border-border space-y-2 flex flex-col justify-between">
-              <div className="space-y-1.5">
-                <div className="flex items-center justify-between">
-                  <span className="font-bold text-fg-muted text-xs">Журнал ремонтов</span>
-                  <span className="text-[10px] text-accent bg-accent/10 px-1.5 py-0.5 rounded-md border border-accent/20">
-                    {exportRepairs.length} заказов
-                  </span>
-                </div>
-                <p className="text-[11px] text-fg-subtle">
-                  Квитанция, дата, клиент, модель, IMEI, поломка, статус и финальная стоимость ремонта.
-                </p>
-              </div>
-              <button
-                onClick={() => setPreviewReport('repairs')}
-                className="w-full py-2 px-3 rounded-lg bg-surface hover:bg-surface-raised text-fg-muted border border-border font-bold text-xs flex items-center justify-center space-x-2 transition-colors mt-2"
-              >
-                <Download className="w-4 h-4" />
-                <span>ПРОСМОТР И СКАЧИВАНИЕ</span>
-              </button>
-            </div>
-          </div>
-        </div>
       </div>
-
-      <ReportPreviewModal
-        open={previewReport !== null}
-        onClose={() => setPreviewReport(null)}
-        title={previewReport ? previewMeta[previewReport].title : ''}
-        subtitle={`${periodLabel} · ${selectedStoreName}`}
-        table={previewTable}
-        onDownload={() => previewReport && previewMeta[previewReport].download()}
-      />
 
       <ReportPreviewModal
         open={salesReportStoreId !== null}

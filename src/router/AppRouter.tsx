@@ -63,7 +63,7 @@ function MainLayout() {
   const location = useLocation();
   const { currentUser } = useAuthStore();
   const { isDailyRateModalOpen, setDailyRateModalOpen } = useUIStore();
-  const { isRateModalOpen, activePage, setActivePage, selectedStoreId, stores } = useApp();
+  const { isRateModalOpen, closeDailyRateModal, activePage, setActivePage, selectedStoreId, stores } = useApp();
 
   React.useEffect(() => {
     const matched = Object.entries(PAGE_ROUTES).find(([_, path]) => path === location.pathname);
@@ -140,7 +140,13 @@ function MainLayout() {
         </footer>
       </div>
 
-      <DailyRateModal isOpen={isDailyRateModalOpen || isRateModalOpen} onClose={() => setDailyRateModalOpen(false)} />
+      <DailyRateModal
+        isOpen={isDailyRateModalOpen || isRateModalOpen}
+        onClose={() => {
+          setDailyRateModalOpen(false);
+          closeDailyRateModal();
+        }}
+      />
       <ScannerModal />
       <PWAInstallPrompt />
       <PWAUpdateNotifier />

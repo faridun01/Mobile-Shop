@@ -8,7 +8,7 @@ const TONE_TEXT: Record<BadgeTone, string> = {
   danger: 'text-danger',
   info: 'text-info',
   accent: 'text-accent',
-  neutral: 'text-fg',
+  neutral: 'text-fg-muted',
 };
 
 interface StatCardProps {

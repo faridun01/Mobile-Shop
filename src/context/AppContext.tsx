@@ -251,6 +251,7 @@ interface AppContextType {
   markAllNotificationsAsRead: () => void;
   resolveNotification: (id: string) => void;
   openDailyRateModal: () => void;
+  closeDailyRateModal: () => void;
   createStore: (name: string, address?: string) => Promise<{ success: boolean; message?: string }>;
   updateStore: (storeId: string, name: string, address?: string) => Promise<{ success: boolean; message?: string }>;
   deleteStore: (storeId: string) => Promise<{ success: boolean; message?: string }>;
@@ -1086,6 +1087,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     useUIStore.getState().setDailyRateModalOpen(true);
   };
 
+  // Mirrors setDailyRate's own cleanup (see below) for the Cancel path — opening this modal
+  // sets both isRateModalOpen and the UI store's flag, so dismissing it without saving must
+  // clear both too, or the modal stays stuck open (isOpen is an OR of the two).
+  const closeDailyRateModal = () => {
+    setIsRateModalOpen(false);
+    useUIStore.getState().setDailyRateModalOpen(false);
+  };
+
   const createStore: AppContextType['createStore'] = async (name, address) => {
     try {
       await apiClient('/stores', { method: 'POST', body: JSON.stringify({ name, address }) });
@@ -1201,6 +1210,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         logout,
         setDailyRate,
         openDailyRateModal,
+        closeDailyRateModal,
         setActivePage,
         setSelectedStoreId,
         setDrawerOpen,
