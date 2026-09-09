@@ -11,6 +11,9 @@ interface ReportPreviewModalProps {
   subtitle?: string;
   table: ReportTable | null;
   onDownload: () => void;
+  downloadLabel?: string;
+  downloading?: boolean;
+  canDownload?: boolean;
 }
 
 /**
@@ -18,7 +21,17 @@ interface ReportPreviewModalProps {
  * period/store filters, so the user can check the numbers on screen before the
  * CSV hits disk instead of having to open the downloaded file to find out.
  */
-export const ReportPreviewModal: React.FC<ReportPreviewModalProps> = ({ open, onClose, title, subtitle, table, onDownload }) => {
+export const ReportPreviewModal: React.FC<ReportPreviewModalProps> = ({
+  open,
+  onClose,
+  title,
+  subtitle,
+  table,
+  onDownload,
+  downloadLabel = 'Скачать CSV',
+  downloading = false,
+  canDownload,
+}) => {
   return (
     <Dialog
       open={open}
@@ -29,8 +42,14 @@ export const ReportPreviewModal: React.FC<ReportPreviewModalProps> = ({ open, on
       footer={
         <>
           <Button variant="secondary" onClick={onClose}>Закрыть</Button>
-          <Button variant="primary" fullWidth leftIcon={Download} onClick={onDownload} disabled={!table || table.rows.length === 0}>
-            Скачать CSV
+          <Button
+            variant="primary"
+            fullWidth
+            leftIcon={Download}
+            onClick={onDownload}
+            disabled={downloading || !(canDownload ?? (!!table && table.rows.length > 0))}
+          >
+            {downloading ? 'Формирование…' : downloadLabel}
           </Button>
         </>
       }

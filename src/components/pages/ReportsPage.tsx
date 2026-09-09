@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useApp } from '../../context/AppContext';
 import { apiClient } from '../../api/client';
-import { mapSale, buildNameLookup } from '../../api/mappers';
-import { Sale } from '../../types';
+import { mapExpense, mapSale, buildNameLookup } from '../../api/mappers';
+import { Expense, Sale } from '../../types';
 import {
   Smartphone,
   ArrowDownRight,
@@ -10,7 +10,11 @@ import {
   Store as StoreIcon,
   Receipt
 } from 'lucide-react';
-import { exportSalesReport, buildSalesReportTable } from '../../utils/exportReports';
+import {
+  exportComprehensiveReport,
+  buildSalesReportTable,
+  type ComprehensiveReportSummary,
+} from '../../utils/exportReports';
 import { ReportPreviewModal } from '../common/ReportPreviewModal';
 
 type Period = 'TODAY' | 'MONTH' | 'SPECIFIC_MONTH' | 'ALL';
@@ -100,6 +104,8 @@ export const ReportsPage: React.FC = () => {
   const [summary, setSummary] = useState<ReportsSummary | null>(null);
   const [summaryLoading, setSummaryLoading] = useState(true);
   const [exportSales, setExportSales] = useState<Sale[]>([]);
+  const [exportExpenses, setExportExpenses] = useState<Expense[]>([]);
+  const [reportDownloading, setReportDownloading] = useState(false);
 
   useEffect(() => {
     if (isSeller) return;
@@ -114,16 +120,19 @@ export const ReportsPage: React.FC = () => {
     Promise.all([
       apiClient<ReportsSummary>(`/reports/summary?${query}`),
       apiClient<any[]>(`/sales?${query}`),
+      apiClient<any[]>(`/expenses?${query}`),
     ])
-      .then(([summaryData, rawSales]) => {
+      .then(([summaryData, rawSales, rawExpenses]) => {
         if (cancelled) return;
         setSummary(summaryData);
         setExportSales(rawSales.map((s) => mapSale(s, namesLookup)));
+        setExportExpenses(rawExpenses.map((expense) => mapExpense(expense, namesLookup)));
       })
       .catch(() => {
         if (cancelled) return;
         setSummary(null);
         setExportSales([]);
+        setExportExpenses([]);
       })
       .finally(() => {
         if (!cancelled) setSummaryLoading(false);
@@ -148,7 +157,11 @@ export const ReportsPage: React.FC = () => {
     // periodCashBonusesUsd isn't store-scoped on the backend (supplier bonuses aren't tied
     // to a retail store), so it's the same figure regardless of which store's report this is —
     // safe to reuse from filteredData even when salesReportStoreId differs from selectedStore.
-    return buildSalesReportTable(salesByStore.get(salesReportStoreId) ?? [], rate, summary?.periodCashBonusesUsd ?? 0);
+    return buildSalesReportTable(
+      salesByStore.get(salesReportStoreId) ?? [],
+      rate,
+      salesReportStoreId === 'all' ? (summary?.periodCashBonusesUsd ?? 0) : 0,
+    );
   }, [salesReportStoreId, salesByStore, rate, summary?.periodCashBonusesUsd]);
 
   const salesReportStoreName = salesReportStoreId === 'all'
@@ -169,6 +182,95 @@ export const ReportsPage: React.FC = () => {
     mainWarehouseStockCount: 0, mainWarehouseStockCostUsd: 0, mainWarehouseStockCostTjs: 0,
     mainWarehouseCashUsd: 0, mainWarehouseCashTjs: 0,
     topSuppliersByDebt: [], storeBreakdown: [], modelCounts: [],
+  };
+
+  const downloadFinancialReport = async () => {
+    if (!salesReportStoreId || !summary || reportDownloading) return;
+
+    const reportStoreId = salesReportStoreId;
+    const reportSales = salesByStore.get(reportStoreId) ?? [];
+    const reportExpenses = reportStoreId === 'all'
+      ? exportExpenses
+      : exportExpenses.filter((expense) => expense.storeId === reportStoreId);
+
+    let reportSummary: ComprehensiveReportSummary;
+    if (reportStoreId === 'all') {
+      reportSummary = {
+        periodLabel,
+        storeName: salesReportStoreName,
+        exchangeRate: rate,
+        unitsSold: filteredData.unitsSold,
+        revenueTjs: filteredData.revenueTjs,
+        revenueUsd: filteredData.revenueUsd,
+        cogsTjs: filteredData.cogsTjs,
+        cogsUsd: filteredData.cogsUsd,
+        grossProfitTjs: filteredData.grossProfitTjs,
+        grossProfitUsd: filteredData.grossProfitUsd,
+        refundPenaltiesTjs: filteredData.periodRefundPenaltiesTjs,
+        refundPenaltiesUsd: filteredData.periodRefundPenaltiesUsd,
+        profitTjs: filteredData.profitTjs,
+        profitUsd: filteredData.profitUsd,
+        cashBonusesTjs: filteredData.periodCashBonusesTjs,
+        cashBonusesUsd: filteredData.periodCashBonusesUsd,
+        expensesTjs: filteredData.expensesTjs,
+        expensesUsd: filteredData.expensesUsd,
+        netProfitTjs: filteredData.netProfitTjs,
+        netProfitUsd: filteredData.netProfitUsd,
+      };
+    } else {
+      const breakdown = filteredData.storeBreakdown.find((item) => item.storeId === reportStoreId);
+      const expensesTjs = reportExpenses.reduce((total, expense) => total + (expense.amountTjs || 0), 0);
+      const expensesUsd = reportExpenses.reduce(
+        (total, expense) => total + (expense.amountUsd ?? ((expense.amountTjs || 0) / (expense.exchangeRate || rate))),
+        0,
+      );
+      const revenueTjs = breakdown?.revenueTjs ?? 0;
+      const revenueUsd = breakdown?.revenueUsd ?? 0;
+      const cogsTjs = breakdown?.cogsTjs ?? 0;
+      const cogsUsd = breakdown?.cogsUsd ?? 0;
+      const grossProfitTjs = revenueTjs - cogsTjs;
+      const grossProfitUsd = revenueUsd - cogsUsd;
+      const profitTjs = breakdown?.profitTjs ?? grossProfitTjs;
+      const profitUsd = breakdown?.profitUsd ?? grossProfitUsd;
+
+      reportSummary = {
+        periodLabel,
+        storeName: salesReportStoreName,
+        exchangeRate: rate,
+        unitsSold: breakdown?.unitsSold ?? 0,
+        revenueTjs,
+        revenueUsd,
+        cogsTjs,
+        cogsUsd,
+        grossProfitTjs,
+        grossProfitUsd,
+        refundPenaltiesTjs: profitTjs - grossProfitTjs,
+        refundPenaltiesUsd: profitUsd - grossProfitUsd,
+        profitTjs,
+        profitUsd,
+        cashBonusesTjs: 0,
+        cashBonusesUsd: 0,
+        expensesTjs: +expensesTjs.toFixed(2),
+        expensesUsd: +expensesUsd.toFixed(2),
+        netProfitTjs: +(profitTjs - expensesTjs).toFixed(2),
+        netProfitUsd: +(profitUsd - expensesUsd).toFixed(2),
+      };
+    }
+
+    setReportDownloading(true);
+    try {
+      await exportComprehensiveReport({
+        sales: reportSales,
+        expenses: reportExpenses,
+        summary: reportSummary,
+        generatedBy: currentUser?.name,
+      });
+    } catch (error) {
+      console.error('Failed to create financial report', error);
+      window.alert('Не удалось сформировать Excel-отчёт. Попробуйте ещё раз.');
+    } finally {
+      setReportDownloading(false);
+    }
   };
 
   if (currentUser?.role === 'SELLER') {
@@ -373,10 +475,13 @@ export const ReportsPage: React.FC = () => {
       <ReportPreviewModal
         open={salesReportStoreId !== null}
         onClose={() => setSalesReportStoreId(null)}
-        title={`Отчет по продажам — ${salesReportStoreName}`}
-        subtitle={periodLabel}
+        title={`Финансовый отчёт — ${salesReportStoreName}`}
+        subtitle={`${periodLabel} • Excel: продажи, расходы и итого`}
         table={salesReportTable}
-        onDownload={() => salesReportStoreId && exportSalesReport(salesByStore.get(salesReportStoreId) ?? [], rate, filteredData.periodCashBonusesUsd)}
+        onDownload={() => void downloadFinancialReport()}
+        downloadLabel="Скачать Excel"
+        downloading={reportDownloading}
+        canDownload={!!summary}
       />
     </div>
   );
