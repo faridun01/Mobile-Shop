@@ -10,7 +10,10 @@ import {
   Award,
   ChevronRight,
   X,
-  Scan
+  Scan,
+  Edit,
+  Trash2,
+  Loader2
 } from 'lucide-react';
 
 export const BonusesPage: React.FC = () => {
@@ -21,6 +24,8 @@ export const BonusesPage: React.FC = () => {
     stores,
     devices,
     createSupplierBonus,
+    updateSupplierBonus,
+    deleteSupplierBonus,
     todayRate,
     openScanner
   } = useApp();
@@ -29,6 +34,19 @@ export const BonusesPage: React.FC = () => {
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedBonus, setSelectedBonus] = useState<SupplierBonus | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const [editingBonus, setEditingBonus] = useState<SupplierBonus | null>(null);
+  const [editCampaignTitle, setEditCampaignTitle] = useState('');
+  const [editAmountUsd, setEditAmountUsd] = useState('');
+  const [editBrand, setEditBrand] = useState('');
+  const [editModel, setEditModel] = useState('');
+  const [editStorage, setEditStorage] = useState('');
+  const [editColor, setEditColor] = useState('');
+  const [editImei, setEditImei] = useState('');
+  const [editImei2, setEditImei2] = useState('');
+
+  const [deletingBonus, setDeletingBonus] = useState<SupplierBonus | null>(null);
 
   const [supplierId, setSupplierId] = useState(suppliers[0]?.id || '');
 
@@ -165,6 +183,7 @@ export const BonusesPage: React.FC = () => {
 
   const handleCreateBonus = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmitting) return;
     setStatusMessage(null);
 
     if (bonusType === 'FREE_DEVICES' && (!bonusBrand.trim() || !bonusModel.trim())) {
@@ -189,40 +208,102 @@ export const BonusesPage: React.FC = () => {
       }
     ] : undefined;
 
-    const res = await createSupplierBonus({
-      supplierId,
-      bonusType,
-      amountUsd: bonusType === 'CASH_DISCOUNT' ? (parseFloat(amountUsd) || 0) : undefined,
-      freeDevices,
-      destinationLocationId
-    });
-
-    if (res.success) {
-      setIsModalOpen(false);
-      setBonusBrand('');
-      setBonusModel('');
-      setBonusStorage('');
-      setBonusColor('');
-      setBonusImei('');
-      setBonusImei2('');
-      setStatusMessage({
-        type: 'success',
-        text: `Бонус успешно сохранен и оприходован на склад`
+    setIsSubmitting(true);
+    try {
+      const res = await createSupplierBonus({
+        supplierId,
+        bonusType,
+        amountUsd: bonusType === 'CASH_DISCOUNT' ? (parseFloat(amountUsd) || 0) : undefined,
+        freeDevices,
+        destinationLocationId
       });
-    } else {
-      setStatusMessage({ type: 'error', text: res.message || 'Ошибка сохранения' });
+
+      if (res.success) {
+        setIsModalOpen(false);
+        setBonusBrand('');
+        setBonusModel('');
+        setBonusStorage('');
+        setBonusColor('');
+        setBonusImei('');
+        setBonusImei2('');
+        setStatusMessage({
+          type: 'success',
+          text: `Бонус успешно сохранен и оприходован на склад`
+        });
+      } else {
+        setStatusMessage({ type: 'error', text: res.message || 'Ошибка сохранения' });
+      }
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleStartEditBonus = (bonus: SupplierBonus) => {
+    setEditCampaignTitle(bonus.campaignTitle || bonus.campaignName || '');
+    setEditAmountUsd(bonus.amountUsd != null ? String(bonus.amountUsd) : '');
+    const fd = bonus.freeDevices?.[0];
+    setEditBrand(fd?.brand || bonus.brand || '');
+    setEditModel(fd?.model || bonus.model || '');
+    setEditStorage(fd?.storage || bonus.storage || '');
+    setEditColor(fd?.color || bonus.color || '');
+    setEditImei(fd?.imei || bonus.imei || '');
+    setEditImei2('');
+    setEditingBonus(bonus);
+  };
+
+  const handleSaveEditBonus = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingBonus || isSubmitting) return;
+
+    setIsSubmitting(true);
+    try {
+      const res = await updateSupplierBonus(editingBonus.id, {
+        campaignTitle: editCampaignTitle.trim() || undefined,
+        amountUsd: editingBonus.bonusType === 'CASH_DISCOUNT' ? (parseFloat(editAmountUsd) || 0) : undefined,
+        freeDevice: editingBonus.bonusType === 'FREE_DEVICES' ? {
+          brand: editBrand.trim(),
+          model: editModel.trim(),
+          storage: editStorage.trim(),
+          color: editColor.trim(),
+          imei: editImei.trim(),
+          imei2: editImei2.trim() || undefined,
+        } : undefined,
+      });
+
+      if (res.success) {
+        setEditingBonus(null);
+        setSelectedBonus(null);
+        setStatusMessage({ type: 'success', text: 'Бонус обновлён' });
+      } else {
+        setStatusMessage({ type: 'error', text: res.message || 'Ошибка обновления бонуса' });
+      }
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleConfirmDeleteBonus = async () => {
+    if (!deletingBonus || isSubmitting) return;
+
+    setIsSubmitting(true);
+    try {
+      const res = await deleteSupplierBonus(deletingBonus.id);
+      if (res.success) {
+        setDeletingBonus(null);
+        setSelectedBonus(null);
+        setStatusMessage({ type: 'success', text: 'Бонус удалён' });
+      } else {
+        setStatusMessage({ type: 'error', text: res.message || 'Ошибка удаления бонуса' });
+      }
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   return (
     <div className="flex-1 flex flex-col h-full overflow-hidden bg-bg text-fg-muted">
       {/* Header */}
-      <div className="p-3 sm:p-4 border-b border-border bg-surface flex items-center justify-between gap-3 shrink-0">
-        <h3 className="text-xs sm:text-sm font-bold text-fg-muted uppercase tracking-wide flex items-center space-x-1.5">
-          <Gift className="w-4 h-4 text-warning" />
-          <span>БОНУСЫ И ПРОМО-ПРОГРАММЫ ПОСТАВЩИКОВ</span>
-        </h3>
-
+      <div className="p-3 sm:p-4 border-b border-border bg-surface flex items-center justify-end gap-3 shrink-0">
         <button
           onClick={() => setIsModalOpen(true)}
           className="px-3 py-1.5 rounded-xl bg-accent hover:bg-accent-strong text-xs font-bold text-accent-fg flex items-center space-x-1.5 shrink-0 transition-colors shadow-xs"
@@ -519,16 +600,19 @@ export const BonusesPage: React.FC = () => {
             <div className="flex space-x-2 pt-2">
               <button
                 type="button"
+                disabled={isSubmitting}
                 onClick={() => setIsModalOpen(false)}
-                className="flex-1 py-2.5 rounded-xl bg-surface-raised hover:bg-surface border border-border text-xs font-bold text-fg-muted uppercase"
+                className="flex-1 py-2.5 rounded-xl bg-surface-raised hover:bg-surface border border-border text-xs font-bold text-fg-muted uppercase disabled:opacity-50"
               >
                 Отмена
               </button>
               <button
                 type="submit"
-                className="flex-1 py-2.5 rounded-xl bg-accent hover:bg-accent-strong text-xs font-bold text-accent-fg uppercase"
+                disabled={isSubmitting}
+                className="flex-1 py-2.5 rounded-xl bg-accent hover:bg-accent-strong text-xs font-bold text-accent-fg uppercase disabled:opacity-60 flex items-center justify-center gap-1.5"
               >
-                Сохранить бонус
+                {isSubmitting && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                {isSubmitting ? 'Сохранение…' : 'Сохранить бонус'}
               </button>
             </div>
           </form>
@@ -611,12 +695,194 @@ export const BonusesPage: React.FC = () => {
               )}
             </div>
 
-            <div className="p-3 border-t border-border flex justify-end">
+            <div className="p-3 border-t border-border flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => handleStartEditBonus(selectedBonus)}
+                  className="px-3 py-2 rounded-xl bg-surface-raised hover:bg-surface border border-border text-fg-muted font-bold text-xs uppercase flex items-center gap-1.5"
+                >
+                  <Edit className="w-3.5 h-3.5" />
+                  Редактировать
+                </button>
+                <button
+                  onClick={() => setDeletingBonus(selectedBonus)}
+                  className="px-3 py-2 rounded-xl bg-danger/10 hover:bg-danger/20 border border-danger/30 text-danger font-bold text-xs uppercase flex items-center gap-1.5"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  Удалить
+                </button>
+              </div>
               <button
                 onClick={() => setSelectedBonus(null)}
                 className="px-4 py-2 rounded-xl bg-accent hover:bg-accent-strong text-accent-fg font-bold text-xs uppercase"
               >
                 ЗАКРЫТЬ
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: Edit Bonus */}
+      {editingBonus && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-xs">
+          <form onSubmit={handleSaveEditBonus} className="w-full max-w-md rounded-2xl bg-surface border border-border p-5 text-fg-muted shadow-2xl space-y-4">
+            <div className="flex items-center justify-between border-b border-border pb-3">
+              <h4 className="text-sm font-bold text-fg-muted flex items-center space-x-2">
+                <Edit className="w-4 h-4 text-accent" />
+                <span>Редактировать бонус</span>
+              </h4>
+              <button type="button" onClick={() => setEditingBonus(null)} className="text-fg-subtle hover:text-fg-muted">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="text-xs space-y-3">
+              <div>
+                <label className="block text-fg-subtle mb-1">Название кампании (опционально)</label>
+                <input
+                  type="text"
+                  value={editCampaignTitle}
+                  onChange={(e) => setEditCampaignTitle(e.target.value)}
+                  className="w-full rounded-xl bg-surface-raised border border-border px-3 py-2 text-fg-muted focus:border-accent focus:outline-none"
+                />
+              </div>
+
+              {editingBonus.bonusType === 'CASH_DISCOUNT' ? (
+                <div>
+                  <label className="block text-fg-subtle text-xs font-semibold mb-1">
+                    Сумма бонуса ($ USD)
+                  </label>
+                  <div className="relative">
+                    <span className="absolute left-2.5 top-2 text-accent font-bold">$</span>
+                    <input
+                      type="number"
+                      value={editAmountUsd}
+                      onChange={(e) => setEditAmountUsd(e.target.value)}
+                      className="w-full rounded-lg bg-surface-raised border border-border pl-7 pr-2.5 py-1.5 text-xs font-bold text-accent focus:border-accent focus:outline-none"
+                    />
+                  </div>
+                </div>
+              ) : (
+                <div className="p-3 rounded-xl bg-surface-raised border border-border space-y-2">
+                  <span className="text-[11px] font-semibold text-fg-muted">Данные подарочного устройства:</span>
+                  <div className="grid grid-cols-2 gap-2">
+                    <input
+                      type="text"
+                      list="bonus-brand-suggestions"
+                      value={editBrand}
+                      onChange={(e) => setEditBrand(e.target.value)}
+                      placeholder="Apple"
+                      className="rounded-lg bg-surface border border-border px-2 py-1.5 text-xs text-fg-muted focus:border-accent focus:outline-none"
+                    />
+                    <input
+                      type="text"
+                      list="bonus-model-suggestions"
+                      value={editModel}
+                      onChange={(e) => setEditModel(e.target.value)}
+                      placeholder="iPhone 16"
+                      className="rounded-lg bg-surface border border-border px-2 py-1.5 text-xs text-fg-muted focus:border-accent focus:outline-none"
+                    />
+                    <input
+                      type="text"
+                      list="bonus-storage-suggestions"
+                      value={editStorage}
+                      onChange={(e) => setEditStorage(e.target.value)}
+                      placeholder="128 GB"
+                      className="rounded-lg bg-surface border border-border px-2 py-1.5 text-xs text-fg-muted focus:border-accent focus:outline-none"
+                    />
+                    <input
+                      type="text"
+                      list="bonus-color-suggestions"
+                      value={editColor}
+                      onChange={(e) => setEditColor(e.target.value)}
+                      placeholder="Black"
+                      className="rounded-lg bg-surface border border-border px-2 py-1.5 text-xs text-fg-muted focus:border-accent focus:outline-none"
+                    />
+                  </div>
+                  <div className="space-y-2 pt-1 border-t border-border">
+                    <div>
+                      <label className="block text-fg-subtle text-[10px] uppercase font-bold mb-0.5">IMEI 1</label>
+                      <input
+                        type="text"
+                        required
+                        value={editImei}
+                        onChange={(e) => setEditImei(e.target.value)}
+                        className="w-full rounded-lg bg-surface border border-border px-2 py-1.5 text-xs text-fg-muted focus:border-accent focus:outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-fg-subtle text-[10px] uppercase font-bold mb-0.5">
+                        IMEI 2 <span className="font-normal">(если менялся)</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={editImei2}
+                        onChange={(e) => setEditImei2(e.target.value)}
+                        placeholder="Оставьте пустым, если без изменений"
+                        className="w-full rounded-lg bg-surface border border-border px-2 py-1.5 text-xs text-fg-muted focus:border-accent focus:outline-none"
+                      />
+                    </div>
+                  </div>
+                  <p className="text-[10px] text-fg-subtle">
+                    Редактирование недоступно, если устройство уже продано, перемещено или отправлено в ремонт.
+                  </p>
+                </div>
+              )}
+            </div>
+
+            <div className="flex space-x-2 pt-2">
+              <button
+                type="button"
+                disabled={isSubmitting}
+                onClick={() => setEditingBonus(null)}
+                className="flex-1 py-2.5 rounded-xl bg-surface-raised hover:bg-surface border border-border text-xs font-bold text-fg-muted uppercase disabled:opacity-50"
+              >
+                Отмена
+              </button>
+              <button
+                type="submit"
+                disabled={isSubmitting}
+                className="flex-1 py-2.5 rounded-xl bg-accent hover:bg-accent-strong text-xs font-bold text-accent-fg uppercase disabled:opacity-60 flex items-center justify-center gap-1.5"
+              >
+                {isSubmitting && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                {isSubmitting ? 'Сохранение…' : 'Сохранить'}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* MODAL: Delete Bonus Confirmation */}
+      {deletingBonus && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-xs">
+          <div className="w-full max-w-sm rounded-2xl bg-surface border border-danger/40 p-5 shadow-2xl text-fg-muted space-y-4">
+            <div className="flex items-center space-x-3 text-danger">
+              <AlertCircle className="w-6 h-6 shrink-0" />
+              <h3 className="text-sm font-bold text-fg-muted">Удаление бонуса</h3>
+            </div>
+            <p className="text-xs text-fg-muted leading-relaxed">
+              Вы действительно хотите удалить бонус от{' '}
+              <strong className="text-fg-muted">{deletingBonus.supplierName}</strong>?
+              {deletingBonus.bonusType === 'CASH_DISCOUNT'
+                ? ' Начисленная от него прибыль владельцев будет отменена.'
+                : ' Подарочное устройство будет удалено со склада (если оно ещё не продано и не перемещено).'}
+            </p>
+            <div className="flex items-center justify-end space-x-2 pt-2">
+              <button
+                disabled={isSubmitting}
+                onClick={() => setDeletingBonus(null)}
+                className="px-4 py-2.5 rounded-xl bg-surface-raised hover:bg-surface border border-border text-xs font-bold text-fg-muted uppercase disabled:opacity-50"
+              >
+                Отмена
+              </button>
+              <button
+                disabled={isSubmitting}
+                onClick={handleConfirmDeleteBonus}
+                className="px-4 py-2.5 rounded-xl bg-danger hover:opacity-90 text-xs font-bold text-white uppercase shadow-xs disabled:opacity-60 flex items-center justify-center gap-1.5"
+              >
+                {isSubmitting && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                {isSubmitting ? 'Удаление…' : 'Удалить бонус'}
               </button>
             </div>
           </div>

@@ -326,6 +326,161 @@ export class SuppliersService {
       return bonus;
     }, { maxWait: 10000, timeout: 25000 });
   }
+
+  /**
+   * CASH_DISCOUNT edits reverse the old owner-profit accrual and re-apply the new
+   * amount, same revert-then-apply pattern as expense edits. FREE_DEVICES edits are
+   * blocked once the underlying device has any transaction history (sold, transferred,
+   * sent to repair) — the bonus record isn't the source of truth for that device anymore.
+   */
+  public static async updateBonus(id: string, input: { campaignTitle?: string; amountUsd?: number; freeDevice?: { brand?: string; model?: string; storage?: string; color?: string; imei?: string; imei2?: string }; actorUserId: string }) {
+    return prisma.$transaction(async (tx) => {
+      const actor = await resolveActor(tx, input.actorUserId);
+      const bonus = await tx.supplierBonus.findUnique({ where: { id }, include: { freeDevices: true, supplier: true } });
+      if (!bonus) throw new Error('Бонус не найден');
+
+      const data: { campaignTitle?: string | null; amountUsd?: number } = {};
+      if (input.campaignTitle !== undefined) data.campaignTitle = input.campaignTitle.trim() || null;
+
+      if (bonus.bonusType === 'CASH_DISCOUNT') {
+        if (input.amountUsd !== undefined) {
+          const newAmountUsd = requirePositiveMoney(input.amountUsd, 'Сумма бонуса');
+          const oldAmountUsd = bonus.amountUsd || 0;
+          if (newAmountUsd !== oldAmountUsd) {
+            const owners = await tx.owner.findMany();
+            for (const owner of owners) {
+              const share = owner.profitSharePercent / 100;
+              const delta = roundMoney(newAmountUsd * share) - roundMoney(oldAmountUsd * share);
+              if (delta === 0) continue;
+              // A lower amount claws back profit already booked as accrued/available — but
+              // if that profit has since been paid out, reinvested, or swept by a quarter
+              // close, it's no longer sitting in availableProfitUsd to claw back from.
+              // Blocking here (same guard shape as payout/withdrawal) beats silently driving
+              // the owner's available profit negative.
+              const guard = await tx.owner.updateMany({
+                where: delta < 0 ? { id: owner.id, availableProfitUsd: { gte: -delta } } : { id: owner.id },
+                data: { totalAccruedProfitUsd: { increment: delta }, availableProfitUsd: { increment: delta } },
+              });
+              if (guard.count !== 1) {
+                throw new Error(`Нельзя уменьшить сумму бонуса: прибыль от него для «${owner.name}» уже выплачена, реинвестирована или зачислена в капитал закрытием квартала`);
+              }
+            }
+          }
+          data.amountUsd = newAmountUsd;
+          await tx.ledgerEntry.updateMany({
+            where: { referenceId: id, type: 'SUPPLIER_BONUS' },
+            data: { amountUsd: newAmountUsd, description: `Денежный бонус от ${bonus.supplier.name}: +$${newAmountUsd}` },
+          });
+        }
+      } else if (bonus.bonusType === 'FREE_DEVICES' && input.freeDevice) {
+        const bonusDevice = bonus.freeDevices[0];
+        if (!bonusDevice) throw new Error('У этого бонуса нет привязанного устройства');
+        if (bonusDevice.deviceId) {
+          const hasHistory = await deviceHasTransactionHistory(tx, [bonusDevice.deviceId]);
+          if (hasHistory) throw new Error('Нельзя редактировать: устройство уже продано, перемещено или отправлено в ремонт');
+        }
+
+        const newImei = input.freeDevice.imei?.trim();
+        if (newImei && newImei !== bonusDevice.imei) {
+          const existing = await tx.device.findFirst({
+            where: { AND: [{ id: { not: bonusDevice.deviceId ?? undefined } }, { OR: [{ imei: newImei }, { imei2: newImei }] }] },
+          });
+          if (existing) throw new Error(`IMEI ${newImei} уже зарегистрирован`);
+        }
+
+        const deviceUpdate: Record<string, string | null> = {};
+        const bonusDeviceUpdate: Record<string, string> = {};
+        if (input.freeDevice.brand !== undefined) { deviceUpdate.brand = input.freeDevice.brand; bonusDeviceUpdate.brand = input.freeDevice.brand; }
+        if (input.freeDevice.model !== undefined) { deviceUpdate.model = input.freeDevice.model; bonusDeviceUpdate.model = input.freeDevice.model; }
+        if (input.freeDevice.storage !== undefined) { deviceUpdate.storage = input.freeDevice.storage; bonusDeviceUpdate.storage = input.freeDevice.storage; }
+        if (input.freeDevice.color !== undefined) { deviceUpdate.color = input.freeDevice.color; bonusDeviceUpdate.color = input.freeDevice.color; }
+        if (newImei) { deviceUpdate.imei = newImei; bonusDeviceUpdate.imei = newImei; }
+        if (input.freeDevice.imei2 !== undefined) { deviceUpdate.imei2 = input.freeDevice.imei2.trim() || null; }
+        if (input.campaignTitle !== undefined) deviceUpdate.bonusCampaign = input.campaignTitle.trim() || null;
+
+        if (bonusDevice.deviceId && Object.keys(deviceUpdate).length > 0) {
+          await tx.device.update({ where: { id: bonusDevice.deviceId }, data: deviceUpdate });
+        }
+        if (Object.keys(bonusDeviceUpdate).length > 0) {
+          await tx.supplierBonusDevice.update({ where: { id: bonusDevice.id }, data: bonusDeviceUpdate });
+        }
+      }
+
+      const updated = await tx.supplierBonus.update({ where: { id }, data, include: { freeDevices: true, supplier: true } });
+
+      await tx.auditLog.create({
+        data: {
+          userId: actor.id,
+          userName: actor.name,
+          userRole: actor.role,
+          action: 'BONUS_EDIT',
+          details: `Отредактирован бонус от ${bonus.supplier.name}`,
+          targetId: id,
+        },
+      });
+
+      return updated;
+    }, { maxWait: 10000, timeout: 25000 });
+  }
+
+  /**
+   * FREE_DEVICES bonuses can't be deleted once the device they created has any
+   * transaction history — same guard as deleting a supplier outright, for the same
+   * reason (SaleItem/TransferItem/RepairTicket hold a hard FK with no cascade).
+   * CASH_DISCOUNT deletes reverse the owner-profit accrual booked at creation.
+   */
+  public static async deleteBonus(id: string, actorUserId: string) {
+    return prisma.$transaction(async (tx) => {
+      const actor = await resolveActor(tx, actorUserId);
+      const bonus = await tx.supplierBonus.findUnique({ where: { id }, include: { freeDevices: true, supplier: true } });
+      if (!bonus) throw new Error('Бонус не найден');
+
+      if (bonus.bonusType === 'FREE_DEVICES') {
+        const deviceIds = bonus.freeDevices.map((d) => d.deviceId).filter((v): v is string => Boolean(v));
+        if (deviceIds.length > 0) {
+          const hasHistory = await deviceHasTransactionHistory(tx, deviceIds);
+          if (hasHistory) throw new Error('Нельзя удалить бонус: устройство уже продано, перемещено или отправлено в ремонт');
+          await tx.deviceTimelineEvent.deleteMany({ where: { deviceId: { in: deviceIds } } });
+          await tx.device.deleteMany({ where: { id: { in: deviceIds } } });
+        }
+      } else if (bonus.bonusType === 'CASH_DISCOUNT' && bonus.amountUsd) {
+        const bonusAmountUsd = bonus.amountUsd;
+        const owners = await tx.owner.findMany();
+        for (const owner of owners) {
+          const delta = roundMoney(bonusAmountUsd * (owner.profitSharePercent / 100));
+          if (delta <= 0) continue;
+          // Same reasoning as updateBonus: this bonus's profit may already have been
+          // paid out, reinvested, or swept into capital by a quarter close, in which case
+          // it's no longer sitting in availableProfitUsd to claw back — block instead of
+          // driving the balance negative.
+          const guard = await tx.owner.updateMany({
+            where: { id: owner.id, availableProfitUsd: { gte: delta } },
+            data: { totalAccruedProfitUsd: { decrement: delta }, availableProfitUsd: { decrement: delta } },
+          });
+          if (guard.count !== 1) {
+            throw new Error(`Нельзя удалить бонус: прибыль от него для «${owner.name}» уже выплачена, реинвестирована или зачислена в капитал закрытием квартала. Сначала скорректируйте капитал владельца вручную.`);
+          }
+        }
+        await tx.ledgerEntry.deleteMany({ where: { referenceId: id, type: 'SUPPLIER_BONUS' } });
+      }
+
+      await tx.supplierBonus.delete({ where: { id } });
+
+      await tx.auditLog.create({
+        data: {
+          userId: actor.id,
+          userName: actor.name,
+          userRole: actor.role,
+          action: 'BONUS_DELETE',
+          details: `Удалён бонус от ${bonus.supplier.name}${bonus.amountUsd ? `: $${bonus.amountUsd}` : ''}`,
+          targetId: id,
+        },
+      });
+
+      return { success: true };
+    }, { maxWait: 10000, timeout: 25000 });
+  }
+
   public static async update(id: string, input: { name?: string; phone?: string; contactPerson?: string }) {
     const data: any = {};
     if (input.name !== undefined) data.name = input.name.trim();

@@ -100,6 +100,26 @@ export function registerSupplierRoutes(app: Express) {
     }
   });
 
+  app.put('/api/supplier-bonuses/:id', authenticateJwt, requireRoles('ADMIN', 'PARTNER'), async (req: AuthenticatedRequest, res, next) => {
+    try {
+      const bonus = await SuppliersService.updateBonus(req.params.id, { ...(req.body ?? {}), actorUserId: req.user!.userId });
+      RealtimeSyncGateway.broadcast('INVENTORY_UPDATE', {});
+      res.json(bonus);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.delete('/api/supplier-bonuses/:id', authenticateJwt, requireRoles('ADMIN', 'PARTNER'), async (req: AuthenticatedRequest, res, next) => {
+    try {
+      const result = await SuppliersService.deleteBonus(req.params.id, req.user!.userId);
+      RealtimeSyncGateway.broadcast('INVENTORY_UPDATE', {});
+      res.json(result);
+    } catch (error) {
+      next(error);
+    }
+  });
+
   app.put('/api/suppliers/:id', authenticateJwt, requireRoles('ADMIN', 'PARTNER'), async (req: AuthenticatedRequest, res, next) => {
     try {
       const supplier = await SuppliersService.update(req.params.id, req.body ?? {});

@@ -315,11 +315,14 @@ export const OwnersPage: React.FC = () => {
 
     const currentOwner = owners.find(o => o.id === selectedOwnerId);
 
-    if (txType === 'REINVEST' && currentOwner) {
-      if (val > (currentOwner.availableProfitUsd ?? 0)) {
+    // Both draw from the same availableProfitUsd bucket the backend guards against —
+    // check it here too so a typo gets instant feedback instead of a round trip.
+    if ((txType === 'REINVEST' || txType === 'PROFIT_PAYOUT') && currentOwner) {
+      const availProfit = currentOwner.availableProfitUsd ?? 0;
+      if (val > availProfit) {
         setStatusBanner({
           tone: 'error',
-          text: `Сумма реинвестирования ($${val}) превышает доступный остаток к выплате ($${currentOwner.availableProfitUsd ?? 0})`
+          text: `Сумма ${txType === 'REINVEST' ? 'реинвестирования' : 'выплаты'} ($${val}) превышает доступный остаток к выплате ($${availProfit})`
         });
         return;
       }
@@ -972,7 +975,7 @@ export const OwnersPage: React.FC = () => {
                       {txType === 'REINVEST' && availProfit > 0 && (
                         <button
                           type="button"
-                          onClick={() => setAmountUsd(Math.floor(availProfit).toString())}
+                          onClick={() => setAmountUsd(availProfit.toFixed(2))}
                           className="w-full py-1.5 px-2 rounded-lg bg-warning/20 hover:bg-warning/30 text-warning text-xs font-bold border border-warning/40 flex items-center justify-center space-x-1 transition-colors"
                         >
                           <span>ВЛОЖИТЬ ВЕСЬ ОСТАТОК </span>
@@ -982,7 +985,7 @@ export const OwnersPage: React.FC = () => {
                       {txType === 'PROFIT_PAYOUT' && availProfit > 0 && (
                         <button
                           type="button"
-                          onClick={() => setAmountUsd(Math.floor(availProfit).toString())}
+                          onClick={() => setAmountUsd(availProfit.toFixed(2))}
                           className="w-full py-1.5 px-2 rounded-lg bg-warning/20 hover:bg-warning/30 text-warning text-xs font-bold border border-warning/40 flex items-center justify-center space-x-1 transition-colors"
                         >
                           <span>ВЫПЛАТИТЬ ВЕСЬ ОСТАТОК</span>

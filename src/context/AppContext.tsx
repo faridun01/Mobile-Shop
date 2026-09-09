@@ -164,6 +164,12 @@ interface AppContextType {
     }[];
     destinationLocationId?: string;
   }) => Promise<{ success: boolean; message?: string }>;
+  updateSupplierBonus: (id: string, data: {
+    campaignTitle?: string;
+    amountUsd?: number;
+    freeDevice?: { brand?: string; model?: string; storage?: string; color?: string; imei?: string; imei2?: string };
+  }) => Promise<{ success: boolean; message?: string }>;
+  deleteSupplierBonus: (id: string) => Promise<{ success: boolean; message?: string }>;
 
   createTransferRequest: (toLocationIdOrParams: string | { fromLocationId?: string; toLocationId: string; deviceIds: string[] }, deviceIds?: string[]) => Promise<{ success: boolean; message?: string }>;
   approveTransfer: (transferId: string) => Promise<{ success: boolean; message?: string }>;
@@ -742,16 +748,40 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
+  // Bonuses only touch bonuses/devices(FREE_DEVICES)/owners(CASH_DISCOUNT) — refetching
+  // every module in the app (refetchAll) after each save was why this felt slow.
+  const refetchAfterBonusChange = () => Promise.all([fetchBonuses(), fetchDevices(), fetchOwners()]);
+
   const createSupplierBonus: AppContextType['createSupplierBonus'] = async ({ supplierId, campaignTitle, bonusType, amountUsd, freeDevices, destinationLocationId }) => {
     try {
       await apiClient('/supplier-bonuses', {
         method: 'POST',
         body: JSON.stringify({ supplierId, campaignTitle, bonusType, amountUsd, freeDevices, destinationStoreId: destinationLocationId }),
       });
-      await refetchAll();
+      await refetchAfterBonusChange();
       return { success: true };
     } catch (err) {
       return { success: false, message: errorMessage(err, 'Не удалось зарегистрировать бонус') };
+    }
+  };
+
+  const updateSupplierBonus: AppContextType['updateSupplierBonus'] = async (id, data) => {
+    try {
+      await apiClient(`/supplier-bonuses/${id}`, { method: 'PUT', body: JSON.stringify(data) });
+      await refetchAfterBonusChange();
+      return { success: true };
+    } catch (err) {
+      return { success: false, message: errorMessage(err, 'Не удалось обновить бонус') };
+    }
+  };
+
+  const deleteSupplierBonus: AppContextType['deleteSupplierBonus'] = async (id) => {
+    try {
+      await apiClient(`/supplier-bonuses/${id}`, { method: 'DELETE' });
+      await refetchAfterBonusChange();
+      return { success: true };
+    } catch (err) {
+      return { success: false, message: errorMessage(err, 'Не удалось удалить бонус') };
     }
   };
 
@@ -1226,6 +1256,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         updateSupplierInvoice,
         deleteSupplierInvoice,
         createSupplierBonus,
+        updateSupplierBonus,
+        deleteSupplierBonus,
         createTransferRequest,
         approveTransfer,
         approveTransferRequest: approveTransfer,
