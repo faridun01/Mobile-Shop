@@ -171,6 +171,8 @@ model Device {
   @@index([storeId, status])
   @@index([status])
   @@index([createdAt])
+  @@index([supplierId])
+  @@index([purchaseInvoiceId])
   @@map("devices")
 }
 

@@ -77,16 +77,14 @@ export class RefundService {
         throw new Error('Не удалось вернуть устройства на склад — состояние изменилось');
       }
 
-      for (const item of sale.saleItems) {
-        await tx.deviceTimelineEvent.create({
-          data: {
-            deviceId: item.deviceId,
-            type: 'REFUND',
-            description: `Возврат по чеку #${sale.receiptNumber}${penaltyFeeTjs > 0 ? `, штраф ${penaltyFeeTjs} TJS` : ''}`,
-            userName: actor.name,
-          },
-        });
-      }
+      await tx.deviceTimelineEvent.createMany({
+        data: sale.saleItems.map((item) => ({
+          deviceId: item.deviceId,
+          type: 'REFUND' as const,
+          description: `Возврат по чеку #${sale.receiptNumber}${penaltyFeeTjs > 0 ? `, штраф ${penaltyFeeTjs} TJS` : ''}`,
+          userName: actor.name,
+        })),
+      });
 
       const store = await tx.store.findUnique({ where: { id: sale.storeId } });
       if (input.paymentMethod === 'CASH') {

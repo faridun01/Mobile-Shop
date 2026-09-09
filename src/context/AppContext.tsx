@@ -523,9 +523,56 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authToken, authUser?.id]);
 
-  // Realtime: any broadcast from another terminal triggers resync
-  useRealtimeSync(authToken, () => {
-    refetchAll().catch((e) => console.error('Realtime resync failed', e));
+  // Realtime: route each broadcast to only the data it actually touched instead of
+  // reloading the entire app for every terminal on every change (same fix as
+  // createSupplierBonus's scoped refetch, applied here to the always-on listener that
+  // fires far more often). Anything not explicitly mapped below — including
+  // RECONNECTED, since the client may have missed events while offline — still falls
+  // back to a full refetchAll() so an unmapped or future event type can't go stale.
+  useRealtimeSync(authToken, (type: string) => {
+    const run = (...tasks: Array<() => Promise<unknown>>) =>
+      Promise.all(tasks.map((t) => t())).catch((e) => console.error('Realtime resync failed', e));
+    switch (type) {
+      case 'INVENTORY_UPDATE':
+        run(fetchDevices, fetchSuppliers, fetchInvoices, fetchBonuses);
+        break;
+      case 'SALE_COMPLETED':
+      case 'EXCHANGE_PROCESSED':
+      case 'REFUND_PROCESSED':
+        run(fetchSales, fetchDevices, fetchStores, fetchOwners);
+        break;
+      case 'EXPENSE_CREATED':
+      case 'EXPENSE_UPDATED':
+      case 'EXPENSE_DELETED':
+        run(fetchExpenses, fetchStores, fetchOwners);
+        break;
+      case 'OWNER_TX':
+        run(fetchOwners, fetchOwnerTransactions, fetchStores);
+        break;
+      case 'REPAIR_UPDATED':
+        run(fetchRepairs);
+        break;
+      case 'STORE_UPDATED':
+        run(fetchStores);
+        break;
+      case 'SUPPLIER_PAYMENT':
+        run(fetchSuppliers, fetchInvoices, fetchStores);
+        break;
+      case 'TRANSFER_UPDATED':
+        run(fetchTransfers, fetchDevices);
+        break;
+      case 'NOTIFICATION_CREATED':
+        run(fetchNotifications);
+        break;
+      case 'USER_UPDATED':
+        run(fetchUsers);
+        break;
+      case 'EXCHANGE_RATE_UPDATED':
+        run(fetchExchangeRate);
+        break;
+      default:
+        refetchAll().catch((e) => console.error('Realtime resync failed', e));
+    }
   });
 
   const login = async (loginStr: string, passStr: string) => {
