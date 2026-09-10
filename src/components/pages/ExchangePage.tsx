@@ -289,9 +289,6 @@ export const ExchangePage: React.FC = () => {
             {/* Receipt / IMEI search bar */}
             {!selectedOldDevice ? (
               <div className="space-y-3">
-                <p className="text-xs text-fg-muted">
-                  Найдите проданное устройство по номеру чека или отсканируйте IMEI на корпусе:
-                </p>
                 <div className="flex space-x-2">
                   <div className="relative flex-1">
                     <Search className="absolute left-3 top-2.5 w-4 h-4 text-fg-subtle" />
