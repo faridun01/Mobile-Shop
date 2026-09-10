@@ -16,6 +16,10 @@ export function registerRepairRoutes(app: Express) {
       const period = VALID_PERIODS.includes(req.query.period as ReportPeriod) ? (req.query.period as ReportPeriod) : 'ALL';
       const month = typeof req.query.month === 'string' ? req.query.month : undefined;
       const dateRange = dateRangeForPeriod(period, month);
+      // Explicit opt-in cap for the app's background/startup load — existing callers
+      // (e.g. the Reports export preview, which asks for an explicit period) that don't
+      // pass it keep today's full-history-for-that-period behavior.
+      const limit = req.query.limit !== undefined ? Math.min(Math.max(Number(req.query.limit) || 0, 1), 2000) : undefined;
       // estimatedCostUsd/finalCostUsd/exchangeRate are snapshotted directly on the ticket when
       // each cost is actually set (RepairsService.create / updateStatus), at that day's rate —
       // no per-request conversion needed here, unlike the old approach that re-derived them
@@ -27,6 +31,7 @@ export function registerRepairRoutes(app: Express) {
         // actually used, so select those explicitly instead.
         include: { statusHistory: { orderBy: { updatedAt: 'asc' } }, store: true, user: { select: { id: true, name: true, role: true } } },
         orderBy: { createdAt: 'desc' },
+        ...(limit ? { take: limit } : {}),
       });
       res.json(repairs);
     } catch (error) {

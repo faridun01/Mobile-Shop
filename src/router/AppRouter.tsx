@@ -10,12 +10,16 @@ import { TabletNavRail } from '../components/layout/TabletNavRail';
 import { Drawer } from '../components/layout/Drawer';
 import { MobileBottomNav } from '../components/layout/MobileBottomNav';
 import { DailyRateModal } from '../components/common/DailyRateModal';
-import { ScannerModal } from '../components/common/ScannerModal';
 import { PWAInstallPrompt } from '../components/pwa/PWAInstallPrompt';
 import { PWAUpdateNotifier } from '../components/pwa/PWAUpdateNotifier';
 import { useUIStore } from '../stores/useUIStore';
 import { useApp } from '../context/AppContext';
 import { LoadingState } from '../components/ui/Skeleton';
+
+// Lazy-loaded so the ~3MB html5-qrcode dependency it pulls in only downloads the first
+// time a user actually opens the scanner, instead of riding along in the main chunk on
+// every page load for every mobile user (see performance audit, P0-1).
+const ScannerModal = lazy(() => import('../components/common/ScannerModal').then(m => ({ default: m.ScannerModal })));
 
 // Lazy-loaded page components for Code Splitting
 const LoginPage = lazy(() => import('../components/pages/LoginPage').then(m => ({ default: m.LoginPage })));
@@ -63,7 +67,7 @@ function MainLayout() {
   const location = useLocation();
   const { currentUser } = useAuthStore();
   const { isDailyRateModalOpen, setDailyRateModalOpen } = useUIStore();
-  const { isRateModalOpen, closeDailyRateModal, activePage, setActivePage, selectedStoreId, stores } = useApp();
+  const { isRateModalOpen, closeDailyRateModal, activePage, setActivePage, selectedStoreId, stores, isScannerOpen } = useApp();
 
   React.useEffect(() => {
     const matched = Object.entries(PAGE_ROUTES).find(([_, path]) => path === location.pathname);
@@ -147,7 +151,11 @@ function MainLayout() {
           closeDailyRateModal();
         }}
       />
-      <ScannerModal />
+      {isScannerOpen && (
+        <Suspense fallback={null}>
+          <ScannerModal />
+        </Suspense>
+      )}
       <PWAInstallPrompt />
       <PWAUpdateNotifier />
     </div>

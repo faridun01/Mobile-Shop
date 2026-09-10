@@ -144,7 +144,9 @@ export const PurchasePage: React.FC = () => {
   // sold) are fetched on demand so the "which units sold" detail view stays accurate.
   useEffect(() => {
     if (!selectedInvoiceId) return;
-    findDevicesByInvoice(selectedInvoiceId).catch((e) => console.error('Failed to load invoice devices', e));
+    let cancelled = false;
+    findDevicesByInvoice(selectedInvoiceId).catch((e) => { if (!cancelled) console.error('Failed to load invoice devices', e); });
+    return () => { cancelled = true; };
   }, [selectedInvoiceId, findDevicesByInvoice]);
 
   // `supplierInvoices` only holds a recent bounded window by default — the current month
@@ -153,10 +155,12 @@ export const PurchasePage: React.FC = () => {
   useEffect(() => {
     const thisMonth = new Date().toISOString().substring(0, 7);
     if (periodFilter === 'SPECIFIC_MONTH' && selectedMonth === thisMonth) return;
+    let cancelled = false;
     fetchInvoicesRange({
       period: periodFilter,
       month: periodFilter === 'SPECIFIC_MONTH' ? selectedMonth : undefined,
-    }).catch((e) => console.error('Failed to load invoices for period', e));
+    }).catch((e) => { if (!cancelled) console.error('Failed to load invoices for period', e); });
+    return () => { cancelled = true; };
   }, [periodFilter, selectedMonth, fetchInvoicesRange]);
 
   // Form states

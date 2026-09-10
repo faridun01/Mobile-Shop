@@ -21,11 +21,28 @@ Textarea.displayName = 'Textarea';
 
 /** No default width — sizes to content like a native select. Pass `w-full` explicitly for a form-field-style select. */
 export const Select = React.forwardRef<HTMLSelectElement, React.SelectHTMLAttributes<HTMLSelectElement>>(
-  ({ className, children, ...rest }, ref) => (
-    <select ref={ref} className={cn(fieldBase, 'py-2 pr-8', className)} {...rest}>
-      {children}
-    </select>
-  )
+  ({ className, children, ...rest }, ref) => {
+    const hasCustomHeight = !!className && /\b(h-|min-h-)/.test(className);
+    const hasCustomText = !!className && /\btext-/.test(className);
+    const hasCustomPy = !!className && /\bpy-/.test(className);
+
+    return (
+      <select
+        ref={ref}
+        className={cn(
+          'rounded-lg bg-surface border border-border px-3 text-fg-muted focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent disabled:opacity-50 transition-colors',
+          !hasCustomHeight && 'min-h-11',
+          !hasCustomPy && 'py-2',
+          !hasCustomText && 'text-sm',
+          !className?.includes('pr-') && 'pr-8',
+          className
+        )}
+        {...rest}
+      >
+        {children}
+      </select>
+    );
+  }
 );
 Select.displayName = 'Select';
 

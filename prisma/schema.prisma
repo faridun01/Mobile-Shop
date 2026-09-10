@@ -570,6 +570,7 @@ model Expense {
 
   @@index([storeId, createdAt])
   @@index([createdAt])
+  @@index([employeeId])
   @@map("expenses")
 }
 

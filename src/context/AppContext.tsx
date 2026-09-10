@@ -14,7 +14,6 @@ import {
   RepairTicket,
   RepairStatus,
   TransferRequest,
-  NotificationItem,
   AuditLogEntry,
   DailyRate,
   PageId,
@@ -24,6 +23,7 @@ import {
 } from '../types';
 import { useAuthStore } from '../stores/useAuthStore';
 import { useUIStore } from '../stores/useUIStore';
+import { useNotifications } from './NotificationsContext';
 import { apiClient } from '../api/client';
 import { useRealtimeSync } from '../hooks/useRealtimeSync';
 import { getBusinessDateKey } from '../utils/businessDate';
@@ -41,7 +41,6 @@ import {
   mapOwnerTransaction,
   mapUser,
   mapStore,
-  mapNotification,
   mapAuditLog,
   mapDailyRate,
 } from '../api/mappers';
@@ -70,6 +69,9 @@ interface AppContextType {
   fetchSalesRange: (params: { period?: 'TODAY' | 'MONTH' | 'SPECIFIC_MONTH' | 'ALL'; month?: string; storeId?: string; sellerId?: string; search?: string }) => Promise<Sale[]>;
   transfers: TransferRequest[];
   repairs: RepairTicket[];
+  // `repairs` only holds a recent, bounded window by default (see fetchRepairs) — this
+  // reaches further back via an explicit period/month, same pattern as fetchSalesRange.
+  fetchRepairsRange: (params: { period?: 'TODAY' | 'MONTH' | 'SPECIFIC_MONTH' | 'ALL'; month?: string }) => Promise<RepairTicket[]>;
   suppliers: Supplier[];
   invoices: SupplierInvoice[];
   supplierInvoices: SupplierInvoice[];
@@ -80,10 +82,16 @@ interface AppContextType {
   bonuses: SupplierBonus[];
   supplierBonuses: SupplierBonus[];
   expenses: Expense[];
+  // `expenses` only holds a recent, bounded window by default (see fetchExpenses) — this
+  // reaches further back by an explicit period/month, or employeeId for one employee's
+  // full advance/expense history, same pattern as fetchSalesRange.
+  fetchExpensesRange: (params: { period?: 'TODAY' | 'MONTH' | 'SPECIFIC_MONTH' | 'ALL'; month?: string; employeeId?: string }) => Promise<Expense[]>;
   owners: Owner[];
   ownerTransactions: OwnerTransaction[];
   users: User[];
-  notifications: NotificationItem[];
+  // notifications moved to NotificationsContext/useNotifications() (performance audit,
+  // P0-2) — they update on every realtime push, unrelated to everything else here, and
+  // used to force this whole context (and every page consuming it) to re-render.
   auditLogs: AuditLogEntry[];
   isInitialLoading: boolean;
 
@@ -269,11 +277,6 @@ interface AppContextType {
   updateUser: (user: User) => Promise<{ success: boolean; message?: string }>;
   toggleUserActive: (userId: string) => Promise<{ success: boolean; message?: string }>;
   deleteUser: (userId: string) => Promise<{ success: boolean; message?: string }>;
-
-  markNotificationRead: (id: string) => void;
-  markNotificationAsRead: (id: string) => void;
-  markAllNotificationsAsRead: () => void;
-  resolveNotification: (id: string) => void;
   openDailyRateModal: () => void;
   closeDailyRateModal: () => void;
   createStore: (name: string, address?: string) => Promise<{ success: boolean; message?: string }>;
@@ -299,6 +302,10 @@ function errorMessage(err: unknown, fallback: string): string {
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const authUser = useAuthStore((s) => s.currentUser);
   const authToken = useAuthStore((s) => s.token);
+  // notifications live in their own context now (see NotificationsContext.tsx) — this
+  // provider only needs to trigger a refetch on realtime events / bulk-reload, never reads
+  // the notification list itself.
+  const { fetchNotifications } = useNotifications();
 
   const [currentUser, setCurrentUserState] = useState<User | null>(authUser);
   const [todayRate, setTodayRateState] = useState<DailyRate | null>(null);
@@ -328,7 +335,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [owners, setOwners] = useState<Owner[]>([]);
   const [ownerTransactions, setOwnerTransactions] = useState<OwnerTransaction[]>([]);
-  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [auditLogs, setAuditLogs] = useState<AuditLogEntry[]>([]);
   const [isInitialLoading, setIsInitialLoading] = useState(true);
 
@@ -463,9 +469,25 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setTransfers(raw.map((t) => mapTransfer(t, namesRef.current)).sort((a, b) => new Date(b.requestedAt).getTime() - new Date(a.requestedAt).getTime()));
   }, []);
 
+  // Bounded — RepairPage's own month filter (defaults to the current month) reaches
+  // further back on demand via fetchRepairsRange.
   const fetchRepairs = useCallback(async () => {
-    const raw = await apiClient<any[]>('/repairs');
+    const raw = await apiClient<any[]>('/repairs?limit=500');
     setRepairs(raw.map((r) => mapRepair(r, namesRef.current)).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
+  }, []);
+
+  const fetchRepairsRange: AppContextType['fetchRepairsRange'] = useCallback(async (params) => {
+    const qs = new URLSearchParams();
+    if (params.period) qs.set('period', params.period);
+    if (params.month) qs.set('month', params.month);
+    const raw = await apiClient<any[]>(`/repairs?${qs.toString()}`);
+    const mapped = raw.map((r) => mapRepair(r, namesRef.current));
+    setRepairs((prev) => {
+      const byId = new Map(prev.map((r) => [r.id, r]));
+      for (const r of mapped) byId.set(r.id, r);
+      return Array.from(byId.values()).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    });
+    return mapped;
   }, []);
 
   const fetchSuppliers = useCallback(async () => {
@@ -515,9 +537,27 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   }, []);
 
+  // Bounded — ExpensesPage's own month filter (defaults to the current month) and
+  // EmployeesPage's payroll/history views reach further back on demand via
+  // fetchExpensesRange (period/month, or employeeId for one person's full history).
   const fetchExpenses = useCallback(async () => {
-    const raw = await apiClient<any[]>('/expenses');
+    const raw = await apiClient<any[]>('/expenses?limit=500');
     setExpenses(raw.map((e) => mapExpense(e, namesRef.current)).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
+  }, []);
+
+  const fetchExpensesRange: AppContextType['fetchExpensesRange'] = useCallback(async (params) => {
+    const qs = new URLSearchParams();
+    if (params.period) qs.set('period', params.period);
+    if (params.month) qs.set('month', params.month);
+    if (params.employeeId) qs.set('employeeId', params.employeeId);
+    const raw = await apiClient<any[]>(`/expenses?${qs.toString()}`);
+    const mapped = raw.map((e) => mapExpense(e, namesRef.current));
+    setExpenses((prev) => {
+      const byId = new Map(prev.map((e) => [e.id, e]));
+      for (const e of mapped) byId.set(e.id, e);
+      return Array.from(byId.values()).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    });
+    return mapped;
   }, []);
 
   const fetchOwners = useCallback(async () => {
@@ -539,11 +579,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     } catch {
       // ADMIN/PARTNER only
     }
-  }, []);
-
-  const fetchNotifications = useCallback(async () => {
-    const raw = await apiClient<any[]>('/notifications');
-    setNotifications(raw.map(mapNotification).sort((a, b) => new Date(b.date || b.timestamp || 0).getTime() - new Date(a.date || a.timestamp || 0).getTime()));
   }, []);
 
   const fetchAuditLogs = useCallback(async () => {
@@ -617,49 +652,73 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // fires far more often). Anything not explicitly mapped below — including
   // RECONNECTED, since the client may have missed events while offline — still falls
   // back to a full refetchAll() so an unmapped or future event type can't go stale.
-  useRealtimeSync(authToken, (type: string) => {
-    const run = (...tasks: Array<() => Promise<unknown>>) =>
-      Promise.all(tasks.map((t) => t())).catch((e) => console.error('Realtime resync failed', e));
+  // Maps a broadcast type to the fetches it actually touches — same scoping as before,
+  // just returned as data instead of run immediately (see the coalescing buffer below).
+  const tasksForRealtimeEvent = useCallback((type: string): Array<() => Promise<unknown>> | null => {
     switch (type) {
       case 'INVENTORY_UPDATE':
-        run(fetchDevices, fetchSuppliers, fetchInvoices, fetchBonuses);
-        break;
+        return [fetchDevices, fetchSuppliers, fetchInvoices, fetchBonuses];
       case 'SALE_COMPLETED':
       case 'EXCHANGE_PROCESSED':
       case 'REFUND_PROCESSED':
-        run(fetchSales, fetchDevices, fetchStores, fetchOwners);
-        break;
+        return [fetchSales, fetchDevices, fetchStores, fetchOwners];
       case 'EXPENSE_CREATED':
       case 'EXPENSE_UPDATED':
       case 'EXPENSE_DELETED':
-        run(fetchExpenses, fetchStores, fetchOwners);
-        break;
+        return [fetchExpenses, fetchStores, fetchOwners];
       case 'OWNER_TX':
-        run(fetchOwners, fetchOwnerTransactions, fetchStores);
-        break;
+        return [fetchOwners, fetchOwnerTransactions, fetchStores];
       case 'REPAIR_UPDATED':
-        run(fetchRepairs);
-        break;
+        return [fetchRepairs];
       case 'STORE_UPDATED':
-        run(fetchStores);
-        break;
+        return [fetchStores];
       case 'SUPPLIER_PAYMENT':
-        run(fetchSuppliers, fetchInvoices, fetchStores);
-        break;
+        return [fetchSuppliers, fetchInvoices, fetchStores];
       case 'TRANSFER_UPDATED':
-        run(fetchTransfers, fetchDevices);
-        break;
+        return [fetchTransfers, fetchDevices];
       case 'NOTIFICATION_CREATED':
-        run(fetchNotifications);
-        break;
+        return [fetchNotifications];
       case 'USER_UPDATED':
-        run(fetchUsers);
-        break;
+        return [fetchUsers];
       case 'EXCHANGE_RATE_UPDATED':
-        run(fetchExchangeRate);
-        break;
+        return [fetchExchangeRate];
       default:
-        refetchAll().catch((e) => console.error('Realtime resync failed', e));
+        return null; // unmapped (including RECONNECTED) — falls back to a full refetchAll
+    }
+  }, [fetchDevices, fetchSuppliers, fetchInvoices, fetchBonuses, fetchSales, fetchStores, fetchOwners, fetchExpenses, fetchOwnerTransactions, fetchRepairs, fetchTransfers, fetchNotifications, fetchUsers, fetchExchangeRate]);
+
+  // A burst of broadcasts in quick succession (e.g. a multi-item refund, a batch
+  // transfer looping individual broadcast() calls) used to fire one full parallel fetch
+  // set per message. This coalesces everything that arrives within one short window into
+  // a single deduped pass — the same fetch function is only ever called once even if
+  // three different event types in the burst all wanted it.
+  const pendingRealtimeTasks = useRef(new Set<() => Promise<unknown>>());
+  const pendingFullRefetch = useRef(false);
+  const realtimeFlushTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const REALTIME_COALESCE_MS = 120;
+
+  const flushRealtimeTasks = useCallback(() => {
+    realtimeFlushTimer.current = undefined;
+    if (pendingFullRefetch.current) {
+      pendingFullRefetch.current = false;
+      pendingRealtimeTasks.current.clear();
+      refetchAll().catch((e) => console.error('Realtime resync failed', e));
+      return;
+    }
+    const tasks = Array.from(pendingRealtimeTasks.current);
+    pendingRealtimeTasks.current.clear();
+    Promise.all(tasks.map((t) => t())).catch((e) => console.error('Realtime resync failed', e));
+  }, [refetchAll]);
+
+  useRealtimeSync(authToken, (type: string) => {
+    const tasks = tasksForRealtimeEvent(type);
+    if (tasks) {
+      for (const t of tasks) pendingRealtimeTasks.current.add(t);
+    } else {
+      pendingFullRefetch.current = true;
+    }
+    if (realtimeFlushTimer.current === undefined) {
+      realtimeFlushTimer.current = setTimeout(flushRealtimeTasks, REALTIME_COALESCE_MS);
     }
   });
 
@@ -1233,20 +1292,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
-  const markNotificationRead = (id: string) => {
-    setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, read: true, isRead: true } : n)));
-    apiClient(`/notifications/${id}/read`, { method: 'PATCH' }).catch((e) => console.error(e));
-  };
-  const markNotificationAsRead = (id: string) => markNotificationRead(id);
-  const markAllNotificationsAsRead = () => {
-    setNotifications((prev) => prev.map((n) => ({ ...n, read: true, isRead: true })));
-    apiClient('/notifications/read-all', { method: 'POST' }).catch((e) => console.error(e));
-  };
-  const resolveNotification = (id: string) => {
-    setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, resolved: true, read: true, isRead: true } : n)));
-    apiClient(`/notifications/${id}/resolve`, { method: 'PATCH' }).catch((e) => console.error(e));
-  };
-
   const openDailyRateModal = () => {
     setIsRateModalOpen(true);
     useUIStore.getState().setDailyRateModalOpen(true);
@@ -1358,6 +1403,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         fetchSalesRange,
         transfers,
         repairs,
+        fetchRepairsRange,
         suppliers,
         invoices,
         supplierInvoices: invoices,
@@ -1365,10 +1411,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         bonuses,
         supplierBonuses: bonuses,
         expenses,
+        fetchExpensesRange,
         owners,
         ownerTransactions,
         users,
-        notifications,
         auditLogs,
         isInitialLoading,
         isRateModalOpen,
@@ -1421,10 +1467,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         updateUser,
         toggleUserActive,
         deleteUser,
-        markNotificationRead,
-        markNotificationAsRead,
-        markAllNotificationsAsRead,
-        resolveNotification,
         createStore,
         updateStore,
         deleteStore,
@@ -1440,7 +1482,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }), [
     resolvedCurrentUser, todayRate, activePage, selectedStoreId, stores, devices, sales,
     transfers, repairs, suppliers, invoices, bonuses, expenses, owners,
-    ownerTransactions, users, notifications, auditLogs, isInitialLoading,
+    ownerTransactions, users, auditLogs, isInitialLoading,
     isRateModalOpen, isScannerOpen, scannerCallback, drawerOpen, theme, authToken,
   ]);
 

@@ -86,7 +86,7 @@ function getCategoryIcon(key: string): React.ElementType {
 }
 
 export const ExpensesPage: React.FC = () => {
-  const { currentUser, expenses, stores, users, todayRate, createExpense, updateExpense, deleteExpense, isInitialLoading, selectedStoreId: globalSelectedStoreId } = useApp();
+  const { currentUser, expenses, fetchExpensesRange, stores, users, todayRate, createExpense, updateExpense, deleteExpense, isInitialLoading, selectedStoreId: globalSelectedStoreId } = useApp();
 
   const isSeller = currentUser?.role === 'SELLER';
   const canAddCategory = currentUser?.role === 'ADMIN' || currentUser?.role === 'PARTNER';
@@ -126,6 +126,21 @@ export const ExpensesPage: React.FC = () => {
   const [selectedStoreFilter, setSelectedStoreFilter] = useState(
     globalSelectedStoreId && globalSelectedStoreId !== 'all' ? globalSelectedStoreId : 'ALL'
   );
+
+  // `expenses` from context only holds a recent bounded window by default — the current
+  // month (this page's own default filter) is always inside it, but "весь период" or an
+  // older month reaches further back, so fetch that exact range from the server and merge
+  // it in. Guarded against a stale response overwriting a newer one on fast clicks.
+  useEffect(() => {
+    const thisMonth = new Date().toISOString().substring(0, 7);
+    if (periodFilter === 'SPECIFIC_MONTH' && selectedMonth === thisMonth) return;
+    let cancelled = false;
+    fetchExpensesRange({
+      period: periodFilter,
+      month: periodFilter === 'SPECIFIC_MONTH' ? selectedMonth : undefined,
+    }).catch((e) => { if (!cancelled) console.error('Failed to load expenses for period', e); });
+    return () => { cancelled = true; };
+  }, [periodFilter, selectedMonth, fetchExpensesRange]);
 
   const [customCategories, setCustomCategories] = useState<CustomCategory[]>(() => {
     try {
@@ -376,24 +391,24 @@ export const ExpensesPage: React.FC = () => {
                 <MonthPicker
                   value={selectedMonth}
                   onChange={setSelectedMonth}
-                  className="h-8 px-2 rounded-lg border border-accent bg-surface text-[11px] font-semibold text-accent focus:outline-none"
+                  className="h-9 px-3 rounded-lg border border-accent bg-surface text-xs font-semibold text-accent focus:outline-none"
                 />
               )}
 
               {!isSeller && (
-                <Select value={selectedStoreFilter} onChange={(e) => setSelectedStoreFilter(e.target.value)} className="h-8 py-0 px-2 text-[11px] w-auto shrink-0">
+                <Select value={selectedStoreFilter} onChange={(e) => setSelectedStoreFilter(e.target.value)} className="h-9 px-3 pr-8 text-xs font-semibold w-auto shrink-0 cursor-pointer">
                   <option value="ALL">Все филиалы</option>
                   {retailStores.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
                 </Select>
               )}
 
-              <Select value={selectedCategoryTab} onChange={(e) => setSelectedCategoryTab(e.target.value)} className="h-8 py-0 px-2 text-[11px] w-auto shrink-0">
+              <Select value={selectedCategoryTab} onChange={(e) => setSelectedCategoryTab(e.target.value)} className="h-9 px-3 pr-8 text-xs font-semibold w-auto shrink-0 cursor-pointer">
                 <option value="ALL">Все категории</option>
                 {allCategoryOptions.map(c => <option key={c.id} value={c.id}>{c.label}</option>)}
               </Select>
 
               {canAddCategory && (
-                <Button variant="secondary" size="md" leftIcon={Plus} className="h-8 px-2.5 text-[11px] shrink-0 whitespace-nowrap" onClick={() => setIsAddCategoryModalOpen(true)}>
+                <Button variant="secondary" size="md" leftIcon={Plus} className="h-9 px-3 text-xs font-semibold shrink-0 whitespace-nowrap" onClick={() => setIsAddCategoryModalOpen(true)}>
                   Категория
                 </Button>
               )}

@@ -55,7 +55,9 @@ export const SuppliersPage: React.FC = () => {
   // sold) are fetched on demand so the "which units sold" detail view stays accurate.
   useEffect(() => {
     if (!selectedInvoiceId) return;
-    findDevicesByInvoice(selectedInvoiceId).catch((e) => console.error('Failed to load invoice devices', e));
+    let cancelled = false;
+    findDevicesByInvoice(selectedInvoiceId).catch((e) => { if (!cancelled) console.error('Failed to load invoice devices', e); });
+    return () => { cancelled = true; };
   }, [selectedInvoiceId, findDevicesByInvoice]);
 
   // `supplierInvoices` only holds a recent bounded window by default — a supplier's full
@@ -63,7 +65,9 @@ export const SuppliersPage: React.FC = () => {
   // this detail view opens instead of only ever showing whatever happened to be loaded.
   useEffect(() => {
     if (!selectedSupplierId) return;
-    fetchInvoicesRange({ supplierId: selectedSupplierId }).catch((e) => console.error('Failed to load supplier invoices', e));
+    let cancelled = false;
+    fetchInvoicesRange({ supplierId: selectedSupplierId }).catch((e) => { if (!cancelled) console.error('Failed to load supplier invoices', e); });
+    return () => { cancelled = true; };
   }, [selectedSupplierId, fetchInvoicesRange]);
   // Filters/sorts the full (unbounded, grows with every purchase invoice ever
   // raised) supplierInvoices array — computed once per relevant change instead of

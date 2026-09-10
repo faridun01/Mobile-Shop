@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useApp } from '../../context/AppContext';
 import { User, Role } from '../../types';
 import {
@@ -34,6 +34,7 @@ export const EmployeesPage: React.FC = () => {
     users,
     stores,
     expenses,
+    fetchExpensesRange,
     sales,
     fetchSalesRange,
     todayRate,
@@ -80,23 +81,114 @@ export const EmployeesPage: React.FC = () => {
     }
   }, [stores, storeId]);
 
-  // `sales` from context only holds a recent bounded window by default — the payroll
-  // table needs every seller's sales for the chosen month, and the financial-history
-  // modal needs one seller's entire lifetime, both of which can reach further back than
-  // that window. Fetch and merge them in on demand instead of assuming they're loaded.
+  // `sales`/`expenses` from context only hold a recent bounded window by default — the
+  // payroll table needs every seller's sales/advances for the chosen month, and the
+  // financial-history modal needs one seller's entire lifetime, both of which can reach
+  // further back than that window. Fetch and merge them in on demand instead of assuming
+  // they're loaded. Guarded against a stale response overwriting a newer one on fast clicks.
   useEffect(() => {
-    fetchSalesRange({ period: 'SPECIFIC_MONTH', month: selectedPayrollMonth }).catch((e) => console.error('Failed to load payroll sales', e));
-  }, [selectedPayrollMonth, fetchSalesRange]);
+    let cancelled = false;
+    Promise.all([
+      fetchSalesRange({ period: 'SPECIFIC_MONTH', month: selectedPayrollMonth }),
+      fetchExpensesRange({ period: 'SPECIFIC_MONTH', month: selectedPayrollMonth }),
+    ]).catch((e) => { if (!cancelled) console.error('Failed to load payroll data', e); });
+    return () => { cancelled = true; };
+  }, [selectedPayrollMonth, fetchSalesRange, fetchExpensesRange]);
 
   useEffect(() => {
     if (!financialHistoryUser) return;
-    fetchSalesRange({ sellerId: financialHistoryUser.id }).catch((e) => console.error('Failed to load employee sales history', e));
-  }, [financialHistoryUser, fetchSalesRange]);
+    let cancelled = false;
+    Promise.all([
+      fetchSalesRange({ sellerId: financialHistoryUser.id }),
+      fetchExpensesRange({ employeeId: financialHistoryUser.id }),
+    ]).catch((e) => { if (!cancelled) console.error('Failed to load employee financial history', e); });
+    return () => { cancelled = true; };
+  }, [financialHistoryUser, fetchSalesRange, fetchExpensesRange]);
   const [baseSalaryTjs, setBaseSalaryTjs] = useState<string>('');
   const [salesCommissionPercent, setSalesCommissionPercent] = useState<string>('');
 
   const [statusMessage, setStatusMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // A name→id index for the isEmployeeAdvance+employeeName fallback match below — since
+  // employeeName is always derived as names.get(employeeId), this only ever matters for a
+  // genuine duplicate-name edge case, but it's kept to stay behavior-identical to the
+  // original per-card filter it replaces.
+  const userIdsByName = useMemo(() => {
+    const map = new Map<string, string[]>();
+    for (const u of users) {
+      const list = map.get(u.name);
+      if (list) list.push(u.id); else map.set(u.name, [u.id]);
+    }
+    return map;
+  }, [users]);
+
+  // One pass over sales/expenses building a per-employee lookup, instead of every
+  // employee card re-filtering the full (bounded-window) sales/expenses arrays on every
+  // render — including renders triggered by something unrelated elsewhere in the app.
+  const employeeLifetimeStatsById = useMemo(() => {
+    const map = new Map<string, { totalAdvances: number; salesRevTjs: number; unitsSold: number }>();
+    const ensure = (id: string) => {
+      let entry = map.get(id);
+      if (!entry) { entry = { totalAdvances: 0, salesRevTjs: 0, unitsSold: 0 }; map.set(id, entry); }
+      return entry;
+    };
+    for (const u of users) ensure(u.id);
+
+    for (const e of expenses) {
+      if (!(e.category === 'EMPLOYEE_ADVANCE' || e.isEmployeeAdvance)) continue;
+      const matchedIds = new Set<string>();
+      if (e.employeeId) matchedIds.add(e.employeeId);
+      if (e.isEmployeeAdvance && e.employeeName) {
+        for (const id of userIdsByName.get(e.employeeName) || []) matchedIds.add(id);
+      }
+      for (const id of matchedIds) ensure(id).totalAdvances += e.amountTjs || 0;
+    }
+
+    for (const s of sales) {
+      if (s.status === 'REFUNDED') continue;
+      const entry = map.get(s.sellerId);
+      if (entry) { entry.salesRevTjs += s.totalTjs; entry.unitsSold += s.items.length; }
+    }
+
+    return map;
+  }, [users, sales, expenses, userIdsByName]);
+
+  // Same one-pass approach, scoped to the payroll modal's selected month.
+  const employeePayrollStatsByMonthAndId = useMemo(() => {
+    const map = new Map<string, { salesRev: number; advances: number; paidSalary: number }>();
+    const ensure = (id: string) => {
+      let entry = map.get(id);
+      if (!entry) { entry = { salesRev: 0, advances: 0, paidSalary: 0 }; map.set(id, entry); }
+      return entry;
+    };
+    for (const u of users) ensure(u.id);
+
+    for (const e of expenses) {
+      if (!e.date.startsWith(selectedPayrollMonth)) continue;
+      const isAdvance = e.category === 'EMPLOYEE_ADVANCE' || e.isEmployeeAdvance;
+      const isSalary = e.category === 'SALARY';
+      if (!isAdvance && !isSalary) continue;
+      const matchedIds = new Set<string>();
+      if (e.employeeId) matchedIds.add(e.employeeId);
+      if (e.isEmployeeAdvance && e.employeeName) {
+        for (const id of userIdsByName.get(e.employeeName) || []) matchedIds.add(id);
+      }
+      for (const id of matchedIds) {
+        const entry = ensure(id);
+        if (isAdvance) entry.advances += e.amountTjs || 0;
+        if (isSalary) entry.paidSalary += e.amountTjs || 0;
+      }
+    }
+
+    for (const s of sales) {
+      if (s.status === 'REFUNDED' || !s.date.startsWith(selectedPayrollMonth)) continue;
+      const entry = map.get(s.sellerId);
+      if (entry) entry.salesRev += s.totalTjs;
+    }
+
+    return map;
+  }, [users, sales, expenses, selectedPayrollMonth, userIdsByName]);
 
   const handleDeleteUserClick = (u: User) => {
     if (currentUser?.id === u.id) {
@@ -455,14 +547,8 @@ export const EmployeesPage: React.FC = () => {
 
                 {/* Salary & Sales Stats */}
                 {(() => {
-                  const empExpenses = expenses.filter(e =>
-                    (e.employeeId === u.id || (e.isEmployeeAdvance && e.employeeName === u.name)) &&
-                    (e.category === 'EMPLOYEE_ADVANCE' || e.isEmployeeAdvance)
-                  );
-                  const totalAdvances = empExpenses.reduce((sum, e) => sum + (e.amountTjs || 0), 0);
-                  const empSales = sales.filter(s => s.sellerId === u.id && s.status !== 'REFUNDED');
-                  const salesRevTjs = empSales.reduce((sum, s) => sum + s.totalTjs, 0);
-                  const unitsSold = empSales.reduce((sum, s) => sum + s.items.length, 0);
+                  const stats = employeeLifetimeStatsById.get(u.id) ?? { totalAdvances: 0, salesRevTjs: 0, unitsSold: 0 };
+                  const { totalAdvances, salesRevTjs, unitsSold } = stats;
                   const baseSal = u.baseSalaryTjs || 0;
                   const commPct = u.salesCommissionPercent || 0;
 
@@ -1354,16 +1440,12 @@ export const EmployeesPage: React.FC = () => {
                 </thead>
                 <tbody className="divide-y divide-border text-[11px]">
                   {users.filter(u => u.isActive ?? u.active).map(u => {
-                    const uSales = sales.filter(s => s.sellerId === u.id && s.status !== 'REFUNDED' && s.date.startsWith(selectedPayrollMonth));
-                    const salesRev = uSales.reduce((acc, s) => acc + s.totalTjs, 0);
+                    const stats = employeePayrollStatsByMonthAndId.get(u.id) ?? { salesRev: 0, advances: 0, paidSalary: 0 };
+                    const { salesRev, advances, paidSalary } = stats;
                     const baseSal = u.baseSalaryTjs || 0;
                     const commPct = u.salesCommissionPercent || 0;
                     const commAmt = Math.round(salesRev * (commPct / 100));
                     const grossAccrued = baseSal + commAmt;
-
-                    const uExpenses = expenses.filter(e => (e.employeeId === u.id || (e.isEmployeeAdvance && e.employeeName === u.name)) && e.date.startsWith(selectedPayrollMonth));
-                    const advances = uExpenses.filter(e => e.category === 'EMPLOYEE_ADVANCE' || e.isEmployeeAdvance).reduce((acc, e) => acc + (e.amountTjs || 0), 0);
-                    const paidSalary = uExpenses.filter(e => e.category === 'SALARY').reduce((acc, e) => acc + (e.amountTjs || 0), 0);
                     const netPayable = Math.max(0, grossAccrued - advances - paidSalary);
 
                     return (

@@ -58,6 +58,11 @@ export default defineConfig(() => {
         },
         workbox: {
           globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2,ttf}'],
+          // exceljs (~920KB) and ScannerModal/html5-qrcode (~340KB) are both already
+          // runtime-lazy (loaded only on export / on opening the scanner) — precaching
+          // them would download both in the background on every first visit regardless
+          // of whether that session ever uses either feature, on a mobile-primary app.
+          globIgnores: ['**/exceljs*.js', '**/ScannerModal*.js'],
           runtimeCaching: [
             // Cache static assets with CacheFirst
             {

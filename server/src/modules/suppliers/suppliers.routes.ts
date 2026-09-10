@@ -46,7 +46,8 @@ export function registerSupplierRoutes(app: Express) {
 
       const invoices = await prisma.supplierInvoice.findMany({
         where,
-        include: { groups: true, supplier: true },
+        // Only the supplier name is ever read (mapSupplierInvoice) — the full row isn't needed.
+        include: { groups: true, supplier: { select: { name: true } } },
         orderBy: { date: 'desc' },
         ...(search ? { take: 20 } : limit ? { take: limit } : {}),
       });
@@ -67,7 +68,8 @@ export function registerSupplierRoutes(app: Express) {
       // opt-in cap is enough here — no search/period infrastructure needed.
       const limit = req.query.limit !== undefined ? Math.min(Math.max(Number(req.query.limit) || 0, 1), 2000) : undefined;
       res.json(await prisma.supplierBonus.findMany({
-        include: { freeDevices: true, supplier: true },
+        // Only the supplier name is ever read (mapSupplierBonus) — the full row isn't needed.
+        include: { freeDevices: true, supplier: { select: { name: true } } },
         orderBy: { createdAt: 'desc' },
         ...(limit ? { take: limit } : {}),
       }));

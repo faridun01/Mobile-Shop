@@ -336,7 +336,7 @@ export class SuppliersService {
   public static async updateBonus(id: string, input: { campaignTitle?: string; amountUsd?: number; freeDevice?: { brand?: string; model?: string; storage?: string; color?: string; imei?: string; imei2?: string }; actorUserId: string }) {
     return prisma.$transaction(async (tx) => {
       const actor = await resolveActor(tx, input.actorUserId);
-      const bonus = await tx.supplierBonus.findUnique({ where: { id }, include: { freeDevices: true, supplier: true } });
+      const bonus = await tx.supplierBonus.findUnique({ where: { id }, include: { freeDevices: true, supplier: { select: { name: true } } } });
       if (!bonus) throw new Error('Бонус не найден');
 
       const data: { campaignTitle?: string | null; amountUsd?: number } = {};
@@ -406,7 +406,7 @@ export class SuppliersService {
         }
       }
 
-      const updated = await tx.supplierBonus.update({ where: { id }, data, include: { freeDevices: true, supplier: true } });
+      const updated = await tx.supplierBonus.update({ where: { id }, data, include: { freeDevices: true, supplier: { select: { name: true } } } });
 
       await tx.auditLog.create({
         data: {
@@ -432,7 +432,7 @@ export class SuppliersService {
   public static async deleteBonus(id: string, actorUserId: string) {
     return prisma.$transaction(async (tx) => {
       const actor = await resolveActor(tx, actorUserId);
-      const bonus = await tx.supplierBonus.findUnique({ where: { id }, include: { freeDevices: true, supplier: true } });
+      const bonus = await tx.supplierBonus.findUnique({ where: { id }, include: { freeDevices: true, supplier: { select: { name: true } } } });
       if (!bonus) throw new Error('Бонус не найден');
 
       if (bonus.bonusType === 'FREE_DEVICES') {

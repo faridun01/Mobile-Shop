@@ -1,6 +1,7 @@
 import React from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useApp } from '../../context/AppContext';
+import { useNotifications } from '../../context/NotificationsContext';
 import { PageId } from '../../types';
 import {
   ShoppingBag,
@@ -93,7 +94,8 @@ const NAV_GROUPS: NavGroup[] = [
 export const Sidebar: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { currentUser, setActivePage, logout, notifications } = useApp();
+  const { currentUser, setActivePage, logout } = useApp();
+  const { notifications } = useNotifications();
 
   const userRole = currentUser?.role || 'SELLER';
   // `resolved` tracks whether an actionable notification has been handled, not whether

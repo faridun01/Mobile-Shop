@@ -19,6 +19,7 @@ export const RepairPage: React.FC = () => {
   const {
     currentUser,
     repairs,
+    fetchRepairsRange,
     sales,
     fetchSalesRange,
     devices,
@@ -33,7 +34,6 @@ export const RepairPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'list' | 'create'>('list');
   const [selectedMonth, setSelectedMonth] = useState<string>(new Date().toISOString().substring(0, 7));
   const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState<string>('ALL');
 
   // Form states for NEW TICKET
   const [receiptSearch, setReceiptSearch] = useState('');
@@ -60,6 +60,21 @@ export const RepairPage: React.FC = () => {
   const retailStores = useMemo(() => {
     return stores.filter(s => !s.isMainWarehouse);
   }, [stores]);
+
+  // `repairs` from context only holds a recent bounded window by default — the current
+  // month (this page's own default filter) is always inside it, but "весь период" ('ALL')
+  // or an older month reaches further back, so fetch that exact range from the server and
+  // merge it in. Guarded against a stale response overwriting a newer one on fast clicks.
+  useEffect(() => {
+    const thisMonth = new Date().toISOString().substring(0, 7);
+    if (selectedMonth === thisMonth) return;
+    let cancelled = false;
+    fetchRepairsRange({
+      period: selectedMonth === 'ALL' ? 'ALL' : 'SPECIFIC_MONTH',
+      month: selectedMonth === 'ALL' ? undefined : selectedMonth,
+    }).catch((e) => { if (!cancelled) console.error('Failed to load repairs for period', e); });
+    return () => { cancelled = true; };
+  }, [selectedMonth, fetchRepairsRange]);
 
   // Defaults to whichever store is currently active on the POS Terminal page —
   // an admin picking a store there should see that same store here without
@@ -103,15 +118,6 @@ export const RepairPage: React.FC = () => {
         if (ticketMonth !== selectedMonth) return false;
       }
 
-      // Status filter
-      if (statusFilter === 'ACTIVE') {
-        if (t.status === 'ISSUED') return false;
-      } else if (statusFilter === 'ISSUED') {
-        if (t.status !== 'ISSUED') return false;
-      } else if (statusFilter !== 'ALL') {
-        if (t.status !== statusFilter) return false;
-      }
-
       // Search query filter
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase().trim();
@@ -128,7 +134,7 @@ export const RepairPage: React.FC = () => {
 
       return true;
     }).sort((a: RepairTicket, b: RepairTicket) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-  }, [repairs, effectiveStoreId, selectedMonth, statusFilter, searchQuery]);
+  }, [repairs, effectiveStoreId, selectedMonth, searchQuery]);
 
   // Statistics for selected month
   const totalRepairsCount = filteredRepairs.length;
@@ -399,7 +405,7 @@ export const RepairPage: React.FC = () => {
                 onChange={(e) => setSelectedStoreId(e.target.value)}
                 className="shrink-0 bg-surface border border-border text-fg-muted text-xs font-semibold rounded-xl px-3 py-1.5 focus:outline-none focus:border-accent"
               >
-                <option value="ALL">Все магазины (Розница)</option>
+                <option value="ALL">Все магазины</option>
                 {retailStores.map(s => (
                   <option key={s.id} value={s.id}>{s.name}</option>
                 ))}
@@ -411,19 +417,6 @@ export const RepairPage: React.FC = () => {
               onChange={setSelectedMonth}
               className="px-3 py-1.5 rounded-xl border border-border text-fg-muted text-xs font-semibold transition-colors bg-surface focus:outline-none focus:border-accent"
             />
-
-            <select
-              value={statusFilter ?? 'ALL'}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              className="shrink-0 bg-surface border border-border text-fg-muted text-xs font-semibold rounded-xl px-3 py-1.5 focus:outline-none focus:border-accent"
-            >
-              <option value="ALL">Все ремонты за месяц</option>
-              <option value="ACTIVE">Активные ремонты</option>
-              <option value="ISSUED">Отремонтированные и выданные</option>
-              <option value="ACCEPTED">Принят</option>
-              <option value="IN_PROGRESS">В работе</option>
-              <option value="READY">Готов к выдаче</option>
-            </select>
           </div>
         </div>
       )}

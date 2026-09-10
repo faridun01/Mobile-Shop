@@ -1,17 +1,18 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '../../context/AppContext';
+import { useNotifications } from '../../context/NotificationsContext';
 import { Bell, Store } from 'lucide-react';
 
 export const TopBar: React.FC = () => {
   const navigate = useNavigate();
   const {
     currentUser,
-    notifications,
     activePage,
     setActivePage,
     stores
   } = useApp();
+  const { notifications } = useNotifications();
 
   // `resolved` tracks whether an actionable notification (e.g. an approval) has been
   // handled — it says nothing about whether the user has actually seen it. Purely

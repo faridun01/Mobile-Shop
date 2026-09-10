@@ -19,7 +19,8 @@ export function registerTransferRoutes(app: Express) {
 
       const transfers = await prisma.transferRequest.findMany({
         where: storeScope,
-        include: { items: true, fromStore: true, toStore: true },
+        // Only the store name is ever read (mapTransfer) — the full row isn't needed.
+        include: { items: true, fromStore: { select: { name: true } }, toStore: { select: { name: true } } },
         orderBy: { requestedAt: 'desc' },
         ...(limit ? { take: limit } : {}),
       });

@@ -198,9 +198,12 @@ export class TransfersService {
   public static async approve(transferId: string, approvedByUserId: string) {
     return prisma.$transaction(async (tx) => {
       const actor = await resolveActor(tx, approvedByUserId);
+      // .name (ledger description) and .isMainWarehouse (destination status) are the only
+      // fields actually read below — narrowed from `true` to avoid pulling cashBalanceTjs
+      // and the rest of the store row along for the ride.
       const transfer = await tx.transferRequest.findUnique({
         where: { id: transferId },
-        include: { items: true, fromStore: true, toStore: true },
+        include: { items: true, fromStore: { select: { name: true, isMainWarehouse: true } }, toStore: { select: { name: true, isMainWarehouse: true } } },
       });
       if (!transfer) throw new Error('Запрос на перемещение не найден');
       if (transfer.status !== 'PENDING_APPROVAL') throw new Error('Этот запрос уже обработан');
@@ -264,7 +267,8 @@ export class TransfersService {
   public static async reject(transferId: string, rejectedByUserId: string, reason: string) {
     return prisma.$transaction(async (tx) => {
       const actor = await resolveActor(tx, rejectedByUserId);
-      const transfer = await tx.transferRequest.findUnique({ where: { id: transferId }, include: { items: true, fromStore: true } });
+      // Only .isMainWarehouse is read below — narrowed from `true`.
+      const transfer = await tx.transferRequest.findUnique({ where: { id: transferId }, include: { items: true, fromStore: { select: { isMainWarehouse: true } } } });
       if (!transfer) throw new Error('Запрос на перемещение не найден');
       if (transfer.status !== 'PENDING_APPROVAL') throw new Error('Этот запрос уже обработан');
 

@@ -16,7 +16,6 @@ import {
   Loader2
 } from 'lucide-react';
 import { StatusBanner, StatusMessage } from '../ui/StatusBanner';
-import { FilterPillGroup } from '../ui/FilterPillGroup';
 import { MonthPicker } from '../ui/MonthPicker';
 
 // Standard Russian noun pluralization (1 -> singular, 2-4 -> few, else -> many),
@@ -591,9 +590,9 @@ export const OwnersPage: React.FC = () => {
           </div>
 
           {/* Controls Bar: Search & Filters */}
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-2.5">
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-2.5">
             <div className="flex flex-wrap items-center gap-2 flex-1">
-              <div className="relative w-full sm:w-64 md:w-80">
+              <div className="relative w-full sm:w-64 md:w-72">
                 <Search className="absolute left-3 top-2.5 w-4 h-4 text-fg-subtle" />
                 <input
                   type="text"
@@ -612,90 +611,48 @@ export const OwnersPage: React.FC = () => {
                 )}
               </div>
 
+              {/* Partner Dropdown */}
               <select
                 value={selectedOwnerFilter}
                 onChange={(e) => setSelectedOwnerFilter(e.target.value)}
-                className="bg-surface-raised border border-border text-fg-muted text-xs font-semibold rounded-xl px-3 py-1.5 focus:outline-none focus:border-accent shrink-0"
+                className="bg-surface-raised border border-border text-fg-muted text-xs font-semibold rounded-xl px-3 py-1.5 focus:outline-none focus:border-accent shrink-0 cursor-pointer"
               >
                 <option value="ALL">Все партнеры</option>
-                {displayOwners.map((o, idx) => (
+                {displayOwners.map((o) => (
                   <option key={o.id} value={o.id}>{getOwnerDetails(o).name}</option>
                 ))}
               </select>
 
-              <FilterPillGroup
-                options={[{ value: 'ALL', label: 'Все время' }, { value: 'SPECIFIC_MONTH', label: 'Месяц' }]}
+              {/* Operation Type Dropdown */}
+              <select
+                value={typeFilter}
+                onChange={(e) => setTypeFilter(e.target.value as typeof typeFilter)}
+                className="bg-surface-raised border border-border text-fg-muted text-xs font-semibold rounded-xl px-3 py-1.5 focus:outline-none focus:border-accent shrink-0 cursor-pointer"
+              >
+                <option value="ALL">Все операции</option>
+                <option value="INVESTMENT">Личные вложения</option>
+                <option value="REINVEST">Реинвестирование</option>
+                <option value="PROFIT_PAYOUT">Выплаты прибыли</option>
+                <option value="WITHDRAWAL">Вывод капитала</option>
+              </select>
+
+              {/* Period Dropdown */}
+              <select
                 value={periodFilter}
-                onChange={(v) => setPeriodFilter(v as typeof periodFilter)}
-                className="shrink-0"
-              />
+                onChange={(e) => setPeriodFilter(e.target.value as typeof periodFilter)}
+                className="bg-surface-raised border border-border text-fg-muted text-xs font-semibold rounded-xl px-3 py-1.5 focus:outline-none focus:border-accent shrink-0 cursor-pointer"
+              >
+                <option value="ALL">Все время</option>
+                <option value="SPECIFIC_MONTH">Месяц</option>
+              </select>
 
               {periodFilter === 'SPECIFIC_MONTH' && (
                 <MonthPicker
                   value={selectedMonth}
                   onChange={setSelectedMonth}
-                  className="h-9 px-2 rounded-lg border border-accent bg-surface text-[11px] font-semibold text-accent focus:outline-none"
+                  className="h-8 px-2 rounded-xl border border-accent bg-surface text-xs font-semibold text-accent focus:outline-none shrink-0"
                 />
               )}
-            </div>
-
-            {/* Category Filter Pills */}
-            <div className="flex items-center space-x-1.5 overflow-x-auto scrollbar-none shrink-0">
-              <button
-                type="button"
-                onClick={() => setTypeFilter('ALL')}
-                className={`px-3 py-1.5 rounded-xl border text-xs font-bold uppercase whitespace-nowrap transition-colors ${
-                  typeFilter === 'ALL'
-                    ? 'border-accent bg-accent/10 text-accent'
-                    : 'border-border bg-surface-raised text-fg-muted hover:text-fg'
-                }`}
-              >
-                Все операции
-              </button>
-              <button
-                type="button"
-                onClick={() => setTypeFilter('INVESTMENT')}
-                className={`px-3 py-1.5 rounded-xl border text-xs font-bold uppercase whitespace-nowrap transition-colors ${
-                  typeFilter === 'INVESTMENT'
-                    ? 'border-accent bg-accent/10 text-accent'
-                    : 'border-border bg-surface-raised text-fg-muted hover:text-fg'
-                }`}
-              >
-                Личные вложения
-              </button>
-              <button
-                type="button"
-                onClick={() => setTypeFilter('REINVEST')}
-                className={`px-3 py-1.5 rounded-xl border text-xs font-bold uppercase whitespace-nowrap transition-colors ${
-                  typeFilter === 'REINVEST'
-                    ? 'border-warning bg-warning/10 text-warning'
-                    : 'border-border bg-surface-raised text-fg-muted hover:text-fg'
-                }`}
-              >
-                Реинвестирование
-              </button>
-              <button
-                type="button"
-                onClick={() => setTypeFilter('PROFIT_PAYOUT')}
-                className={`px-3 py-1.5 rounded-xl border text-xs font-bold uppercase whitespace-nowrap transition-colors ${
-                  typeFilter === 'PROFIT_PAYOUT'
-                    ? 'border-accent bg-accent/10 text-accent'
-                    : 'border-border bg-surface-raised text-fg-muted hover:text-fg'
-                }`}
-              >
-                Выплаты прибыли
-              </button>
-              <button
-                type="button"
-                onClick={() => setTypeFilter('WITHDRAWAL')}
-                className={`px-3 py-1.5 rounded-xl border text-xs font-bold uppercase whitespace-nowrap transition-colors ${
-                  typeFilter === 'WITHDRAWAL'
-                    ? 'border-danger bg-danger/10 text-danger'
-                    : 'border-border bg-surface-raised text-fg-muted hover:text-fg'
-                }`}
-              >
-                Вывод капитала
-              </button>
             </div>
           </div>
 

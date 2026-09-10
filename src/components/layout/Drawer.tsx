@@ -1,6 +1,7 @@
 import React from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useApp } from '../../context/AppContext';
+import { useNotifications } from '../../context/NotificationsContext';
 import { PageId } from '../../types';
 import {
   ShoppingBag,
@@ -101,9 +102,9 @@ export const Drawer: React.FC = () => {
     drawerOpen,
     setDrawerOpen,
     logout,
-    notifications,
     stores
   } = useApp();
+  const { notifications } = useNotifications();
 
   if (!drawerOpen) return null;
 

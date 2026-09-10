@@ -74,10 +74,12 @@ export const SalesHistoryPage: React.FC = () => {
   // in — filteredSales below then just filters the (now-widened) context array as before.
   useEffect(() => {
     if (periodFilter === 'TODAY') return;
+    let cancelled = false;
     fetchSalesRange({
       period: periodFilter,
       month: periodFilter === 'SPECIFIC_MONTH' ? selectedMonth : undefined,
-    }).catch((e) => console.error('Failed to load sales for period', e));
+    }).catch((e) => { if (!cancelled) console.error('Failed to load sales for period', e); });
+    return () => { cancelled = true; };
   }, [periodFilter, selectedMonth, fetchSalesRange]);
 
   const filteredSales = useMemo(() => {
@@ -241,7 +243,11 @@ export const SalesHistoryPage: React.FC = () => {
             />
 
             {currentUser?.role !== 'SELLER' && retailStores.length > 0 && (
-              <Select value={activeStoreId} onChange={(e) => setSelectedStoreId(e.target.value)} className="h-9 min-h-0 py-0 w-auto">
+              <Select
+                value={activeStoreId}
+                onChange={(e) => setSelectedStoreId(e.target.value)}
+                className="h-9 px-3 pr-8 text-xs font-semibold w-auto shrink-0 cursor-pointer"
+              >
                 {retailStores.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
               </Select>
             )}

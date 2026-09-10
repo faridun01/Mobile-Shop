@@ -14,6 +14,11 @@ export interface BroadcastOptions {
   storeIds?: string[];
 }
 
+// Soft cap — not a hard security boundary, just a guard against one runaway session
+// (a stuck tab reconnect-looping, or genuinely dozens of open tabs) growing the tracked
+// connection set without bound.
+const MAX_CONNECTIONS_PER_USER = 10;
+
 export class RealtimeSyncGateway {
   private static wss: WebSocketServer;
   private static clients = new Set<ConnectedClient>();
@@ -40,11 +45,27 @@ export class RealtimeSyncGateway {
       user.role = currentUser.role;
       user.storeId = currentUser.storeId;
 
+      const existingForUser = Array.from(this.clients).filter((c) => c.user.userId === user.userId);
+      if (existingForUser.length >= MAX_CONNECTIONS_PER_USER) {
+        // Drop the oldest connection for this user rather than refusing the new one —
+        // a stuck reconnect loop self-heals instead of locking the user out entirely.
+        existingForUser[0].ws.close(1008, 'Too many connections');
+      }
+
       const client: ConnectedClient = { ws, user };
       this.clients.add(client);
       console.log(`[WebSocket]: ${user.role} ${user.login} connected`);
 
       ws.on('close', () => {
+        this.clients.delete(client);
+      });
+
+      // `close` normally follows `error` for ws, but isn't guaranteed in every case —
+      // without this, a socket that errors without a matching close event stays in the
+      // tracked Set forever (broadcast() skips it via readyState, but it never gets
+      // removed, and it would count against this same client's own connection cap above).
+      ws.on('error', (err) => {
+        console.error(`[WebSocket]: connection error for ${user.login}`, err);
         this.clients.delete(client);
       });
 

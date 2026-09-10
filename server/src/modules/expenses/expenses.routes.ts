@@ -16,10 +16,22 @@ export function registerExpenseRoutes(app: Express) {
       const period = VALID_PERIODS.includes(req.query.period as ReportPeriod) ? (req.query.period as ReportPeriod) : 'ALL';
       const month = typeof req.query.month === 'string' ? req.query.month : undefined;
       const dateRange = dateRangeForPeriod(period, month);
+      // Explicit opt-in cap for the app's background/startup load — existing callers that
+      // don't pass it keep today's full-history-for-that-period behavior. employeeId powers
+      // one employee's full advance/expense history (Employees page), naturally bounded to
+      // that one person's own records rather than the whole business's.
+      const limit = req.query.limit !== undefined ? Math.min(Math.max(Number(req.query.limit) || 0, 1), 2000) : undefined;
+      const employeeId = typeof req.query.employeeId === 'string' ? req.query.employeeId : undefined;
       const expenses = await prisma.expense.findMany({
-        where: { ...(storeScopeId ? { storeId: storeScopeId } : {}), ...(dateRange ? { createdAt: dateRange } : {}) },
-        include: { store: true },
+        where: {
+          ...(storeScopeId ? { storeId: storeScopeId } : {}),
+          ...(employeeId ? { employeeId } : dateRange ? { createdAt: dateRange } : {}),
+        },
+        // Only the store name is ever read (mapExpense) — `include: { store: true }` used
+        // to pull the full row, cashBalanceTjs included, into every expense in the list.
+        include: { store: { select: { name: true } } },
         orderBy: { createdAt: 'desc' },
+        ...(employeeId ? {} : limit ? { take: limit } : {}),
       });
       res.json(expenses);
     } catch (error) {
