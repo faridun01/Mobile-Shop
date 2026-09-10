@@ -22,7 +22,10 @@ export function registerRepairRoutes(app: Express) {
       // from rate history on every read.
       const repairs = await prisma.repairTicket.findMany({
         where: { ...(storeScopeId ? { storeId: storeScopeId } : {}), ...(dateRange ? { createdAt: dateRange } : {}) },
-        include: { statusHistory: { orderBy: { updatedAt: 'asc' } }, store: true, user: true },
+        // `user: true` used to pull the technician's full row — password hash and PIN
+        // included — into every repairs-list response. Only the display fields are
+        // actually used, so select those explicitly instead.
+        include: { statusHistory: { orderBy: { updatedAt: 'asc' } }, store: true, user: { select: { id: true, name: true, role: true } } },
         orderBy: { createdAt: 'desc' },
       });
       res.json(repairs);

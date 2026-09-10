@@ -20,7 +20,9 @@ export const RepairPage: React.FC = () => {
     currentUser,
     repairs,
     sales,
+    fetchSalesRange,
     devices,
+    findDeviceByImei,
     stores,
     createRepairTicket,
     updateRepairStatus,
@@ -133,21 +135,39 @@ export const RepairPage: React.FC = () => {
   const readyRepairsCount = filteredRepairs.filter((t: RepairTicket) => t.status === 'READY' || t.status === 'ISSUED').length;
   const totalExpensesTjs = filteredRepairs.reduce((acc: number, t: RepairTicket) => acc + (t.estimatedCostTjs || 0), 0);
 
-  const handleScanTicket = () => {
-    openScanner((scannedCode) => {
-      const code = scannedCode.trim();
-      const matched = sales.find(s => s.receiptNumber.toString() === code);
-      if (matched) {
-        const item = matched.items[0];
+  // Returns true (and fills the form) if a matching sale was found in the given list.
+  const applySoldDeviceMatch = (list: typeof sales, q: string): boolean => {
+    for (const sale of list) {
+      if (sale.receiptNumber.toString() === q) {
+        const item = sale.items[0];
         if (item) {
           setDeviceModel(`${item.brand} ${item.model} ${item.storage}`);
           if (item.imei) setImei(item.imei);
           setImei2(item.imei2 || '');
-          if (matched.customerName) setClientName(matched.customerName);
-          setStatusMessage({ type: 'success', text: `Данные из чека #${code} автоматически подставлены` });
-          return;
+          if (sale.customerName) setClientName(sale.customerName);
+          setStatusMessage({ type: 'success', text: `Найдена покупка по чеку #${sale.receiptNumber}` });
+          return true;
         }
       }
+      for (const item of sale.items) {
+        if (item.imei.toLowerCase() === q || (item.imei2 && item.imei2.toLowerCase() === q)) {
+          setDeviceModel(`${item.brand} ${item.model} ${item.storage}`);
+          if (item.imei) setImei(item.imei);
+          setImei2(item.imei2 || '');
+          if (sale.customerName) setClientName(sale.customerName);
+          setStatusMessage({ type: 'success', text: `Найдено устройство по IMEI` });
+          return true;
+        }
+      }
+    }
+    return false;
+  };
+
+  const handleScanTicket = () => {
+    openScanner(async (scannedCode) => {
+      const code = scannedCode.trim();
+      const q = code.toLowerCase();
+      if (applySoldDeviceMatch(sales, q)) return;
 
       const devMatch = devices.find(d => d.imei === code || d.imei2 === code);
       if (devMatch) {
@@ -158,37 +178,44 @@ export const RepairPage: React.FC = () => {
         return;
       }
 
+      // Not in the locally-loaded (recent) sales, nor in the (SOLD-excluded) device list —
+      // an older receipt or an already-sold device still resolves via a targeted server
+      // search before giving up and just dropping the code into IMEI.
+      try {
+        const found = await fetchSalesRange({ search: code });
+        if (applySoldDeviceMatch(found, q)) return;
+      } catch {
+        // fall through
+      }
+      try {
+        const [devFound] = await findDeviceByImei(code);
+        if (devFound) {
+          setDeviceModel(`${devFound.brand} ${devFound.model} ${devFound.storage}`);
+          if (devFound.imei) setImei(devFound.imei);
+          setImei2(devFound.imei2 || '');
+          setStatusMessage({ type: 'success', text: `Данные устройства ${devFound.brand} ${devFound.model} подставлены` });
+          return;
+        }
+      } catch {
+        // fall through
+      }
+
       setImei(code);
       setImei2('');
     });
   };
 
-  const handleFindSoldDevice = (query: string) => {
+  const handleFindSoldDevice = async (query: string) => {
     const q = query.trim().toLowerCase();
     if (!q) return;
 
-    for (const sale of sales) {
-      if (sale.receiptNumber.toString() === q) {
-        const item = sale.items[0];
-        if (item) {
-          setDeviceModel(`${item.brand} ${item.model} ${item.storage}`);
-          if (item.imei) setImei(item.imei);
-          setImei2(item.imei2 || '');
-          if (sale.customerName) setClientName(sale.customerName);
-          setStatusMessage({ type: 'success', text: `Найдена покупка по чеку #${sale.receiptNumber}` });
-          return;
-        }
-      }
-      for (const item of sale.items) {
-        if (item.imei.toLowerCase() === q || (item.imei2 && item.imei2.toLowerCase() === q)) {
-          setDeviceModel(`${item.brand} ${item.model} ${item.storage}`);
-          if (item.imei) setImei(item.imei);
-          setImei2(item.imei2 || '');
-          if (sale.customerName) setClientName(sale.customerName);
-          setStatusMessage({ type: 'success', text: `Найдено устройство по IMEI` });
-          return;
-        }
-      }
+    if (applySoldDeviceMatch(sales, q)) return;
+
+    try {
+      const found = await fetchSalesRange({ search: query.trim() });
+      if (applySoldDeviceMatch(found, q)) return;
+    } catch {
+      // fall through to the device/not-found checks below
     }
 
     const devMatch = devices.find(d => d.imei.toLowerCase() === q || (d.imei2 && d.imei2.toLowerCase() === q));
@@ -198,6 +225,19 @@ export const RepairPage: React.FC = () => {
       setImei2(devMatch.imei2 || '');
       setStatusMessage({ type: 'success', text: `Устройство найдено в каталоге` });
       return;
+    }
+
+    try {
+      const [devFound] = await findDeviceByImei(query.trim());
+      if (devFound) {
+        setDeviceModel(`${devFound.brand} ${devFound.model} ${devFound.storage}`);
+        if (devFound.imei) setImei(devFound.imei);
+        setImei2(devFound.imei2 || '');
+        setStatusMessage({ type: 'success', text: `Устройство найдено в каталоге` });
+        return;
+      }
+    } catch {
+      // fall through to not-found
     }
 
     setStatusMessage({ type: 'error', text: `Устройство или чек "${query}" не найдено` });

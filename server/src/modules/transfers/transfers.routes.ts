@@ -13,10 +13,15 @@ export function registerTransferRoutes(app: Express) {
           ? { OR: [{ fromStoreId: req.user!.storeId }, { toStoreId: req.user!.storeId }] }
           : undefined;
 
+      // Explicit opt-in cap — existing callers that don't pass it keep today's full-history
+      // behavior. Pending approvals still surface via Notifications regardless of this cap.
+      const limit = req.query.limit !== undefined ? Math.min(Math.max(Number(req.query.limit) || 0, 1), 2000) : undefined;
+
       const transfers = await prisma.transferRequest.findMany({
         where: storeScope,
         include: { items: true, fromStore: true, toStore: true },
         orderBy: { requestedAt: 'desc' },
+        ...(limit ? { take: limit } : {}),
       });
       res.json(transfers);
     } catch (error) {

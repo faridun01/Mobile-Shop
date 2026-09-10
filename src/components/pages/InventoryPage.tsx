@@ -107,7 +107,7 @@ const StoreCard: React.FC<StoreCardProps> = ({ store, unitCount, valueUsd, showV
 );
 
 export const InventoryPage: React.FC = () => {
-  const { currentUser, devices, stores, openScanner, isInitialLoading, selectedStoreId: globalSelectedStoreId } = useApp();
+  const { currentUser, devices, findDeviceByImei, stores, openScanner, isInitialLoading, selectedStoreId: globalSelectedStoreId } = useApp();
 
   // Defaults to whichever store is currently active on the POS Terminal page —
   // an admin picking a store there should land here already on that store instead
@@ -186,14 +186,30 @@ export const InventoryPage: React.FC = () => {
   }, [devicesInActiveStore]);
 
   const handleScanDevice = () => {
-    openScanner((scannedCode) => {
+    openScanner(async (scannedCode) => {
       const code = scannedCode.trim();
       const match = devices.find(d =>
         (d.imei === code || d.imei2 === code) &&
         (!isSeller || d.locationId === currentUser?.storeId)
       );
-      if (match) setSelectedDevice(match);
-      else setSearchQuery(code);
+      if (match) {
+        setSelectedDevice(match);
+        return;
+      }
+
+      // In-stock devices are always in `devices` (see fetchDevices) — reaching here means
+      // this is either an unregistered code or a SOLD device, which the default list
+      // excludes. Check the server before falling back to a plain text search.
+      try {
+        const [found] = await findDeviceByImei(code);
+        if (found && (!isSeller || found.locationId === currentUser?.storeId)) {
+          setSelectedDevice(found);
+          return;
+        }
+      } catch {
+        // fall through
+      }
+      setSearchQuery(code);
     });
   };
 

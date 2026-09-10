@@ -66,6 +66,9 @@ export const PurchasePage: React.FC = () => {
     todayRate,
     supplierInvoices,
     devices,
+    findDevicesByInvoice,
+    findDeviceByImei,
+    fetchInvoicesRange,
     createPurchase,
     updateSupplierInvoice,
     deleteSupplierInvoice,
@@ -136,6 +139,25 @@ export const PurchasePage: React.FC = () => {
   const [selectedSupplierFilter, setSelectedSupplierFilter] = useState<string>('all');
   const [selectedInvoiceId, setSelectedInvoiceId] = useState<string | null>(null);
   const selectedInvoice = supplierInvoices.find((inv) => inv.id === selectedInvoiceId) || null;
+
+  // `devices` excludes SOLD by default — an invoice's own devices (including any already
+  // sold) are fetched on demand so the "which units sold" detail view stays accurate.
+  useEffect(() => {
+    if (!selectedInvoiceId) return;
+    findDevicesByInvoice(selectedInvoiceId).catch((e) => console.error('Failed to load invoice devices', e));
+  }, [selectedInvoiceId, findDevicesByInvoice]);
+
+  // `supplierInvoices` only holds a recent bounded window by default — the current month
+  // (this page's own default filter) is always inside it, but "весь период" or an older
+  // month reaches further back, so fetch that exact range from the server and merge it in.
+  useEffect(() => {
+    const thisMonth = new Date().toISOString().substring(0, 7);
+    if (periodFilter === 'SPECIFIC_MONTH' && selectedMonth === thisMonth) return;
+    fetchInvoicesRange({
+      period: periodFilter,
+      month: periodFilter === 'SPECIFIC_MONTH' ? selectedMonth : undefined,
+    }).catch((e) => console.error('Failed to load invoices for period', e));
+  }, [periodFilter, selectedMonth, fetchInvoicesRange]);
 
   // Form states
   const [selectedSupplierId, setSelectedSupplierId] = useState<string>(suppliers[0]?.id || '');
@@ -317,18 +339,43 @@ export const PurchasePage: React.FC = () => {
 
   // Scan finder to locate purchase
   const handleScanFinder = () => {
-    openScanner((scannedCode) => {
+    openScanner(async (scannedCode) => {
       const code = scannedCode.trim();
-      const matchedDevice = devices.find(d => d.imei === code || d.imei2 === code);
+      let matchedDevice = devices.find(d => d.imei === code || d.imei2 === code);
+      // Not in the locally-loaded (SOLD-excluded) list — the device may already be sold,
+      // which is exactly the common case for looking up an old purchase this way.
+      if (!matchedDevice) {
+        try {
+          [matchedDevice] = await findDeviceByImei(code);
+        } catch {
+          // fall through
+        }
+      }
       if (matchedDevice && matchedDevice.invoiceNumber) {
-        const matchedInv = supplierInvoices.find(inv => inv.invoiceNumber === matchedDevice.invoiceNumber);
+        let matchedInv = supplierInvoices.find(inv => inv.invoiceNumber === matchedDevice!.invoiceNumber);
+        if (!matchedInv) {
+          try {
+            const found = await fetchInvoicesRange({ search: matchedDevice.invoiceNumber });
+            matchedInv = found.find(inv => inv.invoiceNumber === matchedDevice!.invoiceNumber);
+          } catch {
+            // fall through
+          }
+        }
         if (matchedInv) {
           setSelectedInvoiceId(matchedInv.id);
           return;
         }
       }
 
-      const directInv = supplierInvoices.find(inv => inv.invoiceNumber.toLowerCase() === code.toLowerCase());
+      let directInv = supplierInvoices.find(inv => inv.invoiceNumber.toLowerCase() === code.toLowerCase());
+      if (!directInv) {
+        try {
+          const found = await fetchInvoicesRange({ search: code });
+          directInv = found.find(inv => inv.invoiceNumber.toLowerCase() === code.toLowerCase());
+        } catch {
+          // fall through
+        }
+      }
       if (directInv) {
         setSelectedInvoiceId(directInv.id);
       } else {

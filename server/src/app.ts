@@ -176,6 +176,18 @@ app.get('/api/stores', authenticateJwt, async (req: AuthenticatedRequest, res, n
 
 app.get('/api/devices', authenticateJwt, async (req: AuthenticatedRequest, res, next) => {
   try {
+    // A SOLD device sits in this table forever, so it's the one status that actually grows
+    // unbounded over the shop's lifetime — every other status (in stock, in transfer, in
+    // repair) is capped by real physical inventory and stays roughly constant in size.
+    // `search` reaches a specific SOLD device by IMEI regardless (repair intake / inventory
+    // scan looking up something already sold); it overrides `excludeSold` and any status
+    // filter since it's a targeted, unbounded lookup, not a listing.
+    const search = typeof req.query.search === 'string' ? req.query.search.trim() : undefined;
+    const excludeSold = req.query.excludeSold === 'true';
+    // Every device (any status) from one specific purchase invoice — naturally bounded to
+    // that invoice's own device count, for the invoice-detail "which units were sold" view.
+    const purchaseInvoiceId = typeof req.query.purchaseInvoiceId === 'string' ? req.query.purchaseInvoiceId : undefined;
+
     let where: Prisma.DeviceWhereInput | undefined;
     if (req.user!.role === 'SELLER') {
       // A SELLER also needs to see devices sitting at the main warehouse — that's what they
@@ -192,10 +204,19 @@ app.get('/api/devices', authenticateJwt, async (req: AuthenticatedRequest, res, 
       where = storeId ? { storeId } : undefined;
     }
 
+    if (search) {
+      where = { ...where, OR: [{ imei: search }, { imei2: search }] };
+    } else if (purchaseInvoiceId) {
+      where = { ...where, purchaseInvoiceId };
+    } else if (excludeSold) {
+      where = { ...where, status: { not: 'SOLD' } };
+    }
+
     const devices = await prisma.device.findMany({
       where,
       include: { store: true },
       orderBy: { createdAt: 'desc' },
+      ...(search ? { take: 5 } : {}),
     });
 
     res.json(devices);

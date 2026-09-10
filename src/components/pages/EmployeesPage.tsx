@@ -35,6 +35,7 @@ export const EmployeesPage: React.FC = () => {
     stores,
     expenses,
     sales,
+    fetchSalesRange,
     todayRate,
     createUser,
     updateUser,
@@ -78,6 +79,19 @@ export const EmployeesPage: React.FC = () => {
       setStoreId(stores[0].id);
     }
   }, [stores, storeId]);
+
+  // `sales` from context only holds a recent bounded window by default — the payroll
+  // table needs every seller's sales for the chosen month, and the financial-history
+  // modal needs one seller's entire lifetime, both of which can reach further back than
+  // that window. Fetch and merge them in on demand instead of assuming they're loaded.
+  useEffect(() => {
+    fetchSalesRange({ period: 'SPECIFIC_MONTH', month: selectedPayrollMonth }).catch((e) => console.error('Failed to load payroll sales', e));
+  }, [selectedPayrollMonth, fetchSalesRange]);
+
+  useEffect(() => {
+    if (!financialHistoryUser) return;
+    fetchSalesRange({ sellerId: financialHistoryUser.id }).catch((e) => console.error('Failed to load employee sales history', e));
+  }, [financialHistoryUser, fetchSalesRange]);
   const [baseSalaryTjs, setBaseSalaryTjs] = useState<string>('');
   const [salesCommissionPercent, setSalesCommissionPercent] = useState<string>('');
 

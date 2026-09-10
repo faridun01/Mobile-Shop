@@ -16,6 +16,7 @@ export const ExchangePage: React.FC = () => {
   const {
     currentUser,
     sales,
+    fetchSalesRange,
     devices,
     processExchange,
     openScanner,
@@ -118,23 +119,19 @@ export const ExchangePage: React.FC = () => {
   // as swapping an item within that sale, not a standalone "customer's own phone" credit.
   // A device merely sitting in stock (never sold here) has no sale to attach the exchange
   // to, so that lookup path was removed rather than accepted only to fail on submit.
-  const handleFindSoldImei = (query: string) => {
-    const q = query.trim().toLowerCase();
-    if (!q) return;
-    setReceiptChoice(null);
-
-    for (const sale of sales) {
+  const searchSalesFor = (list: Sale[], q: string): boolean => {
+    for (const sale of list) {
       if (sale.receiptNumber.toString() === q) {
         if (sale.items.length > 1) {
           setReceiptChoice({ sale, items: sale.items });
           setStatus({ tone: 'info', text: `В чеке #${sale.receiptNumber} несколько товаров — выберите нужный` });
-          return;
+          return true;
         }
         const item = sale.items[0];
         if (item) {
           handlePickReceiptItem(sale, item);
           setStatus({ tone: 'success', text: `Найдено проданное устройство по чеку #${sale.receiptNumber}` });
-          return;
+          return true;
         }
       }
 
@@ -145,9 +142,28 @@ export const ExchangePage: React.FC = () => {
         ) {
           applySelectedOldDevice(resolveOldDeviceFromItem(sale, item), item.salePriceTjs || 0);
           setStatus({ tone: 'success', text: `Устройство ${item.brand} ${item.model} найдено в истории продаж` });
-          return;
+          return true;
         }
       }
+    }
+    return false;
+  };
+
+  // `sales` only holds a recent window by default — a trade-in against an older sale
+  // falls through to a server-side search (by receipt number or IMEI) before reporting
+  // "not found", instead of only ever checking what happens to already be loaded.
+  const handleFindSoldImei = async (query: string) => {
+    const q = query.trim().toLowerCase();
+    if (!q) return;
+    setReceiptChoice(null);
+
+    if (searchSalesFor(sales, q)) return;
+
+    try {
+      const found = await fetchSalesRange({ search: query.trim() });
+      if (searchSalesFor(found, q)) return;
+    } catch {
+      // fall through to the not-found message below
     }
 
     setStatus({ tone: 'error', text: `Проданное устройство по чеку/IMEI "${query}" не найдено в истории продаж` });

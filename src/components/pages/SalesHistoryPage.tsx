@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '../../context/AppContext';
 import { SaleItem } from '../../types';
@@ -28,6 +28,7 @@ export const SalesHistoryPage: React.FC = () => {
   const {
     currentUser,
     sales,
+    fetchSalesRange,
     stores,
     openScanner,
     setActivePage,
@@ -67,6 +68,18 @@ export const SalesHistoryPage: React.FC = () => {
 
   const activeStoreId = selectedStoreId || retailStores[0]?.id || '';
 
+  // `sales` from context only holds a recent bounded window by default (fast common case:
+  // TODAY, which is always inside it). Picking "весь период" or an older month reaches
+  // further back than that window, so fetch that exact range from the server and merge it
+  // in — filteredSales below then just filters the (now-widened) context array as before.
+  useEffect(() => {
+    if (periodFilter === 'TODAY') return;
+    fetchSalesRange({
+      period: periodFilter,
+      month: periodFilter === 'SPECIFIC_MONTH' ? selectedMonth : undefined,
+    }).catch((e) => console.error('Failed to load sales for period', e));
+  }, [periodFilter, selectedMonth, fetchSalesRange]);
+
   const filteredSales = useMemo(() => {
     const todayStr = new Date().toISOString().split('T')[0];
 
@@ -99,19 +112,34 @@ export const SalesHistoryPage: React.FC = () => {
     }).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
   }, [sales, currentUser, selectedStoreId, periodFilter, selectedMonth, searchQuery]);
 
+  const findByReceiptOrImei = (list: typeof sales, code: string) =>
+    list.find(s => s.receiptNumber.toString() === code || s.items.some(i => i.imei === code || i.imei2 === code));
+
   const handleScanFinder = () => {
-    openScanner((scannedCode) => {
+    openScanner(async (scannedCode) => {
       const code = scannedCode.trim();
-      const matched = sales.find(s =>
-        s.receiptNumber.toString() === code ||
-        s.items.some(i => i.imei === code || i.imei2 === code)
-      );
+      const matched = findByReceiptOrImei(sales, code);
       if (matched) {
         setSelectedSaleId(matched.id);
         setDialogView('details');
-      } else {
-        setSearchQuery(code);
+        return;
       }
+
+      // Not in the locally-loaded window — an older receipt still resolves via a
+      // targeted server search before falling back to plain text search.
+      try {
+        const found = await fetchSalesRange({ search: code });
+        const serverMatch = findByReceiptOrImei(found, code);
+        if (serverMatch) {
+          setSelectedSaleId(serverMatch.id);
+          setDialogView('details');
+          return;
+        }
+      } catch {
+        // fall through
+      }
+
+      setSearchQuery(code);
     });
   };
 

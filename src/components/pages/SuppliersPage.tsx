@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import { Supplier, SupplierInvoice, Device } from '../../types';
 import {
@@ -30,7 +30,9 @@ export const SuppliersPage: React.FC = () => {
     currentUser,
     suppliers,
     supplierInvoices,
+    fetchInvoicesRange,
     devices,
+    findDevicesByInvoice,
     stores,
     todayRate,
     createSupplier,
@@ -48,6 +50,21 @@ export const SuppliersPage: React.FC = () => {
 
   const selectedSupplier = suppliers.find(s => s.id === selectedSupplierId) || null;
   const selectedInvoice = supplierInvoices.find(inv => inv.id === selectedInvoiceId) || null;
+
+  // `devices` excludes SOLD by default — an invoice's own devices (including any already
+  // sold) are fetched on demand so the "which units sold" detail view stays accurate.
+  useEffect(() => {
+    if (!selectedInvoiceId) return;
+    findDevicesByInvoice(selectedInvoiceId).catch((e) => console.error('Failed to load invoice devices', e));
+  }, [selectedInvoiceId, findDevicesByInvoice]);
+
+  // `supplierInvoices` only holds a recent bounded window by default — a supplier's full
+  // debt/purchase history can reach further back than that, so fetch it explicitly when
+  // this detail view opens instead of only ever showing whatever happened to be loaded.
+  useEffect(() => {
+    if (!selectedSupplierId) return;
+    fetchInvoicesRange({ supplierId: selectedSupplierId }).catch((e) => console.error('Failed to load supplier invoices', e));
+  }, [selectedSupplierId, fetchInvoicesRange]);
   // Filters/sorts the full (unbounded, grows with every purchase invoice ever
   // raised) supplierInvoices array — computed once per relevant change instead of
   // twice per render (desktop panel + mobile overlay both need the same list).

@@ -53,12 +53,30 @@ interface AppContextType {
   selectedStoreId: string; // 'all' or store id
   stores: Store[];
   devices: Device[];
+  // `devices` excludes SOLD units by default (see fetchDevices) — a device once sold never
+  // leaves the table, so it's the one status that grows unbounded over the shop's lifetime.
+  // This reaches a specific SOLD device by exact IMEI and merges it in, for the rare lookup
+  // (repair intake, inventory scan) that needs sale history the in-stock list doesn't carry.
+  findDeviceByImei: (imei: string) => Promise<Device[]>;
+  // Every device (any status, including SOLD) from one purchase invoice — for the
+  // invoice-detail "which units were sold" view, which the SOLD-excluded default misses.
+  findDevicesByInvoice: (invoiceId: string) => Promise<Device[]>;
   sales: Sale[];
+  // `sales` only holds a recent, bounded window by default (see fetchSales). This reaches
+  // further back — by receipt/IMEI search, by seller (full history), or by an explicit
+  // period/month — and merges whatever it finds into `sales`, so every existing
+  // `sales.find(...)`/`sales.filter(...)` call site keeps working unchanged once a caller
+  // has awaited it once for the record it needed.
+  fetchSalesRange: (params: { period?: 'TODAY' | 'MONTH' | 'SPECIFIC_MONTH' | 'ALL'; month?: string; storeId?: string; sellerId?: string; search?: string }) => Promise<Sale[]>;
   transfers: TransferRequest[];
   repairs: RepairTicket[];
   suppliers: Supplier[];
   invoices: SupplierInvoice[];
   supplierInvoices: SupplierInvoice[];
+  // `invoices` only holds a recent, bounded window by default (see fetchInvoices) — this
+  // reaches further back by receipt/IMEI search or an explicit period/month and merges
+  // whatever it finds in, same pattern as fetchSalesRange.
+  fetchInvoicesRange: (params: { period?: 'TODAY' | 'MONTH' | 'SPECIFIC_MONTH' | 'ALL'; month?: string; search?: string; supplierId?: string }) => Promise<SupplierInvoice[]>;
   bonuses: SupplierBonus[];
   supplierBonuses: SupplierBonus[];
   expenses: Expense[];
@@ -382,18 +400,66 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setStores(raw.map(mapStore));
   }, []);
 
+  // excludeSold: a SOLD device never leaves the table, so it's the one status that would
+  // otherwise grow this fetch unbounded over the shop's lifetime — everything else (in
+  // stock, in transfer, in repair) is capped by real physical inventory. Old sold devices
+  // are still reachable on demand via findDeviceByImei.
   const fetchDevices = useCallback(async () => {
-    const raw = await apiClient<any[]>('/devices');
+    const raw = await apiClient<any[]>('/devices?excludeSold=true');
     setDevices(raw.map(mapDevice));
   }, []);
 
+  const mergeDevicesById = (mapped: Device[]) => {
+    setDevices((prev) => {
+      const byId = new Map(prev.map((d) => [d.id, d]));
+      for (const d of mapped) byId.set(d.id, d);
+      return Array.from(byId.values());
+    });
+  };
+
+  const findDeviceByImei: AppContextType['findDeviceByImei'] = useCallback(async (imei) => {
+    const raw = await apiClient<any[]>(`/devices?search=${encodeURIComponent(imei)}`);
+    const mapped = raw.map(mapDevice);
+    mergeDevicesById(mapped);
+    return mapped;
+  }, []);
+
+  const findDevicesByInvoice: AppContextType['findDevicesByInvoice'] = useCallback(async (invoiceId) => {
+    const raw = await apiClient<any[]>(`/devices?purchaseInvoiceId=${encodeURIComponent(invoiceId)}`);
+    const mapped = raw.map(mapDevice);
+    mergeDevicesById(mapped);
+    return mapped;
+  }, []);
+
+  // Bounded by default — the background/startup load used to fetch every sale ever, which
+  // only gets slower as the shop's history grows. Anything outside this recent window is
+  // reached on demand via fetchSalesRange (search/sellerId/explicit period) instead.
   const fetchSales = useCallback(async () => {
-    const raw = await apiClient<any[]>('/sales');
+    const raw = await apiClient<any[]>('/sales?limit=500');
     setSales(raw.map((s) => mapSale(s, namesRef.current)).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
   }, []);
 
+  const fetchSalesRange: AppContextType['fetchSalesRange'] = useCallback(async (params) => {
+    const qs = new URLSearchParams();
+    if (params.period) qs.set('period', params.period);
+    if (params.month) qs.set('month', params.month);
+    if (params.storeId) qs.set('storeId', params.storeId);
+    if (params.sellerId) qs.set('sellerId', params.sellerId);
+    if (params.search) qs.set('search', params.search);
+    const raw = await apiClient<any[]>(`/sales?${qs.toString()}`);
+    const mapped = raw.map((s) => mapSale(s, namesRef.current));
+    setSales((prev) => {
+      const byId = new Map(prev.map((s) => [s.id, s]));
+      for (const s of mapped) byId.set(s.id, s);
+      return Array.from(byId.values()).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    });
+    return mapped;
+  }, []);
+
+  // Bounded — no page needs the full transfer history for correctness (no cross-page
+  // lookup depends on it, unlike sales/devices), so a generous cap is enough.
   const fetchTransfers = useCallback(async () => {
-    const raw = await apiClient<any[]>('/transfers');
+    const raw = await apiClient<any[]>('/transfers?limit=500');
     setTransfers(raw.map((t) => mapTransfer(t, namesRef.current)).sort((a, b) => new Date(b.requestedAt).getTime() - new Date(a.requestedAt).getTime()));
   }, []);
 
@@ -411,18 +477,38 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   }, []);
 
+  // Bounded by default — PurchasePage's own period filter (defaults to the current month,
+  // same shape as SalesHistoryPage) reaches further back on demand via fetchInvoicesRange.
   const fetchInvoices = useCallback(async () => {
     try {
-      const raw = await apiClient<any[]>('/supplier-invoices');
+      const raw = await apiClient<any[]>('/supplier-invoices?limit=500');
       setInvoices(raw.map(mapSupplierInvoice).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
     } catch {
       // ADMIN/PARTNER only — leave empty for SELLER users
     }
   }, []);
 
+  const fetchInvoicesRange: AppContextType['fetchInvoicesRange'] = useCallback(async (params) => {
+    const qs = new URLSearchParams();
+    if (params.period) qs.set('period', params.period);
+    if (params.month) qs.set('month', params.month);
+    if (params.search) qs.set('search', params.search);
+    if (params.supplierId) qs.set('supplierId', params.supplierId);
+    const raw = await apiClient<any[]>(`/supplier-invoices?${qs.toString()}`);
+    const mapped = raw.map(mapSupplierInvoice);
+    setInvoices((prev) => {
+      const byId = new Map(prev.map((i) => [i.id, i]));
+      for (const i of mapped) byId.set(i.id, i);
+      return Array.from(byId.values()).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    });
+    return mapped;
+  }, []);
+
+  // Bounded — bonus campaigns are infrequent, nowhere near sale/device volume, so a
+  // generous cap is enough (no search/widen infrastructure needed).
   const fetchBonuses = useCallback(async () => {
     try {
-      const raw = await apiClient<any[]>('/supplier-bonuses');
+      const raw = await apiClient<any[]>('/supplier-bonuses?limit=500');
       setBonuses(raw.map(mapSupplierBonus).sort((a, b) => new Date(b.dateReceived || b.date || 0).getTime() - new Date(a.dateReceived || a.date || 0).getTime()));
     } catch {
       // ADMIN/PARTNER only — leave empty for SELLER users
@@ -444,9 +530,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   }, []);
 
+  // Bounded — owner-level capital moves (investment/withdrawal/payout/reinvest) are
+  // nowhere near per-sale volume, so a generous cap is enough.
   const fetchOwnerTransactions = useCallback(async () => {
     try {
-      const raw = await apiClient<any[]>('/owner-transactions');
+      const raw = await apiClient<any[]>('/owner-transactions?limit=2000');
       setOwnerTransactions(raw.map((t) => mapOwnerTransaction(t, ownerNamesRef.current, namesRef.current)).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
     } catch {
       // ADMIN/PARTNER only
@@ -1264,12 +1352,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         selectedStoreId,
         stores,
         devices,
+        findDeviceByImei,
+        findDevicesByInvoice,
         sales,
+        fetchSalesRange,
         transfers,
         repairs,
         suppliers,
         invoices,
         supplierInvoices: invoices,
+        fetchInvoicesRange,
         bonuses,
         supplierBonuses: bonuses,
         expenses,
