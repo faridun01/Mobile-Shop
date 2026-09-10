@@ -288,8 +288,8 @@ export const BonusesPage: React.FC = () => {
     setIsSubmitting(true);
     try {
       const res = await deleteSupplierBonus(deletingBonus.id);
+      setDeletingBonus(null);
       if (res.success) {
-        setDeletingBonus(null);
         setSelectedBonus(null);
         setStatusMessage({ type: 'success', text: 'Бонус удалён' });
       } else {

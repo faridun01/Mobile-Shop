@@ -46,27 +46,79 @@ function dateWithinRange(iso: string | Date | null | undefined, range?: { gte: D
 export async function computeReportsSummary(input: ReportsSummaryInput) {
   const dateRange = dateRangeForPeriod(input.period, input.month);
   const storeFilter = input.storeId && input.storeId !== 'all' ? input.storeId : undefined;
-  const rate = (await getRateForDate(new Date())) || 9.5;
 
-  // Sales for the period, across ALL retail stores (per-store breakdown always shows every
-  // store regardless of the store filter) — the date range is the only thing that needs to
-  // scale with history, so it's the only filter applied at the DB level here.
-  const periodSalesAllStores = await prisma.sale.findMany({
-    where: {
-      status: { not: 'REFUNDED' },
-      ...(dateRange ? { createdAt: dateRange } : {}),
-    },
-    include: { saleItems: true },
-    orderBy: { createdAt: 'desc' },
-  });
+  // First wave: every query here is independent of the others, so they go to the DB
+  // together instead of one round-trip at a time — each of these used to be a separate
+  // sequential `await`, and that latency only compounds as the dataset (and DB round-trip
+  // time) grows.
+  const [
+    rateRow,
+    periodSalesAllStores,
+    periodExpensesAllStores,
+    allBonuses,
+    refundedSalesAllStores,
+    supplierDebtAgg,
+    topSuppliersByDebt,
+    mainWarehouseStore,
+    retailStores,
+  ] = await Promise.all([
+    getRateForDate(new Date()),
+    // Sales for the period, across ALL retail stores (per-store breakdown always shows every
+    // store regardless of the store filter) — the date range is the only thing that needs to
+    // scale with history, so it's the only filter applied at the DB level here.
+    prisma.sale.findMany({
+      where: {
+        status: { not: 'REFUNDED' },
+        ...(dateRange ? { createdAt: dateRange } : {}),
+      },
+      include: { saleItems: true },
+      orderBy: { createdAt: 'desc' },
+    }),
+    // Expenses for the period — same pattern: date-scoped at the DB, store-scoped in memory
+    // (a much smaller set by then) since only the top-level total needs the store filter.
+    prisma.expense.findMany({ where: dateRange ? { createdAt: dateRange } : undefined }),
+    // Supplier bonuses aren't a high-growth table (one row per negotiated bonus, not per
+    // transaction) so they're just fetched in full and filtered in memory, same as before.
+    prisma.supplierBonus.findMany({ include: { freeDevices: true } }),
+    // Fetched across all stores (not just storeFilter) so the per-store breakdown below can
+    // fold each store's own penalties into its "Прибыль" the same way the overall total does —
+    // otherwise a refund's retained penalty would only ever show up in the all-stores figure.
+    prisma.sale.findMany({
+      where: {
+        status: 'REFUNDED',
+        penaltyFeeUsd: { not: null },
+        ...(dateRange ? { refundedAt: dateRange } : {}),
+      },
+      select: { storeId: true, penaltyFeeUsd: true, penaltyFeeTjs: true },
+    }),
+    prisma.supplier.aggregate({ _sum: { totalDebtUsd: true } }),
+    prisma.supplier.findMany({ where: { totalDebtUsd: { gt: 0 } }, orderBy: { totalDebtUsd: 'desc' }, take: 8 }),
+    prisma.store.findFirst({ where: { isMainWarehouse: true } }),
+    prisma.store.findMany({ where: { isMainWarehouse: false, ...(storeFilter ? { id: storeFilter } : {}) } }),
+  ]);
+  const rate = rateRow || 9.5;
 
+  // Second wave: each of these depends on an id from wave one (sale ids / store ids), so it
+  // has to wait — but the three of them are still independent of each other.
   const saleIds = periodSalesAllStores.map((s) => s.id);
-  const profitLogs = saleIds.length
-    ? await prisma.auditLog.findMany({
-        where: { targetId: { in: saleIds }, action: { in: ['SALE', 'SALE_BELOW_COST', 'EXCHANGE'] } },
-        select: { targetId: true, action: true, financialDetails: true },
-      })
-    : [];
+  const [profitLogs, mainWarehouseStock, retailStock] = await Promise.all([
+    saleIds.length
+      ? prisma.auditLog.findMany({
+          where: { targetId: { in: saleIds }, action: { in: ['SALE', 'SALE_BELOW_COST', 'EXCHANGE'] } },
+          select: { targetId: true, action: true, financialDetails: true },
+        })
+      : Promise.resolve([]),
+    mainWarehouseStore
+      ? prisma.device.findMany({ where: { storeId: mainWarehouseStore.id, status: 'MAIN_WAREHOUSE' }, select: { costBasisUsd: true, purchasePriceUsd: true } })
+      : Promise.resolve([]),
+    // Only the current in-stock devices at retail stores are needed for the per-store cards —
+    // this is what actually bounds the query as devices pile up over the years, since every
+    // SOLD device that ever existed would otherwise come along for the ride.
+    prisma.device.findMany({
+      where: { storeId: { in: retailStores.map((s) => s.id) }, status: { in: [...IN_STOCK_STATUSES] } },
+      select: { storeId: true, costBasisUsd: true, purchasePriceUsd: true },
+    }),
+  ]);
   const profitsBySale = new Map<string, typeof profitLogs>();
   for (const log of profitLogs) {
     if (log.targetId) profitsBySale.set(log.targetId, [...(profitsBySale.get(log.targetId) ?? []), log]);
@@ -78,17 +130,7 @@ export async function computeReportsSummary(input: ReportsSummaryInput) {
   }
 
   const periodSales = storeFilter ? periodSalesAllStores.filter((s) => s.storeId === storeFilter) : periodSalesAllStores;
-
-  // Expenses for the period — same pattern: date-scoped at the DB, store-scoped in memory
-  // (a much smaller set by then) since only the top-level total needs the store filter.
-  const periodExpensesAllStores = await prisma.expense.findMany({
-    where: dateRange ? { createdAt: dateRange } : undefined,
-  });
   const periodExpenses = storeFilter ? periodExpensesAllStores.filter((e) => e.storeId === storeFilter) : periodExpensesAllStores;
-
-  // Supplier bonuses aren't a high-growth table (one row per negotiated bonus, not per
-  // transaction) so they're just fetched in full and filtered in memory, same as before.
-  const allBonuses = await prisma.supplierBonus.findMany({ include: { freeDevices: true } });
 
   let revenueUsd = 0;
   let cogsUsd = 0;
@@ -147,17 +189,6 @@ export async function computeReportsSummary(input: ReportsSummaryInput) {
   const periodFreeDeviceBonusesReceived = allBonuses.filter((b) => b.bonusType === 'FREE_DEVICES' && dateWithinRange(b.dateReceived, dateRange)).length;
   const freeDeviceBonusesInStock = allBonuses.filter((b) => b.bonusType === 'FREE_DEVICES' && b.status !== 'SOLD').length;
 
-  // Fetched across all stores (not just storeFilter) so the per-store breakdown below can
-  // fold each store's own penalties into its "Прибыль" the same way the overall total does —
-  // otherwise a refund's retained penalty would only ever show up in the all-stores figure.
-  const refundedSalesAllStores = await prisma.sale.findMany({
-    where: {
-      status: 'REFUNDED',
-      penaltyFeeUsd: { not: null },
-      ...(dateRange ? { refundedAt: dateRange } : {}),
-    },
-    select: { storeId: true, penaltyFeeUsd: true, penaltyFeeTjs: true },
-  });
   const refundedSales = storeFilter ? refundedSalesAllStores.filter((s) => s.storeId === storeFilter) : refundedSalesAllStores;
   const periodRefundPenaltiesUsd = refundedSales.reduce((acc, s) => acc + (s.penaltyFeeUsd || 0), 0);
   const periodRefundPenaltiesTjs = refundedSales.reduce((acc, s) => acc + (s.penaltyFeeTjs || 0), 0);
@@ -171,30 +202,13 @@ export async function computeReportsSummary(input: ReportsSummaryInput) {
   const netProfitUsd = +(grossProfitUsd - expensesUsd + periodCashBonusesUsd + periodRefundPenaltiesUsd).toFixed(2);
   const netProfitTjs = Math.round(grossProfitTjs - expensesTjs + periodCashBonusesTjs + periodRefundPenaltiesTjs);
 
-  const [supplierDebtAgg, topSuppliersByDebt] = await Promise.all([
-    prisma.supplier.aggregate({ _sum: { totalDebtUsd: true } }),
-    prisma.supplier.findMany({ where: { totalDebtUsd: { gt: 0 } }, orderBy: { totalDebtUsd: 'desc' }, take: 8 }),
-  ]);
   const totalSupplierDebtUsd = supplierDebtAgg._sum.totalDebtUsd || 0;
   const totalSupplierDebtTjs = Math.round(totalSupplierDebtUsd * rate);
 
-  const mainWarehouseStore = await prisma.store.findFirst({ where: { isMainWarehouse: true } });
-  const mainWarehouseStock = mainWarehouseStore
-    ? await prisma.device.findMany({ where: { storeId: mainWarehouseStore.id, status: 'MAIN_WAREHOUSE' }, select: { costBasisUsd: true, purchasePriceUsd: true } })
-    : [];
   const mainWarehouseStockCostUsd = +mainWarehouseStock.reduce((sum, d) => sum + (d.costBasisUsd || d.purchasePriceUsd || 0), 0).toFixed(2);
   const mainWarehouseStockCostTjs = Math.round(mainWarehouseStockCostUsd * rate);
   const mainWarehouseCashTjs = mainWarehouseStore?.cashBalanceTjs || 0;
   const mainWarehouseCashUsd = +(mainWarehouseCashTjs / rate).toFixed(2);
-
-  const retailStores = await prisma.store.findMany({ where: { isMainWarehouse: false, ...(storeFilter ? { id: storeFilter } : {}) } });
-  // Only the current in-stock devices at retail stores are needed for the per-store cards —
-  // this is what actually bounds the query as devices pile up over the years, since every
-  // SOLD device that ever existed would otherwise come along for the ride.
-  const retailStock = await prisma.device.findMany({
-    where: { storeId: { in: retailStores.map((s) => s.id) }, status: { in: [...IN_STOCK_STATUSES] } },
-    select: { storeId: true, costBasisUsd: true, purchasePriceUsd: true },
-  });
 
   const storeBreakdown = retailStores
     .map((store) => {
@@ -249,6 +263,9 @@ export async function computeReportsSummary(input: ReportsSummaryInput) {
 
   return {
     unitsSold,
+    // Lets the frontend show "X чеков" per store/overall straight from this summary,
+    // instead of fetching the full sales list (only actually needed for the Excel export).
+    salesCount: periodSales.length,
     revenueUsd: +revenueUsd.toFixed(2),
     revenueTjs,
     cogsUsd: +cogsUsd.toFixed(2),

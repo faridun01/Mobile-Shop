@@ -249,8 +249,8 @@ export const SuppliersPage: React.FC = () => {
     setIsSubmitting(true);
     try {
       const res = await deleteSupplier(supId);
+      setDeletingSupplier(null);
       if (res.success) {
-        setDeletingSupplier(null);
         if (selectedSupplierId === supId) {
           setSelectedSupplierId(null);
         }
@@ -296,8 +296,8 @@ export const SuppliersPage: React.FC = () => {
     setIsSubmitting(true);
     try {
       const res = await deleteSupplierInvoice(invId);
+      setDeletingInvoice(null);
       if (res.success) {
-        setDeletingInvoice(null);
         if (selectedInvoiceId === invId) {
           setSelectedInvoiceId(null);
         }

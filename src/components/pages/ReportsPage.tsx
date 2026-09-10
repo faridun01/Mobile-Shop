@@ -26,6 +26,7 @@ type Period = 'TODAY' | 'MONTH' | 'SPECIFIC_MONTH' | 'ALL';
 
 interface ReportsSummary {
   unitsSold: number;
+  salesCount: number;
   revenueUsd: number;
   revenueTjs: number;
   cogsUsd: number;
@@ -108,8 +109,6 @@ export const ReportsPage: React.FC = () => {
   // not with the business's entire lifetime.
   const [summary, setSummary] = useState<ReportsSummary | null>(null);
   const [summaryLoading, setSummaryLoading] = useState(true);
-  const [exportSales, setExportSales] = useState<Sale[]>([]);
-  const [exportExpenses, setExportExpenses] = useState<Expense[]>([]);
   const [reportDownloading, setReportDownloading] = useState(false);
 
   useEffect(() => {
@@ -122,52 +121,72 @@ export const ReportsPage: React.FC = () => {
     if (selectedStore !== 'all') params.set('storeId', selectedStore);
     const query = params.toString();
 
-    Promise.all([
-      apiClient<ReportsSummary>(`/reports/summary?${query}`),
-      apiClient<any[]>(`/sales?${query}`),
-      apiClient<any[]>(`/expenses?${query}`),
-    ])
-      .then(([summaryData, rawSales, rawExpenses]) => {
+    apiClient<ReportsSummary>(`/reports/summary?${query}`)
+      .then((summaryData) => {
         if (cancelled) return;
         setSummary(summaryData);
-        setExportSales(rawSales.map((s) => mapSale(s, namesLookup)));
-        setExportExpenses(rawExpenses.map((expense) => mapExpense(expense, namesLookup)));
       })
       .catch(() => {
         if (cancelled) return;
         setSummary(null);
-        setExportSales([]);
-        setExportExpenses([]);
       })
       .finally(() => {
         if (!cancelled) setSummaryLoading(false);
       });
 
     return () => { cancelled = true; };
-  }, [isSeller, period, selectedMonth, selectedStore, namesLookup]);
+  }, [isSeller, period, selectedMonth, selectedStore]);
 
-  // Per-store "Отчет по продажам": each store gets its own totals and its own
-  // preview/download, instead of one combined report that mixes every branch together.
-  const salesByStore = useMemo(() => {
-    const map = new Map<string, Sale[]>();
-    map.set('all', exportSales);
-    for (const store of retailStores) {
-      map.set(store.id, exportSales.filter((s) => s.storeId === store.id));
-    }
-    return map;
-  }, [exportSales, retailStores]);
+  // The full itemized sales/expenses list is only ever needed for the "Просмотр и скачивание"
+  // preview — everything else on the page reads totals off `summary`. So it's fetched only
+  // once that preview is opened, and scoped to just the one store being previewed, instead of
+  // eagerly pulling every store's full sales+expenses detail on every page/filter load.
+  const [reportSales, setReportSales] = useState<Sale[]>([]);
+  const [reportExpenses, setReportExpenses] = useState<Expense[]>([]);
+  const [reportDataLoading, setReportDataLoading] = useState(false);
+
+  useEffect(() => {
+    if (!salesReportStoreId) return;
+    let cancelled = false;
+    setReportDataLoading(true);
+
+    const params = new URLSearchParams({ period });
+    if (period === 'SPECIFIC_MONTH') params.set('month', selectedMonth);
+    if (salesReportStoreId !== 'all') params.set('storeId', salesReportStoreId);
+    const query = params.toString();
+
+    Promise.all([
+      apiClient<any[]>(`/sales?${query}`),
+      apiClient<any[]>(`/expenses?${query}`),
+    ])
+      .then(([rawSales, rawExpenses]) => {
+        if (cancelled) return;
+        setReportSales(rawSales.map((s) => mapSale(s, namesLookup)));
+        setReportExpenses(rawExpenses.map((expense) => mapExpense(expense, namesLookup)));
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setReportSales([]);
+        setReportExpenses([]);
+      })
+      .finally(() => {
+        if (!cancelled) setReportDataLoading(false);
+      });
+
+    return () => { cancelled = true; };
+  }, [salesReportStoreId, period, selectedMonth, namesLookup]);
 
   const salesReportTable = useMemo(() => {
-    if (!salesReportStoreId) return null;
+    if (!salesReportStoreId || reportDataLoading) return null;
     // periodCashBonusesUsd isn't store-scoped on the backend (supplier bonuses aren't tied
     // to a retail store), so it's the same figure regardless of which store's report this is —
     // safe to reuse from filteredData even when salesReportStoreId differs from selectedStore.
     return buildSalesReportTable(
-      salesByStore.get(salesReportStoreId) ?? [],
+      reportSales,
       rate,
       salesReportStoreId === 'all' ? (summary?.periodCashBonusesUsd ?? 0) : 0,
     );
-  }, [salesReportStoreId, salesByStore, rate, summary?.periodCashBonusesUsd]);
+  }, [salesReportStoreId, reportSales, reportDataLoading, rate, summary?.periodCashBonusesUsd]);
 
   const salesReportStoreName = salesReportStoreId === 'all'
     ? 'Все магазины'
@@ -186,17 +205,13 @@ export const ReportsPage: React.FC = () => {
     totalSupplierDebtUsd: 0, totalSupplierDebtTjs: 0,
     mainWarehouseStockCount: 0, mainWarehouseStockCostUsd: 0, mainWarehouseStockCostTjs: 0,
     mainWarehouseCashUsd: 0, mainWarehouseCashTjs: 0,
-    topSuppliersByDebt: [], storeBreakdown: [], modelCounts: [],
+    topSuppliersByDebt: [], storeBreakdown: [], modelCounts: [], salesCount: 0,
   };
 
   const downloadFinancialReport = async () => {
     if (!salesReportStoreId || !summary || reportDownloading) return;
 
     const reportStoreId = salesReportStoreId;
-    const reportSales = salesByStore.get(reportStoreId) ?? [];
-    const reportExpenses = reportStoreId === 'all'
-      ? exportExpenses
-      : exportExpenses.filter((expense) => expense.storeId === reportStoreId);
 
     let reportSummary: ComprehensiveReportSummary;
     if (reportStoreId === 'all') {
@@ -365,12 +380,13 @@ export const ReportsPage: React.FC = () => {
           </h4>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5 sm:gap-3">
             {[...(selectedStore === 'all' ? [{ id: 'all', name: 'Все магазины' }] : []), ...retailStores].map((store) => {
-              const storeSales = salesByStore.get(store.id) ?? [];
-              // Same recognized-profit figures as the summary card above (filteredData.storeBreakdown),
-              // instead of a second, independent per-item calculation that could disagree with it.
+              // Same recognized-profit figures (and now sales count too) as the summary card
+              // above (filteredData.storeBreakdown), instead of a second, independent
+              // per-item calculation that could disagree with it.
               const breakdown = filteredData.storeBreakdown.find((b) => b.storeId === store.id);
               const revenueTjs = store.id === 'all' ? filteredData.revenueTjs : (breakdown?.revenueTjs ?? 0);
               const profitUsd = store.id === 'all' ? filteredData.profitUsd : (breakdown?.profitUsd ?? 0);
+              const salesCount = store.id === 'all' ? filteredData.salesCount : (breakdown?.salesCount ?? 0);
               return (
                 <div key={store.id} className="p-3.5 rounded-xl bg-surface border border-border space-y-2.5 flex flex-col">
                   <div className="flex items-center justify-between">
@@ -379,7 +395,7 @@ export const ReportsPage: React.FC = () => {
                       {store.name}
                     </span>
                     <span className="text-[10px] text-accent bg-accent/10 px-1.5 py-0.5 rounded-md border border-accent/20">
-                      {storeSales.length} чеков
+                      {salesCount} чеков
                     </span>
                   </div>
                   <div className="grid grid-cols-2 gap-2">
@@ -511,10 +527,11 @@ export const ReportsPage: React.FC = () => {
         title={`Финансовый отчёт — ${salesReportStoreName}`}
         subtitle={`${periodLabel} • Excel: продажи, расходы и итого`}
         table={salesReportTable}
+        loading={reportDataLoading}
         onDownload={() => void downloadFinancialReport()}
         downloadLabel="Скачать Excel"
         downloading={reportDownloading}
-        canDownload={!!summary}
+        canDownload={!!summary && !reportDataLoading}
       />
     </div>
   );

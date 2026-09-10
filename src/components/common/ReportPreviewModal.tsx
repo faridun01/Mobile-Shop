@@ -14,6 +14,8 @@ interface ReportPreviewModalProps {
   downloadLabel?: string;
   downloading?: boolean;
   canDownload?: boolean;
+  /** Data for `table` is still being fetched — show a loading state instead of "no data". */
+  loading?: boolean;
 }
 
 /**
@@ -31,6 +33,7 @@ export const ReportPreviewModal: React.FC<ReportPreviewModalProps> = ({
   downloadLabel = 'Скачать CSV',
   downloading = false,
   canDownload,
+  loading = false,
 }) => {
   return (
     <Dialog
@@ -54,7 +57,9 @@ export const ReportPreviewModal: React.FC<ReportPreviewModalProps> = ({
         </>
       }
     >
-      {!table || table.rows.length === 0 ? (
+      {loading ? (
+        <p className="text-xs text-fg-subtle text-center py-8">Загрузка данных…</p>
+      ) : !table || table.rows.length === 0 ? (
         <p className="text-xs text-fg-subtle text-center py-8">Нет данных за выбранный период / магазин</p>
       ) : (
         <div className="overflow-x-auto">
