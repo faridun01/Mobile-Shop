@@ -806,7 +806,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           customerName: customerName?.trim() || undefined,
         }),
       });
-      await refetchAll();
+      // Mirrors the SALE_COMPLETED realtime task list (tasksForRealtimeEvent) — a full
+      // refetchAll() here used to also fetch users/suppliers/invoices/bonuses/transfers/
+      // repairs/expenses/ownerTransactions/notifications/auditLogs on every single sale,
+      // none of which a sale touches.
+      await Promise.all([fetchSales(), fetchDevices(), fetchStores(), fetchOwners()]);
       return { success: true, receiptNumber: sale.receiptNumber };
     } catch (err) {
       return { success: false, message: errorMessage(err, 'Не удалось выполнить продажу') };
@@ -858,7 +862,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           cardAmountTjs: params.cardAmountTjs,
         }),
       });
-      await refetchAll();
+      // Same scoped set as SALE_COMPLETED/REFUND_PROCESSED (tasksForRealtimeEvent) — an
+      // exchange only touches sales/devices/stores/owners.
+      await Promise.all([fetchSales(), fetchDevices(), fetchStores(), fetchOwners()]);
       return { success: true };
     } catch (err) {
       return { success: false, message: errorMessage(err, 'Не удалось выполнить обмен') };
@@ -871,7 +877,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         method: 'POST',
         body: JSON.stringify({ reason, refundAmountTjs, penaltyFeeTjs, paymentMethod }),
       });
-      await refetchAll();
+      // Same scoped set as SALE_COMPLETED (tasksForRealtimeEvent) — a refund only touches
+      // sales/devices/stores/owners.
+      await Promise.all([fetchSales(), fetchDevices(), fetchStores(), fetchOwners()]);
       return { success: true };
     } catch (err) {
       return { success: false, message: errorMessage(err, 'Не удалось выполнить возврат') };
@@ -885,7 +893,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         method: 'POST',
         body: JSON.stringify({ supplierId, invoiceNumber, date, isStorePurchase, storeId: destStoreId, groups }),
       });
-      await refetchAll();
+      // Mirrors INVENTORY_UPDATE's task list (tasksForRealtimeEvent) — a purchase only
+      // touches devices/suppliers/invoices/bonuses, not the whole app.
+      await Promise.all([fetchDevices(), fetchSuppliers(), fetchInvoices(), fetchBonuses()]);
       return { success: true };
     } catch (err) {
       return { success: false, message: errorMessage(err, 'Не удалось создать приход') };
@@ -905,7 +915,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const updateSupplier: AppContextType['updateSupplier'] = async (id, data) => {
     try {
       await apiClient(`/suppliers/${id}`, { method: 'PUT', body: JSON.stringify(data) });
-      await refetchAll();
+      // Mirrors INVENTORY_UPDATE's task list (tasksForRealtimeEvent).
+      await Promise.all([fetchDevices(), fetchSuppliers(), fetchInvoices(), fetchBonuses()]);
       return { success: true };
     } catch (err) {
       return { success: false, message: errorMessage(err, 'Не удалось обновить поставщика') };
@@ -915,7 +926,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const deleteSupplier: AppContextType['deleteSupplier'] = async (id) => {
     try {
       await apiClient(`/suppliers/${id}`, { method: 'DELETE' });
-      await refetchAll();
+      await Promise.all([fetchDevices(), fetchSuppliers(), fetchInvoices(), fetchBonuses()]);
       return { success: true };
     } catch (err) {
       return { success: false, message: errorMessage(err, 'Не удалось удалить поставщика') };
@@ -925,7 +936,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const updateSupplierInvoice: AppContextType['updateSupplierInvoice'] = async (id, data) => {
     try {
       await apiClient(`/supplier-invoices/${id}`, { method: 'PUT', body: JSON.stringify(data) });
-      await refetchAll();
+      await Promise.all([fetchDevices(), fetchSuppliers(), fetchInvoices(), fetchBonuses()]);
       return { success: true };
     } catch (err) {
       return { success: false, message: errorMessage(err, 'Не удалось обновить накладную') };
@@ -935,7 +946,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const deleteSupplierInvoice: AppContextType['deleteSupplierInvoice'] = async (id) => {
     try {
       await apiClient(`/supplier-invoices/${id}`, { method: 'DELETE' });
-      await refetchAll();
+      await Promise.all([fetchDevices(), fetchSuppliers(), fetchInvoices(), fetchBonuses()]);
       return { success: true };
     } catch (err) {
       return { success: false, message: errorMessage(err, 'Не удалось удалить накладную') };
@@ -998,7 +1009,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         method: 'POST',
         body: JSON.stringify({ fromStoreId: fromLocId, toStoreId: toLocationId, deviceIds }),
       });
-      await refetchAll();
+      // Mirrors TRANSFER_UPDATED's task list (tasksForRealtimeEvent).
+      await Promise.all([fetchTransfers(), fetchDevices()]);
       return { success: true };
     } catch (err) {
       return { success: false, message: errorMessage(err, 'Не удалось создать перемещение') };
@@ -1008,7 +1020,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const approveTransfer: AppContextType['approveTransfer'] = async (transferId) => {
     try {
       await apiClient(`/transfers/${transferId}/approve`, { method: 'POST' });
-      await refetchAll();
+      await Promise.all([fetchTransfers(), fetchDevices()]);
       return { success: true };
     } catch (err) {
       return { success: false, message: errorMessage(err, 'Не удалось подтвердить перемещение') };
@@ -1018,7 +1030,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const rejectTransfer: AppContextType['rejectTransfer'] = async (transferId, reason) => {
     try {
       await apiClient(`/transfers/${transferId}/reject`, { method: 'POST', body: JSON.stringify({ reason }) });
-      await refetchAll();
+      await Promise.all([fetchTransfers(), fetchDevices()]);
       return { success: true };
     } catch (err) {
       return { success: false, message: errorMessage(err, 'Не удалось отклонить перемещение') };
@@ -1034,7 +1046,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         method: 'POST',
         body: JSON.stringify({ ...data, storeId }),
       });
-      await refetchAll();
+      // Mirrors REPAIR_UPDATED's task list (tasksForRealtimeEvent).
+      await fetchRepairs();
       return { success: true, ticketNumber: ticket.ticketNumber };
     } catch (err) {
       return { success: false, message: errorMessage(err, 'Не удалось оформить ремонт') };
@@ -1047,7 +1060,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         method: 'PATCH',
         body: JSON.stringify({ status: newStatus, note, finalCostTjs: costTjs }),
       });
-      await refetchAll();
+      await fetchRepairs();
       return { success: true };
     } catch (err) {
       return { success: false, message: errorMessage(err, 'Не удалось обновить статус ремонта') };
@@ -1066,7 +1079,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           note,
         }),
       });
-      await refetchAll();
+      // Mirrors SUPPLIER_PAYMENT's task list (tasksForRealtimeEvent).
+      await Promise.all([fetchSuppliers(), fetchInvoices(), fetchStores()]);
       return { success: true };
     } catch (err) {
       return { success: false, message: errorMessage(err, 'Не удалось провести оплату поставщику') };
@@ -1084,7 +1098,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           storeId: resolvedStoreId,
         }),
       });
-      await refetchAll();
+      await Promise.all([fetchSuppliers(), fetchInvoices(), fetchStores()]);
       return { success: true };
     } catch (err) {
       return { success: false, message: errorMessage(err, 'Не удалось провести оплату по накладной') };
@@ -1097,7 +1111,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         method: 'POST',
         body: JSON.stringify({ category, amountTjs, targetType, storeId, sourceAccount, comment, description, paidFromCashRegister, employeeId, isEmployeeAdvance }),
       });
-      await refetchAll();
+      // Mirrors EXPENSE_CREATED/UPDATED/DELETED's task list (tasksForRealtimeEvent).
+      await Promise.all([fetchExpenses(), fetchStores(), fetchOwners()]);
       return { success: true };
     } catch (err) {
       return { success: false, message: errorMessage(err, 'Не удалось зарегистрировать расход') };
@@ -1110,7 +1125,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         method: 'PUT',
         body: JSON.stringify(data),
       });
-      await refetchAll();
+      await Promise.all([fetchExpenses(), fetchStores(), fetchOwners()]);
       return { success: true };
     } catch (err) {
       return { success: false, message: errorMessage(err, 'Не удалось обновить расход') };
@@ -1120,7 +1135,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const deleteExpense: AppContextType['deleteExpense'] = async (id) => {
     try {
       await apiClient(`/expenses/${id}`, { method: 'DELETE' });
-      await refetchAll();
+      await Promise.all([fetchExpenses(), fetchStores(), fetchOwners()]);
       return { success: true };
     } catch (err) {
       return { success: false, message: errorMessage(err, 'Не удалось удалить расход') };
