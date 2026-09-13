@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
+import { useDevicesStore } from '../../stores/useDevicesStore';
 import { Supplier, SupplierInvoice, Device } from '../../types';
 import {
   Truck,
@@ -31,8 +32,6 @@ export const SuppliersPage: React.FC = () => {
     suppliers,
     supplierInvoices,
     fetchInvoicesRange,
-    devices,
-    findDevicesByInvoice,
     stores,
     todayRate,
     createSupplier,
@@ -43,6 +42,8 @@ export const SuppliersPage: React.FC = () => {
     paySupplier,
     paySupplierInvoice
   } = useApp();
+  const devices = useDevicesStore((s) => s.devices);
+  const findDevicesByInvoice = useDevicesStore((s) => s.findDevicesByInvoice);
 
   const [selectedSupplierId, setSelectedSupplierId] = useState<string | null>(null);
   const [selectedInvoiceId, setSelectedInvoiceId] = useState<string | null>(null);

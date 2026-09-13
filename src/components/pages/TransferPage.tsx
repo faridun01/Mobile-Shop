@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useApp } from '../../context/AppContext';
+import { useDevicesStore } from '../../stores/useDevicesStore';
 import { TransferRequest } from '../../types';
 import {
   ArrowLeftRight,
@@ -20,7 +21,6 @@ export const TransferPage: React.FC = () => {
   const {
     currentUser,
     stores,
-    devices,
     transfers,
     createTransferRequest,
     approveTransfer,
@@ -28,6 +28,7 @@ export const TransferPage: React.FC = () => {
     openScanner,
     selectedStoreId: globalSelectedStoreId
   } = useApp();
+  const devices = useDevicesStore((s) => s.devices);
 
   const isSeller = currentUser?.role === 'SELLER';
   const mainWarehouse = stores.find(s => s.isMainWarehouse);

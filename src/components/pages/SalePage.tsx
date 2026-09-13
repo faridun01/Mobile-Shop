@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { useApp } from '../../context/AppContext';
+import { useDevicesStore } from '../../stores/useDevicesStore';
 import { Device, PaymentMethod } from '../../types';
 import {
   Smartphone,
@@ -36,7 +37,6 @@ interface CartItem {
 export const SalePage: React.FC = () => {
   const {
     currentUser,
-    devices,
     todayRate,
     selectedStoreId,
     setSelectedStoreId,
@@ -45,6 +45,7 @@ export const SalePage: React.FC = () => {
     createSale,
     isInitialLoading
   } = useApp();
+  const devices = useDevicesStore((s) => s.devices);
 
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedBrand, setSelectedBrand] = useState<string>('ALL');

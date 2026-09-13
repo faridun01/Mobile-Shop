@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
+import { useDevicesStore } from '../../stores/useDevicesStore';
 import { SupplierInvoice, Device } from '../../types';
 import {
   Plus,
@@ -65,9 +66,6 @@ export const PurchasePage: React.FC = () => {
     stores,
     todayRate,
     supplierInvoices,
-    devices,
-    findDevicesByInvoice,
-    findDeviceByImei,
     fetchInvoicesRange,
     createPurchase,
     updateSupplierInvoice,
@@ -75,6 +73,9 @@ export const PurchasePage: React.FC = () => {
     createSupplier,
     openScanner
   } = useApp();
+  const devices = useDevicesStore((s) => s.devices);
+  const findDevicesByInvoice = useDevicesStore((s) => s.findDevicesByInvoice);
+  const findDeviceByImei = useDevicesStore((s) => s.findDeviceByImei);
 
   // Edit Invoice Modal state
   const [editingInvoiceModal, setEditingInvoiceModal] = useState<SupplierInvoice | null>(null);

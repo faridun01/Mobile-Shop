@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { useApp } from '../../context/AppContext';
+import { useDevicesStore } from '../../stores/useDevicesStore';
 import { Device, PaymentMethod, Sale, SaleItem } from '../../types';
 import {
   Search,
@@ -17,12 +18,12 @@ export const ExchangePage: React.FC = () => {
     currentUser,
     sales,
     fetchSalesRange,
-    devices,
     processExchange,
     openScanner,
     stores,
     selectedStoreId: globalSelectedStoreId
   } = useApp();
+  const devices = useDevicesStore((s) => s.devices);
 
   const [receiptSearch, setReceiptSearch] = useState('');
   const [selectedOldDevice, setSelectedOldDevice] = useState<Device | null>(null);
