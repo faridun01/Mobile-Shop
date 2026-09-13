@@ -23,6 +23,7 @@ import {
 } from '../types';
 import { useAuthStore } from '../stores/useAuthStore';
 import { useUIStore } from '../stores/useUIStore';
+import { useDevicesStore } from '../stores/useDevicesStore';
 import { useNotifications } from './NotificationsContext';
 import { apiClient } from '../api/client';
 import { useRealtimeSync } from '../hooks/useRealtimeSync';
@@ -327,7 +328,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [users, setUsers] = useState<User[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [invoices, setInvoices] = useState<SupplierInvoice[]>([]);
-  const [devices, setDevices] = useState<Device[]>([]);
+  const devices = useDevicesStore((s) => s.devices);
+  const findDeviceByImei = useDevicesStore((s) => s.findDeviceByImei);
+  const findDevicesByInvoice = useDevicesStore((s) => s.findDevicesByInvoice);
   const [sales, setSales] = useState<Sale[]>([]);
   const [transfers, setTransfers] = useState<TransferRequest[]>([]);
   const [repairs, setRepairs] = useState<RepairTicket[]>([]);
@@ -404,37 +407,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const raw = await apiClient<any[]>('/stores');
     storeNamesRef.current = new Map(raw.map((s) => [s.id, s.name]));
     setStores(raw.map(mapStore));
-  }, []);
-
-  // excludeSold: a SOLD device never leaves the table, so it's the one status that would
-  // otherwise grow this fetch unbounded over the shop's lifetime — everything else (in
-  // stock, in transfer, in repair) is capped by real physical inventory. Old sold devices
-  // are still reachable on demand via findDeviceByImei.
-  const fetchDevices = useCallback(async () => {
-    const raw = await apiClient<any[]>('/devices?excludeSold=true');
-    setDevices(raw.map(mapDevice));
-  }, []);
-
-  const mergeDevicesById = (mapped: Device[]) => {
-    setDevices((prev) => {
-      const byId = new Map(prev.map((d) => [d.id, d]));
-      for (const d of mapped) byId.set(d.id, d);
-      return Array.from(byId.values());
-    });
-  };
-
-  const findDeviceByImei: AppContextType['findDeviceByImei'] = useCallback(async (imei) => {
-    const raw = await apiClient<any[]>(`/devices?search=${encodeURIComponent(imei)}`);
-    const mapped = raw.map(mapDevice);
-    mergeDevicesById(mapped);
-    return mapped;
-  }, []);
-
-  const findDevicesByInvoice: AppContextType['findDevicesByInvoice'] = useCallback(async (invoiceId) => {
-    const raw = await apiClient<any[]>(`/devices?purchaseInvoiceId=${encodeURIComponent(invoiceId)}`);
-    const mapped = raw.map(mapDevice);
-    mergeDevicesById(mapped);
-    return mapped;
   }, []);
 
   // Bounded by default — the background/startup load used to fetch every sale ever, which
@@ -603,7 +575,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (refetchInFlight.current) return refetchInFlight.current;
     const task = (async () => {
       // 1. Critical core data (Users, Stores, Devices/Catalog, Exchange Rate)
-      await Promise.all([fetchUsers(), fetchStores(), fetchDevices(), fetchExchangeRate()]);
+      await Promise.all([fetchUsers(), fetchStores(), useDevicesStore.getState().fetchDevices(), fetchExchangeRate()]);
 
       // 2. Secondary modules batched to avoid connection pool saturation
       await Promise.all([fetchSales(), fetchTransfers(), fetchRepairs(), fetchExpenses()]);
@@ -614,14 +586,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const clear = () => { if (refetchInFlight.current === task) refetchInFlight.current = null; };
     task.then(clear, clear);
     return task;
-  }, [fetchUsers, fetchStores, fetchDevices, fetchSales, fetchTransfers, fetchRepairs, fetchSuppliers, fetchInvoices, fetchBonuses, fetchExpenses, fetchOwners, fetchOwnerTransactions, fetchNotifications, fetchAuditLogs, fetchExchangeRate]);
+  }, [fetchUsers, fetchStores, fetchSales, fetchTransfers, fetchRepairs, fetchSuppliers, fetchInvoices, fetchBonuses, fetchExpenses, fetchOwners, fetchOwnerTransactions, fetchNotifications, fetchAuditLogs, fetchExchangeRate]);
 
   // Load catalog immediately (fast-path) and fetch secondary modules in background
   useEffect(() => {
     if (!authToken || !authUser) return;
     setIsInitialLoading(true);
 
-    Promise.all([fetchUsers(), fetchStores(), fetchDevices(), fetchExchangeRate()])
+    Promise.all([fetchUsers(), fetchStores(), useDevicesStore.getState().fetchDevices(), fetchExchangeRate()])
       .then(() => {
         setIsInitialLoading(false);
         // Secondary data loads in background
@@ -657,11 +629,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const tasksForRealtimeEvent = useCallback((type: string): Array<() => Promise<unknown>> | null => {
     switch (type) {
       case 'INVENTORY_UPDATE':
-        return [fetchDevices, fetchSuppliers, fetchInvoices, fetchBonuses];
+        return [useDevicesStore.getState().fetchDevices, fetchSuppliers, fetchInvoices, fetchBonuses];
       case 'SALE_COMPLETED':
       case 'EXCHANGE_PROCESSED':
       case 'REFUND_PROCESSED':
-        return [fetchSales, fetchDevices, fetchStores, fetchOwners];
+        return [fetchSales, useDevicesStore.getState().fetchDevices, fetchStores, fetchOwners];
       case 'EXPENSE_CREATED':
       case 'EXPENSE_UPDATED':
       case 'EXPENSE_DELETED':
@@ -675,7 +647,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       case 'SUPPLIER_PAYMENT':
         return [fetchSuppliers, fetchInvoices, fetchStores];
       case 'TRANSFER_UPDATED':
-        return [fetchTransfers, fetchDevices];
+        return [fetchTransfers, useDevicesStore.getState().fetchDevices];
       case 'NOTIFICATION_CREATED':
         return [fetchNotifications];
       case 'USER_UPDATED':
@@ -685,7 +657,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       default:
         return null; // unmapped (including RECONNECTED) — falls back to a full refetchAll
     }
-  }, [fetchDevices, fetchSuppliers, fetchInvoices, fetchBonuses, fetchSales, fetchStores, fetchOwners, fetchExpenses, fetchOwnerTransactions, fetchRepairs, fetchTransfers, fetchNotifications, fetchUsers, fetchExchangeRate]);
+  }, [fetchSuppliers, fetchInvoices, fetchBonuses, fetchSales, fetchStores, fetchOwners, fetchExpenses, fetchOwnerTransactions, fetchRepairs, fetchTransfers, fetchNotifications, fetchUsers, fetchExchangeRate]);
 
   // A burst of broadcasts in quick succession (e.g. a multi-item refund, a batch
   // transfer looping individual broadcast() calls) used to fire one full parallel fetch
@@ -810,7 +782,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       // refetchAll() here used to also fetch users/suppliers/invoices/bonuses/transfers/
       // repairs/expenses/ownerTransactions/notifications/auditLogs on every single sale,
       // none of which a sale touches.
-      await Promise.all([fetchSales(), fetchDevices(), fetchStores(), fetchOwners()]);
+      await Promise.all([fetchSales(), useDevicesStore.getState().fetchDevices(), fetchStores(), fetchOwners()]);
       return { success: true, receiptNumber: sale.receiptNumber };
     } catch (err) {
       return { success: false, message: errorMessage(err, 'Не удалось выполнить продажу') };
@@ -864,7 +836,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       });
       // Same scoped set as SALE_COMPLETED/REFUND_PROCESSED (tasksForRealtimeEvent) — an
       // exchange only touches sales/devices/stores/owners.
-      await Promise.all([fetchSales(), fetchDevices(), fetchStores(), fetchOwners()]);
+      await Promise.all([fetchSales(), useDevicesStore.getState().fetchDevices(), fetchStores(), fetchOwners()]);
       return { success: true };
     } catch (err) {
       return { success: false, message: errorMessage(err, 'Не удалось выполнить обмен') };
@@ -879,7 +851,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       });
       // Same scoped set as SALE_COMPLETED (tasksForRealtimeEvent) — a refund only touches
       // sales/devices/stores/owners.
-      await Promise.all([fetchSales(), fetchDevices(), fetchStores(), fetchOwners()]);
+      await Promise.all([fetchSales(), useDevicesStore.getState().fetchDevices(), fetchStores(), fetchOwners()]);
       return { success: true };
     } catch (err) {
       return { success: false, message: errorMessage(err, 'Не удалось выполнить возврат') };
@@ -895,7 +867,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       });
       // Mirrors INVENTORY_UPDATE's task list (tasksForRealtimeEvent) — a purchase only
       // touches devices/suppliers/invoices/bonuses, not the whole app.
-      await Promise.all([fetchDevices(), fetchSuppliers(), fetchInvoices(), fetchBonuses()]);
+      await Promise.all([useDevicesStore.getState().fetchDevices(), fetchSuppliers(), fetchInvoices(), fetchBonuses()]);
       return { success: true };
     } catch (err) {
       return { success: false, message: errorMessage(err, 'Не удалось создать приход') };
@@ -916,7 +888,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     try {
       await apiClient(`/suppliers/${id}`, { method: 'PUT', body: JSON.stringify(data) });
       // Mirrors INVENTORY_UPDATE's task list (tasksForRealtimeEvent).
-      await Promise.all([fetchDevices(), fetchSuppliers(), fetchInvoices(), fetchBonuses()]);
+      await Promise.all([useDevicesStore.getState().fetchDevices(), fetchSuppliers(), fetchInvoices(), fetchBonuses()]);
       return { success: true };
     } catch (err) {
       return { success: false, message: errorMessage(err, 'Не удалось обновить поставщика') };
@@ -926,7 +898,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const deleteSupplier: AppContextType['deleteSupplier'] = async (id) => {
     try {
       await apiClient(`/suppliers/${id}`, { method: 'DELETE' });
-      await Promise.all([fetchDevices(), fetchSuppliers(), fetchInvoices(), fetchBonuses()]);
+      await Promise.all([useDevicesStore.getState().fetchDevices(), fetchSuppliers(), fetchInvoices(), fetchBonuses()]);
       return { success: true };
     } catch (err) {
       return { success: false, message: errorMessage(err, 'Не удалось удалить поставщика') };
@@ -936,7 +908,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const updateSupplierInvoice: AppContextType['updateSupplierInvoice'] = async (id, data) => {
     try {
       await apiClient(`/supplier-invoices/${id}`, { method: 'PUT', body: JSON.stringify(data) });
-      await Promise.all([fetchDevices(), fetchSuppliers(), fetchInvoices(), fetchBonuses()]);
+      await Promise.all([useDevicesStore.getState().fetchDevices(), fetchSuppliers(), fetchInvoices(), fetchBonuses()]);
       return { success: true };
     } catch (err) {
       return { success: false, message: errorMessage(err, 'Не удалось обновить накладную') };
@@ -946,7 +918,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const deleteSupplierInvoice: AppContextType['deleteSupplierInvoice'] = async (id) => {
     try {
       await apiClient(`/supplier-invoices/${id}`, { method: 'DELETE' });
-      await Promise.all([fetchDevices(), fetchSuppliers(), fetchInvoices(), fetchBonuses()]);
+      await Promise.all([useDevicesStore.getState().fetchDevices(), fetchSuppliers(), fetchInvoices(), fetchBonuses()]);
       return { success: true };
     } catch (err) {
       return { success: false, message: errorMessage(err, 'Не удалось удалить накладную') };
@@ -955,7 +927,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Bonuses only touch bonuses/devices(FREE_DEVICES)/owners(CASH_DISCOUNT) — refetching
   // every module in the app (refetchAll) after each save was why this felt slow.
-  const refetchAfterBonusChange = () => Promise.all([fetchBonuses(), fetchDevices(), fetchOwners()]);
+  const refetchAfterBonusChange = () => Promise.all([fetchBonuses(), useDevicesStore.getState().fetchDevices(), fetchOwners()]);
 
   const createSupplierBonus: AppContextType['createSupplierBonus'] = async ({ supplierId, campaignTitle, bonusType, amountUsd, freeDevices, destinationLocationId }) => {
     try {
@@ -1010,7 +982,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         body: JSON.stringify({ fromStoreId: fromLocId, toStoreId: toLocationId, deviceIds }),
       });
       // Mirrors TRANSFER_UPDATED's task list (tasksForRealtimeEvent).
-      await Promise.all([fetchTransfers(), fetchDevices()]);
+      await Promise.all([fetchTransfers(), useDevicesStore.getState().fetchDevices()]);
       return { success: true };
     } catch (err) {
       return { success: false, message: errorMessage(err, 'Не удалось создать перемещение') };
@@ -1020,7 +992,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const approveTransfer: AppContextType['approveTransfer'] = async (transferId) => {
     try {
       await apiClient(`/transfers/${transferId}/approve`, { method: 'POST' });
-      await Promise.all([fetchTransfers(), fetchDevices()]);
+      await Promise.all([fetchTransfers(), useDevicesStore.getState().fetchDevices()]);
       return { success: true };
     } catch (err) {
       return { success: false, message: errorMessage(err, 'Не удалось подтвердить перемещение') };
@@ -1030,7 +1002,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const rejectTransfer: AppContextType['rejectTransfer'] = async (transferId, reason) => {
     try {
       await apiClient(`/transfers/${transferId}/reject`, { method: 'POST', body: JSON.stringify({ reason }) });
-      await Promise.all([fetchTransfers(), fetchDevices()]);
+      await Promise.all([fetchTransfers(), useDevicesStore.getState().fetchDevices()]);
       return { success: true };
     } catch (err) {
       return { success: false, message: errorMessage(err, 'Не удалось отклонить перемещение') };
