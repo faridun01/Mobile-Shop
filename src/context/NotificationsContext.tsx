@@ -3,6 +3,7 @@ import { NotificationItem } from '../types';
 import { useAuthStore } from '../stores/useAuthStore';
 import { apiClient } from '../api/client';
 import { mapNotification } from '../api/mappers';
+import { useSharedState } from '../hooks/useSharedState';
 
 interface NotificationsContextType {
   notifications: NotificationItem[];
@@ -14,6 +15,7 @@ interface NotificationsContextType {
 }
 
 const NotificationsContext = createContext<NotificationsContextType | undefined>(undefined);
+const NotificationsActionsContext = createContext<Pick<NotificationsContextType, 'fetchNotifications'> | undefined>(undefined);
 
 /**
  * Split out of AppContext (performance audit, P0-2): notifications update on every
@@ -30,7 +32,7 @@ const NotificationsContext = createContext<NotificationsContextType | undefined>
 export const NotificationsProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const authUser = useAuthStore((s) => s.currentUser);
   const authToken = useAuthStore((s) => s.token);
-  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
+  const [notifications, setNotifications] = useSharedState<NotificationItem[]>([]);
 
   const fetchNotifications = useCallback(async () => {
     const raw = await apiClient<any[]>('/notifications');
@@ -72,8 +74,15 @@ export const NotificationsProvider: React.FC<{ children: React.ReactNode }> = ({
     resolveNotification,
   }), [notifications, fetchNotifications, markNotificationRead, markAllNotificationsAsRead, resolveNotification]);
 
-  return <NotificationsContext.Provider value={value}>{children}</NotificationsContext.Provider>;
+  const actions = useMemo(() => ({ fetchNotifications }), [fetchNotifications]);
+  return <NotificationsActionsContext.Provider value={actions}><NotificationsContext.Provider value={value}>{children}</NotificationsContext.Provider></NotificationsActionsContext.Provider>;
 };
+
+export function useNotificationsActions() {
+  const value = useContext(NotificationsActionsContext);
+  if (!value) throw new Error('useNotificationsActions must be used within NotificationsProvider');
+  return value;
+}
 
 export function useNotifications(): NotificationsContextType {
   const ctx = useContext(NotificationsContext);

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useApp } from '../../context/AppContext';
+import { useAppFields } from '../../context/AppContext';
 import { DollarSign, Clock } from 'lucide-react';
 import { Dialog } from '../ui/Dialog';
 import { Button } from '../ui/Button';
@@ -12,7 +12,7 @@ interface DailyRateModalProps {
 }
 
 export const DailyRateModal: React.FC<DailyRateModalProps> = ({ isOpen, onClose }) => {
-  const { todayRate, setDailyRate, currentUser } = useApp();
+  const { todayRate, setDailyRate, currentUser } = useAppFields('todayRate', 'setDailyRate', 'currentUser');
   const todayStr = getBusinessDateKey();
   const isRateSetForToday = todayRate && todayRate.date === todayStr && todayRate.rate > 0;
   // Only ADMIN/PARTNER can actually set the rate (server-enforced) — a SELLER can't act

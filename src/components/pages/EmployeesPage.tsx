@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { useApp } from '../../context/AppContext';
+import { useAppFields } from '../../context/AppContext';
 import { User, Role } from '../../types';
 import {
   Users,
@@ -42,7 +42,7 @@ export const EmployeesPage: React.FC = () => {
     updateUser,
     deleteUser,
     createExpense
-  } = useApp();
+  } = useAppFields('currentUser', 'users', 'stores', 'expenses', 'fetchExpensesRange', 'sales', 'fetchSalesRange', 'todayRate', 'createUser', 'updateUser', 'deleteUser', 'createExpense');
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);

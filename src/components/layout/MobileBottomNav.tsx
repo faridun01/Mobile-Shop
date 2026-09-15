@@ -1,6 +1,6 @@
 import React from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { useApp } from '../../context/AppContext';
+import { useAppFields } from '../../context/AppContext';
 import { useNotifications } from '../../context/NotificationsContext';
 import { PageId } from '../../types';
 import {
@@ -38,7 +38,7 @@ export const MobileBottomNav: React.FC = () => {
     currentUser,
     setActivePage,
     setDrawerOpen
-  } = useApp();
+  } = useAppFields('currentUser', 'setActivePage', 'setDrawerOpen');
   const { notifications } = useNotifications();
 
   const userRole = currentUser?.role || 'SELLER';

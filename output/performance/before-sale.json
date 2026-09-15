@@ -1,0 +1,2383 @@
+{
+  "base": "http://127.0.0.1:4173",
+  "scenario": "sale",
+  "profile": false,
+  "cpuSlowdown": 4,
+  "latencyMs": 150,
+  "downloadKBps": 200,
+  "runs": [
+    {
+      "run": 0,
+      "fcp": 2344,
+      "lcp": 3036,
+      "cls": 0.00010328423233288353,
+      "observedBlockingTime": 99,
+      "heapBytes": 10000000,
+      "resources": [
+        {
+          "url": "https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap",
+          "transferSize": 1244,
+          "encodedBodySize": 944,
+          "decodedBodySize": 18304,
+          "duration": 416.69999998807907
+        },
+        {
+          "url": "http://127.0.0.1:4173/assets/index-BN84jUK3.js",
+          "transferSize": 79899,
+          "encodedBodySize": 79599,
+          "decodedBodySize": 267410,
+          "duration": 788.7000000476837
+        },
+        {
+          "url": "http://127.0.0.1:4173/assets/vendor-react-C6LsRsQd.js",
+          "transferSize": 17800,
+          "encodedBodySize": 17500,
+          "decodedBodySize": 49551,
+          "duration": 471.19999998807907
+        },
+        {
+          "url": "http://127.0.0.1:4173/assets/vendor-icons-C26xjxdi.js",
+          "transferSize": 8668,
+          "encodedBodySize": 8368,
+          "decodedBodySize": 40794,
+          "duration": 343.89999997615814
+        },
+        {
+          "url": "http://127.0.0.1:4173/assets/index-BprzRpwP.css",
+          "transferSize": 12430,
+          "encodedBodySize": 12130,
+          "decodedBodySize": 72238,
+          "duration": 438
+        },
+        {
+          "url": "http://127.0.0.1:4173/registerSW.js",
+          "transferSize": 425,
+          "encodedBodySize": 125,
+          "decodedBodySize": 134,
+          "duration": 189.60000002384186
+        },
+        {
+          "url": "http://127.0.0.1:4173/assets/SalePage-0czei6O9.js",
+          "transferSize": 0,
+          "encodedBodySize": 5225,
+          "decodedBodySize": 14827,
+          "duration": 1.100000023841858
+        },
+        {
+          "url": "http://127.0.0.1:4173/assets/Badge-CZwih2JV.js",
+          "transferSize": 0,
+          "encodedBodySize": 1382,
+          "decodedBodySize": 3548,
+          "duration": 0.9000000357627869
+        },
+        {
+          "url": "http://127.0.0.1:4173/assets/FilterPillGroup-CN4vsekE.js",
+          "transferSize": 0,
+          "encodedBodySize": 360,
+          "decodedBodySize": 536,
+          "duration": 1.199999988079071
+        },
+        {
+          "url": "http://127.0.0.1:4173/assets/EmptyState-6bjMOYgI.js",
+          "transferSize": 0,
+          "encodedBodySize": 308,
+          "decodedBodySize": 498,
+          "duration": 0.800000011920929
+        },
+        {
+          "url": "http://127.0.0.1:4173/assets/StatusBanner-BN5t81Ju.js",
+          "transferSize": 0,
+          "encodedBodySize": 696,
+          "decodedBodySize": 1334,
+          "duration": 1
+        },
+        {
+          "url": "http://127.0.0.1:4173/assets/ConfirmDialog-fFKwud14.js",
+          "transferSize": 0,
+          "encodedBodySize": 493,
+          "decodedBodySize": 832,
+          "duration": 1.4000000357627869
+        },
+        {
+          "url": "http://127.0.0.1:4173/assets/sound-CIOPipKE.js",
+          "transferSize": 0,
+          "encodedBodySize": 492,
+          "decodedBodySize": 1228,
+          "duration": 0.8999999761581421
+        },
+        {
+          "url": "http://127.0.0.1:4173/api/users",
+          "transferSize": 439,
+          "encodedBodySize": 139,
+          "decodedBodySize": 143,
+          "duration": 183.10000002384186
+        },
+        {
+          "url": "http://127.0.0.1:4173/api/stores",
+          "transferSize": 410,
+          "encodedBodySize": 110,
+          "decodedBodySize": 98,
+          "duration": 180.5
+        },
+        {
+          "url": "http://127.0.0.1:4173/api/devices?excludeSold=true",
+          "transferSize": 19138,
+          "encodedBodySize": 18838,
+          "decodedBodySize": 756053,
+          "duration": 299.80000001192093
+        },
+        {
+          "url": "http://127.0.0.1:4173/api/exchange-rate/today",
+          "transferSize": 400,
+          "encodedBodySize": 100,
+          "decodedBodySize": 101,
+          "duration": 180.5
+        },
+        {
+          "url": "http://127.0.0.1:4173/api/notifications",
+          "transferSize": 322,
+          "encodedBodySize": 22,
+          "decodedBodySize": 2,
+          "duration": 194.5
+        },
+        {
+          "url": "http://127.0.0.1:4173/api/sales?limit=500",
+          "transferSize": 9090,
+          "encodedBodySize": 8790,
+          "decodedBodySize": 506175,
+          "duration": 307.39999997615814
+        },
+        {
+          "url": "http://127.0.0.1:4173/api/transfers?limit=500",
+          "transferSize": 322,
+          "encodedBodySize": 22,
+          "decodedBodySize": 2,
+          "duration": 179.69999998807907
+        },
+        {
+          "url": "http://127.0.0.1:4173/api/repairs?limit=500",
+          "transferSize": 4034,
+          "encodedBodySize": 3734,
+          "decodedBodySize": 243785,
+          "duration": 253.5
+        },
+        {
+          "url": "http://127.0.0.1:4173/api/expenses?limit=500",
+          "transferSize": 6536,
+          "encodedBodySize": 6236,
+          "decodedBodySize": 170675,
+          "duration": 283.0999999642372
+        },
+        {
+          "url": "http://127.0.0.1:4173/api/suppliers",
+          "transferSize": 322,
+          "encodedBodySize": 22,
+          "decodedBodySize": 2,
+          "duration": 202.5
+        },
+        {
+          "url": "http://127.0.0.1:4173/api/supplier-invoices?limit=500",
+          "transferSize": 322,
+          "encodedBodySize": 22,
+          "decodedBodySize": 2,
+          "duration": 199.30000001192093
+        },
+        {
+          "url": "http://127.0.0.1:4173/api/supplier-bonuses?limit=500",
+          "transferSize": 322,
+          "encodedBodySize": 22,
+          "decodedBodySize": 2,
+          "duration": 337.60000002384186
+        },
+        {
+          "url": "http://127.0.0.1:4173/api/owners",
+          "transferSize": 322,
+          "encodedBodySize": 22,
+          "decodedBodySize": 2,
+          "duration": 351.69999998807907
+        },
+        {
+          "url": "http://127.0.0.1:4173/api/owner-transactions?limit=2000",
+          "transferSize": 322,
+          "encodedBodySize": 22,
+          "decodedBodySize": 2,
+          "duration": 364.19999998807907
+        },
+        {
+          "url": "http://127.0.0.1:4173/api/notifications",
+          "transferSize": 322,
+          "encodedBodySize": 22,
+          "decodedBodySize": 2,
+          "duration": 409.0999999642372
+        },
+        {
+          "url": "http://127.0.0.1:4173/api/audit-logs",
+          "transferSize": 322,
+          "encodedBodySize": 22,
+          "decodedBodySize": 2,
+          "duration": 436.30000001192093
+        }
+      ],
+      "labInp": 96,
+      "initialRequestCount": 71,
+      "initialApiRequests": [
+        "/api/users",
+        "/api/stores",
+        "/api/devices?excludeSold=true",
+        "/api/exchange-rate/today",
+        "/api/notifications",
+        "/api/sales?limit=500",
+        "/api/transfers?limit=500",
+        "/api/repairs?limit=500",
+        "/api/expenses?limit=500",
+        "/api/suppliers",
+        "/api/supplier-invoices?limit=500",
+        "/api/supplier-bonuses?limit=500",
+        "/api/owners",
+        "/api/owner-transactions?limit=2000",
+        "/api/notifications",
+        "/api/audit-logs"
+      ],
+      "initialRenderCounts": null,
+      "notificationRenders": {},
+      "repeatedDataRenders": {},
+      "requests": [
+        {
+          "url": "http://127.0.0.1:4173/sale",
+          "method": "GET",
+          "type": "document",
+          "worker": false
+        },
+        {
+          "url": "https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap",
+          "method": "GET",
+          "type": "stylesheet",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4173/assets/index-BN84jUK3.js",
+          "method": "GET",
+          "type": "script",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4173/assets/vendor-react-C6LsRsQd.js",
+          "method": "GET",
+          "type": "script",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4173/assets/vendor-icons-C26xjxdi.js",
+          "method": "GET",
+          "type": "script",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4173/assets/index-BprzRpwP.css",
+          "method": "GET",
+          "type": "stylesheet",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4173/registerSW.js",
+          "method": "GET",
+          "type": "script",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4173/sw.js",
+          "method": "GET",
+          "type": "script",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4173/workbox-948e45c5.js",
+          "method": "GET",
+          "type": "other",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4173/registerSW.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4173/pwa-512x512.png",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4173/pwa-192x192.png",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4173/maskable-icon-512x512.png",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4173/index.html",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4173/favicon.svg",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4173/favicon.png",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4173/apple-touch-icon.png",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4173/assets/vendor-react-C6LsRsQd.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4173/assets/vendor-icons-C26xjxdi.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4173/assets/TransferPage-Dd6V-2v5.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4173/assets/SuppliersPage-C8Mkg-vJ.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4173/assets/StatusBanner-BN5t81Ju.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4173/assets/StatCard-Ct-4g5xn.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4173/assets/sound-CIOPipKE.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4173/assets/SettingsPage-02Bog_tM.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4173/assets/SalesHistoryPage-D3aoJPTy.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4173/assets/SalePage-0czei6O9.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4173/assets/ReportsPage-9PoWEPQ5.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4173/assets/RepairPage-Bib_nWte.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4173/assets/PurchasePage-DFX3-6rC.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4173/assets/OwnersPage-Bqrzf7jp.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4173/assets/NotificationsPage-Divr1nXM.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4173/assets/MonthPicker-BODf1lIY.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4173/assets/LoginPage-CmLx2YGz.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4173/assets/InventoryPage-CKn52sKR.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4173/assets/index-BprzRpwP.css",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4173/assets/index-BN84jUK3.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4173/assets/FilterPillGroup-CN4vsekE.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4173/assets/exportReports-CfTkJ4Pg.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4173/assets/ExpensesPage-C1ARWoF9.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4173/assets/ExchangePage-CWZSS0Ni.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4173/assets/EmptyState-6bjMOYgI.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4173/assets/EmployeesPage-ZP7nO9ed.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4173/assets/ConfirmDialog-fFKwud14.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4173/assets/BonusesPage-CVRrBkIi.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4173/assets/Badge-CZwih2JV.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4173/assets/AuditLogPage-Dthzs6w9.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4173/manifest.webmanifest",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4173/assets/SalePage-0czei6O9.js",
+          "method": "GET",
+          "type": "script",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4173/assets/Badge-CZwih2JV.js",
+          "method": "GET",
+          "type": "script",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4173/assets/FilterPillGroup-CN4vsekE.js",
+          "method": "GET",
+          "type": "script",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4173/assets/EmptyState-6bjMOYgI.js",
+          "method": "GET",
+          "type": "script",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4173/assets/StatusBanner-BN5t81Ju.js",
+          "method": "GET",
+          "type": "script",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4173/assets/ConfirmDialog-fFKwud14.js",
+          "method": "GET",
+          "type": "script",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4173/assets/sound-CIOPipKE.js",
+          "method": "GET",
+          "type": "script",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4173/api/users",
+          "method": "GET",
+          "type": "fetch",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4173/api/stores",
+          "method": "GET",
+          "type": "fetch",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4173/api/devices?excludeSold=true",
+          "method": "GET",
+          "type": "fetch",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4173/api/exchange-rate/today",
+          "method": "GET",
+          "type": "fetch",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4173/api/notifications",
+          "method": "GET",
+          "type": "fetch",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4173/api/sales?limit=500",
+          "method": "GET",
+          "type": "fetch",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4173/api/transfers?limit=500",
+          "method": "GET",
+          "type": "fetch",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4173/api/repairs?limit=500",
+          "method": "GET",
+          "type": "fetch",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4173/api/expenses?limit=500",
+          "method": "GET",
+          "type": "fetch",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4173/api/suppliers",
+          "method": "GET",
+          "type": "fetch",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4173/api/supplier-invoices?limit=500",
+          "method": "GET",
+          "type": "fetch",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4173/api/supplier-bonuses?limit=500",
+          "method": "GET",
+          "type": "fetch",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4173/api/owners",
+          "method": "GET",
+          "type": "fetch",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4173/api/owner-transactions?limit=2000",
+          "method": "GET",
+          "type": "fetch",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4173/api/notifications",
+          "method": "GET",
+          "type": "fetch",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4173/api/audit-logs",
+          "method": "GET",
+          "type": "fetch",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4173/api/notifications",
+          "method": "GET",
+          "type": "fetch",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4173/api/sales?limit=500",
+          "method": "GET",
+          "type": "fetch",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4173/api/devices?excludeSold=true",
+          "method": "GET",
+          "type": "fetch",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4173/api/stores",
+          "method": "GET",
+          "type": "fetch",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4173/api/owners",
+          "method": "GET",
+          "type": "fetch",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4173/api/sales?limit=500",
+          "method": "GET",
+          "type": "fetch",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4173/api/devices?excludeSold=true",
+          "method": "GET",
+          "type": "fetch",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4173/api/stores",
+          "method": "GET",
+          "type": "fetch",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4173/api/owners",
+          "method": "GET",
+          "type": "fetch",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4173/api/sales?limit=500",
+          "method": "GET",
+          "type": "fetch",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4173/api/devices?excludeSold=true",
+          "method": "GET",
+          "type": "fetch",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4173/api/stores",
+          "method": "GET",
+          "type": "fetch",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4173/api/owners",
+          "method": "GET",
+          "type": "fetch",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4173/api/sales?limit=500",
+          "method": "GET",
+          "type": "fetch",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4173/api/devices?excludeSold=true",
+          "method": "GET",
+          "type": "fetch",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4173/api/stores",
+          "method": "GET",
+          "type": "fetch",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4173/api/owners",
+          "method": "GET",
+          "type": "fetch",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4173/api/sales?limit=500",
+          "method": "GET",
+          "type": "fetch",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4173/api/devices?excludeSold=true",
+          "method": "GET",
+          "type": "fetch",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4173/api/stores",
+          "method": "GET",
+          "type": "fetch",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4173/api/owners",
+          "method": "GET",
+          "type": "fetch",
+          "worker": false
+        }
+      ],
+      "errors": []
+    },
+    {
+      "run": 1,
+      "fcp": 2284,
+      "lcp": 2736,
+      "cls": 0.00010328423233288353,
+      "observedBlockingTime": 297,
+      "heapBytes": 10000000,
+      "resources": [
+        {
+          "url": "https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap",
+          "transferSize": 1244,
+          "encodedBodySize": 944,
+          "decodedBodySize": 18304,
+          "duration": 889
+        },
+        {
+          "url": "http://127.0.0.1:4173/assets/index-BN84jUK3.js",
+          "transferSize": 79899,
+          "encodedBodySize": 79599,
+          "decodedBodySize": 267410,
+          "duration": 781.5
+        },
+        {
+          "url": "http://127.0.0.1:4173/assets/vendor-react-C6LsRsQd.js",
+          "transferSize": 17800,
+          "encodedBodySize": 17500,
+          "decodedBodySize": 49551,
+          "duration": 460.4000000357628
+        },
+        {
+          "url": "http://127.0.0.1:4173/assets/vendor-icons-C26xjxdi.js",
+          "transferSize": 8668,
+          "encodedBodySize": 8368,
+          "decodedBodySize": 40794,
+          "duration": 334.5
+        },
+        {
+          "url": "http://127.0.0.1:4173/assets/index-BprzRpwP.css",
+          "transferSize": 12430,
+          "encodedBodySize": 12130,
+          "decodedBodySize": 72238,
+          "duration": 406.39999997615814
+        },
+        {
+          "url": "http://127.0.0.1:4173/registerSW.js",
+          "transferSize": 425,
+          "encodedBodySize": 125,
+          "decodedBodySize": 134,
+          "duration": 183.60000002384186
+        },
+        {
+          "url": "http://127.0.0.1:4173/assets/SalePage-0czei6O9.js",
+          "transferSize": 0,
+          "encodedBodySize": 5225,
+          "decodedBodySize": 14827,
+          "duration": 1.2000000476837158
+        },
+        {
+          "url": "http://127.0.0.1:4173/assets/Badge-CZwih2JV.js",
+          "transferSize": 1682,
+          "encodedBodySize": 1382,
+          "decodedBodySize": 3548,
+          "duration": 170.80000001192093
+        },
+        {
+          "url": "http://127.0.0.1:4173/assets/FilterPillGroup-CN4vsekE.js",
+          "transferSize": 0,
+          "encodedBodySize": 360,
+          "decodedBodySize": 536,
+          "duration": 1.5
+        },
+        {
+          "url": "http://127.0.0.1:4173/assets/EmptyState-6bjMOYgI.js",
+          "transferSize": 0,
+          "encodedBodySize": 308,
+          "decodedBodySize": 498,
+          "duration": 1.300000011920929
+        },
+        {
+          "url": "http://127.0.0.1:4173/assets/StatusBanner-BN5t81Ju.js",
+          "transferSize": 0,
+          "encodedBodySize": 696,
+          "decodedBodySize": 1334,
+          "duration": 1.100000023841858
+        },
+        {
+          "url": "http://127.0.0.1:4173/assets/ConfirmDialog-fFKwud14.js",
+          "transferSize": 0,
+          "encodedBodySize": 493,
+          "decodedBodySize": 832,
+          "duration": 1.199999988079071
+        },
+        {
+          "url": "http://127.0.0.1:4173/assets/sound-CIOPipKE.js",
+          "transferSize": 0,
+          "encodedBodySize": 492,
+          "decodedBodySize": 1228,
+          "duration": 1.5
+        },
+        {
+          "url": "http://127.0.0.1:4173/api/users",
+          "transferSize": 439,
+          "encodedBodySize": 139,
+          "decodedBodySize": 143,
+          "duration": 182.20000004768372
+        },
+        {
+          "url": "http://127.0.0.1:4173/api/stores",
+          "transferSize": 410,
+          "encodedBodySize": 110,
+          "decodedBodySize": 98,
+          "duration": 177.4000000357628
+        },
+        {
+          "url": "http://127.0.0.1:4173/api/devices?excludeSold=true",
+          "transferSize": 19138,
+          "encodedBodySize": 18838,
+          "decodedBodySize": 756053,
+          "duration": 296.89999997615814
+        },
+        {
+          "url": "http://127.0.0.1:4173/api/exchange-rate/today",
+          "transferSize": 400,
+          "encodedBodySize": 100,
+          "decodedBodySize": 101,
+          "duration": 180.5
+        },
+        {
+          "url": "http://127.0.0.1:4173/api/notifications",
+          "transferSize": 427,
+          "encodedBodySize": 127,
+          "decodedBodySize": 132,
+          "duration": 187.30000001192093
+        },
+        {
+          "url": "http://127.0.0.1:4173/api/sales?limit=500",
+          "transferSize": 9090,
+          "encodedBodySize": 8790,
+          "decodedBodySize": 506175,
+          "duration": 287
+        },
+        {
+          "url": "http://127.0.0.1:4173/api/transfers?limit=500",
+          "transferSize": 322,
+          "encodedBodySize": 22,
+          "decodedBodySize": 2,
+          "duration": 171.89999997615814
+        },
+        {
+          "url": "http://127.0.0.1:4173/api/repairs?limit=500",
+          "transferSize": 4034,
+          "encodedBodySize": 3734,
+          "decodedBodySize": 243785,
+          "duration": 224.30000001192093
+        },
+        {
+          "url": "http://127.0.0.1:4173/api/expenses?limit=500",
+          "transferSize": 6536,
+          "encodedBodySize": 6236,
+          "decodedBodySize": 170675,
+          "duration": 262.30000001192093
+        },
+        {
+          "url": "http://127.0.0.1:4173/api/suppliers",
+          "transferSize": 322,
+          "encodedBodySize": 22,
+          "decodedBodySize": 2,
+          "duration": 182
+        },
+        {
+          "url": "http://127.0.0.1:4173/api/supplier-invoices?limit=500",
+          "transferSize": 322,
+          "encodedBodySize": 22,
+          "decodedBodySize": 2,
+          "duration": 191.19999998807907
+        },
+        {
+          "url": "http://127.0.0.1:4173/api/supplier-bonuses?limit=500",
+          "transferSize": 322,
+          "encodedBodySize": 22,
+          "decodedBodySize": 2,
+          "duration": 257.9000000357628
+        },
+        {
+          "url": "http://127.0.0.1:4173/api/owners",
+          "transferSize": 322,
+          "encodedBodySize": 22,
+          "decodedBodySize": 2,
+          "duration": 281.5
+        },
+        {
+          "url": "http://127.0.0.1:4173/api/owner-transactions?limit=2000",
+          "transferSize": 322,
+          "encodedBodySize": 22,
+          "decodedBodySize": 2,
+          "duration": 283.5
+        },
+        {
+          "url": "http://127.0.0.1:4173/api/notifications",
+          "transferSize": 427,
+          "encodedBodySize": 127,
+          "decodedBodySize": 132,
+          "duration": 298.19999998807907
+        },
+        {
+          "url": "http://127.0.0.1:4173/api/audit-logs",
+          "transferSize": 322,
+          "encodedBodySize": 22,
+          "decodedBodySize": 2,
+          "duration": 326.5999999642372
+        }
+      ],
+      "labInp": 88,
+      "initialRequestCount": 71,
+      "initialApiRequests": [
+        "/api/users",
+        "/api/stores",
+        "/api/devices?excludeSold=true",
+        "/api/exchange-rate/today",
+        "/api/notifications",
+        "/api/sales?limit=500",
+        "/api/transfers?limit=500",
+        "/api/repairs?limit=500",
+        "/api/expenses?limit=500",
+        "/api/suppliers",
+        "/api/supplier-invoices?limit=500",
+        "/api/supplier-bonuses?limit=500",
+        "/api/owners",
+        "/api/owner-transactions?limit=2000",
+        "/api/notifications",
+        "/api/audit-logs"
+      ],
+      "initialRenderCounts": null,
+      "notificationRenders": {},
+      "repeatedDataRenders": {},
+      "requests": [
+        {
+          "url": "http://127.0.0.1:4173/sale",
+          "method": "GET",
+          "type": "document",
+          "worker": false
+        },
+        {
+          "url": "https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap",
+          "method": "GET",
+          "type": "stylesheet",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4173/assets/index-BN84jUK3.js",
+          "method": "GET",
+          "type": "script",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4173/assets/vendor-react-C6LsRsQd.js",
+          "method": "GET",
+          "type": "script",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4173/assets/vendor-icons-C26xjxdi.js",
+          "method": "GET",
+          "type": "script",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4173/assets/index-BprzRpwP.css",
+          "method": "GET",
+          "type": "stylesheet",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4173/registerSW.js",
+          "method": "GET",
+          "type": "script",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4173/sw.js",
+          "method": "GET",
+          "type": "script",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4173/workbox-948e45c5.js",
+          "method": "GET",
+          "type": "other",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4173/registerSW.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4173/pwa-512x512.png",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4173/pwa-192x192.png",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4173/maskable-icon-512x512.png",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4173/index.html",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4173/favicon.svg",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4173/favicon.png",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4173/apple-touch-icon.png",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4173/assets/vendor-react-C6LsRsQd.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4173/assets/vendor-icons-C26xjxdi.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4173/assets/TransferPage-Dd6V-2v5.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4173/assets/SuppliersPage-C8Mkg-vJ.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4173/assets/StatusBanner-BN5t81Ju.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4173/assets/StatCard-Ct-4g5xn.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4173/assets/sound-CIOPipKE.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4173/assets/SettingsPage-02Bog_tM.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4173/assets/SalesHistoryPage-D3aoJPTy.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4173/assets/SalePage-0czei6O9.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4173/assets/ReportsPage-9PoWEPQ5.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4173/assets/RepairPage-Bib_nWte.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4173/assets/PurchasePage-DFX3-6rC.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4173/assets/OwnersPage-Bqrzf7jp.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4173/assets/NotificationsPage-Divr1nXM.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4173/assets/MonthPicker-BODf1lIY.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4173/assets/LoginPage-CmLx2YGz.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4173/assets/InventoryPage-CKn52sKR.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4173/assets/index-BprzRpwP.css",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4173/assets/index-BN84jUK3.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4173/assets/FilterPillGroup-CN4vsekE.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4173/assets/exportReports-CfTkJ4Pg.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4173/assets/ExpensesPage-C1ARWoF9.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4173/assets/ExchangePage-CWZSS0Ni.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4173/assets/EmptyState-6bjMOYgI.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4173/assets/EmployeesPage-ZP7nO9ed.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4173/assets/ConfirmDialog-fFKwud14.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4173/assets/BonusesPage-CVRrBkIi.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4173/assets/Badge-CZwih2JV.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4173/assets/AuditLogPage-Dthzs6w9.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4173/manifest.webmanifest",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4173/assets/SalePage-0czei6O9.js",
+          "method": "GET",
+          "type": "script",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4173/assets/Badge-CZwih2JV.js",
+          "method": "GET",
+          "type": "script",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4173/assets/FilterPillGroup-CN4vsekE.js",
+          "method": "GET",
+          "type": "script",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4173/assets/EmptyState-6bjMOYgI.js",
+          "method": "GET",
+          "type": "script",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4173/assets/StatusBanner-BN5t81Ju.js",
+          "method": "GET",
+          "type": "script",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4173/assets/ConfirmDialog-fFKwud14.js",
+          "method": "GET",
+          "type": "script",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4173/assets/sound-CIOPipKE.js",
+          "method": "GET",
+          "type": "script",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4173/api/users",
+          "method": "GET",
+          "type": "fetch",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4173/api/stores",
+          "method": "GET",
+          "type": "fetch",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4173/api/devices?excludeSold=true",
+          "method": "GET",
+          "type": "fetch",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4173/api/exchange-rate/today",
+          "method": "GET",
+          "type": "fetch",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4173/api/notifications",
+          "method": "GET",
+          "type": "fetch",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4173/api/sales?limit=500",
+          "method": "GET",
+          "type": "fetch",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4173/api/transfers?limit=500",
+          "method": "GET",
+          "type": "fetch",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4173/api/repairs?limit=500",
+          "method": "GET",
+          "type": "fetch",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4173/api/expenses?limit=500",
+          "method": "GET",
+          "type": "fetch",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4173/api/suppliers",
+          "method": "GET",
+          "type": "fetch",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4173/api/supplier-invoices?limit=500",
+          "method": "GET",
+          "type": "fetch",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4173/api/supplier-bonuses?limit=500",
+          "method": "GET",
+          "type": "fetch",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4173/api/owners",
+          "method": "GET",
+          "type": "fetch",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4173/api/owner-transactions?limit=2000",
+          "method": "GET",
+          "type": "fetch",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4173/api/notifications",
+          "method": "GET",
+          "type": "fetch",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4173/api/audit-logs",
+          "method": "GET",
+          "type": "fetch",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4173/api/notifications",
+          "method": "GET",
+          "type": "fetch",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4173/api/sales?limit=500",
+          "method": "GET",
+          "type": "fetch",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4173/api/devices?excludeSold=true",
+          "method": "GET",
+          "type": "fetch",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4173/api/stores",
+          "method": "GET",
+          "type": "fetch",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4173/api/owners",
+          "method": "GET",
+          "type": "fetch",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4173/api/sales?limit=500",
+          "method": "GET",
+          "type": "fetch",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4173/api/devices?excludeSold=true",
+          "method": "GET",
+          "type": "fetch",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4173/api/stores",
+          "method": "GET",
+          "type": "fetch",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4173/api/owners",
+          "method": "GET",
+          "type": "fetch",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4173/api/sales?limit=500",
+          "method": "GET",
+          "type": "fetch",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4173/api/devices?excludeSold=true",
+          "method": "GET",
+          "type": "fetch",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4173/api/stores",
+          "method": "GET",
+          "type": "fetch",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4173/api/owners",
+          "method": "GET",
+          "type": "fetch",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4173/api/sales?limit=500",
+          "method": "GET",
+          "type": "fetch",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4173/api/devices?excludeSold=true",
+          "method": "GET",
+          "type": "fetch",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4173/api/stores",
+          "method": "GET",
+          "type": "fetch",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4173/api/owners",
+          "method": "GET",
+          "type": "fetch",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4173/api/sales?limit=500",
+          "method": "GET",
+          "type": "fetch",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4173/api/devices?excludeSold=true",
+          "method": "GET",
+          "type": "fetch",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4173/api/stores",
+          "method": "GET",
+          "type": "fetch",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4173/api/owners",
+          "method": "GET",
+          "type": "fetch",
+          "worker": false
+        }
+      ],
+      "errors": []
+    },
+    {
+      "run": 2,
+      "fcp": 2264,
+      "lcp": 2756,
+      "cls": 0.00010328423233288353,
+      "observedBlockingTime": 19,
+      "heapBytes": 10000000,
+      "resources": [
+        {
+          "url": "https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap",
+          "transferSize": 1244,
+          "encodedBodySize": 944,
+          "decodedBodySize": 18304,
+          "duration": 627.1999999880791
+        },
+        {
+          "url": "http://127.0.0.1:4173/assets/index-BN84jUK3.js",
+          "transferSize": 79899,
+          "encodedBodySize": 79599,
+          "decodedBodySize": 267410,
+          "duration": 785.8000000119209
+        },
+        {
+          "url": "http://127.0.0.1:4173/assets/vendor-react-C6LsRsQd.js",
+          "transferSize": 17800,
+          "encodedBodySize": 17500,
+          "decodedBodySize": 49551,
+          "duration": 464.10000002384186
+        },
+        {
+          "url": "http://127.0.0.1:4173/assets/vendor-icons-C26xjxdi.js",
+          "transferSize": 8668,
+          "encodedBodySize": 8368,
+          "decodedBodySize": 40794,
+          "duration": 333.89999997615814
+        },
+        {
+          "url": "http://127.0.0.1:4173/assets/index-BprzRpwP.css",
+          "transferSize": 12430,
+          "encodedBodySize": 12130,
+          "decodedBodySize": 72238,
+          "duration": 410
+        },
+        {
+          "url": "http://127.0.0.1:4173/registerSW.js",
+          "transferSize": 425,
+          "encodedBodySize": 125,
+          "decodedBodySize": 134,
+          "duration": 174.69999998807907
+        },
+        {
+          "url": "http://127.0.0.1:4173/assets/SalePage-0czei6O9.js",
+          "transferSize": 0,
+          "encodedBodySize": 5225,
+          "decodedBodySize": 14827,
+          "duration": 1.199999988079071
+        },
+        {
+          "url": "http://127.0.0.1:4173/assets/Badge-CZwih2JV.js",
+          "transferSize": 0,
+          "encodedBodySize": 1382,
+          "decodedBodySize": 3548,
+          "duration": 4.400000035762787
+        },
+        {
+          "url": "http://127.0.0.1:4173/assets/FilterPillGroup-CN4vsekE.js",
+          "transferSize": 0,
+          "encodedBodySize": 360,
+          "decodedBodySize": 536,
+          "duration": 7.100000023841858
+        },
+        {
+          "url": "http://127.0.0.1:4173/assets/EmptyState-6bjMOYgI.js",
+          "transferSize": 0,
+          "encodedBodySize": 308,
+          "decodedBodySize": 498,
+          "duration": 1.9000000357627869
+        },
+        {
+          "url": "http://127.0.0.1:4173/assets/StatusBanner-BN5t81Ju.js",
+          "transferSize": 0,
+          "encodedBodySize": 696,
+          "decodedBodySize": 1334,
+          "duration": 4.299999952316284
+        },
+        {
+          "url": "http://127.0.0.1:4173/assets/ConfirmDialog-fFKwud14.js",
+          "transferSize": 0,
+          "encodedBodySize": 493,
+          "decodedBodySize": 832,
+          "duration": 6.5
+        },
+        {
+          "url": "http://127.0.0.1:4173/assets/sound-CIOPipKE.js",
+          "transferSize": 0,
+          "encodedBodySize": 492,
+          "decodedBodySize": 1228,
+          "duration": 4.300000011920929
+        },
+        {
+          "url": "http://127.0.0.1:4173/api/users",
+          "transferSize": 439,
+          "encodedBodySize": 139,
+          "decodedBodySize": 143,
+          "duration": 169.10000002384186
+        },
+        {
+          "url": "http://127.0.0.1:4173/api/stores",
+          "transferSize": 410,
+          "encodedBodySize": 110,
+          "decodedBodySize": 98,
+          "duration": 179.4000000357628
+        },
+        {
+          "url": "http://127.0.0.1:4173/api/devices?excludeSold=true",
+          "transferSize": 19138,
+          "encodedBodySize": 18838,
+          "decodedBodySize": 756053,
+          "duration": 279.69999998807907
+        },
+        {
+          "url": "http://127.0.0.1:4173/api/exchange-rate/today",
+          "transferSize": 400,
+          "encodedBodySize": 100,
+          "decodedBodySize": 101,
+          "duration": 181.0999999642372
+        },
+        {
+          "url": "http://127.0.0.1:4173/api/notifications",
+          "transferSize": 427,
+          "encodedBodySize": 127,
+          "decodedBodySize": 132,
+          "duration": 179.5
+        },
+        {
+          "url": "http://127.0.0.1:4173/api/sales?limit=500",
+          "transferSize": 9090,
+          "encodedBodySize": 8790,
+          "decodedBodySize": 506175,
+          "duration": 284.5
+        },
+        {
+          "url": "http://127.0.0.1:4173/api/transfers?limit=500",
+          "transferSize": 322,
+          "encodedBodySize": 22,
+          "decodedBodySize": 2,
+          "duration": 171.5
+        },
+        {
+          "url": "http://127.0.0.1:4173/api/repairs?limit=500",
+          "transferSize": 4034,
+          "encodedBodySize": 3734,
+          "decodedBodySize": 243785,
+          "duration": 238.9000000357628
+        },
+        {
+          "url": "http://127.0.0.1:4173/api/expenses?limit=500",
+          "transferSize": 6536,
+          "encodedBodySize": 6236,
+          "decodedBodySize": 170675,
+          "duration": 260.9000000357628
+        },
+        {
+          "url": "http://127.0.0.1:4173/api/suppliers",
+          "transferSize": 322,
+          "encodedBodySize": 22,
+          "decodedBodySize": 2,
+          "duration": 196.9000000357628
+        },
+        {
+          "url": "http://127.0.0.1:4173/api/supplier-invoices?limit=500",
+          "transferSize": 322,
+          "encodedBodySize": 22,
+          "decodedBodySize": 2,
+          "duration": 193.30000001192093
+        },
+        {
+          "url": "http://127.0.0.1:4173/api/supplier-bonuses?limit=500",
+          "transferSize": 322,
+          "encodedBodySize": 22,
+          "decodedBodySize": 2,
+          "duration": 330.7000000476837
+        },
+        {
+          "url": "http://127.0.0.1:4173/api/owners",
+          "transferSize": 322,
+          "encodedBodySize": 22,
+          "decodedBodySize": 2,
+          "duration": 359.10000002384186
+        },
+        {
+          "url": "http://127.0.0.1:4173/api/owner-transactions?limit=2000",
+          "transferSize": 322,
+          "encodedBodySize": 22,
+          "decodedBodySize": 2,
+          "duration": 357.69999998807907
+        },
+        {
+          "url": "http://127.0.0.1:4173/api/notifications",
+          "transferSize": 427,
+          "encodedBodySize": 127,
+          "decodedBodySize": 132,
+          "duration": 401.80000001192093
+        },
+        {
+          "url": "http://127.0.0.1:4173/api/audit-logs",
+          "transferSize": 322,
+          "encodedBodySize": 22,
+          "decodedBodySize": 2,
+          "duration": 399.30000001192093
+        }
+      ],
+      "labInp": 136,
+      "initialRequestCount": 71,
+      "initialApiRequests": [
+        "/api/users",
+        "/api/stores",
+        "/api/devices?excludeSold=true",
+        "/api/exchange-rate/today",
+        "/api/notifications",
+        "/api/sales?limit=500",
+        "/api/transfers?limit=500",
+        "/api/repairs?limit=500",
+        "/api/expenses?limit=500",
+        "/api/suppliers",
+        "/api/supplier-invoices?limit=500",
+        "/api/supplier-bonuses?limit=500",
+        "/api/owners",
+        "/api/owner-transactions?limit=2000",
+        "/api/notifications",
+        "/api/audit-logs"
+      ],
+      "initialRenderCounts": null,
+      "notificationRenders": {},
+      "repeatedDataRenders": {},
+      "requests": [
+        {
+          "url": "http://127.0.0.1:4173/sale",
+          "method": "GET",
+          "type": "document",
+          "worker": false
+        },
+        {
+          "url": "https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap",
+          "method": "GET",
+          "type": "stylesheet",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4173/assets/index-BN84jUK3.js",
+          "method": "GET",
+          "type": "script",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4173/assets/vendor-react-C6LsRsQd.js",
+          "method": "GET",
+          "type": "script",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4173/assets/vendor-icons-C26xjxdi.js",
+          "method": "GET",
+          "type": "script",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4173/assets/index-BprzRpwP.css",
+          "method": "GET",
+          "type": "stylesheet",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4173/registerSW.js",
+          "method": "GET",
+          "type": "script",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4173/sw.js",
+          "method": "GET",
+          "type": "script",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4173/workbox-948e45c5.js",
+          "method": "GET",
+          "type": "other",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4173/registerSW.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4173/pwa-512x512.png",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4173/pwa-192x192.png",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4173/maskable-icon-512x512.png",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4173/index.html",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4173/favicon.svg",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4173/favicon.png",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4173/apple-touch-icon.png",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4173/assets/vendor-react-C6LsRsQd.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4173/assets/vendor-icons-C26xjxdi.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4173/assets/TransferPage-Dd6V-2v5.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4173/assets/SuppliersPage-C8Mkg-vJ.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4173/assets/StatusBanner-BN5t81Ju.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4173/assets/StatCard-Ct-4g5xn.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4173/assets/sound-CIOPipKE.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4173/assets/SettingsPage-02Bog_tM.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4173/assets/SalesHistoryPage-D3aoJPTy.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4173/assets/SalePage-0czei6O9.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4173/assets/ReportsPage-9PoWEPQ5.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4173/assets/RepairPage-Bib_nWte.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4173/assets/PurchasePage-DFX3-6rC.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4173/assets/OwnersPage-Bqrzf7jp.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4173/assets/NotificationsPage-Divr1nXM.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4173/assets/MonthPicker-BODf1lIY.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4173/assets/LoginPage-CmLx2YGz.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4173/assets/InventoryPage-CKn52sKR.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4173/assets/index-BprzRpwP.css",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4173/assets/index-BN84jUK3.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4173/assets/FilterPillGroup-CN4vsekE.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4173/assets/exportReports-CfTkJ4Pg.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4173/assets/ExpensesPage-C1ARWoF9.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4173/assets/ExchangePage-CWZSS0Ni.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4173/assets/EmptyState-6bjMOYgI.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4173/assets/EmployeesPage-ZP7nO9ed.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4173/assets/ConfirmDialog-fFKwud14.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4173/assets/BonusesPage-CVRrBkIi.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4173/assets/Badge-CZwih2JV.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4173/assets/AuditLogPage-Dthzs6w9.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4173/manifest.webmanifest",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4173/assets/SalePage-0czei6O9.js",
+          "method": "GET",
+          "type": "script",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4173/assets/Badge-CZwih2JV.js",
+          "method": "GET",
+          "type": "script",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4173/assets/FilterPillGroup-CN4vsekE.js",
+          "method": "GET",
+          "type": "script",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4173/assets/EmptyState-6bjMOYgI.js",
+          "method": "GET",
+          "type": "script",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4173/assets/StatusBanner-BN5t81Ju.js",
+          "method": "GET",
+          "type": "script",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4173/assets/ConfirmDialog-fFKwud14.js",
+          "method": "GET",
+          "type": "script",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4173/assets/sound-CIOPipKE.js",
+          "method": "GET",
+          "type": "script",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4173/api/users",
+          "method": "GET",
+          "type": "fetch",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4173/api/stores",
+          "method": "GET",
+          "type": "fetch",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4173/api/devices?excludeSold=true",
+          "method": "GET",
+          "type": "fetch",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4173/api/exchange-rate/today",
+          "method": "GET",
+          "type": "fetch",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4173/api/notifications",
+          "method": "GET",
+          "type": "fetch",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4173/api/sales?limit=500",
+          "method": "GET",
+          "type": "fetch",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4173/api/transfers?limit=500",
+          "method": "GET",
+          "type": "fetch",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4173/api/repairs?limit=500",
+          "method": "GET",
+          "type": "fetch",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4173/api/expenses?limit=500",
+          "method": "GET",
+          "type": "fetch",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4173/api/suppliers",
+          "method": "GET",
+          "type": "fetch",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4173/api/supplier-invoices?limit=500",
+          "method": "GET",
+          "type": "fetch",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4173/api/supplier-bonuses?limit=500",
+          "method": "GET",
+          "type": "fetch",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4173/api/owners",
+          "method": "GET",
+          "type": "fetch",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4173/api/owner-transactions?limit=2000",
+          "method": "GET",
+          "type": "fetch",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4173/api/notifications",
+          "method": "GET",
+          "type": "fetch",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4173/api/audit-logs",
+          "method": "GET",
+          "type": "fetch",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4173/api/notifications",
+          "method": "GET",
+          "type": "fetch",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4173/api/sales?limit=500",
+          "method": "GET",
+          "type": "fetch",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4173/api/devices?excludeSold=true",
+          "method": "GET",
+          "type": "fetch",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4173/api/stores",
+          "method": "GET",
+          "type": "fetch",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4173/api/owners",
+          "method": "GET",
+          "type": "fetch",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4173/api/sales?limit=500",
+          "method": "GET",
+          "type": "fetch",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4173/api/devices?excludeSold=true",
+          "method": "GET",
+          "type": "fetch",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4173/api/stores",
+          "method": "GET",
+          "type": "fetch",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4173/api/owners",
+          "method": "GET",
+          "type": "fetch",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4173/api/sales?limit=500",
+          "method": "GET",
+          "type": "fetch",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4173/api/devices?excludeSold=true",
+          "method": "GET",
+          "type": "fetch",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4173/api/stores",
+          "method": "GET",
+          "type": "fetch",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4173/api/owners",
+          "method": "GET",
+          "type": "fetch",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4173/api/sales?limit=500",
+          "method": "GET",
+          "type": "fetch",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4173/api/devices?excludeSold=true",
+          "method": "GET",
+          "type": "fetch",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4173/api/stores",
+          "method": "GET",
+          "type": "fetch",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4173/api/owners",
+          "method": "GET",
+          "type": "fetch",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4173/api/sales?limit=500",
+          "method": "GET",
+          "type": "fetch",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4173/api/devices?excludeSold=true",
+          "method": "GET",
+          "type": "fetch",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4173/api/stores",
+          "method": "GET",
+          "type": "fetch",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4173/api/owners",
+          "method": "GET",
+          "type": "fetch",
+          "worker": false
+        }
+      ],
+      "errors": []
+    }
+  ]
+}

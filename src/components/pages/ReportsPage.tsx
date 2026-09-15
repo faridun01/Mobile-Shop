@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { useApp } from '../../context/AppContext';
+import { useAppFields } from '../../context/AppContext';
 import { apiClient } from '../../api/client';
 import { mapExpense, mapSale, buildNameLookup } from '../../api/mappers';
 import { Expense, Sale } from '../../types';
@@ -74,7 +74,7 @@ export const ReportsPage: React.FC = () => {
     users,
     todayRate,
     selectedStoreId: globalSelectedStoreId
-  } = useApp();
+  } = useAppFields('currentUser', 'stores', 'users', 'todayRate', 'selectedStoreId');
 
   const [period, setPeriod] = useState<Period>('SPECIFIC_MONTH');
   const [selectedMonth, setSelectedMonth] = useState<string>(new Date().toISOString().substring(0, 7));

@@ -1,6 +1,6 @@
 import React from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { useApp } from '../../context/AppContext';
+import { useAppFields } from '../../context/AppContext';
 import { useNotifications } from '../../context/NotificationsContext';
 import { PageId } from '../../types';
 import {
@@ -64,7 +64,7 @@ const TABLET_NAV_ITEMS: { id: PageId; label: string; icon: React.ElementType; ro
 export const TabletNavRail: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { currentUser, setActivePage, logout } = useApp();
+  const { currentUser, setActivePage, logout } = useAppFields('currentUser', 'setActivePage', 'logout');
   const { notifications } = useNotifications();
 
   const userRole = currentUser?.role || 'SELLER';

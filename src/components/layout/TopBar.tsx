@@ -1,6 +1,6 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useApp } from '../../context/AppContext';
+import { useAppFields } from '../../context/AppContext';
 import { useNotifications } from '../../context/NotificationsContext';
 import { Bell, Store } from 'lucide-react';
 
@@ -11,7 +11,7 @@ export const TopBar: React.FC = () => {
     activePage,
     setActivePage,
     stores
-  } = useApp();
+  } = useAppFields('currentUser', 'activePage', 'setActivePage', 'stores');
   const { notifications } = useNotifications();
 
   // `resolved` tracks whether an actionable notification (e.g. an approval) has been

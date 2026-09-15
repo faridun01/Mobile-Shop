@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Html5Qrcode, Html5QrcodeSupportedFormats } from 'html5-qrcode';
 import { AlertCircle, Flashlight, FlashlightOff, Focus, ZoomIn } from 'lucide-react';
-import { useApp } from '../../context/AppContext';
+import { useAppFields } from '../../context/AppContext';
 import { Dialog } from '../ui/Dialog';
 import { soundEffects } from '../../utils/sound';
 
@@ -52,7 +52,7 @@ const SUPPORTED_FORMATS = [
  * support was removed since the app is used with phone/tablet cameras exclusively.
  */
 export const ScannerModal: React.FC = () => {
-  const { isScannerOpen, scannerCallback, closeScanner } = useApp();
+  const { isScannerOpen, scannerCallback, closeScanner } = useAppFields('isScannerOpen', 'scannerCallback', 'closeScanner');
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const pendingScanRef = useRef({ code: '', matches: 0, seenAt: 0 });
   const scanLockedRef = useRef(false);

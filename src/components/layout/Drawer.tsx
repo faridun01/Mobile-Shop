@@ -1,6 +1,6 @@
 import React from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { useApp } from '../../context/AppContext';
+import { useAppFields } from '../../context/AppContext';
 import { useNotifications } from '../../context/NotificationsContext';
 import { PageId } from '../../types';
 import {
@@ -103,7 +103,7 @@ export const Drawer: React.FC = () => {
     setDrawerOpen,
     logout,
     stores
-  } = useApp();
+  } = useAppFields('currentUser', 'setActivePage', 'drawerOpen', 'setDrawerOpen', 'logout', 'stores');
   const { notifications } = useNotifications();
 
   if (!drawerOpen) return null;

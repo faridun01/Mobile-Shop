@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { useApp } from '../../context/AppContext';
+import { useAppFields } from '../../context/AppContext';
 import {
   ShieldCheck,
   Search,
@@ -46,7 +46,7 @@ export const getLogCategory = (log: { action?: string; details?: string; categor
 };
 
 export const AuditLogPage: React.FC = () => {
-  const { auditLogs } = useApp();
+  const { auditLogs } = useAppFields('auditLogs');
 
   const todayStr = useMemo(() => new Date().toISOString().substring(0, 10), []);
 

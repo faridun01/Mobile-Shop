@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { useApp } from '../../context/AppContext';
+import { useAppFields } from '../../context/AppContext';
 import { Expense, ExpenseCategory } from '../../types';
 import {
   Receipt,
@@ -86,7 +86,7 @@ function getCategoryIcon(key: string): React.ElementType {
 }
 
 export const ExpensesPage: React.FC = () => {
-  const { currentUser, expenses, fetchExpensesRange, stores, users, todayRate, createExpense, updateExpense, deleteExpense, isInitialLoading, selectedStoreId: globalSelectedStoreId } = useApp();
+  const { currentUser, expenses, fetchExpensesRange, stores, users, todayRate, createExpense, updateExpense, deleteExpense, isInitialLoading, selectedStoreId: globalSelectedStoreId } = useAppFields('currentUser', 'expenses', 'fetchExpensesRange', 'stores', 'users', 'todayRate', 'createExpense', 'updateExpense', 'deleteExpense', 'isInitialLoading', 'selectedStoreId');
 
   const isSeller = currentUser?.role === 'SELLER';
   const canAddCategory = currentUser?.role === 'ADMIN' || currentUser?.role === 'PARTNER';

@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
 import { useNavigate, Navigate } from 'react-router-dom';
-import { useApp } from '../../context/AppContext';
+import { useAppFields } from '../../context/AppContext';
 import { Smartphone, Lock, User, AlertCircle, ArrowRight, Eye, EyeOff, ShieldCheck, Loader2 } from 'lucide-react';
 
 export const LoginPage: React.FC = () => {
   const navigate = useNavigate();
-  const { currentUser, login } = useApp();
+  const { currentUser, login } = useAppFields('currentUser', 'login');
   const [loginInput, setLoginInput] = useState('');
   const [passwordInput, setPasswordInput] = useState('');
   const [showPassword, setShowPassword] = useState(false);

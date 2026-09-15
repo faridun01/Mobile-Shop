@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
-import { useApp } from '../../context/AppContext';
+import { useAppFields } from '../../context/AppContext';
 import { TransferRequest } from '../../types';
 import {
   ArrowLeftRight,
@@ -27,7 +27,7 @@ export const TransferPage: React.FC = () => {
     rejectTransfer,
     openScanner,
     selectedStoreId: globalSelectedStoreId
-  } = useApp();
+  } = useAppFields('currentUser', 'stores', 'devices', 'transfers', 'createTransferRequest', 'approveTransfer', 'rejectTransfer', 'openScanner', 'selectedStoreId');
 
   const isSeller = currentUser?.role === 'SELLER';
   const mainWarehouse = stores.find(s => s.isMainWarehouse);

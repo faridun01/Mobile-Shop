@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, useRef, useLayoutEffect } from 'react';
 import {
   User,
   Store,
@@ -21,9 +21,12 @@ import {
   ExpenseCategory,
   ThemeMode
 } from '../types';
+import { useSharedState } from '../hooks/useSharedState';
+import { createStore as createContextStore, useStore, type StoreApi } from 'zustand';
+import { useShallow } from 'zustand/react/shallow';
 import { useAuthStore } from '../stores/useAuthStore';
 import { useUIStore } from '../stores/useUIStore';
-import { useNotifications } from './NotificationsContext';
+import { useNotificationsActions } from './NotificationsContext';
 import { apiClient } from '../api/client';
 import { useRealtimeSync } from '../hooks/useRealtimeSync';
 import { getBusinessDateKey } from '../utils/businessDate';
@@ -293,7 +296,8 @@ interface AppContextType {
   toggleTheme: () => void;
 }
 
-const AppContext = createContext<AppContextType | null>(null);
+const AppContext = createContext<StoreApi<AppContextType> | null>(null);
+const AppLoaderContext = createContext<((keys: readonly (keyof AppContextType)[]) => void) | null>(null);
 
 function errorMessage(err: unknown, fallback: string): string {
   return err instanceof Error ? err.message : fallback;
@@ -305,15 +309,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // notifications live in their own context now (see NotificationsContext.tsx) — this
   // provider only needs to trigger a refetch on realtime events / bulk-reload, never reads
   // the notification list itself.
-  const { fetchNotifications } = useNotifications();
+  const { fetchNotifications } = useNotificationsActions();
 
   const [currentUser, setCurrentUserState] = useState<User | null>(authUser);
-  const [todayRate, setTodayRateState] = useState<DailyRate | null>(null);
+  const [todayRate, setTodayRateState] = useSharedState<DailyRate | null>(null);
   const [activePage, setActivePageState] = useState<PageId>('SALE');
   const [selectedStoreId, setSelectedStoreIdState] = useState<string>(authUser?.role === 'SELLER' && authUser.storeId ? authUser.storeId : 'all');
   const [drawerOpen, setDrawerOpen] = useState(false);
 
-  const [stores, setStores] = useState<Store[]>([]);
+  const [stores, setStores] = useSharedState<Store[]>([]);
 
   // login() clears storeName to undefined (the store list isn't loaded yet at that point),
   // and nothing ever re-populates it afterwards — so it's resolved here from the live store
@@ -324,18 +328,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return resolvedName && resolvedName !== currentUser.storeName ? { ...currentUser, storeName: resolvedName } : currentUser;
   }, [currentUser, stores]);
 
-  const [users, setUsers] = useState<User[]>([]);
-  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
-  const [invoices, setInvoices] = useState<SupplierInvoice[]>([]);
-  const [devices, setDevices] = useState<Device[]>([]);
-  const [sales, setSales] = useState<Sale[]>([]);
-  const [transfers, setTransfers] = useState<TransferRequest[]>([]);
-  const [repairs, setRepairs] = useState<RepairTicket[]>([]);
-  const [bonuses, setBonuses] = useState<SupplierBonus[]>([]);
-  const [expenses, setExpenses] = useState<Expense[]>([]);
-  const [owners, setOwners] = useState<Owner[]>([]);
-  const [ownerTransactions, setOwnerTransactions] = useState<OwnerTransaction[]>([]);
-  const [auditLogs, setAuditLogs] = useState<AuditLogEntry[]>([]);
+  const [users, setUsers] = useSharedState<User[]>([]);
+  const [suppliers, setSuppliers] = useSharedState<Supplier[]>([]);
+  const [invoices, setInvoices] = useSharedState<SupplierInvoice[]>([]);
+  const [devices, setDevices] = useSharedState<Device[]>([]);
+  const [sales, setSales] = useSharedState<Sale[]>([]);
+  const [transfers, setTransfers] = useSharedState<TransferRequest[]>([]);
+  const [repairs, setRepairs] = useSharedState<RepairTicket[]>([]);
+  const [bonuses, setBonuses] = useSharedState<SupplierBonus[]>([]);
+  const [expenses, setExpenses] = useSharedState<Expense[]>([]);
+  const [owners, setOwners] = useSharedState<Owner[]>([]);
+  const [ownerTransactions, setOwnerTransactions] = useSharedState<OwnerTransaction[]>([]);
+  const [auditLogs, setAuditLogs] = useSharedState<AuditLogEntry[]>([]);
   const [isInitialLoading, setIsInitialLoading] = useState(true);
 
   const [isRateModalOpen, setIsRateModalOpen] = useState(false);
@@ -616,35 +620,49 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return task;
   }, [fetchUsers, fetchStores, fetchDevices, fetchSales, fetchTransfers, fetchRepairs, fetchSuppliers, fetchInvoices, fetchBonuses, fetchExpenses, fetchOwners, fetchOwnerTransactions, fetchNotifications, fetchAuditLogs, fetchExchangeRate]);
 
-  // Load catalog immediately (fast-path) and fetch secondary modules in background
-  useEffect(() => {
-    if (!authToken || !authUser) return;
-    setIsInitialLoading(true);
+  const coreReady = useRef<Promise<unknown>>(Promise.resolve());
+  const loadedModules = useRef(new Set<() => Promise<unknown>>());
+  const pendingModules = useRef(new Map<() => Promise<unknown>, Promise<unknown>>());
+  const pageFetchers = useMemo(() => ({
+    sales: fetchSales, transfers: fetchTransfers, repairs: fetchRepairs,
+    suppliers: fetchSuppliers, invoices: fetchInvoices, supplierInvoices: fetchInvoices,
+    bonuses: fetchBonuses, supplierBonuses: fetchBonuses, expenses: fetchExpenses,
+    owners: fetchOwners, ownerTransactions: fetchOwnerTransactions, auditLogs: fetchAuditLogs,
+  }), [fetchSales, fetchTransfers, fetchRepairs, fetchSuppliers, fetchInvoices, fetchBonuses, fetchExpenses, fetchOwners, fetchOwnerTransactions, fetchAuditLogs]);
 
-    Promise.all([fetchUsers(), fetchStores(), fetchDevices(), fetchExchangeRate()])
-      .then(() => {
-        setIsInitialLoading(false);
-        // Secondary data loads in background
-        return Promise.all([
-          fetchSales(),
-          fetchTransfers(),
-          fetchRepairs(),
-          fetchExpenses(),
-          fetchSuppliers(),
-          fetchInvoices(),
-          fetchBonuses(),
-          fetchOwners(),
-          fetchOwnerTransactions(),
-          fetchNotifications(),
-          fetchAuditLogs(),
-        ]);
-      })
-      .catch((e) => {
-        console.error('Initial data load failed', e);
-        setIsInitialLoading(false);
-      });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+  useLayoutEffect(() => {
+    loadedModules.current.clear();
+    pendingModules.current.clear();
+    if (!authToken || !authUser) return;
+    let cancelled = false;
+    setIsInitialLoading(true);
+    coreReady.current = Promise.all([fetchUsers(), fetchStores(), fetchDevices(), fetchExchangeRate()])
+      .catch((error) => { console.error('Initial data load failed', error); })
+      .finally(() => { if (!cancelled) setIsInitialLoading(false); });
+    return () => { cancelled = true; };
   }, [authToken, authUser?.id]);
+
+  const ensurePageData = useCallback((keys: readonly (keyof AppContextType)[]) => {
+    if (!authToken) return;
+    const load = (fetcher: () => Promise<unknown>): Promise<unknown> => {
+      if (loadedModules.current.has(fetcher)) return Promise.resolve();
+      const pending = pendingModules.current.get(fetcher);
+      if (pending) return pending;
+      const task = coreReady.current.then(async () => {
+        if (fetcher === fetchOwnerTransactions) await load(fetchOwners);
+        await fetcher();
+        loadedModules.current.add(fetcher);
+      });
+      pendingModules.current.set(fetcher, task);
+      const clear = () => { if (pendingModules.current.get(fetcher) === task) pendingModules.current.delete(fetcher); };
+      task.then(clear, clear);
+      return task;
+    };
+    for (const key of keys) {
+      const fetcher = pageFetchers[key as keyof typeof pageFetchers];
+      if (fetcher) void load(fetcher).catch((error) => console.error('Page data load failed', error));
+    }
+  }, [authToken, pageFetchers, fetchOwnerTransactions, fetchOwners]);
 
   // Realtime: route each broadcast to only the data it actually touched instead of
   // reloading the entire app for every terminal on every change (same fix as
@@ -705,10 +723,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       refetchAll().catch((e) => console.error('Realtime resync failed', e));
       return;
     }
-    const tasks = Array.from(pendingRealtimeTasks.current);
+    const deferred = new Set<() => Promise<unknown>>(Object.values(pageFetchers));
+    const tasks = Array.from(pendingRealtimeTasks.current).filter((task) =>
+      !deferred.has(task) || loadedModules.current.has(task) || pendingModules.current.has(task));
     pendingRealtimeTasks.current.clear();
     Promise.all(tasks.map((t) => t())).catch((e) => console.error('Realtime resync failed', e));
-  }, [refetchAll]);
+  }, [refetchAll, pageFetchers]);
 
   useRealtimeSync(authToken, (type: string) => {
     const tasks = tasksForRealtimeEvent(type);
@@ -1501,15 +1521,50 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     isRateModalOpen, isScannerOpen, scannerCallback, drawerOpen, theme, authToken,
   ]);
 
+  // Stable action identities let consumers subscribe to data fields independently.
+  // Delegates always use the latest committed closures, preserving existing behavior.
+  const latestValue = useRef(contextValue);
+  const storeRef = useRef<StoreApi<AppContextType> | null>(null);
+  if (!storeRef.current) {
+    const initial = { ...contextValue };
+    for (const key of Object.keys(initial) as (keyof AppContextType)[]) {
+      if (typeof initial[key] === 'function') {
+        (initial as unknown as Record<string, unknown>)[key] = (...args: unknown[]) =>
+          (latestValue.current[key] as (...values: unknown[]) => unknown)(...args);
+      }
+    }
+    storeRef.current = createContextStore(() => initial);
+  }
+  useLayoutEffect(() => {
+    latestValue.current = contextValue;
+    const values: Partial<AppContextType> = {};
+    for (const key of Object.keys(contextValue) as (keyof AppContextType)[]) {
+      if (typeof contextValue[key] !== 'function') {
+        (values as Record<string, unknown>)[key] = contextValue[key];
+      }
+    }
+    storeRef.current!.setState(values);
+  }, [contextValue]);
+
   return (
-    <AppContext.Provider value={contextValue}>
-      {children}
-    </AppContext.Provider>
+    <AppLoaderContext.Provider value={ensurePageData}>
+      <AppContext.Provider value={storeRef.current}>{children}</AppContext.Provider>
+    </AppLoaderContext.Provider>
   );
 };
 
+export function useAppFields<K extends keyof AppContextType>(...keys: K[]): Pick<AppContextType, K> {
+  const store = useContext(AppContext);
+  const load = useContext(AppLoaderContext);
+  if (!store) throw new Error('useAppFields must be used within AppProvider');
+  const fields = useStore(store, useShallow((state) => Object.fromEntries(keys.map((key) => [key, state[key]])) as Pick<AppContextType, K>));
+  const keySignature = keys.join(',');
+  useEffect(() => { load?.(keys); }, [load, keySignature]);
+  return fields;
+}
+
 export const useApp = () => {
-  const context = useContext(AppContext);
-  if (!context) throw new Error('useApp must be used within AppProvider');
-  return context;
+  const store = useContext(AppContext);
+  if (!store) throw new Error('useApp must be used within AppProvider');
+  return useStore(store);
 };

@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useApp } from '../../context/AppContext';
+import { useAppFields } from '../../context/AppContext';
 import { SaleItem } from '../../types';
 import {
   ChevronRight,
@@ -35,7 +35,7 @@ export const SalesHistoryPage: React.FC = () => {
     processRefund,
     isInitialLoading,
     selectedStoreId: globalSelectedStoreId
-  } = useApp();
+  } = useAppFields('currentUser', 'sales', 'fetchSalesRange', 'stores', 'openScanner', 'setActivePage', 'processRefund', 'isInitialLoading', 'selectedStoreId');
 
   // Defaults to "today" — this is a same-shift lookup tool far more often than a monthly report.
   const [periodFilter, setPeriodFilter] = useState<'TODAY' | 'SPECIFIC_MONTH' | 'ALL'>('TODAY');

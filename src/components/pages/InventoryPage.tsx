@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { useApp } from '../../context/AppContext';
+import { useAppFields } from '../../context/AppContext';
 import { Device, DeviceStatus, Store as StoreType } from '../../types';
 import {
   Smartphone,
@@ -107,7 +107,7 @@ const StoreCard: React.FC<StoreCardProps> = ({ store, unitCount, valueUsd, showV
 );
 
 export const InventoryPage: React.FC = () => {
-  const { currentUser, devices, findDeviceByImei, stores, openScanner, isInitialLoading, selectedStoreId: globalSelectedStoreId } = useApp();
+  const { currentUser, devices, findDeviceByImei, stores, openScanner, isInitialLoading, selectedStoreId: globalSelectedStoreId } = useAppFields('currentUser', 'devices', 'findDeviceByImei', 'stores', 'openScanner', 'isInitialLoading', 'selectedStoreId');
 
   // Defaults to whichever store is currently active on the POS Terminal page —
   // an admin picking a store there should land here already on that store instead

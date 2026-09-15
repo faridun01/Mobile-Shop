@@ -13,7 +13,7 @@ import { DailyRateModal } from '../components/common/DailyRateModal';
 import { PWAInstallPrompt } from '../components/pwa/PWAInstallPrompt';
 import { PWAUpdateNotifier } from '../components/pwa/PWAUpdateNotifier';
 import { useUIStore } from '../stores/useUIStore';
-import { useApp } from '../context/AppContext';
+import { useAppFields } from '../context/AppContext';
 import { LoadingState } from '../components/ui/Skeleton';
 
 // Lazy-loaded so the ~3MB html5-qrcode dependency it pulls in only downloads the first
@@ -67,7 +67,7 @@ function MainLayout() {
   const location = useLocation();
   const { currentUser } = useAuthStore();
   const { isDailyRateModalOpen, setDailyRateModalOpen } = useUIStore();
-  const { isRateModalOpen, closeDailyRateModal, activePage, setActivePage, selectedStoreId, stores, isScannerOpen } = useApp();
+  const { isRateModalOpen, closeDailyRateModal, activePage, setActivePage, selectedStoreId, stores, isScannerOpen } = useAppFields('isRateModalOpen', 'closeDailyRateModal', 'activePage', 'setActivePage', 'selectedStoreId', 'stores', 'isScannerOpen');
 
   React.useEffect(() => {
     const matched = Object.entries(PAGE_ROUTES).find(([_, path]) => path === location.pathname);

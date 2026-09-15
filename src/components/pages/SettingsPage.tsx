@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Navigate } from 'react-router-dom';
-import { useApp } from '../../context/AppContext';
+import { useAppFields } from '../../context/AppContext';
 import { Store as StoreType } from '../../types';
 import {
   Settings as SettingsIcon,
@@ -37,7 +37,7 @@ export const SettingsPage: React.FC = () => {
     theme,
     setTheme,
     logout
-  } = useApp();
+  } = useAppFields('currentUser', 'stores', 'todayRate', 'createStore', 'updateStore', 'deleteStore', 'mergeStores', 'adjustStoreCashBalance', 'openDailyRateModal', 'theme', 'setTheme', 'logout');
 
   const [newStoreName, setNewStoreName] = useState('');
   const [newStoreAddress, setNewStoreAddress] = useState('');

@@ -1,6 +1,6 @@
 import React from 'react';
 import { useNavigate, Navigate } from 'react-router-dom';
-import { useApp } from '../../context/AppContext';
+import { useAppFields } from '../../context/AppContext';
 import { useNotifications } from '../../context/NotificationsContext';
 import { Bell, ArrowRight, CheckCheck } from 'lucide-react';
 import { PageHeader } from '../ui/PageHeader';
@@ -28,7 +28,7 @@ const PAGE_ROUTES: Record<string, string> = {
 
 export const NotificationsPage: React.FC = () => {
   const navigate = useNavigate();
-  const { currentUser, setActivePage } = useApp();
+  const { currentUser, setActivePage } = useAppFields('currentUser', 'setActivePage');
   const { notifications, markNotificationAsRead, markAllNotificationsAsRead } = useNotifications();
 
   if (currentUser?.role === 'SELLER') {

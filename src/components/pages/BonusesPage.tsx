@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
-import { useApp } from '../../context/AppContext';
+import { useAppFields } from '../../context/AppContext';
 import { SupplierBonus } from '../../types';
 import {
   Gift,
@@ -28,7 +28,7 @@ export const BonusesPage: React.FC = () => {
     deleteSupplierBonus,
     todayRate,
     openScanner
-  } = useApp();
+  } = useAppFields('currentUser', 'supplierBonuses', 'suppliers', 'stores', 'devices', 'createSupplierBonus', 'updateSupplierBonus', 'deleteSupplierBonus', 'todayRate', 'openScanner');
 
   const rate = todayRate?.rate || 9.50;
 

@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { useApp } from '../../context/AppContext';
+import { useAppFields } from '../../context/AppContext';
 import { Supplier, SupplierInvoice, Device } from '../../types';
 import {
   Truck,
@@ -42,7 +42,7 @@ export const SuppliersPage: React.FC = () => {
     deleteSupplierInvoice,
     paySupplier,
     paySupplierInvoice
-  } = useApp();
+  } = useAppFields('currentUser', 'suppliers', 'supplierInvoices', 'fetchInvoicesRange', 'devices', 'findDevicesByInvoice', 'stores', 'todayRate', 'createSupplier', 'updateSupplier', 'deleteSupplier', 'updateSupplierInvoice', 'deleteSupplierInvoice', 'paySupplier', 'paySupplierInvoice');
 
   const [selectedSupplierId, setSelectedSupplierId] = useState<string | null>(null);
   const [selectedInvoiceId, setSelectedInvoiceId] = useState<string | null>(null);

@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { useApp } from '../../context/AppContext';
+import { useAppFields } from '../../context/AppContext';
 import {
   Plus,
   PieChart,
@@ -50,7 +50,7 @@ export const OwnersPage: React.FC = () => {
     linkOwnerToUser,
     closeQuarterPeriod,
     initializeOwners
-  } = useApp();
+  } = useAppFields('currentUser', 'owners', 'users', 'ownerTransactions', 'suppliers', 'todayRate', 'createOwnerTransaction', 'updateOwnerProfitShares', 'linkOwnerToUser', 'closeQuarterPeriod', 'initializeOwners');
 
   const [isInitializing, setIsInitializing] = useState(false);
   const [linkingOwnerId, setLinkingOwnerId] = useState<string | null>(null);

@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { useApp } from '../../context/AppContext';
+import { useAppFields } from '../../context/AppContext';
 import { Device, PaymentMethod } from '../../types';
 import {
   Smartphone,
@@ -44,7 +44,7 @@ export const SalePage: React.FC = () => {
     openScanner,
     createSale,
     isInitialLoading
-  } = useApp();
+  } = useAppFields('currentUser', 'devices', 'todayRate', 'selectedStoreId', 'setSelectedStoreId', 'stores', 'openScanner', 'createSale', 'isInitialLoading');
 
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedBrand, setSelectedBrand] = useState<string>('ALL');

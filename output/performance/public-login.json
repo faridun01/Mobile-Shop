@@ -1,0 +1,1096 @@
+{
+  "base": "https://mobile-shop-three-wine.vercel.app",
+  "scenario": "login",
+  "profile": false,
+  "cpuSlowdown": 4,
+  "latencyMs": 150,
+  "downloadKBps": 200,
+  "runs": [
+    {
+      "run": 0,
+      "fcp": 3016,
+      "lcp": 3628,
+      "cls": 0,
+      "observedBlockingTime": 215,
+      "heapBytes": 10000000,
+      "resources": [
+        {
+          "url": "https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap",
+          "transferSize": 1244,
+          "encodedBodySize": 944,
+          "decodedBodySize": 18304,
+          "duration": 779.5
+        },
+        {
+          "url": "https://mobile-shop-three-wine.vercel.app/assets/index-DwxREOt6.js",
+          "transferSize": 82510,
+          "encodedBodySize": 82210,
+          "decodedBodySize": 267371,
+          "duration": 889.8000000119209
+        },
+        {
+          "url": "https://mobile-shop-three-wine.vercel.app/assets/vendor-react-C6LsRsQd.js",
+          "transferSize": 18646,
+          "encodedBodySize": 18346,
+          "decodedBodySize": 49551,
+          "duration": 1045.6000000238419
+        },
+        {
+          "url": "https://mobile-shop-three-wine.vercel.app/assets/vendor-icons-C26xjxdi.js",
+          "transferSize": 8645,
+          "encodedBodySize": 8345,
+          "decodedBodySize": 40794,
+          "duration": 1140.300000011921
+        },
+        {
+          "url": "https://mobile-shop-three-wine.vercel.app/assets/index-BprzRpwP.css",
+          "transferSize": 12311,
+          "encodedBodySize": 12011,
+          "decodedBodySize": 72238,
+          "duration": 249.70000004768372
+        },
+        {
+          "url": "https://mobile-shop-three-wine.vercel.app/registerSW.js",
+          "transferSize": 434,
+          "encodedBodySize": 134,
+          "decodedBodySize": 134,
+          "duration": 200.80000001192093
+        },
+        {
+          "url": "https://mobile-shop-three-wine.vercel.app/assets/LoginPage-D4TEXbCz.js",
+          "transferSize": 2152,
+          "encodedBodySize": 1852,
+          "decodedBodySize": 4852,
+          "duration": 185.0999999642372
+        }
+      ],
+      "labInp": 72,
+      "initialRequestCount": 49,
+      "initialApiRequests": [],
+      "initialRenderCounts": null,
+      "notificationRenders": null,
+      "repeatedDataRenders": null,
+      "requests": [
+        {
+          "url": "https://mobile-shop-three-wine.vercel.app/login",
+          "method": "GET",
+          "type": "document",
+          "worker": false
+        },
+        {
+          "url": "https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap",
+          "method": "GET",
+          "type": "stylesheet",
+          "worker": false
+        },
+        {
+          "url": "https://mobile-shop-three-wine.vercel.app/assets/index-DwxREOt6.js",
+          "method": "GET",
+          "type": "script",
+          "worker": false
+        },
+        {
+          "url": "https://mobile-shop-three-wine.vercel.app/assets/vendor-react-C6LsRsQd.js",
+          "method": "GET",
+          "type": "script",
+          "worker": false
+        },
+        {
+          "url": "https://mobile-shop-three-wine.vercel.app/assets/vendor-icons-C26xjxdi.js",
+          "method": "GET",
+          "type": "script",
+          "worker": false
+        },
+        {
+          "url": "https://mobile-shop-three-wine.vercel.app/assets/index-BprzRpwP.css",
+          "method": "GET",
+          "type": "stylesheet",
+          "worker": false
+        },
+        {
+          "url": "https://mobile-shop-three-wine.vercel.app/registerSW.js",
+          "method": "GET",
+          "type": "script",
+          "worker": false
+        },
+        {
+          "url": "https://mobile-shop-three-wine.vercel.app/sw.js",
+          "method": "GET",
+          "type": "script",
+          "worker": true
+        },
+        {
+          "url": "https://mobile-shop-three-wine.vercel.app/workbox-948e45c5.js",
+          "method": "GET",
+          "type": "other",
+          "worker": true
+        },
+        {
+          "url": "https://mobile-shop-three-wine.vercel.app/assets/LoginPage-D4TEXbCz.js",
+          "method": "GET",
+          "type": "script",
+          "worker": false
+        },
+        {
+          "url": "https://mobile-shop-three-wine.vercel.app/registerSW.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "https://mobile-shop-three-wine.vercel.app/pwa-512x512.png",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "https://mobile-shop-three-wine.vercel.app/pwa-192x192.png",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "https://mobile-shop-three-wine.vercel.app/maskable-icon-512x512.png",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "https://mobile-shop-three-wine.vercel.app/index.html",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "https://mobile-shop-three-wine.vercel.app/favicon.svg",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "https://mobile-shop-three-wine.vercel.app/favicon.png",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "https://mobile-shop-three-wine.vercel.app/apple-touch-icon.png",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "https://mobile-shop-three-wine.vercel.app/assets/vendor-react-C6LsRsQd.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "https://mobile-shop-three-wine.vercel.app/assets/vendor-icons-C26xjxdi.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "https://mobile-shop-three-wine.vercel.app/assets/sound-CIOPipKE.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "https://mobile-shop-three-wine.vercel.app/assets/index-DwxREOt6.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "https://mobile-shop-three-wine.vercel.app/assets/index-BprzRpwP.css",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "https://mobile-shop-three-wine.vercel.app/assets/exportReports-BP_4LWmc.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "https://mobile-shop-three-wine.vercel.app/assets/TransferPage-CWallnLl.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "https://mobile-shop-three-wine.vercel.app/assets/SuppliersPage-DMZlGrWZ.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "https://mobile-shop-three-wine.vercel.app/assets/StatusBanner-Dz3Sc-jc.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "https://mobile-shop-three-wine.vercel.app/assets/StatCard-BAqP0qbm.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "https://mobile-shop-three-wine.vercel.app/assets/SettingsPage-BL3n2kjX.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "https://mobile-shop-three-wine.vercel.app/assets/SalesHistoryPage-CylYbWvS.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "https://mobile-shop-three-wine.vercel.app/assets/SalePage-DfNY7vbC.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "https://mobile-shop-three-wine.vercel.app/assets/ReportsPage-CvRaFT4e.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "https://mobile-shop-three-wine.vercel.app/assets/RepairPage-Cl0efCx8.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "https://mobile-shop-three-wine.vercel.app/assets/PurchasePage-ka2x1DPr.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "https://mobile-shop-three-wine.vercel.app/assets/OwnersPage-DE4yjgtk.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "https://mobile-shop-three-wine.vercel.app/assets/NotificationsPage-Cea7kOFS.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "https://mobile-shop-three-wine.vercel.app/assets/MonthPicker-C4dOo73u.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "https://mobile-shop-three-wine.vercel.app/assets/LoginPage-D4TEXbCz.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "https://mobile-shop-three-wine.vercel.app/assets/InventoryPage-CEYSZDvg.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "https://mobile-shop-three-wine.vercel.app/assets/FilterPillGroup-B4Ep_xIL.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "https://mobile-shop-three-wine.vercel.app/assets/ExpensesPage-C9bduMxh.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "https://mobile-shop-three-wine.vercel.app/assets/ExchangePage-Cn2Eux8O.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "https://mobile-shop-three-wine.vercel.app/assets/EmptyState-DEAI6qAl.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "https://mobile-shop-three-wine.vercel.app/assets/EmployeesPage-Wl7Xdkys.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "https://mobile-shop-three-wine.vercel.app/assets/ConfirmDialog-COC9MzNo.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "https://mobile-shop-three-wine.vercel.app/assets/BonusesPage-CTZeriCP.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "https://mobile-shop-three-wine.vercel.app/assets/Badge-C-cLeKKM.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "https://mobile-shop-three-wine.vercel.app/assets/AuditLogPage-DS-IJxnM.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "https://mobile-shop-three-wine.vercel.app/manifest.webmanifest",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        }
+      ],
+      "errors": []
+    },
+    {
+      "run": 1,
+      "fcp": 1768,
+      "lcp": 2284,
+      "cls": 0,
+      "observedBlockingTime": 221,
+      "heapBytes": 10000000,
+      "resources": [
+        {
+          "url": "https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap",
+          "transferSize": 1244,
+          "encodedBodySize": 944,
+          "decodedBodySize": 18304,
+          "duration": 426.19999998807907
+        },
+        {
+          "url": "https://mobile-shop-three-wine.vercel.app/assets/index-DwxREOt6.js",
+          "transferSize": 82510,
+          "encodedBodySize": 82210,
+          "decodedBodySize": 267371,
+          "duration": 801.3999999761581
+        },
+        {
+          "url": "https://mobile-shop-three-wine.vercel.app/assets/vendor-react-C6LsRsQd.js",
+          "transferSize": 18646,
+          "encodedBodySize": 18346,
+          "decodedBodySize": 49551,
+          "duration": 484.30000001192093
+        },
+        {
+          "url": "https://mobile-shop-three-wine.vercel.app/assets/vendor-icons-C26xjxdi.js",
+          "transferSize": 8645,
+          "encodedBodySize": 8345,
+          "decodedBodySize": 40794,
+          "duration": 438.0999999642372
+        },
+        {
+          "url": "https://mobile-shop-three-wine.vercel.app/assets/index-BprzRpwP.css",
+          "transferSize": 12311,
+          "encodedBodySize": 12011,
+          "decodedBodySize": 72238,
+          "duration": 405.60000002384186
+        },
+        {
+          "url": "https://mobile-shop-three-wine.vercel.app/registerSW.js",
+          "transferSize": 434,
+          "encodedBodySize": 134,
+          "decodedBodySize": 134,
+          "duration": 174.60000002384186
+        },
+        {
+          "url": "https://mobile-shop-three-wine.vercel.app/assets/LoginPage-D4TEXbCz.js",
+          "transferSize": 2152,
+          "encodedBodySize": 1852,
+          "decodedBodySize": 4852,
+          "duration": 174.19999998807907
+        }
+      ],
+      "labInp": 48,
+      "initialRequestCount": 49,
+      "initialApiRequests": [],
+      "initialRenderCounts": null,
+      "notificationRenders": null,
+      "repeatedDataRenders": null,
+      "requests": [
+        {
+          "url": "https://mobile-shop-three-wine.vercel.app/login",
+          "method": "GET",
+          "type": "document",
+          "worker": false
+        },
+        {
+          "url": "https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap",
+          "method": "GET",
+          "type": "stylesheet",
+          "worker": false
+        },
+        {
+          "url": "https://mobile-shop-three-wine.vercel.app/assets/index-DwxREOt6.js",
+          "method": "GET",
+          "type": "script",
+          "worker": false
+        },
+        {
+          "url": "https://mobile-shop-three-wine.vercel.app/assets/vendor-react-C6LsRsQd.js",
+          "method": "GET",
+          "type": "script",
+          "worker": false
+        },
+        {
+          "url": "https://mobile-shop-three-wine.vercel.app/assets/vendor-icons-C26xjxdi.js",
+          "method": "GET",
+          "type": "script",
+          "worker": false
+        },
+        {
+          "url": "https://mobile-shop-three-wine.vercel.app/assets/index-BprzRpwP.css",
+          "method": "GET",
+          "type": "stylesheet",
+          "worker": false
+        },
+        {
+          "url": "https://mobile-shop-three-wine.vercel.app/registerSW.js",
+          "method": "GET",
+          "type": "script",
+          "worker": false
+        },
+        {
+          "url": "https://mobile-shop-three-wine.vercel.app/sw.js",
+          "method": "GET",
+          "type": "script",
+          "worker": true
+        },
+        {
+          "url": "https://mobile-shop-three-wine.vercel.app/workbox-948e45c5.js",
+          "method": "GET",
+          "type": "other",
+          "worker": true
+        },
+        {
+          "url": "https://mobile-shop-three-wine.vercel.app/assets/LoginPage-D4TEXbCz.js",
+          "method": "GET",
+          "type": "script",
+          "worker": false
+        },
+        {
+          "url": "https://mobile-shop-three-wine.vercel.app/registerSW.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "https://mobile-shop-three-wine.vercel.app/pwa-512x512.png",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "https://mobile-shop-three-wine.vercel.app/pwa-192x192.png",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "https://mobile-shop-three-wine.vercel.app/maskable-icon-512x512.png",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "https://mobile-shop-three-wine.vercel.app/index.html",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "https://mobile-shop-three-wine.vercel.app/favicon.svg",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "https://mobile-shop-three-wine.vercel.app/favicon.png",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "https://mobile-shop-three-wine.vercel.app/apple-touch-icon.png",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "https://mobile-shop-three-wine.vercel.app/assets/vendor-react-C6LsRsQd.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "https://mobile-shop-three-wine.vercel.app/assets/vendor-icons-C26xjxdi.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "https://mobile-shop-three-wine.vercel.app/assets/sound-CIOPipKE.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "https://mobile-shop-three-wine.vercel.app/assets/index-DwxREOt6.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "https://mobile-shop-three-wine.vercel.app/assets/index-BprzRpwP.css",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "https://mobile-shop-three-wine.vercel.app/assets/exportReports-BP_4LWmc.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "https://mobile-shop-three-wine.vercel.app/assets/TransferPage-CWallnLl.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "https://mobile-shop-three-wine.vercel.app/assets/SuppliersPage-DMZlGrWZ.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "https://mobile-shop-three-wine.vercel.app/assets/StatusBanner-Dz3Sc-jc.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "https://mobile-shop-three-wine.vercel.app/assets/StatCard-BAqP0qbm.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "https://mobile-shop-three-wine.vercel.app/assets/SettingsPage-BL3n2kjX.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "https://mobile-shop-three-wine.vercel.app/assets/SalesHistoryPage-CylYbWvS.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "https://mobile-shop-three-wine.vercel.app/assets/SalePage-DfNY7vbC.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "https://mobile-shop-three-wine.vercel.app/assets/ReportsPage-CvRaFT4e.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "https://mobile-shop-three-wine.vercel.app/assets/RepairPage-Cl0efCx8.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "https://mobile-shop-three-wine.vercel.app/assets/PurchasePage-ka2x1DPr.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "https://mobile-shop-three-wine.vercel.app/assets/OwnersPage-DE4yjgtk.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "https://mobile-shop-three-wine.vercel.app/assets/NotificationsPage-Cea7kOFS.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "https://mobile-shop-three-wine.vercel.app/assets/MonthPicker-C4dOo73u.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "https://mobile-shop-three-wine.vercel.app/assets/LoginPage-D4TEXbCz.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "https://mobile-shop-three-wine.vercel.app/assets/InventoryPage-CEYSZDvg.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "https://mobile-shop-three-wine.vercel.app/assets/FilterPillGroup-B4Ep_xIL.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "https://mobile-shop-three-wine.vercel.app/assets/ExpensesPage-C9bduMxh.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "https://mobile-shop-three-wine.vercel.app/assets/ExchangePage-Cn2Eux8O.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "https://mobile-shop-three-wine.vercel.app/assets/EmptyState-DEAI6qAl.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "https://mobile-shop-three-wine.vercel.app/assets/EmployeesPage-Wl7Xdkys.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "https://mobile-shop-three-wine.vercel.app/assets/ConfirmDialog-COC9MzNo.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "https://mobile-shop-three-wine.vercel.app/assets/BonusesPage-CTZeriCP.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "https://mobile-shop-three-wine.vercel.app/assets/Badge-C-cLeKKM.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "https://mobile-shop-three-wine.vercel.app/assets/AuditLogPage-DS-IJxnM.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "https://mobile-shop-three-wine.vercel.app/manifest.webmanifest",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        }
+      ],
+      "errors": []
+    },
+    {
+      "run": 2,
+      "fcp": 2152,
+      "lcp": 3164,
+      "cls": 0,
+      "observedBlockingTime": 353,
+      "heapBytes": 10000000,
+      "resources": [
+        {
+          "url": "https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap",
+          "transferSize": 1244,
+          "encodedBodySize": 944,
+          "decodedBodySize": 18304,
+          "duration": 397.30000001192093
+        },
+        {
+          "url": "https://mobile-shop-three-wine.vercel.app/assets/index-DwxREOt6.js",
+          "transferSize": 82510,
+          "encodedBodySize": 82210,
+          "decodedBodySize": 267371,
+          "duration": 803.3000000119209
+        },
+        {
+          "url": "https://mobile-shop-three-wine.vercel.app/assets/vendor-react-C6LsRsQd.js",
+          "transferSize": 18646,
+          "encodedBodySize": 18346,
+          "decodedBodySize": 49551,
+          "duration": 486.5999999642372
+        },
+        {
+          "url": "https://mobile-shop-three-wine.vercel.app/assets/vendor-icons-C26xjxdi.js",
+          "transferSize": 8645,
+          "encodedBodySize": 8345,
+          "decodedBodySize": 40794,
+          "duration": 326.69999998807907
+        },
+        {
+          "url": "https://mobile-shop-three-wine.vercel.app/assets/index-BprzRpwP.css",
+          "transferSize": 12311,
+          "encodedBodySize": 12011,
+          "decodedBodySize": 72238,
+          "duration": 406.30000001192093
+        },
+        {
+          "url": "https://mobile-shop-three-wine.vercel.app/registerSW.js",
+          "transferSize": 434,
+          "encodedBodySize": 134,
+          "decodedBodySize": 134,
+          "duration": 185.5999999642372
+        },
+        {
+          "url": "https://mobile-shop-three-wine.vercel.app/assets/LoginPage-D4TEXbCz.js",
+          "transferSize": 2152,
+          "encodedBodySize": 1852,
+          "decodedBodySize": 4852,
+          "duration": 168.30000001192093
+        }
+      ],
+      "labInp": 80,
+      "initialRequestCount": 49,
+      "initialApiRequests": [],
+      "initialRenderCounts": null,
+      "notificationRenders": null,
+      "repeatedDataRenders": null,
+      "requests": [
+        {
+          "url": "https://mobile-shop-three-wine.vercel.app/login",
+          "method": "GET",
+          "type": "document",
+          "worker": false
+        },
+        {
+          "url": "https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap",
+          "method": "GET",
+          "type": "stylesheet",
+          "worker": false
+        },
+        {
+          "url": "https://mobile-shop-three-wine.vercel.app/assets/index-DwxREOt6.js",
+          "method": "GET",
+          "type": "script",
+          "worker": false
+        },
+        {
+          "url": "https://mobile-shop-three-wine.vercel.app/assets/vendor-react-C6LsRsQd.js",
+          "method": "GET",
+          "type": "script",
+          "worker": false
+        },
+        {
+          "url": "https://mobile-shop-three-wine.vercel.app/assets/vendor-icons-C26xjxdi.js",
+          "method": "GET",
+          "type": "script",
+          "worker": false
+        },
+        {
+          "url": "https://mobile-shop-three-wine.vercel.app/assets/index-BprzRpwP.css",
+          "method": "GET",
+          "type": "stylesheet",
+          "worker": false
+        },
+        {
+          "url": "https://mobile-shop-three-wine.vercel.app/registerSW.js",
+          "method": "GET",
+          "type": "script",
+          "worker": false
+        },
+        {
+          "url": "https://mobile-shop-three-wine.vercel.app/sw.js",
+          "method": "GET",
+          "type": "script",
+          "worker": true
+        },
+        {
+          "url": "https://mobile-shop-three-wine.vercel.app/workbox-948e45c5.js",
+          "method": "GET",
+          "type": "other",
+          "worker": true
+        },
+        {
+          "url": "https://mobile-shop-three-wine.vercel.app/registerSW.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "https://mobile-shop-three-wine.vercel.app/assets/LoginPage-D4TEXbCz.js",
+          "method": "GET",
+          "type": "script",
+          "worker": false
+        },
+        {
+          "url": "https://mobile-shop-three-wine.vercel.app/pwa-512x512.png",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "https://mobile-shop-three-wine.vercel.app/pwa-192x192.png",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "https://mobile-shop-three-wine.vercel.app/maskable-icon-512x512.png",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "https://mobile-shop-three-wine.vercel.app/index.html",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "https://mobile-shop-three-wine.vercel.app/favicon.svg",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "https://mobile-shop-three-wine.vercel.app/favicon.png",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "https://mobile-shop-three-wine.vercel.app/apple-touch-icon.png",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "https://mobile-shop-three-wine.vercel.app/assets/vendor-react-C6LsRsQd.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "https://mobile-shop-three-wine.vercel.app/assets/vendor-icons-C26xjxdi.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "https://mobile-shop-three-wine.vercel.app/assets/sound-CIOPipKE.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "https://mobile-shop-three-wine.vercel.app/assets/index-DwxREOt6.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "https://mobile-shop-three-wine.vercel.app/assets/index-BprzRpwP.css",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "https://mobile-shop-three-wine.vercel.app/assets/exportReports-BP_4LWmc.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "https://mobile-shop-three-wine.vercel.app/assets/TransferPage-CWallnLl.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "https://mobile-shop-three-wine.vercel.app/assets/SuppliersPage-DMZlGrWZ.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "https://mobile-shop-three-wine.vercel.app/assets/StatusBanner-Dz3Sc-jc.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "https://mobile-shop-three-wine.vercel.app/assets/StatCard-BAqP0qbm.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "https://mobile-shop-three-wine.vercel.app/assets/SettingsPage-BL3n2kjX.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "https://mobile-shop-three-wine.vercel.app/assets/SalesHistoryPage-CylYbWvS.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "https://mobile-shop-three-wine.vercel.app/assets/SalePage-DfNY7vbC.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "https://mobile-shop-three-wine.vercel.app/assets/ReportsPage-CvRaFT4e.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "https://mobile-shop-three-wine.vercel.app/assets/RepairPage-Cl0efCx8.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "https://mobile-shop-three-wine.vercel.app/assets/PurchasePage-ka2x1DPr.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "https://mobile-shop-three-wine.vercel.app/assets/OwnersPage-DE4yjgtk.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "https://mobile-shop-three-wine.vercel.app/assets/NotificationsPage-Cea7kOFS.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "https://mobile-shop-three-wine.vercel.app/assets/MonthPicker-C4dOo73u.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "https://mobile-shop-three-wine.vercel.app/assets/LoginPage-D4TEXbCz.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "https://mobile-shop-three-wine.vercel.app/assets/InventoryPage-CEYSZDvg.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "https://mobile-shop-three-wine.vercel.app/assets/FilterPillGroup-B4Ep_xIL.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "https://mobile-shop-three-wine.vercel.app/assets/ExpensesPage-C9bduMxh.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "https://mobile-shop-three-wine.vercel.app/assets/ExchangePage-Cn2Eux8O.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "https://mobile-shop-three-wine.vercel.app/assets/EmptyState-DEAI6qAl.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "https://mobile-shop-three-wine.vercel.app/assets/EmployeesPage-Wl7Xdkys.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "https://mobile-shop-three-wine.vercel.app/assets/ConfirmDialog-COC9MzNo.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "https://mobile-shop-three-wine.vercel.app/assets/BonusesPage-CTZeriCP.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "https://mobile-shop-three-wine.vercel.app/assets/Badge-C-cLeKKM.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "https://mobile-shop-three-wine.vercel.app/assets/AuditLogPage-DS-IJxnM.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "https://mobile-shop-three-wine.vercel.app/manifest.webmanifest",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        }
+      ],
+      "errors": []
+    }
+  ]
+}

@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { useApp } from '../../context/AppContext';
+import { useAppFields } from '../../context/AppContext';
 import { RepairTicket, RepairStatus } from '../../types';
 import {
   Wrench,
@@ -29,7 +29,7 @@ export const RepairPage: React.FC = () => {
     updateRepairStatus,
     openScanner,
     selectedStoreId: globalSelectedStoreId
-  } = useApp();
+  } = useAppFields('currentUser', 'repairs', 'fetchRepairsRange', 'sales', 'fetchSalesRange', 'devices', 'findDeviceByImei', 'stores', 'createRepairTicket', 'updateRepairStatus', 'openScanner', 'selectedStoreId');
 
   const [activeTab, setActiveTab] = useState<'list' | 'create'>('list');
   const [selectedMonth, setSelectedMonth] = useState<string>(new Date().toISOString().substring(0, 7));

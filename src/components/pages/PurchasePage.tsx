@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
-import { useApp } from '../../context/AppContext';
+import { useAppFields } from '../../context/AppContext';
 import { SupplierInvoice, Device } from '../../types';
 import {
   Plus,
@@ -74,7 +74,7 @@ export const PurchasePage: React.FC = () => {
     deleteSupplierInvoice,
     createSupplier,
     openScanner
-  } = useApp();
+  } = useAppFields('currentUser', 'suppliers', 'stores', 'todayRate', 'supplierInvoices', 'devices', 'findDevicesByInvoice', 'findDeviceByImei', 'fetchInvoicesRange', 'createPurchase', 'updateSupplierInvoice', 'deleteSupplierInvoice', 'createSupplier', 'openScanner');
 
   // Edit Invoice Modal state
   const [editingInvoiceModal, setEditingInvoiceModal] = useState<SupplierInvoice | null>(null);
