@@ -7,12 +7,13 @@ describe('money validation', () => {
     expect(requireNonNegativeMoney(0, 'Сумма')).toBe(0);
   });
 
-  it.each([NaN, Infinity, -Infinity, 'not-a-number'])('rejects invalid number %s', (value) => {
+  it.each([NaN, Infinity, -Infinity, 'not-a-number', null, undefined, true, false, '', ' ', [], {}])('rejects invalid number %s', (value) => {
     expect(() => requireFiniteNumber(value, 'Сумма')).toThrow();
   });
 
   it('rejects negative and zero values in the appropriate modes', () => {
     expect(() => requirePositiveMoney(0, 'Сумма')).toThrow();
+    expect(() => requirePositiveMoney(0.001, 'Сумма')).toThrow();
     expect(() => requireNonNegativeMoney(-0.01, 'Сумма')).toThrow();
   });
 

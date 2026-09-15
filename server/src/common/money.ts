@@ -1,4 +1,7 @@
 export function requireFiniteNumber(value: unknown, label: string): number {
+  if ((typeof value !== 'number' && typeof value !== 'string') || (typeof value === 'string' && !value.trim())) {
+    throw new Error(`${label}: укажите корректное числовое значение`);
+  }
   const number = typeof value === 'number' ? value : Number(value);
   if (!Number.isFinite(number)) {
     throw new Error(`${label}: укажите корректное числовое значение`);
@@ -8,7 +11,7 @@ export function requireFiniteNumber(value: unknown, label: string): number {
 
 export function requirePositiveMoney(value: unknown, label: string): number {
   const number = requireFiniteNumber(value, label);
-  if (number <= 0) {
+  if (roundMoney(number) <= 0) {
     throw new Error(`${label} должна быть больше нуля`);
   }
   return roundMoney(number);

@@ -118,10 +118,15 @@ export class RepairsService {
       if (newStatus === 'ISSUED' && ticket.status === 'ISSUED') {
         throw new Error('Этот ремонт уже был выдан клиенту');
       }
+      if (ticket.status === 'ISSUED' && newStatus !== ticket.status) {
+        throw new Error('Выданный ремонт закрыт. Для повторного обращения создайте новую квитанцию');
+      }
       if (newStatus === 'ISSUED' && ticket.status !== 'READY') throw new Error('Сначала отметьте ремонт как готовый к выдаче');
       if (newStatus === ticket.status) return ticket;
 
-      const costVal = finalCostTjs !== undefined && finalCostTjs !== null ? Number(finalCostTjs) : (ticket.finalCostTjs || ticket.estimatedCostTjs || 0);
+      const costVal = finalCostTjs !== undefined && finalCostTjs !== null
+        ? requireNonNegativeMoney(finalCostTjs, 'Стоимость ремонта')
+        : (ticket.finalCostTjs ?? ticket.estimatedCostTjs ?? 0);
 
       // Snapshot in USD only when the final cost is actually being decided right now — an
       // explicit new value, or the first time it's ever being set (e.g. carried over from the
@@ -138,11 +143,11 @@ export class RepairsService {
       }
 
       const updated = await tx.repairTicket.update({
-        where: { id: ticketId },
+        where: { id: ticketId, status: ticket.status, updatedAt: ticket.updatedAt },
         data: {
           status: newStatus as any,
-          finalCostTjs: costVal > 0 ? costVal : ticket.finalCostTjs,
-          finalCostUsd: costVal > 0 ? finalCostUsd : ticket.finalCostUsd,
+          finalCostTjs: costVal,
+          finalCostUsd: costVal > 0 ? finalCostUsd : 0,
           exchangeRate: costVal > 0 ? operationRate : ticket.exchangeRate,
           statusHistory: { create: [{ status: newStatus as any, updatedByUserId, note }] },
         },

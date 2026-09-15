@@ -1,16 +1,7 @@
 import { prisma } from '../../prisma/prisma.service';
 import type { TransactionClient } from '../../prisma/prisma.service';
-
-export function getBusinessDateKey(date: Date = new Date()): string {
-  const parts = new Intl.DateTimeFormat('en-US', {
-    timeZone: process.env.BUSINESS_TIME_ZONE || 'Asia/Tashkent',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).formatToParts(date);
-  const value = (type: Intl.DateTimeFormatPartTypes) => parts.find((part) => part.type === type)?.value;
-  return `${value('year')}-${value('month')}-${value('day')}`;
-}
+import { getBusinessDateKey } from '../../common/business-date';
+export { getBusinessDateKey } from '../../common/business-date';
 
 export async function getRateForDate(date: Date): Promise<number | null> {
   const rate = await prisma.exchangeRate.findUnique({ where: { date: getBusinessDateKey(date) } });

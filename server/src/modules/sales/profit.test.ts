@@ -78,3 +78,20 @@ describe('refund owner allocations', () => {
     ] } }], currentOwners, 0)).toThrow('исходное распределение');
   });
 });
+
+
+describe('exact owner allocation', () => {
+  const owners = [{ id: 'a', profitSharePercent: 50 }, { id: 'b', profitSharePercent: 50 }];
+  it.each([0.01, 0.03, 1.01, -0.01, -0.03, 100.99])('preserves the total for %s', (amount) => {
+    const allocated = allocateOwnerProfit(amount, owners);
+    expect(Math.round(allocated.reduce((sum, row) => sum + row.amountUsd, 0) * 100)).toBe(Math.round(amount * 100));
+    expect(allocateOwnerProfit(amount, [...owners].reverse()).reverse()).toEqual(allocated);
+  });
+  it('does not allocate a remainder to zero-share owners', () => {
+    expect(allocateOwnerProfit(0.01, [{ id: 'a', profitSharePercent: 0 }, { id: 'b', profitSharePercent: 100 }]))
+      .toEqual([{ ownerId: 'a', amountUsd: 0 }, { ownerId: 'b', amountUsd: 0.01 }]);
+  });
+  it('rejects invalid shares before booking money', () => {
+    expect(() => allocateOwnerProfit(100, [{ id: 'a', profitSharePercent: 99.99 }])).toThrow('100%');
+  });
+});

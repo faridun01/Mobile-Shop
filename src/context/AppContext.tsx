@@ -669,7 +669,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       case 'OWNER_TX':
         return [fetchOwners, fetchOwnerTransactions, fetchStores];
       case 'REPAIR_UPDATED':
-        return [fetchRepairs];
+        return [fetchRepairs, fetchExpenses, fetchStores, fetchOwners];
       case 'STORE_UPDATED':
         return [fetchStores];
       case 'SUPPLIER_PAYMENT':
@@ -1060,7 +1060,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         method: 'PATCH',
         body: JSON.stringify({ status: newStatus, note, finalCostTjs: costTjs }),
       });
-      await fetchRepairs();
+      await Promise.all([fetchRepairs(), fetchExpenses(), fetchStores(), fetchOwners()]);
       return { success: true };
     } catch (err) {
       return { success: false, message: errorMessage(err, 'Не удалось обновить статус ремонта') };

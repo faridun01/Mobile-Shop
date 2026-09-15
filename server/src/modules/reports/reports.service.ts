@@ -1,9 +1,10 @@
 import { prisma } from '../../prisma/prisma.service';
-import { getBusinessDateKey, getRateForDate } from '../exchange-rate/exchange-rate.service';
+import { getRateForDate } from '../exchange-rate/exchange-rate.service';
 import { calculateRecognizedProfit } from '../sales/profit';
 import { roundMoney } from '../../common/money';
 
-export type ReportPeriod = 'TODAY' | 'MONTH' | 'SPECIFIC_MONTH' | 'ALL';
+import { dateRangeForPeriod, type ReportPeriod } from '../../common/business-date';
+export { dateRangeForPeriod, type ReportPeriod } from '../../common/business-date';
 
 export interface ReportsSummaryInput {
   period: ReportPeriod;
@@ -13,34 +14,21 @@ export interface ReportsSummaryInput {
 
 const IN_STOCK_STATUSES = ['STORE_STOCK', 'IN_STOCK_AFTER_EXCHANGE'] as const;
 
-/**
- * Mirrors the date-window semantics the frontend used to apply client-side via
- * `sale.date.startsWith(dateKey)` on the raw ISO `createdAt` string — that compared the
- * UTC calendar day, not the business (Asia/Tashkent) day, so the boundaries here match
- * that exactly (same numbers before/after moving this to the server).
- */
-export function dateRangeForPeriod(period: ReportPeriod, month?: string): { gte: Date; lt: Date } | undefined {
-  if (period === 'ALL') return undefined;
-
-  if (period === 'TODAY') {
-    const todayStr = getBusinessDateKey();
-    const start = new Date(`${todayStr}T00:00:00.000Z`);
-    return { gte: start, lt: new Date(start.getTime() + 24 * 60 * 60 * 1000) };
-  }
-
-  const monthStr = period === 'SPECIFIC_MONTH' ? month : getBusinessDateKey().substring(0, 7);
-  if (!monthStr || !/^\d{4}-\d{2}$/.test(monthStr)) return undefined;
-  const [year, mon] = monthStr.split('-').map(Number);
-  const start = new Date(Date.UTC(year, mon - 1, 1));
-  const end = new Date(Date.UTC(mon === 12 ? year + 1 : year, mon === 12 ? 0 : mon, 1));
-  return { gte: start, lt: end };
-}
-
 function dateWithinRange(iso: string | Date | null | undefined, range?: { gte: Date; lt: Date }): boolean {
   if (!range) return true;
   if (!iso) return false;
   const t = new Date(iso).getTime();
   return t >= range.gte.getTime() && t < range.lt.getTime();
+}
+
+function groupByStore<T extends { storeId: string }>(rows: T[]): Map<string, T[]> {
+  const groups = new Map<string, T[]>();
+  for (const row of rows) {
+    const group = groups.get(row.storeId);
+    if (group) group.push(row);
+    else groups.set(row.storeId, [row]);
+  }
+  return groups;
 }
 
 export async function computeReportsSummary(input: ReportsSummaryInput) {
@@ -79,7 +67,7 @@ export async function computeReportsSummary(input: ReportsSummaryInput) {
     prisma.expense.findMany({ where: dateRange ? { createdAt: dateRange } : undefined }),
     // Supplier bonuses aren't a high-growth table (one row per negotiated bonus, not per
     // transaction) so they're just fetched in full and filtered in memory, same as before.
-    prisma.supplierBonus.findMany({ include: { freeDevices: true } }),
+    prisma.supplierBonus.findMany({ select: { bonusType: true, amountUsd: true, dateReceived: true, exchangeRate: true, status: true } }),
     // Fetched across all stores (not just storeFilter) so the per-store breakdown below can
     // fold each store's own penalties into its "Прибыль" the same way the overall total does —
     // otherwise a refund's retained penalty would only ever show up in the all-stores figure.
@@ -154,7 +142,7 @@ export async function computeReportsSummary(input: ReportsSummaryInput) {
 
     sale.saleItems.forEach((item) => {
       unitsSold++;
-      const itemCostUsd = item.costBasisUsd || item.purchaseCostUsd || 0;
+      const itemCostUsd = item.costBasisUsd ?? item.purchaseCostUsd ?? 0;
       const itemPriceUsd = item.salePriceUsd || +(item.salePriceTjs / saleRate).toFixed(2);
       const itemProfitUsd = +(itemPriceUsd - itemCostUsd).toFixed(2);
 
@@ -174,15 +162,15 @@ export async function computeReportsSummary(input: ReportsSummaryInput) {
   });
 
   const grossProfitUsd = +(revenueUsd - cogsUsd).toFixed(2);
-  const revenueTjs = Math.round(historicalRevenueTjs);
-  const cogsTjs = Math.round(historicalCogsTjs);
+  const revenueTjs = roundMoney(historicalRevenueTjs);
+  const cogsTjs = roundMoney(historicalCogsTjs);
   const grossProfitTjs = revenueTjs - cogsTjs;
   const grossMarginPercent = revenueUsd > 0 ? +((grossProfitUsd / revenueUsd) * 100).toFixed(1) : 0;
 
   const expensesTjs = periodExpenses.reduce((acc, e) => acc + (e.amountTjs || 0), 0);
   const expensesUsd = +periodExpenses.reduce((acc, e) => acc + (e.amountUsd ?? ((e.amountTjs || 0) / (e.exchangeRate || rate))), 0).toFixed(2);
 
-  const periodCashBonuses = allBonuses.filter((b) => b.bonusType === 'CASH_DISCOUNT' && b.amountUsd && dateWithinRange(b.dateReceived, dateRange));
+  const periodCashBonuses = allBonuses.filter((b) => !storeFilter && b.bonusType === 'CASH_DISCOUNT' && b.amountUsd && dateWithinRange(b.dateReceived, dateRange));
   const periodCashBonusesUsd = periodCashBonuses.reduce((acc, b) => acc + (b.amountUsd || 0), 0);
   const periodCashBonusesTjs = periodCashBonuses.reduce((acc, b) => acc + (b.amountUsd || 0) * b.exchangeRate, 0);
 
@@ -200,19 +188,21 @@ export async function computeReportsSummary(input: ReportsSummaryInput) {
   }
 
   const netProfitUsd = +(grossProfitUsd - expensesUsd + periodCashBonusesUsd + periodRefundPenaltiesUsd).toFixed(2);
-  const netProfitTjs = Math.round(grossProfitTjs - expensesTjs + periodCashBonusesTjs + periodRefundPenaltiesTjs);
+  const netProfitTjs = roundMoney(grossProfitTjs - expensesTjs + periodCashBonusesTjs + periodRefundPenaltiesTjs);
 
-  const totalSupplierDebtUsd = supplierDebtAgg._sum.totalDebtUsd || 0;
-  const totalSupplierDebtTjs = Math.round(totalSupplierDebtUsd * rate);
+  const totalSupplierDebtUsd = Number(supplierDebtAgg._sum.totalDebtUsd ?? 0);
+  const totalSupplierDebtTjs = roundMoney(totalSupplierDebtUsd * rate);
 
-  const mainWarehouseStockCostUsd = +mainWarehouseStock.reduce((sum, d) => sum + (d.costBasisUsd || d.purchasePriceUsd || 0), 0).toFixed(2);
-  const mainWarehouseStockCostTjs = Math.round(mainWarehouseStockCostUsd * rate);
+  const mainWarehouseStockCostUsd = +mainWarehouseStock.reduce((sum, d) => sum + (d.costBasisUsd ?? d.purchasePriceUsd ?? 0), 0).toFixed(2);
+  const mainWarehouseStockCostTjs = roundMoney(mainWarehouseStockCostUsd * rate);
   const mainWarehouseCashTjs = mainWarehouseStore?.cashBalanceTjs || 0;
   const mainWarehouseCashUsd = +(mainWarehouseCashTjs / rate).toFixed(2);
 
+  const salesByStore = groupByStore(periodSalesAllStores);
+  const stockByStore = groupByStore(retailStock);
   const storeBreakdown = retailStores
     .map((store) => {
-      const storeSales = periodSalesAllStores.filter((s) => s.storeId === store.id);
+      const storeSales = (salesByStore.get(store.id) ?? []);
       let storeRevenueUsd = 0;
       let storeRevenueTjs = 0;
       let storeCogsUsd = 0;
@@ -233,8 +223,8 @@ export async function computeReportsSummary(input: ReportsSummaryInput) {
         storeProfitTjs += sale.totalTjs - saleCogsUsd * saleRate;
         storeUnits += sale.saleItems.length;
       });
-      const stock = retailStock.filter((d) => d.storeId === store.id);
-      const stockCostUsd = stock.reduce((sum, d) => sum + (d.costBasisUsd || d.purchasePriceUsd || 0), 0);
+      const stock = (stockByStore.get(store.id) ?? []);
+      const stockCostUsd = stock.reduce((sum, d) => sum + (d.costBasisUsd ?? d.purchasePriceUsd ?? 0), 0);
       // Same "с учетом возвратов" treatment as the overall totals: a refund's original
       // margin is gone, but the withheld penalty is real retained profit and counts here.
       const storePenalty = refundPenaltiesByStore.get(store.id) || { usd: 0, tjs: 0 };
@@ -242,17 +232,17 @@ export async function computeReportsSummary(input: ReportsSummaryInput) {
         storeId: store.id,
         storeName: store.name,
         revenueUsd: +storeRevenueUsd.toFixed(2),
-        revenueTjs: Math.round(storeRevenueTjs),
+        revenueTjs: roundMoney(storeRevenueTjs),
         cogsUsd: +storeCogsUsd.toFixed(2),
-        cogsTjs: Math.round(storeCogsTjs),
+        cogsTjs: roundMoney(storeCogsTjs),
         profitUsd: +(storeProfitUsd + storePenalty.usd).toFixed(2),
-        profitTjs: Math.round(storeProfitTjs + storePenalty.tjs),
+        profitTjs: roundMoney(storeProfitTjs + storePenalty.tjs),
         unitsSold: storeUnits,
         salesCount: storeSales.length,
         cashTjs: store.cashBalanceTjs,
         stockCount: stock.length,
         stockCostUsd: +stockCostUsd.toFixed(2),
-        stockCostTjs: Math.round(stockCostUsd * rate),
+        stockCostTjs: roundMoney(stockCostUsd * rate),
       };
     })
     .sort((a, b) => b.revenueUsd - a.revenueUsd);
@@ -277,18 +267,18 @@ export async function computeReportsSummary(input: ReportsSummaryInput) {
     // the per-store cards (storeBreakdown.profitUsd/Tjs below) and netProfitUsd/Tjs all build
     // on, so they can no longer disagree the way the old client-side per-item calc did.
     profitUsd: +(grossProfitUsd + periodRefundPenaltiesUsd).toFixed(2),
-    profitTjs: Math.round(grossProfitTjs + periodRefundPenaltiesTjs),
+    profitTjs: roundMoney(grossProfitTjs + periodRefundPenaltiesTjs),
     expensesTjs,
     expensesUsd,
     periodRefundPenaltiesUsd: roundMoney(periodRefundPenaltiesUsd),
-    periodRefundPenaltiesTjs: Math.round(periodRefundPenaltiesTjs),
+    periodRefundPenaltiesTjs: roundMoney(periodRefundPenaltiesTjs),
     netProfitUsd,
     netProfitTjs,
     periodCashBonusesUsd: roundMoney(periodCashBonusesUsd),
-    periodCashBonusesTjs: Math.round(periodCashBonusesTjs),
+    periodCashBonusesTjs: roundMoney(periodCashBonusesTjs),
     giftDeviceUnitsSold,
     giftDeviceProfitUsd: +giftDeviceProfitUsd.toFixed(2),
-    giftDeviceProfitTjs: Math.round(giftDeviceProfitTjs),
+    giftDeviceProfitTjs: roundMoney(giftDeviceProfitTjs),
     periodFreeDeviceBonusesReceived,
     freeDeviceBonusesInStock,
     totalSupplierDebtUsd: +totalSupplierDebtUsd.toFixed(2),

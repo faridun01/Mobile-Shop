@@ -8,6 +8,8 @@ import { soundEffects } from '../../utils/sound';
 const READER_ELEMENT_ID = 'ms-barcode-scanner-viewport';
 const CONFIRMATION_WINDOW_MS = 800;
 const REQUIRED_MATCHING_FRAMES = 2;
+// Shared across remounts: a new camera waits for the previous stream to stop.
+let cameraRelease: Promise<void> = Promise.resolve();
 
 type BarcodeCameraCapabilities = MediaTrackCapabilities & {
   focusMode?: string[];
@@ -73,8 +75,11 @@ export const ScannerModal: React.FC = () => {
       // Closing the dialog will stop the camera even if pause is unavailable.
     }
     soundEffects.playAddToCartSuccess();
-    scannerCallback?.(trimmed);
-    closeScanner();
+    try {
+      scannerCallback?.(trimmed);
+    } finally {
+      closeScanner();
+    }
   };
 
   const confirmScan = (decodedText: string) => {
@@ -164,14 +169,17 @@ export const ScannerModal: React.FC = () => {
     let cancelled = false;
     scanLockedRef.current = false;
     pendingScanRef.current = { code: '', matches: 0, seenAt: 0 };
-    const instance = new Html5Qrcode(READER_ELEMENT_ID, {
+    let instance: Html5Qrcode | null = null;
+    const startPromise = cameraRelease.then(async () => {
+      if (cancelled) return;
+      instance = new Html5Qrcode(READER_ELEMENT_ID, {
       formatsToSupport: SUPPORTED_FORMATS,
       useBarCodeDetectorIfSupported: true,
       verbose: false,
     });
     scannerRef.current = instance;
 
-    instance
+    await instance
       .start(
         { facingMode: 'environment' },
         {
@@ -200,7 +208,7 @@ export const ScannerModal: React.FC = () => {
         }
       )
       .then(async () => {
-        if (cancelled) return;
+        if (cancelled || !instance) return;
         try {
           const capabilities = instance.getRunningTrackCapabilities() as BarcodeCameraCapabilities;
           setTorchSupported(!!capabilities.torch);
@@ -228,7 +236,7 @@ export const ScannerModal: React.FC = () => {
           setTorchSupported(false);
         }
       })
-      .catch((error: unknown) => {
+    }).catch((error: unknown) => {
         if (!cancelled) {
           const errorName = typeof error === 'object' && error && 'name' in error ? String(error.name) : '';
           setCameraError(
@@ -243,14 +251,12 @@ export const ScannerModal: React.FC = () => {
 
     return () => {
       cancelled = true;
-      const running = scannerRef.current;
-      scannerRef.current = null;
-      if (running) {
-        Promise.resolve()
-          .then(() => running.stop())
-          .catch(() => {})
-          .finally(() => running.clear());
-      }
+      if (scannerRef.current === instance) scannerRef.current = null;
+      cameraRelease = startPromise.then(async () => {
+        if (!instance) return;
+        try { await instance.stop(); } catch { /* Start may have failed. */ }
+        try { instance.clear(); } catch { /* Viewport may already be unmounted. */ }
+      });
     };
   }, [isScannerOpen]);
 

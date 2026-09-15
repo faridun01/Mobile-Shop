@@ -8,10 +8,21 @@ import { roundMoney } from '../../common/money';
 export type OwnerProfitAllocation = { ownerId: string; amountUsd: number };
 
 export function allocateOwnerProfit(amountUsd: number, owners: { id: string; profitSharePercent: number }[]): OwnerProfitAllocation[] {
-  return owners.map((owner) => ({
-    ownerId: owner.id,
-    amountUsd: roundMoney(amountUsd * owner.profitSharePercent / 100),
-  }));
+  if (!owners.length) return [];
+  const totalShare = owners.reduce((sum, owner) => sum + owner.profitSharePercent, 0);
+  if (owners.some((owner) => !Number.isFinite(owner.profitSharePercent) || owner.profitSharePercent < 0) ||
+      Math.abs(totalShare - 100) > 0.000001 || new Set(owners.map((owner) => owner.id)).size !== owners.length) {
+    throw new Error('Доли владельцев должны составлять ровно 100%');
+  }
+  const cents = Math.round(Math.abs(roundMoney(amountUsd)) * 100);
+  const parts = owners.map((owner) => {
+    const exact = cents * owner.profitSharePercent / totalShare;
+    return { ownerId: owner.id, cents: Math.floor(exact), remainder: exact - Math.floor(exact) };
+  });
+  const remainder = cents - parts.reduce((sum, part) => sum + part.cents, 0);
+  const ranked = [...parts].sort((a, b) => b.remainder - a.remainder || a.ownerId.localeCompare(b.ownerId));
+  for (let i = 0; i < remainder; i++) ranked[i].cents++;
+  return parts.map((part) => ({ ownerId: part.ownerId, amountUsd: part.cents === 0 ? 0 : Math.sign(amountUsd) * part.cents / 100 }));
 }
 
 /** Reverse the amounts actually booked, including rounding and every exchange. */

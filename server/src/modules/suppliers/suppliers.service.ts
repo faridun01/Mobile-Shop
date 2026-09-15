@@ -74,17 +74,22 @@ export class SuppliersService {
 
       for (const invoice of openInvoices) {
         if (remainingToPay <= 0) break;
-        const remainingOnInvoice = invoice.totalAmountUsd - invoice.paidAmountUsd;
+        const remainingOnInvoice = roundMoney(invoice.totalAmountUsd - invoice.paidAmountUsd);
         if (remainingOnInvoice <= 0) continue;
 
         const payForThis = Math.min(remainingOnInvoice, remainingToPay);
-        await tx.supplierInvoice.update({ where: { id: invoice.id }, data: { paidAmountUsd: { increment: payForThis } } });
+        const invoiceGuard = await tx.supplierInvoice.updateMany({
+          where: { id: invoice.id, paidAmountUsd: invoice.paidAmountUsd, totalAmountUsd: invoice.totalAmountUsd },
+          data: { paidAmountUsd: { increment: payForThis } },
+        });
+        if (invoiceGuard.count !== 1) throw new Error('Накладная оплачивается параллельно, обновите данные и повторите оплату');
         await tx.supplierPaymentAllocation.create({
           data: { paymentId: payment.id, invoiceId: invoice.id, allocatedAmountUsd: payForThis },
         });
         allocations.push({ invoiceId: invoice.id, invoiceNumber: invoice.invoiceNumber, allocatedAmountUsd: payForThis });
-        remainingToPay -= payForThis;
+        remainingToPay = roundMoney(remainingToPay - payForThis);
       }
+      if (remainingToPay !== 0) throw new Error('Долг поставщика не совпадает с остатками накладных. Требуется сверка');
 
       const debtGuard = await tx.supplier.updateMany({
         where: { id: input.supplierId, totalDebtUsd: { gte: amountUsd } },
@@ -98,6 +103,7 @@ export class SuppliersService {
       let store = null;
       if (input.sourceAccount === 'STORE_CASH' && input.storeId) {
         store = await tx.store.findUnique({ where: { id: input.storeId } });
+        if (!store || !store.active) throw new Error('Касса магазина не найдена или неактивна');
         if (store) {
           // Unlike sales/expenses, supplier payments may be funded from the main
           // warehouse's account — purchases (приходы) are recorded there and its
@@ -154,8 +160,8 @@ export class SuppliersService {
       const supplier = await tx.supplier.findUnique({ where: { id: invoice.supplierId } });
       if (!supplier) throw new Error('Поставщик не найден');
 
-      const remainingOnInvoice = invoice.totalAmountUsd - invoice.paidAmountUsd;
-      if (amountUsd > remainingOnInvoice + 0.01) throw new Error('Сумма оплаты превышает остаток долга по накладной');
+      const remainingOnInvoice = roundMoney(invoice.totalAmountUsd - invoice.paidAmountUsd);
+      if (amountUsd > remainingOnInvoice) throw new Error('Сумма оплаты превышает остаток долга по накладной');
 
       const payment = await tx.supplierPayment.create({
         data: {
@@ -169,7 +175,7 @@ export class SuppliersService {
       });
 
       const invoiceGuard = await tx.supplierInvoice.updateMany({
-        where: { id: input.invoiceId, paidAmountUsd: { lte: invoice.totalAmountUsd - amountUsd + 0.01 } },
+        where: { id: input.invoiceId, paidAmountUsd: invoice.paidAmountUsd, totalAmountUsd: invoice.totalAmountUsd },
         data: { paidAmountUsd: { increment: amountUsd } },
       });
       if (invoiceGuard.count !== 1) throw new Error('Данные накладной изменились, обновите страницу и повторите оплату');
@@ -190,6 +196,7 @@ export class SuppliersService {
       let store = null;
       if (input.sourceAccount === 'STORE_CASH' && input.storeId) {
         store = await tx.store.findUnique({ where: { id: input.storeId } });
+        if (!store || !store.active) throw new Error('Касса магазина не найдена или неактивна');
         if (store) {
           const cashAmountTjs = roundMoney(amountUsd * exchangeRate);
           const cashGuard = await tx.store.updateMany({ where: { id: input.storeId, cashBalanceTjs: { gte: cashAmountTjs } }, data: { cashBalanceTjs: { decrement: cashAmountTjs } } });
@@ -498,41 +505,15 @@ export class SuppliersService {
       const supplier = await tx.supplier.findUnique({ where: { id } });
       if (!supplier) throw new Error('Поставщик не найден');
 
-      // Devices with transaction history (sold, transferred, sent to repair) cannot be
-      // hard-deleted — they're referenced by SaleItem/TransferItem/RepairTicket rows with
-      // no cascade. Deleting them anyway would crash with a raw FK constraint error.
-      const devices = await tx.device.findMany({ where: { supplierId: id }, select: { id: true } });
-      const deviceIds = devices.map((d) => d.id);
-      if (deviceIds.length > 0) {
-        const hasHistory = await deviceHasTransactionHistory(tx, deviceIds);
-        if (hasHistory) {
-          throw new Error('Нельзя удалить поставщика: часть его устройств уже продана, перемещена или отправлена в ремонт');
-        }
+      // A supplier with purchases/payments/bonuses must retain its financial history.
+      const history = await tx.supplier.findUnique({
+        where: { id },
+        select: { _count: { select: { devices: true, invoices: true, payments: true, bonuses: true } } },
+      });
+      if (history && Object.values(history._count).some((count) => count > 0)) {
+        throw new Error('?????? ??????? ?????????? ? ??????????, ???????? ??? ????????: ?????????? ????????? ?????????? ???????');
       }
 
-      // Delete allocations, payments, bonus devices, bonuses, group items, devices, and invoices
-      const payments = await tx.supplierPayment.findMany({ where: { supplierId: id } });
-      const paymentIds = payments.map((p) => p.id);
-      if (paymentIds.length > 0) {
-        await tx.supplierPaymentAllocation.deleteMany({ where: { paymentId: { in: paymentIds } } });
-        await tx.supplierPayment.deleteMany({ where: { supplierId: id } });
-      }
-
-      const bonuses = await tx.supplierBonus.findMany({ where: { supplierId: id } });
-      const bonusIds = bonuses.map((b) => b.id);
-      if (bonusIds.length > 0) {
-        await tx.supplierBonusDevice.deleteMany({ where: { bonusId: { in: bonusIds } } });
-        await tx.supplierBonus.deleteMany({ where: { supplierId: id } });
-      }
-
-      const invoices = await tx.supplierInvoice.findMany({ where: { supplierId: id } });
-      const invoiceIds = invoices.map((i) => i.id);
-      if (invoiceIds.length > 0) {
-        await tx.invoiceGroup.deleteMany({ where: { invoiceId: { in: invoiceIds } } });
-      }
-
-      await tx.device.deleteMany({ where: { supplierId: id } });
-      await tx.supplierInvoice.deleteMany({ where: { supplierId: id } });
       return tx.supplier.delete({ where: { id } });
     }, { maxWait: 10000, timeout: 25000 });
   }

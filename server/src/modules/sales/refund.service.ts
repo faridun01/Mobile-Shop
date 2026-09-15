@@ -112,21 +112,9 @@ export class RefundService {
           referenceId: sale.id,
         },
       });
-      if (penaltyFeeTjs > 0) {
-        await tx.ledgerEntry.create({
-          data: {
-            type: 'REFUND',
-            description: `Штраф за возврат по чеку #${sale.receiptNumber} (100% в прибыль)`,
-            amountTjs: penaltyFeeTjs,
-            amountUsd: penaltyUsd,
-            exchangeRate: rate,
-            storeId: sale.storeId,
-            storeName: store?.name,
-            userName: actor.name,
-            referenceId: sale.id,
-          },
-        });
-      }
+      // The retained penalty is already included in the reduced cash refund.
+      // Its profit impact is stored on the sale and in owner allocations, not as
+      // another cash receipt (which would count the same penalty twice).
 
       await tx.auditLog.create({
         data: {

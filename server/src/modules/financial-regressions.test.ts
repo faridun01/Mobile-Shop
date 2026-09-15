@@ -1,0 +1,69 @@
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+const db = vi.hoisted(() => {
+  const model = () => ({ findUnique: vi.fn(), findMany: vi.fn(), update: vi.fn(), updateMany: vi.fn(),
+    create: vi.fn(), createMany: vi.fn(), delete: vi.fn() });
+  return { supplier: model(), supplierInvoice: model(), supplierPayment: model(), supplierPaymentAllocation: model(),
+    store: model(), ledgerEntry: model(), auditLog: model(), sale: model(), owner: model(), device: model(), deviceTimelineEvent: model() };
+});
+vi.mock('../prisma/prisma.service', () => ({ prisma: { $transaction: (fn: (tx: typeof db) => unknown) => fn(db) } }));
+vi.mock('../common/actor', () => ({ resolveActor: async () => ({ id: 'admin', name: 'Admin', role: 'ADMIN' }) }));
+vi.mock('./exchange-rate/exchange-rate.service', () => ({ requireTodayRate: async () => 10, getRateForDate: async () => 10 }));
+import { SuppliersService } from './suppliers/suppliers.service';
+import { RefundService } from './sales/refund.service';
+
+beforeEach(() => {
+  vi.resetAllMocks();
+  db.supplier.findUnique.mockResolvedValue({ id: 'supplier', name: 'Supplier', totalDebtUsd: 200 });
+  db.supplierInvoice.findMany.mockResolvedValue([{ id: 'invoice', invoiceNumber: '1', totalAmountUsd: 100, paidAmountUsd: 0 }]);
+  db.supplierInvoice.findUnique.mockResolvedValue({ id: 'invoice', supplierId: 'supplier', totalAmountUsd: 100, paidAmountUsd: 50 });
+  db.supplierInvoice.updateMany.mockResolvedValue({ count: 1 });
+  db.supplier.updateMany.mockResolvedValue({ count: 1 });
+  db.supplierPayment.create.mockResolvedValue({ id: 'payment' });
+});
+
+describe('supplier payment safeguards', () => {
+  const input = { supplierId: 'supplier', amountUsd: 50, sourceAccount: 'MAIN_ACCOUNT' as const, createdByUserId: 'admin' };
+  it('rejects an invoice changed by a concurrent payment before allocating funds', async () => {
+    db.supplierInvoice.updateMany.mockResolvedValue({ count: 0 });
+    await expect(SuppliersService.pay(input)).rejects.toThrow('параллельно');
+    expect(db.supplierPaymentAllocation.create).not.toHaveBeenCalled();
+    expect(db.ledgerEntry.create).not.toHaveBeenCalled();
+  });
+  it('rejects supplier debt that cannot be allocated to invoices', async () => {
+    await expect(SuppliersService.pay({ ...input, amountUsd: 150 })).rejects.toThrow('сверка');
+    expect(db.ledgerEntry.create).not.toHaveBeenCalled();
+  });
+  it('rejects a nonexistent cash register', async () => {
+    db.store.findUnique.mockResolvedValue(null);
+    await expect(SuppliersService.pay({ ...input, sourceAccount: 'STORE_CASH', storeId: 'missing' })).rejects.toThrow('Касса');
+    expect(db.ledgerEntry.create).not.toHaveBeenCalled();
+  });
+  it('does not overpay an invoice by even one cent', async () => {
+    await expect(SuppliersService.payInvoice({ invoiceId: 'invoice', amountUsd: 50.01, sourceAccount: 'MAIN_ACCOUNT', createdByUserId: 'admin' })).rejects.toThrow('остаток');
+    expect(db.supplierPayment.create).not.toHaveBeenCalled();
+  });
+  it('preserves suppliers with financial history', async () => {
+    db.supplier.findUnique.mockResolvedValue({ id: 'supplier', _count: { invoices: 0, payments: 1, devices: 0, bonuses: 0 } });
+    await expect(SuppliersService.delete('supplier')).rejects.toThrow('историю');
+    expect(db.supplier.delete).not.toHaveBeenCalled();
+  });
+});
+
+describe('refund cash ledger', () => {
+  it('retains the penalty once: receipt 1000 minus refund 900 leaves 100', async () => {
+    db.sale.findUnique.mockResolvedValue({ id: 'sale', receiptNumber: 1, status: 'COMPLETED', totalTjs: 1000,
+      debtAmountTjs: 0, storeId: 'store', saleItems: [{ deviceId: 'device' }] });
+    db.auditLog.findMany.mockResolvedValue([{ action: 'SALE', financialDetails: { ownerProfitAllocations: [{ ownerId: 'owner', amountUsd: 20 }] } }]);
+    db.owner.findMany.mockResolvedValue([{ id: 'owner', profitSharePercent: 100 }]);
+    db.device.updateMany.mockResolvedValue({ count: 1 });
+    db.store.updateMany.mockResolvedValue({ count: 1 });
+    db.store.findUnique.mockResolvedValue({ name: 'Shop' });
+    await RefundService.refund({ saleId: 'sale', reason: 'Возврат', refundAmountTjs: 900, penaltyFeeTjs: 100, paymentMethod: 'CASH', refundedByUserId: 'admin' });
+    const cashMovement = db.ledgerEntry.create.mock.calls.reduce((sum, [entry]) => sum + entry.data.amountTjs, 0);
+    expect(1000 + cashMovement).toBe(100);
+    expect(db.owner.update).toHaveBeenCalledWith(expect.objectContaining({ data: {
+      totalAccruedProfitUsd: { increment: -10 }, availableProfitUsd: { increment: -10 },
+    } }));
+  });
+});

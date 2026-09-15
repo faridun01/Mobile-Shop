@@ -130,7 +130,7 @@ export class OwnersService {
     }));
     if (new Set(normalized.map((share) => share.ownerId)).size !== normalized.length) throw new Error('Владелец не может быть указан дважды');
     const total = normalized.reduce((sum, s) => sum + s.sharePercent, 0);
-    if (Math.abs(total - 100) > 0.01) {
+    if (Math.abs(total - 100) > 0.000001) {
       throw new Error(`Сумма долей должна равняться 100% (сейчас ${total}%)`);
     }
 
@@ -185,14 +185,15 @@ export class OwnersService {
           const exchangeRate = await requireTodayRate(tx);
           await Promise.all(sweptOwners.map(async (owner) => {
             const remaining = owner.availableProfitUsd || 0;
-            await tx.owner.update({
-              where: { id: owner.id },
+            const guard = await tx.owner.updateMany({
+              where: { id: owner.id, availableProfitUsd: remaining },
               data: {
                 capitalBalanceUsd: { increment: remaining },
                 totalReinvestedUsd: { increment: remaining },
-                availableProfitUsd: 0,
+                availableProfitUsd: { decrement: remaining },
               },
             });
+            if (guard.count !== 1) throw new Error('Прибыль изменилась во время закрытия квартала. Обновите данные и повторите');
             // Mirrors what a manual REINVEST produces — without this, capital visibly
             // grows with no matching entry in the transaction history feed.
             await tx.ownerTransaction.create({
