@@ -13,7 +13,7 @@ export default defineConfig(() => {
         registerType: 'prompt',
         injectRegister: 'auto',
         devOptions: {
-          enabled: true,
+          enabled: false,
         },
         // Workbox globPatterns already covers these files; listing them again adds
         // duplicate precache entries with different revision/cache keys.

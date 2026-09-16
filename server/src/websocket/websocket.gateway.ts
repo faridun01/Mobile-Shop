@@ -1,9 +1,11 @@
+import crypto from 'node:crypto';
 import { WebSocketServer, WebSocket } from 'ws';
 import type { Server } from 'node:http';
 import { AuthService, JwtPayload } from '../auth/auth.service';
 import { prisma } from '../prisma/prisma.service';
 
 interface ConnectedClient {
+  id: string;
   ws: WebSocket;
   user: JwtPayload;
 }
@@ -27,6 +29,7 @@ export class RealtimeSyncGateway {
     this.wss = new WebSocketServer({ server, path: '/ws' });
 
     this.wss.on('connection', async (ws: WebSocket, request) => {
+      const connectionId = crypto.randomUUID();
       const url = new URL(request.url ?? '', 'http://localhost');
       const token = url.searchParams.get('token');
       const user = token ? AuthService.verifyToken(token) : null;
@@ -36,7 +39,32 @@ export class RealtimeSyncGateway {
         return;
       }
 
-      const currentUser = await prisma.user.findUnique({ where: { id: user.userId }, select: { active: true, login: true, role: true, storeId: true } }).catch(() => null);
+      // Track early disconnect/error while awaiting the database user check
+      let isAborted = false;
+      const handleEarlyAbort = () => {
+        isAborted = true;
+      };
+      ws.once('close', handleEarlyAbort);
+      ws.once('error', handleEarlyAbort);
+
+      let currentUser = null;
+      try {
+        currentUser = await prisma.user.findUnique({
+          where: { id: user.userId },
+          select: { active: true, login: true, role: true, storeId: true }
+        });
+      } catch (err) {
+        console.error(`[WebSocket] DB error checking user for id=${connectionId}:`, err);
+      } finally {
+        ws.removeListener('close', handleEarlyAbort);
+        ws.removeListener('error', handleEarlyAbort);
+      }
+
+      // If the client aborted or closed during the async DB query, exit cleanly
+      if (isAborted || ws.readyState !== WebSocket.OPEN) {
+        return;
+      }
+
       if (!currentUser?.active) {
         ws.close(1008, 'Unauthorized');
         return;
@@ -49,15 +77,19 @@ export class RealtimeSyncGateway {
       if (existingForUser.length >= MAX_CONNECTIONS_PER_USER) {
         // Drop the oldest connection for this user rather than refusing the new one —
         // a stuck reconnect loop self-heals instead of locking the user out entirely.
-        existingForUser[0].ws.close(1008, 'Too many connections');
+        const oldest = existingForUser[0];
+        oldest.ws.close(1008, 'Too many connections');
+        this.clients.delete(oldest);
       }
 
-      const client: ConnectedClient = { ws, user };
+      const client: ConnectedClient = { id: connectionId, ws, user };
       this.clients.add(client);
-      console.log(`[WebSocket]: ${user.role} ${user.login} connected`);
+      console.log(`[WebSocket] CONNECTED    id=${connectionId} user=${user.login} role=${user.role}`);
 
-      ws.on('close', () => {
+      ws.on('close', (code, reason) => {
         this.clients.delete(client);
+        const reasonStr = reason ? reason.toString() : '';
+        console.log(`[WebSocket] DISCONNECTED id=${connectionId} user=${user.login} role=${user.role} code=${code} reason=${reasonStr}`);
       });
 
       // `close` normally follows `error` for ws, but isn't guaranteed in every case —
@@ -65,7 +97,7 @@ export class RealtimeSyncGateway {
       // tracked Set forever (broadcast() skips it via readyState, but it never gets
       // removed, and it would count against this same client's own connection cap above).
       ws.on('error', (err) => {
-        console.error(`[WebSocket]: connection error for ${user.login}`, err);
+        console.error(`[WebSocket] ERROR        id=${connectionId} user=${user.login}`, err);
         this.clients.delete(client);
       });
 
