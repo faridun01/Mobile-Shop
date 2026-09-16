@@ -15,14 +15,10 @@ export default defineConfig(() => {
         devOptions: {
           enabled: true,
         },
-        includeAssets: [
-          'favicon.svg',
-          'favicon.png',
-          'apple-touch-icon.png',
-          'maskable-icon-512x512.png',
-          'pwa-192x192.png',
-          'pwa-512x512.png'
-        ],
+        // Workbox globPatterns already covers these files; listing them again adds
+        // duplicate precache entries with different revision/cache keys.
+        includeAssets: [],
+        includeManifestIcons: false,
         manifest: {
           name: 'Mobile Shop POS & ERP',
           short_name: 'Mobile Shop',
@@ -58,10 +54,8 @@ export default defineConfig(() => {
         },
         workbox: {
           globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2,ttf}'],
-          // exceljs (~920KB) and ScannerModal/html5-qrcode (~340KB) are both already
-          // runtime-lazy (loaded only on export / on opening the scanner) — precaching
-          // them would download both in the background on every first visit regardless
-          // of whether that session ever uses either feature, on a mobile-primary app.
+          // Preserve offline access to every existing page. Only the two already
+          // on-demand dependencies stay excluded from installation.
           globIgnores: ['**/exceljs*.js', '**/ScannerModal*.js'],
           runtimeCaching: [
             // Cache static assets with CacheFirst

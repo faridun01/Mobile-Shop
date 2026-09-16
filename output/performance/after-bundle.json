@@ -1,0 +1,65 @@
+{
+  "label": "after",
+  "initial": [
+    {
+      "file": "assets/index-D54GgkEF.js",
+      "bytes": 228967,
+      "gzip": 70933
+    },
+    {
+      "file": "assets/vendor-react-Dql9hiTQ.js",
+      "bytes": 49551,
+      "gzip": 17500
+    },
+    {
+      "file": "assets/vendor-icons-48zcEsOx.js",
+      "bytes": 40794,
+      "gzip": 8368
+    }
+  ],
+  "initialJsBytes": 319312,
+  "initialJsGzip": 96801,
+  "precacheEntries": 39,
+  "precacheBytes": 945046,
+  "entries": [
+    "registerSW.js",
+    "pwa-512x512.png",
+    "pwa-192x192.png",
+    "maskable-icon-512x512.png",
+    "index.html",
+    "favicon.svg",
+    "favicon.png",
+    "apple-touch-icon.png",
+    "assets/vendor-react-Dql9hiTQ.js",
+    "assets/vendor-icons-48zcEsOx.js",
+    "assets/TransferPage-BId20Wc1.js",
+    "assets/SuppliersPage-Dl__NWL8.js",
+    "assets/StatusBanner-CNHBblSm.js",
+    "assets/StatCard-Ct3M0S45.js",
+    "assets/sound-CIOPipKE.js",
+    "assets/SettingsPage-Cx0HbM_j.js",
+    "assets/SalesHistoryPage-CbGw_pRt.js",
+    "assets/SalePage-DApBcttY.js",
+    "assets/ReportsPage-CbT3LkS3.js",
+    "assets/RepairPage-tdA5MflX.js",
+    "assets/PurchasePage-DjzVZ5u3.js",
+    "assets/NotificationsPage-CmufUH2G.js",
+    "assets/MonthPicker-J6lJokJE.js",
+    "assets/MainLayout-DJIZPL_i.js",
+    "assets/LoginPage-Berid7Vy.js",
+    "assets/InventoryPage-BfaoIsZ7.js",
+    "assets/index-D54GgkEF.js",
+    "assets/index-BprzRpwP.css",
+    "assets/FilterPillGroup-Sm9EVIq9.js",
+    "assets/exportReports-HURi3LIC.js",
+    "assets/ExpensesPage-CD99K5j_.js",
+    "assets/ExchangePage-DiGRP0Ua.js",
+    "assets/EmptyState-B7wyNwLl.js",
+    "assets/ConfirmDialog-ZTPwQzND.js",
+    "assets/Badge-GZPPLWVH.js",
+    "maskable-icon-512x512.png",
+    "pwa-192x192.png",
+    "pwa-512x512.png",
+    "manifest.webmanifest"
+  ]
+}

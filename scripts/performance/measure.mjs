@@ -3,9 +3,13 @@ import { mkdir, writeFile } from 'node:fs/promises';
 
 const label = process.argv[2] || 'before';
 const base = process.argv[3] || 'http://127.0.0.1:4173';
-const scenario = process.argv[4] || 'sale';
-const runs = Number(process.argv[5] || 3);
-const profile = process.argv.includes('--profile');
+let scenario = process.argv[4] || 'sale';
+let runs = Number(process.argv[5] || 3);
+let profile = process.argv.includes('--profile');
+if (scenario === 'sale-profile') {
+  scenario = 'sale';
+  profile = true;
+}
 const browser = await chromium.launch({ headless: true });
 const results = [];
 try {

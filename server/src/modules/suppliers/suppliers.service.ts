@@ -104,15 +104,13 @@ export class SuppliersService {
       if (input.sourceAccount === 'STORE_CASH' && input.storeId) {
         store = await tx.store.findUnique({ where: { id: input.storeId } });
         if (!store || !store.active) throw new Error('Касса магазина не найдена или неактивна');
-        if (store) {
-          // Unlike sales/expenses, supplier payments may be funded from the main
-          // warehouse's account — purchases (приходы) are recorded there and its
-          // balance is meant to fund paying those suppliers back, not just retail stores.
-          // amountUsd was collected in USD terms but store registers hold TJS; convert via today's rate if available.
-          const cashAmountTjs = roundMoney(amountUsd * exchangeRate);
-          const cashGuard = await tx.store.updateMany({ where: { id: input.storeId, cashBalanceTjs: { gte: cashAmountTjs } }, data: { cashBalanceTjs: { decrement: cashAmountTjs } } });
-          if (cashGuard.count !== 1) throw new Error('В кассе недостаточно наличных для оплаты поставщику');
-        }
+        // Unlike sales/expenses, supplier payments may be funded from the main
+        // warehouse's account — purchases (приходы) are recorded there and its
+        // balance is meant to fund paying those suppliers back, not just retail stores.
+        // amountUsd was collected in USD terms but store registers hold TJS; convert via today's rate if available.
+        const cashAmountTjs = roundMoney(amountUsd * exchangeRate);
+        const cashGuard = await tx.store.updateMany({ where: { id: input.storeId, cashBalanceTjs: { gte: cashAmountTjs } }, data: { cashBalanceTjs: { decrement: cashAmountTjs } } });
+        if (cashGuard.count !== 1) throw new Error('В кассе недостаточно наличных для оплаты поставщику');
       }
 
       await tx.ledgerEntry.create({
@@ -197,11 +195,9 @@ export class SuppliersService {
       if (input.sourceAccount === 'STORE_CASH' && input.storeId) {
         store = await tx.store.findUnique({ where: { id: input.storeId } });
         if (!store || !store.active) throw new Error('Касса магазина не найдена или неактивна');
-        if (store) {
-          const cashAmountTjs = roundMoney(amountUsd * exchangeRate);
-          const cashGuard = await tx.store.updateMany({ where: { id: input.storeId, cashBalanceTjs: { gte: cashAmountTjs } }, data: { cashBalanceTjs: { decrement: cashAmountTjs } } });
-          if (cashGuard.count !== 1) throw new Error('В кассе недостаточно наличных для оплаты поставщику');
-        }
+        const cashAmountTjs = roundMoney(amountUsd * exchangeRate);
+        const cashGuard = await tx.store.updateMany({ where: { id: input.storeId, cashBalanceTjs: { gte: cashAmountTjs } }, data: { cashBalanceTjs: { decrement: cashAmountTjs } } });
+        if (cashGuard.count !== 1) throw new Error('В кассе недостаточно наличных для оплаты поставщику');
       }
 
       await tx.ledgerEntry.create({
@@ -511,7 +507,7 @@ export class SuppliersService {
         select: { _count: { select: { devices: true, invoices: true, payments: true, bonuses: true } } },
       });
       if (history && Object.values(history._count).some((count) => count > 0)) {
-        throw new Error('?????? ??????? ?????????? ? ??????????, ???????? ??? ????????: ?????????? ????????? ?????????? ???????');
+        throw new Error('Нельзя удалить поставщика: у него есть финансовую историю. Пометьте его как неактивного');
       }
 
       return tx.supplier.delete({ where: { id } });

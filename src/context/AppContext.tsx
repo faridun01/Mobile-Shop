@@ -1528,7 +1528,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   if (!storeRef.current) {
     const initial = { ...contextValue };
     for (const key of Object.keys(initial) as (keyof AppContextType)[]) {
-      if (typeof initial[key] === 'function') {
+      if (key !== 'scannerCallback' && typeof initial[key] === 'function') {
         (initial as unknown as Record<string, unknown>)[key] = (...args: unknown[]) =>
           (latestValue.current[key] as (...values: unknown[]) => unknown)(...args);
       }
@@ -1539,7 +1539,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     latestValue.current = contextValue;
     const values: Partial<AppContextType> = {};
     for (const key of Object.keys(contextValue) as (keyof AppContextType)[]) {
-      if (typeof contextValue[key] !== 'function') {
+      if (key === 'scannerCallback' || typeof contextValue[key] !== 'function') {
         (values as Record<string, unknown>)[key] = contextValue[key];
       }
     }
@@ -1557,8 +1557,20 @@ export function useAppFields<K extends keyof AppContextType>(...keys: K[]): Pick
   const store = useContext(AppContext);
   const load = useContext(AppLoaderContext);
   if (!store) throw new Error('useAppFields must be used within AppProvider');
-  const fields = useStore(store, useShallow((state) => Object.fromEntries(keys.map((key) => [key, state[key]])) as Pick<AppContextType, K>));
   const keySignature = keys.join(',');
+  const selector = useMemo(
+    () => (state: AppContextType) => {
+      const slice = {} as Pick<AppContextType, K>;
+      for (let i = 0; i < keys.length; i++) {
+        const k = keys[i];
+        slice[k] = state[k];
+      }
+      return slice;
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [keySignature]
+  );
+  const fields = useStore(store, useShallow(selector));
   useEffect(() => { load?.(keys); }, [load, keySignature]);
   return fields;
 }

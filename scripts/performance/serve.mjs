@@ -32,6 +32,10 @@ const server = http.createServer(async (req, res) => {
   }
   if (url.pathname.startsWith('/api/')) {
     await new Promise((resolve) => setTimeout(resolve, 100));
+    if (url.pathname === '/api/exchange-rate/today') {
+      const todayStr = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Tashkent' }).format(new Date());
+      data['/api/exchange-rate/today'] = { date: todayStr, rate: 10, createdAt: new Date().toISOString(), createdByUserId: user.id };
+    }
     const body = Buffer.from(JSON.stringify(data[url.pathname] ?? []));
     const payload = gzipSync(body);
     res.writeHead(200, { 'Content-Type': 'application/json', 'Content-Encoding': 'gzip', 'Cache-Control': 'no-store', 'Content-Length': payload.length });

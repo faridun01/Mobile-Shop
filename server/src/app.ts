@@ -403,6 +403,10 @@ app.use((error: any, req: Request, res: Response, _next: NextFunction) => {
   // every service for user-facing Russian messages) are safe to forward as-is below.
   const isPrismaError = error && typeof error === 'object' && typeof error.name === 'string' && error.name.startsWith('Prisma');
   if (isPrismaError) {
+    if ((error as any).name === 'PrismaClientInitializationError' || (error as any).code === 'P1001' || String((error as any).message).includes("Can't reach database server")) {
+      res.status(503).json({ message: 'Ошибка подключения к базе данных: PostgreSQL не запущен (порт 5435)' });
+      return;
+    }
     res.status(400).json({ message: 'Некорректный запрос' });
     return;
   }
