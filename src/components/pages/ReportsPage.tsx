@@ -114,6 +114,7 @@ export const ReportsPage: React.FC = () => {
   useEffect(() => {
     if (isSeller) return;
     let cancelled = false;
+    const controller = new AbortController();
     setSummaryLoading(true);
 
     const params = new URLSearchParams({ period });
@@ -121,7 +122,7 @@ export const ReportsPage: React.FC = () => {
     if (selectedStore !== 'all') params.set('storeId', selectedStore);
     const query = params.toString();
 
-    apiClient<ReportsSummary>(`/reports/summary?${query}`)
+    apiClient<ReportsSummary>(`/reports/summary?${query}`, { signal: controller.signal })
       .then((summaryData) => {
         if (cancelled) return;
         setSummary(summaryData);
@@ -134,7 +135,7 @@ export const ReportsPage: React.FC = () => {
         if (!cancelled) setSummaryLoading(false);
       });
 
-    return () => { cancelled = true; };
+    return () => { cancelled = true; controller.abort(); };
   }, [isSeller, period, selectedMonth, selectedStore]);
 
   // The full itemized sales/expenses list is only ever needed for the "Просмотр и скачивание"
@@ -148,6 +149,7 @@ export const ReportsPage: React.FC = () => {
   useEffect(() => {
     if (!salesReportStoreId) return;
     let cancelled = false;
+    const controller = new AbortController();
     setReportDataLoading(true);
 
     const params = new URLSearchParams({ period });
@@ -156,8 +158,8 @@ export const ReportsPage: React.FC = () => {
     const query = params.toString();
 
     Promise.all([
-      apiClient<any[]>(`/sales?${query}`),
-      apiClient<any[]>(`/expenses?${query}`),
+      apiClient<any[]>(`/sales?${query}`, { signal: controller.signal }),
+      apiClient<any[]>(`/expenses?${query}`, { signal: controller.signal }),
     ])
       .then(([rawSales, rawExpenses]) => {
         if (cancelled) return;
@@ -173,7 +175,7 @@ export const ReportsPage: React.FC = () => {
         if (!cancelled) setReportDataLoading(false);
       });
 
-    return () => { cancelled = true; };
+    return () => { cancelled = true; controller.abort(); };
   }, [salesReportStoreId, period, selectedMonth, namesLookup]);
 
   const salesReportTable = useMemo(() => {

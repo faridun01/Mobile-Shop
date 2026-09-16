@@ -21,11 +21,25 @@ const data = {
   '/api/transfers': [], '/api/suppliers': [], '/api/supplier-invoices': [], '/api/supplier-bonuses': [],
   '/api/owners': [], '/api/owner-transactions': [], '/api/audit-logs': [], '/api/notifications': [],
 };
+// Complete shape for the report route smoke check; no financial claims are made
+// from this fixture (server calculations have separate regression coverage).
+data['/api/reports/summary'] = Object.fromEntries([
+  'unitsSold', 'salesCount', 'revenueUsd', 'revenueTjs', 'cogsUsd', 'cogsTjs',
+  'grossProfitUsd', 'grossProfitTjs', 'grossMarginPercent', 'profitUsd', 'profitTjs',
+  'expensesTjs', 'expensesUsd', 'periodRefundPenaltiesUsd', 'periodRefundPenaltiesTjs',
+  'netProfitUsd', 'netProfitTjs', 'periodCashBonusesUsd', 'periodCashBonusesTjs',
+  'giftDeviceUnitsSold', 'giftDeviceProfitUsd', 'giftDeviceProfitTjs',
+  'periodFreeDeviceBonusesReceived', 'freeDeviceBonusesInStock',
+  'totalSupplierDebtUsd', 'totalSupplierDebtTjs', 'mainWarehouseStockCount',
+  'mainWarehouseStockCostUsd', 'mainWarehouseStockCostTjs', 'mainWarehouseCashUsd', 'mainWarehouseCashTjs',
+].map((key) => [key, 0]));
+Object.assign(data['/api/reports/summary'], { topSuppliersByDebt: [], storeBreakdown: [], modelCounts: [] });
 const mime = { '.html': 'text/html', '.js': 'application/javascript', '.css': 'text/css', '.json': 'application/json', '.webmanifest': 'application/manifest+json', '.svg': 'image/svg+xml', '.png': 'image/png', '.woff2': 'font/woff2' };
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, `http://localhost:${port}`);
   if (url.pathname === '/__perf/event') {
-    const type = url.searchParams.get('type');
+    let type = url.searchParams.get('type');
+    if (type === 'DEVICE_CHANGED') { devices[0].model = 'Updated Model'; type = 'INVENTORY_UPDATE'; }
     if (type === 'NOTIFICATION_CREATED') data['/api/notifications'] = [{ id: 'notification', title: 'Audit', message: 'Audit event', createdAt: date, read: false, resolved: false }];
     for (const client of sockets.clients) client.send(JSON.stringify({ type, payload: {} }));
     res.end('ok'); return;

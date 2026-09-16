@@ -16,6 +16,7 @@ await build({
         const pattern = new RegExp(`((?:export )?(?:const ${name}[^=]*= [^\\n]*=>|function ${name}\\([^)]*\\)) \\{)`);
         code = code.replace(pattern, `$1\n(window.__renderCounts ??= {})['${name}'] = ((window.__renderCounts ?? {})['${name}'] ?? 0) + 1;`);
       }
+      if (id.endsWith('AppContext.tsx')) code = code.replace('  return (\n    <AppLoaderContext.Provider', '  window.__auditStore = storeRef.current;\n  return (\n    <AppLoaderContext.Provider');
       return code;
     },
   }] : [],

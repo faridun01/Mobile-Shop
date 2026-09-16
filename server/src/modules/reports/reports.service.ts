@@ -51,38 +51,45 @@ export async function computeReportsSummary(input: ReportsSummaryInput) {
     retailStores,
   ] = await Promise.all([
     getRateForDate(new Date()),
-    // Sales for the period, across ALL retail stores (per-store breakdown always shows every
-    // store regardless of the store filter) — the date range is the only thing that needs to
-    // scale with history, so it's the only filter applied at the DB level here.
+    // The breakdown uses the same store scope, so unrelated stores are not needed.
     prisma.sale.findMany({
       where: {
         status: { not: 'REFUNDED' },
+        ...(storeFilter ? { storeId: storeFilter } : {}),
         ...(dateRange ? { createdAt: dateRange } : {}),
       },
-      include: { saleItems: true },
+      select: {
+        id: true, storeId: true, totalTjs: true, totalUsd: true, exchangeRate: true,
+        saleItems: { select: {
+          brand: true, model: true, salePriceUsd: true, salePriceTjs: true,
+          costBasisUsd: true, purchaseCostUsd: true,
+        } },
+      },
       orderBy: { createdAt: 'desc' },
     }),
-    // Expenses for the period — same pattern: date-scoped at the DB, store-scoped in memory
-    // (a much smaller set by then) since only the top-level total needs the store filter.
-    prisma.expense.findMany({ where: dateRange ? { createdAt: dateRange } : undefined }),
+    prisma.expense.findMany({
+      where: { ...(dateRange ? { createdAt: dateRange } : {}), ...(storeFilter ? { storeId: storeFilter } : {}) },
+      select: { storeId: true, amountTjs: true, amountUsd: true, exchangeRate: true },
+    }),
     // Supplier bonuses aren't a high-growth table (one row per negotiated bonus, not per
     // transaction) so they're just fetched in full and filtered in memory, same as before.
     prisma.supplierBonus.findMany({ select: { bonusType: true, amountUsd: true, dateReceived: true, exchangeRate: true, status: true } }),
-    // Fetched across all stores (not just storeFilter) so the per-store breakdown below can
-    // fold each store's own penalties into its "Прибыль" the same way the overall total does —
-    // otherwise a refund's retained penalty would only ever show up in the all-stores figure.
+    // Refund penalties use the same scope as sales and the per-store breakdown.
     prisma.sale.findMany({
       where: {
         status: 'REFUNDED',
+        ...(storeFilter ? { storeId: storeFilter } : {}),
         penaltyFeeUsd: { not: null },
         ...(dateRange ? { refundedAt: dateRange } : {}),
       },
       select: { storeId: true, penaltyFeeUsd: true, penaltyFeeTjs: true },
     }),
     prisma.supplier.aggregate({ _sum: { totalDebtUsd: true } }),
-    prisma.supplier.findMany({ where: { totalDebtUsd: { gt: 0 } }, orderBy: { totalDebtUsd: 'desc' }, take: 8 }),
-    prisma.store.findFirst({ where: { isMainWarehouse: true } }),
-    prisma.store.findMany({ where: { isMainWarehouse: false, ...(storeFilter ? { id: storeFilter } : {}) } }),
+    prisma.supplier.findMany({ where: { totalDebtUsd: { gt: 0 } }, orderBy: { totalDebtUsd: 'desc' }, take: 8,
+      select: { id: true, name: true, totalPurchasedUsd: true, totalPaidUsd: true, totalDebtUsd: true } }),
+    prisma.store.findFirst({ where: { isMainWarehouse: true }, select: { id: true, cashBalanceTjs: true } }),
+    prisma.store.findMany({ where: { isMainWarehouse: false, ...(storeFilter ? { id: storeFilter } : {}) },
+      select: { id: true, name: true, cashBalanceTjs: true } }),
   ]);
   const rate = rateRow || 9.5;
 

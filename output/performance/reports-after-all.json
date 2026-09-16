@@ -1,0 +1,27 @@
+{
+  "storeId": "all",
+  "workload": [
+    {
+      "table": "sales",
+      "rows": 1846,
+      "bytes": 421608
+    },
+    {
+      "table": "expenses",
+      "rows": 2000,
+      "bytes": 151001
+    },
+    {
+      "table": "sales",
+      "rows": 154,
+      "bytes": 9935
+    },
+    {
+      "table": "profitLogs",
+      "rows": 1846,
+      "bytes": 166963
+    }
+  ],
+  "rows": 5846,
+  "bytes": 749507
+}

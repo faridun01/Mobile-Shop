@@ -1,0 +1,1759 @@
+{
+  "base": "http://127.0.0.1:4185",
+  "scenario": "sale",
+  "profile": false,
+  "cpuSlowdown": 4,
+  "latencyMs": 150,
+  "downloadKBps": 200,
+  "runs": [
+    {
+      "run": 0,
+      "fcp": 1964,
+      "lcp": 2064,
+      "cls": 0,
+      "observedBlockingTime": 0,
+      "heapBytes": 10000000,
+      "resources": [
+        {
+          "url": "http://127.0.0.1:4185/assets/index-Drx-aa9T.js",
+          "transferSize": 71247,
+          "encodedBodySize": 70947,
+          "decodedBodySize": 229025,
+          "duration": 728.8000000007451
+        },
+        {
+          "url": "http://127.0.0.1:4185/assets/vendor-react-Dql9hiTQ.js",
+          "transferSize": 17800,
+          "encodedBodySize": 17500,
+          "decodedBodySize": 49551,
+          "duration": 444.1000000014901
+        },
+        {
+          "url": "http://127.0.0.1:4185/assets/vendor-icons-48zcEsOx.js",
+          "transferSize": 8668,
+          "encodedBodySize": 8368,
+          "decodedBodySize": 40794,
+          "duration": 331.69999999925494
+        },
+        {
+          "url": "http://127.0.0.1:4185/assets/index-BprzRpwP.css",
+          "transferSize": 12430,
+          "encodedBodySize": 12130,
+          "decodedBodySize": 72238,
+          "duration": 379
+        },
+        {
+          "url": "http://127.0.0.1:4185/registerSW.js",
+          "transferSize": 425,
+          "encodedBodySize": 125,
+          "decodedBodySize": 134,
+          "duration": 173
+        },
+        {
+          "url": "http://127.0.0.1:4185/assets/MainLayout-gHjX_xtp.js",
+          "transferSize": 11354,
+          "encodedBodySize": 11054,
+          "decodedBodySize": 43082,
+          "duration": 259.80000000074506
+        },
+        {
+          "url": "http://127.0.0.1:4185/api/users",
+          "transferSize": 438,
+          "encodedBodySize": 138,
+          "decodedBodySize": 143,
+          "duration": 177.60000000149012
+        },
+        {
+          "url": "http://127.0.0.1:4185/api/stores",
+          "transferSize": 410,
+          "encodedBodySize": 110,
+          "decodedBodySize": 98,
+          "duration": 176.19999999925494
+        },
+        {
+          "url": "http://127.0.0.1:4185/api/devices?excludeSold=true",
+          "transferSize": 19138,
+          "encodedBodySize": 18838,
+          "decodedBodySize": 756053,
+          "duration": 308.4000000022352
+        },
+        {
+          "url": "http://127.0.0.1:4185/api/exchange-rate/today",
+          "transferSize": 400,
+          "encodedBodySize": 100,
+          "decodedBodySize": 101,
+          "duration": 188.40000000223517
+        },
+        {
+          "url": "http://127.0.0.1:4185/api/notifications",
+          "transferSize": 322,
+          "encodedBodySize": 22,
+          "decodedBodySize": 2,
+          "duration": 182.30000000074506
+        },
+        {
+          "url": "http://127.0.0.1:4185/assets/SalePage-C6xUemfG.js",
+          "transferSize": 0,
+          "encodedBodySize": 5278,
+          "decodedBodySize": 14994,
+          "duration": 0.6999999992549419
+        },
+        {
+          "url": "http://127.0.0.1:4185/assets/Badge-lvT5Ks__.js",
+          "transferSize": 1705,
+          "encodedBodySize": 1405,
+          "decodedBodySize": 3586,
+          "duration": 188.19999999925494
+        },
+        {
+          "url": "http://127.0.0.1:4185/assets/FilterPillGroup-BAQKtYO_.js",
+          "transferSize": 659,
+          "encodedBodySize": 359,
+          "decodedBodySize": 536,
+          "duration": 170.19999999925494
+        },
+        {
+          "url": "http://127.0.0.1:4185/assets/EmptyState-MawHvLFm.js",
+          "transferSize": 605,
+          "encodedBodySize": 305,
+          "decodedBodySize": 498,
+          "duration": 172.59999999776483
+        },
+        {
+          "url": "http://127.0.0.1:4185/assets/StatusBanner-BN_Uj_DO.js",
+          "transferSize": 0,
+          "encodedBodySize": 696,
+          "decodedBodySize": 1339,
+          "duration": 0.6000000014901161
+        },
+        {
+          "url": "http://127.0.0.1:4185/assets/ConfirmDialog-DhUTfYe6.js",
+          "transferSize": 813,
+          "encodedBodySize": 513,
+          "decodedBodySize": 870,
+          "duration": 182.39999999850988
+        },
+        {
+          "url": "http://127.0.0.1:4185/assets/sound-CIOPipKE.js",
+          "transferSize": 0,
+          "encodedBodySize": 492,
+          "decodedBodySize": 1228,
+          "duration": 0.3999999985098839
+        }
+      ],
+      "labInp": 40,
+      "initialRequestCount": 61,
+      "initialApiRequests": [
+        "/api/users",
+        "/api/stores",
+        "/api/devices?excludeSold=true",
+        "/api/exchange-rate/today",
+        "/api/notifications"
+      ],
+      "initialRenderCounts": null,
+      "notificationRenders": {},
+      "repeatedDataRenders": {},
+      "requests": [
+        {
+          "url": "http://127.0.0.1:4185/sale",
+          "method": "GET",
+          "type": "document",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4185/assets/index-Drx-aa9T.js",
+          "method": "GET",
+          "type": "script",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4185/assets/vendor-react-Dql9hiTQ.js",
+          "method": "GET",
+          "type": "script",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4185/assets/vendor-icons-48zcEsOx.js",
+          "method": "GET",
+          "type": "script",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4185/assets/index-BprzRpwP.css",
+          "method": "GET",
+          "type": "stylesheet",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4185/registerSW.js",
+          "method": "GET",
+          "type": "script",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4185/sw.js",
+          "method": "GET",
+          "type": "script",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4185/workbox-948e45c5.js",
+          "method": "GET",
+          "type": "other",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4185/assets/MainLayout-gHjX_xtp.js",
+          "method": "GET",
+          "type": "script",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4185/api/users",
+          "method": "GET",
+          "type": "fetch",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4185/api/stores",
+          "method": "GET",
+          "type": "fetch",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4185/api/devices?excludeSold=true",
+          "method": "GET",
+          "type": "fetch",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4185/api/exchange-rate/today",
+          "method": "GET",
+          "type": "fetch",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4185/registerSW.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4185/pwa-512x512.png",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4185/pwa-192x192.png",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4185/maskable-icon-512x512.png",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4185/index.html",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4185/favicon.svg",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4185/favicon.png",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4185/apple-touch-icon.png",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4185/assets/vendor-react-Dql9hiTQ.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4185/api/notifications",
+          "method": "GET",
+          "type": "fetch",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4185/assets/vendor-icons-48zcEsOx.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4185/assets/TransferPage-sgb1QXDy.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4185/assets/SuppliersPage-C6fNIljY.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4185/assets/StatusBanner-BN_Uj_DO.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4185/assets/StatCard-B0L5fEJZ.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4185/assets/sound-CIOPipKE.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4185/assets/SettingsPage-BlbAHvPM.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4185/assets/SalesHistoryPage-Dc3YigWm.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4185/assets/SalePage-C6xUemfG.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4185/assets/ReportsPage-DHyFSIDv.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4185/assets/RepairPage-D6lto5MW.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4185/assets/SalePage-C6xUemfG.js",
+          "method": "GET",
+          "type": "script",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4185/assets/Badge-lvT5Ks__.js",
+          "method": "GET",
+          "type": "script",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4185/assets/FilterPillGroup-BAQKtYO_.js",
+          "method": "GET",
+          "type": "script",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4185/assets/EmptyState-MawHvLFm.js",
+          "method": "GET",
+          "type": "script",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4185/assets/StatusBanner-BN_Uj_DO.js",
+          "method": "GET",
+          "type": "script",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4185/assets/ConfirmDialog-DhUTfYe6.js",
+          "method": "GET",
+          "type": "script",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4185/assets/sound-CIOPipKE.js",
+          "method": "GET",
+          "type": "script",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4185/assets/PurchasePage-C717jLGJ.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4185/assets/OwnersPage-DD3Q2yj2.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4185/assets/NotificationsPage-jpxvkDKO.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4185/assets/MonthPicker-BLZtdLdH.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4185/assets/MainLayout-gHjX_xtp.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4185/assets/LoginPage-j0W0TosV.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4185/assets/InventoryPage-BAiz6De4.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4185/assets/index-Drx-aa9T.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4185/assets/index-BprzRpwP.css",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4185/assets/FilterPillGroup-BAQKtYO_.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4185/assets/exportReports-Bo4i7k9O.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4185/assets/ExpensesPage-BK74UjsG.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4185/assets/ExchangePage-BWdy44es.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4185/assets/EmptyState-MawHvLFm.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4185/assets/EmployeesPage-DGdImB4F.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4185/assets/ConfirmDialog-DhUTfYe6.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4185/assets/BonusesPage-CQ6jzoY-.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4185/assets/Badge-lvT5Ks__.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4185/assets/AuditLogPage--7Hj9UOi.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4185/manifest.webmanifest",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4185/api/notifications",
+          "method": "GET",
+          "type": "fetch",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4185/api/devices?excludeSold=true",
+          "method": "GET",
+          "type": "fetch",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4185/api/stores",
+          "method": "GET",
+          "type": "fetch",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4185/api/devices?excludeSold=true",
+          "method": "GET",
+          "type": "fetch",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4185/api/stores",
+          "method": "GET",
+          "type": "fetch",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4185/api/devices?excludeSold=true",
+          "method": "GET",
+          "type": "fetch",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4185/api/stores",
+          "method": "GET",
+          "type": "fetch",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4185/api/devices?excludeSold=true",
+          "method": "GET",
+          "type": "fetch",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4185/api/stores",
+          "method": "GET",
+          "type": "fetch",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4185/api/devices?excludeSold=true",
+          "method": "GET",
+          "type": "fetch",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4185/api/stores",
+          "method": "GET",
+          "type": "fetch",
+          "worker": false
+        }
+      ],
+      "errors": []
+    },
+    {
+      "run": 1,
+      "fcp": 1200,
+      "lcp": 1660,
+      "cls": 0,
+      "observedBlockingTime": 16,
+      "heapBytes": 10000000,
+      "resources": [
+        {
+          "url": "http://127.0.0.1:4185/assets/index-Drx-aa9T.js",
+          "transferSize": 71247,
+          "encodedBodySize": 70947,
+          "decodedBodySize": 229025,
+          "duration": 724.9000000022352
+        },
+        {
+          "url": "http://127.0.0.1:4185/assets/vendor-react-Dql9hiTQ.js",
+          "transferSize": 17800,
+          "encodedBodySize": 17500,
+          "decodedBodySize": 49551,
+          "duration": 457.4000000022352
+        },
+        {
+          "url": "http://127.0.0.1:4185/assets/vendor-icons-48zcEsOx.js",
+          "transferSize": 8668,
+          "encodedBodySize": 8368,
+          "decodedBodySize": 40794,
+          "duration": 330.30000000074506
+        },
+        {
+          "url": "http://127.0.0.1:4185/assets/index-BprzRpwP.css",
+          "transferSize": 12430,
+          "encodedBodySize": 12130,
+          "decodedBodySize": 72238,
+          "duration": 409.3999999985099
+        },
+        {
+          "url": "http://127.0.0.1:4185/registerSW.js",
+          "transferSize": 425,
+          "encodedBodySize": 125,
+          "decodedBodySize": 134,
+          "duration": 188.59999999776483
+        },
+        {
+          "url": "http://127.0.0.1:4185/assets/MainLayout-gHjX_xtp.js",
+          "transferSize": 11354,
+          "encodedBodySize": 11054,
+          "decodedBodySize": 43082,
+          "duration": 267.1000000014901
+        },
+        {
+          "url": "http://127.0.0.1:4185/api/users",
+          "transferSize": 438,
+          "encodedBodySize": 138,
+          "decodedBodySize": 143,
+          "duration": 170.59999999776483
+        },
+        {
+          "url": "http://127.0.0.1:4185/api/stores",
+          "transferSize": 410,
+          "encodedBodySize": 110,
+          "decodedBodySize": 98,
+          "duration": 167.69999999925494
+        },
+        {
+          "url": "http://127.0.0.1:4185/api/devices?excludeSold=true",
+          "transferSize": 19138,
+          "encodedBodySize": 18838,
+          "decodedBodySize": 756053,
+          "duration": 308.3999999985099
+        },
+        {
+          "url": "http://127.0.0.1:4185/api/exchange-rate/today",
+          "transferSize": 400,
+          "encodedBodySize": 100,
+          "decodedBodySize": 101,
+          "duration": 178.80000000074506
+        },
+        {
+          "url": "http://127.0.0.1:4185/api/notifications",
+          "transferSize": 426,
+          "encodedBodySize": 126,
+          "decodedBodySize": 132,
+          "duration": 165.30000000074506
+        },
+        {
+          "url": "http://127.0.0.1:4185/assets/SalePage-C6xUemfG.js",
+          "transferSize": 0,
+          "encodedBodySize": 5278,
+          "decodedBodySize": 14994,
+          "duration": 0.6999999992549419
+        },
+        {
+          "url": "http://127.0.0.1:4185/assets/Badge-lvT5Ks__.js",
+          "transferSize": 0,
+          "encodedBodySize": 1405,
+          "decodedBodySize": 3586,
+          "duration": 0.3999999985098839
+        },
+        {
+          "url": "http://127.0.0.1:4185/assets/FilterPillGroup-BAQKtYO_.js",
+          "transferSize": 0,
+          "encodedBodySize": 359,
+          "decodedBodySize": 536,
+          "duration": 1
+        },
+        {
+          "url": "http://127.0.0.1:4185/assets/EmptyState-MawHvLFm.js",
+          "transferSize": 0,
+          "encodedBodySize": 305,
+          "decodedBodySize": 498,
+          "duration": 0.3999999985098839
+        },
+        {
+          "url": "http://127.0.0.1:4185/assets/StatusBanner-BN_Uj_DO.js",
+          "transferSize": 0,
+          "encodedBodySize": 696,
+          "decodedBodySize": 1339,
+          "duration": 0.29999999701976776
+        },
+        {
+          "url": "http://127.0.0.1:4185/assets/ConfirmDialog-DhUTfYe6.js",
+          "transferSize": 0,
+          "encodedBodySize": 513,
+          "decodedBodySize": 870,
+          "duration": 0.5999999977648258
+        },
+        {
+          "url": "http://127.0.0.1:4185/assets/sound-CIOPipKE.js",
+          "transferSize": 0,
+          "encodedBodySize": 492,
+          "decodedBodySize": 1228,
+          "duration": 0.8999999985098839
+        }
+      ],
+      "labInp": 40,
+      "initialRequestCount": 61,
+      "initialApiRequests": [
+        "/api/users",
+        "/api/stores",
+        "/api/devices?excludeSold=true",
+        "/api/exchange-rate/today",
+        "/api/notifications"
+      ],
+      "initialRenderCounts": null,
+      "notificationRenders": {},
+      "repeatedDataRenders": {},
+      "requests": [
+        {
+          "url": "http://127.0.0.1:4185/sale",
+          "method": "GET",
+          "type": "document",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4185/assets/index-Drx-aa9T.js",
+          "method": "GET",
+          "type": "script",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4185/assets/vendor-react-Dql9hiTQ.js",
+          "method": "GET",
+          "type": "script",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4185/assets/vendor-icons-48zcEsOx.js",
+          "method": "GET",
+          "type": "script",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4185/assets/index-BprzRpwP.css",
+          "method": "GET",
+          "type": "stylesheet",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4185/registerSW.js",
+          "method": "GET",
+          "type": "script",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4185/sw.js",
+          "method": "GET",
+          "type": "script",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4185/workbox-948e45c5.js",
+          "method": "GET",
+          "type": "other",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4185/registerSW.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4185/pwa-512x512.png",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4185/pwa-192x192.png",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4185/maskable-icon-512x512.png",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4185/index.html",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4185/favicon.svg",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4185/favicon.png",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4185/apple-touch-icon.png",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4185/assets/vendor-react-Dql9hiTQ.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4185/assets/vendor-icons-48zcEsOx.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4185/assets/TransferPage-sgb1QXDy.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4185/assets/SuppliersPage-C6fNIljY.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4185/assets/StatusBanner-BN_Uj_DO.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4185/assets/StatCard-B0L5fEJZ.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4185/assets/sound-CIOPipKE.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4185/assets/SettingsPage-BlbAHvPM.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4185/assets/SalesHistoryPage-Dc3YigWm.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4185/assets/MainLayout-gHjX_xtp.js",
+          "method": "GET",
+          "type": "script",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4185/api/users",
+          "method": "GET",
+          "type": "fetch",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4185/api/stores",
+          "method": "GET",
+          "type": "fetch",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4185/api/devices?excludeSold=true",
+          "method": "GET",
+          "type": "fetch",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4185/api/exchange-rate/today",
+          "method": "GET",
+          "type": "fetch",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4185/assets/SalePage-C6xUemfG.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4185/assets/ReportsPage-DHyFSIDv.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4185/assets/RepairPage-D6lto5MW.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4185/assets/PurchasePage-C717jLGJ.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4185/assets/OwnersPage-DD3Q2yj2.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4185/assets/NotificationsPage-jpxvkDKO.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4185/assets/MonthPicker-BLZtdLdH.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4185/assets/MainLayout-gHjX_xtp.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4185/api/notifications",
+          "method": "GET",
+          "type": "fetch",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4185/assets/LoginPage-j0W0TosV.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4185/assets/InventoryPage-BAiz6De4.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4185/assets/index-Drx-aa9T.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4185/assets/index-BprzRpwP.css",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4185/assets/FilterPillGroup-BAQKtYO_.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4185/assets/exportReports-Bo4i7k9O.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4185/assets/ExpensesPage-BK74UjsG.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4185/assets/ExchangePage-BWdy44es.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4185/assets/EmptyState-MawHvLFm.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4185/assets/EmployeesPage-DGdImB4F.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4185/assets/ConfirmDialog-DhUTfYe6.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4185/assets/BonusesPage-CQ6jzoY-.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4185/assets/Badge-lvT5Ks__.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4185/assets/AuditLogPage--7Hj9UOi.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4185/manifest.webmanifest",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4185/assets/SalePage-C6xUemfG.js",
+          "method": "GET",
+          "type": "script",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4185/assets/Badge-lvT5Ks__.js",
+          "method": "GET",
+          "type": "script",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4185/assets/FilterPillGroup-BAQKtYO_.js",
+          "method": "GET",
+          "type": "script",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4185/assets/EmptyState-MawHvLFm.js",
+          "method": "GET",
+          "type": "script",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4185/assets/StatusBanner-BN_Uj_DO.js",
+          "method": "GET",
+          "type": "script",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4185/assets/ConfirmDialog-DhUTfYe6.js",
+          "method": "GET",
+          "type": "script",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4185/assets/sound-CIOPipKE.js",
+          "method": "GET",
+          "type": "script",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4185/api/notifications",
+          "method": "GET",
+          "type": "fetch",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4185/api/devices?excludeSold=true",
+          "method": "GET",
+          "type": "fetch",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4185/api/stores",
+          "method": "GET",
+          "type": "fetch",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4185/api/devices?excludeSold=true",
+          "method": "GET",
+          "type": "fetch",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4185/api/stores",
+          "method": "GET",
+          "type": "fetch",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4185/api/devices?excludeSold=true",
+          "method": "GET",
+          "type": "fetch",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4185/api/stores",
+          "method": "GET",
+          "type": "fetch",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4185/api/devices?excludeSold=true",
+          "method": "GET",
+          "type": "fetch",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4185/api/stores",
+          "method": "GET",
+          "type": "fetch",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4185/api/devices?excludeSold=true",
+          "method": "GET",
+          "type": "fetch",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4185/api/stores",
+          "method": "GET",
+          "type": "fetch",
+          "worker": false
+        }
+      ],
+      "errors": []
+    },
+    {
+      "run": 2,
+      "fcp": 1204,
+      "lcp": 1904,
+      "cls": 0,
+      "observedBlockingTime": 12,
+      "heapBytes": 10000000,
+      "resources": [
+        {
+          "url": "http://127.0.0.1:4185/assets/index-Drx-aa9T.js",
+          "transferSize": 71247,
+          "encodedBodySize": 70947,
+          "decodedBodySize": 229025,
+          "duration": 735
+        },
+        {
+          "url": "http://127.0.0.1:4185/assets/vendor-react-Dql9hiTQ.js",
+          "transferSize": 17800,
+          "encodedBodySize": 17500,
+          "decodedBodySize": 49551,
+          "duration": 466
+        },
+        {
+          "url": "http://127.0.0.1:4185/assets/vendor-icons-48zcEsOx.js",
+          "transferSize": 8668,
+          "encodedBodySize": 8368,
+          "decodedBodySize": 40794,
+          "duration": 338.20000000298023
+        },
+        {
+          "url": "http://127.0.0.1:4185/assets/index-BprzRpwP.css",
+          "transferSize": 12430,
+          "encodedBodySize": 12130,
+          "decodedBodySize": 72238,
+          "duration": 417.19999999925494
+        },
+        {
+          "url": "http://127.0.0.1:4185/registerSW.js",
+          "transferSize": 425,
+          "encodedBodySize": 125,
+          "decodedBodySize": 134,
+          "duration": 179.30000000074506
+        },
+        {
+          "url": "http://127.0.0.1:4185/assets/MainLayout-gHjX_xtp.js",
+          "transferSize": 11354,
+          "encodedBodySize": 11054,
+          "decodedBodySize": 43082,
+          "duration": 259
+        },
+        {
+          "url": "http://127.0.0.1:4185/api/users",
+          "transferSize": 438,
+          "encodedBodySize": 138,
+          "decodedBodySize": 143,
+          "duration": 165.10000000149012
+        },
+        {
+          "url": "http://127.0.0.1:4185/api/stores",
+          "transferSize": 410,
+          "encodedBodySize": 110,
+          "decodedBodySize": 98,
+          "duration": 178.30000000074506
+        },
+        {
+          "url": "http://127.0.0.1:4185/api/devices?excludeSold=true",
+          "transferSize": 19138,
+          "encodedBodySize": 18838,
+          "decodedBodySize": 756053,
+          "duration": 316.4000000022352
+        },
+        {
+          "url": "http://127.0.0.1:4185/api/exchange-rate/today",
+          "transferSize": 400,
+          "encodedBodySize": 100,
+          "decodedBodySize": 101,
+          "duration": 191.69999999925494
+        },
+        {
+          "url": "http://127.0.0.1:4185/api/notifications",
+          "transferSize": 426,
+          "encodedBodySize": 126,
+          "decodedBodySize": 132,
+          "duration": 172.79999999701977
+        },
+        {
+          "url": "http://127.0.0.1:4185/assets/SalePage-C6xUemfG.js",
+          "transferSize": 0,
+          "encodedBodySize": 5278,
+          "decodedBodySize": 14994,
+          "duration": 0.6000000014901161
+        },
+        {
+          "url": "http://127.0.0.1:4185/assets/Badge-lvT5Ks__.js",
+          "transferSize": 0,
+          "encodedBodySize": 1405,
+          "decodedBodySize": 3586,
+          "duration": 0.6000000014901161
+        },
+        {
+          "url": "http://127.0.0.1:4185/assets/FilterPillGroup-BAQKtYO_.js",
+          "transferSize": 0,
+          "encodedBodySize": 359,
+          "decodedBodySize": 536,
+          "duration": 0.30000000074505806
+        },
+        {
+          "url": "http://127.0.0.1:4185/assets/EmptyState-MawHvLFm.js",
+          "transferSize": 0,
+          "encodedBodySize": 305,
+          "decodedBodySize": 498,
+          "duration": 0.5
+        },
+        {
+          "url": "http://127.0.0.1:4185/assets/StatusBanner-BN_Uj_DO.js",
+          "transferSize": 0,
+          "encodedBodySize": 696,
+          "decodedBodySize": 1339,
+          "duration": 0.7000000029802322
+        },
+        {
+          "url": "http://127.0.0.1:4185/assets/ConfirmDialog-DhUTfYe6.js",
+          "transferSize": 0,
+          "encodedBodySize": 513,
+          "decodedBodySize": 870,
+          "duration": 0.5
+        },
+        {
+          "url": "http://127.0.0.1:4185/assets/sound-CIOPipKE.js",
+          "transferSize": 0,
+          "encodedBodySize": 492,
+          "decodedBodySize": 1228,
+          "duration": 0.4000000022351742
+        }
+      ],
+      "labInp": 32,
+      "initialRequestCount": 61,
+      "initialApiRequests": [
+        "/api/users",
+        "/api/stores",
+        "/api/devices?excludeSold=true",
+        "/api/exchange-rate/today",
+        "/api/notifications"
+      ],
+      "initialRenderCounts": null,
+      "notificationRenders": {},
+      "repeatedDataRenders": {},
+      "requests": [
+        {
+          "url": "http://127.0.0.1:4185/sale",
+          "method": "GET",
+          "type": "document",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4185/assets/index-Drx-aa9T.js",
+          "method": "GET",
+          "type": "script",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4185/assets/vendor-react-Dql9hiTQ.js",
+          "method": "GET",
+          "type": "script",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4185/assets/vendor-icons-48zcEsOx.js",
+          "method": "GET",
+          "type": "script",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4185/assets/index-BprzRpwP.css",
+          "method": "GET",
+          "type": "stylesheet",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4185/registerSW.js",
+          "method": "GET",
+          "type": "script",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4185/sw.js",
+          "method": "GET",
+          "type": "script",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4185/workbox-948e45c5.js",
+          "method": "GET",
+          "type": "other",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4185/registerSW.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4185/pwa-512x512.png",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4185/pwa-192x192.png",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4185/maskable-icon-512x512.png",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4185/index.html",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4185/favicon.svg",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4185/favicon.png",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4185/apple-touch-icon.png",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4185/assets/vendor-react-Dql9hiTQ.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4185/assets/vendor-icons-48zcEsOx.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4185/assets/TransferPage-sgb1QXDy.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4185/assets/SuppliersPage-C6fNIljY.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4185/assets/StatusBanner-BN_Uj_DO.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4185/assets/StatCard-B0L5fEJZ.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4185/assets/sound-CIOPipKE.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4185/assets/SettingsPage-BlbAHvPM.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4185/assets/SalesHistoryPage-Dc3YigWm.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4185/assets/SalePage-C6xUemfG.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4185/assets/ReportsPage-DHyFSIDv.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4185/assets/RepairPage-D6lto5MW.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4185/assets/MainLayout-gHjX_xtp.js",
+          "method": "GET",
+          "type": "script",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4185/api/users",
+          "method": "GET",
+          "type": "fetch",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4185/api/stores",
+          "method": "GET",
+          "type": "fetch",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4185/api/devices?excludeSold=true",
+          "method": "GET",
+          "type": "fetch",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4185/api/exchange-rate/today",
+          "method": "GET",
+          "type": "fetch",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4185/assets/PurchasePage-C717jLGJ.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4185/assets/OwnersPage-DD3Q2yj2.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4185/assets/NotificationsPage-jpxvkDKO.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4185/assets/MonthPicker-BLZtdLdH.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4185/assets/MainLayout-gHjX_xtp.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4185/api/notifications",
+          "method": "GET",
+          "type": "fetch",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4185/assets/LoginPage-j0W0TosV.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4185/assets/InventoryPage-BAiz6De4.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4185/assets/index-Drx-aa9T.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4185/assets/index-BprzRpwP.css",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4185/assets/FilterPillGroup-BAQKtYO_.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4185/assets/exportReports-Bo4i7k9O.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4185/assets/ExpensesPage-BK74UjsG.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4185/assets/ExchangePage-BWdy44es.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4185/assets/EmptyState-MawHvLFm.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4185/assets/EmployeesPage-DGdImB4F.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4185/assets/ConfirmDialog-DhUTfYe6.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4185/assets/BonusesPage-CQ6jzoY-.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4185/assets/Badge-lvT5Ks__.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4185/assets/AuditLogPage--7Hj9UOi.js",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4185/manifest.webmanifest",
+          "method": "GET",
+          "type": "fetch",
+          "worker": true
+        },
+        {
+          "url": "http://127.0.0.1:4185/assets/SalePage-C6xUemfG.js",
+          "method": "GET",
+          "type": "script",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4185/assets/Badge-lvT5Ks__.js",
+          "method": "GET",
+          "type": "script",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4185/assets/FilterPillGroup-BAQKtYO_.js",
+          "method": "GET",
+          "type": "script",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4185/assets/EmptyState-MawHvLFm.js",
+          "method": "GET",
+          "type": "script",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4185/assets/StatusBanner-BN_Uj_DO.js",
+          "method": "GET",
+          "type": "script",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4185/assets/ConfirmDialog-DhUTfYe6.js",
+          "method": "GET",
+          "type": "script",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4185/assets/sound-CIOPipKE.js",
+          "method": "GET",
+          "type": "script",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4185/api/notifications",
+          "method": "GET",
+          "type": "fetch",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4185/api/devices?excludeSold=true",
+          "method": "GET",
+          "type": "fetch",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4185/api/stores",
+          "method": "GET",
+          "type": "fetch",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4185/api/devices?excludeSold=true",
+          "method": "GET",
+          "type": "fetch",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4185/api/stores",
+          "method": "GET",
+          "type": "fetch",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4185/api/devices?excludeSold=true",
+          "method": "GET",
+          "type": "fetch",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4185/api/stores",
+          "method": "GET",
+          "type": "fetch",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4185/api/devices?excludeSold=true",
+          "method": "GET",
+          "type": "fetch",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4185/api/stores",
+          "method": "GET",
+          "type": "fetch",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4185/api/devices?excludeSold=true",
+          "method": "GET",
+          "type": "fetch",
+          "worker": false
+        },
+        {
+          "url": "http://127.0.0.1:4185/api/stores",
+          "method": "GET",
+          "type": "fetch",
+          "worker": false
+        }
+      ],
+      "errors": []
+    }
+  ]
+}

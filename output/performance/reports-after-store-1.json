@@ -1,0 +1,27 @@
+{
+  "storeId": "store-1",
+  "workload": [
+    {
+      "table": "sales",
+      "rows": 93,
+      "bytes": 21195
+    },
+    {
+      "table": "expenses",
+      "rows": 100,
+      "bytes": 7501
+    },
+    {
+      "table": "sales",
+      "rows": 7,
+      "bytes": 449
+    },
+    {
+      "table": "profitLogs",
+      "rows": 93,
+      "bytes": 8411
+    }
+  ],
+  "rows": 293,
+  "bytes": 37556
+}
