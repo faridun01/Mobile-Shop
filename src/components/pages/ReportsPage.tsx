@@ -20,6 +20,7 @@ import {
   buildSalesReportTable,
   type ComprehensiveReportSummary,
 } from '../../utils/exportReports';
+import { FALLBACK_EXCHANGE_RATE } from '../../utils/exchangeRate';
 import { ReportPreviewModal } from '../common/ReportPreviewModal';
 
 type Period = 'TODAY' | 'MONTH' | 'SPECIFIC_MONTH' | 'ALL';
@@ -94,7 +95,7 @@ export const ReportsPage: React.FC = () => {
   // combined report across every store, a store id for a single one, null when closed.
   const [salesReportStoreId, setSalesReportStoreId] = useState<string | null>(null);
 
-  const rate = todayRate?.rate || 9.50;
+  const rate = todayRate?.rate || FALLBACK_EXCHANGE_RATE;
   const isSeller = currentUser?.role === 'SELLER';
   const namesLookup = useMemo(() => buildNameLookup(users), [users]);
 

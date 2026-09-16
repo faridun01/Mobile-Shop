@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useAppFields } from '../../context/AppContext';
 import { Expense, ExpenseCategory } from '../../types';
+import { FALLBACK_EXCHANGE_RATE } from '../../utils/exchangeRate';
 import {
   Receipt,
   Plus,
@@ -274,7 +275,7 @@ export const ExpensesPage: React.FC = () => {
     setStatus({ tone: 'success', text: `Новая категория "${name}" добавлена` });
   };
 
-  const rate = todayRate?.rate || 9.50;
+  const rate = todayRate?.rate || FALLBACK_EXCHANGE_RATE;
 
   const filteredExpenses = useMemo(() => {
     const todayStr = new Date().toISOString().split('T')[0];

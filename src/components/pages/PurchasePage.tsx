@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { useAppFields } from '../../context/AppContext';
 import { SupplierInvoice, Device } from '../../types';
+import { FALLBACK_EXCHANGE_RATE } from '../../utils/exchangeRate';
 import {
   Plus,
   Trash2,
@@ -244,7 +245,7 @@ export const PurchasePage: React.FC = () => {
   const [justSavedInvoice, setJustSavedInvoice] = useState<string | null>(null);
 
   // Current rate
-  const rate = todayRate?.rate || 9.5;
+  const rate = todayRate?.rate || FALLBACK_EXCHANGE_RATE;
 
   // Autocomplete suggestion lists derived from database devices and standard presets
   const brandOptions = useMemo(() => {

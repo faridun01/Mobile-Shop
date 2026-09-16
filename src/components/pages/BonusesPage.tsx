@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { useAppFields } from '../../context/AppContext';
 import { SupplierBonus } from '../../types';
+import { FALLBACK_EXCHANGE_RATE } from '../../utils/exchangeRate';
 import {
   Gift,
   Plus,
@@ -30,7 +31,7 @@ export const BonusesPage: React.FC = () => {
     openScanner
   } = useAppFields('currentUser', 'supplierBonuses', 'suppliers', 'stores', 'devices', 'createSupplierBonus', 'updateSupplierBonus', 'deleteSupplierBonus', 'todayRate', 'openScanner');
 
-  const rate = todayRate?.rate || 9.50;
+  const rate = todayRate?.rate || FALLBACK_EXCHANGE_RATE;
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedBonus, setSelectedBonus] = useState<SupplierBonus | null>(null);

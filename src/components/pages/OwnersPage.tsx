@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useAppFields } from '../../context/AppContext';
+import { FALLBACK_EXCHANGE_RATE } from '../../utils/exchangeRate';
 import {
   Plus,
   PieChart,
@@ -142,7 +143,7 @@ export const OwnersPage: React.FC = () => {
   const [statusBanner, setStatusBanner] = useState<StatusMessage | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const rate = todayRate?.rate || 9.5;
+  const rate = todayRate?.rate || FALLBACK_EXCHANGE_RATE;
 
   // Filtered transactions (Must be called before any conditional return statements)
   const filteredTransactions = useMemo(() => {
@@ -673,7 +674,7 @@ export const OwnersPage: React.FC = () => {
                 // fresh personal deposit, so it belongs on the same "+" side, not with
                 // PROFIT_PAYOUT/WITHDRAWAL which actually take money out to the owner.
                 const isCapitalIncrease = isDeposit || isReinvest;
-                const tjsVal = Math.round((tx.amountUsd || 0) * tx.exchangeRate);
+                const tjsVal = Math.round((tx.amountUsd || 0) * (tx.exchangeRate || rate));
 
                 return (
                   <div

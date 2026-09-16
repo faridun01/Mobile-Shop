@@ -323,7 +323,7 @@ export function mapOwnerTransaction(t: any, ownerNames: NameLookup, userNames: N
     ownerName: ownerNames.get(t.ownerId) || '',
     type: t.type,
     amountUsd: t.amountUsd,
-    exchangeRate: t.exchangeRate,
+    exchangeRate: t.exchangeRate ?? undefined,
     date: t.createdAt,
     sourceOrDestination: t.sourceOrDestination ?? '',
     createdByName: userNames.get(t.createdByUserId) || t.createdByUserId,

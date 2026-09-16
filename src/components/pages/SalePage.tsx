@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { useAppFields } from '../../context/AppContext';
 import { Device, PaymentMethod } from '../../types';
+import { FALLBACK_EXCHANGE_RATE } from '../../utils/exchangeRate';
 import {
   Smartphone,
   Trash2,
@@ -192,7 +193,7 @@ export const SalePage: React.FC = () => {
   const totalTjs = cart.reduce((acc, item) => acc + (item.salePriceTjs && item.salePriceTjs > 0 ? item.salePriceTjs : 0), 0);
   const hasEmptyPrice = cart.some(item => item.salePriceTjs === undefined || item.salePriceTjs <= 0);
   const totalUsd = todayRate ? +(totalTjs / todayRate.rate).toFixed(2) : 0;
-  const rate = todayRate?.rate || 9.50;
+  const rate = todayRate?.rate || FALLBACK_EXCHANGE_RATE;
 
   const isItemBelowCost = (item: CartItem) => {
     if (item.salePriceTjs === undefined || isNaN(item.salePriceTjs)) return false;
