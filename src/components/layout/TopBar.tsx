@@ -36,6 +36,7 @@ export const TopBar: React.FC = () => {
       case 'OWNERS': return 'Партнеры и капитал';
       case 'EMPLOYEES': return 'Сотрудники';
       case 'REPORTS': return 'Финансовые отчёты';
+      case 'FINANCE': return 'Финансы';
       case 'AUDIT_LOG': return 'Журнал аудита';
       case 'SETTINGS': return 'Настройки';
       case 'NOTIFICATIONS': return 'Уведомления';

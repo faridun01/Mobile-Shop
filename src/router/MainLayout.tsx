@@ -36,6 +36,7 @@ const ExpensesPage = lazy(() => import('../components/pages/ExpensesPage').then(
 const OwnersPage = lazy(() => import('../components/pages/OwnersPage').then(m => ({ default: m.OwnersPage })));
 const EmployeesPage = lazy(() => import('../components/pages/EmployeesPage').then(m => ({ default: m.EmployeesPage })));
 const ReportsPage = lazy(() => import('../components/pages/ReportsPage').then(m => ({ default: m.ReportsPage })));
+const FinancePage = lazy(() => import('../components/pages/FinancePage').then(m => ({ default: m.FinancePage })));
 const AuditLogPage = lazy(() => import('../components/pages/AuditLogPage').then(m => ({ default: m.AuditLogPage })));
 const SettingsPage = lazy(() => import('../components/pages/SettingsPage').then(m => ({ default: m.SettingsPage })));
 const NotificationsPage = lazy(() => import('../components/pages/NotificationsPage').then(m => ({ default: m.NotificationsPage })));
@@ -54,6 +55,7 @@ const PAGE_ROUTES: Record<string, string> = {
   OWNERS: '/owners',
   EMPLOYEES: '/employees',
   REPORTS: '/reports',
+  FINANCE: '/finance',
   AUDIT_LOG: '/audit-log',
   SETTINGS: '/settings',
   NOTIFICATIONS: '/notifications',
@@ -116,6 +118,7 @@ export function MainLayout() {
               <Route path="/owners" element={<OwnersPage />} />
               <Route path="/employees" element={<EmployeesPage />} />
               <Route path="/reports" element={<ReportsPage />} />
+              <Route path="/finance" element={<FinancePage />} />
               <Route path="/audit-log" element={<AuditLogPage />} />
               <Route path="/settings" element={<SettingsPage />} />
               <Route path="/notifications" element={<NotificationsPage />} />

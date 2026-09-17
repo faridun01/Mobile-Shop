@@ -19,7 +19,11 @@ import {
   PageId,
   PaymentMethod,
   ExpenseCategory,
-  ThemeMode
+  ThemeMode,
+  FinancialAccount,
+  FinancialCategory,
+  CounterpartyType,
+  LedgerCurrency,
 } from '../types';
 import { useSharedState } from '../hooks/useSharedState';
 import { createStore as createContextStore, useStore, type StoreApi } from 'zustand';
@@ -46,6 +50,8 @@ import {
   mapStore,
   mapAuditLog,
   mapDailyRate,
+  mapFinancialAccount,
+  mapFinancialCategory,
 } from '../api/mappers';
 
 interface AppContextType {
@@ -91,6 +97,8 @@ interface AppContextType {
   fetchExpensesRange: (params: { period?: 'TODAY' | 'MONTH' | 'SPECIFIC_MONTH' | 'ALL'; month?: string; employeeId?: string }) => Promise<Expense[]>;
   owners: Owner[];
   ownerTransactions: OwnerTransaction[];
+  financialAccounts: FinancialAccount[];
+  financialCategories: FinancialCategory[];
   users: User[];
   // notifications moved to NotificationsContext/useNotifications() (performance audit,
   // P0-2) — they update on every realtime push, unrelated to everything else here, and
@@ -261,6 +269,48 @@ interface AppContextType {
   updateExpense: (id: string, data: { category?: string; amountTjs?: number; storeId?: string; comment?: string; description?: string }) => Promise<{ success: boolean; message?: string }>;
   deleteExpense: (id: string) => Promise<{ success: boolean; message?: string }>;
 
+  createFinancialCategory: (params: { name: string; direction: 'IN' | 'OUT' }) => Promise<{ success: boolean; message?: string }>;
+  createCashReceipt: (params: {
+    accountId: string;
+    amount: number;
+    currency: LedgerCurrency;
+    categoryId?: string;
+    categoryName?: string;
+    counterpartyType?: CounterpartyType;
+    counterpartyId?: string;
+    counterpartyName?: string;
+    shopId?: string;
+    description: string;
+    comment?: string;
+    /** Stable per-attempt key (generate once when the form opens, resend unchanged on retry). */
+    idempotencyKey?: string;
+  }) => Promise<{ success: boolean; message?: string }>;
+  createCashExpense: (params: {
+    accountId: string;
+    amount: number;
+    currency: LedgerCurrency;
+    categoryId?: string;
+    categoryName?: string;
+    counterpartyType?: CounterpartyType;
+    counterpartyId?: string;
+    counterpartyName?: string;
+    shopId?: string;
+    description: string;
+    comment?: string;
+    idempotencyKey?: string;
+  }) => Promise<{ success: boolean; message?: string }>;
+  createTransfer: (params: {
+    accountId: string;
+    destinationAccountId: string;
+    amount: number;
+    currency: LedgerCurrency;
+    shopId?: string;
+    description: string;
+    comment?: string;
+    idempotencyKey?: string;
+  }) => Promise<{ success: boolean; message?: string }>;
+  cancelFinancialTransaction: (id: string, idempotencyKey?: string) => Promise<{ success: boolean; message?: string }>;
+
   createOwnerTransaction: (params: {
     ownerId: string;
     type: 'INVESTMENT' | 'WITHDRAWAL' | 'PROFIT_PAYOUT' | 'REINVEST';
@@ -336,6 +386,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [expenses, setExpenses] = useSharedState<Expense[]>([]);
   const [owners, setOwners] = useSharedState<Owner[]>([]);
   const [ownerTransactions, setOwnerTransactions] = useSharedState<OwnerTransaction[]>([]);
+  const [financialAccounts, setFinancialAccounts] = useSharedState<FinancialAccount[]>([]);
+  const [financialCategories, setFinancialCategories] = useSharedState<FinancialCategory[]>([]);
   const [auditLogs, setAuditLogs] = useSharedState<AuditLogEntry[]>([]);
   const [isInitialLoading, setIsInitialLoading] = useState(true);
 
@@ -605,6 +657,26 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   }), [coalesceFetch]);
 
+  // ADMIN/PARTNER-only, like fetchOwners/fetchOwnerTransactions above — SELLER gets a 403
+  // and these silently stay empty, same as owners does.
+  const fetchFinancialAccounts = useCallback(() => coalesceFetch('financialAccounts', async () => {
+    try {
+      const raw = await apiClient<any[]>('/finance/accounts');
+      setFinancialAccounts(raw.map(mapFinancialAccount));
+    } catch {
+      // ADMIN/PARTNER only
+    }
+  }), [coalesceFetch]);
+
+  const fetchFinancialCategories = useCallback(() => coalesceFetch('financialCategories', async () => {
+    try {
+      const raw = await apiClient<any[]>('/finance/categories');
+      setFinancialCategories(raw.map(mapFinancialCategory));
+    } catch {
+      // ADMIN/PARTNER only
+    }
+  }), [coalesceFetch]);
+
   const fetchAuditLogs = useCallback(() => coalesceFetch('auditLogs', async () => {
     try {
       const raw = await apiClient<any[]>('/audit-logs');
@@ -648,7 +720,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     suppliers: fetchSuppliers, invoices: fetchInvoices, supplierInvoices: fetchInvoices,
     bonuses: fetchBonuses, supplierBonuses: fetchBonuses, expenses: fetchExpenses,
     owners: fetchOwners, ownerTransactions: fetchOwnerTransactions, auditLogs: fetchAuditLogs,
-  }), [fetchSales, fetchTransfers, fetchRepairs, fetchSuppliers, fetchInvoices, fetchBonuses, fetchExpenses, fetchOwners, fetchOwnerTransactions, fetchAuditLogs]);
+    financialAccounts: fetchFinancialAccounts, financialCategories: fetchFinancialCategories,
+  }), [fetchSales, fetchTransfers, fetchRepairs, fetchSuppliers, fetchInvoices, fetchBonuses, fetchExpenses, fetchOwners, fetchOwnerTransactions, fetchAuditLogs, fetchFinancialAccounts, fetchFinancialCategories]);
 
   useLayoutEffect(() => {
     loadedModules.current.clear();
@@ -706,6 +779,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         return [fetchExpenses, fetchStores, fetchOwners];
       case 'OWNER_TX':
         return [fetchOwners, fetchOwnerTransactions, fetchStores];
+      case 'FINANCIAL_TRANSACTION_CREATED':
+      case 'FINANCIAL_TRANSACTION_CANCELLED':
+        // The journal (Операции tab) manages its own paginated fetch independently and
+        // re-queries on its own — only the account balances shown elsewhere need refreshing.
+        return [fetchFinancialAccounts, fetchStores];
+      case 'FINANCIAL_CATEGORY_CREATED':
+        return [fetchFinancialCategories];
       case 'REPAIR_UPDATED':
         return [fetchRepairs, fetchExpenses, fetchStores, fetchOwners];
       case 'STORE_UPDATED':
@@ -723,7 +803,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       default:
         return null; // unmapped (including RECONNECTED) — falls back to a full refetchAll
     }
-  }, [fetchDevices, fetchSuppliers, fetchInvoices, fetchBonuses, fetchSales, fetchStores, fetchOwners, fetchExpenses, fetchOwnerTransactions, fetchRepairs, fetchTransfers, fetchNotifications, fetchUsers, fetchExchangeRate]);
+  }, [fetchDevices, fetchSuppliers, fetchInvoices, fetchBonuses, fetchSales, fetchStores, fetchOwners, fetchExpenses, fetchOwnerTransactions, fetchRepairs, fetchTransfers, fetchNotifications, fetchUsers, fetchExchangeRate, fetchFinancialAccounts, fetchFinancialCategories]);
 
   // A burst of broadcasts in quick succession (e.g. a multi-item refund, a batch
   // transfer looping individual broadcast() calls) used to fire one full parallel fetch
@@ -745,10 +825,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     [fetchOwnerTransactions, 'ownerTransactions'],
     [fetchAuditLogs, 'auditLogs'],
     [fetchExchangeRate, 'exchangeRate'],
+    [fetchFinancialAccounts, 'financialAccounts'],
+    [fetchFinancialCategories, 'financialCategories'],
   ]), [
     fetchSales, fetchDevices, fetchStores, fetchOwners, fetchExpenses,
     fetchSuppliers, fetchInvoices, fetchBonuses, fetchTransfers, fetchRepairs,
     fetchUsers, fetchOwnerTransactions, fetchAuditLogs, fetchExchangeRate,
+    fetchFinancialAccounts, fetchFinancialCategories,
   ]);
 
   const pendingRealtimeTasks = useRef(new Set<() => Promise<unknown>>());
@@ -1222,6 +1305,76 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
+  const createFinancialCategory: AppContextType['createFinancialCategory'] = async ({ name, direction }) => {
+    try {
+      await apiClient('/finance/categories', { method: 'POST', body: JSON.stringify({ name, direction }) });
+      markLocalMutation(['financialCategories']);
+      await fetchFinancialCategories();
+      return { success: true };
+    } catch (err) {
+      return { success: false, message: errorMessage(err, 'Не удалось добавить категорию') };
+    }
+  };
+
+  const createCashReceipt: AppContextType['createCashReceipt'] = async ({ idempotencyKey, ...body }) => {
+    try {
+      await apiClient('/finance/cash-receipt', {
+        method: 'POST',
+        body: JSON.stringify(body),
+        headers: idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : undefined,
+      });
+      markLocalMutation(['financialAccounts', 'stores']);
+      await Promise.all([fetchFinancialAccounts(), fetchStores()]);
+      return { success: true };
+    } catch (err) {
+      return { success: false, message: errorMessage(err, 'Не удалось провести приход') };
+    }
+  };
+
+  const createCashExpense: AppContextType['createCashExpense'] = async ({ idempotencyKey, ...body }) => {
+    try {
+      await apiClient('/finance/cash-expense', {
+        method: 'POST',
+        body: JSON.stringify(body),
+        headers: idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : undefined,
+      });
+      markLocalMutation(['financialAccounts', 'stores']);
+      await Promise.all([fetchFinancialAccounts(), fetchStores()]);
+      return { success: true };
+    } catch (err) {
+      return { success: false, message: errorMessage(err, 'Не удалось провести расход') };
+    }
+  };
+
+  const createTransfer: AppContextType['createTransfer'] = async ({ idempotencyKey, ...body }) => {
+    try {
+      await apiClient('/finance/transfer', {
+        method: 'POST',
+        body: JSON.stringify(body),
+        headers: idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : undefined,
+      });
+      markLocalMutation(['financialAccounts', 'stores']);
+      await Promise.all([fetchFinancialAccounts(), fetchStores()]);
+      return { success: true };
+    } catch (err) {
+      return { success: false, message: errorMessage(err, 'Не удалось выполнить перевод') };
+    }
+  };
+
+  const cancelFinancialTransaction: AppContextType['cancelFinancialTransaction'] = async (id, idempotencyKey) => {
+    try {
+      await apiClient(`/finance/transactions/${id}/cancel`, {
+        method: 'POST',
+        headers: idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : undefined,
+      });
+      markLocalMutation(['financialAccounts', 'stores']);
+      await Promise.all([fetchFinancialAccounts(), fetchStores()]);
+      return { success: true };
+    } catch (err) {
+      return { success: false, message: errorMessage(err, 'Не удалось отменить операцию') };
+    }
+  };
+
   const initializeOwners: AppContextType['initializeOwners'] = async () => {
     try {
       await apiClient('/owners/init', { method: 'POST' });
@@ -1509,6 +1662,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         fetchExpensesRange,
         owners,
         ownerTransactions,
+        financialAccounts,
+        financialCategories,
         users,
         auditLogs,
         isInitialLoading,
@@ -1550,6 +1705,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         createExpense,
         updateExpense,
         deleteExpense,
+        createFinancialCategory,
+        createCashReceipt,
+        createCashExpense,
+        createTransfer,
+        cancelFinancialTransaction,
         initializeOwners,
         createOwnerTransaction,
         ownerInvestment,
@@ -1574,7 +1734,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }), [
     resolvedCurrentUser, todayRate, activePage, selectedStoreId, stores, devices, sales,
     transfers, repairs, suppliers, invoices, bonuses, expenses, owners,
-    ownerTransactions, users, auditLogs, isInitialLoading,
+    ownerTransactions, financialAccounts, financialCategories, users, auditLogs, isInitialLoading,
     isRateModalOpen, isScannerOpen, scannerCallback, drawerOpen, theme, authToken,
   ]);
 

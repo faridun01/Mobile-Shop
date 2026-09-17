@@ -837,6 +837,11 @@ model FinancialTransaction {
   sourceId              String?
   // Set on a reversal transaction; points back to the transaction it reverses.
   reversedTransactionId String? @unique
+  // Stripe-style idempotency: the client generates this once per logical attempt (form
+  // open / confirm-dialog open) and resends it unchanged on any retry. Nullable+unique
+  // (like FinancialAccount.storeId) — Postgres allows unlimited NULLs, so callers that
+  // omit it are unaffected. See finance.service.ts for the pre-check + P2002-recovery.
+  idempotencyKey        String? @unique
 
   description String
   comment     String?

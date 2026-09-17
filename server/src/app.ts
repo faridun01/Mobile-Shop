@@ -20,6 +20,7 @@ import { registerNotificationRoutes } from './modules/notifications/notification
 import { registerExchangeRateRoutes } from './modules/exchange-rate/exchange-rate.routes';
 import { registerStoreRoutes } from './modules/stores/stores.routes';
 import { registerReportRoutes } from './modules/reports/reports.routes';
+import { registerFinanceRoutes } from './modules/finance/finance.routes';
 import { requirePositiveMoney } from './common/money';
 import { requireTodayRate } from './modules/exchange-rate/exchange-rate.service';
 
@@ -385,6 +386,7 @@ registerNotificationRoutes(app);
 registerExchangeRateRoutes(app);
 registerStoreRoutes(app);
 registerReportRoutes(app);
+registerFinanceRoutes(app);
 
 app.use((error: any, req: Request, res: Response, _next: NextFunction) => {
   // Every error that reaches here gets logged server-side, regardless of what the client

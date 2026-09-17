@@ -62,7 +62,7 @@ export type LedgerType =
   | 'REFUND'
   | 'CUSTOMER_PAYMENT';
 
-export type PageId = 
+export type PageId =
   | 'SALE'
   | 'SALES_HISTORY'
   | 'INVENTORY'
@@ -76,6 +76,7 @@ export type PageId =
   | 'OWNERS'
   | 'EMPLOYEES'
   | 'REPORTS'
+  | 'FINANCE'
   | 'AUDIT_LOG'
   | 'SETTINGS'
   | 'NOTIFICATIONS';
@@ -401,6 +402,71 @@ export interface OwnerTransaction {
   sourceOrDestination: string;
   createdByName: string;
   note?: string;
+}
+
+// ---------------------------------------------------------------------------
+// Finance module (Phase 2) — mirrors the FinancialAccount/FinancialTransaction/
+// FinancialCategory Prisma models (see prisma/schema.prisma).
+// ---------------------------------------------------------------------------
+
+export type FinancialAccountType = 'CASH' | 'BANK' | 'MAIN' | 'OTHER';
+export type FinancialTransactionType = 'INCOME' | 'EXPENSE' | 'TRANSFER' | 'SUPPLIER_PAYMENT' | 'OWNER_DEPOSIT' | 'OWNER_WITHDRAWAL' | 'REFUND' | 'ADJUSTMENT';
+export type FinancialDirection = 'IN' | 'OUT' | 'NEUTRAL';
+export type FinancialTransactionStatus = 'POSTED' | 'CANCELLED';
+export type CounterpartyType = 'SUPPLIER' | 'CUSTOMER' | 'EMPLOYEE' | 'OWNER' | 'OTHER';
+export type LedgerCurrency = 'TJS' | 'USD';
+
+export interface FinancialAccount {
+  id: string;
+  name: string;
+  type: FinancialAccountType;
+  storeId?: string;
+  storeName?: string;
+  active: boolean;
+  balanceTjs: number;
+  balanceUsd: number;
+  openingBalanceTjs: number;
+  openingBalanceUsd: number;
+}
+
+export interface FinancialCategory {
+  id: string;
+  name: string;
+  direction: 'IN' | 'OUT';
+  isSystem: boolean;
+  active: boolean;
+}
+
+export interface FinancialTransaction {
+  id: string;
+  transactionNumber: string;
+  type: FinancialTransactionType;
+  direction: FinancialDirection;
+  status: FinancialTransactionStatus;
+  transactionDate: string;
+  accountId: string;
+  accountName?: string;
+  destinationAccountId?: string;
+  destinationAccountName?: string;
+  amount: number;
+  currency: LedgerCurrency;
+  exchangeRate?: number;
+  amountTjs: number;
+  amountUsd: number;
+  balanceCurrency: LedgerCurrency;
+  categoryId?: string;
+  categoryName?: string;
+  counterpartyType?: CounterpartyType;
+  counterpartyId?: string;
+  counterpartyName?: string;
+  shopId?: string;
+  sourceType?: string;
+  sourceId?: string;
+  reversedTransactionId?: string;
+  description: string;
+  comment?: string;
+  createdByUserId: string;
+  createdAt: string;
 }
 
 export interface DailyRate {

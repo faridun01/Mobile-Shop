@@ -20,7 +20,8 @@ import {
   FileText,
   Settings,
   Bell,
-  LogOut
+  LogOut,
+  Landmark
 } from 'lucide-react';
 
 const PAGE_ROUTES: Record<string, string> = {
@@ -37,6 +38,7 @@ const PAGE_ROUTES: Record<string, string> = {
   OWNERS: '/owners',
   EMPLOYEES: '/employees',
   REPORTS: '/reports',
+  FINANCE: '/finance',
   AUDIT_LOG: '/audit-log',
   SETTINGS: '/settings',
   NOTIFICATIONS: '/notifications',
@@ -54,6 +56,7 @@ const TABLET_NAV_ITEMS: { id: PageId; label: string; icon: React.ElementType; ro
   { id: 'EXPENSES', label: 'Расходы', icon: Wallet, roles: ['ADMIN', 'PARTNER'] },
   { id: 'BONUSES', label: 'Бонусы', icon: Gift, roles: ['ADMIN', 'PARTNER'] },
   { id: 'REPORTS', label: 'Отчёты', icon: BarChart3, roles: ['ADMIN', 'PARTNER'] },
+  { id: 'FINANCE', label: 'Финансы', icon: Landmark, roles: ['ADMIN', 'PARTNER'] },
   { id: 'OWNERS', label: 'Партнеры', icon: Users, roles: ['ADMIN', 'PARTNER'] },
   { id: 'EMPLOYEES', label: 'Кадры', icon: UserCheck, roles: ['ADMIN'] },
   { id: 'AUDIT_LOG', label: 'Аудит', icon: FileText, roles: ['ADMIN'] },

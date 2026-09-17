@@ -306,3 +306,197 @@ export async function computeReportsSummary(input: ReportsSummaryInput) {
     modelCounts: sortedModelList,
   };
 }
+
+// ---------------------------------------------------------------------------
+// Finance module reports (Phase 2) — the first reports in this file built on
+// FinancialTransaction/FinancialAccount instead of Sale/Expense/Store.cashBalanceTjs.
+// ---------------------------------------------------------------------------
+
+type PeriodInput = { period: ReportPeriod; month?: string };
+
+/**
+ * Signed TJS/USD movement a single account experienced within `dateRange` (undefined =
+ * all time), from the account's own point of view: as the transaction's `accountId` its
+ * sign follows `direction` (IN=+, OUT/NEUTRAL=-, since a NEUTRAL row today is always a
+ * TRANSFER whose `accountId` side is the source); as the `destinationAccountId` of a
+ * TRANSFER it's always a receipt (+). Used to walk a current cached balance backwards to
+ * what it must have been at the start of the period, without storing daily snapshots.
+ */
+async function computeAccountPeriodMovement(accountId: string, dateRange?: { gte: Date; lt: Date }) {
+  const [asSource, asDestination] = await Promise.all([
+    prisma.financialTransaction.findMany({
+      where: { accountId, status: 'POSTED', ...(dateRange ? { transactionDate: dateRange } : {}) },
+      select: { direction: true, balanceCurrency: true, amountTjs: true, amountUsd: true },
+    }),
+    prisma.financialTransaction.findMany({
+      where: { destinationAccountId: accountId, status: 'POSTED', ...(dateRange ? { transactionDate: dateRange } : {}) },
+      select: { balanceCurrency: true, amountTjs: true, amountUsd: true },
+    }),
+  ]);
+
+  let deltaTjs = 0;
+  let deltaUsd = 0;
+  for (const t of asSource) {
+    const amount = t.balanceCurrency === 'TJS' ? t.amountTjs : t.amountUsd;
+    const signed = t.direction === 'IN' ? amount : -amount;
+    if (t.balanceCurrency === 'TJS') deltaTjs += signed;
+    else deltaUsd += signed;
+  }
+  for (const t of asDestination) {
+    const amount = t.balanceCurrency === 'TJS' ? t.amountTjs : t.amountUsd;
+    if (t.balanceCurrency === 'TJS') deltaTjs += amount;
+    else deltaUsd += amount;
+  }
+  return { deltaTjs, deltaUsd };
+}
+
+/** Resolves which FinancialAccount rows a report should cover for a given store filter. */
+async function resolveReportAccounts(storeId?: string) {
+  if (storeId && storeId !== 'all') {
+    const account = await prisma.financialAccount.findUnique({ where: { storeId } });
+    return account ? [account] : [];
+  }
+  return prisma.financialAccount.findMany({ where: { active: true } });
+}
+
+async function computeCategoryBreakdown(accountIds: string[], dateRange?: { gte: Date; lt: Date }) {
+  if (accountIds.length === 0) return { income: [], expense: [], incomeTotalTjs: 0, incomeTotalUsd: 0, expenseTotalTjs: 0, expenseTotalUsd: 0 };
+
+  const [incomeGroups, expenseGroups, categories] = await Promise.all([
+    prisma.financialTransaction.groupBy({
+      by: ['categoryId'],
+      where: { accountId: { in: accountIds }, status: 'POSTED', direction: 'IN', ...(dateRange ? { transactionDate: dateRange } : {}) },
+      _sum: { amountTjs: true, amountUsd: true },
+    }),
+    prisma.financialTransaction.groupBy({
+      by: ['categoryId'],
+      where: { accountId: { in: accountIds }, status: 'POSTED', direction: 'OUT', ...(dateRange ? { transactionDate: dateRange } : {}) },
+      _sum: { amountTjs: true, amountUsd: true },
+    }),
+    prisma.financialCategory.findMany({ select: { id: true, name: true } }),
+  ]);
+  const categoryName = new Map(categories.map((c) => [c.id, c.name]));
+
+  // groupBy's `_sum` bypasses the decimal-extension's per-field result mapping (that only
+  // covers normal record shapes), so these come back as raw Prisma.Decimal instances —
+  // Number(...) converts via Decimal's string valueOf, same effect as .toNumber().
+  const toRow = (g: { categoryId: string | null; _sum: { amountTjs: unknown; amountUsd: unknown } }) => ({
+    categoryId: g.categoryId,
+    categoryName: g.categoryId ? categoryName.get(g.categoryId) ?? 'Без категории' : 'Без категории',
+    amountTjs: roundMoney(Number(g._sum.amountTjs) || 0),
+    amountUsd: roundMoney(Number(g._sum.amountUsd) || 0),
+  });
+
+  const income = incomeGroups.map(toRow).sort((a, b) => b.amountTjs - a.amountTjs);
+  const expense = expenseGroups.map(toRow).sort((a, b) => b.amountTjs - a.amountTjs);
+  return {
+    income,
+    expense,
+    incomeTotalTjs: roundMoney(income.reduce((s, r) => s + r.amountTjs, 0)),
+    incomeTotalUsd: roundMoney(income.reduce((s, r) => s + r.amountUsd, 0)),
+    expenseTotalTjs: roundMoney(expense.reduce((s, r) => s + r.amountTjs, 0)),
+    expenseTotalUsd: roundMoney(expense.reduce((s, r) => s + r.amountUsd, 0)),
+  };
+}
+
+export interface CashFlowReportInput extends PeriodInput {
+  storeId?: string;
+}
+
+export async function computeCashFlowReport(input: CashFlowReportInput) {
+  const dateRange = dateRangeForPeriod(input.period, input.month);
+  const accounts = await resolveReportAccounts(input.storeId);
+
+  const movements = await Promise.all(accounts.map((a) => computeAccountPeriodMovement(a.id, dateRange)));
+  let openingBalanceTjs = 0;
+  let openingBalanceUsd = 0;
+  let closingBalanceTjs = 0;
+  let closingBalanceUsd = 0;
+  accounts.forEach((account, i) => {
+    closingBalanceTjs += account.balanceTjs;
+    closingBalanceUsd += account.balanceUsd;
+    openingBalanceTjs += account.balanceTjs - movements[i].deltaTjs;
+    openingBalanceUsd += account.balanceUsd - movements[i].deltaUsd;
+  });
+
+  const breakdown = await computeCategoryBreakdown(accounts.map((a) => a.id), dateRange);
+
+  return {
+    openingBalanceTjs: roundMoney(openingBalanceTjs),
+    openingBalanceUsd: roundMoney(openingBalanceUsd),
+    closingBalanceTjs: roundMoney(closingBalanceTjs),
+    closingBalanceUsd: roundMoney(closingBalanceUsd),
+    income: breakdown.income,
+    expense: breakdown.expense,
+    incomeTotalTjs: breakdown.incomeTotalTjs,
+    incomeTotalUsd: breakdown.incomeTotalUsd,
+    expenseTotalTjs: breakdown.expenseTotalTjs,
+    expenseTotalUsd: breakdown.expenseTotalUsd,
+  };
+}
+
+export interface AccountStatementInput extends PeriodInput {
+  accountId: string;
+}
+
+export async function computeAccountStatement(input: AccountStatementInput) {
+  const account = await prisma.financialAccount.findUnique({ where: { id: input.accountId } });
+  if (!account) throw new Error('Счёт не найден');
+
+  const dateRange = dateRangeForPeriod(input.period, input.month);
+  const movement = await computeAccountPeriodMovement(account.id, dateRange);
+  const openingBalanceTjs = roundMoney(account.balanceTjs - movement.deltaTjs);
+  const openingBalanceUsd = roundMoney(account.balanceUsd - movement.deltaUsd);
+
+  const transactions = await prisma.financialTransaction.findMany({
+    where: {
+      status: 'POSTED',
+      OR: [{ accountId: account.id }, { destinationAccountId: account.id }],
+      ...(dateRange ? { transactionDate: dateRange } : {}),
+    },
+    orderBy: { transactionDate: 'asc' },
+    include: { category: { select: { name: true } }, account: { select: { name: true } }, destinationAccount: { select: { name: true } } },
+  });
+
+  let runningTjs = openingBalanceTjs;
+  let runningUsd = openingBalanceUsd;
+  const rows = transactions.map((t) => {
+    const isSource = t.accountId === account.id;
+    const amount = t.balanceCurrency === 'TJS' ? t.amountTjs : t.amountUsd;
+    const signed = isSource ? (t.direction === 'IN' ? amount : -amount) : amount;
+    if (t.balanceCurrency === 'TJS') runningTjs = roundMoney(runningTjs + signed);
+    else runningUsd = roundMoney(runningUsd + signed);
+    return {
+      id: t.id,
+      transactionNumber: t.transactionNumber,
+      transactionDate: t.transactionDate,
+      type: t.type,
+      description: t.description,
+      categoryName: t.category?.name ?? null,
+      counterpartyName: t.counterpartyName,
+      balanceCurrency: t.balanceCurrency,
+      signedAmount: roundMoney(signed),
+      runningBalanceTjs: runningTjs,
+      runningBalanceUsd: runningUsd,
+    };
+  });
+
+  return {
+    account: { id: account.id, name: account.name, type: account.type },
+    openingBalanceTjs,
+    openingBalanceUsd,
+    closingBalanceTjs: runningTjs,
+    closingBalanceUsd: runningUsd,
+    rows,
+  };
+}
+
+export interface IncomeExpenseReportInput extends PeriodInput {
+  storeId?: string;
+}
+
+export async function computeIncomeExpenseReport(input: IncomeExpenseReportInput) {
+  const dateRange = dateRangeForPeriod(input.period, input.month);
+  const accounts = await resolveReportAccounts(input.storeId);
+  return computeCategoryBreakdown(accounts.map((a) => a.id), dateRange);
+}
