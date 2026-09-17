@@ -6,6 +6,8 @@ export interface JwtPayload {
   login: string;
   role: 'ADMIN' | 'PARTNER' | 'SELLER';
   storeId?: string | null;
+  sessionId?: string;
+  exp?: number;
 }
 
 function loadJwtSecret(): string {
@@ -50,6 +52,28 @@ export class AuthService {
   // of this value, since authenticateJwt re-checks `active` from the DB on every request.
   private static readonly TOKEN_LIFETIME_SECONDS = 60 * 60 * 12;
 
+  public static async createSession(payload: JwtPayload, verifiedPasswordHash: string): Promise<string> {
+    const expiresAt = new Date(Date.now() + this.TOKEN_LIFETIME_SECONDS * 1000);
+    const session = await prisma.$transaction(async tx => {
+      await tx.$queryRaw`SELECT id FROM users WHERE id = ${payload.userId} FOR UPDATE`;
+      const current = await tx.user.findUnique({ where: { id: payload.userId } });
+      if (!current?.active || current.password !== verifiedPasswordHash) throw new Error('Учётные данные изменились. Войдите снова.');
+      return tx.authSession.create({ data: { userId: payload.userId, expiresAt } });
+    });
+    return this.generateToken({ ...payload, sessionId: session.id });
+  }
+
+  public static async authenticateToken(token: string): Promise<JwtPayload | null> {
+    const payload = this.verifyToken(token);
+    if (!payload?.sessionId) return null;
+    const session = await prisma.authSession.findUnique({ where: { id: payload.sessionId },
+      include: { user: { select: { login: true, role: true, storeId: true, active: true } } } });
+    if (!session || session.revokedAt || session.expiresAt.getTime() <= Date.now() ||
+        session.userId !== payload.userId || !session.user.active) return null;
+    return { userId: session.userId, login: session.user.login, role: session.user.role,
+      storeId: session.user.storeId, sessionId: session.id, exp: payload.exp };
+  }
+
   // Create JWT Token
   public static generateToken(payload: JwtPayload): string {
     const header = Buffer.from(JSON.stringify({ alg: 'HS256', typ: 'JWT' })).toString('base64url');
@@ -65,6 +89,7 @@ export class AuthService {
   // Verify JWT Token
   public static verifyToken(token: string): JwtPayload | null {
     try {
+      if (token.split('.').length !== 3) return null;
       const [header, encodedPayload, signature] = token.split('.');
       if (!header || !encodedPayload || !signature) return null;
 
@@ -82,7 +107,7 @@ export class AuthService {
       const decodedHeader = JSON.parse(Buffer.from(header, 'base64url').toString('utf8'));
       if (decodedHeader?.alg !== 'HS256' || decodedHeader?.typ !== 'JWT') return null;
       const payload: JwtPayload & { exp: number } = JSON.parse(Buffer.from(encodedPayload, 'base64url').toString('utf8'));
-      if (payload.exp < Math.floor(Date.now() / 1000)) return null;
+      if (!Number.isFinite(payload.exp) || payload.exp <= Math.floor(Date.now() / 1000)) return null;
 
       return payload;
     } catch {

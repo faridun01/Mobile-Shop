@@ -5,6 +5,7 @@ import { getRateForDate } from '../exchange-rate/exchange-rate.service';
 import { requirePositiveMoney, roundMoney } from '../../common/money';
 import { getStoreCashAccount } from '../finance/account.service';
 import { postTransaction, cancelTransaction } from '../finance/financial-transaction.service';
+import { currentOwnerAllocations, readOwnerAllocations, replaceOwnerAllocations } from '../finance/owner-allocations';
 
 export interface CreateExpenseInput {
   category: string;
@@ -32,12 +33,14 @@ export async function createExpense(tx: TransactionClient, input: CreateExpenseI
   const store = input.storeId ? await tx.store.findUnique({ where: { id: input.storeId } }) : null;
   const resolvedSource = input.sourceAccount || (input.paidFromCashRegister ? (store ? `Касса ${store.name}` : 'Касса') : 'Счет компании');
   const paidFromCashRegister = input.paidFromCashRegister ?? true;
+  const ownerProfitAllocations = await currentOwnerAllocations(tx, amountUsd);
 
   const expense = await tx.expense.create({
     data: {
       category: input.category,
       amountTjs,
       amountUsd,
+      ownerProfitAllocations,
       exchangeRate: rate,
       targetType: resolvedTargetType,
       storeId: input.storeId,
@@ -78,18 +81,7 @@ export async function createExpense(tx: TransactionClient, input: CreateExpenseI
     });
   }
 
-  const owners = await tx.owner.findMany();
-  if (owners.length > 0) {
-    await Promise.all(
-      owners.map(owner => {
-        const delta = roundMoney(amountUsd * (owner.profitSharePercent / 100));
-        return tx.owner.update({
-          where: { id: owner.id },
-          data: { totalAccruedProfitUsd: { decrement: delta }, availableProfitUsd: { decrement: delta } },
-        });
-      })
-    );
-  }
+  await replaceOwnerAllocations(tx, [], ownerProfitAllocations, -1);
 
   await tx.ledgerEntry.create({
     data: {
@@ -136,6 +128,7 @@ export async function updateExpense(
   actorId: string
 ) {
   return prisma.$transaction(async (tx) => {
+    await tx.$queryRaw`SELECT id FROM expenses WHERE id = ${id} FOR UPDATE`;
     const existing = await tx.expense.findUnique({ where: { id } });
     if (!existing) throw new Error('Расход не найден');
     if (existing.cancelledAt) throw new Error('Нельзя редактировать отменённый расход');
@@ -155,7 +148,7 @@ export async function updateExpense(
     // exactly mirroring the reverse-old/apply-new pattern already used for the store
     // cash balance and owner profit below — simpler and safer than trying to patch a
     // POSTED row in place, and it naturally handles the store-changed case too.
-    const existingTransaction = await tx.financialTransaction.findFirst({ where: { sourceType: 'EXPENSE', sourceId: id, status: 'POSTED' } });
+    const existingTransaction = await tx.financialTransaction.findFirst({ where: { sourceType: 'EXPENSE', sourceId: id, status: 'POSTED', reversedTransactionId: null } });
     if (existingTransaction) {
       await cancelTransaction(tx, existingTransaction.id, actor.id);
     }
@@ -183,19 +176,12 @@ export async function updateExpense(
     // an expense decrements owner profit at creation (see createExpense), so an edit that
     // changes the amount must roll that accrual forward too, or owner profit permanently
     // drifts from the actual expense total.
-    const owners = await tx.owner.findMany();
-    await Promise.all(owners.map((owner) => {
-      const share = owner.profitSharePercent / 100;
-      const revertDelta = roundMoney((existing.amountUsd || 0) * share);
-      const applyDelta = roundMoney(newAmountUsd * share);
-      return tx.owner.update({
-        where: { id: owner.id },
-        data: {
-          totalAccruedProfitUsd: { increment: revertDelta - applyDelta },
-          availableProfitUsd: { increment: revertDelta - applyDelta },
-        },
-      });
-    }));
+    let ownerProfitAllocations;
+    if (newAmountUsd !== existing.amountUsd) {
+      const previous = readOwnerAllocations(existing.ownerProfitAllocations);
+      ownerProfitAllocations = await currentOwnerAllocations(tx, newAmountUsd);
+      await replaceOwnerAllocations(tx, previous, ownerProfitAllocations, -1);
+    }
 
     const updated = await tx.expense.update({
       where: { id },
@@ -203,6 +189,7 @@ export async function updateExpense(
         category: newCategory,
         amountTjs: newAmountTjs,
         amountUsd: newAmountUsd,
+        ...(ownerProfitAllocations ? { ownerProfitAllocations } : {}),
         storeId: newStoreId,
         comment: newComment,
         description: newDescription,
@@ -260,6 +247,7 @@ export async function updateExpense(
 
 export async function deleteExpense(id: string, actorId: string) {
   return prisma.$transaction(async (tx) => {
+    await tx.$queryRaw`SELECT id FROM expenses WHERE id = ${id} FOR UPDATE`;
     const existing = await tx.expense.findUnique({ where: { id } });
     if (!existing) throw new Error('Расход не найден');
     if (existing.cancelledAt) throw new Error('Расход уже отменён');
@@ -275,18 +263,11 @@ export async function deleteExpense(id: string, actorId: string) {
     }
 
     // Reverse the profit impact this expense accrued against owners at creation time.
-    const owners = await tx.owner.findMany();
-    await Promise.all(owners.map((owner) => {
-      const delta = roundMoney((existing.amountUsd || 0) * (owner.profitSharePercent / 100));
-      return tx.owner.update({
-        where: { id: owner.id },
-        data: { totalAccruedProfitUsd: { increment: delta }, availableProfitUsd: { increment: delta } },
-      });
-    }));
+    await replaceOwnerAllocations(tx, readOwnerAllocations(existing.ownerProfitAllocations), [], -1);
 
     // Reverse (never hard-delete) the financial ledger transaction, if one was posted —
     // no more `ledgerEntry.deleteMany` here either, matching the same no-hard-delete rule.
-    const existingTransaction = await tx.financialTransaction.findFirst({ where: { sourceType: 'EXPENSE', sourceId: id, status: 'POSTED' } });
+    const existingTransaction = await tx.financialTransaction.findFirst({ where: { sourceType: 'EXPENSE', sourceId: id, status: 'POSTED', reversedTransactionId: null } });
     if (existingTransaction) {
       await cancelTransaction(tx, existingTransaction.id, actor.id);
     }

@@ -37,7 +37,8 @@ export function registerExpenseRoutes(app: Express) {
         orderBy: { createdAt: 'desc' },
         ...(employeeId ? {} : limit ? { take: limit } : {}),
       });
-      res.json(expenses);
+      // Allocation snapshots are internal accounting data, not part of the seller's expense view.
+      res.json(expenses.map(({ ownerProfitAllocations: _allocations, ...expense }) => expense));
     } catch (error) {
       next(error);
     }

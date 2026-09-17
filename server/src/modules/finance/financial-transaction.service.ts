@@ -142,6 +142,8 @@ export async function cancelTransaction(tx: TransactionClient, transactionId: st
   const original = await tx.financialTransaction.findUnique({ where: { id: transactionId } });
   if (!original) throw new Error('Финансовая операция не найдена');
   if (original.status === 'CANCELLED') throw new Error('Операция уже отменена');
+  if (original.reversedTransactionId) throw new Error('Нельзя отменить сторнирующую операцию');
+  if (original.type === 'TRANSFER' && !original.destinationAccountId) throw new Error('Не указан счёт назначения перевода');
 
   await tx.financialTransaction.update({
     where: { id: transactionId },
@@ -154,8 +156,8 @@ export async function cancelTransaction(tx: TransactionClient, transactionId: st
     type: original.type as FinancialTransactionType,
     direction: reverseDirection,
     numberPrefix: 'AJ',
-    accountId: original.accountId,
-    destinationAccountId: original.destinationAccountId ?? undefined,
+    accountId: original.type === 'TRANSFER' ? original.destinationAccountId! : original.accountId,
+    destinationAccountId: original.type === 'TRANSFER' ? original.accountId : undefined,
     balanceCurrency: original.balanceCurrency as LedgerCurrency,
     amount: original.amount,
     currency: original.currency as LedgerCurrency,

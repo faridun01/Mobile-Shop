@@ -178,8 +178,20 @@ model User {
   auditLogs     AuditLog[]
   notifications Notification[]
   ownerProfile  Owner?
+  sessions      AuthSession[]
 
   @@map("users")
+}
+
+model AuthSession {
+  id        String   @id @default(uuid())
+  userId    String
+  expiresAt DateTime
+  revokedAt DateTime?
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("auth_sessions")
 }
 
 model Device {
@@ -479,6 +491,7 @@ model SupplierBonus {
   campaignTitle String?
   bonusType     BonusType
   amountUsd     Decimal?  @db.Decimal(14, 2)
+  ownerProfitAllocations Json?
   exchangeRate  Decimal   @db.Decimal(10, 4)
   status        String?
   dateReceived  DateTime  @default(now())
@@ -605,6 +618,7 @@ model Expense {
   category             String
   amountTjs            Decimal   @db.Decimal(14, 2)
   amountUsd            Decimal?  @db.Decimal(14, 2)
+  ownerProfitAllocations Json?
   exchangeRate         Decimal?  @db.Decimal(10, 4)
   targetType           String    @default("STORE")
   storeId              String?

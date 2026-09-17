@@ -114,7 +114,7 @@ app.post('/api/auth/login', async (req, res, next) => {
     }
 
     loginAttempts.delete(rateLimitKey);
-    const token = AuthService.generateToken({ userId: user.id, login: user.login, role: user.role, storeId: user.storeId });
+    const token = await AuthService.createSession({ userId: user.id, login: user.login, role: user.role, storeId: user.storeId }, user.password);
 
     await prisma.auditLog.create({
       data: {
@@ -147,6 +147,8 @@ app.post('/api/auth/login', async (req, res, next) => {
 
 app.post('/api/auth/logout', authenticateJwt, async (req: AuthenticatedRequest, res, next) => {
   try {
+    await prisma.authSession.update({ where: { id: req.user!.sessionId! }, data: { revokedAt: new Date() } });
+    RealtimeSyncGateway.disconnectSession(req.user!.sessionId!);
     await prisma.auditLog.create({
       data: {
         userId: req.user!.userId,

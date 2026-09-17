@@ -97,7 +97,7 @@ export class UsersService {
     },
     updatedByUserId: string,
   ) {
-    return prisma.$transaction(async (tx) => {
+    const updatedUser = await prisma.$transaction(async (tx) => {
       const actor = await resolveActor(tx, updatedByUserId);
       const targetUser = await tx.user.findUnique({ where: { id: userId } });
       if (!targetUser) throw new Error('Пользователь не найден');
@@ -128,6 +128,9 @@ export class UsersService {
       }
 
       const user = await tx.user.update({ where: { id: userId }, data, select: SAFE_SELECT });
+      if (data.password || data.role || input.storeId !== undefined) {
+        await tx.authSession.updateMany({ where: { userId, revokedAt: null }, data: { revokedAt: new Date() } });
+      }
 
       // Keep a linked Owner's display name in sync — it must never drift from the
       // actual account it represents (a partner is a real person, not a free-text label).
@@ -140,12 +143,15 @@ export class UsersService {
       });
       return user;
     }, { maxWait: 10000, timeout: 25000 });
+    if (input.password?.trim() || input.role || input.storeId !== undefined) RealtimeSyncGateway.disconnectUser(userId);
+    return updatedUser;
   }
 
   public static async setActive(userId: string, active: boolean, actingUserId: string) {
     const user = await prisma.$transaction(async (tx) => {
       const actor = await resolveActor(tx, actingUserId);
       const user = await tx.user.update({ where: { id: userId }, data: { active }, select: SAFE_SELECT });
+      if (!active) await tx.authSession.updateMany({ where: { userId, revokedAt: null }, data: { revokedAt: new Date() } });
       await tx.auditLog.create({
         data: {
           userId: actor.id,

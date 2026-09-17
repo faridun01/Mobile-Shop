@@ -8,6 +8,7 @@ interface ConnectedClient {
   id: string;
   ws: WebSocket;
   user: JwtPayload;
+  authenticated: boolean;
 }
 
 export interface BroadcastOptions {
@@ -32,7 +33,9 @@ export class RealtimeSyncGateway {
       const connectionId = crypto.randomUUID();
       const url = new URL(request.url ?? '', 'http://localhost');
       const token = url.searchParams.get('token');
-      const user = token ? AuthService.verifyToken(token) : null;
+      let user: JwtPayload | null = null;
+      try { user = token ? await AuthService.authenticateToken(token) : null; }
+      catch (error) { console.error('[WebSocket] Session validation failed', error); }
 
       if (!user) {
         ws.close(1008, 'Unauthorized');
@@ -82,11 +85,15 @@ export class RealtimeSyncGateway {
         this.clients.delete(oldest);
       }
 
-      const client: ConnectedClient = { id: connectionId, ws, user };
+      const client: ConnectedClient = { id: connectionId, ws, user, authenticated: false };
       this.clients.add(client);
+      // Expiry applies to established sockets too, not only new handshakes.
+      const expiryTimer = setTimeout(() => ws.close(1008, 'Session expired'), Math.max(0, (user.exp ?? 0) * 1000 - Date.now()));
+      expiryTimer.unref();
       console.log(`[WebSocket] CONNECTED    id=${connectionId} user=${user.login} role=${user.role}`);
 
       ws.on('close', (code, reason) => {
+        clearTimeout(expiryTimer);
         this.clients.delete(client);
         const reasonStr = reason ? reason.toString() : '';
         console.log(`[WebSocket] DISCONNECTED id=${connectionId} user=${user.login} role=${user.role} code=${code} reason=${reasonStr}`);
@@ -106,6 +113,17 @@ export class RealtimeSyncGateway {
       ws.on('message', () => {
         /* no-op: inbound messages are ignored */
       });
+      // Logout/password changes can commit while the handshake awaits the DB.
+      // Register first, then recheck: revocation now either finds this client or
+      // is observed here. Never broadcast to a client before this check completes.
+      try {
+        const current = await AuthService.authenticateToken(token!);
+        if (!current) { ws.close(1008, 'Session disabled'); return; }
+        client.user = current;
+        client.authenticated = ws.readyState === WebSocket.OPEN;
+      } catch {
+        ws.close(1008, 'Session validation failed');
+      }
     });
   }
 
@@ -115,13 +133,19 @@ export class RealtimeSyncGateway {
     }
   }
 
+  public static disconnectSession(sessionId: string) {
+    for (const client of this.clients) {
+      if (client.user.sessionId === sessionId) client.ws.close(1008, 'Session disabled');
+    }
+  }
+
   public static broadcast(eventType: string, payload: any, options: BroadcastOptions = {}) {
     if (!this.wss) return;
 
     const message = JSON.stringify({ type: eventType, payload, timestamp: new Date().toISOString() });
 
     for (const client of this.clients) {
-      if (client.ws.readyState !== WebSocket.OPEN) continue;
+      if (!client.authenticated || client.ws.readyState !== WebSocket.OPEN) continue;
 
       const canSeeEverything = client.user.role === 'ADMIN' || client.user.role === 'PARTNER';
       const inScope =

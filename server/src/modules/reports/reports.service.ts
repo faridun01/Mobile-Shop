@@ -68,7 +68,7 @@ export async function computeReportsSummary(input: ReportsSummaryInput) {
       orderBy: { createdAt: 'desc' },
     }),
     prisma.expense.findMany({
-      where: { ...(dateRange ? { createdAt: dateRange } : {}), ...(storeFilter ? { storeId: storeFilter } : {}) },
+      where: { cancelledAt: null, ...(dateRange ? { createdAt: dateRange } : {}), ...(storeFilter ? { storeId: storeFilter } : {}) },
       select: { storeId: true, amountTjs: true, amountUsd: true, exchangeRate: true },
     }),
     // Supplier bonuses aren't a high-growth table (one row per negotiated bonus, not per
@@ -322,14 +322,14 @@ type PeriodInput = { period: ReportPeriod; month?: string };
  * TRANSFER it's always a receipt (+). Used to walk a current cached balance backwards to
  * what it must have been at the start of the period, without storing daily snapshots.
  */
-async function computeAccountPeriodMovement(accountId: string, dateRange?: { gte: Date; lt: Date }) {
+async function computeAccountPeriodMovement(accountId: string, dateRange?: { gte?: Date; lt?: Date }) {
   const [asSource, asDestination] = await Promise.all([
     prisma.financialTransaction.findMany({
-      where: { accountId, status: 'POSTED', ...(dateRange ? { transactionDate: dateRange } : {}) },
+      where: { accountId, ...(dateRange ? { transactionDate: dateRange } : {}) },
       select: { direction: true, balanceCurrency: true, amountTjs: true, amountUsd: true },
     }),
     prisma.financialTransaction.findMany({
-      where: { destinationAccountId: accountId, status: 'POSTED', ...(dateRange ? { transactionDate: dateRange } : {}) },
+      where: { destinationAccountId: accountId, ...(dateRange ? { transactionDate: dateRange } : {}) },
       select: { balanceCurrency: true, amountTjs: true, amountUsd: true },
     }),
   ]);
@@ -362,15 +362,12 @@ async function resolveReportAccounts(storeId?: string) {
 async function computeCategoryBreakdown(accountIds: string[], dateRange?: { gte: Date; lt: Date }) {
   if (accountIds.length === 0) return { income: [], expense: [], incomeTotalTjs: 0, incomeTotalUsd: 0, expenseTotalTjs: 0, expenseTotalUsd: 0 };
 
-  const [incomeGroups, expenseGroups, categories] = await Promise.all([
+  // A reversal subtracts from its original category/direction, rather than
+  // inventing an expense for cancelled income (or income for cancelled expense).
+  const [groups, categories] = await Promise.all([
     prisma.financialTransaction.groupBy({
-      by: ['categoryId'],
-      where: { accountId: { in: accountIds }, status: 'POSTED', direction: 'IN', ...(dateRange ? { transactionDate: dateRange } : {}) },
-      _sum: { amountTjs: true, amountUsd: true },
-    }),
-    prisma.financialTransaction.groupBy({
-      by: ['categoryId'],
-      where: { accountId: { in: accountIds }, status: 'POSTED', direction: 'OUT', ...(dateRange ? { transactionDate: dateRange } : {}) },
+      by: ['categoryId', 'direction', 'reversedTransactionId'],
+      where: { accountId: { in: accountIds }, direction: { in: ['IN', 'OUT'] }, ...(dateRange ? { transactionDate: dateRange } : {}) },
       _sum: { amountTjs: true, amountUsd: true },
     }),
     prisma.financialCategory.findMany({ select: { id: true, name: true } }),
@@ -387,8 +384,22 @@ async function computeCategoryBreakdown(accountIds: string[], dateRange?: { gte:
     amountUsd: roundMoney(Number(g._sum.amountUsd) || 0),
   });
 
-  const income = incomeGroups.map(toRow).sort((a, b) => b.amountTjs - a.amountTjs);
-  const expense = expenseGroups.map(toRow).sort((a, b) => b.amountTjs - a.amountTjs);
+  const incomeMap = new Map<string | null, ReturnType<typeof toRow>>();
+  const expenseMap = new Map<string | null, ReturnType<typeof toRow>>();
+  for (const group of groups) {
+    const reversal = Boolean(group.reversedTransactionId);
+    const isIncome = reversal ? group.direction === 'OUT' : group.direction === 'IN';
+    const map = isIncome ? incomeMap : expenseMap;
+    const row = toRow(group);
+    const previous = map.get(row.categoryId);
+    const sign = reversal ? -1 : 1;
+    map.set(row.categoryId, { ...row,
+      amountTjs: roundMoney((previous?.amountTjs ?? 0) + sign * row.amountTjs),
+      amountUsd: roundMoney((previous?.amountUsd ?? 0) + sign * row.amountUsd),
+    });
+  }
+  const income = [...incomeMap.values()].filter(r => r.amountTjs !== 0 || r.amountUsd !== 0).sort((a, b) => b.amountTjs - a.amountTjs);
+  const expense = [...expenseMap.values()].filter(r => r.amountTjs !== 0 || r.amountUsd !== 0).sort((a, b) => b.amountTjs - a.amountTjs);
   return {
     income,
     expense,
@@ -408,15 +419,20 @@ export async function computeCashFlowReport(input: CashFlowReportInput) {
   const accounts = await resolveReportAccounts(input.storeId);
 
   const movements = await Promise.all(accounts.map((a) => computeAccountPeriodMovement(a.id, dateRange)));
+  const laterMovements = await Promise.all(accounts.map((a) => dateRange
+    ? computeAccountPeriodMovement(a.id, { gte: dateRange.lt })
+    : Promise.resolve({ deltaTjs: 0, deltaUsd: 0 })));
   let openingBalanceTjs = 0;
   let openingBalanceUsd = 0;
   let closingBalanceTjs = 0;
   let closingBalanceUsd = 0;
   accounts.forEach((account, i) => {
-    closingBalanceTjs += account.balanceTjs;
-    closingBalanceUsd += account.balanceUsd;
-    openingBalanceTjs += account.balanceTjs - movements[i].deltaTjs;
-    openingBalanceUsd += account.balanceUsd - movements[i].deltaUsd;
+    const closingTjs = account.balanceTjs - laterMovements[i].deltaTjs;
+    const closingUsd = account.balanceUsd - laterMovements[i].deltaUsd;
+    closingBalanceTjs += closingTjs;
+    closingBalanceUsd += closingUsd;
+    openingBalanceTjs += closingTjs - movements[i].deltaTjs;
+    openingBalanceUsd += closingUsd - movements[i].deltaUsd;
   });
 
   const breakdown = await computeCategoryBreakdown(accounts.map((a) => a.id), dateRange);
@@ -445,16 +461,16 @@ export async function computeAccountStatement(input: AccountStatementInput) {
 
   const dateRange = dateRangeForPeriod(input.period, input.month);
   const movement = await computeAccountPeriodMovement(account.id, dateRange);
-  const openingBalanceTjs = roundMoney(account.balanceTjs - movement.deltaTjs);
-  const openingBalanceUsd = roundMoney(account.balanceUsd - movement.deltaUsd);
+  const later = dateRange ? await computeAccountPeriodMovement(account.id, { gte: dateRange.lt }) : { deltaTjs: 0, deltaUsd: 0 };
+  const openingBalanceTjs = roundMoney(account.balanceTjs - later.deltaTjs - movement.deltaTjs);
+  const openingBalanceUsd = roundMoney(account.balanceUsd - later.deltaUsd - movement.deltaUsd);
 
   const transactions = await prisma.financialTransaction.findMany({
     where: {
-      status: 'POSTED',
       OR: [{ accountId: account.id }, { destinationAccountId: account.id }],
       ...(dateRange ? { transactionDate: dateRange } : {}),
     },
-    orderBy: { transactionDate: 'asc' },
+    orderBy: [{ transactionDate: 'asc' }, { transactionNumber: 'asc' }],
     include: { category: { select: { name: true } }, account: { select: { name: true } }, destinationAccount: { select: { name: true } } },
   });
 

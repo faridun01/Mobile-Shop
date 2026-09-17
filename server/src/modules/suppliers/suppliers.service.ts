@@ -4,6 +4,8 @@ import { resolveActor } from '../../common/actor';
 import { requireNonNegativeMoney, requirePositiveMoney, roundMoney } from '../../common/money';
 import { requireTodayRate } from '../exchange-rate/exchange-rate.service';
 import { getStoreCashAccount, getMainAccount } from '../finance/account.service';
+import { currentOwnerAllocations, readOwnerAllocations, replaceOwnerAllocations } from '../finance/owner-allocations';
+import type { OwnerProfitAllocation } from '../sales/profit';
 import { postTransaction } from '../finance/financial-transaction.service';
 
 /** True if any of these devices has a sale, transfer, or repair record referencing it (hard FK, no cascade). */
@@ -294,12 +296,14 @@ export class SuppliersService {
       if (!supplier) throw new Error('Поставщик не найден');
       if (!['FREE_DEVICES', 'CASH_DISCOUNT'].includes(input.bonusType)) throw new Error('Некорректный тип бонуса');
       if (input.bonusType === 'CASH_DISCOUNT') input.amountUsd = requirePositiveMoney(input.amountUsd, 'Сумма бонуса');
+      const ownerProfitAllocations = input.bonusType === 'CASH_DISCOUNT' ? await currentOwnerAllocations(tx, input.amountUsd!) : [];
 
       const bonus = await tx.supplierBonus.create({
         data: {
           supplierId: input.supplierId,
           campaignTitle: input.campaignTitle,
           bonusType: input.bonusType,
+          ownerProfitAllocations,
           amountUsd: input.amountUsd,
           exchangeRate,
           status: 'IN_STOCK',
@@ -350,15 +354,7 @@ export class SuppliersService {
         // per the user (2026-09-07), this is realized straight into net profit, deliberately
         // kept separate from the main warehouse's operating till (same profit/capital split
         // already established for owner payout — see the domain-total-invested-capital memory).
-        const bonusAmountUsd = input.amountUsd;
-        const owners = await tx.owner.findMany();
-        await Promise.all(owners.map((owner) => {
-          const delta = roundMoney(bonusAmountUsd * (owner.profitSharePercent / 100));
-          return tx.owner.update({
-            where: { id: owner.id },
-            data: { totalAccruedProfitUsd: { increment: delta }, availableProfitUsd: { increment: delta } },
-          });
-        }));
+        await replaceOwnerAllocations(tx, [], ownerProfitAllocations, 1);
         await tx.ledgerEntry.create({
           data: {
             type: 'SUPPLIER_BONUS',
@@ -395,11 +391,12 @@ export class SuppliersService {
    */
   public static async updateBonus(id: string, input: { campaignTitle?: string; amountUsd?: number; freeDevice?: { brand?: string; model?: string; storage?: string; color?: string; imei?: string; imei2?: string }; actorUserId: string }) {
     return prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM supplier_bonuses WHERE id = ${id} FOR UPDATE`;
       const actor = await resolveActor(tx, input.actorUserId);
       const bonus = await tx.supplierBonus.findUnique({ where: { id }, include: { freeDevices: true, supplier: { select: { name: true } } } });
       if (!bonus) throw new Error('Бонус не найден');
 
-      const data: { campaignTitle?: string | null; amountUsd?: number } = {};
+      const data: { campaignTitle?: string | null; amountUsd?: number; ownerProfitAllocations?: OwnerProfitAllocation[] } = {};
       if (input.campaignTitle !== undefined) data.campaignTitle = input.campaignTitle.trim() || null;
 
       if (bonus.bonusType === 'CASH_DISCOUNT') {
@@ -407,24 +404,9 @@ export class SuppliersService {
           const newAmountUsd = requirePositiveMoney(input.amountUsd, 'Сумма бонуса');
           const oldAmountUsd = bonus.amountUsd || 0;
           if (newAmountUsd !== oldAmountUsd) {
-            const owners = await tx.owner.findMany();
-            for (const owner of owners) {
-              const share = owner.profitSharePercent / 100;
-              const delta = roundMoney(newAmountUsd * share) - roundMoney(oldAmountUsd * share);
-              if (delta === 0) continue;
-              // A lower amount claws back profit already booked as accrued/available — but
-              // if that profit has since been paid out, reinvested, or swept by a quarter
-              // close, it's no longer sitting in availableProfitUsd to claw back from.
-              // Blocking here (same guard shape as payout/withdrawal) beats silently driving
-              // the owner's available profit negative.
-              const guard = await tx.owner.updateMany({
-                where: delta < 0 ? { id: owner.id, availableProfitUsd: { gte: -delta } } : { id: owner.id },
-                data: { totalAccruedProfitUsd: { increment: delta }, availableProfitUsd: { increment: delta } },
-              });
-              if (guard.count !== 1) {
-                throw new Error(`Нельзя уменьшить сумму бонуса: прибыль от него для «${owner.name}» уже выплачена, реинвестирована или зачислена в капитал закрытием квартала`);
-              }
-            }
+            const previous = readOwnerAllocations(bonus.ownerProfitAllocations);
+            data.ownerProfitAllocations = await currentOwnerAllocations(tx, newAmountUsd);
+            await replaceOwnerAllocations(tx, previous, data.ownerProfitAllocations, 1, true);
           }
           data.amountUsd = newAmountUsd;
           await tx.ledgerEntry.updateMany({
@@ -491,6 +473,7 @@ export class SuppliersService {
    */
   public static async deleteBonus(id: string, actorUserId: string) {
     return prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM supplier_bonuses WHERE id = ${id} FOR UPDATE`;
       const actor = await resolveActor(tx, actorUserId);
       const bonus = await tx.supplierBonus.findUnique({ where: { id }, include: { freeDevices: true, supplier: { select: { name: true } } } });
       if (!bonus) throw new Error('Бонус не найден');
@@ -504,23 +487,7 @@ export class SuppliersService {
           await tx.device.deleteMany({ where: { id: { in: deviceIds } } });
         }
       } else if (bonus.bonusType === 'CASH_DISCOUNT' && bonus.amountUsd) {
-        const bonusAmountUsd = bonus.amountUsd;
-        const owners = await tx.owner.findMany();
-        for (const owner of owners) {
-          const delta = roundMoney(bonusAmountUsd * (owner.profitSharePercent / 100));
-          if (delta <= 0) continue;
-          // Same reasoning as updateBonus: this bonus's profit may already have been
-          // paid out, reinvested, or swept into capital by a quarter close, in which case
-          // it's no longer sitting in availableProfitUsd to claw back — block instead of
-          // driving the balance negative.
-          const guard = await tx.owner.updateMany({
-            where: { id: owner.id, availableProfitUsd: { gte: delta } },
-            data: { totalAccruedProfitUsd: { decrement: delta }, availableProfitUsd: { decrement: delta } },
-          });
-          if (guard.count !== 1) {
-            throw new Error(`Нельзя удалить бонус: прибыль от него для «${owner.name}» уже выплачена, реинвестирована или зачислена в капитал закрытием квартала. Сначала скорректируйте капитал владельца вручную.`);
-          }
-        }
+        await replaceOwnerAllocations(tx, readOwnerAllocations(bonus.ownerProfitAllocations), [], 1, true);
         await tx.ledgerEntry.deleteMany({ where: { referenceId: id, type: 'SUPPLIER_BONUS' } });
       }
 

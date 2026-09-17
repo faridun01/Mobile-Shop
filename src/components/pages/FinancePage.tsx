@@ -257,7 +257,7 @@ export const FinancePage: React.FC = () => {
 
   const renderJournalRow = (t: FinancialTransaction) => {
     const isIncoming = t.direction === 'IN' || (t.direction === 'NEUTRAL' && t.type === 'TRANSFER');
-    const cancellable = t.status === 'POSTED' && !t.sourceType;
+    const cancellable = t.status === 'POSTED' && !t.sourceType && !t.reversedTransactionId;
     return (
       <div key={t.id} className={`p-3.5 flex items-start gap-3 ${t.status === 'CANCELLED' ? 'opacity-50' : ''}`}>
         <div className={`p-2 rounded-lg shrink-0 ${isIncoming ? 'bg-success/10 text-success' : 'bg-danger/10 text-danger'}`}>
@@ -426,7 +426,7 @@ export const FinancePage: React.FC = () => {
                       <tbody className="divide-y divide-border">
                         {journalRows.map((t) => {
                           const isIncoming = t.direction === 'IN';
-                          const cancellable = t.status === 'POSTED' && !t.sourceType;
+                          const cancellable = t.status === 'POSTED' && !t.sourceType && !t.reversedTransactionId;
                           const amount = formatMoney(t.balanceCurrency === 'TJS' ? t.amountTjs : t.amountUsd, t.balanceCurrency);
                           return (
                             <tr key={t.id} className={t.status === 'CANCELLED' ? 'opacity-50' : ''}>

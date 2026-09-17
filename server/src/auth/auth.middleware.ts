@@ -1,6 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
 import { AuthService, JwtPayload } from './auth.service';
-import { prisma } from '../prisma/prisma.service';
 
 export interface AuthenticatedRequest extends Request {
   user?: JwtPayload;
@@ -15,20 +14,12 @@ export async function authenticateJwt(req: AuthenticatedRequest, res: Response, 
     return res.status(401).json({ message: 'Требуется авторизация: токен доступа отсутствует' });
   }
 
-  const payload = AuthService.verifyToken(token);
-  if (!payload) {
-    return res.status(401).json({ message: 'Сессия недействительна или истекла, войдите снова' });
-  }
-
   try {
-    const user = await prisma.user.findUnique({
-      where: { id: payload.userId },
-      select: { login: true, role: true, storeId: true, active: true },
-    });
-    if (!user || !user.active) {
-      return res.status(401).json({ message: 'Учётная запись деактивирована, обратитесь к администратору' });
+    const payload = await AuthService.authenticateToken(token);
+    if (!payload) {
+      return res.status(401).json({ message: 'Сессия недействительна или истекла, войдите снова' });
     }
-    req.user = { userId: payload.userId, login: user.login, role: user.role, storeId: user.storeId };
+    req.user = payload;
     next();
   } catch (error) {
     next(error);

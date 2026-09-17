@@ -69,6 +69,24 @@ describe('postTransaction', () => {
 });
 
 describe('cancelTransaction', () => {
+  it.each(['TJS', 'USD'] as const)('reverses a transfer in %s by swapping its accounts', async (currency) => {
+    db.financialTransaction.findUnique.mockResolvedValue({
+      ...basePosting, id: 'transfer', status: 'POSTED', type: 'TRANSFER', direction: 'NEUTRAL',
+      destinationAccountId: 'account-2', balanceCurrency: currency,
+    });
+    const reversal = await cancelTransaction(db as any, 'transfer', 'admin');
+    const field = currency === 'TJS' ? 'balanceTjs' : 'balanceUsd';
+    const amount = currency === 'TJS' ? 500 : 50;
+    expect(db.financialAccount.update).toHaveBeenCalledWith({ where: { id: 'account-2' }, data: { [field]: { increment: -amount } } });
+    expect(db.financialAccount.update).toHaveBeenCalledWith({ where: { id: 'account-1' }, data: { [field]: { increment: amount } } });
+    expect(reversal).toMatchObject({ accountId: 'account-2', destinationAccountId: 'account-1', reversedTransactionId: 'transfer' });
+  });
+
+  it('rejects cancelling a reversal', async () => {
+    db.financialTransaction.findUnique.mockResolvedValue({ status: 'POSTED', reversedTransactionId: 'original' });
+    await expect(cancelTransaction(db as any, 'reversal', 'admin')).rejects.toThrow('сторнирующую');
+    expect(db.financialAccount.update).not.toHaveBeenCalled();
+  });
   it('marks the original CANCELLED and posts a linked reversal instead of deleting anything', async () => {
     db.financialTransaction.findUnique.mockResolvedValue({
       id: 'ftx-1', status: 'POSTED', type: 'EXPENSE', direction: 'OUT', accountId: 'account-1', destinationAccountId: null,

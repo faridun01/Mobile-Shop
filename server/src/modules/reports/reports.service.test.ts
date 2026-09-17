@@ -56,6 +56,7 @@ beforeEach(() => {
 describe('financial report query optimization preserves all totals', () => {
   it.each(['all', 'store-0', 'store-1'])('preserves the complete report for %s', async (storeId) => {
     const summary = await computeReportsSummary({ period: 'SPECIFIC_MONTH', month: '2026-09', storeId });
+    expect(db.expense.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ cancelledAt: null }) }));
     expect(summary).toMatchSnapshot();
     if (process.env.REPORT_BENCHMARK_LABEL) {
       mkdirSync('output/performance', { recursive: true });
