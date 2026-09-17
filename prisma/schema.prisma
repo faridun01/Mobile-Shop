@@ -84,6 +84,55 @@ enum LedgerType {
   CUSTOMER_PAYMENT
 }
 
+enum FinancialAccountType {
+  CASH
+  BANK
+  MAIN
+  OTHER
+}
+
+enum FinancialTransactionType {
+  INCOME
+  EXPENSE
+  TRANSFER
+  SUPPLIER_PAYMENT
+  OWNER_DEPOSIT
+  OWNER_WITHDRAWAL
+  REFUND
+  ADJUSTMENT
+}
+
+// NEUTRAL = TRANSFER/ADJUSTMENT — excluded from income/expense reports so moving
+// money between the business's own accounts never shows up as fake revenue/cost.
+enum FinancialDirection {
+  IN
+  OUT
+  NEUTRAL
+}
+
+enum FinancialTransactionStatus {
+  POSTED
+  CANCELLED
+}
+
+enum CounterpartyType {
+  SUPPLIER
+  CUSTOMER
+  EMPLOYEE
+  OWNER
+  OTHER
+}
+
+// Which of an account's two balance columns (balanceTjs/balanceUsd) a transaction
+// actually moved — distinct from `currency`/`amount` (what was paid) because every
+// transaction also stores a TJS *and* USD equivalent for reporting, but only one of
+// them corresponds to a real account movement. Needed so cancelling a transaction
+// reverses the correct balance.
+enum LedgerCurrency {
+  TJS
+  USD
+}
+
 model Store {
   id              String   @id @default(uuid())
   name            String
@@ -94,14 +143,16 @@ model Store {
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
-  users            User[]
-  devices          Device[]
-  sales            Sale[]
-  repairs          RepairTicket[]
-  expenses         Expense[]
-  transfersFrom    TransferRequest[] @relation("FromStore")
-  transfersTo      TransferRequest[] @relation("ToStore")
-  purchaseInvoices SupplierInvoice[]
+  users                 User[]
+  devices               Device[]
+  sales                 Sale[]
+  repairs               RepairTicket[]
+  expenses              Expense[]
+  transfersFrom         TransferRequest[]      @relation("FromStore")
+  transfersTo           TransferRequest[]      @relation("ToStore")
+  purchaseInvoices      SupplierInvoice[]
+  financialAccount      FinancialAccount?
+  financialTransactions FinancialTransaction[]
 
   @@map("stores")
 }
@@ -550,21 +601,25 @@ model RepairStatusHistory {
 }
 
 model Expense {
-  id                   String   @id @default(uuid())
+  id                   String    @id @default(uuid())
   category             String
-  amountTjs            Decimal  @db.Decimal(14, 2)
-  amountUsd            Decimal? @db.Decimal(14, 2)
-  exchangeRate         Decimal? @db.Decimal(10, 4)
-  targetType           String   @default("STORE")
+  amountTjs            Decimal   @db.Decimal(14, 2)
+  amountUsd            Decimal?  @db.Decimal(14, 2)
+  exchangeRate         Decimal?  @db.Decimal(10, 4)
+  targetType           String    @default("STORE")
   storeId              String?
   sourceAccount        String?
   comment              String?
   description          String?
   createdByUserId      String
-  paidFromCashRegister Boolean  @default(true)
+  paidFromCashRegister Boolean   @default(true)
   employeeId           String?
-  isEmployeeAdvance    Boolean  @default(false)
-  createdAt            DateTime @default(now())
+  isEmployeeAdvance    Boolean   @default(false)
+  createdAt            DateTime  @default(now())
+  // Cancellation record instead of a hard delete — the expense (and its financial
+  // transaction) must stay queryable forever for audit purposes; see FinancialTransaction.
+  cancelledAt          DateTime?
+  cancelledByUserId    String?
 
   store Store? @relation(fields: [storeId], references: [id])
 
@@ -575,12 +630,12 @@ model Expense {
 }
 
 model Owner {
-  id     String  @id @default(uuid())
+  id                    String   @id @default(uuid())
   // Links this capital/profit record to the actual login account of the business
   // partner it belongs to, so the name is never a manually-copied snapshot that can
   // drift out of sync — nullable because a legacy/silent investor may have no login.
-  userId String? @unique
-  name   String
+  userId                String?  @unique
+  name                  String
   // The partner's ownership share as a percentage, not a money amount — left as
   // Float on purpose.
   profitSharePercent    Float
@@ -697,4 +752,122 @@ model LedgerEntry {
 
   @@index([createdAt])
   @@map("ledger_entries")
+}
+
+// Unified financial ledger (Phase 1 of the finance module). Every account
+// (per-store cash register + the company-wide Main Account) has its balance
+// mutated only alongside a FinancialTransaction row in the same DB transaction —
+// see server/src/modules/finance. LedgerEntry above is left untouched by this
+// system; it keeps recording exactly what it always has.
+model FinancialAccount {
+  id                String               @id @default(uuid())
+  name              String
+  type              FinancialAccountType
+  // One CASH account per store (nullable+unique so MAIN/OTHER accounts have no store).
+  storeId           String?              @unique
+  active            Boolean              @default(true)
+  openingBalanceTjs Decimal              @default(0) @db.Decimal(14, 2)
+  openingBalanceUsd Decimal              @default(0) @db.Decimal(14, 2)
+  // Cached running balance, kept in sync transactionally by financial-transaction.service.ts —
+  // not derived by summing FinancialTransaction rows at read time.
+  balanceTjs        Decimal              @default(0) @db.Decimal(14, 2)
+  balanceUsd        Decimal              @default(0) @db.Decimal(14, 2)
+  createdAt         DateTime             @default(now())
+  updatedAt         DateTime             @updatedAt
+
+  store                   Store?                 @relation(fields: [storeId], references: [id])
+  transactions            FinancialTransaction[] @relation("AccountTransactions")
+  destinationTransactions FinancialTransaction[] @relation("DestinationAccountTransactions")
+
+  @@map("financial_accounts")
+}
+
+model FinancialCategory {
+  id        String             @id @default(uuid())
+  name      String
+  direction FinancialDirection
+  parentId  String?
+  // System categories are wired to automatic postings (sales, supplier payments, ...)
+  // and can't be deleted from the UI; admins may still create/edit custom categories.
+  isSystem  Boolean            @default(false)
+  active    Boolean            @default(true)
+  createdAt DateTime           @default(now())
+
+  parent       FinancialCategory?     @relation("CategoryHierarchy", fields: [parentId], references: [id])
+  children     FinancialCategory[]    @relation("CategoryHierarchy")
+  transactions FinancialTransaction[]
+
+  @@map("financial_categories")
+}
+
+model FinancialTransaction {
+  id                String                     @id @default(uuid())
+  transactionNumber String                     @unique
+  type              FinancialTransactionType
+  direction         FinancialDirection
+  status            FinancialTransactionStatus @default(POSTED)
+  transactionDate   DateTime                   @default(now())
+
+  accountId            String
+  // TRANSFER only — the account money moved into.
+  destinationAccountId String?
+
+  // Original amount/currency as entered, plus the frozen-at-creation TJS/USD
+  // equivalents — same "snapshot the rate, never recompute later" contract every
+  // other money model in this schema already follows.
+  amount          Decimal        @db.Decimal(14, 2)
+  currency        String
+  exchangeRate    Decimal?       @db.Decimal(10, 4)
+  amountTjs       Decimal        @db.Decimal(14, 2)
+  amountUsd       Decimal        @db.Decimal(14, 2)
+  // Which balance column this row actually moved on `account`/`destinationAccount` — see enum doc.
+  balanceCurrency LedgerCurrency
+
+  categoryId       String?
+  // Loose reference (not a FK) since the target table depends on counterpartyType —
+  // mirrors the existing unenforced-string-ref convention used by sourceAccount/
+  // createdByUserId across SupplierPayment/Expense/OwnerTransaction.
+  counterpartyType CounterpartyType?
+  counterpartyId   String?
+  counterpartyName String?
+
+  shopId                String?
+  // Business document that generated this row, e.g. "SALE" / "EXPENSE" / "SUPPLIER_PAYMENT".
+  sourceType            String?
+  sourceId              String?
+  // Set on a reversal transaction; points back to the transaction it reverses.
+  reversedTransactionId String? @unique
+
+  description String
+  comment     String?
+
+  createdByUserId   String
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  cancelledAt       DateTime?
+  cancelledByUserId String?
+
+  account            FinancialAccount   @relation("AccountTransactions", fields: [accountId], references: [id])
+  destinationAccount FinancialAccount?  @relation("DestinationAccountTransactions", fields: [destinationAccountId], references: [id])
+  category           FinancialCategory? @relation(fields: [categoryId], references: [id])
+  shop               Store?             @relation(fields: [shopId], references: [id])
+
+  @@index([transactionDate])
+  @@index([accountId])
+  @@index([shopId])
+  @@index([sourceType, sourceId])
+  @@index([categoryId])
+  @@index([counterpartyType, counterpartyId])
+  @@index([status])
+  @@map("financial_transactions")
+}
+
+// Atomic per-prefix-per-year counter backing FinancialTransaction.transactionNumber
+// (e.g. key "CR-2026" -> next receipt number). Incremented via a single
+// UPDATE ... RETURNING so concurrent requests can never receive the same number.
+model DocumentSequence {
+  key       String @id
+  nextValue Int    @default(1)
+
+  @@map("document_sequences")
 }

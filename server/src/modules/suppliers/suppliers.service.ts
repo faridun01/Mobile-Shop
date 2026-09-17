@@ -3,6 +3,8 @@ import type { TransactionClient } from '../../prisma/prisma.service';
 import { resolveActor } from '../../common/actor';
 import { requireNonNegativeMoney, requirePositiveMoney, roundMoney } from '../../common/money';
 import { requireTodayRate } from '../exchange-rate/exchange-rate.service';
+import { getStoreCashAccount, getMainAccount } from '../finance/account.service';
+import { postTransaction } from '../finance/financial-transaction.service';
 
 /** True if any of these devices has a sale, transfer, or repair record referencing it (hard FK, no cascade). */
 async function deviceHasTransactionHistory(tx: TransactionClient, deviceIds: string[]): Promise<boolean> {
@@ -113,6 +115,35 @@ export class SuppliersService {
         if (cashGuard.count !== 1) throw new Error('В кассе недостаточно наличных для оплаты поставщику');
       }
 
+      // MAIN_ACCOUNT has no enforced balance guard yet (Phase 1 decision) — it is
+      // still tracked in the ledger/dashboard, but never blocks this payment, matching
+      // today's behavior where paying "from the main account" was never blocked either.
+      const financeAccount = input.sourceAccount === 'STORE_CASH' && input.storeId
+        ? await getStoreCashAccount(tx, input.storeId, store?.name)
+        : await getMainAccount(tx);
+      await postTransaction(tx, {
+        type: 'SUPPLIER_PAYMENT',
+        direction: 'OUT',
+        numberPrefix: 'SP',
+        accountId: financeAccount.id,
+        balanceCurrency: input.sourceAccount === 'STORE_CASH' ? 'TJS' : 'USD',
+        amount: amountUsd,
+        currency: 'USD',
+        exchangeRate,
+        amountTjs: roundMoney(amountUsd * exchangeRate),
+        amountUsd,
+        categoryName: 'Оплата поставщику',
+        counterpartyType: 'SUPPLIER',
+        counterpartyId: supplier.id,
+        counterpartyName: supplier.name,
+        shopId: input.storeId,
+        sourceType: 'SUPPLIER_PAYMENT',
+        sourceId: payment.id,
+        description: `Выплата поставщику ${supplier.name}: $${amountUsd}`,
+        createdByUserId: actor.id,
+        guardBalance: input.sourceAccount === 'STORE_CASH',
+      });
+
       await tx.ledgerEntry.create({
         data: {
           type: 'SUPPLIER_PAYMENT',
@@ -199,6 +230,32 @@ export class SuppliersService {
         const cashGuard = await tx.store.updateMany({ where: { id: input.storeId, cashBalanceTjs: { gte: cashAmountTjs } }, data: { cashBalanceTjs: { decrement: cashAmountTjs } } });
         if (cashGuard.count !== 1) throw new Error('В кассе недостаточно наличных для оплаты поставщику');
       }
+
+      const financeAccount = input.sourceAccount === 'STORE_CASH' && input.storeId
+        ? await getStoreCashAccount(tx, input.storeId, store?.name)
+        : await getMainAccount(tx);
+      await postTransaction(tx, {
+        type: 'SUPPLIER_PAYMENT',
+        direction: 'OUT',
+        numberPrefix: 'SP',
+        accountId: financeAccount.id,
+        balanceCurrency: input.sourceAccount === 'STORE_CASH' ? 'TJS' : 'USD',
+        amount: amountUsd,
+        currency: 'USD',
+        exchangeRate,
+        amountTjs: roundMoney(amountUsd * exchangeRate),
+        amountUsd,
+        categoryName: 'Оплата поставщику',
+        counterpartyType: 'SUPPLIER',
+        counterpartyId: supplier.id,
+        counterpartyName: supplier.name,
+        shopId: input.storeId,
+        sourceType: 'SUPPLIER_PAYMENT',
+        sourceId: payment.id,
+        description: `Выплата поставщику ${supplier.name} по накладной ${invoice.invoiceNumber}: $${amountUsd}`,
+        createdByUserId: actor.id,
+        guardBalance: input.sourceAccount === 'STORE_CASH',
+      });
 
       await tx.ledgerEntry.create({
         data: {
@@ -498,15 +555,17 @@ export class SuppliersService {
 
   public static async delete(id: string) {
     return prisma.$transaction(async (tx) => {
-      const supplier = await tx.supplier.findUnique({ where: { id } });
+      const supplier = await tx.supplier.findUnique({
+        where: { id },
+        select: {
+          id: true,
+          _count: { select: { devices: true, invoices: true, payments: true, bonuses: true } },
+        },
+      });
       if (!supplier) throw new Error('Поставщик не найден');
 
       // A supplier with purchases/payments/bonuses must retain its financial history.
-      const history = await tx.supplier.findUnique({
-        where: { id },
-        select: { _count: { select: { devices: true, invoices: true, payments: true, bonuses: true } } },
-      });
-      if (history && Object.values(history._count).some((count) => count > 0)) {
+      if (Object.values(supplier._count).some((count) => count > 0)) {
         throw new Error('Нельзя удалить поставщика: у него есть финансовую историю. Пометьте его как неактивного');
       }
 

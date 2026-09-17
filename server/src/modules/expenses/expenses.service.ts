@@ -3,6 +3,8 @@ import type { TransactionClient } from '../../prisma/prisma.service';
 import { resolveActor } from '../../common/actor';
 import { getRateForDate } from '../exchange-rate/exchange-rate.service';
 import { requirePositiveMoney, roundMoney } from '../../common/money';
+import { getStoreCashAccount } from '../finance/account.service';
+import { postTransaction, cancelTransaction } from '../finance/financial-transaction.service';
 
 export interface CreateExpenseInput {
   category: string;
@@ -53,6 +55,27 @@ export async function createExpense(tx: TransactionClient, input: CreateExpenseI
     if (store.isMainWarehouse) throw new Error('Главный склад не является торговой кассой');
     const cashGuard = await tx.store.updateMany({ where: { id: input.storeId, cashBalanceTjs: { gte: amountTjs } }, data: { cashBalanceTjs: { decrement: amountTjs } } });
     if (cashGuard.count !== 1) throw new Error('В кассе недостаточно наличных для расхода');
+
+    const cashAccount = await getStoreCashAccount(tx, input.storeId, store.name);
+    await postTransaction(tx, {
+      type: 'EXPENSE',
+      direction: 'OUT',
+      numberPrefix: 'CE',
+      accountId: cashAccount.id,
+      balanceCurrency: 'TJS',
+      amount: amountTjs,
+      currency: 'TJS',
+      exchangeRate: rate,
+      amountTjs,
+      amountUsd,
+      categoryName: input.category,
+      shopId: input.storeId,
+      sourceType: 'EXPENSE',
+      sourceId: expense.id,
+      description: input.comment || input.description || `Расход: ${input.category}`,
+      comment: input.comment,
+      createdByUserId: actor.id,
+    });
   }
 
   const owners = await tx.owner.findMany();
@@ -115,6 +138,7 @@ export async function updateExpense(
   return prisma.$transaction(async (tx) => {
     const existing = await tx.expense.findUnique({ where: { id } });
     if (!existing) throw new Error('Расход не найден');
+    if (existing.cancelledAt) throw new Error('Нельзя редактировать отменённый расход');
 
     const actor = await resolveActor(tx, actorId);
     const rate = existing.exchangeRate || (await getRateForDate(new Date()));
@@ -127,6 +151,15 @@ export async function updateExpense(
     const newComment = input.comment !== undefined ? input.comment.trim() : existing.comment;
     const newDescription = input.description !== undefined ? input.description.trim() : existing.description;
 
+    // The ledger transaction is cancelled and reposted from scratch on every edit,
+    // exactly mirroring the reverse-old/apply-new pattern already used for the store
+    // cash balance and owner profit below — simpler and safer than trying to patch a
+    // POSTED row in place, and it naturally handles the store-changed case too.
+    const existingTransaction = await tx.financialTransaction.findFirst({ where: { sourceType: 'EXPENSE', sourceId: id, status: 'POSTED' } });
+    if (existingTransaction) {
+      await cancelTransaction(tx, existingTransaction.id, actor.id);
+    }
+
     // Adjust store cash balance if amount or store changed
     if (existing.storeId && (existing.paidFromCashRegister || (existing.sourceAccount && existing.sourceAccount.toLowerCase().includes('касса')))) {
       await tx.store.update({
@@ -134,14 +167,16 @@ export async function updateExpense(
         data: { cashBalanceTjs: { increment: existing.amountTjs } },
       });
     }
+    let newCashAccountId: string | undefined;
     if (newStoreId && (existing.paidFromCashRegister || (existing.sourceAccount && existing.sourceAccount.toLowerCase().includes('касса')))) {
-      const targetStore = await tx.store.findUnique({ where: { id: newStoreId }, select: { isMainWarehouse: true } });
+      const targetStore = await tx.store.findUnique({ where: { id: newStoreId }, select: { isMainWarehouse: true, name: true } });
       if (!targetStore || targetStore.isMainWarehouse) throw new Error('Главный склад не является торговой кассой');
       const cashGuard = await tx.store.updateMany({
         where: { id: newStoreId, cashBalanceTjs: { gte: newAmountTjs } },
         data: { cashBalanceTjs: { decrement: newAmountTjs } },
       });
       if (cashGuard.count !== 1) throw new Error('В кассе недостаточно наличных для расхода');
+      newCashAccountId = (await getStoreCashAccount(tx, newStoreId, targetStore.name)).id;
     }
 
     // Reverse the old amount's owner profit impact and re-apply it for the new amount —
@@ -185,6 +220,28 @@ export async function updateExpense(
       },
     });
 
+    if (newCashAccountId) {
+      await postTransaction(tx, {
+        type: 'EXPENSE',
+        direction: 'OUT',
+        numberPrefix: 'CE',
+        accountId: newCashAccountId,
+        balanceCurrency: 'TJS',
+        amount: newAmountTjs,
+        currency: 'TJS',
+        exchangeRate: rate,
+        amountTjs: newAmountTjs,
+        amountUsd: newAmountUsd,
+        categoryName: newCategory,
+        shopId: newStoreId ?? undefined,
+        sourceType: 'EXPENSE',
+        sourceId: id,
+        description: newComment || newDescription || `Расход: ${newCategory}`,
+        comment: newComment ?? undefined,
+        createdByUserId: actor.id,
+      });
+    }
+
     await tx.auditLog.create({
       data: {
         userId: actor.id,
@@ -205,6 +262,7 @@ export async function deleteExpense(id: string, actorId: string) {
   return prisma.$transaction(async (tx) => {
     const existing = await tx.expense.findUnique({ where: { id } });
     if (!existing) throw new Error('Расход не найден');
+    if (existing.cancelledAt) throw new Error('Расход уже отменён');
 
     const actor = await resolveActor(tx, actorId);
 
@@ -226,8 +284,12 @@ export async function deleteExpense(id: string, actorId: string) {
       });
     }));
 
-    // Delete corresponding ledger entries
-    await tx.ledgerEntry.deleteMany({ where: { referenceId: id } });
+    // Reverse (never hard-delete) the financial ledger transaction, if one was posted —
+    // no more `ledgerEntry.deleteMany` here either, matching the same no-hard-delete rule.
+    const existingTransaction = await tx.financialTransaction.findFirst({ where: { sourceType: 'EXPENSE', sourceId: id, status: 'POSTED' } });
+    if (existingTransaction) {
+      await cancelTransaction(tx, existingTransaction.id, actor.id);
+    }
 
     await tx.auditLog.create({
       data: {
@@ -235,12 +297,14 @@ export async function deleteExpense(id: string, actorId: string) {
         userName: actor.name,
         userRole: actor.role,
         action: 'EXPENSE_DELETE',
-        details: `Удален расход [${existing.category}]: ${existing.amountTjs} TJS ($${existing.amountUsd})`,
+        details: `Отменён расход [${existing.category}]: ${existing.amountTjs} TJS ($${existing.amountUsd})`,
         financialDetails: { amountTjs: existing.amountTjs, amountUsd: existing.amountUsd },
         targetId: id,
       },
     });
 
-    return tx.expense.delete({ where: { id } });
+    // Cancelled, never hard-deleted — the row (and its reversed ledger transaction)
+    // stay queryable forever for audit purposes.
+    return tx.expense.update({ where: { id }, data: { cancelledAt: new Date(), cancelledByUserId: actor.id } });
   }, { maxWait: 10000, timeout: 25000 });
 }

@@ -3,6 +3,8 @@ import { resolveActor } from '../../common/actor';
 import { getRateForDate } from '../exchange-rate/exchange-rate.service';
 import { moneyEquals, requireNonNegativeMoney, roundMoney } from '../../common/money';
 import { refundOwnerProfit } from './profit';
+import { getStoreCashAccount } from '../finance/account.service';
+import { postTransaction } from '../finance/financial-transaction.service';
 
 export interface RefundInput {
   saleId: string;
@@ -90,6 +92,25 @@ export class RefundService {
       if (input.paymentMethod === 'CASH') {
         const cashGuard = await tx.store.updateMany({ where: { id: sale.storeId, cashBalanceTjs: { gte: actualRefundTjs } }, data: { cashBalanceTjs: { decrement: actualRefundTjs } } });
         if (cashGuard.count !== 1) throw new Error('В кассе недостаточно наличных для возврата');
+        const cashAccount = await getStoreCashAccount(tx, sale.storeId, store?.name);
+        await postTransaction(tx, {
+          type: 'REFUND',
+          direction: 'OUT',
+          numberPrefix: 'RF',
+          accountId: cashAccount.id,
+          balanceCurrency: 'TJS',
+          amount: actualRefundTjs,
+          currency: 'TJS',
+          exchangeRate: rate,
+          amountTjs: actualRefundTjs,
+          amountUsd: roundMoney(actualRefundTjs / rate),
+          categoryName: 'Возврат покупателю',
+          shopId: sale.storeId,
+          sourceType: 'SALE',
+          sourceId: sale.id,
+          description: `Возврат по чеку #${sale.receiptNumber}: ${input.reason}`,
+          createdByUserId: actor.id,
+        });
       }
 
       await Promise.all(ownerProfitAllocations.map(({ ownerId, amountUsd: delta }) => {

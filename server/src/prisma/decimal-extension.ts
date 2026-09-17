@@ -333,5 +333,41 @@ export const decimalExtension = Prisma.defineExtension({
         compute: (data) => d2n(data.exchangeRate),
       },
     },
+    financialAccount: {
+      openingBalanceTjs: {
+        needs: { openingBalanceTjs: true },
+        compute: (data) => d2n(data.openingBalanceTjs) as number,
+      },
+      openingBalanceUsd: {
+        needs: { openingBalanceUsd: true },
+        compute: (data) => d2n(data.openingBalanceUsd) as number,
+      },
+      balanceTjs: {
+        needs: { balanceTjs: true },
+        compute: (data) => d2n(data.balanceTjs) as number,
+      },
+      balanceUsd: {
+        needs: { balanceUsd: true },
+        compute: (data) => d2n(data.balanceUsd) as number,
+      },
+    },
+    financialTransaction: {
+      amount: {
+        needs: { amount: true },
+        compute: (data) => d2n(data.amount) as number,
+      },
+      exchangeRate: {
+        needs: { exchangeRate: true },
+        compute: (data) => d2n(data.exchangeRate),
+      },
+      amountTjs: {
+        needs: { amountTjs: true },
+        compute: (data) => d2n(data.amountTjs) as number,
+      },
+      amountUsd: {
+        needs: { amountUsd: true },
+        compute: (data) => d2n(data.amountUsd) as number,
+      },
+    },
   },
 });

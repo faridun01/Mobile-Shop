@@ -287,10 +287,7 @@ interface AppContextType {
   deleteStore: (storeId: string) => Promise<{ success: boolean; message?: string }>;
   mergeStores: (sourceStoreId: string, targetStoreId: string) => Promise<{ success: boolean; message?: string }>;
   adjustStoreCashBalance: (storeId: string, newBalanceTjs: number, reason: string) => Promise<{ success: boolean; message?: string }>;
-  resetToDemo: () => void;
-  switchToRealDataMode: () => void;
   closeQuarterPeriod: (params: { quarterName: string; transferRemainingToCapital: boolean }) => Promise<{ success: boolean; message?: string }>;
-  resetEntireSystemDataToZero: () => void;
   theme: ThemeMode;
   setTheme: (theme: ThemeMode) => void;
   toggleTheme: () => void;
@@ -398,26 +395,49 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const storeNamesRef = useRef(buildNameLookup([]));
   const ownerNamesRef = useRef(new Map<string, string>());
 
-  const fetchUsers = useCallback(async () => {
+  const inFlightFetchers = useRef(new Map<string, Promise<unknown>>());
+  const coalesceFetch = useCallback(<T,>(key: string, fn: () => Promise<T>): Promise<T> => {
+    const existing = inFlightFetchers.current.get(key);
+    if (existing) return existing as Promise<T>;
+    const task = fn().finally(() => {
+      if (inFlightFetchers.current.get(key) === task) {
+        inFlightFetchers.current.delete(key);
+      }
+    });
+    inFlightFetchers.current.set(key, task);
+    return task;
+  }, []);
+
+  const localMutationTimestamps = useRef(new Map<string, number>());
+  const MUTATION_ECHO_GRACE_MS = 2000;
+
+  const markLocalMutation = useCallback((fetchKeys: string[]) => {
+    const now = Date.now();
+    for (const k of fetchKeys) {
+      localMutationTimestamps.current.set(k, now);
+    }
+  }, []);
+
+  const fetchUsers = useCallback(() => coalesceFetch('users', async () => {
     const raw = await apiClient<any[]>('/users');
     namesRef.current = buildNameLookup(raw);
     setUsers(raw.map((u) => mapUser(u, storeNamesRef.current)));
-  }, []);
+  }), [coalesceFetch]);
 
-  const fetchStores = useCallback(async () => {
+  const fetchStores = useCallback(() => coalesceFetch('stores', async () => {
     const raw = await apiClient<any[]>('/stores');
     storeNamesRef.current = new Map(raw.map((s) => [s.id, s.name]));
     setStores(raw.map(mapStore));
-  }, []);
+  }), [coalesceFetch]);
 
   // excludeSold: a SOLD device never leaves the table, so it's the one status that would
   // otherwise grow this fetch unbounded over the shop's lifetime — everything else (in
   // stock, in transfer, in repair) is capped by real physical inventory. Old sold devices
   // are still reachable on demand via findDeviceByImei.
-  const fetchDevices = useCallback(async () => {
+  const fetchDevices = useCallback(() => coalesceFetch('devices', async () => {
     const raw = await apiClient<any[]>('/devices?excludeSold=true');
     setDevices(raw.map(mapDevice));
-  }, []);
+  }), [coalesceFetch]);
 
   const mergeDevicesById = (mapped: Device[]) => {
     setDevices((prev) => {
@@ -444,10 +464,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // Bounded by default — the background/startup load used to fetch every sale ever, which
   // only gets slower as the shop's history grows. Anything outside this recent window is
   // reached on demand via fetchSalesRange (search/sellerId/explicit period) instead.
-  const fetchSales = useCallback(async () => {
+  const fetchSales = useCallback(() => coalesceFetch('sales', async () => {
     const raw = await apiClient<any[]>('/sales?limit=500');
     setSales(raw.map((s) => mapSale(s, namesRef.current)).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
-  }, []);
+  }), [coalesceFetch]);
 
   const fetchSalesRange: AppContextType['fetchSalesRange'] = useCallback(async (params) => {
     const qs = new URLSearchParams();
@@ -468,17 +488,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Bounded — no page needs the full transfer history for correctness (no cross-page
   // lookup depends on it, unlike sales/devices), so a generous cap is enough.
-  const fetchTransfers = useCallback(async () => {
+  const fetchTransfers = useCallback(() => coalesceFetch('transfers', async () => {
     const raw = await apiClient<any[]>('/transfers?limit=500');
     setTransfers(raw.map((t) => mapTransfer(t, namesRef.current)).sort((a, b) => new Date(b.requestedAt).getTime() - new Date(a.requestedAt).getTime()));
-  }, []);
+  }), [coalesceFetch]);
 
   // Bounded — RepairPage's own month filter (defaults to the current month) reaches
   // further back on demand via fetchRepairsRange.
-  const fetchRepairs = useCallback(async () => {
+  const fetchRepairs = useCallback(() => coalesceFetch('repairs', async () => {
     const raw = await apiClient<any[]>('/repairs?limit=500');
     setRepairs(raw.map((r) => mapRepair(r, namesRef.current)).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
-  }, []);
+  }), [coalesceFetch]);
 
   const fetchRepairsRange: AppContextType['fetchRepairsRange'] = useCallback(async (params) => {
     const qs = new URLSearchParams();
@@ -494,25 +514,25 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return mapped;
   }, []);
 
-  const fetchSuppliers = useCallback(async () => {
+  const fetchSuppliers = useCallback(() => coalesceFetch('suppliers', async () => {
     try {
       const raw = await apiClient<any[]>('/suppliers');
       setSuppliers(raw.map(mapSupplier));
     } catch {
       // ADMIN/PARTNER only — leave empty for SELLER users
     }
-  }, []);
+  }), [coalesceFetch]);
 
   // Bounded by default — PurchasePage's own period filter (defaults to the current month,
   // same shape as SalesHistoryPage) reaches further back on demand via fetchInvoicesRange.
-  const fetchInvoices = useCallback(async () => {
+  const fetchInvoices = useCallback(() => coalesceFetch('invoices', async () => {
     try {
       const raw = await apiClient<any[]>('/supplier-invoices?limit=500');
       setInvoices(raw.map(mapSupplierInvoice).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
     } catch {
       // ADMIN/PARTNER only — leave empty for SELLER users
     }
-  }, []);
+  }), [coalesceFetch]);
 
   const fetchInvoicesRange: AppContextType['fetchInvoicesRange'] = useCallback(async (params) => {
     const qs = new URLSearchParams();
@@ -532,22 +552,22 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Bounded — bonus campaigns are infrequent, nowhere near sale/device volume, so a
   // generous cap is enough (no search/widen infrastructure needed).
-  const fetchBonuses = useCallback(async () => {
+  const fetchBonuses = useCallback(() => coalesceFetch('bonuses', async () => {
     try {
       const raw = await apiClient<any[]>('/supplier-bonuses?limit=500');
       setBonuses(raw.map(mapSupplierBonus).sort((a, b) => new Date(b.dateReceived || b.date || 0).getTime() - new Date(a.dateReceived || a.date || 0).getTime()));
     } catch {
       // ADMIN/PARTNER only — leave empty for SELLER users
     }
-  }, []);
+  }), [coalesceFetch]);
 
   // Bounded — ExpensesPage's own month filter (defaults to the current month) and
   // EmployeesPage's payroll/history views reach further back on demand via
   // fetchExpensesRange (period/month, or employeeId for one person's full history).
-  const fetchExpenses = useCallback(async () => {
+  const fetchExpenses = useCallback(() => coalesceFetch('expenses', async () => {
     const raw = await apiClient<any[]>('/expenses?limit=500');
     setExpenses(raw.map((e) => mapExpense(e, namesRef.current)).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
-  }, []);
+  }), [coalesceFetch]);
 
   const fetchExpensesRange: AppContextType['fetchExpensesRange'] = useCallback(async (params) => {
     const qs = new URLSearchParams();
@@ -564,7 +584,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return mapped;
   }, []);
 
-  const fetchOwners = useCallback(async () => {
+  const fetchOwners = useCallback(() => coalesceFetch('owners', async () => {
     try {
       const raw = await apiClient<any[]>('/owners');
       ownerNamesRef.current = new Map(raw.map((o) => [o.id, o.name]));
@@ -572,35 +592,35 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     } catch {
       // SELLER role is forbidden from this endpoint — leave owners empty, not an error.
     }
-  }, []);
+  }), [coalesceFetch]);
 
   // Bounded — owner-level capital moves (investment/withdrawal/payout/reinvest) are
   // nowhere near per-sale volume, so a generous cap is enough.
-  const fetchOwnerTransactions = useCallback(async () => {
+  const fetchOwnerTransactions = useCallback(() => coalesceFetch('ownerTransactions', async () => {
     try {
       const raw = await apiClient<any[]>('/owner-transactions?limit=2000');
       setOwnerTransactions(raw.map((t) => mapOwnerTransaction(t, ownerNamesRef.current, namesRef.current)).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
     } catch {
       // ADMIN/PARTNER only
     }
-  }, []);
+  }), [coalesceFetch]);
 
-  const fetchAuditLogs = useCallback(async () => {
+  const fetchAuditLogs = useCallback(() => coalesceFetch('auditLogs', async () => {
     try {
       const raw = await apiClient<any[]>('/audit-logs');
       setAuditLogs(raw.map(mapAuditLog).sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()));
     } catch {
       // ADMIN only
     }
-  }, []);
+  }), [coalesceFetch]);
 
-  const fetchExchangeRate = useCallback(async () => {
+  const fetchExchangeRate = useCallback(() => coalesceFetch('exchangeRate', async () => {
     const raw = await apiClient<any>('/exchange-rate/today');
     const mapped = mapDailyRate(raw);
     setTodayRateState(mapped);
     checkRatePrompt(mapped);
     return mapped;
-  }, [checkRatePrompt]);
+  }), [coalesceFetch, checkRatePrompt]);
 
   const refetchInFlight = useRef<Promise<void> | null>(null);
   const refetchAll = useCallback(() => {
@@ -710,6 +730,27 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // set per message. This coalesces everything that arrives within one short window into
   // a single deduped pass — the same fetch function is only ever called once even if
   // three different event types in the burst all wanted it.
+  const fetcherKeyMap = useMemo(() => new Map<() => Promise<unknown>, string>([
+    [fetchSales, 'sales'],
+    [fetchDevices, 'devices'],
+    [fetchStores, 'stores'],
+    [fetchOwners, 'owners'],
+    [fetchExpenses, 'expenses'],
+    [fetchSuppliers, 'suppliers'],
+    [fetchInvoices, 'invoices'],
+    [fetchBonuses, 'bonuses'],
+    [fetchTransfers, 'transfers'],
+    [fetchRepairs, 'repairs'],
+    [fetchUsers, 'users'],
+    [fetchOwnerTransactions, 'ownerTransactions'],
+    [fetchAuditLogs, 'auditLogs'],
+    [fetchExchangeRate, 'exchangeRate'],
+  ]), [
+    fetchSales, fetchDevices, fetchStores, fetchOwners, fetchExpenses,
+    fetchSuppliers, fetchInvoices, fetchBonuses, fetchTransfers, fetchRepairs,
+    fetchUsers, fetchOwnerTransactions, fetchAuditLogs, fetchExchangeRate,
+  ]);
+
   const pendingRealtimeTasks = useRef(new Set<() => Promise<unknown>>());
   const pendingFullRefetch = useRef(false);
   const realtimeFlushTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
@@ -724,11 +765,23 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return;
     }
     const deferred = new Set<() => Promise<unknown>>(Object.values(pageFetchers));
-    const tasks = Array.from(pendingRealtimeTasks.current).filter((task) =>
-      !deferred.has(task) || loadedModules.current.has(task) || pendingModules.current.has(task));
+    const now = Date.now();
+    const tasks = Array.from(pendingRealtimeTasks.current).filter((task) => {
+      if (deferred.has(task) && !loadedModules.current.has(task) && !pendingModules.current.has(task)) {
+        return false;
+      }
+      const key = fetcherKeyMap.get(task);
+      if (key) {
+        const lastLocal = localMutationTimestamps.current.get(key) || 0;
+        if (now - lastLocal < MUTATION_ECHO_GRACE_MS) {
+          return false;
+        }
+      }
+      return true;
+    });
     pendingRealtimeTasks.current.clear();
     Promise.all(tasks.map((t) => t())).catch((e) => console.error('Realtime resync failed', e));
-  }, [refetchAll, pageFetchers]);
+  }, [refetchAll, pageFetchers, fetcherKeyMap]);
 
   useRealtimeSync(authToken, (type: string) => {
     const tasks = tasksForRealtimeEvent(type);
@@ -826,10 +879,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           customerName: customerName?.trim() || undefined,
         }),
       });
-      // Mirrors the SALE_COMPLETED realtime task list (tasksForRealtimeEvent) — a full
-      // refetchAll() here used to also fetch users/suppliers/invoices/bonuses/transfers/
-      // repairs/expenses/ownerTransactions/notifications/auditLogs on every single sale,
-      // none of which a sale touches.
+      markLocalMutation(['sales', 'devices', 'stores', 'owners']);
       await Promise.all([fetchSales(), fetchDevices(), fetchStores(), fetchOwners()]);
       return { success: true, receiptNumber: sale.receiptNumber };
     } catch (err) {
@@ -882,8 +932,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           cardAmountTjs: params.cardAmountTjs,
         }),
       });
-      // Same scoped set as SALE_COMPLETED/REFUND_PROCESSED (tasksForRealtimeEvent) — an
-      // exchange only touches sales/devices/stores/owners.
+      markLocalMutation(['sales', 'devices', 'stores', 'owners']);
       await Promise.all([fetchSales(), fetchDevices(), fetchStores(), fetchOwners()]);
       return { success: true };
     } catch (err) {
@@ -897,8 +946,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         method: 'POST',
         body: JSON.stringify({ reason, refundAmountTjs, penaltyFeeTjs, paymentMethod }),
       });
-      // Same scoped set as SALE_COMPLETED (tasksForRealtimeEvent) — a refund only touches
-      // sales/devices/stores/owners.
+      markLocalMutation(['sales', 'devices', 'stores', 'owners']);
       await Promise.all([fetchSales(), fetchDevices(), fetchStores(), fetchOwners()]);
       return { success: true };
     } catch (err) {
@@ -913,8 +961,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         method: 'POST',
         body: JSON.stringify({ supplierId, invoiceNumber, date, isStorePurchase, storeId: destStoreId, groups }),
       });
-      // Mirrors INVENTORY_UPDATE's task list (tasksForRealtimeEvent) — a purchase only
-      // touches devices/suppliers/invoices/bonuses, not the whole app.
+      markLocalMutation(['devices', 'suppliers', 'invoices', 'bonuses']);
       await Promise.all([fetchDevices(), fetchSuppliers(), fetchInvoices(), fetchBonuses()]);
       return { success: true };
     } catch (err) {
@@ -925,6 +972,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const createSupplier: AppContextType['createSupplier'] = async ({ name, phone, contactPerson }) => {
     try {
       await apiClient('/suppliers', { method: 'POST', body: JSON.stringify({ name, phone, contactPerson }) });
+      markLocalMutation(['suppliers']);
       await fetchSuppliers();
       return { success: true };
     } catch (err) {
@@ -935,7 +983,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const updateSupplier: AppContextType['updateSupplier'] = async (id, data) => {
     try {
       await apiClient(`/suppliers/${id}`, { method: 'PUT', body: JSON.stringify(data) });
-      // Mirrors INVENTORY_UPDATE's task list (tasksForRealtimeEvent).
+      markLocalMutation(['devices', 'suppliers', 'invoices', 'bonuses']);
       await Promise.all([fetchDevices(), fetchSuppliers(), fetchInvoices(), fetchBonuses()]);
       return { success: true };
     } catch (err) {
@@ -946,6 +994,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const deleteSupplier: AppContextType['deleteSupplier'] = async (id) => {
     try {
       await apiClient(`/suppliers/${id}`, { method: 'DELETE' });
+      markLocalMutation(['devices', 'suppliers', 'invoices', 'bonuses']);
       await Promise.all([fetchDevices(), fetchSuppliers(), fetchInvoices(), fetchBonuses()]);
       return { success: true };
     } catch (err) {
@@ -956,6 +1005,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const updateSupplierInvoice: AppContextType['updateSupplierInvoice'] = async (id, data) => {
     try {
       await apiClient(`/supplier-invoices/${id}`, { method: 'PUT', body: JSON.stringify(data) });
+      markLocalMutation(['devices', 'suppliers', 'invoices', 'bonuses']);
       await Promise.all([fetchDevices(), fetchSuppliers(), fetchInvoices(), fetchBonuses()]);
       return { success: true };
     } catch (err) {
@@ -966,6 +1016,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const deleteSupplierInvoice: AppContextType['deleteSupplierInvoice'] = async (id) => {
     try {
       await apiClient(`/supplier-invoices/${id}`, { method: 'DELETE' });
+      markLocalMutation(['devices', 'suppliers', 'invoices', 'bonuses']);
       await Promise.all([fetchDevices(), fetchSuppliers(), fetchInvoices(), fetchBonuses()]);
       return { success: true };
     } catch (err) {
@@ -975,7 +1026,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Bonuses only touch bonuses/devices(FREE_DEVICES)/owners(CASH_DISCOUNT) — refetching
   // every module in the app (refetchAll) after each save was why this felt slow.
-  const refetchAfterBonusChange = () => Promise.all([fetchBonuses(), fetchDevices(), fetchOwners()]);
+  const refetchAfterBonusChange = () => {
+    markLocalMutation(['bonuses', 'devices', 'owners']);
+    return Promise.all([fetchBonuses(), fetchDevices(), fetchOwners()]);
+  };
 
   const createSupplierBonus: AppContextType['createSupplierBonus'] = async ({ supplierId, campaignTitle, bonusType, amountUsd, freeDevices, destinationLocationId }) => {
     try {
@@ -1029,7 +1083,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         method: 'POST',
         body: JSON.stringify({ fromStoreId: fromLocId, toStoreId: toLocationId, deviceIds }),
       });
-      // Mirrors TRANSFER_UPDATED's task list (tasksForRealtimeEvent).
+      markLocalMutation(['transfers', 'devices']);
       await Promise.all([fetchTransfers(), fetchDevices()]);
       return { success: true };
     } catch (err) {
@@ -1040,6 +1094,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const approveTransfer: AppContextType['approveTransfer'] = async (transferId) => {
     try {
       await apiClient(`/transfers/${transferId}/approve`, { method: 'POST' });
+      markLocalMutation(['transfers', 'devices']);
       await Promise.all([fetchTransfers(), fetchDevices()]);
       return { success: true };
     } catch (err) {
@@ -1050,6 +1105,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const rejectTransfer: AppContextType['rejectTransfer'] = async (transferId, reason) => {
     try {
       await apiClient(`/transfers/${transferId}/reject`, { method: 'POST', body: JSON.stringify({ reason }) });
+      markLocalMutation(['transfers', 'devices']);
       await Promise.all([fetchTransfers(), fetchDevices()]);
       return { success: true };
     } catch (err) {
@@ -1066,7 +1122,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         method: 'POST',
         body: JSON.stringify({ ...data, storeId }),
       });
-      // Mirrors REPAIR_UPDATED's task list (tasksForRealtimeEvent).
+      markLocalMutation(['repairs']);
       await fetchRepairs();
       return { success: true, ticketNumber: ticket.ticketNumber };
     } catch (err) {
@@ -1080,6 +1136,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         method: 'PATCH',
         body: JSON.stringify({ status: newStatus, note, finalCostTjs: costTjs }),
       });
+      markLocalMutation(['repairs', 'expenses', 'stores', 'owners']);
       await Promise.all([fetchRepairs(), fetchExpenses(), fetchStores(), fetchOwners()]);
       return { success: true };
     } catch (err) {
@@ -1099,7 +1156,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           note,
         }),
       });
-      // Mirrors SUPPLIER_PAYMENT's task list (tasksForRealtimeEvent).
+      markLocalMutation(['suppliers', 'invoices', 'stores']);
       await Promise.all([fetchSuppliers(), fetchInvoices(), fetchStores()]);
       return { success: true };
     } catch (err) {
@@ -1118,6 +1175,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           storeId: resolvedStoreId,
         }),
       });
+      markLocalMutation(['suppliers', 'invoices', 'stores']);
       await Promise.all([fetchSuppliers(), fetchInvoices(), fetchStores()]);
       return { success: true };
     } catch (err) {
@@ -1131,7 +1189,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         method: 'POST',
         body: JSON.stringify({ category, amountTjs, targetType, storeId, sourceAccount, comment, description, paidFromCashRegister, employeeId, isEmployeeAdvance }),
       });
-      // Mirrors EXPENSE_CREATED/UPDATED/DELETED's task list (tasksForRealtimeEvent).
+      markLocalMutation(['expenses', 'stores', 'owners']);
       await Promise.all([fetchExpenses(), fetchStores(), fetchOwners()]);
       return { success: true };
     } catch (err) {
@@ -1145,6 +1203,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         method: 'PUT',
         body: JSON.stringify(data),
       });
+      markLocalMutation(['expenses', 'stores', 'owners']);
       await Promise.all([fetchExpenses(), fetchStores(), fetchOwners()]);
       return { success: true };
     } catch (err) {
@@ -1155,6 +1214,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const deleteExpense: AppContextType['deleteExpense'] = async (id) => {
     try {
       await apiClient(`/expenses/${id}`, { method: 'DELETE' });
+      markLocalMutation(['expenses', 'stores', 'owners']);
       await Promise.all([fetchExpenses(), fetchStores(), fetchOwners()]);
       return { success: true };
     } catch (err) {
@@ -1165,6 +1225,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const initializeOwners: AppContextType['initializeOwners'] = async () => {
     try {
       await apiClient('/owners/init', { method: 'POST' });
+      markLocalMutation(['owners', 'ownerTransactions']);
       await Promise.all([fetchOwners(), fetchOwnerTransactions()]);
       return { success: true };
     } catch (err) {
@@ -1180,6 +1241,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const ownerInvestment: AppContextType['ownerInvestment'] = async (ownerId, amountUsd, destination, note) => {
     try {
       await apiClient(`/owners/${ownerId}/investment`, { method: 'POST', body: JSON.stringify({ amountUsd, destination, note }) });
+      markLocalMutation(['owners', 'ownerTransactions', 'stores']);
       await Promise.all([fetchOwners(), fetchOwnerTransactions(), fetchStores()]);
       return { success: true };
     } catch (err) {
@@ -1190,6 +1252,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const ownerCapitalWithdrawal: AppContextType['ownerCapitalWithdrawal'] = async (ownerId, amountUsd, source, note) => {
     try {
       await apiClient(`/owners/${ownerId}/withdrawal`, { method: 'POST', body: JSON.stringify({ amountUsd, source, note }) });
+      markLocalMutation(['owners', 'ownerTransactions', 'stores']);
       await Promise.all([fetchOwners(), fetchOwnerTransactions(), fetchStores()]);
       return { success: true };
     } catch (err) {
@@ -1200,6 +1263,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const ownerProfitPayout: AppContextType['ownerProfitPayout'] = async (ownerId, amountUsd, source, note) => {
     try {
       await apiClient(`/owners/${ownerId}/payout`, { method: 'POST', body: JSON.stringify({ amountUsd, source, note }) });
+      markLocalMutation(['owners', 'ownerTransactions', 'stores']);
       await Promise.all([fetchOwners(), fetchOwnerTransactions(), fetchStores()]);
       return { success: true };
     } catch (err) {
@@ -1210,6 +1274,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const ownerReinvest: AppContextType['ownerReinvest'] = async (ownerId, amountUsd, note) => {
     try {
       await apiClient(`/owners/${ownerId}/reinvest`, { method: 'POST', body: JSON.stringify({ amountUsd, note }) });
+      markLocalMutation(['owners', 'ownerTransactions']);
       await Promise.all([fetchOwners(), fetchOwnerTransactions()]);
       return { success: true };
     } catch (err) {
@@ -1234,6 +1299,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         ];
     try {
       await apiClient('/owners/profit-shares', { method: 'POST', body: JSON.stringify({ shares }) });
+      markLocalMutation(['owners']);
       await fetchOwners();
       return { success: true };
     } catch (err) {
@@ -1244,6 +1310,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const linkOwnerToUser: AppContextType['linkOwnerToUser'] = async (ownerId, userId) => {
     try {
       await apiClient(`/owners/${ownerId}/link-user`, { method: 'POST', body: JSON.stringify({ userId }) });
+      markLocalMutation(['owners']);
       await fetchOwners();
       return { success: true };
     } catch (err) {
@@ -1265,6 +1332,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           salesCommissionPercent: userData.salesCommissionPercent,
         }),
       });
+      markLocalMutation(['users']);
       await fetchUsers();
       return { success: true };
     } catch (err) {
@@ -1293,6 +1361,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (nextActive !== undefined) {
         await apiClient(`/users/${userData.id}/status`, { method: 'PATCH', body: JSON.stringify({ active: nextActive }) });
       }
+      markLocalMutation(['users', 'owners']);
       await fetchUsers();
       if (currentUser?.id === userData.id) {
         const mapped = mapUser(updated, storeNamesRef.current);
@@ -1310,6 +1379,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (!target) return { success: false };
     try {
       await apiClient(`/users/${userId}/status`, { method: 'PATCH', body: JSON.stringify({ active: !target.active }) });
+      markLocalMutation(['users']);
       await fetchUsers();
       return { success: true };
     } catch (err) {
@@ -1320,6 +1390,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const deleteUser: AppContextType['deleteUser'] = async (userId) => {
     try {
       await apiClient(`/users/${userId}`, { method: 'DELETE' });
+      markLocalMutation(['users']);
       await fetchUsers();
       return { success: true };
     } catch (err) {
@@ -1343,6 +1414,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const createStore: AppContextType['createStore'] = async (name, address) => {
     try {
       await apiClient('/stores', { method: 'POST', body: JSON.stringify({ name, address }) });
+      markLocalMutation(['stores']);
       await fetchStores();
       return { success: true };
     } catch (err) {
@@ -1393,6 +1465,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const closeQuarterPeriod: AppContextType['closeQuarterPeriod'] = async ({ quarterName, transferRemainingToCapital }) => {
     try {
       await apiClient('/owners/quarter-close', { method: 'POST', body: JSON.stringify({ quarterName, transferRemainingToCapital }) });
+      markLocalMutation(['owners']);
       await fetchOwners();
       return { success: true };
     } catch (err) {
@@ -1400,20 +1473,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
-  // The app is always backed by real PostgreSQL now — these demo/local-only reset
-  // helpers from the pre-migration mock no longer have a meaningful, safe server
-  // equivalent (a full destructive wipe of production data isn't something a UI
-  // button should trigger silently). They resync from the real data instead.
-  const resetToDemo = () => {
-    console.warn('resetToDemo: приложение работает на реальной базе данных, демо-данные недоступны.');
-    refetchAll().catch((e) => console.error(e));
-  };
-  const switchToRealDataMode = () => {
-    refetchAll().catch((e) => console.error(e));
-  };
-  const resetEntireSystemDataToZero = () => {
-    console.warn('Полный сброс данных недоступен в реальном режиме — обратитесь к администратору базы данных.');
-  };
+
 
   // Every field/function below is redefined on each render (plain consts in the
   // component body, not individually useCallback-wrapped) — but since they all
@@ -1507,10 +1567,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         deleteStore,
         mergeStores,
         adjustStoreCashBalance,
-        resetToDemo,
-        switchToRealDataMode,
         closeQuarterPeriod,
-        resetEntireSystemDataToZero,
         theme,
         setTheme,
         toggleTheme

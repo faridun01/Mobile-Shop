@@ -20,16 +20,9 @@ export async function requireTodayRate(
 
 export async function setTodayRate(rate: number, userId: string) {
   const today = getBusinessDateKey();
-  const existing = await prisma.exchangeRate.findUnique({ where: { date: today } });
-
-  if (existing) {
-    return prisma.exchangeRate.update({
-      where: { date: today },
-      data: { rate, updatedByUserId: userId, updatedAt: new Date() },
-    });
-  }
-
-  return prisma.exchangeRate.create({
-    data: { date: today, rate, createdByUserId: userId },
+  return prisma.exchangeRate.upsert({
+    where: { date: today },
+    update: { rate, updatedByUserId: userId, updatedAt: new Date() },
+    create: { date: today, rate, createdByUserId: userId },
   });
 }

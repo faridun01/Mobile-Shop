@@ -120,13 +120,5 @@ export function registerOwnerRoutes(app: Express) {
       next(error);
     }
   });
-
-  app.post('/api/owners/reset-capital', authenticateJwt, requireRoles('ADMIN'), async (req: AuthenticatedRequest, res, next) => {
-    try {
-      const owners = await OwnersService.resetAllCapital(req.user!.userId);
-      res.json(owners);
-    } catch (error) {
-      next(error);
-    }
-  });
 }
+

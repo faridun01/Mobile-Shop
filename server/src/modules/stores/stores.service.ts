@@ -1,5 +1,6 @@
 import { prisma } from '../../prisma/prisma.service';
 import { resolveActor } from '../../common/actor';
+import { getStoreCashAccount } from '../finance/account.service';
 
 export class StoresService {
   public static async create(name: string, address: string | undefined, userId: string) {
@@ -55,6 +56,12 @@ export class StoresService {
         data: { storeId: mainWarehouse.id },
       });
 
+      // A store this deletable has no financial history either (every dependent table
+      // above was empty or fully reassigned) — its FinancialAccount, if one exists at
+      // all, is a zero-balance row with no FinancialTransaction pointing at it, so it's
+      // always safe to drop before the store itself.
+      await tx.financialAccount.deleteMany({ where: { storeId } });
+
       try {
         await tx.store.delete({ where: { id: storeId } });
       } catch (error: any) {
@@ -88,6 +95,12 @@ export class StoresService {
 
       const roundedBalance = Math.round(newBalanceTjs * 100) / 100;
       const updated = await tx.store.update({ where: { id: storeId }, data: { cashBalanceTjs: roundedBalance } });
+
+      // Keep the linked FinancialAccount's balance in lockstep with the store's —
+      // same "set to an exact value, not logged as a ledger movement" correction,
+      // just mirrored onto the account the finance module actually reads.
+      const account = await getStoreCashAccount(tx, storeId, store.name);
+      await tx.financialAccount.update({ where: { id: account.id }, data: { balanceTjs: roundedBalance } });
 
       await tx.auditLog.create({
         data: {
@@ -136,6 +149,22 @@ export class StoresService {
       await tx.repairTicket.updateMany({ where: { storeId: sourceStoreId }, data: { storeId: targetStoreId } });
       await tx.expense.updateMany({ where: { storeId: sourceStoreId }, data: { storeId: targetStoreId } });
       await tx.ledgerEntry.updateMany({ where: { storeId: sourceStoreId }, data: { storeId: targetStoreId } });
+      // FinancialTransaction.accountId can't just be repointed to targetStoreId the way
+      // the loose storeId/shopId string fields above are — it's a real FK into
+      // FinancialAccount, and each store has exactly one (@unique). Reassign the actual
+      // rows to the target's account, fold the balance in, then the now-empty source
+      // account can be dropped before the source store itself is.
+      const targetAccount = await getStoreCashAccount(tx, targetStoreId, target.name);
+      const sourceAccount = await tx.financialAccount.findUnique({ where: { storeId: sourceStoreId } });
+      if (sourceAccount) {
+        await tx.financialTransaction.updateMany({ where: { accountId: sourceAccount.id }, data: { accountId: targetAccount.id, shopId: targetStoreId } });
+        await tx.financialTransaction.updateMany({ where: { destinationAccountId: sourceAccount.id }, data: { destinationAccountId: targetAccount.id } });
+        await tx.financialAccount.update({
+          where: { id: targetAccount.id },
+          data: { balanceTjs: { increment: sourceAccount.balanceTjs }, balanceUsd: { increment: sourceAccount.balanceUsd } },
+        });
+        await tx.financialAccount.delete({ where: { id: sourceAccount.id } });
+      }
 
       await tx.store.update({ where: { id: targetStoreId }, data: { cashBalanceTjs: { increment: source.cashBalanceTjs } } });
 

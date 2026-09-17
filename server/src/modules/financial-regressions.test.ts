@@ -1,10 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const db = vi.hoisted(() => {
-  const model = () => ({ findUnique: vi.fn(), findMany: vi.fn(), update: vi.fn(), updateMany: vi.fn(),
+  const model = () => ({ findUnique: vi.fn(), findFirst: vi.fn(), findMany: vi.fn(), update: vi.fn(), updateMany: vi.fn(),
     create: vi.fn(), createMany: vi.fn(), delete: vi.fn() });
-  return { supplier: model(), supplierInvoice: model(), supplierPayment: model(), supplierPaymentAllocation: model(),
-    store: model(), ledgerEntry: model(), auditLog: model(), sale: model(), owner: model(), device: model(), deviceTimelineEvent: model() };
+  return {
+    supplier: model(), supplierInvoice: model(), supplierPayment: model(), supplierPaymentAllocation: model(),
+    store: model(), ledgerEntry: model(), auditLog: model(), sale: model(), owner: model(), device: model(), deviceTimelineEvent: model(),
+    financialAccount: model(), financialTransaction: model(), financialCategory: model(),
+    $queryRaw: vi.fn(),
+  };
 });
 vi.mock('../prisma/prisma.service', () => ({ prisma: { $transaction: (fn: (tx: typeof db) => unknown) => fn(db) } }));
 vi.mock('../common/actor', () => ({ resolveActor: async () => ({ id: 'admin', name: 'Admin', role: 'ADMIN' }) }));
@@ -20,6 +24,17 @@ beforeEach(() => {
   db.supplierInvoice.updateMany.mockResolvedValue({ count: 1 });
   db.supplier.updateMany.mockResolvedValue({ count: 1 });
   db.supplierPayment.create.mockResolvedValue({ id: 'payment' });
+  // Finance ledger scaffolding used by postTransaction (see finance/financial-transaction.service.ts)
+  // — the finance module's own tests cover its logic in detail; here it just needs
+  // to not crash so these pre-existing regression tests keep exercising their own thing.
+  db.financialAccount.findUnique.mockResolvedValue({ id: 'cash-account', balanceTjs: 100000, balanceUsd: 100000 });
+  db.financialAccount.findFirst.mockResolvedValue({ id: 'main-account', balanceTjs: 100000, balanceUsd: 100000 });
+  db.financialAccount.create.mockResolvedValue({ id: 'cash-account', balanceTjs: 0, balanceUsd: 0 });
+  db.financialAccount.update.mockResolvedValue({});
+  db.financialAccount.updateMany.mockResolvedValue({ count: 1 });
+  db.financialCategory.findFirst.mockResolvedValue({ id: 'category-1' });
+  db.financialTransaction.create.mockResolvedValue({ id: 'ftx-1' });
+  db.$queryRaw.mockResolvedValue([{ issued: 1 }]);
 });
 
 describe('supplier payment safeguards', () => {

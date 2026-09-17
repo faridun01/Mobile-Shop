@@ -142,19 +142,6 @@ export class UsersService {
     }, { maxWait: 10000, timeout: 25000 });
   }
 
-  public static async resetPassword(userId: string, newPassword: string, actingUserId: string) {
-    return prisma.$transaction(async (tx) => {
-      const actor = await resolveActor(tx, actingUserId);
-      const target = await tx.user.findUnique({ where: { id: userId } });
-      if (!target) throw new Error('Сотрудник не найден');
-      const hashed = await AuthService.hashPassword(requireValidPassword(newPassword));
-      await tx.user.update({ where: { id: userId }, data: { password: hashed } });
-      await tx.auditLog.create({
-        data: { userId: actor.id, userName: actor.name, userRole: actor.role, action: 'PASSWORD_RESET', details: `Сброшен пароль сотрудника: ${target.name}`, targetId: userId },
-      });
-    }, { maxWait: 10000, timeout: 25000 });
-  }
-
   public static async setActive(userId: string, active: boolean, actingUserId: string) {
     const user = await prisma.$transaction(async (tx) => {
       const actor = await resolveActor(tx, actingUserId);

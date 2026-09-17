@@ -3,6 +3,8 @@ import { resolveActor } from '../../common/actor';
 import { getRateForDate } from '../exchange-rate/exchange-rate.service';
 import { moneyEquals, requireFiniteNumber, requireNonNegativeMoney, requirePositiveMoney, roundMoney } from '../../common/money';
 import { allocateOwnerProfit } from '../sales/profit';
+import { getStoreCashAccount } from '../finance/account.service';
+import { postTransaction } from '../finance/financial-transaction.service';
 
 export interface ExchangeInput {
   saleId: string;
@@ -167,6 +169,26 @@ export class ExchangesService {
           ? await tx.store.updateMany({ where: { id: sale.storeId, cashBalanceTjs: { gte: Math.abs(cashDelta) } }, data: { cashBalanceTjs: { increment: cashDelta } } })
           : await tx.store.updateMany({ where: { id: sale.storeId }, data: { cashBalanceTjs: { increment: cashDelta } } });
         if (cashGuard.count !== 1) throw new Error('В кассе недостаточно наличных для выплаты разницы клиенту');
+
+        const cashAccount = await getStoreCashAccount(tx, sale.storeId, store.name);
+        await postTransaction(tx, {
+          type: cashDelta > 0 ? 'INCOME' : 'REFUND',
+          direction: cashDelta > 0 ? 'IN' : 'OUT',
+          numberPrefix: cashDelta > 0 ? 'CR' : 'RF',
+          accountId: cashAccount.id,
+          balanceCurrency: 'TJS',
+          amount: Math.abs(cashDelta),
+          currency: 'TJS',
+          exchangeRate: rate,
+          amountTjs: Math.abs(cashDelta),
+          amountUsd: roundMoney(Math.abs(cashDelta) / rate),
+          categoryName: cashDelta > 0 ? 'Продажа' : 'Возврат покупателю',
+          shopId: sale.storeId,
+          sourceType: 'SALE',
+          sourceId: sale.id,
+          description: `Обмен по чеку #${sale.receiptNumber}: ${returnedDevice.model} → ${replacementDevice.model}`,
+          createdByUserId: actor.id,
+        });
       }
 
       // Incremental exchange profit is the new device's selling price minus its cost.

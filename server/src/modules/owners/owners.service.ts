@@ -3,6 +3,8 @@ import type { TransactionClient } from '../../prisma/prisma.service';
 import { resolveActor } from '../../common/actor';
 import { requirePositiveMoney, requireNonNegativeMoney, roundMoney } from '../../common/money';
 import { requireTodayRate } from '../exchange-rate/exchange-rate.service';
+import { getStoreCashAccount } from '../finance/account.service';
+import { postTransaction } from '../finance/financial-transaction.service';
 
 export class OwnersService {
   /**
@@ -30,8 +32,30 @@ export class OwnersService {
       await tx.store.update({ where: { id: mainWarehouse.id }, data: { cashBalanceTjs: { increment: cashAmountTjs } } });
 
       const updated = await tx.owner.update({ where: { id: ownerId }, data: { capitalBalanceUsd: { increment: amountUsd } } });
-      await tx.ownerTransaction.create({
+      const ownerTx = await tx.ownerTransaction.create({
         data: { ownerId, type: 'INVESTMENT', amountUsd, exchangeRate, sourceOrDestination: destination, createdByUserId: actor.id, note },
+      });
+      const cashAccount = await getStoreCashAccount(tx, mainWarehouse.id, mainWarehouse.name);
+      await postTransaction(tx, {
+        type: 'OWNER_DEPOSIT',
+        direction: 'IN',
+        numberPrefix: 'OD',
+        accountId: cashAccount.id,
+        balanceCurrency: 'TJS',
+        amount: amountUsd,
+        currency: 'USD',
+        exchangeRate,
+        amountTjs: cashAmountTjs,
+        amountUsd,
+        categoryName: 'Взнос владельца',
+        counterpartyType: 'OWNER',
+        counterpartyId: ownerId,
+        counterpartyName: owner.name,
+        shopId: mainWarehouse.id,
+        sourceType: 'OWNER_TRANSACTION',
+        sourceId: ownerTx.id,
+        description: `${owner.name} вложил $${amountUsd} в капитал (${destination})`,
+        createdByUserId: actor.id,
       });
       await tx.ledgerEntry.create({ data: { type: 'OWNER_INVESTMENT', description: `${owner.name} вложил $${amountUsd} в капитал (${destination})`, amountUsd, exchangeRate, storeId: mainWarehouse.id, storeName: mainWarehouse.name, userName: actor.name } });
       await tx.auditLog.create({
@@ -57,8 +81,30 @@ export class OwnersService {
       if (cashGuard.count !== 1) throw new Error('В кассе главного склада недостаточно наличных для изъятия');
 
       const updated = await tx.owner.findUniqueOrThrow({ where: { id: ownerId } });
-      await tx.ownerTransaction.create({
+      const ownerTx = await tx.ownerTransaction.create({
         data: { ownerId, type: 'WITHDRAWAL', amountUsd, exchangeRate, sourceOrDestination: source, createdByUserId: actor.id, note },
+      });
+      const cashAccount = await getStoreCashAccount(tx, mainWarehouse.id, mainWarehouse.name);
+      await postTransaction(tx, {
+        type: 'OWNER_WITHDRAWAL',
+        direction: 'OUT',
+        numberPrefix: 'OW',
+        accountId: cashAccount.id,
+        balanceCurrency: 'TJS',
+        amount: amountUsd,
+        currency: 'USD',
+        exchangeRate,
+        amountTjs: cashAmountTjs,
+        amountUsd,
+        categoryName: 'Изъятие капитала владельцем',
+        counterpartyType: 'OWNER',
+        counterpartyId: ownerId,
+        counterpartyName: owner.name,
+        shopId: mainWarehouse.id,
+        sourceType: 'OWNER_TRANSACTION',
+        sourceId: ownerTx.id,
+        description: `${owner.name} изъял $${amountUsd} из капитала`,
+        createdByUserId: actor.id,
       });
       await tx.ledgerEntry.create({ data: { type: 'OWNER_CAPITAL_WITHDRAWAL', description: `${owner.name} изъял $${amountUsd} из капитала`, amountUsd: -amountUsd, exchangeRate, storeId: mainWarehouse.id, storeName: mainWarehouse.name, userName: actor.name } });
       await tx.auditLog.create({
@@ -87,8 +133,30 @@ export class OwnersService {
       if (cashGuard.count !== 1) throw new Error('В кассе главного склада недостаточно наличных для выплаты прибыли');
 
       const updated = await tx.owner.findUniqueOrThrow({ where: { id: ownerId } });
-      await tx.ownerTransaction.create({
+      const ownerTx = await tx.ownerTransaction.create({
         data: { ownerId, type: 'PROFIT_PAYOUT', amountUsd, exchangeRate, sourceOrDestination: source, createdByUserId: actor.id, note },
+      });
+      const cashAccount = await getStoreCashAccount(tx, mainWarehouse.id, mainWarehouse.name);
+      await postTransaction(tx, {
+        type: 'OWNER_WITHDRAWAL',
+        direction: 'OUT',
+        numberPrefix: 'OW',
+        accountId: cashAccount.id,
+        balanceCurrency: 'TJS',
+        amount: amountUsd,
+        currency: 'USD',
+        exchangeRate,
+        amountTjs: cashAmountTjs,
+        amountUsd,
+        categoryName: 'Выплата прибыли владельцу',
+        counterpartyType: 'OWNER',
+        counterpartyId: ownerId,
+        counterpartyName: owner.name,
+        shopId: mainWarehouse.id,
+        sourceType: 'OWNER_TRANSACTION',
+        sourceId: ownerTx.id,
+        description: `Выплачена прибыль ${owner.name}: $${amountUsd}`,
+        createdByUserId: actor.id,
       });
       await tx.ledgerEntry.create({ data: { type: 'OWNER_PROFIT_PAYOUT', description: `Выплачена прибыль ${owner.name}: $${amountUsd}`, amountUsd: -amountUsd, exchangeRate, storeId: mainWarehouse.id, storeName: mainWarehouse.name, userName: actor.name } });
       await tx.auditLog.create({
@@ -220,20 +288,6 @@ export class OwnersService {
         },
       });
 
-      return tx.owner.findMany();
-    });
-  }
-
-  public static async resetAllCapital(userId: string) {
-    return prisma.$transaction(async (tx) => {
-      const actor = await resolveActor(tx, userId);
-      await tx.owner.updateMany({
-        data: { capitalBalanceUsd: 0, totalAccruedProfitUsd: 0, totalPaidProfitUsd: 0, totalReinvestedUsd: 0, availableProfitUsd: 0 },
-      });
-      await tx.ownerTransaction.deleteMany({});
-      await tx.auditLog.create({
-        data: { userId: actor.id, userName: actor.name, userRole: actor.role, action: 'OWNERS_CAPITAL_RESET', details: 'Капитал и история операций всех партнеров обнулены ($0 USD / 0 TJS)' },
-      });
       return tx.owner.findMany();
     });
   }

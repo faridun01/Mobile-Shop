@@ -24,6 +24,10 @@ export function registerExpenseRoutes(app: Express) {
       const employeeId = typeof req.query.employeeId === 'string' ? req.query.employeeId : undefined;
       const expenses = await prisma.expense.findMany({
         where: {
+          // Cancelled expenses are kept forever for audit (see expenses.service.ts
+          // deleteExpense) but stay out of the everyday list, matching the old
+          // hard-delete behavior from the user's point of view.
+          cancelledAt: null,
           ...(storeScopeId ? { storeId: storeScopeId } : {}),
           ...(employeeId ? { employeeId } : dateRange ? { createdAt: dateRange } : {}),
         },

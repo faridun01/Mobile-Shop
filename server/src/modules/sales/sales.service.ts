@@ -3,6 +3,8 @@ import type { TransactionClient } from '../../prisma/prisma.service';
 import { getRateForDate } from '../exchange-rate/exchange-rate.service';
 import { moneyEquals, requireNonNegativeMoney, requirePositiveMoney, roundMoney } from '../../common/money';
 import { allocateOwnerProfit } from './profit';
+import { getStoreCashAccount } from '../finance/account.service';
+import { postTransaction } from '../finance/financial-transaction.service';
 
 export interface CreateSaleInput {
   storeId: string;
@@ -136,6 +138,29 @@ export class SalesService {
 
       if (cashAmountTjs !== 0) {
         await tx.store.update({ where: { id: input.storeId }, data: { cashBalanceTjs: { increment: cashAmountTjs } } });
+        // Card payments settle outside any account this system tracks today (no
+        // card/bank settlement account exists yet — matches existing behavior, where
+        // the card portion has never moved a balance field either), so only the cash
+        // component is posted to the ledger.
+        const cashAccount = await getStoreCashAccount(tx, input.storeId, store.name);
+        await postTransaction(tx, {
+          type: 'INCOME',
+          direction: 'IN',
+          numberPrefix: 'CR',
+          accountId: cashAccount.id,
+          balanceCurrency: 'TJS',
+          amount: cashAmountTjs,
+          currency: 'TJS',
+          exchangeRate: rate,
+          amountTjs: cashAmountTjs,
+          amountUsd: roundMoney(cashAmountTjs / rate),
+          categoryName: 'Продажа',
+          shopId: input.storeId,
+          sourceType: 'SALE',
+          sourceId: sale.id,
+          description: `Чек #${sale.receiptNumber}: продажа наличными`,
+          createdByUserId: input.userId,
+        });
       }
 
       const saleProfitUsd = roundMoney(totalUsd - totalCostUsd);
