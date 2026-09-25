@@ -118,7 +118,7 @@ export const Drawer: React.FC = () => {
   const userStoreName = currentUser?.storeId ? (stores.find(s => s.id === currentUser.storeId)?.name || currentUser.storeName) : currentUser?.storeName;
 
   return (
-    <div className="app-safe-area fixed inset-0 z-60 flex md:hidden flex-col bg-bg text-fg-muted w-full h-dvh overflow-hidden">
+    <div className="app-safe-area fixed inset-x-0 top-0 bottom-[calc(3.5rem+max(0.5rem,env(safe-area-inset-bottom,0px)))] z-40 flex md:hidden flex-col bg-bg text-fg-muted w-full overflow-hidden">
       {/* Header */}
       <div className="p-4 border-b border-border bg-surface flex items-center justify-between shrink-0">
         <div className="flex items-center gap-3 min-w-0">
@@ -202,24 +202,25 @@ export const Drawer: React.FC = () => {
             </div>
           );
         })}
-      </div>
 
-      {/* Footer */}
-      <div className="p-3 border-t border-border bg-surface flex items-center justify-between shrink-0 safe-area-pb">
-        <button
-          onClick={() => {
-            setDrawerOpen(false);
-            logout();
-          }}
-          className="h-11 px-4 rounded-xl bg-danger/10 hover:bg-danger/15 text-danger border border-danger/30 text-xs font-semibold transition-colors flex items-center gap-2"
-        >
-          <LogOut className="w-4 h-4" />
-          <span>Выход из системы</span>
-        </button>
-
-        <span className="text-[11px] text-fg-subtle font-mono">
-          Mobile Shop POS
-        </span>
+        {/* Logout item at the end of the mobile menu list */}
+        <div className="pt-2">
+          <button
+            onClick={() => {
+              setDrawerOpen(false);
+              logout();
+            }}
+            className="w-full flex items-center justify-between px-3.5 py-3.5 rounded-xl border text-left bg-danger/10 hover:bg-danger/15 text-danger border-danger/30 font-semibold transition-all active:scale-[0.99]"
+          >
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="p-2 rounded-lg bg-danger/15 text-danger shrink-0 border border-danger/20">
+                <LogOut className="w-4.5 h-4.5" />
+              </div>
+              <span className="text-xs md:text-sm font-bold truncate">Выйти из системы</span>
+            </div>
+            <ChevronRight className="w-4 h-4 text-danger/60 shrink-0" />
+          </button>
+        </div>
       </div>
     </div>
   );

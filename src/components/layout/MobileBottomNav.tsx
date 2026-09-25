@@ -37,8 +37,9 @@ export const MobileBottomNav: React.FC = () => {
   const {
     currentUser,
     setActivePage,
+    drawerOpen,
     setDrawerOpen
-  } = useAppFields('currentUser', 'setActivePage', 'setDrawerOpen');
+  } = useAppFields('currentUser', 'setActivePage', 'drawerOpen', 'setDrawerOpen');
   const { notifications } = useNotifications();
 
   const userRole = currentUser?.role || 'SELLER';
@@ -125,18 +126,20 @@ export const MobileBottomNav: React.FC = () => {
       />
 
       <button
-        onClick={() => setDrawerOpen(true)}
-        className="flex-1 min-h-11 flex flex-col items-center justify-center gap-0.5 text-fg-subtle active:text-fg-muted transition-colors"
+        onClick={() => setDrawerOpen(!drawerOpen)}
+        className={`flex-1 min-h-11 flex flex-col items-center justify-center gap-0.5 transition-colors ${
+          drawerOpen ? 'text-accent' : 'text-fg-subtle active:text-fg'
+        }`}
       >
         <div className="relative">
-          <Menu className="w-5 h-5" />
+          <Menu className="w-5 h-5" strokeWidth={drawerOpen ? 2.5 : 2} />
           {unreadNotifs > 0 && (
             <span className="absolute -top-1.5 -right-2 flex h-4 min-w-4 items-center justify-center rounded-full bg-danger px-1 text-[9px] font-bold text-white">
               {unreadNotifs}
             </span>
           )}
         </div>
-        <span className="text-[10px] font-medium leading-none">Меню</span>
+        <span className={`text-[10px] leading-none ${drawerOpen ? 'font-semibold' : 'font-medium'}`}>Меню</span>
       </button>
     </nav>
   );

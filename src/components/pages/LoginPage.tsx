@@ -68,7 +68,7 @@ export const LoginPage: React.FC = () => {
           <form onSubmit={handleSubmit} className="space-y-3.5">
             <div>
               <label className="block text-[10px] uppercase tracking-wider text-fg-subtle mb-1 font-semibold">
-                ЛОГИН ПОЛЬЗОВАТЕЛЯ / USERNAME
+                ЛОГИН ПОЛЬЗОВАТЕЛЯ
               </label>
               <div className="relative">
                 <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-fg-subtle">
@@ -78,7 +78,7 @@ export const LoginPage: React.FC = () => {
                   type="text"
                   value={loginInput ?? ''}
                   onChange={(e) => setLoginInput(e.target.value)}
-                  placeholder="admin, partner, seller..."
+                  placeholder="Введите логин"
                   disabled={isLoading}
                   autoFocus
                   required
@@ -89,7 +89,7 @@ export const LoginPage: React.FC = () => {
 
             <div>
               <label className="block text-[10px] uppercase tracking-wider text-fg-subtle mb-1 font-semibold">
-                ПАРОЛЬ ДЛЯ ВХОДА / PASSWORD
+                ПАРОЛЬ ДЛЯ ВХОДА 
               </label>
               <div className="relative">
                 <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-fg-subtle">
