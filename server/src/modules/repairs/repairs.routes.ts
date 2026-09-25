@@ -1,3 +1,4 @@
+import { D, decimalMin, decimalMax, moneyJson, type MoneyInput } from '../../common/decimal';
 import type { Express } from 'express';
 import { authenticateJwt, enforceBodyStoreScope, type AuthenticatedRequest } from '../../auth/auth.middleware';
 import { prisma } from '../../prisma/prisma.service';
@@ -69,7 +70,7 @@ export function registerRepairRoutes(app: Express) {
           return;
         }
       }
-      const parsedCost = finalCostTjs !== undefined && finalCostTjs !== null ? Number(finalCostTjs) : undefined;
+      const parsedCost = finalCostTjs !== undefined && finalCostTjs !== null ? D(finalCostTjs) : undefined;
       const ticket = await RepairsService.updateStatus(req.params.id, status, req.user!.userId, note, parsedCost);
       RealtimeSyncGateway.broadcast('REPAIR_UPDATED', { ticketId: ticket.id }, { storeIds: [ticket.storeId] });
       res.json(ticket);

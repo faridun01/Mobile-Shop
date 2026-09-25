@@ -1,3 +1,5 @@
+import '../common/decimal-test-setup';
+import { D } from '../common/decimal';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const db = vi.hoisted(() => {
@@ -75,8 +77,8 @@ describe('refund cash ledger', () => {
     db.store.updateMany.mockResolvedValue({ count: 1 });
     db.store.findUnique.mockResolvedValue({ name: 'Shop' });
     await RefundService.refund({ saleId: 'sale', reason: 'Возврат', refundAmountTjs: 900, penaltyFeeTjs: 100, paymentMethod: 'CASH', refundedByUserId: 'admin' });
-    const cashMovement = db.ledgerEntry.create.mock.calls.reduce((sum, [entry]) => sum + entry.data.amountTjs, 0);
-    expect(1000 + cashMovement).toBe(100);
+    const cashMovement = db.ledgerEntry.create.mock.calls.reduce((sum, [entry]) => sum.plus(entry.data.amountTjs), D(0));
+    expect(cashMovement.plus(1000)).toEqual(100);
     expect(db.owner.update).toHaveBeenCalledWith(expect.objectContaining({ data: {
       totalAccruedProfitUsd: { increment: -10 }, availableProfitUsd: { increment: -10 },
     } }));

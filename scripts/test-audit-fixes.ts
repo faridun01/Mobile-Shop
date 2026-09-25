@@ -1,3 +1,4 @@
+import { D, decimalMin, decimalMax, moneyJson, type MoneyInput } from '../server/src/common/decimal';
 import 'dotenv/config';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
@@ -9,6 +10,7 @@ assert(['localhost', '127.0.0.1'].includes(url.hostname), 'Local database requir
 const schema = `audit_fixes_${Date.now()}_${process.pid}`;
 url.searchParams.set('schema', schema);
 process.env.DATABASE_URL = url.href;
+process.env.SEED_TEST_DATA = 'true';
 const db = new PrismaClient();
 await db.$executeRawUnsafe(`CREATE SCHEMA "${schema}"`);
 let server: import('node:http').Server | undefined;
@@ -38,6 +40,12 @@ try {
   RealtimeSyncGateway.init(server);
   await new Promise<void>(resolve => server!.once('listening', resolve));
   const port = (server.address() as import('node:net').AddressInfo).port;
+  const cors = await fetch(`http://127.0.0.1:${port}/api/finance/cash-receipt`, {
+    method: 'OPTIONS', headers: { Origin: 'http://localhost:3000', 'Access-Control-Request-Method': 'POST', 'Access-Control-Request-Headers': 'authorization,content-type,idempotency-key' },
+  });
+  assert.equal(cors.status, 200);
+  assert.match(cors.headers.get('access-control-allow-headers') || '', /Idempotency-Key/i);
+  pass('CORS preflight permits idempotent financial requests');
   const api = async (route: string, token?: string, body?: unknown, method = body ? 'POST' : 'GET') => {
     const res = await fetch(`http://127.0.0.1:${port}/api${route}`, { method,
       headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
@@ -63,6 +71,11 @@ try {
   assert.equal(await socketClosed, 1008);
   pass('logout revokes only the current session and closes its WebSocket');
   assert.equal((await api('/users/user-ahmad', admin, { password: 'changed123' }, 'PATCH')).status, 200);
+  const changedPasswordHash = (await prisma.user.findUniqueOrThrow({ where: { id: 'user-ahmad' } })).password;
+  const reseed = spawnSync(process.execPath, ['--import', 'dotenv/config', '--import', 'tsx', 'prisma/seed.ts'], { env: process.env, encoding: 'utf8', timeout: 60000 });
+  assert.equal(reseed.status, 0, reseed.stderr);
+  assert.equal((await prisma.user.findUniqueOrThrow({ where: { id: 'user-ahmad' } })).password, changedPasswordHash);
+  pass('repeated seed preserves an existing changed password');
   assert.equal((await api('/stores', otherSession)).status, 401);
   const fresh = await login('ahmad', 'changed123');
   assert.equal((await api('/stores', fresh)).status, 200);
@@ -71,11 +84,11 @@ try {
 
   const cash = await prisma.financialAccount.findUniqueOrThrow({ where: { storeId: 'store-siyoma' } });
   const main = await prisma.financialAccount.create({ data: { name: 'Regression main', type: 'MAIN' } });
-  const receipt = (id: string, amount: number, currency: 'TJS' | 'USD' = 'TJS') => finance.createCashReceipt({ accountId: id, amount, currency, categoryName: 'Audit income', description: 'Regression receipt', createdByUserId: 'user-admin' });
+  const receipt = (id: string, amount: MoneyInput, currency: 'TJS' | 'USD' = 'TJS') => finance.createCashReceipt({ accountId: id, amount, currency, categoryName: 'Audit income', description: 'Regression receipt', createdByUserId: 'user-admin' });
   await receipt(cash.id, 1000);
   const cashBefore = await prisma.financialAccount.findUniqueOrThrow({ where: { id: cash.id } });
   const storeBefore = await prisma.store.findUniqueOrThrow({ where: { id: 'store-siyoma' } });
-  const transfer = await finance.createTransfer({ accountId: cash.id, destinationAccountId: main.id, amount: 100, currency: 'TJS', description: 'Regression transfer', createdByUserId: 'user-admin' });
+  const transfer = await finance.createTransfer({ accountId: cash.id, destinationAccountId: main.id, amount: D(100), currency: 'TJS', description: 'Regression transfer', createdByUserId: 'user-admin' });
   const reversal = await finance.cancelFinancialTransaction(transfer.id, 'user-admin', 'cancel-transfer');
   assert.equal((await finance.cancelFinancialTransaction(transfer.id, 'user-admin', 'cancel-transfer')).id, reversal.id);
   assert.equal((await prisma.financialAccount.findUniqueOrThrow({ where: { id: cash.id } })).balanceTjs, cashBefore.balanceTjs);
@@ -91,7 +104,7 @@ try {
   await finance.cancelFinancialTransaction(income.id, 'user-admin');
   const statement = await reports.computeAccountStatement({ accountId: account.id, period: 'ALL' });
   assert.equal(statement.openingBalanceTjs, 0); assert.equal(statement.closingBalanceTjs, 0);
-  assert.equal(statement.rows.reduce((sum, r) => sum + r.signedAmount, 0), 0);
+  assert.equal(statement.rows.reduce((sum, r) => D(sum).plus(r.signedAmount), D(0)), 0);
   assert.equal(statement.rows.length, 2);
   const totalsAfter = await reports.computeIncomeExpenseReport({ period: 'ALL' });
   assert.equal(totalsAfter.incomeTotalTjs, totalsBefore.incomeTotalTjs);
@@ -114,24 +127,24 @@ try {
   assert.equal(september.openingBalanceTjs, 100); assert.equal(september.closingBalanceTjs, 200);
   const augustCashAfter = await reports.computeCashFlowReport({ period: 'SPECIFIC_MONTH', month: '2026-08' });
   assert.equal(augustCashAfter.openingBalanceTjs, augustCashBefore.openingBalanceTjs);
-  assert.equal(augustCashAfter.closingBalanceTjs - augustCashBefore.closingBalanceTjs, 100);
-  assert.equal(augustCashAfter.incomeTotalTjs - augustCashBefore.incomeTotalTjs, 100);
+  assert.equal(D(augustCashAfter.closingBalanceTjs).minus(augustCashBefore.closingBalanceTjs), 100);
+  assert.equal(D(augustCashAfter.incomeTotalTjs).minus(augustCashBefore.incomeTotalTjs), 100);
   pass('historical statement excludes later movements, including a later cancellation');
 
   const shares = (a: number) => OwnersService.updateProfitShares([{ ownerId: 'owner-admin', sharePercent: a }, { ownerId: 'owner-partner', sharePercent: 100 - a }], 'user-admin');
   const balances = async () => (await prisma.owner.findMany({ orderBy: { id: 'asc' } })).map(o => o.availableProfitUsd);
-  await prisma.owner.updateMany({ data: { availableProfitUsd: 100, totalAccruedProfitUsd: 100 } });
+  await prisma.owner.updateMany({ data: { availableProfitUsd: D(100), totalAccruedProfitUsd: D(100) } });
   await shares(60);
-  const bonus = await SuppliersService.createBonus({ supplierId: 'sup-dubai', bonusType: 'CASH_DISCOUNT', amountUsd: 100, createdByUserId: 'user-admin' });
+  const bonus = await SuppliersService.createBonus({ supplierId: 'sup-dubai', bonusType: 'CASH_DISCOUNT', amountUsd: D(100), createdByUserId: 'user-admin' });
   assert.deepEqual(await balances(), [160, 140]);
   await shares(50);
   await SuppliersService.deleteBonus(bonus.id, 'user-admin');
   assert.deepEqual(await balances(), [100, 100]);
   pass('bonus reversal uses original 60/40 amounts after shares change');
   await shares(60);
-  const editedBonus = await SuppliersService.createBonus({ supplierId: 'sup-dubai', bonusType: 'CASH_DISCOUNT', amountUsd: 100, createdByUserId: 'user-admin' });
+  const editedBonus = await SuppliersService.createBonus({ supplierId: 'sup-dubai', bonusType: 'CASH_DISCOUNT', amountUsd: D(100), createdByUserId: 'user-admin' });
   await shares(50);
-  await SuppliersService.updateBonus(editedBonus.id, { amountUsd: 80, actorUserId: 'user-admin' });
+  await SuppliersService.updateBonus(editedBonus.id, { amountUsd: D(80), actorUserId: 'user-admin' });
   assert.deepEqual(await balances(), [140, 140]);
   await shares(70);
   await SuppliersService.deleteBonus(editedBonus.id, 'user-admin');
@@ -139,26 +152,26 @@ try {
   pass('bonus edits replace historical allocations and subsequent deletion restores balances');
   await shares(60);
   const beforeSummary = await reports.computeReportsSummary({ period: 'ALL' });
-  const expense = await expenses.createExpenseStandalone({ category: 'OTHER', amountTjs: 105, storeId: 'store-siyoma', paidFromCashRegister: true, createdByUserId: 'user-admin' });
+  const expense = await expenses.createExpenseStandalone({ category: 'OTHER', amountTjs: D(105), storeId: 'store-siyoma', paidFromCashRegister: true, createdByUserId: 'user-admin' });
   await shares(50);
   await expenses.deleteExpense(expense.id, 'user-admin');
   assert.deepEqual(await balances(), [100, 100]);
   assert.equal((await reports.computeReportsSummary({ period: 'ALL' })).expensesTjs, beforeSummary.expensesTjs);
   pass('expense cancellation restores historical allocations and removes summary expense');
-  const edited = await expenses.createExpenseStandalone({ category: 'OTHER', amountTjs: 105, storeId: 'store-siyoma', paidFromCashRegister: true, createdByUserId: 'user-admin' });
-  await expenses.updateExpense(edited.id, { amountTjs: 210 }, 'user-admin');
-  await expenses.updateExpense(edited.id, { amountTjs: 315 }, 'user-admin');
+  const edited = await expenses.createExpenseStandalone({ category: 'OTHER', amountTjs: D(105), storeId: 'store-siyoma', paidFromCashRegister: true, createdByUserId: 'user-admin' });
+  await expenses.updateExpense(edited.id, { amountTjs: D(210) }, 'user-admin');
+  await expenses.updateExpense(edited.id, { amountTjs: D(315) }, 'user-admin');
   await shares(70);
   await expenses.deleteExpense(edited.id, 'user-admin');
   assert.deepEqual(await balances(), [100, 100]);
   assert.equal((await prisma.financialAccount.findUniqueOrThrow({ where: { id: cash.id } })).balanceTjs, cashBefore.balanceTjs);
   pass('repeated expense edits reverse the live posting, not an earlier reversal');
-  const concurrent = await expenses.createExpenseStandalone({ category: 'OTHER', amountTjs: 105, storeId: 'store-siyoma', createdByUserId: 'user-admin' });
+  const concurrent = await expenses.createExpenseStandalone({ category: 'OTHER', amountTjs: D(105), storeId: 'store-siyoma', createdByUserId: 'user-admin' });
   const cancellations = await Promise.allSettled([expenses.deleteExpense(concurrent.id, 'user-admin'), expenses.deleteExpense(concurrent.id, 'user-admin')]);
   assert.equal(cancellations.filter(r => r.status === 'fulfilled').length, 1);
   assert.deepEqual(await balances(), [100, 100]);
   pass('concurrent expense cancellation returns cash and profit exactly once');
-  const legacy = await expenses.createExpenseStandalone({ category: 'OTHER', amountTjs: 105, paidFromCashRegister: false, createdByUserId: 'user-admin' });
+  const legacy = await expenses.createExpenseStandalone({ category: 'OTHER', amountTjs: D(105), paidFromCashRegister: false, createdByUserId: 'user-admin' });
   await db.$executeRaw`UPDATE expenses SET "ownerProfitAllocations" = NULL WHERE id = ${legacy.id}`;
   const beforeLegacy = await balances();
   await assert.rejects(expenses.deleteExpense(legacy.id, 'user-admin'), /исходное распределение/);

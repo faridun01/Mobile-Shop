@@ -1,3 +1,4 @@
+import { D, decimalMin, decimalMax, moneyJson, type MoneyInput } from './common/decimal';
 import 'dotenv/config';
 import express, { type NextFunction, type Request, type Response } from 'express';
 import { prisma } from './prisma/prisma.service';
@@ -23,8 +24,10 @@ import { registerReportRoutes } from './modules/reports/reports.routes';
 import { registerFinanceRoutes } from './modules/finance/finance.routes';
 import { requirePositiveMoney } from './common/money';
 import { requireTodayRate } from './modules/exchange-rate/exchange-rate.service';
+import { decimalJsonReplacer } from './common/decimal';
 
 export const app = express();
+app.set('json replacer', decimalJsonReplacer);
 
 // Trusts the immediate upstream proxy (nginx, in production — see docker-compose.prod.yml)
 // so req.ip reflects the real client IP from X-Forwarded-For instead of nginx's own
@@ -55,7 +58,7 @@ app.use((req, res, next) => {
     res.header('Vary', 'Origin');
   }
   res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
-  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, Idempotency-Key');
   if (req.method === 'OPTIONS') {
     res.sendStatus(200);
     return;
@@ -83,6 +86,13 @@ app.get('/api/health', async (_req, res, next) => {
 const LOGIN_ATTEMPT_WINDOW_MS = 15 * 60 * 1000;
 const LOGIN_MAX_ATTEMPTS = 10;
 const loginAttempts = new Map<string, { count: number; windowStartedAt: number }>();
+const loginAttemptsCleanup = setInterval(() => {
+  const cutoff = Date.now() - LOGIN_ATTEMPT_WINDOW_MS;
+  for (const [key, entry] of loginAttempts) {
+    if (entry.windowStartedAt <= cutoff) loginAttempts.delete(key);
+  }
+}, 60_000);
+loginAttemptsCleanup.unref();
 
 function isLoginRateLimited(key: string): boolean {
   const now = Date.now();
@@ -289,7 +299,7 @@ app.post('/api/purchases', authenticateJwt, requireRoles('ADMIN', 'PARTNER'), en
       });
       if (existing) throw new Error(`IMEI ${existing.imei} уже зарегистрирован`);
 
-      const totalAmountUsd = normalizedDevices.reduce((sum, device) => sum + device.purchasePriceUsd, 0);
+      const totalAmountUsd = normalizedDevices.reduce((sum, device) => D(sum).plus(device.purchasePriceUsd), D(0));
       const invoice = await transaction.supplierInvoice.create({
         data: {
           invoiceNumber: String(invoiceNumber).trim(),
@@ -351,7 +361,7 @@ app.post('/api/purchases', authenticateJwt, requireRoles('ADMIN', 'PARTNER'), en
           userRole: req.user!.role,
           action: 'PURCHASE',
           details: `Создан приход по накладной ${invoice.invoiceNumber} (${supplier.name}): ${devices.length} устройств, сумма $${totalAmountUsd}`,
-          financialDetails: { amountUsd: totalAmountUsd, exchangeRate },
+          financialDetails: moneyJson({ amountUsd: totalAmountUsd, exchangeRate }),
         },
       });
 

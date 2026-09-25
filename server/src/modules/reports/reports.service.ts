@@ -1,3 +1,4 @@
+import { D, decimalMin, decimalMax, moneyJson, type MoneyInput } from '../../common/decimal';
 import { prisma } from '../../prisma/prisma.service';
 import { getRateForDate } from '../exchange-rate/exchange-rate.service';
 import { calculateRecognizedProfit } from '../sales/profit';
@@ -118,92 +119,92 @@ export async function computeReportsSummary(input: ReportsSummaryInput) {
   for (const log of profitLogs) {
     if (log.targetId) profitsBySale.set(log.targetId, [...(profitsBySale.get(log.targetId) ?? []), log]);
   }
-  const recognizedProfitById = new Map<string, number>();
+  const recognizedProfitById = new Map<string, MoneyInput>();
   for (const sale of periodSalesAllStores) {
-    const fallbackCost = sale.saleItems.reduce((sum, item) => sum + item.costBasisUsd, 0);
-    recognizedProfitById.set(sale.id, calculateRecognizedProfit(profitsBySale.get(sale.id) ?? [], sale.totalUsd - fallbackCost));
+    const fallbackCost = sale.saleItems.reduce((sum, item) => D(sum).plus(item.costBasisUsd), D(0));
+    recognizedProfitById.set(sale.id, calculateRecognizedProfit(profitsBySale.get(sale.id) ?? [], D(sale.totalUsd).minus(fallbackCost)));
   }
 
   const periodSales = storeFilter ? periodSalesAllStores.filter((s) => s.storeId === storeFilter) : periodSalesAllStores;
   const periodExpenses = storeFilter ? periodExpensesAllStores.filter((e) => e.storeId === storeFilter) : periodExpensesAllStores;
 
-  let revenueUsd = 0;
-  let cogsUsd = 0;
-  let historicalRevenueTjs = 0;
-  let historicalCogsTjs = 0;
+  let revenueUsd = D(0);
+  let cogsUsd = D(0);
+  let historicalRevenueTjs = D(0);
+  let historicalCogsTjs = D(0);
   let unitsSold = 0;
-  const modelCounts: Record<string, { count: number; revenueUsd: number; cogsUsd: number; profitUsd: number }> = {};
+  const modelCounts: Record<string, { count: number; revenueUsd: MoneyInput; cogsUsd: MoneyInput; profitUsd: MoneyInput }> = {};
   let giftDeviceUnitsSold = 0;
-  let giftDeviceProfitUsd = 0;
-  let giftDeviceProfitTjs = 0;
+  let giftDeviceProfitUsd = D(0);
+  let giftDeviceProfitTjs = D(0);
 
   periodSales.forEach((sale) => {
     const saleRate = sale.exchangeRate || rate;
-    const saleRevenueUsd = sale.totalUsd || +(sale.totalTjs / saleRate).toFixed(2);
-    revenueUsd += saleRevenueUsd;
-    historicalRevenueTjs += sale.totalTjs;
+    const saleRevenueUsd = sale.totalUsd || D((D(sale.totalTjs).div(saleRate)).toFixed(2));
+    revenueUsd = D(revenueUsd).plus(saleRevenueUsd);
+    historicalRevenueTjs = D(historicalRevenueTjs).plus(sale.totalTjs);
 
     const saleProfitUsd = recognizedProfitById.get(sale.id) ?? 0;
-    cogsUsd += saleRevenueUsd - saleProfitUsd;
-    historicalCogsTjs += (saleRevenueUsd - saleProfitUsd) * saleRate;
+    cogsUsd = D(cogsUsd).plus(D(saleRevenueUsd).minus(saleProfitUsd));
+    historicalCogsTjs = D(historicalCogsTjs).plus(D((D(saleRevenueUsd).minus(saleProfitUsd))).mul(saleRate));
 
     sale.saleItems.forEach((item) => {
       unitsSold++;
       const itemCostUsd = item.costBasisUsd ?? item.purchaseCostUsd ?? 0;
-      const itemPriceUsd = item.salePriceUsd || +(item.salePriceTjs / saleRate).toFixed(2);
-      const itemProfitUsd = +(itemPriceUsd - itemCostUsd).toFixed(2);
+      const itemPriceUsd = item.salePriceUsd || D((D(item.salePriceTjs).div(saleRate)).toFixed(2));
+      const itemProfitUsd = D((D(itemPriceUsd).minus(itemCostUsd)).toFixed(2));
 
       const modelKey = `${item.brand} ${item.model}`.trim();
-      if (!modelCounts[modelKey]) modelCounts[modelKey] = { count: 0, revenueUsd: 0, cogsUsd: 0, profitUsd: 0 };
+      if (!modelCounts[modelKey]) modelCounts[modelKey] = { count: 0, revenueUsd: D(0), cogsUsd: D(0), profitUsd: D(0) };
       modelCounts[modelKey].count += 1;
-      modelCounts[modelKey].revenueUsd += itemPriceUsd;
-      modelCounts[modelKey].cogsUsd += itemCostUsd;
-      modelCounts[modelKey].profitUsd += itemProfitUsd;
+      modelCounts[modelKey].revenueUsd = D(modelCounts[modelKey].revenueUsd).plus(itemPriceUsd);
+      modelCounts[modelKey].cogsUsd = D(modelCounts[modelKey].cogsUsd).plus(itemCostUsd);
+      modelCounts[modelKey].profitUsd = D(modelCounts[modelKey].profitUsd).plus(itemProfitUsd);
 
-      if (!itemCostUsd) {
+      if (D(itemCostUsd).isZero()) {
         giftDeviceUnitsSold += 1;
-        giftDeviceProfitUsd += itemPriceUsd;
-        giftDeviceProfitTjs += item.salePriceTjs || itemPriceUsd * saleRate;
+        giftDeviceProfitUsd = D(giftDeviceProfitUsd).plus(itemPriceUsd);
+        giftDeviceProfitTjs = D(giftDeviceProfitTjs).plus(item.salePriceTjs || D(itemPriceUsd).mul(saleRate));
       }
     });
   });
 
-  const grossProfitUsd = +(revenueUsd - cogsUsd).toFixed(2);
+  const grossProfitUsd = D((D(revenueUsd).minus(cogsUsd)).toFixed(2));
   const revenueTjs = roundMoney(historicalRevenueTjs);
   const cogsTjs = roundMoney(historicalCogsTjs);
-  const grossProfitTjs = revenueTjs - cogsTjs;
-  const grossMarginPercent = revenueUsd > 0 ? +((grossProfitUsd / revenueUsd) * 100).toFixed(1) : 0;
+  const grossProfitTjs = D(revenueTjs).minus(cogsTjs);
+  const grossMarginPercent = D(revenueUsd).gt(0) ? D((D((D(grossProfitUsd).div(revenueUsd))).mul(100)).toFixed(1)) : 0;
 
-  const expensesTjs = periodExpenses.reduce((acc, e) => acc + (e.amountTjs || 0), 0);
-  const expensesUsd = +periodExpenses.reduce((acc, e) => acc + (e.amountUsd ?? ((e.amountTjs || 0) / (e.exchangeRate || rate))), 0).toFixed(2);
+  const expensesTjs = periodExpenses.reduce((acc, e) => D(acc).plus((e.amountTjs || 0)), D(0));
+  const expensesUsd = D(periodExpenses.reduce((acc, e) => D(acc).plus((e.amountUsd ?? (D((e.amountTjs || 0)).div((e.exchangeRate || rate))))), D(0)).toFixed(2));
 
   const periodCashBonuses = allBonuses.filter((b) => !storeFilter && b.bonusType === 'CASH_DISCOUNT' && b.amountUsd && dateWithinRange(b.dateReceived, dateRange));
-  const periodCashBonusesUsd = periodCashBonuses.reduce((acc, b) => acc + (b.amountUsd || 0), 0);
-  const periodCashBonusesTjs = periodCashBonuses.reduce((acc, b) => acc + (b.amountUsd || 0) * b.exchangeRate, 0);
+  const periodCashBonusesUsd = periodCashBonuses.reduce((acc, b) => D(acc).plus((b.amountUsd || 0)), D(0));
+  const periodCashBonusesTjs = periodCashBonuses.reduce((acc, b) => D(acc).plus(D((b.amountUsd || 0)).mul(b.exchangeRate)), D(0));
 
   const periodFreeDeviceBonusesReceived = allBonuses.filter((b) => b.bonusType === 'FREE_DEVICES' && dateWithinRange(b.dateReceived, dateRange)).length;
   const freeDeviceBonusesInStock = allBonuses.filter((b) => b.bonusType === 'FREE_DEVICES' && b.status !== 'SOLD').length;
 
   const refundedSales = storeFilter ? refundedSalesAllStores.filter((s) => s.storeId === storeFilter) : refundedSalesAllStores;
-  const periodRefundPenaltiesUsd = refundedSales.reduce((acc, s) => acc + (s.penaltyFeeUsd || 0), 0);
-  const periodRefundPenaltiesTjs = refundedSales.reduce((acc, s) => acc + (s.penaltyFeeTjs || 0), 0);
-  const refundPenaltiesByStore = new Map<string, { usd: number; tjs: number }>();
+  const periodRefundPenaltiesUsd = refundedSales.reduce((acc, s) => D(acc).plus((s.penaltyFeeUsd || 0)), D(0));
+  const periodRefundPenaltiesTjs = refundedSales.reduce((acc, s) => D(acc).plus((s.penaltyFeeTjs || 0)), D(0));
+  const refundPenaltiesByStore = new Map<string, { usd: MoneyInput; tjs: MoneyInput }>();
   for (const s of refundedSalesAllStores) {
     if (!s.storeId) continue;
-    const prev = refundPenaltiesByStore.get(s.storeId) || { usd: 0, tjs: 0 };
-    refundPenaltiesByStore.set(s.storeId, { usd: prev.usd + (s.penaltyFeeUsd || 0), tjs: prev.tjs + (s.penaltyFeeTjs || 0) });
+    const prev = refundPenaltiesByStore.get(s.storeId) || { usd: D(0), tjs: D(0) };
+    refundPenaltiesByStore.set(s.storeId, { usd: D(prev.usd).plus((s.penaltyFeeUsd || 0)), tjs: D(prev.tjs).plus((s.penaltyFeeTjs || 0)) });
   }
 
-  const netProfitUsd = +(grossProfitUsd - expensesUsd + periodCashBonusesUsd + periodRefundPenaltiesUsd).toFixed(2);
-  const netProfitTjs = roundMoney(grossProfitTjs - expensesTjs + periodCashBonusesTjs + periodRefundPenaltiesTjs);
+  const netProfitUsd = D((D(D(D(grossProfitUsd).minus(expensesUsd)).plus(periodCashBonusesUsd)).plus(periodRefundPenaltiesUsd)).toFixed(2));
+  const netProfitTjs = roundMoney(D(D(D(grossProfitTjs).minus(expensesTjs)).plus(periodCashBonusesTjs)).plus(periodRefundPenaltiesTjs));
 
-  const totalSupplierDebtUsd = Number(supplierDebtAgg._sum.totalDebtUsd ?? 0);
-  const totalSupplierDebtTjs = roundMoney(totalSupplierDebtUsd * rate);
+  const totalSupplierDebtUsd = D(supplierDebtAgg._sum.totalDebtUsd ?? 0);
+  const totalSupplierDebtTjs = roundMoney(D(totalSupplierDebtUsd).mul(rate));
 
-  const mainWarehouseStockCostUsd = +mainWarehouseStock.reduce((sum, d) => sum + (d.costBasisUsd ?? d.purchasePriceUsd ?? 0), 0).toFixed(2);
-  const mainWarehouseStockCostTjs = roundMoney(mainWarehouseStockCostUsd * rate);
+  const mainWarehouseStockCostUsd = D(mainWarehouseStock.reduce((sum, d) => D(sum).plus((d.costBasisUsd ?? d.purchasePriceUsd ?? 0)), D(0)).toFixed(2));
+  const mainWarehouseStockCostTjs = roundMoney(D(mainWarehouseStockCostUsd).mul(rate));
   const mainWarehouseCashTjs = mainWarehouseStore?.cashBalanceTjs || 0;
-  const mainWarehouseCashUsd = +(mainWarehouseCashTjs / rate).toFixed(2);
+  const mainWarehouseCashUsd = D((D(mainWarehouseCashTjs).div(rate)).toFixed(2));
 
   const salesByStore = groupByStore(periodSalesAllStores);
   const stockByStore = groupByStore(retailStock);
@@ -216,112 +217,112 @@ export async function computeReportsSummary(input: ReportsSummaryInput) {
     expensesByStore.set(e.storeId, [...(expensesByStore.get(e.storeId) ?? []), e]);
   }
   const summarizeExpenses = (rows: typeof periodExpenses) => {
-    const byCategory = new Map<string, { category: string; amountUsd: number; amountTjs: number }>();
-    let usd = 0;
-    let tjs = 0;
-    let unpaidTjs = 0;
+    const byCategory = new Map<string, { category: string; amountUsd: MoneyInput; amountTjs: MoneyInput }>();
+    let usd = D(0);
+    let tjs = D(0);
+    let unpaidTjs = D(0);
     for (const e of rows) {
-      const eUsd = e.amountUsd ?? ((e.amountTjs || 0) / (e.exchangeRate || rate));
-      usd += eUsd;
-      tjs += e.amountTjs || 0;
-      if (e.status === 'UNPAID') unpaidTjs += e.amountTjs || 0;
-      const prev = byCategory.get(e.category) ?? { category: e.category, amountUsd: 0, amountTjs: 0 };
-      byCategory.set(e.category, { category: e.category, amountUsd: prev.amountUsd + eUsd, amountTjs: prev.amountTjs + (e.amountTjs || 0) });
+      const eUsd = e.amountUsd ?? (D((e.amountTjs || 0)).div((e.exchangeRate || rate)));
+      usd = D(usd).plus(eUsd);
+      tjs = D(tjs).plus(e.amountTjs || 0);
+      if (e.status === 'UNPAID') unpaidTjs = D(unpaidTjs).plus(e.amountTjs || 0);
+      const prev = byCategory.get(e.category) ?? { category: e.category, amountUsd: D(0), amountTjs: D(0) };
+      byCategory.set(e.category, { category: e.category, amountUsd: D(prev.amountUsd).plus(eUsd), amountTjs: D(prev.amountTjs).plus((e.amountTjs || 0)) });
     }
     return {
-      expensesUsd: +usd.toFixed(2),
+      expensesUsd: D(usd.toFixed(2)),
       expensesTjs: roundMoney(tjs),
       unpaidExpensesTjs: roundMoney(unpaidTjs),
       expensesByCategory: [...byCategory.values()]
-        .map((c) => ({ ...c, amountUsd: +c.amountUsd.toFixed(2), amountTjs: roundMoney(c.amountTjs) }))
-        .sort((a, b) => b.amountUsd - a.amountUsd),
+        .map((c) => ({ ...c, amountUsd: D(D(c.amountUsd).toFixed(2)), amountTjs: roundMoney(c.amountTjs) }))
+        .sort((a, b) => D(b.amountUsd).comparedTo(a.amountUsd)),
     };
   };
   const storeBreakdown = retailStores
     .map((store) => {
       const storeSales = (salesByStore.get(store.id) ?? []);
-      let storeRevenueUsd = 0;
-      let storeRevenueTjs = 0;
-      let storeCogsUsd = 0;
-      let storeCogsTjs = 0;
-      let storeProfitUsd = 0;
-      let storeProfitTjs = 0;
+      let storeRevenueUsd = D(0);
+      let storeRevenueTjs = D(0);
+      let storeCogsUsd = D(0);
+      let storeCogsTjs = D(0);
+      let storeProfitUsd = D(0);
+      let storeProfitTjs = D(0);
       let storeUnits = 0;
-      const storeModels = new Map<string, { name: string; count: number; revenueUsd: number; profitUsd: number }>();
+      const storeModels = new Map<string, { name: string; count: number; revenueUsd: MoneyInput; profitUsd: MoneyInput }>();
       storeSales.forEach((sale) => {
         const saleRate = sale.exchangeRate || rate;
-        const saleRevenueUsd = sale.totalUsd || +(sale.totalTjs / saleRate).toFixed(2);
+        const saleRevenueUsd = sale.totalUsd || D((D(sale.totalTjs).div(saleRate)).toFixed(2));
         const saleProfitUsd = recognizedProfitById.get(sale.id) ?? 0;
-        const saleCogsUsd = saleRevenueUsd - saleProfitUsd;
-        storeRevenueUsd += saleRevenueUsd;
-        storeRevenueTjs += sale.totalTjs;
-        storeCogsUsd += saleCogsUsd;
-        storeCogsTjs += saleCogsUsd * saleRate;
-        storeProfitUsd += saleProfitUsd;
-        storeProfitTjs += sale.totalTjs - saleCogsUsd * saleRate;
+        const saleCogsUsd = D(saleRevenueUsd).minus(saleProfitUsd);
+        storeRevenueUsd = D(storeRevenueUsd).plus(saleRevenueUsd);
+        storeRevenueTjs = D(storeRevenueTjs).plus(sale.totalTjs);
+        storeCogsUsd = D(storeCogsUsd).plus(saleCogsUsd);
+        storeCogsTjs = D(storeCogsTjs).plus(D(saleCogsUsd).mul(saleRate));
+        storeProfitUsd = D(storeProfitUsd).plus(saleProfitUsd);
+        storeProfitTjs = D(storeProfitTjs).plus(D(sale.totalTjs).minus(D(saleCogsUsd).mul(saleRate)));
         storeUnits += sale.saleItems.length;
         for (const item of sale.saleItems) {
           const name = `${item.brand} ${item.model}`.trim();
-          const itemPriceUsd = item.salePriceUsd || +(item.salePriceTjs / saleRate).toFixed(2);
+          const itemPriceUsd = item.salePriceUsd || D((D(item.salePriceTjs).div(saleRate)).toFixed(2));
           const itemCostUsd = item.costBasisUsd ?? item.purchaseCostUsd ?? 0;
-          const prev = storeModels.get(name) ?? { name, count: 0, revenueUsd: 0, profitUsd: 0 };
-          storeModels.set(name, { name, count: prev.count + 1, revenueUsd: prev.revenueUsd + itemPriceUsd, profitUsd: prev.profitUsd + itemPriceUsd - itemCostUsd });
+          const prev = storeModels.get(name) ?? { name, count: 0, revenueUsd: D(0), profitUsd: D(0) };
+          storeModels.set(name, { name, count: prev.count + 1, revenueUsd: D(prev.revenueUsd).plus(itemPriceUsd), profitUsd: D(D(prev.profitUsd).plus(itemPriceUsd)).minus(itemCostUsd) });
         }
       });
       const storeExpenses = summarizeExpenses(expensesByStore.get(store.id) ?? []);
       const stock = (stockByStore.get(store.id) ?? []);
-      const stockCostUsd = stock.reduce((sum, d) => sum + (d.costBasisUsd ?? d.purchasePriceUsd ?? 0), 0);
+      const stockCostUsd = stock.reduce((sum, d) => D(sum).plus((d.costBasisUsd ?? d.purchasePriceUsd ?? 0)), D(0));
       // Same "с учетом возвратов" treatment as the overall totals: a refund's original
       // margin is gone, but the withheld penalty is real retained profit and counts here.
-      const storePenalty = refundPenaltiesByStore.get(store.id) || { usd: 0, tjs: 0 };
+      const storePenalty = refundPenaltiesByStore.get(store.id) || { usd: D(0), tjs: D(0) };
       return {
         storeId: store.id,
         storeName: store.name,
-        revenueUsd: +storeRevenueUsd.toFixed(2),
+        revenueUsd: D(storeRevenueUsd.toFixed(2)),
         revenueTjs: roundMoney(storeRevenueTjs),
-        cogsUsd: +storeCogsUsd.toFixed(2),
+        cogsUsd: D(storeCogsUsd.toFixed(2)),
         cogsTjs: roundMoney(storeCogsTjs),
-        profitUsd: +(storeProfitUsd + storePenalty.usd).toFixed(2),
-        profitTjs: roundMoney(storeProfitTjs + storePenalty.tjs),
+        profitUsd: D((D(storeProfitUsd).plus(storePenalty.usd)).toFixed(2)),
+        profitTjs: roundMoney(D(storeProfitTjs).plus(storePenalty.tjs)),
         refundPenaltiesUsd: roundMoney(storePenalty.usd),
         ...storeExpenses,
-        netProfitUsd: +(storeProfitUsd + storePenalty.usd - storeExpenses.expensesUsd).toFixed(2),
-        netProfitTjs: roundMoney(storeProfitTjs + storePenalty.tjs - storeExpenses.expensesTjs),
+        netProfitUsd: D((D(D(storeProfitUsd).plus(storePenalty.usd)).minus(storeExpenses.expensesUsd)).toFixed(2)),
+        netProfitTjs: roundMoney(D(D(storeProfitTjs).plus(storePenalty.tjs)).minus(storeExpenses.expensesTjs)),
         topModels: [...storeModels.values()]
-          .map((m) => ({ ...m, revenueUsd: +m.revenueUsd.toFixed(2), profitUsd: +m.profitUsd.toFixed(2) }))
-          .sort((a, b) => b.count - a.count || b.profitUsd - a.profitUsd)
+          .map((m) => ({ ...m, revenueUsd: D(D(m.revenueUsd).toFixed(2)), profitUsd: D(D(m.profitUsd).toFixed(2)) }))
+          .sort((a, b) => b.count - a.count || D(b.profitUsd).comparedTo(a.profitUsd))
           .slice(0, 5),
         unitsSold: storeUnits,
         salesCount: storeSales.length,
         cashTjs: store.cashBalanceTjs,
         stockCount: stock.length,
-        stockCostUsd: +stockCostUsd.toFixed(2),
-        stockCostTjs: roundMoney(stockCostUsd * rate),
+        stockCostUsd: D(stockCostUsd.toFixed(2)),
+        stockCostTjs: roundMoney(D(stockCostUsd).mul(rate)),
       };
     })
-    .sort((a, b) => b.revenueUsd - a.revenueUsd);
+    .sort((a, b) => D(b.revenueUsd).comparedTo(a.revenueUsd));
 
   const sortedModelList = Object.entries(modelCounts)
     .map(([name, data]) => ({ name, ...data }))
-    .sort((a, b) => b.profitUsd - a.profitUsd || b.revenueUsd - a.revenueUsd);
+    .sort((a, b) => D(b.profitUsd).comparedTo(a.profitUsd) || D(b.revenueUsd).comparedTo(a.revenueUsd));
 
   return {
     unitsSold,
     // Lets the frontend show "X чеков" per store/overall straight from this summary,
     // instead of fetching the full sales list (only actually needed for the Excel export).
     salesCount: periodSales.length,
-    revenueUsd: +revenueUsd.toFixed(2),
+    revenueUsd: D(revenueUsd.toFixed(2)),
     revenueTjs,
-    cogsUsd: +cogsUsd.toFixed(2),
+    cogsUsd: D(cogsUsd.toFixed(2)),
     cogsTjs,
-    grossProfitUsd: +grossProfitUsd.toFixed(2),
+    grossProfitUsd: D(grossProfitUsd.toFixed(2)),
     grossProfitTjs,
     grossMarginPercent,
     // "Прибыль (с учетом возвратов)" — the single recognized-profit figure the summary card,
     // the per-store cards (storeBreakdown.profitUsd/Tjs below) and netProfitUsd/Tjs all build
     // on, so they can no longer disagree the way the old client-side per-item calc did.
-    profitUsd: +(grossProfitUsd + periodRefundPenaltiesUsd).toFixed(2),
-    profitTjs: roundMoney(grossProfitTjs + periodRefundPenaltiesTjs),
+    profitUsd: D((D(grossProfitUsd).plus(periodRefundPenaltiesUsd)).toFixed(2)),
+    profitTjs: roundMoney(D(grossProfitTjs).plus(periodRefundPenaltiesTjs)),
     expensesTjs,
     expensesUsd,
     periodRefundPenaltiesUsd: roundMoney(periodRefundPenaltiesUsd),
@@ -331,11 +332,11 @@ export async function computeReportsSummary(input: ReportsSummaryInput) {
     periodCashBonusesUsd: roundMoney(periodCashBonusesUsd),
     periodCashBonusesTjs: roundMoney(periodCashBonusesTjs),
     giftDeviceUnitsSold,
-    giftDeviceProfitUsd: +giftDeviceProfitUsd.toFixed(2),
+    giftDeviceProfitUsd: D(giftDeviceProfitUsd.toFixed(2)),
     giftDeviceProfitTjs: roundMoney(giftDeviceProfitTjs),
     periodFreeDeviceBonusesReceived,
     freeDeviceBonusesInStock,
-    totalSupplierDebtUsd: +totalSupplierDebtUsd.toFixed(2),
+    totalSupplierDebtUsd: D(totalSupplierDebtUsd.toFixed(2)),
     totalSupplierDebtTjs,
     mainWarehouseStockCount: mainWarehouseStock.length,
     mainWarehouseStockCostUsd,
@@ -383,18 +384,18 @@ async function computeAccountPeriodMovement(accountId: string, dateRange?: { gte
     }),
   ]);
 
-  let deltaTjs = 0;
-  let deltaUsd = 0;
+  let deltaTjs = D(0);
+  let deltaUsd = D(0);
   for (const t of asSource) {
     const amount = t.balanceCurrency === 'TJS' ? t.amountTjs : t.amountUsd;
-    const signed = t.direction === 'IN' ? amount : -amount;
-    if (t.balanceCurrency === 'TJS') deltaTjs += signed;
-    else deltaUsd += signed;
+    const signed = t.direction === 'IN' ? amount : D(amount).negated();
+    if (t.balanceCurrency === 'TJS') deltaTjs = D(deltaTjs).plus(signed);
+    else deltaUsd = D(deltaUsd).plus(signed);
   }
   for (const t of asDestination) {
     const amount = t.balanceCurrency === 'TJS' ? t.amountTjs : t.amountUsd;
-    if (t.balanceCurrency === 'TJS') deltaTjs += amount;
-    else deltaUsd += amount;
+    if (t.balanceCurrency === 'TJS') deltaTjs = D(deltaTjs).plus(amount);
+    else deltaUsd = D(deltaUsd).plus(amount);
   }
   return { deltaTjs, deltaUsd };
 }
@@ -409,7 +410,7 @@ async function resolveReportAccounts(storeId?: string) {
 }
 
 async function computeCategoryBreakdown(accountIds: string[], dateRange?: { gte: Date; lt: Date }) {
-  if (accountIds.length === 0) return { income: [], expense: [], incomeTotalTjs: 0, incomeTotalUsd: 0, expenseTotalTjs: 0, expenseTotalUsd: 0 };
+  if (accountIds.length === 0) return { income: [], expense: [], incomeTotalTjs: D(0), incomeTotalUsd: D(0), expenseTotalTjs: D(0), expenseTotalUsd: D(0) };
 
   // A reversal subtracts from its original category/direction, rather than
   // inventing an expense for cancelled income (or income for cancelled expense).
@@ -426,11 +427,11 @@ async function computeCategoryBreakdown(accountIds: string[], dateRange?: { gte:
   // groupBy's `_sum` bypasses the decimal-extension's per-field result mapping (that only
   // covers normal record shapes), so these come back as raw Prisma.Decimal instances —
   // Number(...) converts via Decimal's string valueOf, same effect as .toNumber().
-  const toRow = (g: { categoryId: string | null; _sum: { amountTjs: unknown; amountUsd: unknown } }) => ({
+  const toRow = (g: { categoryId: string | null; _sum: { amountTjs: MoneyInput | null; amountUsd: MoneyInput | null } }) => ({
     categoryId: g.categoryId,
     categoryName: g.categoryId ? categoryName.get(g.categoryId) ?? 'Без категории' : 'Без категории',
-    amountTjs: roundMoney(Number(g._sum.amountTjs) || 0),
-    amountUsd: roundMoney(Number(g._sum.amountUsd) || 0),
+    amountTjs: roundMoney(g._sum.amountTjs ?? 0),
+    amountUsd: roundMoney(g._sum.amountUsd ?? 0),
   });
 
   const incomeMap = new Map<string | null, ReturnType<typeof toRow>>();
@@ -443,19 +444,19 @@ async function computeCategoryBreakdown(accountIds: string[], dateRange?: { gte:
     const previous = map.get(row.categoryId);
     const sign = reversal ? -1 : 1;
     map.set(row.categoryId, { ...row,
-      amountTjs: roundMoney((previous?.amountTjs ?? 0) + sign * row.amountTjs),
-      amountUsd: roundMoney((previous?.amountUsd ?? 0) + sign * row.amountUsd),
+      amountTjs: roundMoney(D((previous?.amountTjs ?? 0)).plus(D(sign).mul(row.amountTjs))),
+      amountUsd: roundMoney(D((previous?.amountUsd ?? 0)).plus(D(sign).mul(row.amountUsd))),
     });
   }
-  const income = [...incomeMap.values()].filter(r => r.amountTjs !== 0 || r.amountUsd !== 0).sort((a, b) => b.amountTjs - a.amountTjs);
-  const expense = [...expenseMap.values()].filter(r => r.amountTjs !== 0 || r.amountUsd !== 0).sort((a, b) => b.amountTjs - a.amountTjs);
+  const income = [...incomeMap.values()].filter(r => !D(r.amountTjs).eq(0) || !D(r.amountUsd).eq(0)).sort((a, b) => D(b.amountTjs).comparedTo(a.amountTjs));
+  const expense = [...expenseMap.values()].filter(r => !D(r.amountTjs).eq(0) || !D(r.amountUsd).eq(0)).sort((a, b) => D(b.amountTjs).comparedTo(a.amountTjs));
   return {
     income,
     expense,
-    incomeTotalTjs: roundMoney(income.reduce((s, r) => s + r.amountTjs, 0)),
-    incomeTotalUsd: roundMoney(income.reduce((s, r) => s + r.amountUsd, 0)),
-    expenseTotalTjs: roundMoney(expense.reduce((s, r) => s + r.amountTjs, 0)),
-    expenseTotalUsd: roundMoney(expense.reduce((s, r) => s + r.amountUsd, 0)),
+    incomeTotalTjs: roundMoney(income.reduce((s, r) => D(s).plus(r.amountTjs), D(0))),
+    incomeTotalUsd: roundMoney(income.reduce((s, r) => D(s).plus(r.amountUsd), D(0))),
+    expenseTotalTjs: roundMoney(expense.reduce((s, r) => D(s).plus(r.amountTjs), D(0))),
+    expenseTotalUsd: roundMoney(expense.reduce((s, r) => D(s).plus(r.amountUsd), D(0))),
   };
 }
 
@@ -470,18 +471,18 @@ export async function computeCashFlowReport(input: CashFlowReportInput) {
   const movements = await Promise.all(accounts.map((a) => computeAccountPeriodMovement(a.id, dateRange)));
   const laterMovements = await Promise.all(accounts.map((a) => dateRange
     ? computeAccountPeriodMovement(a.id, { gte: dateRange.lt })
-    : Promise.resolve({ deltaTjs: 0, deltaUsd: 0 })));
-  let openingBalanceTjs = 0;
-  let openingBalanceUsd = 0;
-  let closingBalanceTjs = 0;
-  let closingBalanceUsd = 0;
+    : Promise.resolve({ deltaTjs: D(0), deltaUsd: D(0) })));
+  let openingBalanceTjs = D(0);
+  let openingBalanceUsd = D(0);
+  let closingBalanceTjs = D(0);
+  let closingBalanceUsd = D(0);
   accounts.forEach((account, i) => {
-    const closingTjs = account.balanceTjs - laterMovements[i].deltaTjs;
-    const closingUsd = account.balanceUsd - laterMovements[i].deltaUsd;
-    closingBalanceTjs += closingTjs;
-    closingBalanceUsd += closingUsd;
-    openingBalanceTjs += closingTjs - movements[i].deltaTjs;
-    openingBalanceUsd += closingUsd - movements[i].deltaUsd;
+    const closingTjs = D(account.balanceTjs).minus(laterMovements[i].deltaTjs);
+    const closingUsd = D(account.balanceUsd).minus(laterMovements[i].deltaUsd);
+    closingBalanceTjs = D(closingBalanceTjs).plus(closingTjs);
+    closingBalanceUsd = D(closingBalanceUsd).plus(closingUsd);
+    openingBalanceTjs = D(openingBalanceTjs).plus(D(closingTjs).minus(movements[i].deltaTjs));
+    openingBalanceUsd = D(openingBalanceUsd).plus(D(closingUsd).minus(movements[i].deltaUsd));
   });
 
   const breakdown = await computeCategoryBreakdown(accounts.map((a) => a.id), dateRange);
@@ -510,9 +511,9 @@ export async function computeAccountStatement(input: AccountStatementInput) {
 
   const dateRange = dateRangeForPeriod(input.period, input.month);
   const movement = await computeAccountPeriodMovement(account.id, dateRange);
-  const later = dateRange ? await computeAccountPeriodMovement(account.id, { gte: dateRange.lt }) : { deltaTjs: 0, deltaUsd: 0 };
-  const openingBalanceTjs = roundMoney(account.balanceTjs - later.deltaTjs - movement.deltaTjs);
-  const openingBalanceUsd = roundMoney(account.balanceUsd - later.deltaUsd - movement.deltaUsd);
+  const later = dateRange ? await computeAccountPeriodMovement(account.id, { gte: dateRange.lt }) : { deltaTjs: D(0), deltaUsd: D(0) };
+  const openingBalanceTjs = roundMoney(D(D(account.balanceTjs).minus(later.deltaTjs)).minus(movement.deltaTjs));
+  const openingBalanceUsd = roundMoney(D(D(account.balanceUsd).minus(later.deltaUsd)).minus(movement.deltaUsd));
 
   const transactions = await prisma.financialTransaction.findMany({
     where: {
@@ -528,9 +529,9 @@ export async function computeAccountStatement(input: AccountStatementInput) {
   const rows = transactions.map((t) => {
     const isSource = t.accountId === account.id;
     const amount = t.balanceCurrency === 'TJS' ? t.amountTjs : t.amountUsd;
-    const signed = isSource ? (t.direction === 'IN' ? amount : -amount) : amount;
-    if (t.balanceCurrency === 'TJS') runningTjs = roundMoney(runningTjs + signed);
-    else runningUsd = roundMoney(runningUsd + signed);
+    const signed = isSource ? (t.direction === 'IN' ? amount : D(amount).negated()) : amount;
+    if (t.balanceCurrency === 'TJS') runningTjs = roundMoney(D(runningTjs).plus(signed));
+    else runningUsd = roundMoney(D(runningUsd).plus(signed));
     return {
       id: t.id,
       transactionNumber: t.transactionNumber,

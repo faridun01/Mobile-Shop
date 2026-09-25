@@ -1,3 +1,4 @@
+import '../../common/decimal-test-setup';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const db = vi.hoisted(() => {
@@ -35,7 +36,7 @@ describe('nextTransactionNumber', () => {
   it('formats prefix-year-padded sequence from the raw query result', async () => {
     const number = await nextTransactionNumber(db as any, 'CR');
     const year = new Date().getFullYear();
-    expect(number).toBe(`CR-${year}-000042`);
+    expect(number).toEqual(`CR-${year}-000042`);
   });
 });
 

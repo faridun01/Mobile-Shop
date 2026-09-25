@@ -590,22 +590,23 @@ export const OwnersPage: React.FC = () => {
             </div>
           </div>
 
-          {/* Controls Bar: Search & Filters */}
-          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-2.5">
-            <div className="flex flex-wrap items-center gap-2 flex-1">
-              <div className="relative w-full sm:w-64 md:w-72">
-                <Search className="absolute left-3 top-2.5 w-4 h-4 text-fg-subtle" />
+          {/* Controls Bar: Search & Compact Modern Filters */}
+          <div className="space-y-2">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+              {/* Search Input */}
+              <div className="relative flex-1 min-w-[200px]">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-fg-subtle pointer-events-none" />
                 <input
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Поиск по партнеру / примечанию / сумме..."
+                  placeholder="Поиск по партнеру, примечанию или сумме..."
                   className="w-full rounded-xl bg-surface-raised border border-border pl-9 pr-8 py-1.5 text-xs text-fg-muted placeholder-fg-subtle focus:border-accent focus:outline-none transition-colors"
                 />
                 {searchQuery && (
                   <button
                     onClick={() => setSearchQuery('')}
-                    className="absolute right-2.5 top-2.5 text-fg-subtle hover:text-fg-muted"
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-fg-subtle hover:text-fg-muted p-0.5"
                   >
                     <X className="w-3.5 h-3.5" />
                   </button>
@@ -613,47 +614,102 @@ export const OwnersPage: React.FC = () => {
               </div>
 
               {/* Partner Dropdown */}
-              <select
-                value={selectedOwnerFilter}
-                onChange={(e) => setSelectedOwnerFilter(e.target.value)}
-                className="bg-surface-raised border border-border text-fg-muted text-xs font-semibold rounded-xl px-3 py-1.5 focus:outline-none focus:border-accent shrink-0 cursor-pointer"
-              >
-                <option value="ALL">Все партнеры</option>
-                {displayOwners.map((o) => (
-                  <option key={o.id} value={o.id}>{getOwnerDetails(o).name}</option>
-                ))}
-              </select>
+              <div className="flex items-center gap-1.5 shrink-0">
+                <select
+                  value={selectedOwnerFilter}
+                  onChange={(e) => setSelectedOwnerFilter(e.target.value)}
+                  className="bg-surface-raised border border-border text-fg-muted text-xs font-semibold rounded-xl px-3 py-1.5 focus:outline-none focus:border-accent shrink-0 cursor-pointer"
+                >
+                  <option value="ALL">Все партнеры</option>
+                  {displayOwners.map((o) => (
+                    <option key={o.id} value={o.id}>{getOwnerDetails(o).name}</option>
+                  ))}
+                </select>
 
-              {/* Operation Type Dropdown */}
-              <select
-                value={typeFilter}
-                onChange={(e) => setTypeFilter(e.target.value as typeof typeFilter)}
-                className="bg-surface-raised border border-border text-fg-muted text-xs font-semibold rounded-xl px-3 py-1.5 focus:outline-none focus:border-accent shrink-0 cursor-pointer"
-              >
-                <option value="ALL">Все операции</option>
-                <option value="INVESTMENT">Личные вложения</option>
-                <option value="REINVEST">Реинвестирование</option>
-                <option value="PROFIT_PAYOUT">Выплаты прибыли</option>
-                <option value="WITHDRAWAL">Вывод капитала</option>
-              </select>
+                {/* Period Toggle Pills */}
+                <div className="flex items-center gap-1 bg-surface-raised border border-border p-0.5 rounded-xl shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => setPeriodFilter('ALL')}
+                    className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all ${
+                      periodFilter === 'ALL'
+                        ? 'bg-surface text-accent shadow-xs font-bold'
+                        : 'text-fg-subtle hover:text-fg-muted'
+                    }`}
+                  >
+                    Все время
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPeriodFilter('SPECIFIC_MONTH')}
+                    className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all ${
+                      periodFilter === 'SPECIFIC_MONTH'
+                        ? 'bg-surface text-accent shadow-xs font-bold'
+                        : 'text-fg-subtle hover:text-fg-muted'
+                    }`}
+                  >
+                    По месяцам
+                  </button>
+                </div>
 
-              {/* Period Dropdown */}
-              <select
-                value={periodFilter}
-                onChange={(e) => setPeriodFilter(e.target.value as typeof periodFilter)}
-                className="bg-surface-raised border border-border text-fg-muted text-xs font-semibold rounded-xl px-3 py-1.5 focus:outline-none focus:border-accent shrink-0 cursor-pointer"
-              >
-                <option value="ALL">Все время</option>
-                <option value="SPECIFIC_MONTH">Месяц</option>
-              </select>
+                {periodFilter === 'SPECIFIC_MONTH' && (
+                  <MonthPicker
+                    value={selectedMonth}
+                    onChange={setSelectedMonth}
+                    className="h-8 px-2 rounded-xl border border-accent bg-surface text-xs font-semibold text-accent focus:outline-none shrink-0"
+                  />
+                )}
 
-              {periodFilter === 'SPECIFIC_MONTH' && (
-                <MonthPicker
-                  value={selectedMonth}
-                  onChange={setSelectedMonth}
-                  className="h-8 px-2 rounded-xl border border-accent bg-surface text-xs font-semibold text-accent focus:outline-none shrink-0"
-                />
-              )}
+                {/* Reset all filters button if any active */}
+                {(searchQuery || typeFilter !== 'ALL' || selectedOwnerFilter !== 'ALL' || periodFilter !== 'ALL') && (
+                  <button
+                    onClick={() => {
+                      setSearchQuery('');
+                      setTypeFilter('ALL');
+                      setSelectedOwnerFilter('ALL');
+                      setPeriodFilter('ALL');
+                    }}
+                    className="p-1.5 text-fg-subtle hover:text-danger hover:bg-danger/10 rounded-xl transition-colors shrink-0"
+                    title="Сбросить все фильтры"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Row 2: Operation Type Segmented Pills */}
+            <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none pb-0.5 pt-0.5">
+              {[
+                { id: 'ALL', label: 'Все операции' },
+                { id: 'INVESTMENT', label: '+ Вложения' },
+                { id: 'REINVEST', label: '🔄 Реинвест' },
+                { id: 'PROFIT_PAYOUT', label: '↑ Выплаты' },
+                { id: 'WITHDRAWAL', label: '🏦 Вывод' },
+              ].map((pill) => {
+                const isActive = typeFilter === pill.id;
+                const count = pill.id === 'ALL' 
+                  ? ownerTransactions.length 
+                  : ownerTransactions.filter(t => t.type === pill.id).length;
+                return (
+                  <button
+                    key={pill.id}
+                    onClick={() => setTypeFilter(pill.id as typeof typeFilter)}
+                    className={`px-2.5 py-1 rounded-xl text-xs whitespace-nowrap transition-all flex items-center gap-1.5 shrink-0 ${
+                      isActive
+                        ? 'bg-accent text-accent-fg font-bold shadow-xs'
+                        : 'bg-surface-raised border border-border text-fg-subtle hover:text-fg-muted hover:border-fg-subtle/40 font-medium'
+                    }`}
+                  >
+                    <span>{pill.label}</span>
+                    <span className={`text-[10px] px-1.5 py-0.2 rounded-full ${
+                      isActive ? 'bg-accent-fg/20 text-accent-fg font-bold' : 'bg-surface text-fg-subtle'
+                    }`}>
+                      {count}
+                    </span>
+                  </button>
+                );
+              })}
             </div>
           </div>
 

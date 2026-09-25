@@ -1,3 +1,5 @@
+import { moneyJson } from '../../common/decimal';
+import '../../common/decimal-test-setup';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { writeFileSync, mkdirSync } from 'node:fs';
 
@@ -57,7 +59,7 @@ describe('financial report query optimization preserves all totals', () => {
   it.each(['all', 'store-0', 'store-1'])('preserves the complete report for %s', async (storeId) => {
     const summary = await computeReportsSummary({ period: 'SPECIFIC_MONTH', month: '2026-09', storeId });
     expect(db.expense.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ cancelledAt: null }) }));
-    expect(summary).toMatchSnapshot();
+    expect(moneyJson(summary)).toMatchSnapshot();
     if (process.env.REPORT_BENCHMARK_LABEL) {
       mkdirSync('output/performance', { recursive: true });
       writeFileSync(`output/performance/reports-${process.env.REPORT_BENCHMARK_LABEL}-${storeId}.json`, JSON.stringify({ storeId, workload,

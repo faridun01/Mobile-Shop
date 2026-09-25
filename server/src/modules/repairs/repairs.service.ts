@@ -1,3 +1,4 @@
+import { D, decimalMin, decimalMax, moneyJson, type MoneyInput } from '../../common/decimal';
 import { prisma } from '../../prisma/prisma.service';
 import { resolveActor } from '../../common/actor';
 import { createExpense } from '../expenses/expenses.service';
@@ -21,9 +22,9 @@ export interface CreateRepairInput {
   visualCondition?: string;
   equipmentPackage?: string;
   comment?: string;
-  estimatedCostTjs?: number;
-  repairCostTjs?: number;
-  prepaymentTjs?: number;
+  estimatedCostTjs?: MoneyInput;
+  repairCostTjs?: MoneyInput;
+  prepaymentTjs?: MoneyInput;
 }
 
 export class RepairsService {
@@ -37,12 +38,12 @@ export class RepairsService {
       // Snapshot the intake quote in USD right now, at today's rate — same as every other
       // money-in-TJS operation in the app — instead of leaving it to be reconstructed later
       // from whatever the rate happens to be at read time.
-      let estimatedCostUsd: number | undefined;
-      let intakeRate: number | undefined;
+      let estimatedCostUsd: MoneyInput | undefined;
+      let intakeRate: MoneyInput | undefined;
       if (input.estimatedCostTjs) {
         intakeRate = (await getRateForDate(new Date())) ?? undefined;
         if (!intakeRate) throw new Error('Сначала задайте курс валют на сегодня');
-        estimatedCostUsd = roundMoney(input.estimatedCostTjs / intakeRate);
+        estimatedCostUsd = roundMoney(D(input.estimatedCostTjs).div(intakeRate));
       }
 
       const ticket = await tx.repairTicket.create({
@@ -105,7 +106,7 @@ export class RepairsService {
     }, { maxWait: 10000, timeout: 25000 });
   }
 
-  public static async updateStatus(ticketId: string, newStatus: string, updatedByUserId: string, note?: string, finalCostTjs?: number) {
+  public static async updateStatus(ticketId: string, newStatus: string, updatedByUserId: string, note?: string, finalCostTjs?: MoneyInput) {
     const statuses = ['ACCEPTED', 'IN_PROGRESS', 'READY', 'ISSUED', 'DIAGNOSTICS', 'IN_REPAIR', 'DELIVERED', 'UNREPAIRABLE'];
     if (!statuses.includes(newStatus)) throw new Error('Некорректный статус ремонта');
     if (finalCostTjs !== undefined) requireNonNegativeMoney(finalCostTjs, 'Стоимость ремонта');
@@ -132,14 +133,14 @@ export class RepairsService {
       // explicit new value, or the first time it's ever being set (e.g. carried over from the
       // estimate). A later status change that just carries the same already-snapshotted final
       // cost forward must not re-price it at whatever the rate happens to be that day.
-      const explicitOverride = finalCostTjs !== undefined && finalCostTjs !== null && Number(finalCostTjs) > 0;
-      const needsUsdSnapshot = costVal > 0 && (explicitOverride || ticket.finalCostUsd == null);
+      const explicitOverride = finalCostTjs !== undefined && finalCostTjs !== null && D(D(finalCostTjs)).gt(0);
+      const needsUsdSnapshot = D(costVal).gt(0) && (explicitOverride || ticket.finalCostUsd === null);
       let finalCostUsd = ticket.finalCostUsd ?? undefined;
       let operationRate = ticket.exchangeRate ?? undefined;
       if (needsUsdSnapshot) {
         operationRate = (await getRateForDate(new Date())) ?? undefined;
         if (!operationRate) throw new Error('Сначала задайте курс валют на сегодня');
-        finalCostUsd = roundMoney(costVal / operationRate);
+        finalCostUsd = roundMoney(D(costVal).div(operationRate));
       }
 
       const updated = await tx.repairTicket.update({
@@ -147,13 +148,13 @@ export class RepairsService {
         data: {
           status: newStatus as any,
           finalCostTjs: costVal,
-          finalCostUsd: costVal > 0 ? finalCostUsd : 0,
-          exchangeRate: costVal > 0 ? operationRate : ticket.exchangeRate,
+          finalCostUsd: D(costVal).gt(0) ? finalCostUsd : 0,
+          exchangeRate: D(costVal).gt(0) ? operationRate : ticket.exchangeRate,
           statusHistory: { create: [{ status: newStatus as any, updatedByUserId, note }] },
         },
       });
 
-      if (costVal > 0 && newStatus === 'ISSUED') {
+      if (D(costVal).gt(0) && newStatus === 'ISSUED') {
         await createExpense(tx, {
           category: 'REPAIR_PARTS',
           amountTjs: costVal,
@@ -170,7 +171,7 @@ export class RepairsService {
           userName: actor.name,
           userRole: actor.role,
           action: 'REPAIR_STATUS_CHANGE',
-          details: `Ремонт #${ticket.ticketNumber} (${ticket.model}): статус "${newStatus}".${newStatus === 'ISSUED' && costVal > 0 ? ` Расход: ${costVal} TJS списан с кассы магазина.` : ''}`,
+          details: `Ремонт #${ticket.ticketNumber} (${ticket.model}): статус "${newStatus}".${newStatus === 'ISSUED' && D(costVal).gt(0) ? ` Расход: ${costVal} TJS списан с кассы магазина.` : ''}`,
           targetId: ticketId,
         },
       });

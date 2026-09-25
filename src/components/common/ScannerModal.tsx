@@ -64,6 +64,7 @@ export const ScannerModal: React.FC = () => {
   const [zoomRange, setZoomRange] = useState<ZoomRange | null>(null);
   const [zoomValue, setZoomValue] = useState(1);
   const [scanHint, setScanHint] = useState('Поместите один штрих-код внутрь рамки');
+  const [manualCode, setManualCode] = useState('');
 
   const resolveScan = (code: string) => {
     const trimmed = code.trim();
@@ -163,6 +164,7 @@ export const ScannerModal: React.FC = () => {
       setZoomRange(null);
       setZoomValue(1);
       setScanHint('Поместите один штрих-код внутрь рамки');
+      setManualCode('');
       return;
     }
 
@@ -170,18 +172,10 @@ export const ScannerModal: React.FC = () => {
     scanLockedRef.current = false;
     pendingScanRef.current = { code: '', matches: 0, seenAt: 0 };
     let instance: Html5Qrcode | null = null;
-    const startPromise = cameraRelease.then(async () => {
-      if (cancelled) return;
-      instance = new Html5Qrcode(READER_ELEMENT_ID, {
-      formatsToSupport: SUPPORTED_FORMATS,
-      useBarCodeDetectorIfSupported: true,
-      verbose: false,
-    });
-    scannerRef.current = instance;
 
-    await instance
-      .start(
-        { facingMode: 'environment' },
+    const startScannerWithFacing = async (qrcode: Html5Qrcode, facing: 'environment' | 'user') => {
+      await qrcode.start(
+        { facingMode: facing },
         {
           fps: 18,
           aspectRatio: 16 / 9,
@@ -192,9 +186,9 @@ export const ScannerModal: React.FC = () => {
             const height = Math.floor(Math.min(130, Math.max(70, width * 0.3), viewfinderHeight * 0.55));
             return { width, height };
           },
-          disableFlip: true,
+          disableFlip: facing === 'environment',
           videoConstraints: {
-            facingMode: { ideal: 'environment' },
+            facingMode: { ideal: facing },
             width: { ideal: 1920 },
             height: { ideal: 1080 },
             advanced: [{ focusMode: 'continuous' } as BarcodeCameraConstraint],
@@ -206,36 +200,56 @@ export const ScannerModal: React.FC = () => {
         () => {
           // Per-frame "nothing decoded yet" — not an error, ignore.
         }
-      )
-      .then(async () => {
+      );
+    };
+
+    const startPromise = cameraRelease.then(async () => {
+      if (cancelled) return;
+      instance = new Html5Qrcode(READER_ELEMENT_ID, {
+        formatsToSupport: SUPPORTED_FORMATS,
+        useBarCodeDetectorIfSupported: true,
+        verbose: false,
+      });
+      scannerRef.current = instance;
+
+      try {
+        await startScannerWithFacing(instance, 'environment');
+      } catch (primaryErr) {
         if (cancelled || !instance) return;
         try {
-          const capabilities = instance.getRunningTrackCapabilities() as BarcodeCameraCapabilities;
-          setTorchSupported(!!capabilities.torch);
-          const modes = capabilities.focusMode ?? [];
-          setFocusSupported(modes.includes('continuous') || modes.includes('single-shot'));
-
-          if (modes.includes('continuous')) {
-            instance.applyVideoConstraints({
-              advanced: [{ focusMode: 'continuous' } as BarcodeCameraConstraint],
-            }).catch(() => {});
-          }
-
-          const zoom = capabilities.zoom;
-          if (zoom && Number.isFinite(zoom.min) && Number.isFinite(zoom.max) && zoom.max > zoom.min) {
-            const range = { min: zoom.min, max: zoom.max, step: zoom.step && zoom.step > 0 ? zoom.step : 0.1 };
-            const currentZoom = (instance.getRunningTrackSettings() as BarcodeCameraSettings).zoom;
-            const preferredZoom = Math.min(range.max, Math.max(range.min, Math.max(currentZoom ?? range.min, 1.5)));
-            setZoomRange(range);
-            setZoomValue(preferredZoom);
-            await instance.applyVideoConstraints({
-              advanced: [{ zoom: preferredZoom } as BarcodeCameraConstraint],
-            }).catch(() => {});
-          }
+          await startScannerWithFacing(instance, 'user');
         } catch {
-          setTorchSupported(false);
+          throw primaryErr;
         }
-      })
+      }
+
+      if (cancelled || !instance) return;
+      try {
+        const capabilities = instance.getRunningTrackCapabilities() as BarcodeCameraCapabilities;
+        setTorchSupported(!!capabilities.torch);
+        const modes = capabilities.focusMode ?? [];
+        setFocusSupported(modes.includes('continuous') || modes.includes('single-shot'));
+
+        if (modes.includes('continuous')) {
+          instance.applyVideoConstraints({
+            advanced: [{ focusMode: 'continuous' } as BarcodeCameraConstraint],
+          }).catch(() => {});
+        }
+
+        const zoom = capabilities.zoom;
+        if (zoom && Number.isFinite(zoom.min) && Number.isFinite(zoom.max) && zoom.max > zoom.min) {
+          const range = { min: zoom.min, max: zoom.max, step: zoom.step && zoom.step > 0 ? zoom.step : 0.1 };
+          const currentZoom = (instance.getRunningTrackSettings() as BarcodeCameraSettings).zoom;
+          const preferredZoom = Math.min(range.max, Math.max(range.min, Math.max(currentZoom ?? range.min, 1.5)));
+          setZoomRange(range);
+          setZoomValue(preferredZoom);
+          await instance.applyVideoConstraints({
+            advanced: [{ zoom: preferredZoom } as BarcodeCameraConstraint],
+          }).catch(() => {});
+        }
+      } catch {
+        setTorchSupported(false);
+      }
     }).catch((error: unknown) => {
         if (!cancelled) {
           const errorName = typeof error === 'object' && error && 'name' in error ? String(error.name) : '';
@@ -324,6 +338,32 @@ export const ScannerModal: React.FC = () => {
             <span>{cameraError}</span>
           </div>
         )}
+
+        {/* Manual Barcode / IMEI Input Option */}
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (manualCode.trim()) {
+              resolveScan(manualCode.trim());
+            }
+          }}
+          className="flex items-center gap-2 pt-2 border-t border-border"
+        >
+          <input
+            type="text"
+            value={manualCode}
+            onChange={(e) => setManualCode(e.target.value)}
+            placeholder="Или введите IMEI / штрихкод вручную..."
+            className="flex-1 px-3 py-2 bg-surface-raised border border-border rounded-xl text-xs text-fg-muted placeholder-fg-subtle focus:outline-none focus:border-accent"
+          />
+          <button
+            type="submit"
+            disabled={!manualCode.trim()}
+            className="px-3.5 py-2 bg-accent text-accent-fg font-bold text-xs rounded-xl hover:bg-accent-strong disabled:opacity-50 transition-colors shrink-0"
+          >
+            Готово
+          </button>
+        </form>
       </div>
     </Dialog>
   );

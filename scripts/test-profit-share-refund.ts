@@ -1,3 +1,4 @@
+import { D, decimalMin, decimalMax, moneyJson, type MoneyInput } from '../server/src/common/decimal';
 import 'dotenv/config';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
@@ -9,6 +10,7 @@ assert(['localhost', '127.0.0.1'].includes(url.hostname), 'Use a local test data
 const schema = `refund_share_test_${Date.now()}_${process.pid}`;
 url.searchParams.set('schema', schema);
 process.env.DATABASE_URL = url.href;
+process.env.SEED_TEST_DATA = 'true';
 const db = new PrismaClient();
 let disconnectService: (() => Promise<void>) | undefined;
 
@@ -42,16 +44,16 @@ try {
   const device = () => prisma.device.create({ data: {
     imei: `990000000000${String(++deviceNumber).padStart(3, '0')}`,
     brand: 'Test', model: 'Refund regression', storage: '128GB', color: 'Black',
-    status: 'STORE_STOCK', storeId: 'store-siyoma', purchasePriceUsd: 100, costBasisUsd: 100,
+    status: 'STORE_STOCK', storeId: 'store-siyoma', purchasePriceUsd: D(100), costBasisUsd: D(100),
   } });
   const makeSale = async () => {
     const item = await device();
     const sale = await SalesService.executeSale({ storeId: 'store-siyoma', userId: 'user-admin',
-      items: [{ deviceId: item.id, salePriceTjs: 2000 }], paymentMethod: 'CASH' });
+      items: [{ deviceId: item.id, salePriceTjs: D(2000) }], paymentMethod: 'CASH' });
     return { sale, item };
   };
   const refund = (saleId: string, total = 2000, penalty = 0) => RefundService.refund({
-    saleId, reason: 'Regression test', refundAmountTjs: total - penalty, penaltyFeeTjs: penalty,
+    saleId, reason: 'Regression test', refundAmountTjs: D(total).minus(penalty), penaltyFeeTjs: penalty,
     paymentMethod: 'CASH', refundedByUserId: 'user-admin',
   });
 
@@ -70,7 +72,7 @@ try {
   const replacement = await device();
   await ExchangesService.process({ saleId: exchanged.sale.id,
     returnedImei: exchanged.item.imei, returnedBrand: 'Test', returnedModel: 'Refund regression',
-    exchangeInValueTjs: 2000, replacementDeviceId: replacement.id, newPriceTjs: 2500,
+    exchangeInValueTjs: D(2000), replacementDeviceId: replacement.id, newPriceTjs: D(2500),
     processedByUserId: 'user-admin', paymentMethod: 'CASH' });
   assert.deepEqual(await balances(), [{ accrued: 135, available: 135 }, { accrued: 115, available: 115 }]);
   await shares(20);
@@ -87,7 +89,7 @@ try {
 
   const legacy = await makeSale();
   await prisma.auditLog.updateMany({ where: { targetId: legacy.sale.id, action: 'SALE' },
-    data: { financialDetails: { recognizedProfitUsd: 100 } } });
+    data: { financialDetails: moneyJson({ recognizedProfitUsd: D(100) }) } });
   const before = await balances();
   const cash = (await prisma.store.findUniqueOrThrow({ where: { id: 'store-siyoma' } })).cashBalanceTjs;
   await assert.rejects(refund(legacy.sale.id), /исходное распределение/);

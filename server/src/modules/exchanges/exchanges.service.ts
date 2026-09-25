@@ -1,3 +1,4 @@
+import { D, decimalMin, decimalMax, moneyJson, type MoneyInput } from '../../common/decimal';
 import { prisma } from '../../prisma/prisma.service';
 import { resolveActor } from '../../common/actor';
 import { getRateForDate } from '../exchange-rate/exchange-rate.service';
@@ -13,13 +14,13 @@ export interface ExchangeInput {
   returnedModel: string;
   returnedStorage?: string;
   returnedColor?: string;
-  exchangeInValueTjs: number;
+  exchangeInValueTjs: MoneyInput;
   replacementDeviceId: string;
-  newPriceTjs: number;
-  differenceTjs?: number;
+  newPriceTjs: MoneyInput;
+  differenceTjs?: MoneyInput;
   paymentMethod?: 'CASH' | 'CARD';
-  cashAmountTjs?: number;
-  cardAmountTjs?: number;
+  cashAmountTjs?: MoneyInput;
+  cardAmountTjs?: MoneyInput;
   processedByUserId: string;
 }
 
@@ -27,7 +28,7 @@ export class ExchangesService {
   public static async process(input: ExchangeInput) {
     const exchangeInValueTjs = requirePositiveMoney(input.exchangeInValueTjs, 'Зачётная стоимость');
     const newPriceTjs = requirePositiveMoney(input.newPriceTjs, 'Цена нового устройства');
-    const canonicalDifferenceTjs = newPriceTjs - exchangeInValueTjs;
+    const canonicalDifferenceTjs = D(newPriceTjs).minus(exchangeInValueTjs);
     if (input.differenceTjs !== undefined && !moneyEquals(requireFiniteNumber(input.differenceTjs, 'Разница обмена'), canonicalDifferenceTjs)) {
       throw new Error('Разница обмена не совпадает с ценой нового устройства минус зачётная стоимость');
     }
@@ -55,20 +56,18 @@ export class ExchangesService {
 
       if (replacementDevice.id === matchedItem.deviceId) throw new Error('Нельзя обменять устройство на него же');
 
-      const exchangeInValueUsd = roundMoney(exchangeInValueTjs / rate);
-      const newPriceUsd = roundMoney(newPriceTjs / rate);
+      const exchangeInValueUsd = roundMoney(D(exchangeInValueTjs).div(rate));
+      const newPriceUsd = roundMoney(D(newPriceTjs).div(rate));
       const diffTjs = canonicalDifferenceTjs;
       const paymentMethod = input.paymentMethod ?? 'CASH';
-      const cashAmountTjs = input.cashAmountTjs ?? (paymentMethod === 'CASH' ? diffTjs : 0);
-      const cardAmountTjs = input.cardAmountTjs ?? (paymentMethod === 'CARD' ? diffTjs : 0);
-      requireFiniteNumber(cashAmountTjs, 'Расчёт наличными');
-      requireFiniteNumber(cardAmountTjs, 'Расчёт по карте');
-      if (!moneyEquals(cashAmountTjs + cardAmountTjs, diffTjs)) {
+      const cashAmountTjs = roundMoney(input.cashAmountTjs ?? (paymentMethod === 'CASH' ? diffTjs : 0));
+      const cardAmountTjs = roundMoney(input.cardAmountTjs ?? (paymentMethod === 'CARD' ? diffTjs : 0));
+      if (!moneyEquals(D(cashAmountTjs).plus(cardAmountTjs), diffTjs)) {
         throw new Error('Сумма расчёта наличными и по карте должна совпадать с разницей обмена');
       }
       if (paymentMethod === 'CASH' && !moneyEquals(cardAmountTjs, 0)) throw new Error('При наличном расчёте сумма по карте должна быть нулевой');
       if (paymentMethod === 'CARD' && !moneyEquals(cashAmountTjs, 0)) throw new Error('При расчёте картой сумма наличными должна быть нулевой');
-      if (diffTjs > 0) {
+      if (D(diffTjs).gt(0)) {
         requireNonNegativeMoney(cashAmountTjs, 'Доплата наличными');
         requireNonNegativeMoney(cardAmountTjs, 'Доплата по карте');
       }
@@ -107,9 +106,9 @@ export class ExchangesService {
         },
       });
 
-      const newTotalTjs = Math.max(0, sale.totalTjs + diffTjs);
-      const newTotalUsd = roundMoney(sale.totalUsd + diffTjs / rate);
-      const exchangeProfitUsd = roundMoney(newPriceUsd - replacementDevice.costBasisUsd);
+      const newTotalTjs = decimalMax(0, D(sale.totalTjs).plus(diffTjs));
+      const newTotalUsd = roundMoney(D(sale.totalUsd).plus(D(diffTjs).div(rate)));
+      const exchangeProfitUsd = roundMoney(D(newPriceUsd).minus(replacementDevice.costBasisUsd));
 
       await tx.saleItem.update({
         where: { id: matchedItem.id },
@@ -133,10 +132,10 @@ export class ExchangesService {
         data: {
           totalTjs: newTotalTjs,
           totalUsd: newTotalUsd,
-          cashAmountTjs: sale.cashAmountTjs + cashAmountTjs,
-          cardAmountTjs: sale.cardAmountTjs + cardAmountTjs,
+          cashAmountTjs: D(sale.cashAmountTjs).plus(cashAmountTjs),
+          cardAmountTjs: D(sale.cardAmountTjs).plus(cardAmountTjs),
           status: 'EXCHANGED',
-          hasBelowCostItem: sale.saleItems.some((item) => item.id !== matchedItem.id && item.isBelowCost) || newPriceUsd < replacementDevice.costBasisUsd,
+          hasBelowCostItem: sale.saleItems.some((item) => item.id !== matchedItem.id && item.isBelowCost) || D(newPriceUsd).lt(replacementDevice.costBasisUsd),
           exchangeEvents: {
             create: [
               {
@@ -164,25 +163,25 @@ export class ExchangesService {
 
       const store = await tx.store.findUnique({ where: { id: sale.storeId } });
       const cashDelta = paymentMethod === 'CASH' ? diffTjs : 0;
-      if (cashDelta !== 0 && store) {
-        const cashGuard = cashDelta < 0
-          ? await tx.store.updateMany({ where: { id: sale.storeId, cashBalanceTjs: { gte: Math.abs(cashDelta) } }, data: { cashBalanceTjs: { increment: cashDelta } } })
+      if (!D(cashDelta).eq(0) && store) {
+        const cashGuard = D(cashDelta).lt(0)
+          ? await tx.store.updateMany({ where: { id: sale.storeId, cashBalanceTjs: { gte: D(cashDelta).abs() } }, data: { cashBalanceTjs: { increment: cashDelta } } })
           : await tx.store.updateMany({ where: { id: sale.storeId }, data: { cashBalanceTjs: { increment: cashDelta } } });
-        if (cashGuard.count !== 1) throw new Error('В кассе недостаточно наличных для выплаты разницы клиенту');
+        if (!D(cashGuard.count).eq(1)) throw new Error('В кассе недостаточно наличных для выплаты разницы клиенту');
 
         const cashAccount = await getStoreCashAccount(tx, sale.storeId, store.name);
         await postTransaction(tx, {
-          type: cashDelta > 0 ? 'INCOME' : 'REFUND',
-          direction: cashDelta > 0 ? 'IN' : 'OUT',
-          numberPrefix: cashDelta > 0 ? 'CR' : 'RF',
+          type: D(cashDelta).gt(0) ? 'INCOME' : 'REFUND',
+          direction: D(cashDelta).gt(0) ? 'IN' : 'OUT',
+          numberPrefix: D(cashDelta).gt(0) ? 'CR' : 'RF',
           accountId: cashAccount.id,
           balanceCurrency: 'TJS',
-          amount: Math.abs(cashDelta),
+          amount: D(cashDelta).abs(),
           currency: 'TJS',
           exchangeRate: rate,
-          amountTjs: Math.abs(cashDelta),
-          amountUsd: roundMoney(Math.abs(cashDelta) / rate),
-          categoryName: cashDelta > 0 ? 'Продажа' : 'Возврат покупателю',
+          amountTjs: D(cashDelta).abs(),
+          amountUsd: roundMoney(D(D(cashDelta).abs()).div(rate)),
+          categoryName: D(cashDelta).gt(0) ? 'Продажа' : 'Возврат покупателю',
           shopId: sale.storeId,
           sourceType: 'SALE',
           sourceId: sale.id,
@@ -208,7 +207,7 @@ export class ExchangesService {
           type: 'EXCHANGE_SETTLEMENT',
           description: `Обмен по чеку #${sale.receiptNumber}: ${returnedDevice.model} → ${replacementDevice.model}`,
           amountTjs: diffTjs,
-          amountUsd: roundMoney(diffTjs / rate),
+          amountUsd: roundMoney(D(diffTjs).div(rate)),
           exchangeRate: rate,
           storeId: sale.storeId,
           storeName: store?.name,
@@ -223,8 +222,8 @@ export class ExchangesService {
           userName: actor.name,
           userRole: actor.role,
           action: 'EXCHANGE',
-          details: `Чек #${sale.receiptNumber}: обмен ${returnedDevice.model} (IMEI ${returnedDevice.imei}) на ${replacementDevice.model} (IMEI ${replacementDevice.imei}). Расчет: ${diffTjs >= 0 ? '+' : ''}${diffTjs} TJS`,
-          financialDetails: { exchangeInValueTjs, exchangeInValueUsd, newPriceTjs, newPriceUsd, differenceTjs: diffTjs, exchangeProfitUsd, ownerProfitAllocations },
+          details: `Чек #${sale.receiptNumber}: обмен ${returnedDevice.model} (IMEI ${returnedDevice.imei}) на ${replacementDevice.model} (IMEI ${replacementDevice.imei}). Расчет: ${D(diffTjs).gte(0) ? '+' : ''}${diffTjs} TJS`,
+          financialDetails: moneyJson({ exchangeInValueTjs, exchangeInValueUsd, newPriceTjs, newPriceUsd, differenceTjs: diffTjs, exchangeProfitUsd, ownerProfitAllocations: moneyJson(ownerProfitAllocations) }),
           receiptNumber: sale.receiptNumber,
           targetId: sale.id,
         },

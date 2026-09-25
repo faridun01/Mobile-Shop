@@ -87,7 +87,13 @@ export function ModalLayer({ children, className, variant = 'legacy', onClose, l
   }, [label]);
 
   return createPortal(
-    <div ref={ref} data-modal-layer className={cn('modal-layer', `modal-${variant}`, className)}>{children}</div>,
+    <div
+      ref={ref}
+      data-modal-layer
+      className={cn('fixed inset-0 z-[60] flex overflow-hidden modal-layer', `modal-${variant}`, className)}
+    >
+      {children}
+    </div>,
     document.body,
   );
 }

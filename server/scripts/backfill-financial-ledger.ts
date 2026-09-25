@@ -1,18 +1,4 @@
-/**
- * One-off, idempotent backfill for the Phase 1 unified financial ledger.
- *
- * - Creates one CASH FinancialAccount per existing Store, seeded at that store's
- *   current cashBalanceTjs (both as balanceTjs and openingBalanceTjs).
- * - Creates the single company-wide MAIN FinancialAccount (starts at 0 — no
- *   real Main Account balance ever existed before this).
- * - Seeds default FinancialCategory rows.
- * - Imports historical LedgerEntry rows as FinancialTransaction rows FOR HISTORY
- *   ONLY — it never touches any account balance a second time (those are already
- *   correct via the opening-balance seed above), so nothing is double-counted.
- *
- * Safe to re-run: exits immediately if any FinancialTransaction already exists.
- * Run with: npx tsx server/scripts/backfill-financial-ledger.ts
- */
+import { D, decimalMin, decimalMax, moneyJson, type MoneyInput } from '../src/common/decimal';
 import { prisma } from '../src/prisma/prisma.service';
 import { roundMoney } from '../src/common/money';
 
@@ -124,8 +110,8 @@ async function main() {
 
     if (entry.type === 'EXCHANGE_SETTLEMENT') {
       const diff = entry.amountTjs ?? 0;
-      mapped = diff >= 0 ? { type: 'INCOME', direction: 'IN' } : { type: 'REFUND', direction: 'OUT' };
-      categoryName = diff >= 0 ? 'Продажа' : 'Возврат покупателю';
+      mapped = D(diff).gte(0) ? { type: 'INCOME', direction: 'IN' } : { type: 'REFUND', direction: 'OUT' };
+      categoryName = D(diff).gte(0) ? 'Продажа' : 'Возврат покупателю';
     }
 
     if (!mapped) {
@@ -137,8 +123,8 @@ async function main() {
     const accountId = entry.storeId && accountByStoreId.has(entry.storeId) ? accountByStoreId.get(entry.storeId)! : mainAccount.id;
     const balanceCurrency: 'TJS' | 'USD' = isSupplierPayment && !entry.storeId ? 'USD' : 'TJS';
     const rate = entry.exchangeRate ?? 1;
-    const amountUsdAbs = Math.abs(entry.amountUsd ?? (entry.amountTjs ? roundMoney(entry.amountTjs / rate) : 0));
-    const amountTjsAbs = Math.abs(entry.amountTjs ?? roundMoney(amountUsdAbs * rate));
+    const amountUsdAbs = D(entry.amountUsd ?? (entry.amountTjs ? roundMoney(D(entry.amountTjs).div(rate)) : 0)).abs();
+    const amountTjsAbs = D(entry.amountTjs ?? roundMoney(D(amountUsdAbs).mul(rate))).abs();
 
     let counterpartyType: 'SUPPLIER' | 'OWNER' | undefined;
     let counterpartyName: string | undefined;

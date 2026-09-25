@@ -1,3 +1,4 @@
+import { D, decimalMin, decimalMax, moneyJson, type MoneyInput } from '../../common/decimal';
 import type { Express } from 'express';
 import { authenticateJwt, requireRoles, type AuthenticatedRequest } from '../../auth/auth.middleware';
 import { RealtimeSyncGateway } from '../../websocket/websocket.gateway';
@@ -108,7 +109,7 @@ export function registerFinanceRoutes(app: Express) {
         return;
       }
       const created = await createCashReceipt({
-        accountId, amount: Number(amount), currency, categoryId, categoryName,
+        accountId, amount: D(amount), currency, categoryId, categoryName,
         counterpartyType, counterpartyId, counterpartyName, shopId, description, comment,
         createdByUserId: req.user!.userId,
         idempotencyKey: readIdempotencyKey(req),
@@ -128,7 +129,7 @@ export function registerFinanceRoutes(app: Express) {
         return;
       }
       const created = await createCashExpense({
-        accountId, amount: Number(amount), currency, categoryId, categoryName,
+        accountId, amount: D(amount), currency, categoryId, categoryName,
         counterpartyType, counterpartyId, counterpartyName, shopId, description, comment,
         createdByUserId: req.user!.userId,
         idempotencyKey: readIdempotencyKey(req),
@@ -148,7 +149,7 @@ export function registerFinanceRoutes(app: Express) {
         return;
       }
       const created = await createTransfer({
-        accountId, destinationAccountId, amount: Number(amount), currency, shopId, description, comment,
+        accountId, destinationAccountId, amount: D(amount), currency, shopId, description, comment,
         createdByUserId: req.user!.userId,
         idempotencyKey: readIdempotencyKey(req),
       });

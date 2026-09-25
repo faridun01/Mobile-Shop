@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAppFields } from '../../context/AppContext';
 import { apiClient } from '../../api/client';
 import { mapExpense, mapSale, buildNameLookup } from '../../api/mappers';
@@ -14,6 +15,7 @@ import {
   Wallet,
   PiggyBank,
   ChevronDown,
+  Users,
 } from 'lucide-react';
 import { MonthPicker } from '../ui/MonthPicker';
 import { StatCard } from '../ui/StatCard';
@@ -130,13 +132,16 @@ interface ProfitReportProps {
 
 /** "Отчёт" / "По складам" tabs of FinancePage — SELLER gating is done by FinancePage itself. */
 export const ProfitReport: React.FC<ProfitReportProps> = ({ view, month, onMonthChange }) => {
+  const navigate = useNavigate();
   const {
     currentUser,
     stores,
     users,
     todayRate,
-    selectedStoreId: globalSelectedStoreId
-  } = useAppFields('currentUser', 'stores', 'users', 'todayRate', 'selectedStoreId');
+    selectedStoreId: globalSelectedStoreId,
+    owners,
+    setActivePage,
+  } = useAppFields('currentUser', 'stores', 'users', 'todayRate', 'selectedStoreId', 'owners', 'setActivePage');
 
   const period = 'SPECIFIC_MONTH';
   // Summary view defaults to whichever store is active on the POS Terminal page (same
@@ -356,6 +361,48 @@ export const ProfitReport: React.FC<ProfitReportProps> = ({ view, month, onMonth
                 <span className={data.netProfitUsd >= 0 ? 'text-accent' : 'text-danger'}>{signedUsd(data.netProfitUsd)}</span>
               </div>
             </div>
+
+            {/* Distribution to partners */}
+            {owners.length > 0 && (
+              <div className="p-3.5 rounded-xl bg-surface border border-border space-y-2.5 text-sm">
+                <div className="flex items-center justify-between pb-1.5 border-b border-border">
+                  <h4 className="text-[10px] font-bold text-fg-subtle uppercase tracking-wider flex items-center gap-1.5">
+                    <Users className="w-3.5 h-3.5 text-accent" />
+                    <span>Распределение чистой прибыли между партнерами</span>
+                  </h4>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setActivePage('OWNERS');
+                      navigate('/owners');
+                    }}
+                    className="text-xs font-semibold text-accent hover:underline flex items-center gap-1 cursor-pointer"
+                  >
+                    Партнеры и капитал →
+                  </button>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-0.5">
+                  {owners.map((owner) => {
+                    const percent = owner.profitSharePercent || 0;
+                    const periodShare = Math.round((data.netProfitUsd * percent) / 100 * 100) / 100;
+                    return (
+                      <div key={owner.id} className="p-2.5 rounded-lg bg-surface-raised border border-border flex items-center justify-between gap-2">
+                        <div className="min-w-0">
+                          <p className="text-xs font-bold text-fg-muted truncate">{owner.name} ({percent}%)</p>
+                          <p className="text-[11px] text-fg-subtle truncate">
+                            За период: <span className="font-semibold text-accent">{signedUsd(periodShare)}</span>
+                          </p>
+                        </div>
+                        <div className="text-right shrink-0">
+                          <p className="text-[10px] text-fg-subtle uppercase">К выплате всего</p>
+                          <p className="text-xs font-bold text-warning">${(owner.availableProfitUsd || 0).toLocaleString()} USD</p>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
 
             {data.topSuppliersByDebt.length > 0 && (
               <div className="p-3.5 rounded-xl bg-surface border border-border space-y-2.5">

@@ -22,6 +22,8 @@ import { LoadingState } from '../ui/Skeleton';
 import { Dialog } from '../ui/Dialog';
 import { StatusBanner, StatusMessage } from '../ui/StatusBanner';
 
+import { getBusinessDateKey } from '../../utils/businessDate';
+
 type DialogView = 'details' | 'refund' | 'pick-exchange' | 'pick-repair';
 
 export const SalesHistoryPage: React.FC = () => {
@@ -38,15 +40,13 @@ export const SalesHistoryPage: React.FC = () => {
     selectedStoreId: globalSelectedStoreId
   } = useAppFields('currentUser', 'sales', 'fetchSalesRange', 'stores', 'openScanner', 'setActivePage', 'processRefund', 'isInitialLoading', 'selectedStoreId');
 
-  // Defaults to "today" — this is a same-shift lookup tool far more often than a monthly report.
-  const [periodFilter, setPeriodFilter] = useState<'TODAY' | 'SPECIFIC_MONTH' | 'ALL'>('TODAY');
+  // Defaults to "all" for ADMIN/PARTNER or "today"
+  const [periodFilter, setPeriodFilter] = useState<'TODAY' | 'SPECIFIC_MONTH' | 'ALL'>('ALL');
   const [selectedMonth, setSelectedMonth] = useState<string>(new Date().toISOString().substring(0, 7));
 
   const retailStores = useMemo(() => stores.filter((s) => !s.isMainWarehouse), [stores]);
 
-  // Defaults to whichever store is currently active on the POS Terminal page —
-  // an admin picking a store there should see that same store here without
-  // re-picking it; they can still switch it locally afterward.
+  // Defaults to whichever store is currently active on the POS Terminal page, or 'all' for admin/partner
   const [selectedStoreId, setSelectedStoreId] = useState<string>(() => {
     if (currentUser?.storeId) {
       return currentUser.storeId;
@@ -54,7 +54,7 @@ export const SalesHistoryPage: React.FC = () => {
     if (globalSelectedStoreId && globalSelectedStoreId !== 'all') {
       return globalSelectedStoreId;
     }
-    return retailStores[0]?.id || '';
+    return 'all';
   });
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedSaleId, setSelectedSaleId] = useState<string | null>(null);
@@ -67,30 +67,27 @@ export const SalesHistoryPage: React.FC = () => {
   const [status, setStatus] = useState<StatusMessage | null>(null);
   const [isSubmittingRefund, setIsSubmittingRefund] = useState(false);
 
-  const activeStoreId = selectedStoreId || retailStores[0]?.id || '';
+  const activeStoreId = currentUser?.role === 'SELLER' ? (currentUser.storeId || '') : selectedStoreId;
 
-  // `sales` from context only holds a recent bounded window by default (fast common case:
-  // TODAY, which is always inside it). Picking "весь период" or an older month reaches
-  // further back than that window, so fetch that exact range from the server and merge it
-  // in — filteredSales below then just filters the (now-widened) context array as before.
+  // Always fetch for the active scope so sales history is never stale or empty
   useEffect(() => {
-    if (periodFilter === 'TODAY') return;
     let cancelled = false;
     fetchSalesRange({
       period: periodFilter,
       month: periodFilter === 'SPECIFIC_MONTH' ? selectedMonth : undefined,
+      storeId: activeStoreId && activeStoreId !== 'all' ? activeStoreId : undefined,
     }).catch((e) => { if (!cancelled) console.error('Failed to load sales for period', e); });
     return () => { cancelled = true; };
-  }, [periodFilter, selectedMonth, fetchSalesRange]);
+  }, [periodFilter, selectedMonth, activeStoreId, fetchSalesRange]);
 
   const filteredSales = useMemo(() => {
-    const todayStr = new Date().toISOString().split('T')[0];
+    const todayStr = getBusinessDateKey();
 
     return sales.filter((sale) => {
       if (currentUser?.role === 'SELLER' && sale.sellerId !== currentUser.id) return false;
-      if (activeStoreId && sale.storeId !== activeStoreId) return false;
+      if (activeStoreId && activeStoreId !== 'all' && sale.storeId !== activeStoreId) return false;
 
-      const saleDateStr = sale.date.split('T')[0];
+      const saleDateStr = getBusinessDateKey(new Date(sale.date));
       if (periodFilter === 'TODAY' && saleDateStr !== todayStr) return false;
       if (periodFilter === 'SPECIFIC_MONTH' && !saleDateStr.startsWith(selectedMonth)) return false;
 
@@ -113,7 +110,7 @@ export const SalesHistoryPage: React.FC = () => {
 
       return true;
     }).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-  }, [sales, currentUser, selectedStoreId, periodFilter, selectedMonth, searchQuery]);
+  }, [sales, currentUser, activeStoreId, periodFilter, selectedMonth, searchQuery]);
 
   const findByReceiptOrImei = (list: typeof sales, code: string) =>
     list.find(s => s.receiptNumber.toString() === code || s.items.some(i => i.imei === code || i.imei2 === code));
@@ -226,6 +223,7 @@ export const SalesHistoryPage: React.FC = () => {
           <div className="flex flex-wrap items-center gap-1.5">
             <FilterPillGroup
               options={[
+                { value: 'ALL', label: 'Все' },
                 { value: 'TODAY', label: 'Сегодня' },
               ]}
               value={periodFilter === 'SPECIFIC_MONTH' ? '' : periodFilter}
@@ -239,7 +237,7 @@ export const SalesHistoryPage: React.FC = () => {
                 setPeriodFilter('SPECIFIC_MONTH');
               }}
               className={`h-9 px-3 rounded-lg border text-xs font-semibold bg-surface focus:outline-none ${
-                periodFilter === 'SPECIFIC_MONTH' ? 'border-accent text-accent' : 'border-border text-fg-muted'
+                periodFilter === 'SPECIFIC_MONTH' ? 'border-accent text-accent font-bold' : 'border-border text-fg-muted'
               }`}
             />
 
@@ -249,12 +247,13 @@ export const SalesHistoryPage: React.FC = () => {
                 onChange={(e) => setSelectedStoreId(e.target.value)}
                 className="h-9 px-3 pr-8 text-xs font-semibold w-auto shrink-0 cursor-pointer"
               >
+                <option value="all">Все магазины</option>
                 {retailStores.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
               </Select>
             ) : (
               <span className="h-9 px-3 rounded-lg border border-border bg-surface text-xs font-semibold text-fg-muted flex items-center gap-1.5 shrink-0">
                 <Store className="w-3.5 h-3.5 text-accent shrink-0" />
-                <span>{stores.find(s => s.id === activeStoreId)?.name || currentUser?.storeName || 'Магазин'}</span>
+                <span>{stores.find(s => s.id === activeStoreId)?.name || currentUser?.storeName || 'Все магазины'}</span>
               </span>
             )}
           </div>

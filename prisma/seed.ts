@@ -1,6 +1,6 @@
 import { prisma } from '../server/src/prisma/prisma.service.js';
 import { AuthService } from '../server/src/auth/auth.service.js';
-import { getBusinessDateKey } from '../server/src/modules/exchange-rate/exchange-rate.service.js';
+import { seedPassword } from './seed-passwords.js';
 
 const STORE_SEEDS = [
   { id: 'main-warehouse', name: 'Главный склад', isMainWarehouse: true },
@@ -25,6 +25,13 @@ const OWNER_SEEDS = [
 ];
 
 async function main() {
+  // Validate all missing users before making any changes. Existing credentials stay intact.
+  const passwords = new Map<string, string>();
+  for (const user of USER_SEEDS) {
+    if (!await prisma.user.findUnique({ where: { id: user.id } })) {
+      passwords.set(user.id, seedPassword(user.login, user.password));
+    }
+  }
   for (const store of STORE_SEEDS) {
     await prisma.store.upsert({
       where: { id: store.id },
@@ -42,13 +49,12 @@ async function main() {
   }
 
   for (const user of USER_SEEDS) {
-    const hashedPassword = await AuthService.hashPassword(user.password);
+    const password = passwords.get(user.id);
+    if (!password) continue;
+    const hashedPassword = await AuthService.hashPassword(password);
     await prisma.user.upsert({
       where: { id: user.id },
-      update: {
-        password: hashedPassword,
-        storeId: user.storeId,
-      },
+      update: {},
       create: {
         id: user.id,
         name: user.name,

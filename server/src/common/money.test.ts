@@ -1,10 +1,11 @@
+import './decimal-test-setup';
 import { describe, expect, it } from 'vitest';
 import { moneyEquals, requireFiniteNumber, requireNonNegativeMoney, requirePositiveMoney, roundMoney } from './money';
 
 describe('money validation', () => {
   it('accepts finite positive values and numeric strings', () => {
-    expect(requirePositiveMoney('12.50', 'Сумма')).toBe(12.5);
-    expect(requireNonNegativeMoney(0, 'Сумма')).toBe(0);
+    expect(requirePositiveMoney('12.50', 'Сумма')).toEqual(12.5);
+    expect(requireNonNegativeMoney(0, 'Сумма')).toEqual(0);
   });
 
   it.each([NaN, Infinity, -Infinity, 'not-a-number', null, undefined, true, false, '', ' ', [], {}])('rejects invalid number %s', (value) => {
@@ -18,12 +19,12 @@ describe('money validation', () => {
   });
 
   it('compares monetary totals to cent precision', () => {
-    expect(moneyEquals(100, 99.995)).toBe(true);
-    expect(moneyEquals(100, 99.98)).toBe(false);
+    expect(moneyEquals(100, 99.995)).toEqual(true);
+    expect(moneyEquals(100, 99.98)).toEqual(false);
   });
 
   it('rounds positive and negative half cents symmetrically', () => {
-    expect(roundMoney(874.765)).toBe(874.77);
-    expect(roundMoney(-25.235)).toBe(-25.24);
+    expect(roundMoney(874.765)).toEqual(874.77);
+    expect(roundMoney(-25.235)).toEqual(-25.24);
   });
 });

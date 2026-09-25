@@ -1,3 +1,4 @@
+import { D, decimalMin, decimalMax, moneyJson, type MoneyInput } from '../../common/decimal';
 import { prisma } from '../../prisma/prisma.service';
 import type { TransactionClient } from '../../prisma/prisma.service';
 import { resolveActor } from '../../common/actor';
@@ -70,16 +71,17 @@ async function resolveAccountOrThrow(tx: TransactionClient, accountId: string) {
  * only, so a manual entry against one can't be booked in USD.
  */
 function assertAccountCurrency(account: { storeId: string | null; name: string }, currency: LedgerCurrency) {
+  if (!['TJS', 'USD'].includes(currency)) throw new Error('Некорректная валюта операции');
   if (account.storeId && currency !== 'TJS') {
     throw new Error(`Касса "${account.name}" ведётся только в TJS — операции в USD не поддерживаются`);
   }
 }
 
 /** Mirrors a guarded balance movement onto Store.cashBalanceTjs when `account` is a per-store CASH account. */
-async function syncStoreCashBalance(tx: TransactionClient, account: { storeId: string | null }, deltaTjs: number, guard: boolean) {
-  if (!account.storeId || deltaTjs === 0) return;
-  if (deltaTjs < 0 && guard) {
-    const res = await tx.store.updateMany({ where: { id: account.storeId, cashBalanceTjs: { gte: -deltaTjs } }, data: { cashBalanceTjs: { increment: deltaTjs } } });
+async function syncStoreCashBalance(tx: TransactionClient, account: { storeId: string | null }, deltaTjs: MoneyInput, guard: boolean) {
+  if (!account.storeId || D(deltaTjs).eq(0)) return;
+  if (D(deltaTjs).lt(0) && guard) {
+    const res = await tx.store.updateMany({ where: { id: account.storeId, cashBalanceTjs: { gte: D(deltaTjs).negated() } }, data: { cashBalanceTjs: { increment: deltaTjs } } });
     if (res.count !== 1) throw new Error('В кассе недостаточно наличных для этой операции');
   } else {
     await tx.store.update({ where: { id: account.storeId }, data: { cashBalanceTjs: { increment: deltaTjs } } });
@@ -88,7 +90,7 @@ async function syncStoreCashBalance(tx: TransactionClient, account: { storeId: s
 
 export interface ManualEntryInput {
   accountId: string;
-  amount: number;
+  amount: MoneyInput;
   currency: LedgerCurrency;
   categoryId?: string;
   categoryName?: string;
@@ -116,8 +118,8 @@ export async function createCashReceipt(input: ManualEntryInput) {
     const account = await resolveAccountOrThrow(tx, input.accountId);
     assertAccountCurrency(account, input.currency);
     const rate = await requireTodayRate(tx);
-    const amountTjs = input.currency === 'TJS' ? amount : roundMoney(amount * rate);
-    const amountUsd = input.currency === 'USD' ? amount : roundMoney(amount / rate);
+    const amountTjs = input.currency === 'TJS' ? amount : roundMoney(D(amount).mul(rate));
+    const amountUsd = input.currency === 'USD' ? amount : roundMoney(D(amount).div(rate));
 
     await syncStoreCashBalance(tx, account, amountTjs, false);
 
@@ -151,7 +153,7 @@ export async function createCashReceipt(input: ManualEntryInput) {
         userRole: actor.role,
         action: 'FINANCIAL_CASH_RECEIPT',
         details: `Приход ${created.transactionNumber}: ${amount} ${input.currency} на счёт "${account.name}". ${input.description}`,
-        financialDetails: { amount, currency: input.currency, amountTjs, amountUsd },
+        financialDetails: moneyJson({ amount, currency: input.currency, amountTjs, amountUsd }),
         targetId: created.id,
       },
     });
@@ -177,10 +179,10 @@ export async function createCashExpense(input: ManualEntryInput) {
     const account = await resolveAccountOrThrow(tx, input.accountId);
     assertAccountCurrency(account, input.currency);
     const rate = await requireTodayRate(tx);
-    const amountTjs = input.currency === 'TJS' ? amount : roundMoney(amount * rate);
-    const amountUsd = input.currency === 'USD' ? amount : roundMoney(amount / rate);
+    const amountTjs = input.currency === 'TJS' ? amount : roundMoney(D(amount).mul(rate));
+    const amountUsd = input.currency === 'USD' ? amount : roundMoney(D(amount).div(rate));
 
-    await syncStoreCashBalance(tx, account, -amountTjs, true);
+    await syncStoreCashBalance(tx, account, D(amountTjs).negated(), true);
 
     const created = await postTransaction(tx, {
       type: 'EXPENSE',
@@ -212,7 +214,7 @@ export async function createCashExpense(input: ManualEntryInput) {
         userRole: actor.role,
         action: 'FINANCIAL_CASH_EXPENSE',
         details: `Расход ${created.transactionNumber}: ${amount} ${input.currency} со счёта "${account.name}". ${input.description}`,
-        financialDetails: { amount, currency: input.currency, amountTjs, amountUsd },
+        financialDetails: moneyJson({ amount, currency: input.currency, amountTjs, amountUsd }),
         targetId: created.id,
       },
     });
@@ -227,7 +229,7 @@ export async function createCashExpense(input: ManualEntryInput) {
 export interface CreateTransferInput {
   accountId: string;
   destinationAccountId: string;
-  amount: number;
+  amount: MoneyInput;
   currency: LedgerCurrency;
   shopId?: string;
   description: string;
@@ -254,10 +256,10 @@ export async function createTransfer(input: CreateTransferInput) {
     assertAccountCurrency(source, input.currency);
     assertAccountCurrency(destination, input.currency);
     const rate = await requireTodayRate(tx);
-    const amountTjs = input.currency === 'TJS' ? amount : roundMoney(amount * rate);
-    const amountUsd = input.currency === 'USD' ? amount : roundMoney(amount / rate);
+    const amountTjs = input.currency === 'TJS' ? amount : roundMoney(D(amount).mul(rate));
+    const amountUsd = input.currency === 'USD' ? amount : roundMoney(D(amount).div(rate));
 
-    await syncStoreCashBalance(tx, source, -amountTjs, true);
+    await syncStoreCashBalance(tx, source, D(amountTjs).negated(), true);
     await syncStoreCashBalance(tx, destination, amountTjs, false);
 
     const created = await postTransaction(tx, {
@@ -286,7 +288,7 @@ export async function createTransfer(input: CreateTransferInput) {
         userRole: actor.role,
         action: 'FINANCIAL_TRANSFER',
         details: `Перевод ${created.transactionNumber}: ${amount} ${input.currency} из "${source.name}" в "${destination.name}". ${input.description}`,
-        financialDetails: { amount, currency: input.currency, amountTjs, amountUsd },
+        financialDetails: moneyJson({ amount, currency: input.currency, amountTjs, amountUsd }),
         targetId: created.id,
       },
     });
@@ -328,9 +330,9 @@ export async function cancelFinancialTransaction(transactionId: string, actorId:
           ? await tx.financialAccount.findUnique({ where: { id: existing.destinationAccountId } })
           : null;
         if (account) await syncStoreCashBalance(tx, account, existing.amountTjs, false);
-        if (destinationAccount) await syncStoreCashBalance(tx, destinationAccount, -existing.amountTjs, false);
+        if (destinationAccount) await syncStoreCashBalance(tx, destinationAccount, D(existing.amountTjs).negated(), false);
       } else if (account) {
-        const reversalDeltaTjs = existing.direction === 'IN' ? -existing.amountTjs : existing.amountTjs;
+        const reversalDeltaTjs = existing.direction === 'IN' ? D(existing.amountTjs).negated() : existing.amountTjs;
         await syncStoreCashBalance(tx, account, reversalDeltaTjs, false);
       }
     }
@@ -344,7 +346,7 @@ export async function cancelFinancialTransaction(transactionId: string, actorId:
         userRole: actor.role,
         action: 'FINANCIAL_TRANSACTION_CANCELLED',
         details: `Отменена операция ${existing.transactionNumber}: ${existing.description}`,
-        financialDetails: { amountTjs: existing.amountTjs, amountUsd: existing.amountUsd },
+        financialDetails: moneyJson({ amountTjs: existing.amountTjs, amountUsd: existing.amountUsd }),
         targetId: existing.id,
       },
     });

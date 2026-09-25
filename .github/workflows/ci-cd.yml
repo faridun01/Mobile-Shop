@@ -42,6 +42,7 @@ jobs:
     env:
       DATABASE_URL: postgresql://postgres:postgres@localhost:5432/mobile_shop_ci?schema=public
       JWT_SECRET: ci-only-throwaway-secret-not-used-anywhere-else
+      SEED_TEST_DATA: 'true'
 
     steps:
       - name: Checkout Source Code
@@ -178,5 +179,4 @@ jobs:
           prerelease: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
 

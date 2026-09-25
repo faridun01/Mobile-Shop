@@ -1,3 +1,4 @@
+import { D, decimalMin, decimalMax, moneyJson, type MoneyInput } from '../../common/decimal';
 export interface ProfitAuditRecord {
   action: string;
   financialDetails: unknown;
@@ -5,31 +6,34 @@ export interface ProfitAuditRecord {
 
 import { roundMoney } from '../../common/money';
 
-export type OwnerProfitAllocation = { ownerId: string; amountUsd: number };
+export type OwnerProfitAllocation = { ownerId: string; amountUsd: MoneyInput };
 
-export function allocateOwnerProfit(amountUsd: number, owners: { id: string; profitSharePercent: number }[]): OwnerProfitAllocation[] {
+export function allocateOwnerProfit(amountUsd: MoneyInput, owners: { id: string; profitSharePercent: MoneyInput }[]): OwnerProfitAllocation[] {
   if (!owners.length) return [];
-  const totalShare = owners.reduce((sum, owner) => sum + owner.profitSharePercent, 0);
-  if (owners.some((owner) => !Number.isFinite(owner.profitSharePercent) || owner.profitSharePercent < 0) ||
-      Math.abs(totalShare - 100) > 0.000001 || new Set(owners.map((owner) => owner.id)).size !== owners.length) {
+  const totalShare = owners.reduce((sum, owner) => D(sum).plus(owner.profitSharePercent), D(0));
+  if (owners.some((owner) => !D(owner.profitSharePercent).isFinite() || D(owner.profitSharePercent).lt(0)) ||
+      D(D(D(totalShare).minus(100)).abs()).gt(0.000001) || new Set(owners.map((owner) => owner.id)).size !== owners.length) {
     throw new Error('Доли владельцев должны составлять ровно 100%');
   }
-  const cents = Math.round(Math.abs(roundMoney(amountUsd)) * 100);
+  const cents = D(D(D(roundMoney(amountUsd)).abs()).mul(100)).round();
   const parts = owners.map((owner) => {
-    const exact = cents * owner.profitSharePercent / totalShare;
-    return { ownerId: owner.id, cents: Math.floor(exact), remainder: exact - Math.floor(exact) };
+    const exact = D(D(cents).mul(owner.profitSharePercent)).div(totalShare);
+    return { ownerId: owner.id, cents: exact.floor(), remainder: exact.minus(exact.floor()) };
   });
-  const remainder = cents - parts.reduce((sum, part) => sum + part.cents, 0);
-  const ranked = [...parts].sort((a, b) => b.remainder - a.remainder || a.ownerId.localeCompare(b.ownerId));
-  for (let i = 0; i < remainder; i++) ranked[i].cents++;
-  return parts.map((part) => ({ ownerId: part.ownerId, amountUsd: part.cents === 0 ? 0 : Math.sign(amountUsd) * part.cents / 100 }));
+  const remainder = D(cents).minus(parts.reduce((sum, part) => D(sum).plus(part.cents), D(0)));
+  const ranked = [...parts].sort((a, b) => b.remainder.comparedTo(a.remainder) || a.ownerId.localeCompare(b.ownerId));
+  for (let i = 0; i < remainder.toNumber(); i++) ranked[i].cents = ranked[i].cents.plus(1);
+  return parts.map((part) => ({
+    ownerId: part.ownerId,
+    amountUsd: roundMoney(D(part.cents).eq(0) ? 0 : D(D(D(amountUsd).isNegative() ? -1 : 1).mul(part.cents)).div(100)),
+  }));
 }
 
 /** Reverse the amounts actually booked, including rounding and every exchange. */
 export function refundOwnerProfit(
   logs: ProfitAuditRecord[],
-  owners: { id: string; profitSharePercent: number }[],
-  penaltyUsd: number,
+  owners: { id: string; profitSharePercent: MoneyInput }[],
+  penaltyUsd: MoneyInput,
 ): OwnerProfitAllocation[] {
   const missingHistory = () => new Error('Для этого чека не сохранено исходное распределение прибыли партнёров. Возврат требует восстановления истории начислений.');
   const originals = logs.filter((log) => log.action === 'SALE' || log.action === 'SALE_BELOW_COST');
@@ -49,14 +53,14 @@ export function refundOwnerProfit(
         throw new Error('Партнёр из исходного распределения прибыли не найден. Восстановите его учётную запись перед возвратом.');
       }
       seen.add(allocation.ownerId);
-      deltas.set(allocation.ownerId, roundMoney(deltas.get(allocation.ownerId)! - allocation.amountUsd));
+      deltas.set(allocation.ownerId, roundMoney(D(deltas.get(allocation.ownerId)!).minus(allocation.amountUsd)));
     }
   }
   return Array.from(deltas, ([ownerId, amountUsd]) => ({ ownerId, amountUsd }));
 }
 
-export function calculateRecognizedProfit(logs: ProfitAuditRecord[], fallbackProfitUsd: number): number {
-  let amount = 0;
+export function calculateRecognizedProfit(logs: ProfitAuditRecord[], fallbackProfitUsd: MoneyInput) {
+  let amount = D(0);
   let hasOriginal = false;
 
   for (const log of logs) {
@@ -67,11 +71,11 @@ export function calculateRecognizedProfit(logs: ProfitAuditRecord[], fallbackPro
     const exchangeProfit = details.exchangeProfitUsd;
 
     if ((log.action === 'SALE' || log.action === 'SALE_BELOW_COST') && typeof originalProfit === 'number' && Number.isFinite(originalProfit)) {
-      amount += originalProfit;
+      amount = D(amount).plus(originalProfit);
       hasOriginal = true;
     }
     if (log.action === 'EXCHANGE' && typeof exchangeProfit === 'number' && Number.isFinite(exchangeProfit)) {
-      amount += exchangeProfit;
+      amount = D(amount).plus(exchangeProfit);
     }
   }
 

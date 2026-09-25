@@ -1,3 +1,4 @@
+import { D, decimalMin, decimalMax, moneyJson, type MoneyInput } from '../../common/decimal';
 import type { Express } from 'express';
 import { authenticateJwt, requireRoles, type AuthenticatedRequest } from '../../auth/auth.middleware';
 import { StoresService } from './stores.service';
@@ -41,7 +42,7 @@ export function registerStoreRoutes(app: Express) {
         res.status(400).json({ message: 'newBalanceTjs обязателен' });
         return;
       }
-      const store = await StoresService.adjustCashBalance(req.params.id, Number(newBalanceTjs), reason, req.user!.userId);
+      const store = await StoresService.adjustCashBalance(req.params.id, D(newBalanceTjs), reason, req.user!.userId);
       RealtimeSyncGateway.broadcast('STORE_UPDATED', { storeId: store.id });
       res.json(store);
     } catch (error) {

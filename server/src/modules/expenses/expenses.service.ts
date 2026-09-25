@@ -1,3 +1,4 @@
+import { D, decimalMin, decimalMax, moneyJson, type MoneyInput } from '../../common/decimal';
 import { prisma } from '../../prisma/prisma.service';
 import type { TransactionClient } from '../../prisma/prisma.service';
 import { resolveActor } from '../../common/actor';
@@ -9,7 +10,7 @@ import { currentOwnerAllocations, readOwnerAllocations, replaceOwnerAllocations 
 
 export interface CreateExpenseInput {
   category: string;
-  amountTjs: number;
+  amountTjs: MoneyInput;
   targetType?: 'STORE' | 'BUSINESS';
   storeId?: string;
   sourceAccount?: string;
@@ -27,12 +28,12 @@ export async function createExpense(tx: TransactionClient, input: CreateExpenseI
   const amountTjs = requirePositiveMoney(input.amountTjs, 'Сумма расхода');
   const rate = await getRateForDate(new Date());
   if (!rate) throw new Error('Сначала задайте курс валют на сегодня');
-  const amountUsd = roundMoney(amountTjs / rate);
+  const amountUsd = roundMoney(D(amountTjs).div(rate));
   const resolvedTargetType = input.targetType || (input.storeId ? 'STORE' : 'BUSINESS');
 
   const store = input.storeId ? await tx.store.findUnique({ where: { id: input.storeId } }) : null;
   const paidFromCashRegister = input.paidFromCashRegister ?? true;
-  const writesOffCash = Boolean(input.storeId && store && (paidFromCashRegister || input.sourceAccount?.toLowerCase().includes('касса')));
+  const writesOffCash = Boolean(input.storeId && store && paidFromCashRegister);
   // Not written off the cash register → nothing has actually been paid yet; the expense is
   // recorded as UNPAID and settled later from the register via payExpense.
   const status = writesOffCash ? 'PAID' : 'UNPAID';
@@ -44,7 +45,7 @@ export async function createExpense(tx: TransactionClient, input: CreateExpenseI
       category: input.category,
       amountTjs,
       amountUsd,
-      ownerProfitAllocations,
+      ownerProfitAllocations: moneyJson(ownerProfitAllocations),
       exchangeRate: rate,
       targetType: resolvedTargetType,
       storeId: input.storeId,
@@ -63,7 +64,7 @@ export async function createExpense(tx: TransactionClient, input: CreateExpenseI
   if (writesOffCash && store && input.storeId) {
     if (store.isMainWarehouse) throw new Error('Главный склад не является торговой кассой');
     const cashGuard = await tx.store.updateMany({ where: { id: input.storeId, cashBalanceTjs: { gte: amountTjs } }, data: { cashBalanceTjs: { decrement: amountTjs } } });
-    if (cashGuard.count !== 1) throw new Error('В кассе недостаточно наличных для расхода');
+    if (!D(cashGuard.count).eq(1)) throw new Error('В кассе недостаточно наличных для расхода');
 
     const cashAccount = await getStoreCashAccount(tx, input.storeId, store.name);
     await postTransaction(tx, {
@@ -93,8 +94,8 @@ export async function createExpense(tx: TransactionClient, input: CreateExpenseI
     data: {
       type: input.category === 'Зарплата' || input.category === 'SALARY' ? 'SALARY' : 'EXPENSE',
       description: input.comment || input.description || `Расход: ${input.category}`,
-      amountTjs: -amountTjs,
-      amountUsd: -amountUsd,
+      amountTjs: D(amountTjs).negated(),
+      amountUsd: D(amountUsd).negated(),
       exchangeRate: rate,
       storeId: input.storeId,
       storeName: store?.name,
@@ -110,7 +111,7 @@ export async function createExpense(tx: TransactionClient, input: CreateExpenseI
       userRole: actor.role,
       action: 'EXPENSE',
       details: `Зарегистрирован расход [${input.category}]: ${amountTjs} TJS ($${amountUsd}) (${store?.name || 'Бизнес'})${status === 'UNPAID' ? ' — не оплачено' : ''}`,
-      financialDetails: { amountTjs, amountUsd, exchangeRate: rate },
+      financialDetails: moneyJson({ amountTjs, amountUsd, exchangeRate: rate }),
       targetId: expense.id,
     },
   });
@@ -141,11 +142,11 @@ export async function payExpense(id: string, actorId: string, storeIdForBusiness
       where: { id: storeId, cashBalanceTjs: { gte: existing.amountTjs } },
       data: { cashBalanceTjs: { decrement: existing.amountTjs } },
     });
-    if (cashGuard.count !== 1) throw new Error('В кассе недостаточно наличных для оплаты расхода');
+    if (!D(cashGuard.count).eq(1)) throw new Error('В кассе недостаточно наличных для оплаты расхода');
 
     const rate = existing.exchangeRate || (await getRateForDate(new Date()));
     if (!rate) throw new Error('Не найден курс валют для расхода');
-    const amountUsd = existing.amountUsd ?? roundMoney(existing.amountTjs / rate);
+    const amountUsd = existing.amountUsd ?? roundMoney(D(existing.amountTjs).div(rate));
     const description = existing.comment || existing.description || `Расход: ${existing.category}`;
 
     const cashAccount = await getStoreCashAccount(tx, storeId, store.name);
@@ -187,7 +188,7 @@ export async function payExpense(id: string, actorId: string, storeIdForBusiness
         userRole: actor.role,
         action: 'EXPENSE_PAID',
         details: `Оплачен расход [${existing.category}]: ${existing.amountTjs} TJS ($${amountUsd}) из кассы ${store.name}`,
-        financialDetails: { amountTjs: existing.amountTjs, amountUsd, exchangeRate: rate },
+        financialDetails: moneyJson({ amountTjs: existing.amountTjs, amountUsd, exchangeRate: rate }),
         targetId: id,
       },
     });
@@ -200,7 +201,7 @@ export async function updateExpense(
   id: string,
   input: {
     category?: string;
-    amountTjs?: number;
+    amountTjs?: MoneyInput;
     storeId?: string;
     comment?: string;
     description?: string;
@@ -218,9 +219,10 @@ export async function updateExpense(
     if (!rate) throw new Error('Не найден курс валют для пересчёта расхода');
 
     const newAmountTjs = input.amountTjs !== undefined ? requirePositiveMoney(input.amountTjs, 'Сумма расхода') : existing.amountTjs;
-    const newAmountUsd = roundMoney(newAmountTjs / rate);
+    const newAmountUsd = roundMoney(D(newAmountTjs).div(rate));
     const newCategory = input.category !== undefined ? input.category.trim() : existing.category;
     const newStoreId = input.storeId !== undefined ? input.storeId : existing.storeId;
+    if (existing.status === 'PAID' && existing.paidFromCashRegister && !newStoreId) throw new Error('Для оплаченного расхода необходимо сохранить кассу оплаты');
     const newComment = input.comment !== undefined ? input.comment.trim() : existing.comment;
     const newDescription = input.description !== undefined ? input.description.trim() : existing.description;
 
@@ -234,21 +236,21 @@ export async function updateExpense(
     }
 
     // Adjust store cash balance if amount or store changed
-    if (existing.storeId && (existing.paidFromCashRegister || (existing.sourceAccount && existing.sourceAccount.toLowerCase().includes('касса')))) {
+    if (existing.storeId && existing.status === 'PAID' && existing.paidFromCashRegister) {
       await tx.store.update({
         where: { id: existing.storeId },
         data: { cashBalanceTjs: { increment: existing.amountTjs } },
       });
     }
     let newCashAccountId: string | undefined;
-    if (newStoreId && (existing.paidFromCashRegister || (existing.sourceAccount && existing.sourceAccount.toLowerCase().includes('касса')))) {
+    if (newStoreId && existing.status === 'PAID' && existing.paidFromCashRegister) {
       const targetStore = await tx.store.findUnique({ where: { id: newStoreId }, select: { isMainWarehouse: true, name: true } });
       if (!targetStore || targetStore.isMainWarehouse) throw new Error('Главный склад не является торговой кассой');
       const cashGuard = await tx.store.updateMany({
         where: { id: newStoreId, cashBalanceTjs: { gte: newAmountTjs } },
         data: { cashBalanceTjs: { decrement: newAmountTjs } },
       });
-      if (cashGuard.count !== 1) throw new Error('В кассе недостаточно наличных для расхода');
+      if (!D(cashGuard.count).eq(1)) throw new Error('В кассе недостаточно наличных для расхода');
       newCashAccountId = (await getStoreCashAccount(tx, newStoreId, targetStore.name)).id;
     }
 
@@ -257,7 +259,7 @@ export async function updateExpense(
     // changes the amount must roll that accrual forward too, or owner profit permanently
     // drifts from the actual expense total.
     let ownerProfitAllocations;
-    if (newAmountUsd !== existing.amountUsd) {
+    if (existing.amountUsd === null || !D(newAmountUsd).eq(existing.amountUsd)) {
       const previous = readOwnerAllocations(existing.ownerProfitAllocations);
       ownerProfitAllocations = await currentOwnerAllocations(tx, newAmountUsd);
       await replaceOwnerAllocations(tx, previous, ownerProfitAllocations, -1);
@@ -269,7 +271,7 @@ export async function updateExpense(
         category: newCategory,
         amountTjs: newAmountTjs,
         amountUsd: newAmountUsd,
-        ...(ownerProfitAllocations ? { ownerProfitAllocations } : {}),
+        ...(ownerProfitAllocations ? { ownerProfitAllocations: moneyJson(ownerProfitAllocations) } : {}),
         storeId: newStoreId,
         comment: newComment,
         description: newDescription,
@@ -280,8 +282,8 @@ export async function updateExpense(
     await tx.ledgerEntry.updateMany({
       where: { referenceId: id },
       data: {
-        amountTjs: -newAmountTjs,
-        amountUsd: -newAmountUsd,
+        amountTjs: D(newAmountTjs).negated(),
+        amountUsd: D(newAmountUsd).negated(),
         description: newComment || newDescription || `Расход: ${newCategory}`,
         storeId: newStoreId,
       },
@@ -316,7 +318,7 @@ export async function updateExpense(
         userRole: actor.role,
         action: 'EXPENSE_EDIT',
         details: `Отредактирован расход [${newCategory}]: ${newAmountTjs} TJS ($${newAmountUsd})`,
-        financialDetails: { amountTjs: newAmountTjs, amountUsd: newAmountUsd },
+        financialDetails: moneyJson({ amountTjs: newAmountTjs, amountUsd: newAmountUsd }),
         targetId: id,
       },
     });
@@ -335,7 +337,7 @@ export async function deleteExpense(id: string, actorId: string) {
     const actor = await resolveActor(tx, actorId);
 
     // Revert store cash balance
-    if (existing.storeId && (existing.paidFromCashRegister || (existing.sourceAccount && existing.sourceAccount.toLowerCase().includes('касса')))) {
+    if (existing.storeId && existing.status === 'PAID' && existing.paidFromCashRegister) {
       await tx.store.update({
         where: { id: existing.storeId },
         data: { cashBalanceTjs: { increment: existing.amountTjs } },
@@ -359,7 +361,7 @@ export async function deleteExpense(id: string, actorId: string) {
         userRole: actor.role,
         action: 'EXPENSE_DELETE',
         details: `Отменён расход [${existing.category}]: ${existing.amountTjs} TJS ($${existing.amountUsd})`,
-        financialDetails: { amountTjs: existing.amountTjs, amountUsd: existing.amountUsd },
+        financialDetails: moneyJson({ amountTjs: existing.amountTjs, amountUsd: existing.amountUsd }),
         targetId: id,
       },
     });

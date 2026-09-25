@@ -1,3 +1,4 @@
+import { D, decimalMin, decimalMax, moneyJson, type MoneyInput } from '../../common/decimal';
 import type { Express } from 'express';
 import type { Prisma } from '@prisma/client';
 import { authenticateJwt, requireRoles, enforceStoreScope, type AuthenticatedRequest } from '../../auth/auth.middleware';
@@ -72,8 +73,8 @@ export function registerRefundRoutes(app: Express) {
       const profits = new Map<string, typeof profitLogs>();
       for (const log of profitLogs) if (log.targetId) profits.set(log.targetId, [...(profits.get(log.targetId) ?? []), log]);
       res.json(sales.map((sale) => {
-        const fallbackCost = sale.saleItems.reduce((sum, item) => sum + item.costBasisUsd, 0);
-        return { ...sale, recognizedProfitUsd: calculateRecognizedProfit(profits.get(sale.id) ?? [], sale.totalUsd - fallbackCost) };
+        const fallbackCost = sale.saleItems.reduce((sum, item) => D(sum).plus(item.costBasisUsd), D(0));
+        return { ...sale, recognizedProfitUsd: calculateRecognizedProfit(profits.get(sale.id) ?? [], D(sale.totalUsd).minus(fallbackCost)) };
       }));
     } catch (error) {
       next(error);
@@ -83,7 +84,7 @@ export function registerRefundRoutes(app: Express) {
   app.post('/api/sales/:id/refund', authenticateJwt, requireRoles('ADMIN', 'PARTNER'), async (req: AuthenticatedRequest, res, next) => {
     try {
       const { reason, refundAmountTjs, penaltyFeeTjs, paymentMethod } = req.body ?? {};
-      if (!reason || refundAmountTjs == null || !paymentMethod) {
+      if (!reason || refundAmountTjs === null || !paymentMethod) {
         res.status(400).json({ message: 'reason, refundAmountTjs и paymentMethod обязательны' });
         return;
       }
@@ -91,8 +92,8 @@ export function registerRefundRoutes(app: Express) {
       const sale = await RefundService.refund({
         saleId: req.params.id,
         reason,
-        refundAmountTjs: Number(refundAmountTjs),
-        penaltyFeeTjs: penaltyFeeTjs != null ? Number(penaltyFeeTjs) : undefined,
+        refundAmountTjs: D(refundAmountTjs),
+        penaltyFeeTjs: penaltyFeeTjs !== null ? D(penaltyFeeTjs) : undefined,
         paymentMethod,
         refundedByUserId: req.user!.userId,
       });

@@ -1,3 +1,4 @@
+import { D, decimalMin, decimalMax, moneyJson, type MoneyInput } from '../../common/decimal';
 import { prisma } from '../../prisma/prisma.service';
 import type { TransactionClient } from '../../prisma/prisma.service';
 import { resolveActor } from '../../common/actor';
@@ -20,7 +21,7 @@ export class OwnersService {
     return store;
   }
 
-  public static async investment(ownerId: string, amountUsd: number, destination: string, note: string | undefined, userId: string) {
+  public static async investment(ownerId: string, amountUsd: MoneyInput, destination: string, note: string | undefined, userId: string) {
     amountUsd = requirePositiveMoney(amountUsd, 'Сумма инвестиции');
     return prisma.$transaction(async (tx) => {
       const actor = await resolveActor(tx, userId);
@@ -29,7 +30,7 @@ export class OwnersService {
       if (!owner) throw new Error('Владелец не найден');
 
       const mainWarehouse = await OwnersService.getMainWarehouse(tx);
-      const cashAmountTjs = roundMoney(amountUsd * exchangeRate);
+      const cashAmountTjs = roundMoney(D(amountUsd).mul(exchangeRate));
       await tx.store.update({ where: { id: mainWarehouse.id }, data: { cashBalanceTjs: { increment: cashAmountTjs } } });
 
       const updated = await tx.owner.update({ where: { id: ownerId }, data: { capitalBalanceUsd: { increment: amountUsd } } });
@@ -60,13 +61,13 @@ export class OwnersService {
       });
       await tx.ledgerEntry.create({ data: { type: 'OWNER_INVESTMENT', description: `${owner.name} вложил $${amountUsd} в капитал (${destination})`, amountUsd, exchangeRate, storeId: mainWarehouse.id, storeName: mainWarehouse.name, userName: actor.name } });
       await tx.auditLog.create({
-        data: { userId: actor.id, userName: actor.name, userRole: actor.role, action: 'OWNER_INVESTMENT', details: `${owner.name} вложил $${amountUsd} в капитал (${destination})`, financialDetails: { amountUsd, exchangeRate } },
+        data: { userId: actor.id, userName: actor.name, userRole: actor.role, action: 'OWNER_INVESTMENT', details: `${owner.name} вложил $${amountUsd} в капитал (${destination})`, financialDetails: moneyJson({ amountUsd, exchangeRate }) },
       });
       return updated;
     }, { maxWait: 10000, timeout: 25000 });
   }
 
-  public static async withdrawal(ownerId: string, amountUsd: number, source: string, note: string | undefined, userId: string) {
+  public static async withdrawal(ownerId: string, amountUsd: MoneyInput, source: string, note: string | undefined, userId: string) {
     amountUsd = requirePositiveMoney(amountUsd, 'Сумма изъятия');
     return prisma.$transaction(async (tx) => {
       const actor = await resolveActor(tx, userId);
@@ -77,9 +78,9 @@ export class OwnersService {
       if (guard.count !== 1) throw new Error('Сумма изъятия превышает текущий капитал');
 
       const mainWarehouse = await OwnersService.getMainWarehouse(tx);
-      const cashAmountTjs = roundMoney(amountUsd * exchangeRate);
+      const cashAmountTjs = roundMoney(D(amountUsd).mul(exchangeRate));
       const cashGuard = await tx.store.updateMany({ where: { id: mainWarehouse.id, cashBalanceTjs: { gte: cashAmountTjs } }, data: { cashBalanceTjs: { decrement: cashAmountTjs } } });
-      if (cashGuard.count !== 1) throw new Error('В кассе главного склада недостаточно наличных для изъятия');
+      if (!D(cashGuard.count).eq(1)) throw new Error('В кассе главного склада недостаточно наличных для изъятия');
 
       const updated = await tx.owner.findUniqueOrThrow({ where: { id: ownerId } });
       const ownerTx = await tx.ownerTransaction.create({
@@ -107,15 +108,15 @@ export class OwnersService {
         description: `${owner.name} изъял $${amountUsd} из капитала`,
         createdByUserId: actor.id,
       });
-      await tx.ledgerEntry.create({ data: { type: 'OWNER_CAPITAL_WITHDRAWAL', description: `${owner.name} изъял $${amountUsd} из капитала`, amountUsd: -amountUsd, exchangeRate, storeId: mainWarehouse.id, storeName: mainWarehouse.name, userName: actor.name } });
+      await tx.ledgerEntry.create({ data: { type: 'OWNER_CAPITAL_WITHDRAWAL', description: `${owner.name} изъял $${amountUsd} из капитала`, amountUsd: D(amountUsd).negated(), exchangeRate, storeId: mainWarehouse.id, storeName: mainWarehouse.name, userName: actor.name } });
       await tx.auditLog.create({
-        data: { userId: actor.id, userName: actor.name, userRole: actor.role, action: 'OWNER_WITHDRAWAL', details: `${owner.name} изъял $${amountUsd} из капитала`, financialDetails: { amountUsd, exchangeRate } },
+        data: { userId: actor.id, userName: actor.name, userRole: actor.role, action: 'OWNER_WITHDRAWAL', details: `${owner.name} изъял $${amountUsd} из капитала`, financialDetails: moneyJson({ amountUsd, exchangeRate }) },
       });
       return updated;
     }, { maxWait: 10000, timeout: 25000 });
   }
 
-  public static async payout(ownerId: string, amountUsd: number, source: string, note: string | undefined, userId: string) {
+  public static async payout(ownerId: string, amountUsd: MoneyInput, source: string, note: string | undefined, userId: string) {
     amountUsd = requirePositiveMoney(amountUsd, 'Сумма выплаты');
     return prisma.$transaction(async (tx) => {
       const actor = await resolveActor(tx, userId);
@@ -129,9 +130,9 @@ export class OwnersService {
       if (guard.count !== 1) throw new Error('Сумма выплаты превышает доступную прибыль');
 
       const mainWarehouse = await OwnersService.getMainWarehouse(tx);
-      const cashAmountTjs = roundMoney(amountUsd * exchangeRate);
+      const cashAmountTjs = roundMoney(D(amountUsd).mul(exchangeRate));
       const cashGuard = await tx.store.updateMany({ where: { id: mainWarehouse.id, cashBalanceTjs: { gte: cashAmountTjs } }, data: { cashBalanceTjs: { decrement: cashAmountTjs } } });
-      if (cashGuard.count !== 1) throw new Error('В кассе главного склада недостаточно наличных для выплаты прибыли');
+      if (!D(cashGuard.count).eq(1)) throw new Error('В кассе главного склада недостаточно наличных для выплаты прибыли');
 
       const updated = await tx.owner.findUniqueOrThrow({ where: { id: ownerId } });
       const ownerTx = await tx.ownerTransaction.create({
@@ -159,15 +160,15 @@ export class OwnersService {
         description: `Выплачена прибыль ${owner.name}: $${amountUsd}`,
         createdByUserId: actor.id,
       });
-      await tx.ledgerEntry.create({ data: { type: 'OWNER_PROFIT_PAYOUT', description: `Выплачена прибыль ${owner.name}: $${amountUsd}`, amountUsd: -amountUsd, exchangeRate, storeId: mainWarehouse.id, storeName: mainWarehouse.name, userName: actor.name } });
+      await tx.ledgerEntry.create({ data: { type: 'OWNER_PROFIT_PAYOUT', description: `Выплачена прибыль ${owner.name}: $${amountUsd}`, amountUsd: D(amountUsd).negated(), exchangeRate, storeId: mainWarehouse.id, storeName: mainWarehouse.name, userName: actor.name } });
       await tx.auditLog.create({
-        data: { userId: actor.id, userName: actor.name, userRole: actor.role, action: 'PROFIT_PAYOUT', details: `Выплачена прибыль ${owner.name}: $${amountUsd}`, financialDetails: { amountUsd, exchangeRate } },
+        data: { userId: actor.id, userName: actor.name, userRole: actor.role, action: 'PROFIT_PAYOUT', details: `Выплачена прибыль ${owner.name}: $${amountUsd}`, financialDetails: moneyJson({ amountUsd, exchangeRate }) },
       });
       return updated;
     }, { maxWait: 10000, timeout: 25000 });
   }
 
-  public static async reinvest(ownerId: string, amountUsd: number, note: string | undefined, userId: string) {
+  public static async reinvest(ownerId: string, amountUsd: MoneyInput, note: string | undefined, userId: string) {
     amountUsd = requirePositiveMoney(amountUsd, 'Сумма реинвестирования');
     return prisma.$transaction(async (tx) => {
       const actor = await resolveActor(tx, userId);
@@ -185,21 +186,21 @@ export class OwnersService {
       });
       await tx.ledgerEntry.create({ data: { type: 'OWNER_REINVESTMENT', description: `${owner.name} реинвестировал $${amountUsd} доступной прибыли в капитал`, amountUsd, exchangeRate, userName: actor.name } });
       await tx.auditLog.create({
-        data: { userId: actor.id, userName: actor.name, userRole: actor.role, action: 'REINVEST', details: `${owner.name} реинвестировал $${amountUsd} доступной прибыли в капитал`, financialDetails: { amountUsd, exchangeRate } },
+        data: { userId: actor.id, userName: actor.name, userRole: actor.role, action: 'REINVEST', details: `${owner.name} реинвестировал $${amountUsd} доступной прибыли в капитал`, financialDetails: moneyJson({ amountUsd, exchangeRate }) },
       });
       return updated;
     }, { maxWait: 10000, timeout: 25000 });
   }
 
   public static async updateProfitShares(shares: { ownerId: string; sharePercent: number }[], userId: string, rebalanceBalances = false) {
-    if (!Array.isArray(shares) || shares.length === 0) throw new Error('Укажите доли владельцев');
+    if (!Array.isArray(shares) || D(shares.length).eq(0)) throw new Error('Укажите доли владельцев');
     const normalized = shares.map((share) => ({
       ownerId: share.ownerId,
       sharePercent: requireNonNegativeMoney(share.sharePercent, 'Доля владельца'),
     }));
-    if (new Set(normalized.map((share) => share.ownerId)).size !== normalized.length) throw new Error('Владелец не может быть указан дважды');
-    const total = normalized.reduce((sum, s) => sum + s.sharePercent, 0);
-    if (Math.abs(total - 100) > 0.000001) {
+    if (!D(new Set(normalized.map((share) => share.ownerId)).size).eq(normalized.length)) throw new Error('Владелец не может быть указан дважды');
+    const total = normalized.reduce((sum, s) => D(sum).plus(s.sharePercent), D(0));
+    if (D(D(D(total).minus(100)).abs()).gt(0.000001)) {
       throw new Error(`Сумма долей должна равняться 100% (сейчас ${total}%)`);
     }
 
@@ -212,8 +213,8 @@ export class OwnersService {
       }
 
       if (rebalanceBalances) {
-        const totalAvailable = roundMoney(owners.reduce((sum, o) => sum + (o.availableProfitUsd || 0), 0));
-        const totalAccrued = roundMoney(owners.reduce((sum, o) => sum + (o.totalAccruedProfitUsd || 0), 0));
+        const totalAvailable = roundMoney(owners.reduce((sum, o) => D(sum).plus((o.availableProfitUsd || 0)), D(0)));
+        const totalAccrued = roundMoney(owners.reduce((sum, o) => D(sum).plus((o.totalAccruedProfitUsd || 0)), D(0)));
 
         const availAllocations = allocateOwnerProfit(
           totalAvailable,
@@ -231,8 +232,8 @@ export class OwnersService {
             where: { id: s.ownerId },
             data: {
               profitSharePercent: s.sharePercent,
-              availableProfitUsd: avail,
-              totalAccruedProfitUsd: accrued,
+              availableProfitUsd: roundMoney(avail),
+              totalAccruedProfitUsd: roundMoney(accrued),
             },
           });
         }
@@ -261,8 +262,8 @@ export class OwnersService {
       const owners = await tx.owner.findMany();
       if (!owners.length) throw new Error('Владельцы не найдены');
 
-      const totalAvailable = roundMoney(owners.reduce((sum, o) => sum + (o.availableProfitUsd || 0), 0));
-      const totalAccrued = roundMoney(owners.reduce((sum, o) => sum + (o.totalAccruedProfitUsd || 0), 0));
+      const totalAvailable = roundMoney(owners.reduce((sum, o) => D(sum).plus((o.availableProfitUsd || 0)), D(0)));
+      const totalAccrued = roundMoney(owners.reduce((sum, o) => D(sum).plus((o.totalAccruedProfitUsd || 0)), D(0)));
 
       const availAllocations = allocateOwnerProfit(
         totalAvailable,
@@ -279,8 +280,8 @@ export class OwnersService {
         await tx.owner.update({
           where: { id: o.id },
           data: {
-            availableProfitUsd: avail,
-            totalAccruedProfitUsd: accrued,
+            availableProfitUsd: roundMoney(avail),
+            totalAccruedProfitUsd: roundMoney(accrued),
           },
         });
       }
@@ -314,7 +315,7 @@ export class OwnersService {
         totalPaidProfitUsd: o.totalPaidProfitUsd,
         availableProfitUsd: o.availableProfitUsd,
       }));
-      await tx.quarterClosure.create({ data: { quarterName, closedByUserId: actor.id, snapshot } });
+      await tx.quarterClosure.create({ data: { quarterName, closedByUserId: actor.id, snapshot: moneyJson(snapshot) } });
 
       // totalAccruedProfitUsd / totalPaidProfitUsd are lifetime counters — the same
       // fields drive the always-visible KPI cards on the main Owners dashboard, which
@@ -322,7 +323,7 @@ export class OwnersService {
       // the yet-unclaimed availableProfitUsd is affected, and only if the admin opts
       // to sweep it into capital instead of leaving it payable into next quarter.
       if (transferRemainingToCapital) {
-        const sweptOwners = owners.filter((owner) => (owner.availableProfitUsd || 0) > 0);
+        const sweptOwners = owners.filter((owner) => D((owner.availableProfitUsd || 0)).gt(0));
         if (sweptOwners.length > 0) {
           const exchangeRate = await requireTodayRate(tx);
           await Promise.all(sweptOwners.map(async (owner) => {
@@ -375,8 +376,8 @@ export class OwnersService {
 
     await prisma.owner.createMany({
       data: [
-        { userId: adminUser?.id, name: adminUser?.name || 'Далер', profitSharePercent: 50, capitalBalanceUsd: 0, totalAccruedProfitUsd: 0, totalPaidProfitUsd: 0, totalReinvestedUsd: 0, availableProfitUsd: 0 },
-        { userId: partnerUser?.id, name: partnerUser?.name || 'Рустам', profitSharePercent: 50, capitalBalanceUsd: 0, totalAccruedProfitUsd: 0, totalPaidProfitUsd: 0, totalReinvestedUsd: 0, availableProfitUsd: 0 },
+        { userId: adminUser?.id, name: adminUser?.name || 'Далер', profitSharePercent: 50, capitalBalanceUsd: D(0), totalAccruedProfitUsd: D(0), totalPaidProfitUsd: D(0), totalReinvestedUsd: D(0), availableProfitUsd: D(0) },
+        { userId: partnerUser?.id, name: partnerUser?.name || 'Рустам', profitSharePercent: 50, capitalBalanceUsd: D(0), totalAccruedProfitUsd: D(0), totalPaidProfitUsd: D(0), totalReinvestedUsd: D(0), availableProfitUsd: D(0) },
       ],
     });
 

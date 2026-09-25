@@ -1,3 +1,4 @@
+import { D, decimalMin, decimalMax, moneyJson, type MoneyInput } from '../../common/decimal';
 import { prisma } from '../../prisma/prisma.service';
 import { resolveActor } from '../../common/actor';
 import { getRateForDate } from '../exchange-rate/exchange-rate.service';
@@ -9,8 +10,8 @@ import { postTransaction } from '../finance/financial-transaction.service';
 export interface RefundInput {
   saleId: string;
   reason: string;
-  refundAmountTjs: number;
-  penaltyFeeTjs?: number;
+  refundAmountTjs: MoneyInput;
+  penaltyFeeTjs?: MoneyInput;
   paymentMethod: 'CASH' | 'CARD';
   refundedByUserId: string;
 }
@@ -30,18 +31,18 @@ export class RefundService {
       if (sale.status === 'REFUNDED') throw new Error('Этот чек уже был возвращён');
 
       const rate = (await getRateForDate(new Date())) ?? sale.exchangeRate;
-      if (!rate || rate <= 0) throw new Error('Не найден курс валют для возврата');
+      if (!rate || D(rate).lte(0)) throw new Error('Не найден курс валют для возврата');
       const penaltyFeeTjs = requestedPenaltyTjs;
       // For a DEBT sale, only the cash/card portion actually collected up front can be
       // handed back — the still-unpaid remainder was never real money in the register.
       // That remainder is simply forgiven below instead of being refunded.
-      const amountActuallyCollectedTjs = sale.totalTjs - sale.debtAmountTjs;
-      if (penaltyFeeTjs > amountActuallyCollectedTjs) throw new Error('Штраф не может превышать фактически полученную сумму по чеку');
-      const expectedRefundTjs = amountActuallyCollectedTjs - penaltyFeeTjs;
+      const amountActuallyCollectedTjs = D(sale.totalTjs).minus(sale.debtAmountTjs);
+      if (D(penaltyFeeTjs).gt(amountActuallyCollectedTjs)) throw new Error('Штраф не может превышать фактически полученную сумму по чеку');
+      const expectedRefundTjs = D(amountActuallyCollectedTjs).minus(penaltyFeeTjs);
       if (!moneyEquals(requestedRefundTjs, expectedRefundTjs)) {
         throw new Error('Сумма возврата должна равняться фактически полученной сумме по чеку за вычетом штрафа');
       }
-      const penaltyUsd = roundMoney(penaltyFeeTjs / rate);
+      const penaltyUsd = roundMoney(D(penaltyFeeTjs).div(rate));
       const actualRefundTjs = requestedRefundTjs;
       const profitLogs = await tx.auditLog.findMany({
         where: { targetId: sale.id, action: { in: ['SALE', 'SALE_BELOW_COST', 'EXCHANGE'] } },
@@ -60,13 +61,13 @@ export class RefundService {
           penaltyFeeTjs,
           penaltyFeeUsd: penaltyUsd,
           actualRefundAmountTjs: actualRefundTjs,
-          debtAmountTjs: 0,
+          debtAmountTjs: D(0),
         },
       });
 
       // Refunding a sale returns the devices to stock, so any debt the customer still
       // owed on it is forgiven — there's nothing left to collect for.
-      if (sale.debtAmountTjs > 0 && sale.customerId) {
+      if (D(sale.debtAmountTjs).gt(0) && sale.customerId) {
         await tx.customer.update({ where: { id: sale.customerId }, data: { totalDebtTjs: { decrement: sale.debtAmountTjs } } });
       }
 
@@ -83,7 +84,7 @@ export class RefundService {
         data: sale.saleItems.map((item) => ({
           deviceId: item.deviceId,
           type: 'REFUND' as const,
-          description: `Возврат по чеку #${sale.receiptNumber}${penaltyFeeTjs > 0 ? `, штраф ${penaltyFeeTjs} TJS` : ''}`,
+          description: `Возврат по чеку #${sale.receiptNumber}${D(penaltyFeeTjs).gt(0) ? `, штраф ${penaltyFeeTjs} TJS` : ''}`,
           userName: actor.name,
         })),
       });
@@ -91,7 +92,7 @@ export class RefundService {
       const store = await tx.store.findUnique({ where: { id: sale.storeId } });
       if (input.paymentMethod === 'CASH') {
         const cashGuard = await tx.store.updateMany({ where: { id: sale.storeId, cashBalanceTjs: { gte: actualRefundTjs } }, data: { cashBalanceTjs: { decrement: actualRefundTjs } } });
-        if (cashGuard.count !== 1) throw new Error('В кассе недостаточно наличных для возврата');
+        if (!D(cashGuard.count).eq(1)) throw new Error('В кассе недостаточно наличных для возврата');
         const cashAccount = await getStoreCashAccount(tx, sale.storeId, store?.name);
         await postTransaction(tx, {
           type: 'REFUND',
@@ -103,7 +104,7 @@ export class RefundService {
           currency: 'TJS',
           exchangeRate: rate,
           amountTjs: actualRefundTjs,
-          amountUsd: roundMoney(actualRefundTjs / rate),
+          amountUsd: roundMoney(D(actualRefundTjs).div(rate)),
           categoryName: 'Возврат покупателю',
           shopId: sale.storeId,
           sourceType: 'SALE',
@@ -124,8 +125,8 @@ export class RefundService {
         data: {
           type: 'REFUND',
           description: `Возврат по чеку #${sale.receiptNumber}: ${input.reason}`,
-          amountTjs: -actualRefundTjs,
-          amountUsd: -roundMoney(actualRefundTjs / rate),
+          amountTjs: D(actualRefundTjs).negated(),
+          amountUsd: D(roundMoney(D(actualRefundTjs).div(rate))).negated(),
           exchangeRate: rate,
           storeId: sale.storeId,
           storeName: store?.name,
@@ -143,8 +144,8 @@ export class RefundService {
           userName: actor.name,
           userRole: actor.role,
           action: 'REFUND',
-          details: `Чек #${sale.receiptNumber}: возврат на сумму ${actualRefundTjs} TJS. ${penaltyFeeTjs > 0 ? `Удержан штраф: ${penaltyFeeTjs} TJS.` : ''} Причина: ${input.reason}`,
-          financialDetails: { amountTjs: actualRefundTjs, penaltyTjs: penaltyFeeTjs, penaltyUsd, ownerProfitAllocations },
+          details: `Чек #${sale.receiptNumber}: возврат на сумму ${actualRefundTjs} TJS. ${D(penaltyFeeTjs).gt(0) ? `Удержан штраф: ${penaltyFeeTjs} TJS.` : ''} Причина: ${input.reason}`,
+          financialDetails: moneyJson({ amountTjs: actualRefundTjs, penaltyTjs: penaltyFeeTjs, penaltyUsd, ownerProfitAllocations: moneyJson(ownerProfitAllocations) }),
           receiptNumber: sale.receiptNumber,
           targetId: sale.id,
         },

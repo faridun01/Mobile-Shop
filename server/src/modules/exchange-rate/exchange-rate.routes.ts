@@ -1,3 +1,4 @@
+import { D, decimalMin, decimalMax, moneyJson, type MoneyInput } from '../../common/decimal';
 import type { Express } from 'express';
 import { authenticateJwt, requireRoles, type AuthenticatedRequest } from '../../auth/auth.middleware';
 import { prisma } from '../../prisma/prisma.service';
@@ -17,8 +18,8 @@ export function registerExchangeRateRoutes(app: Express) {
 
   app.post('/api/exchange-rate/today', authenticateJwt, requireRoles('ADMIN', 'PARTNER'), async (req: AuthenticatedRequest, res, next) => {
     try {
-      const rate = Number(req.body?.rate);
-      if (!Number.isFinite(rate) || rate <= 0) {
+      const rate = D(req.body?.rate);
+      if (!rate.isFinite() || rate.lte(0)) {
         res.status(400).json({ message: 'Укажите корректный курс валюты' });
         return;
       }
@@ -32,7 +33,7 @@ export function registerExchangeRateRoutes(app: Express) {
           userRole: req.user!.role,
           action: before ? 'RATE_CHANGE' : 'RATE_SET',
           details: `Курс USD/TJS установлен: 1 USD = ${rate.toFixed(2)} TJS`,
-          financialDetails: { exchangeRate: rate },
+          financialDetails: moneyJson({ exchangeRate: rate }),
         },
       });
 

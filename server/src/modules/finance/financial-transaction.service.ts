@@ -1,3 +1,4 @@
+import { D, decimalMin, decimalMax, moneyJson, type MoneyInput } from '../../common/decimal';
 import type { TransactionClient } from '../../prisma/prisma.service';
 import { nextTransactionNumber } from './transaction-number.service';
 
@@ -24,11 +25,11 @@ export interface PostTransactionInput {
   destinationAccountId?: string;
   /** Which of the account's two balance columns this transaction actually moves. */
   balanceCurrency: LedgerCurrency;
-  amount: number;
+  amount: MoneyInput;
   currency: LedgerCurrency;
-  exchangeRate?: number | null;
-  amountTjs: number;
-  amountUsd: number;
+  exchangeRate?: MoneyInput | null;
+  amountTjs: MoneyInput;
+  amountUsd: MoneyInput;
   categoryId?: string;
   categoryName?: string;
   counterpartyType?: CounterpartyType;
@@ -47,18 +48,18 @@ export interface PostTransactionInput {
   idempotencyKey?: string;
 }
 
-async function adjustBalance(tx: TransactionClient, accountId: string, currency: LedgerCurrency, delta: number, guard: boolean) {
-  if (delta === 0) return;
+async function adjustBalance(tx: TransactionClient, accountId: string, currency: LedgerCurrency, delta: MoneyInput, guard: boolean) {
+  if (D(delta).eq(0)) return;
   if (currency === 'TJS') {
-    if (delta < 0 && guard) {
-      const res = await tx.financialAccount.updateMany({ where: { id: accountId, balanceTjs: { gte: -delta } }, data: { balanceTjs: { increment: delta } } });
+    if (D(delta).lt(0) && guard) {
+      const res = await tx.financialAccount.updateMany({ where: { id: accountId, balanceTjs: { gte: D(delta).negated() } }, data: { balanceTjs: { increment: delta } } });
       if (res.count !== 1) throw new Error('Недостаточно средств на счёте для этой операции');
     } else {
       await tx.financialAccount.update({ where: { id: accountId }, data: { balanceTjs: { increment: delta } } });
     }
   } else {
-    if (delta < 0 && guard) {
-      const res = await tx.financialAccount.updateMany({ where: { id: accountId, balanceUsd: { gte: -delta } }, data: { balanceUsd: { increment: delta } } });
+    if (D(delta).lt(0) && guard) {
+      const res = await tx.financialAccount.updateMany({ where: { id: accountId, balanceUsd: { gte: D(delta).negated() } }, data: { balanceUsd: { increment: delta } } });
       if (res.count !== 1) throw new Error('Недостаточно средств на счёте для этой операции');
     } else {
       await tx.financialAccount.update({ where: { id: accountId }, data: { balanceUsd: { increment: delta } } });
@@ -85,12 +86,12 @@ export async function postTransaction(tx: TransactionClient, input: PostTransact
   const guard = input.guardBalance ?? true;
 
   if (input.direction === 'OUT') {
-    await adjustBalance(tx, input.accountId, input.balanceCurrency, -moveAmount, guard);
+    await adjustBalance(tx, input.accountId, input.balanceCurrency, D(moveAmount).negated(), guard);
   } else if (input.direction === 'IN') {
     await adjustBalance(tx, input.accountId, input.balanceCurrency, moveAmount, guard);
   } else if (input.type === 'TRANSFER') {
     if (!input.destinationAccountId) throw new Error('Не указан счёт назначения перевода');
-    await adjustBalance(tx, input.accountId, input.balanceCurrency, -moveAmount, guard);
+    await adjustBalance(tx, input.accountId, input.balanceCurrency, D(moveAmount).negated(), guard);
     await adjustBalance(tx, input.destinationAccountId, input.balanceCurrency, moveAmount, false);
   }
 

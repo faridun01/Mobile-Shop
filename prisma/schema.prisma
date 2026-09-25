@@ -166,8 +166,7 @@ model User {
   active                 Boolean  @default(true)
   storeId                String?
   baseSalaryTjs          Decimal? @db.Decimal(14, 2)
-  // A commission rate, not a money amount — left as Float on purpose.
-  salesCommissionPercent Float?
+  salesCommissionPercent Decimal? @db.Decimal(7, 4)
   pin                    String?
   createdAt              DateTime @default(now())
   updatedAt              DateTime @updatedAt
@@ -654,9 +653,7 @@ model Owner {
   // drift out of sync — nullable because a legacy/silent investor may have no login.
   userId                String?  @unique
   name                  String
-  // The partner's ownership share as a percentage, not a money amount — left as
-  // Float on purpose.
-  profitSharePercent    Float
+  profitSharePercent    Decimal @db.Decimal(7, 4)
   capitalBalanceUsd     Decimal  @default(0) @db.Decimal(14, 2)
   totalAccruedProfitUsd Decimal  @default(0) @db.Decimal(14, 2)
   totalPaidProfitUsd    Decimal  @default(0) @db.Decimal(14, 2)

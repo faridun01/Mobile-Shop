@@ -23,6 +23,7 @@ import {
 import { soundEffects } from '../../utils/sound';
 import { MonthPicker } from '../ui/MonthPicker';
 import { Combobox } from '../ui/Combobox';
+import { getBusinessDateKey } from '../../utils/businessDate';
 
 interface PurchaseItem {
   imei: string;
@@ -154,8 +155,6 @@ export const PurchasePage: React.FC = () => {
   // (this page's own default filter) is always inside it, but "весь период" or an older
   // month reaches further back, so fetch that exact range from the server and merge it in.
   useEffect(() => {
-    const thisMonth = new Date().toISOString().substring(0, 7);
-    if (periodFilter === 'SPECIFIC_MONTH' && selectedMonth === thisMonth) return;
     let cancelled = false;
     fetchInvoicesRange({
       period: periodFilter,
@@ -293,11 +292,11 @@ export const PurchasePage: React.FC = () => {
 
   // Filtered list of purchase invoices
   const filteredInvoices = useMemo(() => {
-    const todayStr = new Date().toISOString().split('T')[0];
+    const todayStr = getBusinessDateKey();
 
     return (supplierInvoices || []).filter((inv) => {
       // 1. Period filter
-      const invDateStr = inv.date.split('T')[0];
+      const invDateStr = getBusinessDateKey(new Date(inv.date));
       if (periodFilter === 'TODAY' && invDateStr !== todayStr) {
         return false;
       }
@@ -654,6 +653,18 @@ export const PurchasePage: React.FC = () => {
           {/* Period selector & Supplier Filter — kept on one scrollable row instead of
               wrapping to a second line on narrow/mobile screens. */}
           <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none text-xs">
+            <button
+              type="button"
+              onClick={() => setPeriodFilter('TODAY')}
+              className={`shrink-0 px-3 py-1.5 rounded-xl border text-xs font-bold uppercase transition-colors ${
+                periodFilter === 'TODAY'
+                  ? 'border-accent bg-accent/10 text-accent'
+                  : 'border-border bg-surface text-fg-muted hover:text-fg'
+              }`}
+            >
+              Сегодня
+            </button>
+
             <MonthPicker
               value={selectedMonth}
               onChange={(v) => {

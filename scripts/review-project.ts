@@ -1,3 +1,4 @@
+import { D, decimalMin, decimalMax, moneyJson, type MoneyInput } from '../server/src/common/decimal';
 import 'dotenv/config';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
@@ -12,6 +13,7 @@ const schema = process.env.REVIEW_SCHEMA || `project_review_${Date.now()}`;
 assert(/^project_review_\d+$/.test(schema));
 url.searchParams.set('schema', schema);
 process.env.DATABASE_URL = url.href;
+process.env.SEED_TEST_DATA = 'true';
 const db = new PrismaClient();
 if (!process.env.REVIEW_SCHEMA) await db.$executeRawUnsafe(`CREATE SCHEMA "${schema}"`);
 console.log('AUDIT_SCHEMA', schema);
@@ -54,19 +56,19 @@ const accounts = (await api('/finance/accounts', admin)).body;
 const source = accounts.find((a: any) => a.storeId === 'store-siyoma');
 const destination = accounts.find((a: any) => a.id !== source.id);
 assert(source && destination);
-await api('/finance/cash-receipt', admin, { accountId: source.id, amount: 1000, currency: 'TJS', categoryName: 'Audit funding', description: 'Isolated audit funding' });
+await api('/finance/cash-receipt', admin, { accountId: source.id, amount: D(1000), currency: 'TJS', categoryName: 'Audit funding', description: 'Isolated audit funding' });
 async function balances() {
   const rows = (await api('/finance/accounts', admin)).body;
   const store = await prisma.store.findUniqueOrThrow({ where: { id: 'store-siyoma' } });
   return { source: rows.find((r: any) => r.id === source.id).balanceTjs, destination: rows.find((r: any) => r.id === destination.id).balanceTjs, store: store.cashBalanceTjs };
 }
 const before = await balances();
-const transfer = await api('/finance/transfer', admin, { accountId: source.id, destinationAccountId: destination.id, amount: 100, currency: 'TJS', description: 'Audit transfer cancellation' });
+const transfer = await api('/finance/transfer', admin, { accountId: source.id, destinationAccountId: destination.id, amount: D(100), currency: 'TJS', description: 'Audit transfer cancellation' });
 const afterTransfer = await balances();
 const cancel = await api(`/finance/transactions/${transfer.body.id}/cancel`, admin, {});
 const afterCancel = await balances();
 console.log('TRANSFER_CANCELLATION', JSON.stringify({ transferStatus: transfer.status, cancelStatus: cancel.status, before, afterTransfer, afterCancel, restored: JSON.stringify(before) === JSON.stringify(afterCancel) }));
-const invalidCurrency = await api('/finance/cash-receipt', admin, { accountId: destination.id, amount: 100, currency: 'EUR', categoryName: 'Audit funding', description: 'Invalid currency probe' });
+const invalidCurrency = await api('/finance/cash-receipt', admin, { accountId: destination.id, amount: D(100), currency: 'EUR', categoryName: 'Audit funding', description: 'Invalid currency probe' });
 console.log('INVALID_CURRENCY', JSON.stringify({ status: invalidCurrency.status, currency: invalidCurrency.body.currency, amount: invalidCurrency.body.amount, amountUsd: invalidCurrency.body.amountUsd, balanceCurrency: invalidCurrency.body.balanceCurrency }));
 const logout = await api('/auth/logout', seller, {});
 console.log('TOKEN_AFTER_LOGOUT', JSON.stringify({ logoutStatus: logout.status, oldTokenStatus: (await api('/stores', seller)).status }));

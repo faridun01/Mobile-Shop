@@ -1,3 +1,4 @@
+import { D, decimalMin, decimalMax, moneyJson, type MoneyInput } from '../../common/decimal';
 import { prisma } from '../../prisma/prisma.service';
 import { resolveActor } from '../../common/actor';
 import { getStoreCashAccount } from '../finance/account.service';
@@ -84,8 +85,8 @@ export class StoresService {
    * the old→new values; deliberately NOT written to the ledger, since a correction
    * isn't a real cash movement and shouldn't appear as fake revenue/expense in P&L.
    */
-  public static async adjustCashBalance(storeId: string, newBalanceTjs: number, reason: string, userId: string) {
-    if (!Number.isFinite(newBalanceTjs)) throw new Error('Укажите корректную сумму');
+  public static async adjustCashBalance(storeId: string, newBalanceTjs: MoneyInput, reason: string, userId: string) {
+    if (!D(newBalanceTjs).isFinite()) throw new Error('Укажите корректную сумму');
     if (!reason?.trim()) throw new Error('Укажите причину корректировки');
 
     return prisma.$transaction(async (tx) => {
@@ -93,7 +94,7 @@ export class StoresService {
       const store = await tx.store.findUnique({ where: { id: storeId } });
       if (!store) throw new Error('Магазин не найден');
 
-      const roundedBalance = Math.round(newBalanceTjs * 100) / 100;
+      const roundedBalance = D(D(D(newBalanceTjs).mul(100)).round()).div(100);
       const updated = await tx.store.update({ where: { id: storeId }, data: { cashBalanceTjs: roundedBalance } });
 
       // Keep the linked FinancialAccount's balance in lockstep with the store's —
@@ -109,7 +110,7 @@ export class StoresService {
           userRole: actor.role,
           action: 'STORE_CASH_ADJUSTMENT',
           details: `Корректировка кассы "${store.name}": ${store.cashBalanceTjs} TJS → ${roundedBalance} TJS. Причина: ${reason.trim()}`,
-          financialDetails: { oldBalanceTjs: store.cashBalanceTjs, newBalanceTjs: roundedBalance },
+          financialDetails: moneyJson({ oldBalanceTjs: store.cashBalanceTjs, newBalanceTjs: roundedBalance }),
           targetId: storeId,
         },
       });

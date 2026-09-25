@@ -1,33 +1,16 @@
 #!/bin/bash
-# ==============================================================================
-# Production PostgreSQL Automated Backup Script
-# Performs compressed pg_dump and retains backups for 30 days.
-# ==============================================================================
-set -o pipefail
-
+set -euo pipefail
+umask 077
 DB_CONTAINER="${DB_CONTAINER:-mobile_shop_db_prod}"
-BACKUP_DIR="./backups"
-TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
-BACKUP_FILE="${BACKUP_DIR}/mobile_shop_db_${TIMESTAMP}.sql.gz"
-
-mkdir -p ${BACKUP_DIR}
-
-echo "[$(date)] Starting PostgreSQL database backup..."
-
-# Dump and gzip compression. pipefail (above) makes the pipeline's exit code
-# reflect pg_dump's failure, not just gzip's — otherwise a failed dump (e.g.
-# wrong container name) still produces a "successful", empty/corrupt archive.
-docker exec ${DB_CONTAINER} pg_dump -U postgres -d mobile_shop_db | gzip > ${BACKUP_FILE}
-
-if [ $? -eq 0 ]; then
-    echo "[$(date)] Backup completed successfully: ${BACKUP_FILE}"
-else
-    echo "[$(date)] ERROR: PostgreSQL backup failed!"
-    rm -f ${BACKUP_FILE}
-    exit 1
-fi
-
-# Cleanup old backups older than 30 days
-find ${BACKUP_DIR} -type f -name "*.sql.gz" -mtime +30 -exec rm {} \;
-
-echo "[$(date)] Old backups cleanup complete."
+DB_USER="${DB_USER:-${POSTGRES_USER:-postgres}}"
+DB_NAME="${DB_NAME:-${POSTGRES_DB:-mobile_shop_db}}"
+BACKUP_DIR="${BACKUP_DIR:-./backups}"
+mkdir -p -- "$BACKUP_DIR"
+BACKUP_FILE="$BACKUP_DIR/${DB_NAME}_$(date +%Y%m%d_%H%M%S)_$$.sql.gz"
+PARTIAL=$(mktemp "$BACKUP_DIR/.backup.XXXXXX")
+trap 'rm -f -- "$PARTIAL"' EXIT
+docker exec "$DB_CONTAINER" pg_dump -U "$DB_USER" -d "$DB_NAME" --schema=public --clean --if-exists --no-owner --no-privileges | gzip > "$PARTIAL"
+gzip -t "$PARTIAL"
+mv -- "$PARTIAL" "$BACKUP_FILE"
+echo "Backup complete: $BACKUP_FILE"
+find "$BACKUP_DIR" -type f -name "${DB_NAME}_*.sql.gz" -mtime +30 -delete

@@ -1,3 +1,4 @@
+import { D, decimalMin, decimalMax, moneyJson, type MoneyInput } from '../../common/decimal';
 import type { Express } from 'express';
 import { authenticateJwt, enforceBodyStoreScope, requireRoles, type AuthenticatedRequest } from '../../auth/auth.middleware';
 import { prisma } from '../../prisma/prisma.service';
@@ -55,7 +56,7 @@ export function registerExpenseRoutes(app: Express) {
 
       const expense = await createExpenseStandalone({
         category,
-        amountTjs: Number(amountTjs),
+        amountTjs: D(amountTjs),
         targetType,
         storeId,
         sourceAccount,

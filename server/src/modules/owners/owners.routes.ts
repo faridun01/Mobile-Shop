@@ -1,3 +1,4 @@
+import { D, decimalMin, decimalMax, moneyJson, type MoneyInput } from '../../common/decimal';
 import type { Express } from 'express';
 import { authenticateJwt, requireRoles, type AuthenticatedRequest } from '../../auth/auth.middleware';
 import { prisma } from '../../prisma/prisma.service';
@@ -52,7 +53,7 @@ export function registerOwnerRoutes(app: Express) {
   app.post('/api/owners/:id/investment', authenticateJwt, requireRoles('ADMIN', 'PARTNER'), async (req: AuthenticatedRequest, res, next) => {
     try {
       const { amountUsd, destination, note } = req.body ?? {};
-      const owner = await OwnersService.investment(req.params.id, Number(amountUsd), destination ?? 'Главный счет', note, req.user!.userId);
+      const owner = await OwnersService.investment(req.params.id, D(amountUsd), destination ?? 'Главный счет', note, req.user!.userId);
       RealtimeSyncGateway.broadcast('OWNER_TX', { ownerId: owner.id });
       res.json(owner);
     } catch (error) {
@@ -63,7 +64,7 @@ export function registerOwnerRoutes(app: Express) {
   app.post('/api/owners/:id/withdrawal', authenticateJwt, requireRoles('ADMIN', 'PARTNER'), async (req: AuthenticatedRequest, res, next) => {
     try {
       const { amountUsd, source, note } = req.body ?? {};
-      const owner = await OwnersService.withdrawal(req.params.id, Number(amountUsd), source ?? 'Главный счет', note, req.user!.userId);
+      const owner = await OwnersService.withdrawal(req.params.id, D(amountUsd), source ?? 'Главный счет', note, req.user!.userId);
       RealtimeSyncGateway.broadcast('OWNER_TX', { ownerId: owner.id });
       res.json(owner);
     } catch (error) {
@@ -74,7 +75,7 @@ export function registerOwnerRoutes(app: Express) {
   app.post('/api/owners/:id/payout', authenticateJwt, requireRoles('ADMIN', 'PARTNER'), async (req: AuthenticatedRequest, res, next) => {
     try {
       const { amountUsd, source, note } = req.body ?? {};
-      const owner = await OwnersService.payout(req.params.id, Number(amountUsd), source ?? 'Главный счет', note, req.user!.userId);
+      const owner = await OwnersService.payout(req.params.id, D(amountUsd), source ?? 'Главный счет', note, req.user!.userId);
       RealtimeSyncGateway.broadcast('OWNER_TX', { ownerId: owner.id });
       res.json(owner);
     } catch (error) {
@@ -85,7 +86,7 @@ export function registerOwnerRoutes(app: Express) {
   app.post('/api/owners/:id/reinvest', authenticateJwt, requireRoles('ADMIN', 'PARTNER'), async (req: AuthenticatedRequest, res, next) => {
     try {
       const { amountUsd, note } = req.body ?? {};
-      const owner = await OwnersService.reinvest(req.params.id, Number(amountUsd), note, req.user!.userId);
+      const owner = await OwnersService.reinvest(req.params.id, D(amountUsd), note, req.user!.userId);
       RealtimeSyncGateway.broadcast('OWNER_TX', { ownerId: owner.id });
       res.json(owner);
     } catch (error) {
@@ -106,7 +107,7 @@ export function registerOwnerRoutes(app: Express) {
   app.post('/api/owners/profit-shares', authenticateJwt, requireRoles('ADMIN', 'PARTNER'), async (req: AuthenticatedRequest, res, next) => {
     try {
       const { shares, rebalanceBalances } = req.body ?? {};
-      if (!Array.isArray(shares) || shares.length === 0) {
+      if (!Array.isArray(shares) || D(shares.length).eq(0)) {
         res.status(400).json({ message: 'shares обязателен и должен быть непустым массивом' });
         return;
       }

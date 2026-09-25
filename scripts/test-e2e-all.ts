@@ -1,3 +1,4 @@
+import { D, decimalMin, decimalMax, moneyJson, type MoneyInput } from '../server/src/common/decimal';
 import { app } from '../server/src/app';
 import { prisma } from '../server/src/prisma/prisma.service';
 
@@ -44,14 +45,14 @@ async function runE2ETests() {
 
     // Seed intentionally leaves the daily rate unset. Set it through the real API
     // so the server uses the configured business timezone and records the actor.
-    const testExchangeRate = 10.5;
+    const testExchangeRate = D(10.5);
     const setRateRes = await fetch(`${API_BASE}/exchange-rate/today`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${adminToken}` },
       body: JSON.stringify({ rate: testExchangeRate }),
     });
     const initializedRate = await setRateRes.json();
-    const rateInitialized = setRateRes.ok && initializedRate?.rate === testExchangeRate;
+    const rateInitialized = setRateRes.ok && D(initializedRate?.rate).eq(testExchangeRate);
     assert(rateInitialized, 'Initialize today exchange rate before financial operations');
     if (!rateInitialized) {
       throw new Error(`E2E setup failed: exchange rate initialization returned HTTP ${setRateRes.status}`);
@@ -187,7 +188,7 @@ async function runE2ETests() {
             model: 'iPhone 15 Pro Audit',
             storage: '256GB',
             color: 'Natural Titanium',
-            purchasePriceUsd: 900,
+            purchasePriceUsd: D(900),
             items: [{ imei: testImei }]
           }
         ]
@@ -240,7 +241,7 @@ async function runE2ETests() {
             model: 'Galaxy S24 Audit',
             storage: '256GB',
             color: 'Black',
-            purchasePriceUsd: 700,
+            purchasePriceUsd: D(700),
             items: [{ imei: `777${Date.now().toString().slice(-12)}` }]
           }]
         })
@@ -271,15 +272,15 @@ async function runE2ETests() {
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${adminToken}` },
         body: JSON.stringify({
           storeId: 'store-siyoma',
-          items: [{ deviceId: createdDeviceId, salePriceTjs: 10500 }],
+          items: [{ deviceId: createdDeviceId, salePriceTjs: D(10500) }],
           paymentMethod: 'CASH',
-          cashAmountTjs: 10500,
-          cardAmountTjs: 0,
+          cashAmountTjs: D(10500),
+          cardAmountTjs: D(0),
           customerName: 'Покупатель Аудит'
         })
       });
       const saleData = await saleRes.json();
-      assert(saleRes.status === 201 && saleData.totalTjs === 10500, 'Execute POS sale at store');
+      assert(saleRes.status === 201 && D(saleData.totalTjs).eq(10500), 'Execute POS sale at store');
       if (saleData.id) createdSaleId = saleData.id;
 
       if (createdSaleId) {
@@ -288,7 +289,7 @@ async function runE2ETests() {
           headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${adminToken}` },
           body: JSON.stringify({
             reason: 'Тестовый возврат при аудите',
-            refundAmountTjs: 10500,
+            refundAmountTjs: D(10500),
             paymentMethod: 'CASH'
           })
         });
@@ -333,14 +334,14 @@ async function runE2ETests() {
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${adminToken}` },
       body: JSON.stringify({
         category: 'UTILITIES',
-        amountTjs: 250,
+        amountTjs: D(250),
         storeId: 'store-siyoma',
         paidFromCashRegister: false,
         description: 'Оплата коммунальных услуг за текущий месяц'
       })
     });
     const expenseData = await expenseRes.json();
-    assert(expenseRes.status === 201 && expenseData.amountTjs === 250, 'Create expense entry');
+    assert(expenseRes.status === 201 && D(expenseData.amountTjs).eq(250), 'Create expense entry');
 
     // 9. AUDIT LOGS & EXCHANGE RATES
     console.log('\n--- 9. AUDIT LOGS & SYSTEM METRICS ---');
@@ -354,7 +355,7 @@ async function runE2ETests() {
       headers: { Authorization: `Bearer ${adminToken}` }
     });
     const rateData = await rateRes.json();
-    assert(rateRes.ok && rateData?.rate === testExchangeRate, 'Fetch today exchange rate');
+    assert(rateRes.ok && D(rateData?.rate).eq(testExchangeRate), 'Fetch today exchange rate');
 
     // Cleanup created test device & purchase invoice
     if (createdDeviceId) {

@@ -1,3 +1,4 @@
+import { D, decimalMin, decimalMax, moneyJson, type MoneyInput } from '../../common/decimal';
 import type { Express } from 'express';
 import { authenticateJwt, type AuthenticatedRequest } from '../../auth/auth.middleware';
 import { prisma } from '../../prisma/prisma.service';
@@ -8,7 +9,7 @@ export function registerExchangeRoutes(app: Express) {
   app.post('/api/exchanges', authenticateJwt, async (req: AuthenticatedRequest, res, next) => {
     try {
       const body = req.body ?? {};
-      if (!body.saleId || !body.returnedImei || !body.replacementDeviceId || body.newPriceTjs == null || body.exchangeInValueTjs == null) {
+      if (!body.saleId || !body.returnedImei || !body.replacementDeviceId || body.newPriceTjs === null || body.exchangeInValueTjs === null) {
         res.status(400).json({ message: 'saleId, returnedImei, replacementDeviceId, exchangeInValueTjs и newPriceTjs обязательны' });
         return;
       }

@@ -1,3 +1,5 @@
+import { D, moneyJson } from '../../common/decimal';
+import '../../common/decimal-test-setup';
 import { describe, expect, it } from 'vitest';
 import { allocateOwnerProfit, calculateRecognizedProfit, refundOwnerProfit } from './profit';
 
@@ -7,18 +9,18 @@ describe('recognized sale profit', () => {
       { action: 'SALE', financialDetails: { recognizedProfitUsd: 400 } },
       { action: 'EXCHANGE', financialDetails: { exchangeProfitUsd: 500 } },
       { action: 'EXCHANGE', financialDetails: { exchangeProfitUsd: -25.235 } },
-    ], 1)).toBe(874.77);
+    ], 1)).toEqual(874.77);
   });
 
   it('uses the fallback for legacy sales without an audited original profit', () => {
     expect(calculateRecognizedProfit([
       { action: 'EXCHANGE', financialDetails: { exchangeProfitUsd: 50 } },
-    ], 125.126)).toBe(125.13);
+    ], 125.126)).toEqual(125.13);
   });
 
   it('preserves a real zero or negative audited profit', () => {
-    expect(calculateRecognizedProfit([{ action: 'SALE_BELOW_COST', financialDetails: { recognizedProfitUsd: -10 } }], 99)).toBe(-10);
-    expect(calculateRecognizedProfit([{ action: 'SALE', financialDetails: { recognizedProfitUsd: 0 } }], 99)).toBe(0);
+    expect(calculateRecognizedProfit([{ action: 'SALE_BELOW_COST', financialDetails: { recognizedProfitUsd: -10 } }], 99)).toEqual(-10);
+    expect(calculateRecognizedProfit([{ action: 'SALE', financialDetails: { recognizedProfitUsd: 0 } }], 99)).toEqual(0);
   });
 });
 
@@ -26,7 +28,7 @@ describe('refund owner allocations', () => {
   const originalOwners = [{ id: 'a', profitSharePercent: 60 }, { id: 'b', profitSharePercent: 40 }];
   const currentOwners = [{ id: 'a', profitSharePercent: 50 }, { id: 'b', profitSharePercent: 50 }];
   const sale = (amount: number) => ({ action: 'SALE', financialDetails: {
-    ownerProfitAllocations: allocateOwnerProfit(amount, originalOwners),
+    ownerProfitAllocations: moneyJson(allocateOwnerProfit(amount, originalOwners)),
   } });
 
   it('reverses 60/40 amounts even after shares become 50/50', () => {
@@ -43,7 +45,7 @@ describe('refund owner allocations', () => {
 
   it('reverses each exchange using its own recorded amounts', () => {
     const exchange = { action: 'EXCHANGE', financialDetails: {
-      ownerProfitAllocations: allocateOwnerProfit(50, currentOwners),
+      ownerProfitAllocations: moneyJson(allocateOwnerProfit(50, currentOwners)),
     } };
     expect(refundOwnerProfit([sale(100), exchange], originalOwners, 0)).toEqual([
       { ownerId: 'a', amountUsd: -85 }, { ownerId: 'b', amountUsd: -65 },
@@ -84,7 +86,7 @@ describe('exact owner allocation', () => {
   const owners = [{ id: 'a', profitSharePercent: 50 }, { id: 'b', profitSharePercent: 50 }];
   it.each([0.01, 0.03, 1.01, -0.01, -0.03, 100.99])('preserves the total for %s', (amount) => {
     const allocated = allocateOwnerProfit(amount, owners);
-    expect(Math.round(allocated.reduce((sum, row) => sum + row.amountUsd, 0) * 100)).toBe(Math.round(amount * 100));
+    expect(allocated.reduce((sum, row) => sum.plus(row.amountUsd), D(0)).toFixed(2)).toEqual(D(amount).toFixed(2));
     expect(allocateOwnerProfit(amount, [...owners].reverse()).reverse()).toEqual(allocated);
   });
   it('does not allocate a remainder to zero-share owners', () => {

@@ -1,3 +1,4 @@
+import { D, decimalMin, decimalMax, moneyJson, type MoneyInput } from '../../common/decimal';
 import { prisma } from '../../prisma/prisma.service';
 import type { TransactionClient } from '../../prisma/prisma.service';
 import { resolveActor } from '../../common/actor';
@@ -20,7 +21,7 @@ async function deviceHasTransactionHistory(tx: TransactionClient, deviceIds: str
 
 export interface PaySupplierInput {
   supplierId: string;
-  amountUsd: number;
+  amountUsd: MoneyInput;
   // Always a store's (or the main warehouse's) cash register — the company-wide
   // «Главный счёт» was removed, so there is no other place a payment can come from.
   sourceAccount: 'STORE_CASH';
@@ -33,8 +34,8 @@ export interface SupplierBonusInput {
   supplierId: string;
   campaignTitle?: string;
   bonusType: 'FREE_DEVICES' | 'CASH_DISCOUNT';
-  amountUsd?: number;
-  freeDevices?: { brand: string; model: string; storage: string; color: string; imei: string; costBasisUsd: number }[];
+  amountUsd?: MoneyInput;
+  freeDevices?: { brand: string; model: string; storage: string; color: string; imei: string; costBasisUsd: MoneyInput }[];
   destinationStoreId?: string;
   createdByUserId: string;
 }
@@ -57,7 +58,7 @@ export class SuppliersService {
       const exchangeRate = await requireTodayRate(tx);
       const supplier = await tx.supplier.findUnique({ where: { id: input.supplierId } });
       if (!supplier) throw new Error('Поставщик не найден');
-      if (amountUsd > supplier.totalDebtUsd + 0.01) throw new Error('Сумма оплаты превышает задолженность поставщику');
+      if (D(amountUsd).gt(supplier.totalDebtUsd)) throw new Error('Сумма оплаты превышает задолженность поставщику');
 
       const openInvoices = await tx.supplierInvoice.findMany({
         where: { supplierId: input.supplierId },
@@ -65,7 +66,7 @@ export class SuppliersService {
       });
 
       let remainingToPay = amountUsd;
-      const allocations: { invoiceId: string; invoiceNumber: string; allocatedAmountUsd: number }[] = [];
+      const allocations: { invoiceId: string; invoiceNumber: string; allocatedAmountUsd: MoneyInput }[] = [];
 
       const payment = await tx.supplierPayment.create({
         data: {
@@ -79,11 +80,11 @@ export class SuppliersService {
       });
 
       for (const invoice of openInvoices) {
-        if (remainingToPay <= 0) break;
-        const remainingOnInvoice = roundMoney(invoice.totalAmountUsd - invoice.paidAmountUsd);
-        if (remainingOnInvoice <= 0) continue;
+        if (D(remainingToPay).lte(0)) break;
+        const remainingOnInvoice = roundMoney(D(invoice.totalAmountUsd).minus(invoice.paidAmountUsd));
+        if (D(remainingOnInvoice).lte(0)) continue;
 
-        const payForThis = Math.min(remainingOnInvoice, remainingToPay);
+        const payForThis = decimalMin(remainingOnInvoice, remainingToPay);
         const invoiceGuard = await tx.supplierInvoice.updateMany({
           where: { id: invoice.id, paidAmountUsd: invoice.paidAmountUsd, totalAmountUsd: invoice.totalAmountUsd },
           data: { paidAmountUsd: { increment: payForThis } },
@@ -93,9 +94,9 @@ export class SuppliersService {
           data: { paymentId: payment.id, invoiceId: invoice.id, allocatedAmountUsd: payForThis },
         });
         allocations.push({ invoiceId: invoice.id, invoiceNumber: invoice.invoiceNumber, allocatedAmountUsd: payForThis });
-        remainingToPay = roundMoney(remainingToPay - payForThis);
+        remainingToPay = roundMoney(D(remainingToPay).minus(payForThis));
       }
-      if (remainingToPay !== 0) throw new Error('Долг поставщика не совпадает с остатками накладных. Требуется сверка');
+      if (!D(remainingToPay).eq(0)) throw new Error('Долг поставщика не совпадает с остатками накладных. Требуется сверка');
 
       const debtGuard = await tx.supplier.updateMany({
         where: { id: input.supplierId, totalDebtUsd: { gte: amountUsd } },
@@ -104,7 +105,7 @@ export class SuppliersService {
           totalDebtUsd: { decrement: amountUsd },
         },
       });
-      if (debtGuard.count !== 1) throw new Error('Задолженность изменилась, обновите данные и повторите оплату');
+      if (!D(debtGuard.count).eq(1)) throw new Error('Задолженность изменилась, обновите данные и повторите оплату');
 
       const store = await tx.store.findUnique({ where: { id: input.storeId } });
       if (!store || !store.active) throw new Error('Касса магазина не найдена или неактивна');
@@ -112,9 +113,9 @@ export class SuppliersService {
       // warehouse's account — purchases (приходы) are recorded there and its
       // balance is meant to fund paying those suppliers back, not just retail stores.
       // amountUsd was collected in USD terms but store registers hold TJS; convert via today's rate if available.
-      const cashAmountTjs = roundMoney(amountUsd * exchangeRate);
+      const cashAmountTjs = roundMoney(D(amountUsd).mul(exchangeRate));
       const cashGuard = await tx.store.updateMany({ where: { id: input.storeId, cashBalanceTjs: { gte: cashAmountTjs } }, data: { cashBalanceTjs: { decrement: cashAmountTjs } } });
-      if (cashGuard.count !== 1) throw new Error('В кассе недостаточно наличных для оплаты поставщику');
+      if (!D(cashGuard.count).eq(1)) throw new Error('В кассе недостаточно наличных для оплаты поставщику');
 
       const financeAccount = await getStoreCashAccount(tx, input.storeId, store.name);
       await postTransaction(tx, {
@@ -126,7 +127,7 @@ export class SuppliersService {
         amount: amountUsd,
         currency: 'USD',
         exchangeRate,
-        amountTjs: roundMoney(amountUsd * exchangeRate),
+        amountTjs: roundMoney(D(amountUsd).mul(exchangeRate)),
         amountUsd,
         categoryName: 'Оплата поставщику',
         counterpartyType: 'SUPPLIER',
@@ -144,7 +145,7 @@ export class SuppliersService {
         data: {
           type: 'SUPPLIER_PAYMENT',
           description: `Выплата поставщику ${supplier.name}: $${amountUsd}`,
-          amountUsd: -amountUsd,
+          amountUsd: D(amountUsd).negated(),
           exchangeRate,
           storeId: input.storeId,
           storeName: store?.name,
@@ -162,7 +163,7 @@ export class SuppliersService {
           details: `Проведена оплата поставщику ${supplier.name} на сумму $${amountUsd}. Распределено по FIFO: ${allocations
             .map((a) => `${a.invoiceNumber} ($${a.allocatedAmountUsd})`)
             .join(', ')}`,
-          financialDetails: { amountUsd, exchangeRate },
+          financialDetails: moneyJson({ amountUsd, exchangeRate }),
           targetId: payment.id,
         },
       });
@@ -172,7 +173,7 @@ export class SuppliersService {
   }
 
   /** Pays a single specific invoice directly, instead of FIFO across all open invoices. */
-  public static async payInvoice(input: { invoiceId: string; amountUsd: number; sourceAccount: 'STORE_CASH'; storeId: string; createdByUserId: string }) {
+  public static async payInvoice(input: { invoiceId: string; amountUsd: MoneyInput; sourceAccount: 'STORE_CASH'; storeId: string; createdByUserId: string }) {
     const amountUsd = requirePositiveMoney(input.amountUsd, 'Сумма оплаты');
     if (input.sourceAccount !== 'STORE_CASH') throw new Error('Некорректный источник оплаты');
     if (!input.storeId) throw new Error('Выберите кассу, из которой оплатить');
@@ -185,8 +186,8 @@ export class SuppliersService {
       const supplier = await tx.supplier.findUnique({ where: { id: invoice.supplierId } });
       if (!supplier) throw new Error('Поставщик не найден');
 
-      const remainingOnInvoice = roundMoney(invoice.totalAmountUsd - invoice.paidAmountUsd);
-      if (amountUsd > remainingOnInvoice) throw new Error('Сумма оплаты превышает остаток долга по накладной');
+      const remainingOnInvoice = roundMoney(D(invoice.totalAmountUsd).minus(invoice.paidAmountUsd));
+      if (D(amountUsd).gt(remainingOnInvoice)) throw new Error('Сумма оплаты превышает остаток долга по накладной');
 
       const payment = await tx.supplierPayment.create({
         data: {
@@ -216,13 +217,13 @@ export class SuppliersService {
           totalDebtUsd: { decrement: amountUsd },
         },
       });
-      if (debtGuard.count !== 1) throw new Error('Задолженность изменилась, обновите данные и повторите оплату');
+      if (!D(debtGuard.count).eq(1)) throw new Error('Задолженность изменилась, обновите данные и повторите оплату');
 
       const store = await tx.store.findUnique({ where: { id: input.storeId } });
       if (!store || !store.active) throw new Error('Касса магазина не найдена или неактивна');
-      const cashAmountTjs = roundMoney(amountUsd * exchangeRate);
+      const cashAmountTjs = roundMoney(D(amountUsd).mul(exchangeRate));
       const cashGuard = await tx.store.updateMany({ where: { id: input.storeId, cashBalanceTjs: { gte: cashAmountTjs } }, data: { cashBalanceTjs: { decrement: cashAmountTjs } } });
-      if (cashGuard.count !== 1) throw new Error('В кассе недостаточно наличных для оплаты поставщику');
+      if (!D(cashGuard.count).eq(1)) throw new Error('В кассе недостаточно наличных для оплаты поставщику');
 
       const financeAccount = await getStoreCashAccount(tx, input.storeId, store.name);
       await postTransaction(tx, {
@@ -234,7 +235,7 @@ export class SuppliersService {
         amount: amountUsd,
         currency: 'USD',
         exchangeRate,
-        amountTjs: roundMoney(amountUsd * exchangeRate),
+        amountTjs: roundMoney(D(amountUsd).mul(exchangeRate)),
         amountUsd,
         categoryName: 'Оплата поставщику',
         counterpartyType: 'SUPPLIER',
@@ -252,7 +253,7 @@ export class SuppliersService {
         data: {
           type: 'SUPPLIER_PAYMENT',
           description: `Выплата поставщику ${supplier.name} по накладной ${invoice.invoiceNumber}: $${amountUsd}`,
-          amountUsd: -amountUsd,
+          amountUsd: D(amountUsd).negated(),
           exchangeRate,
           storeId: input.storeId,
           storeName: store?.name,
@@ -268,7 +269,7 @@ export class SuppliersService {
           userRole: actor.role,
           action: 'SUPPLIER_PAYMENT',
           details: `Проведена оплата поставщику ${supplier.name} по накладной ${invoice.invoiceNumber} на сумму $${amountUsd}`,
-          financialDetails: { amountUsd, exchangeRate },
+          financialDetails: moneyJson({ amountUsd, exchangeRate }),
           targetId: payment.id,
         },
       });
@@ -292,12 +293,16 @@ export class SuppliersService {
           supplierId: input.supplierId,
           campaignTitle: input.campaignTitle,
           bonusType: input.bonusType,
-          ownerProfitAllocations,
+          ownerProfitAllocations: moneyJson(ownerProfitAllocations),
           amountUsd: input.amountUsd,
           exchangeRate,
           status: 'IN_STOCK',
         },
       });
+
+      if (input.bonusType === 'CASH_DISCOUNT' && ownerProfitAllocations.length) {
+        await replaceOwnerAllocations(tx, [], ownerProfitAllocations, 1);
+      }
 
       if (input.bonusType === 'FREE_DEVICES' && input.freeDevices?.length) {
         const imeis = input.freeDevices.map((d) => d.imei);
@@ -325,7 +330,7 @@ export class SuppliersService {
               color: device.color,
               status: targetStatus,
               storeId,
-              purchasePriceUsd: 0,
+              purchasePriceUsd: D(0),
               costBasisUsd,
               isBonus: true,
               bonusCampaign: input.campaignTitle,
@@ -363,7 +368,7 @@ export class SuppliersService {
           userRole: actor.role,
           action: 'SUPPLIER_BONUS',
           details: `Зафиксирован бонус от ${supplier.name}${input.amountUsd ? `: $${input.amountUsd}` : ''}`,
-          financialDetails: input.amountUsd ? { amountUsd: input.amountUsd, exchangeRate } : { exchangeRate },
+          financialDetails: moneyJson(input.amountUsd ? { amountUsd: input.amountUsd, exchangeRate } : { exchangeRate }),
           targetId: bonus.id,
         },
       });
@@ -378,21 +383,21 @@ export class SuppliersService {
    * blocked once the underlying device has any transaction history (sold, transferred,
    * sent to repair) — the bonus record isn't the source of truth for that device anymore.
    */
-  public static async updateBonus(id: string, input: { campaignTitle?: string; amountUsd?: number; freeDevice?: { brand?: string; model?: string; storage?: string; color?: string; imei?: string; imei2?: string }; actorUserId: string }) {
+  public static async updateBonus(id: string, input: { campaignTitle?: string; amountUsd?: MoneyInput; freeDevice?: { brand?: string; model?: string; storage?: string; color?: string; imei?: string; imei2?: string }; actorUserId: string }) {
     return prisma.$transaction(async (tx) => {
       await tx.$queryRaw`SELECT id FROM supplier_bonuses WHERE id = ${id} FOR UPDATE`;
       const actor = await resolveActor(tx, input.actorUserId);
       const bonus = await tx.supplierBonus.findUnique({ where: { id }, include: { freeDevices: true, supplier: { select: { name: true } } } });
       if (!bonus) throw new Error('Бонус не найден');
 
-      const data: { campaignTitle?: string | null; amountUsd?: number; ownerProfitAllocations?: OwnerProfitAllocation[] } = {};
+      const data: { campaignTitle?: string | null; amountUsd?: MoneyInput; ownerProfitAllocations?: OwnerProfitAllocation[] } = {};
       if (input.campaignTitle !== undefined) data.campaignTitle = input.campaignTitle.trim() || null;
 
       if (bonus.bonusType === 'CASH_DISCOUNT') {
         if (input.amountUsd !== undefined) {
           const newAmountUsd = requirePositiveMoney(input.amountUsd, 'Сумма бонуса');
           const oldAmountUsd = bonus.amountUsd || 0;
-          if (newAmountUsd !== oldAmountUsd) {
+          if (!D(newAmountUsd).eq(oldAmountUsd)) {
             const previous = readOwnerAllocations(bonus.ownerProfitAllocations);
             data.ownerProfitAllocations = await currentOwnerAllocations(tx, newAmountUsd);
             await replaceOwnerAllocations(tx, previous, data.ownerProfitAllocations, 1, true);
@@ -432,7 +437,7 @@ export class SuppliersService {
         if (bonusDevice.deviceId && Object.keys(deviceUpdate).length > 0) {
           await tx.device.update({ where: { id: bonusDevice.deviceId }, data: deviceUpdate });
         }
-        if (Object.keys(bonusDeviceUpdate).length > 0) {
+        if (D(Object.keys(bonusDeviceUpdate).length).gt(0)) {
           await tx.supplierBonusDevice.update({ where: { id: bonusDevice.id }, data: bonusDeviceUpdate });
         }
       }
@@ -529,7 +534,7 @@ export class SuppliersService {
     }, { maxWait: 10000, timeout: 25000 });
   }
 
-  public static async updateInvoice(id: string, input: { invoiceNumber?: string; date?: string; totalAmountUsd?: number }) {
+  public static async updateInvoice(id: string, input: { invoiceNumber?: string; date?: string; totalAmountUsd?: MoneyInput }) {
     return prisma.$transaction(async (tx) => {
       const invoice = await tx.supplierInvoice.findUnique({ where: { id } });
       if (!invoice) throw new Error('Накладная не найдена');
@@ -545,25 +550,25 @@ export class SuppliersService {
       if (input.totalAmountUsd !== undefined) {
         const oldTotal = invoice.totalAmountUsd;
         const newTotal = requireNonNegativeMoney(input.totalAmountUsd, 'Сумма накладной');
-        if (newTotal + 0.01 < invoice.paidAmountUsd) throw new Error('Сумма накладной не может быть меньше уже оплаченной суммы');
-        const diff = newTotal - oldTotal;
+        if (D(D(newTotal).plus(0.01)).lt(invoice.paidAmountUsd)) throw new Error('Сумма накладной не может быть меньше уже оплаченной суммы');
+        const diff = D(newTotal).minus(oldTotal);
 
         data.totalAmountUsd = newTotal;
 
-        if (diff !== 0) {
+        if (!diff.isZero()) {
           const invoiceDevices = await tx.device.findMany({ where: { purchaseInvoiceId: id }, select: { id: true } });
           if (await deviceHasTransactionHistory(tx, invoiceDevices.map((device) => device.id))) {
             throw new Error('Нельзя менять сумму накладной после продажи, перемещения или ремонта её устройств');
           }
-          if (oldTotal <= 0 && invoiceDevices.length > 0) throw new Error('Для изменения нулевой накладной отредактируйте состав прихода');
-          const ratio = oldTotal > 0 ? newTotal / oldTotal : 1;
+          if (D(oldTotal).lte(0) && invoiceDevices.length > 0) throw new Error('Для изменения нулевой накладной отредактируйте состав прихода');
+          const ratio = D(oldTotal).gt(0) ? D(newTotal).div(oldTotal) : 1;
           const groups = await tx.invoiceGroup.findMany({ where: { invoiceId: id } });
           for (const group of groups) {
-            await tx.invoiceGroup.update({ where: { id: group.id }, data: { purchasePriceUsd: Number((group.purchasePriceUsd * ratio).toFixed(2)) } });
+            await tx.invoiceGroup.update({ where: { id: group.id }, data: { purchasePriceUsd: D((D(group.purchasePriceUsd).mul(ratio)).toFixed(2)) } });
           }
           const devices = await tx.device.findMany({ where: { purchaseInvoiceId: id } });
           for (const device of devices) {
-            const adjustedCost = Number((device.purchasePriceUsd * ratio).toFixed(2));
+            const adjustedCost = D((D(device.purchasePriceUsd).mul(ratio)).toFixed(2));
             await tx.device.update({ where: { id: device.id }, data: { purchasePriceUsd: adjustedCost, costBasisUsd: adjustedCost } });
           }
           await tx.supplier.update({
@@ -596,7 +601,7 @@ export class SuppliersService {
     return prisma.$transaction(async (tx) => {
       const invoice = await tx.supplierInvoice.findUnique({ where: { id } });
       if (!invoice) throw new Error('Накладная не найдена');
-      if (invoice.paidAmountUsd > 0) throw new Error('Нельзя удалить уже оплаченную или частично оплаченную накладную');
+      if (D(invoice.paidAmountUsd).gt(0)) throw new Error('Нельзя удалить уже оплаченную или частично оплаченную накладную');
 
       // purchaseInvoiceId is the only reliable link — invoiceNumber has no uniqueness
       // constraint (two invoices, even from different suppliers, can share one), so
@@ -613,7 +618,7 @@ export class SuppliersService {
         }
       }
 
-      const remainingDebtOnInvoice = invoice.totalAmountUsd - invoice.paidAmountUsd;
+      const remainingDebtOnInvoice = D(invoice.totalAmountUsd).minus(invoice.paidAmountUsd);
 
       await tx.invoiceGroup.deleteMany({ where: { invoiceId: id } });
       await tx.supplierPaymentAllocation.deleteMany({ where: { invoiceId: id } });

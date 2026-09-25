@@ -476,3 +476,57 @@ body {
   height: 100dvh;
   max-height: 100dvh;
 }
+
+/* =========================================================================
+   MODAL LAYER & DIALOG SHEETS (Consistent across all mobile screens & desktop)
+   ========================================================================= */
+.modal-layer {
+  position: fixed !important;
+  inset: 0 !important;
+  z-index: 60 !important;
+  display: flex !important;
+  overflow: hidden !important;
+}
+
+.modal-layer.modal-sheet {
+  align-items: flex-end !important;
+  justify-content: center !important;
+  padding: 0 !important;
+}
+
+@media (min-width: 768px) {
+  .modal-layer.modal-sheet {
+    align-items: center !important;
+    justify-content: center !important;
+    padding: 1rem !important;
+  }
+}
+
+.modal-layer.modal-legacy {
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 1rem !important;
+}
+
+.modal-layer.modal-fullscreen {
+  align-items: stretch !important;
+  justify-content: stretch !important;
+}
+
+.dialog-panel {
+  max-height: 90dvh;
+  width: 100%;
+}
+
+@media (max-width: 767px) {
+  .dialog-panel {
+    max-height: 88dvh;
+    border-bottom-left-radius: 0 !important;
+    border-bottom-right-radius: 0 !important;
+  }
+}
+
+.dialog-bottom-space {
+  padding-bottom: max(1rem, env(safe-area-inset-bottom, 1rem));
+}
+

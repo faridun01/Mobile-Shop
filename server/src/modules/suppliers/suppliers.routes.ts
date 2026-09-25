@@ -1,3 +1,4 @@
+import { D, decimalMin, decimalMax, moneyJson, type MoneyInput } from '../../common/decimal';
 import type { Express } from 'express';
 import type { Prisma } from '@prisma/client';
 import { authenticateJwt, requireRoles, type AuthenticatedRequest } from '../../auth/auth.middleware';
@@ -53,8 +54,8 @@ export function registerSupplierRoutes(app: Express) {
       });
       const withComputed = invoices.map((inv) => ({
         ...inv,
-        remainingAmountUsd: inv.totalAmountUsd - inv.paidAmountUsd,
-        status: inv.paidAmountUsd >= inv.totalAmountUsd ? 'PAID' : inv.paidAmountUsd > 0 ? 'PARTIALLY_PAID' : 'UNPAID',
+        remainingAmountUsd: D(inv.totalAmountUsd).minus(inv.paidAmountUsd),
+        status: D(inv.paidAmountUsd).gte(inv.totalAmountUsd) ? 'PAID' : D(inv.paidAmountUsd).gt(0) ? 'PARTIALLY_PAID' : 'UNPAID',
       }));
       res.json(withComputed);
     } catch (error) {
@@ -89,16 +90,18 @@ export function registerSupplierRoutes(app: Express) {
 
   app.post('/api/suppliers/:id/payments', authenticateJwt, requireRoles('ADMIN', 'PARTNER'), async (req: AuthenticatedRequest, res, next) => {
     try {
-      const { amountUsd, sourceAccount, storeId, note } = req.body ?? {};
-      if (!amountUsd || !sourceAccount) {
-        res.status(400).json({ message: 'amountUsd и sourceAccount обязательны' });
+      const { amountUsd, sourceAccount, sourceAccountId, storeId, note } = req.body ?? {};
+      const resolvedStoreId = storeId || sourceAccountId;
+      const resolvedSourceAccount = sourceAccount || 'STORE_CASH';
+      if (!amountUsd || !resolvedStoreId) {
+        res.status(400).json({ message: 'Сумма оплаты (amountUsd) и касса списания (storeId/sourceAccountId) обязательны' });
         return;
       }
       const result = await SuppliersService.pay({
         supplierId: req.params.id,
-        amountUsd: Number(amountUsd),
-        sourceAccount,
-        storeId,
+        amountUsd: D(amountUsd),
+        sourceAccount: resolvedSourceAccount,
+        storeId: resolvedStoreId,
         note,
         createdByUserId: req.user!.userId,
       });
@@ -111,16 +114,18 @@ export function registerSupplierRoutes(app: Express) {
 
   app.post('/api/supplier-invoices/:id/payments', authenticateJwt, requireRoles('ADMIN', 'PARTNER'), async (req: AuthenticatedRequest, res, next) => {
     try {
-      const { amountUsd, sourceAccount, storeId } = req.body ?? {};
-      if (!amountUsd || !sourceAccount) {
-        res.status(400).json({ message: 'amountUsd и sourceAccount обязательны' });
+      const { amountUsd, sourceAccount, sourceAccountId, storeId } = req.body ?? {};
+      const resolvedStoreId = storeId || sourceAccountId;
+      const resolvedSourceAccount = sourceAccount || 'STORE_CASH';
+      if (!amountUsd || !resolvedStoreId) {
+        res.status(400).json({ message: 'Сумма оплаты (amountUsd) и касса списания (storeId/sourceAccountId) обязательны' });
         return;
       }
       const result = await SuppliersService.payInvoice({
         invoiceId: req.params.id,
-        amountUsd: Number(amountUsd),
-        sourceAccount,
-        storeId,
+        amountUsd: D(amountUsd),
+        sourceAccount: resolvedSourceAccount,
+        storeId: resolvedStoreId,
         createdByUserId: req.user!.userId,
       });
       RealtimeSyncGateway.broadcast('SUPPLIER_PAYMENT', { invoiceId: req.params.id });

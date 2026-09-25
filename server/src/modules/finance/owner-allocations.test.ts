@@ -1,3 +1,4 @@
+import '../../common/decimal-test-setup';
 import { describe, expect, it, vi } from 'vitest';
 import { readOwnerAllocations, replaceOwnerAllocations } from './owner-allocations';
 

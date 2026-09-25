@@ -1,3 +1,4 @@
+import { D, decimalMin, decimalMax, moneyJson, type MoneyInput } from '../../common/decimal';
 import { prisma } from '../../prisma/prisma.service';
 import type { TransactionClient } from '../../prisma/prisma.service';
 import { getRateForDate } from '../exchange-rate/exchange-rate.service';
@@ -9,10 +10,10 @@ import { postTransaction } from '../finance/financial-transaction.service';
 export interface CreateSaleInput {
   storeId: string;
   userId: string;
-  items: { deviceId: string; salePriceTjs: number }[];
+  items: { deviceId: string; salePriceTjs: MoneyInput }[];
   paymentMethod: 'CASH' | 'CARD' | 'SPLIT';
-  cashAmountTjs?: number;
-  cardAmountTjs?: number;
+  cashAmountTjs?: MoneyInput;
+  cardAmountTjs?: MoneyInput;
   customerName?: string;
 }
 
@@ -45,13 +46,13 @@ export class SalesService {
       ...item,
       salePriceTjs: requirePositiveMoney(item.salePriceTjs, 'Цена продажи'),
     }));
-    const totalTjs = normalizedItems.reduce((sum, item) => sum + item.salePriceTjs, 0);
-    const cashAmountTjs = input.paymentMethod === 'CASH' ? totalTjs : input.paymentMethod === 'SPLIT' ? input.cashAmountTjs ?? 0 : 0;
-    const cardAmountTjs = input.paymentMethod === 'CARD' ? totalTjs : input.paymentMethod === 'SPLIT' ? input.cardAmountTjs ?? 0 : 0;
+    const totalTjs = normalizedItems.reduce((sum, item) => D(sum).plus(item.salePriceTjs), D(0));
+    const cashAmountTjs = requireNonNegativeMoney(input.paymentMethod === 'CASH' ? totalTjs : input.paymentMethod === 'SPLIT' ? input.cashAmountTjs ?? 0 : 0, 'Сумма наличными');
+    const cardAmountTjs = requireNonNegativeMoney(input.paymentMethod === 'CARD' ? totalTjs : input.paymentMethod === 'SPLIT' ? input.cardAmountTjs ?? 0 : 0, 'Сумма по карте');
 
     requireNonNegativeMoney(cashAmountTjs, 'Сумма наличными');
     requireNonNegativeMoney(cardAmountTjs, 'Сумма по карте');
-    if (input.paymentMethod === 'SPLIT' && !moneyEquals(cashAmountTjs + cardAmountTjs, totalTjs)) {
+    if (input.paymentMethod === 'SPLIT' && !moneyEquals(D(cashAmountTjs).plus(cardAmountTjs), totalTjs)) {
       throw new Error('Сумма наличных и по карте должна совпадать с итоговой суммой чека');
     }
 
@@ -73,17 +74,17 @@ export class SalesService {
       }
       const deviceById = new Map(devices.map((d) => [d.id, d]));
 
-      const totalUsd = roundMoney(totalTjs / rate);
-      let totalCostUsd = 0;
+      const totalUsd = roundMoney(D(totalTjs).div(rate));
+      let totalCostUsd = D(0);
       let hasBelowCostItem = false;
 
       const saleItemsData = normalizedItems.map((item) => {
         const device = deviceById.get(item.deviceId)!;
-        const salePriceUsd = roundMoney(item.salePriceTjs / rate);
-        const costTjs = device.costBasisUsd * rate;
-        const isBelowCost = item.salePriceTjs < costTjs;
+        const salePriceUsd = roundMoney(D(item.salePriceTjs).div(rate));
+        const costTjs = D(device.costBasisUsd).mul(rate);
+        const isBelowCost = D(item.salePriceTjs).lt(costTjs);
         if (isBelowCost) hasBelowCostItem = true;
-        totalCostUsd += device.costBasisUsd;
+        totalCostUsd = D(totalCostUsd).plus(device.costBasisUsd);
         return {
           deviceId: device.id,
           brand: device.brand,
@@ -136,7 +137,7 @@ export class SalesService {
         })),
       });
 
-      if (cashAmountTjs !== 0) {
+      if (!D(cashAmountTjs).eq(0)) {
         await tx.store.update({ where: { id: input.storeId }, data: { cashBalanceTjs: { increment: cashAmountTjs } } });
         // Card payments settle outside any account this system tracks today (no
         // card/bank settlement account exists yet — matches existing behavior, where
@@ -153,7 +154,7 @@ export class SalesService {
           currency: 'TJS',
           exchangeRate: rate,
           amountTjs: cashAmountTjs,
-          amountUsd: roundMoney(cashAmountTjs / rate),
+          amountUsd: roundMoney(D(cashAmountTjs).div(rate)),
           categoryName: 'Продажа',
           shopId: input.storeId,
           sourceType: 'SALE',
@@ -163,7 +164,7 @@ export class SalesService {
         });
       }
 
-      const saleProfitUsd = roundMoney(totalUsd - totalCostUsd);
+      const saleProfitUsd = roundMoney(D(totalUsd).minus(totalCostUsd));
       const owners = await tx.owner.findMany();
       const ownerProfitAllocations = allocateOwnerProfit(saleProfitUsd, owners);
       await Promise.all(ownerProfitAllocations.map(({ ownerId, amountUsd: delta }) => {
@@ -191,7 +192,7 @@ export class SalesService {
           userId: input.userId,
           action: hasBelowCostItem ? 'SALE_BELOW_COST' : 'SALE',
           details: `Чек #${sale.receiptNumber}: продажа ${saleItemsData.length} устройств на сумму ${totalTjs} TJS ($${totalUsd})`,
-          financialDetails: { amountTjs: totalTjs, amountUsd: totalUsd, exchangeRate: rate, recognizedProfitUsd: saleProfitUsd, ownerProfitAllocations },
+          financialDetails: moneyJson({ amountTjs: totalTjs, amountUsd: totalUsd, exchangeRate: rate, recognizedProfitUsd: saleProfitUsd, ownerProfitAllocations: moneyJson(ownerProfitAllocations) }),
           receiptNumber: sale.receiptNumber,
           targetId: sale.id,
         },

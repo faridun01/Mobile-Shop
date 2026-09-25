@@ -1,3 +1,4 @@
+import { D, decimalMin, decimalMax, moneyJson, type MoneyInput } from '../../common/decimal';
 import { prisma } from '../../prisma/prisma.service';
 import { AuthService } from '../../auth/auth.service';
 import { resolveActor } from '../../common/actor';
@@ -52,7 +53,7 @@ export class UsersService {
     name: string;
     role: 'ADMIN' | 'PARTNER' | 'SELLER';
     storeId?: string;
-    baseSalaryTjs?: number;
+    baseSalaryTjs?: MoneyInput;
     salesCommissionPercent?: number;
     createdByUserId: string;
   }) {
@@ -94,7 +95,7 @@ export class UsersService {
       name?: string;
       role?: 'ADMIN' | 'PARTNER' | 'SELLER';
       storeId?: string | null;
-      baseSalaryTjs?: number;
+      baseSalaryTjs?: MoneyInput;
       salesCommissionPercent?: number;
     },
     updatedByUserId: string,

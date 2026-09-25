@@ -435,7 +435,7 @@ export const SalePage: React.FC = () => {
         subtitle={`${totalTjs.toLocaleString()} TJS ≈ $${totalUsd}`}
         maxWidth="lg"
         footer={
-          <div className="flex gap-2">
+          <div className="w-full grid grid-cols-2 gap-2">
             <Button
               variant="secondary"
               size="lg"
@@ -443,6 +443,7 @@ export const SalePage: React.FC = () => {
               leftIcon={Plus}
               disabled={isSubmittingSale}
               onClick={handleAddMore}
+              className="h-12 text-sm font-bold flex items-center justify-center"
             >
               Добавить ещё
             </Button>
@@ -453,8 +454,9 @@ export const SalePage: React.FC = () => {
               loading={isSubmittingSale}
               disabled={hasEmptyPrice || totalTjs <= 0}
               onClick={handleFinishPayment}
+              className="h-12 text-sm font-bold flex items-center justify-center"
             >
-              {isSubmittingSale ? 'Оформление…' : hasEmptyPrice ? 'Укажите цену' : `Оплата `}
+              {isSubmittingSale ? 'Оформление…' : hasEmptyPrice ? 'Укажите цену' : 'Оплата'}
             </Button>
           </div>
         }
