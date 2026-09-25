@@ -292,10 +292,11 @@ export const PurchasePage: React.FC = () => {
     return (supplierInvoices || []).filter((inv) => {
       // 1. Period filter
       const invDateStr = getBusinessDateKey(new Date(inv.date));
-      if (periodFilter === 'TODAY' && invDateStr !== todayStr) {
+      const rawDateStr = typeof inv.date === 'string' ? inv.date : '';
+      if (periodFilter === 'TODAY' && invDateStr !== todayStr && !rawDateStr.startsWith(todayStr)) {
         return false;
       }
-      if (periodFilter === 'SPECIFIC_MONTH' && !invDateStr.startsWith(selectedMonth)) {
+      if (periodFilter === 'SPECIFIC_MONTH' && !invDateStr.startsWith(selectedMonth) && !rawDateStr.startsWith(selectedMonth)) {
         return false;
       }
 
@@ -639,15 +640,14 @@ export const PurchasePage: React.FC = () => {
             </button>
           </div>
 
-          {/* Period selector & Supplier Filter — kept on one scrollable row instead of
-              wrapping to a second line on narrow/mobile screens. */}
-          <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none text-xs">
+          {/* Period selector & Supplier Filter */}
+          <div className="flex flex-wrap items-center gap-1.5 text-xs">
             <button
               type="button"
               onClick={() => setPeriodFilter('TODAY')}
               className={`shrink-0 px-3 py-1.5 rounded-xl border text-xs font-bold uppercase transition-colors ${
                 periodFilter === 'TODAY'
-                  ? 'border-accent bg-accent/10 text-accent'
+                  ? 'border-accent bg-accent/10 text-accent shadow-xs'
                   : 'border-border bg-surface text-fg-muted hover:text-fg'
               }`}
             >
@@ -656,13 +656,14 @@ export const PurchasePage: React.FC = () => {
 
             <MonthPicker
               value={selectedMonth}
+              onOpen={() => setPeriodFilter('SPECIFIC_MONTH')}
               onChange={(v) => {
                 setSelectedMonth(v);
                 setPeriodFilter('SPECIFIC_MONTH');
               }}
               className={`px-3 py-1.5 rounded-xl border text-xs font-semibold transition-colors bg-surface focus:outline-none ${
                 periodFilter === 'SPECIFIC_MONTH'
-                  ? 'border-accent text-accent font-bold'
+                  ? 'border-accent text-accent font-bold shadow-xs'
                   : 'border-border text-fg-muted hover:border-fg-subtle'
               }`}
             />
@@ -672,7 +673,7 @@ export const PurchasePage: React.FC = () => {
               onClick={() => setPeriodFilter('ALL')}
               className={`shrink-0 px-3 py-1.5 rounded-xl border text-xs font-bold uppercase transition-colors ${
                 periodFilter === 'ALL'
-                  ? 'border-accent bg-accent/10 text-accent'
+                  ? 'border-accent bg-accent/10 text-accent shadow-xs'
                   : 'border-border bg-surface text-fg-muted hover:text-fg'
               }`}
             >

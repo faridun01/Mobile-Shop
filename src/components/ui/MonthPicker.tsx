@@ -1,4 +1,5 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { Calendar, ChevronLeft, ChevronRight } from 'lucide-react';
 import { cn } from '../../utils/cn';
 
@@ -11,35 +12,80 @@ interface MonthPickerProps {
   /** 'YYYY-MM', same format the native <input type="month"> this replaces used. */
   value: string;
   onChange: (value: string) => void;
+  onOpen?: () => void;
   className?: string;
 }
 
 /**
- * Drop-in replacement for <input type="month">. The native picker's calendar popup always
- * renders in the browser/OS locale — on an English-locale machine that means English month
- * names no matter what language the rest of the app is in, with no way to override it from
- * HTML/CSS. This renders its own dropdown instead, so month names are always Russian and
- * picking one applies immediately (no separate "confirm" step some native pickers require).
+ * Drop-in replacement for <input type="month">. Rendered via portal to document.body
+ * so it is NEVER clipped by any parent container with overflow-x: auto or overflow: hidden.
  */
-export const MonthPicker: React.FC<MonthPickerProps> = ({ value, onChange, className }) => {
+export const MonthPicker: React.FC<MonthPickerProps> = ({ value, onChange, onOpen, className }) => {
   const [open, setOpen] = useState(false);
-  const containerRef = useRef<HTMLDivElement>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const popoverRef = useRef<HTMLDivElement>(null);
+  const [coords, setCoords] = useState<{ top: number; left: number }>({ top: 0, left: 0 });
 
   const [valueYearStr, valueMonthStr] = value.split('-');
   const valueYear = Number(valueYearStr) || undefined;
   const valueMonth = Number(valueMonthStr) || undefined; // 1-indexed
 
-  // The year shown in the grid can be paged independently of the actual selection —
-  // reset to the selected year every time the popover is (re)opened.
   const [viewYear, setViewYear] = useState<number>(valueYear || new Date().getFullYear());
   useEffect(() => {
     if (open) setViewYear(valueYear || new Date().getFullYear());
   }, [open, valueYear]);
 
+  const updatePosition = useCallback(() => {
+    if (!buttonRef.current) return;
+    const rect = buttonRef.current.getBoundingClientRect();
+    const popoverWidth = 224;
+    const popoverHeight = 185;
+
+    // Horizontally clamp within viewport
+    let left = rect.left;
+    if (left + popoverWidth > window.innerWidth - 8) {
+      left = Math.max(8, window.innerWidth - popoverWidth - 8);
+    }
+    if (left < 8) left = 8;
+
+    // Vertically open below, or above if tight space
+    let top = rect.bottom + 4;
+    if (top + popoverHeight > window.innerHeight && rect.top - popoverHeight - 4 > 0) {
+      top = rect.top - popoverHeight - 4;
+    }
+
+    setCoords({ top, left });
+  }, []);
+
+  const handleToggle = () => {
+    if (!open) {
+      updatePosition();
+      onOpen?.();
+      setOpen(true);
+    } else {
+      setOpen(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!open) return;
+    const handleScrollOrResize = () => updatePosition();
+    window.addEventListener('resize', handleScrollOrResize, { passive: true });
+    window.addEventListener('scroll', handleScrollOrResize, { passive: true, capture: true });
+    return () => {
+      window.removeEventListener('resize', handleScrollOrResize);
+      window.removeEventListener('scroll', handleScrollOrResize, { capture: true });
+    };
+  }, [open, updatePosition]);
+
   useEffect(() => {
     if (!open) return;
     const handleClickOutside = (e: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+      const target = e.target as Node;
+      if (
+        buttonRef.current && !buttonRef.current.contains(target) &&
+        popoverRef.current && !popoverRef.current.contains(target)
+      ) {
         setOpen(false);
       }
     };
@@ -57,24 +103,29 @@ export const MonthPicker: React.FC<MonthPickerProps> = ({ value, onChange, class
   const label = valueMonth && valueYear ? `${MONTH_NAMES_RU[valueMonth - 1]} ${valueYear}` : 'Выберите месяц';
 
   return (
-    <div className="relative shrink-0" ref={containerRef}>
+    <>
       <button
+        ref={buttonRef}
         type="button"
-        onClick={() => setOpen((o) => !o)}
-        className={cn('inline-flex items-center gap-1.5 cursor-pointer', className)}
+        onClick={handleToggle}
+        className={cn('inline-flex items-center gap-1.5 cursor-pointer shrink-0 select-none', className)}
       >
         <Calendar className="w-3.5 h-3.5 shrink-0" />
         <span className="truncate">{label}</span>
       </button>
 
-      {open && (
-        <div className="absolute z-50 top-full left-0 mt-1 w-52 rounded-lg border border-border bg-surface shadow-lg p-2">
-          <div className="flex items-center justify-between mb-1.5">
+      {open && typeof document !== 'undefined' && createPortal(
+        <div
+          ref={popoverRef}
+          style={{ top: `${coords.top}px`, left: `${coords.left}px` }}
+          className="fixed z-[9999] w-56 rounded-xl border border-border bg-surface shadow-2xl p-2.5 backdrop-blur-md animate-in fade-in zoom-in-95 duration-100"
+        >
+          <div className="flex items-center justify-between mb-2 pb-1.5 border-b border-border">
             <button
               type="button"
               onClick={() => setViewYear((y) => y - 1)}
               aria-label="Предыдущий год"
-              className="p-1 rounded-md hover:bg-surface-raised text-fg-muted"
+              className="p-1 rounded-lg hover:bg-surface-raised text-fg-muted transition-colors"
             >
               <ChevronLeft className="w-4 h-4" />
             </button>
@@ -83,7 +134,7 @@ export const MonthPicker: React.FC<MonthPickerProps> = ({ value, onChange, class
               type="button"
               onClick={() => setViewYear((y) => y + 1)}
               aria-label="Следующий год"
-              className="p-1 rounded-md hover:bg-surface-raised text-fg-muted"
+              className="p-1 rounded-lg hover:bg-surface-raised text-fg-muted transition-colors"
             >
               <ChevronRight className="w-4 h-4" />
             </button>
@@ -99,8 +150,10 @@ export const MonthPicker: React.FC<MonthPickerProps> = ({ value, onChange, class
                     onChange(`${viewYear}-${String(idx + 1).padStart(2, '0')}`);
                     setOpen(false);
                   }}
-                  className={`py-1.5 rounded-md text-[11px] font-semibold transition-colors ${
-                    isSelected ? 'bg-accent text-accent-fg' : 'text-fg-muted hover:bg-surface-raised'
+                  className={`py-1.5 rounded-lg text-xs font-medium transition-all ${
+                    isSelected
+                      ? 'bg-accent text-accent-fg font-bold shadow-xs'
+                      : 'text-fg-muted hover:bg-surface-raised active:scale-95'
                   }`}
                 >
                   {name.slice(0, 3)}
@@ -108,8 +161,9 @@ export const MonthPicker: React.FC<MonthPickerProps> = ({ value, onChange, class
               );
             })}
           </div>
-        </div>
+        </div>,
+        document.body
       )}
-    </div>
+    </>
   );
 };
