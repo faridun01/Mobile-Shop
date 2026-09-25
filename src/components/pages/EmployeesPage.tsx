@@ -37,12 +37,11 @@ export const EmployeesPage: React.FC = () => {
     fetchExpensesRange,
     sales,
     fetchSalesRange,
-    todayRate,
     createUser,
     updateUser,
     deleteUser,
     createExpense
-  } = useAppFields('currentUser', 'users', 'stores', 'expenses', 'fetchExpensesRange', 'sales', 'fetchSalesRange', 'todayRate', 'createUser', 'updateUser', 'deleteUser', 'createExpense');
+  } = useAppFields('currentUser', 'users', 'stores', 'expenses', 'fetchExpensesRange', 'sales', 'fetchSalesRange', 'createUser', 'updateUser', 'deleteUser', 'createExpense');
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);

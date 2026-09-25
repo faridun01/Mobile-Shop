@@ -1,7 +1,6 @@
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { useAppFields } from '../../context/AppContext';
 import { SupplierInvoice, Device } from '../../types';
-import { FALLBACK_EXCHANGE_RATE } from '../../utils/exchangeRate';
 import {
   Plus,
   Trash2,
@@ -65,7 +64,6 @@ export const PurchasePage: React.FC = () => {
     currentUser,
     suppliers,
     stores,
-    todayRate,
     supplierInvoices,
     devices,
     findDevicesByInvoice,
@@ -76,7 +74,7 @@ export const PurchasePage: React.FC = () => {
     deleteSupplierInvoice,
     createSupplier,
     openScanner
-  } = useAppFields('currentUser', 'suppliers', 'stores', 'todayRate', 'supplierInvoices', 'devices', 'findDevicesByInvoice', 'findDeviceByImei', 'fetchInvoicesRange', 'createPurchase', 'updateSupplierInvoice', 'deleteSupplierInvoice', 'createSupplier', 'openScanner');
+  } = useAppFields('currentUser', 'suppliers', 'stores', 'supplierInvoices', 'devices', 'findDevicesByInvoice', 'findDeviceByImei', 'fetchInvoicesRange', 'createPurchase', 'updateSupplierInvoice', 'deleteSupplierInvoice', 'createSupplier', 'openScanner');
 
   // Edit Invoice Modal state
   const [editingInvoiceModal, setEditingInvoiceModal] = useState<SupplierInvoice | null>(null);
@@ -219,7 +217,7 @@ export const PurchasePage: React.FC = () => {
     // the company (e.g. a payment changing one invoice's status elsewhere).
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [supplierInvoices?.length]);
-  const [purchaseDate, setPurchaseDate] = useState<string>(new Date().toISOString().split('T')[0]);
+  const [purchaseDate] = useState<string>(new Date().toISOString().split('T')[0]);
   
   // Destination mode (Main Warehouse intake is ADMIN ONLY)
   const [isStorePurchase, setIsStorePurchase] = useState<boolean>(currentUser?.role !== 'ADMIN');
@@ -242,9 +240,6 @@ export const PurchasePage: React.FC = () => {
   const [statusMessage, setStatusMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [justSavedInvoice, setJustSavedInvoice] = useState<string | null>(null);
-
-  // Current rate
-  const rate = todayRate?.rate || FALLBACK_EXCHANGE_RATE;
 
   // Autocomplete suggestion lists derived from database devices and standard presets
   const brandOptions = useMemo(() => {
@@ -334,12 +329,6 @@ export const PurchasePage: React.FC = () => {
       return true;
     }).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
   }, [supplierInvoices, devices, periodFilter, selectedMonth, selectedSupplierFilter, searchQuery]);
-
-  // Aggregate stats for invoices
-  const totalInvoicesCount = filteredInvoices.length;
-  const totalUnitsReceived = filteredInvoices.reduce((acc, inv) => acc + (inv.devicesCount || 0), 0);
-  const totalSumUsd = filteredInvoices.reduce((acc, inv) => acc + (inv.totalAmountUsd || 0), 0);
-  const totalDebtUsd = filteredInvoices.reduce((acc, inv) => acc + (inv.remainingAmountUsd || 0), 0);
 
   // Scan finder to locate purchase
   const handleScanFinder = () => {

@@ -26,7 +26,7 @@ const FILTER_CATEGORIES = [
   { id: 'SYSTEM', label: 'Системные' },
 ];
 
-export const getLogCategory = (log: { action?: string; details?: string; category?: string }): string => {
+const getLogCategory = (log: { action?: string; details?: string; category?: string }): string => {
   if (log.category && log.category !== 'SYSTEM' && log.category !== 'OTHER') {
     return log.category.toUpperCase();
   }

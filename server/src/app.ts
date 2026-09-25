@@ -1,4 +1,4 @@
-import { D, decimalMin, decimalMax, moneyJson, type MoneyInput } from './common/decimal';
+import { D, moneyJson } from './common/decimal';
 import 'dotenv/config';
 import express, { type NextFunction, type Request, type Response } from 'express';
 import { prisma } from './prisma/prisma.service';
@@ -240,7 +240,7 @@ app.get('/api/devices', authenticateJwt, async (req: AuthenticatedRequest, res, 
 
 app.post('/api/purchases', authenticateJwt, requireRoles('ADMIN', 'PARTNER'), enforceBodyStoreScope, async (req: AuthenticatedRequest, res, next) => {
   try {
-    const { supplierId, invoiceNumber, date, storeId, isStorePurchase, groups } = req.body ?? {};
+    const { supplierId, invoiceNumber, date, storeId, groups } = req.body ?? {};
     if (!supplierId || !invoiceNumber || !storeId || !Array.isArray(groups) || groups.length === 0) {
       res.status(400).json({ message: 'supplierId, invoiceNumber, storeId и groups обязательны' });
       return;

@@ -1,4 +1,4 @@
-import { D, decimalMin, decimalMax, moneyJson, type MoneyInput } from '../../common/decimal';
+import { D, moneyJson, type MoneyInput } from '../../common/decimal';
 import { prisma } from '../../prisma/prisma.service';
 import type { TransactionClient } from '../../prisma/prisma.service';
 import { resolveActor } from '../../common/actor';
@@ -19,7 +19,7 @@ export async function listCategories() {
   return prisma.financialCategory.findMany({ where: { active: true }, orderBy: { name: 'asc' } });
 }
 
-export interface CreateCategoryInput {
+interface CreateCategoryInput {
   name: string;
   direction: 'IN' | 'OUT';
 }
@@ -88,7 +88,7 @@ async function syncStoreCashBalance(tx: TransactionClient, account: { storeId: s
   }
 }
 
-export interface ManualEntryInput {
+interface ManualEntryInput {
   accountId: string;
   amount: MoneyInput;
   currency: LedgerCurrency;
@@ -226,7 +226,7 @@ export async function createCashExpense(input: ManualEntryInput) {
   }
 }
 
-export interface CreateTransferInput {
+interface CreateTransferInput {
   accountId: string;
   destinationAccountId: string;
   amount: MoneyInput;
@@ -358,7 +358,7 @@ export async function cancelFinancialTransaction(transactionId: string, actorId:
   }
 }
 
-export interface ListTransactionsInput {
+interface ListTransactionsInput {
   cursor?: string;
   limit?: number;
   period?: ReportPeriod;

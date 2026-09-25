@@ -1,28 +1,6 @@
-import type {
-  Device,
-  DeviceTimelineEvent,
-  Sale,
-  SaleItem,
-  ExchangeEvent,
-  Supplier,
-  SupplierInvoice,
-  SupplierBonus,
-  Expense,
-  Owner,
-  OwnerTransaction,
-  TransferRequest,
-  RepairTicket,
-  User,
-  Store,
-  NotificationItem,
-  AuditLogEntry,
-  DailyRate,
-  FinancialAccount,
-  FinancialCategory,
-  FinancialTransaction,
-} from '../types';
+import type { Device, DeviceTimelineEvent, Sale, SaleItem, ExchangeEvent, Supplier, SupplierInvoice, SupplierBonus, Expense, Owner, OwnerTransaction, TransferRequest, RepairTicket, User, Store, NotificationItem, AuditLogEntry, DailyRate } from '../types';
 
-export type NameLookup = Map<string, string>;
+type NameLookup = Map<string, string>;
 
 export function buildNameLookup(users: any[]): NameLookup {
   return new Map(users.map((u) => [u.id, u.name]));
@@ -361,65 +339,6 @@ export function mapStore(s: any): Store {
     isMainWarehouse: s.isMainWarehouse,
     cashBalanceTjs: s.cashBalanceTjs,
     active: s.active,
-  };
-}
-
-export function mapFinancialAccount(a: any): FinancialAccount {
-  return {
-    id: a.id,
-    name: a.name,
-    type: a.type,
-    storeId: a.storeId ?? undefined,
-    storeName: a.store?.name ?? undefined,
-    active: a.active,
-    balanceTjs: a.balanceTjs,
-    balanceUsd: a.balanceUsd,
-    openingBalanceTjs: a.openingBalanceTjs,
-    openingBalanceUsd: a.openingBalanceUsd,
-  };
-}
-
-export function mapFinancialCategory(c: any): FinancialCategory {
-  return {
-    id: c.id,
-    name: c.name,
-    direction: c.direction,
-    isSystem: c.isSystem,
-    active: c.active,
-  };
-}
-
-export function mapFinancialTransaction(t: any): FinancialTransaction {
-  return {
-    id: t.id,
-    transactionNumber: t.transactionNumber,
-    type: t.type,
-    direction: t.direction,
-    status: t.status,
-    transactionDate: t.transactionDate,
-    accountId: t.accountId,
-    accountName: t.account?.name,
-    destinationAccountId: t.destinationAccountId ?? undefined,
-    destinationAccountName: t.destinationAccount?.name,
-    amount: t.amount,
-    currency: t.currency,
-    exchangeRate: t.exchangeRate ?? undefined,
-    amountTjs: t.amountTjs,
-    amountUsd: t.amountUsd,
-    balanceCurrency: t.balanceCurrency,
-    categoryId: t.categoryId ?? undefined,
-    categoryName: t.category?.name,
-    counterpartyType: t.counterpartyType ?? undefined,
-    counterpartyId: t.counterpartyId ?? undefined,
-    counterpartyName: t.counterpartyName ?? undefined,
-    shopId: t.shopId ?? undefined,
-    sourceType: t.sourceType ?? undefined,
-    sourceId: t.sourceId ?? undefined,
-    reversedTransactionId: t.reversedTransactionId ?? undefined,
-    description: t.description,
-    comment: t.comment ?? undefined,
-    createdByUserId: t.createdByUserId,
-    createdAt: t.createdAt,
   };
 }
 

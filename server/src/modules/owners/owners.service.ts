@@ -1,4 +1,4 @@
-import { D, decimalMin, decimalMax, moneyJson, type MoneyInput } from '../../common/decimal';
+import { D, moneyJson, type MoneyInput } from '../../common/decimal';
 import { prisma } from '../../prisma/prisma.service';
 import type { TransactionClient } from '../../prisma/prisma.service';
 import { resolveActor } from '../../common/actor';
@@ -255,50 +255,6 @@ export class OwnersService {
           details: `Изменены доли партнеров: ${normalized.map((s) => `${s.sharePercent}%`).join(', ')}${rebalanceBalances ? ' (остатки прибыли пересчитаны по долям)' : ''}`,
         },
       });
-      return tx.owner.findMany();
-    });
-  }
-
-  public static async rebalanceBalancesByShares(userId: string) {
-    return prisma.$transaction(async (tx) => {
-      const actor = await resolveActor(tx, userId);
-      const owners = await tx.owner.findMany();
-      if (!owners.length) throw new Error('Владельцы не найдены');
-
-      const totalAvailable = roundMoney(owners.reduce((sum, o) => D(sum).plus((o.availableProfitUsd || 0)), D(0)));
-      const totalAccrued = roundMoney(owners.reduce((sum, o) => D(sum).plus((o.totalAccruedProfitUsd || 0)), D(0)));
-
-      const availAllocations = allocateOwnerProfit(
-        totalAvailable,
-        owners.map(o => ({ id: o.id, profitSharePercent: o.profitSharePercent }))
-      );
-      const accruedAllocations = allocateOwnerProfit(
-        totalAccrued,
-        owners.map(o => ({ id: o.id, profitSharePercent: o.profitSharePercent }))
-      );
-
-      for (const o of owners) {
-        const avail = availAllocations.find(a => a.ownerId === o.id)?.amountUsd ?? 0;
-        const accrued = accruedAllocations.find(a => a.ownerId === o.id)?.amountUsd ?? 0;
-        await tx.owner.update({
-          where: { id: o.id },
-          data: {
-            availableProfitUsd: roundMoney(avail),
-            totalAccruedProfitUsd: roundMoney(accrued),
-          },
-        });
-      }
-
-      await tx.auditLog.create({
-        data: {
-          userId: actor.id,
-          userName: actor.name,
-          userRole: actor.role,
-          action: 'PROFIT_SHARE_CHANGE',
-          details: `Остатки прибыли партнеров пересчитаны строго по долям (${owners.map(o => `${o.name}: ${o.profitSharePercent}%`).join(', ')})`,
-        },
-      });
-
       return tx.owner.findMany();
     });
   }

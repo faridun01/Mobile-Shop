@@ -30,7 +30,7 @@ function barcodeCenter(barcode: Barcode) {
  * screen pixels on both platforms. Such a position-based pick is flagged `confirm`: the
  * caller accepts it only once two consecutive frames agree.
  */
-export function chooseImei(found: ImeiBarcode[]): { imei: string | null; hint: string; confirm?: boolean } {
+function chooseImei(found: ImeiBarcode[]): { imei: string | null; hint: string; confirm?: boolean } {
   if (!found.length) return { imei: null, hint: SCAN_HINTS.notImei };
   const distinct = new Set(found.flatMap((barcode) => barcode.imeis));
   // One barcode (a QR with both IMEIs yields IMEI 1) or the same IMEI printed twice.

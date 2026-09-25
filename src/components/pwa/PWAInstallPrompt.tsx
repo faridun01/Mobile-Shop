@@ -11,7 +11,6 @@ export const PWAInstallPrompt: React.FC = () => {
   const [isStandalone, setIsStandalone] = useState<boolean>(false);
   const [showAndroidBanner, setShowAndroidBanner] = useState<boolean>(false);
   const [showIOSGuide, setShowIOSGuide] = useState<boolean>(false);
-  const [isIOS, setIsIOS] = useState<boolean>(false);
   const [isSafari, setIsSafari] = useState<boolean>(false);
 
   useEffect(() => {
@@ -31,7 +30,6 @@ export const PWAInstallPrompt: React.FC = () => {
     const ua = window.navigator.userAgent.toLowerCase();
     const iosDevice = /iphone|ipad|ipod/.test(ua);
     const safariBrowser = iosDevice && /safari/.test(ua) && !/crios|fxios|edgios/.test(ua);
-    setIsIOS(iosDevice);
     setIsSafari(safariBrowser);
 
     // Check dismissal cooldown (3 days)

@@ -1,30 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, useRef, useLayoutEffect } from 'react';
-import {
-  User,
-  Store,
-  Device,
-  DeviceStatus,
-  Sale,
-  Supplier,
-  SupplierInvoice,
-  SupplierBonus,
-  Expense,
-  Owner,
-  OwnerTransaction,
-  RepairTicket,
-  RepairStatus,
-  TransferRequest,
-  AuditLogEntry,
-  DailyRate,
-  PageId,
-  PaymentMethod,
-  ExpenseCategory,
-  ThemeMode,
-  FinancialAccount,
-  FinancialCategory,
-  CounterpartyType,
-  LedgerCurrency,
-} from '../types';
+import { User, Store, Device, Sale, Supplier, SupplierInvoice, SupplierBonus, Expense, Owner, OwnerTransaction, RepairTicket, RepairStatus, TransferRequest, AuditLogEntry, DailyRate, PageId, PaymentMethod, ExpenseCategory, ThemeMode } from '../types';
 import { useSharedState } from '../hooks/useSharedState';
 import { createStore as createContextStore, useStore, type StoreApi } from 'zustand';
 import { useShallow } from 'zustand/react/shallow';
@@ -52,9 +27,9 @@ import {
   mapStore,
   mapAuditLog,
   mapDailyRate,
-  mapFinancialAccount,
-  mapFinancialCategory,
 } from '../api/mappers';
+
+type ActionResult = { success: boolean; message?: string };
 
 interface AppContextType {
   currentUser: User | null;
@@ -99,8 +74,6 @@ interface AppContextType {
   fetchExpensesRange: (params: { period?: 'TODAY' | 'MONTH' | 'SPECIFIC_MONTH' | 'ALL'; month?: string; employeeId?: string }) => Promise<Expense[]>;
   owners: Owner[];
   ownerTransactions: OwnerTransaction[];
-  financialAccounts: FinancialAccount[];
-  financialCategories: FinancialCategory[];
   users: User[];
   // notifications moved to NotificationsContext/useNotifications() (performance audit,
   // P0-2) — they update on every realtime push, unrelated to everything else here, and
@@ -212,9 +185,7 @@ interface AppContextType {
 
   createTransferRequest: (toLocationIdOrParams: string | { fromLocationId?: string; toLocationId: string; deviceIds: string[] }, deviceIds?: string[]) => Promise<{ success: boolean; message?: string }>;
   approveTransfer: (transferId: string) => Promise<{ success: boolean; message?: string }>;
-  approveTransferRequest: (transferId: string) => Promise<{ success: boolean; message?: string }>;
   rejectTransfer: (transferId: string, reason: string) => Promise<{ success: boolean; message?: string }>;
-  rejectTransferRequest: (transferId: string, reason: string) => Promise<{ success: boolean; message?: string }>;
 
   createRepairTicket: (params: {
     imei: string;
@@ -272,48 +243,6 @@ interface AppContextType {
   deleteExpense: (id: string) => Promise<{ success: boolean; message?: string }>;
   payExpense: (id: string, storeId?: string) => Promise<{ success: boolean; message?: string }>;
 
-  createFinancialCategory: (params: { name: string; direction: 'IN' | 'OUT' }) => Promise<{ success: boolean; message?: string }>;
-  createCashReceipt: (params: {
-    accountId: string;
-    amount: number;
-    currency: LedgerCurrency;
-    categoryId?: string;
-    categoryName?: string;
-    counterpartyType?: CounterpartyType;
-    counterpartyId?: string;
-    counterpartyName?: string;
-    shopId?: string;
-    description: string;
-    comment?: string;
-    /** Stable per-attempt key (generate once when the form opens, resend unchanged on retry). */
-    idempotencyKey?: string;
-  }) => Promise<{ success: boolean; message?: string }>;
-  createCashExpense: (params: {
-    accountId: string;
-    amount: number;
-    currency: LedgerCurrency;
-    categoryId?: string;
-    categoryName?: string;
-    counterpartyType?: CounterpartyType;
-    counterpartyId?: string;
-    counterpartyName?: string;
-    shopId?: string;
-    description: string;
-    comment?: string;
-    idempotencyKey?: string;
-  }) => Promise<{ success: boolean; message?: string }>;
-  createTransfer: (params: {
-    accountId: string;
-    destinationAccountId: string;
-    amount: number;
-    currency: LedgerCurrency;
-    shopId?: string;
-    description: string;
-    comment?: string;
-    idempotencyKey?: string;
-  }) => Promise<{ success: boolean; message?: string }>;
-  cancelFinancialTransaction: (id: string, idempotencyKey?: string) => Promise<{ success: boolean; message?: string }>;
-
   createOwnerTransaction: (params: {
     ownerId: string;
     type: 'INVESTMENT' | 'WITHDRAWAL' | 'PROFIT_PAYOUT' | 'REINVEST';
@@ -322,18 +251,11 @@ interface AppContextType {
   }) => Promise<{ success: boolean; message?: string }>;
 
   initializeOwners: () => Promise<{ success: boolean; message?: string }>;
-  ownerInvestment: (ownerId: string, amountUsd: number, destination: string, note?: string) => Promise<{ success: boolean; message?: string }>;
-  ownerCapitalWithdrawal: (ownerId: string, amountUsd: number, source: string, note?: string) => Promise<{ success: boolean; message?: string }>;
-  ownerProfitPayout: (ownerId: string, amountUsd: number, source: string, note?: string) => Promise<{ success: boolean; message?: string }>;
-  ownerProfitPayoutDistributed: (amountUsd: number, source?: string, note?: string) => Promise<{ success: boolean; message?: string }>;
-  ownerReinvest: (ownerId: string, amountUsd: number, note?: string) => Promise<{ success: boolean; message?: string }>;
   updateOwnerProfitShares: (owner1Share: number | { ownerId: string; sharePercent: number }[], owner2Share?: number, rebalanceBalances?: boolean) => Promise<{ success: boolean; message?: string }>;
-  rebalanceOwnerBalances: () => Promise<{ success: boolean; message?: string }>;
   linkOwnerToUser: (ownerId: string, userId: string | null) => Promise<{ success: boolean; message?: string }>;
 
   createUser: (user: Omit<User, 'id' | 'createdAt'>) => Promise<{ success: boolean; message?: string }>;
   updateUser: (user: User) => Promise<{ success: boolean; message?: string }>;
-  toggleUserActive: (userId: string) => Promise<{ success: boolean; message?: string }>;
   deleteUser: (userId: string) => Promise<{ success: boolean; message?: string }>;
   openDailyRateModal: () => void;
   closeDailyRateModal: () => void;
@@ -391,8 +313,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [expenses, setExpenses] = useSharedState<Expense[]>([]);
   const [owners, setOwners] = useSharedState<Owner[]>([]);
   const [ownerTransactions, setOwnerTransactions] = useSharedState<OwnerTransaction[]>([]);
-  const [financialAccounts, setFinancialAccounts] = useSharedState<FinancialAccount[]>([]);
-  const [financialCategories, setFinancialCategories] = useSharedState<FinancialCategory[]>([]);
   const [auditLogs, setAuditLogs] = useSharedState<AuditLogEntry[]>([]);
   const [isInitialLoading, setIsInitialLoading] = useState(true);
 
@@ -666,26 +586,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   }), [coalesceFetch]);
 
-  // ADMIN/PARTNER-only, like fetchOwners/fetchOwnerTransactions above — SELLER gets a 403
-  // and these silently stay empty, same as owners does.
-  const fetchFinancialAccounts = useCallback(() => coalesceFetch('financialAccounts', async () => {
-    try {
-      const raw = await apiClient<any[]>('/finance/accounts');
-      setFinancialAccounts(raw.map(mapFinancialAccount));
-    } catch {
-      // ADMIN/PARTNER only
-    }
-  }), [coalesceFetch]);
-
-  const fetchFinancialCategories = useCallback(() => coalesceFetch('financialCategories', async () => {
-    try {
-      const raw = await apiClient<any[]>('/finance/categories');
-      setFinancialCategories(raw.map(mapFinancialCategory));
-    } catch {
-      // ADMIN/PARTNER only
-    }
-  }), [coalesceFetch]);
-
   const fetchAuditLogs = useCallback(() => coalesceFetch('auditLogs', async () => {
     try {
       const raw = await apiClient<any[]>('/audit-logs');
@@ -729,8 +629,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     suppliers: fetchSuppliers, invoices: fetchInvoices, supplierInvoices: fetchInvoices,
     bonuses: fetchBonuses, supplierBonuses: fetchBonuses, expenses: fetchExpenses,
     owners: fetchOwners, ownerTransactions: fetchOwnerTransactions, auditLogs: fetchAuditLogs,
-    financialAccounts: fetchFinancialAccounts, financialCategories: fetchFinancialCategories,
-  }), [fetchSales, fetchTransfers, fetchRepairs, fetchSuppliers, fetchInvoices, fetchBonuses, fetchExpenses, fetchOwners, fetchOwnerTransactions, fetchAuditLogs, fetchFinancialAccounts, fetchFinancialCategories]);
+  }), [fetchSales, fetchTransfers, fetchRepairs, fetchSuppliers, fetchInvoices, fetchBonuses, fetchExpenses, fetchOwners, fetchOwnerTransactions, fetchAuditLogs]);
 
   useLayoutEffect(() => {
     loadedModules.current.clear();
@@ -790,11 +689,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         return [fetchOwners, fetchOwnerTransactions, fetchStores];
       case 'FINANCIAL_TRANSACTION_CREATED':
       case 'FINANCIAL_TRANSACTION_CANCELLED':
-        // The journal (Операции tab) manages its own paginated fetch independently and
-        // re-queries on its own — only the account balances shown elsewhere need refreshing.
-        return [fetchFinancialAccounts, fetchStores];
+        // Manual ledger entries only move store cash registers on screen.
+        return [fetchStores];
       case 'FINANCIAL_CATEGORY_CREATED':
-        return [fetchFinancialCategories];
+        return []; // nothing on screen lists financial categories
       case 'REPAIR_UPDATED':
         return [fetchRepairs, fetchExpenses, fetchStores, fetchOwners];
       case 'STORE_UPDATED':
@@ -812,7 +710,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       default:
         return null; // unmapped (including RECONNECTED) — falls back to a full refetchAll
     }
-  }, [fetchDevices, fetchSuppliers, fetchInvoices, fetchBonuses, fetchSales, fetchStores, fetchOwners, fetchExpenses, fetchOwnerTransactions, fetchRepairs, fetchTransfers, fetchNotifications, fetchUsers, fetchExchangeRate, fetchFinancialAccounts, fetchFinancialCategories]);
+  }, [fetchDevices, fetchSuppliers, fetchInvoices, fetchBonuses, fetchSales, fetchStores, fetchOwners, fetchExpenses, fetchOwnerTransactions, fetchRepairs, fetchTransfers, fetchNotifications, fetchUsers, fetchExchangeRate]);
 
   // A burst of broadcasts in quick succession (e.g. a multi-item refund, a batch
   // transfer looping individual broadcast() calls) used to fire one full parallel fetch
@@ -834,13 +732,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     [fetchOwnerTransactions, 'ownerTransactions'],
     [fetchAuditLogs, 'auditLogs'],
     [fetchExchangeRate, 'exchangeRate'],
-    [fetchFinancialAccounts, 'financialAccounts'],
-    [fetchFinancialCategories, 'financialCategories'],
   ]), [
     fetchSales, fetchDevices, fetchStores, fetchOwners, fetchExpenses,
     fetchSuppliers, fetchInvoices, fetchBonuses, fetchTransfers, fetchRepairs,
     fetchUsers, fetchOwnerTransactions, fetchAuditLogs, fetchExchangeRate,
-    fetchFinancialAccounts, fetchFinancialCategories,
   ]);
 
   const pendingRealtimeTasks = useRef(new Set<() => Promise<unknown>>());
@@ -1024,7 +919,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     const returnedItem = params.returnedItem;
     try {
-      const sale = await apiClient<any>('/exchanges', {
+      await apiClient<any>('/exchanges', {
         method: 'POST',
         body: JSON.stringify({
           saleId: targetSale.id,
@@ -1345,76 +1240,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
-  const createFinancialCategory: AppContextType['createFinancialCategory'] = async ({ name, direction }) => {
-    try {
-      await apiClient('/finance/categories', { method: 'POST', body: JSON.stringify({ name, direction }) });
-      markLocalMutation(['financialCategories']);
-      await fetchFinancialCategories();
-      return { success: true };
-    } catch (err) {
-      return { success: false, message: errorMessage(err, 'Не удалось добавить категорию') };
-    }
-  };
-
-  const createCashReceipt: AppContextType['createCashReceipt'] = async ({ idempotencyKey, ...body }) => {
-    try {
-      await apiClient('/finance/cash-receipt', {
-        method: 'POST',
-        body: JSON.stringify(body),
-        headers: idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : undefined,
-      });
-      markLocalMutation(['financialAccounts', 'stores']);
-      await Promise.all([fetchFinancialAccounts(), fetchStores()]);
-      return { success: true };
-    } catch (err) {
-      return { success: false, message: errorMessage(err, 'Не удалось провести приход') };
-    }
-  };
-
-  const createCashExpense: AppContextType['createCashExpense'] = async ({ idempotencyKey, ...body }) => {
-    try {
-      await apiClient('/finance/cash-expense', {
-        method: 'POST',
-        body: JSON.stringify(body),
-        headers: idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : undefined,
-      });
-      markLocalMutation(['financialAccounts', 'stores']);
-      await Promise.all([fetchFinancialAccounts(), fetchStores()]);
-      return { success: true };
-    } catch (err) {
-      return { success: false, message: errorMessage(err, 'Не удалось провести расход') };
-    }
-  };
-
-  const createTransfer: AppContextType['createTransfer'] = async ({ idempotencyKey, ...body }) => {
-    try {
-      await apiClient('/finance/transfer', {
-        method: 'POST',
-        body: JSON.stringify(body),
-        headers: idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : undefined,
-      });
-      markLocalMutation(['financialAccounts', 'stores']);
-      await Promise.all([fetchFinancialAccounts(), fetchStores()]);
-      return { success: true };
-    } catch (err) {
-      return { success: false, message: errorMessage(err, 'Не удалось выполнить перевод') };
-    }
-  };
-
-  const cancelFinancialTransaction: AppContextType['cancelFinancialTransaction'] = async (id, idempotencyKey) => {
-    try {
-      await apiClient(`/finance/transactions/${id}/cancel`, {
-        method: 'POST',
-        headers: idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : undefined,
-      });
-      markLocalMutation(['financialAccounts', 'stores']);
-      await Promise.all([fetchFinancialAccounts(), fetchStores()]);
-      return { success: true };
-    } catch (err) {
-      return { success: false, message: errorMessage(err, 'Не удалось отменить операцию') };
-    }
-  };
-
   const initializeOwners: AppContextType['initializeOwners'] = async () => {
     try {
       await apiClient('/owners/init', { method: 'POST' });
@@ -1431,7 +1256,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
-  const ownerInvestment: AppContextType['ownerInvestment'] = async (ownerId, amountUsd, destination, note) => {
+  const ownerInvestment = async (ownerId: string, amountUsd: number, destination: string, note?: string): Promise<ActionResult> => {
     try {
       await apiClient(`/owners/${ownerId}/investment`, { method: 'POST', body: JSON.stringify({ amountUsd, destination, note }) });
       markLocalMutation(['owners', 'ownerTransactions', 'stores']);
@@ -1442,7 +1267,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
-  const ownerCapitalWithdrawal: AppContextType['ownerCapitalWithdrawal'] = async (ownerId, amountUsd, source, note) => {
+  const ownerCapitalWithdrawal = async (ownerId: string, amountUsd: number, source: string, note?: string): Promise<ActionResult> => {
     try {
       await apiClient(`/owners/${ownerId}/withdrawal`, { method: 'POST', body: JSON.stringify({ amountUsd, source, note }) });
       markLocalMutation(['owners', 'ownerTransactions', 'stores']);
@@ -1453,7 +1278,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
-  const ownerProfitPayout: AppContextType['ownerProfitPayout'] = async (ownerId, amountUsd, source, note) => {
+  const ownerProfitPayout = async (ownerId: string, amountUsd: number, source: string, note?: string): Promise<ActionResult> => {
     try {
       await apiClient(`/owners/${ownerId}/payout`, { method: 'POST', body: JSON.stringify({ amountUsd, source, note }) });
       markLocalMutation(['owners', 'ownerTransactions', 'stores']);
@@ -1464,18 +1289,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
-  const ownerProfitPayoutDistributed: AppContextType['ownerProfitPayoutDistributed'] = async (amountUsd, source = 'Главный счет', note) => {
-    try {
-      await apiClient('/owners/payout-distributed', { method: 'POST', body: JSON.stringify({ amountUsd, source, note }) });
-      markLocalMutation(['owners', 'ownerTransactions', 'stores']);
-      await Promise.all([fetchOwners(), fetchOwnerTransactions(), fetchStores()]);
-      return { success: true };
-    } catch (err) {
-      return { success: false, message: errorMessage(err, 'Сумма выплаты превышает доступную прибыль партнеров') };
-    }
-  };
-
-  const ownerReinvest: AppContextType['ownerReinvest'] = async (ownerId, amountUsd, note) => {
+  const ownerReinvest = async (ownerId: string, amountUsd: number, note?: string): Promise<ActionResult> => {
     try {
       await apiClient(`/owners/${ownerId}/reinvest`, { method: 'POST', body: JSON.stringify({ amountUsd, note }) });
       markLocalMutation(['owners', 'ownerTransactions']);
@@ -1489,25 +1303,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const createOwnerTransaction: AppContextType['createOwnerTransaction'] = async ({ ownerId, type, amountUsd, note }) => {
     if (type === 'INVESTMENT') return ownerInvestment(ownerId, amountUsd, 'Главный счет', note);
     if (type === 'WITHDRAWAL') return ownerCapitalWithdrawal(ownerId, amountUsd, 'Главный счет', note);
-    if (type === 'PROFIT_PAYOUT') {
-      if (ownerId === 'ALL') {
-        return ownerProfitPayoutDistributed(amountUsd, 'Главный счет', note);
-      }
-      return ownerProfitPayout(ownerId, amountUsd, 'Главный счет', note);
-    }
+    if (type === 'PROFIT_PAYOUT') return ownerProfitPayout(ownerId, amountUsd, 'Главный счет', note);
     if (type === 'REINVEST') return ownerReinvest(ownerId, amountUsd, note);
     return { success: false, message: 'Неизвестный тип операции' };
-  };
-
-  const rebalanceOwnerBalances: AppContextType['rebalanceOwnerBalances'] = async () => {
-    try {
-      await apiClient('/owners/rebalance-balances', { method: 'POST' });
-      markLocalMutation(['owners']);
-      await fetchOwners();
-      return { success: true };
-    } catch (err) {
-      return { success: false, message: errorMessage(err, 'Ошибка перерасчета остатков по долям') };
-    }
   };
 
   const updateOwnerProfitShares: AppContextType['updateOwnerProfitShares'] = async (owner1ShareOrShares, owner2Share, rebalanceBalances = false) => {
@@ -1592,19 +1390,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return { success: true };
     } catch (err) {
       return { success: false, message: errorMessage(err, 'Не удалось обновить данные сотрудника') };
-    }
-  };
-
-  const toggleUserActive: AppContextType['toggleUserActive'] = async (userId) => {
-    const target = users.find((u) => u.id === userId);
-    if (!target) return { success: false };
-    try {
-      await apiClient(`/users/${userId}/status`, { method: 'PATCH', body: JSON.stringify({ active: !target.active }) });
-      markLocalMutation(['users']);
-      await fetchUsers();
-      return { success: true };
-    } catch (err) {
-      return { success: false, message: errorMessage(err, 'Не удалось изменить статус сотрудника') };
     }
   };
 
@@ -1730,8 +1515,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         fetchExpensesRange,
         owners,
         ownerTransactions,
-        financialAccounts,
-        financialCategories,
         users,
         auditLogs,
         isInitialLoading,
@@ -1763,9 +1546,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         deleteSupplierBonus,
         createTransferRequest,
         approveTransfer,
-        approveTransferRequest: approveTransfer,
         rejectTransfer,
-        rejectTransferRequest: rejectTransfer,
         createRepairTicket,
         updateRepairStatus,
         paySupplier,
@@ -1774,24 +1555,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         updateExpense,
         deleteExpense,
         payExpense,
-        createFinancialCategory,
-        createCashReceipt,
-        createCashExpense,
-        createTransfer,
-        cancelFinancialTransaction,
         initializeOwners,
         createOwnerTransaction,
-        ownerInvestment,
-        ownerCapitalWithdrawal,
-        ownerProfitPayout,
-        ownerProfitPayoutDistributed,
-        ownerReinvest,
         updateOwnerProfitShares,
-        rebalanceOwnerBalances,
         linkOwnerToUser,
         createUser,
         updateUser,
-        toggleUserActive,
         deleteUser,
         createStore,
         updateStore,
@@ -1805,7 +1574,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }), [
     resolvedCurrentUser, todayRate, activePage, selectedStoreId, stores, devices, sales,
     transfers, repairs, suppliers, invoices, bonuses, expenses, owners,
-    ownerTransactions, financialAccounts, financialCategories, users, auditLogs, isInitialLoading,
+    ownerTransactions, users, auditLogs, isInitialLoading,
     isRateModalOpen, isScannerOpen, scannerCallback, drawerOpen, theme, authToken,
   ]);
 
@@ -1862,9 +1631,3 @@ export function useAppFields<K extends keyof AppContextType>(...keys: K[]): Pick
   useEffect(() => { load?.(keys); }, [load, keySignature]);
   return fields;
 }
-
-export const useApp = () => {
-  const store = useContext(AppContext);
-  if (!store) throw new Error('useApp must be used within AppProvider');
-  return useStore(store);
-};

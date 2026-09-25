@@ -1,6 +1,6 @@
 import { useSyncExternalStore } from 'react';
 
-export type NavigationLayout = 'desktop' | 'tablet' | 'mobile';
+type NavigationLayout = 'desktop' | 'tablet' | 'mobile';
 
 function getSnapshot(): NavigationLayout {
   if (typeof window === 'undefined') return 'mobile';

@@ -1,4 +1,4 @@
-import { D, decimalMin, decimalMax, moneyJson, type MoneyInput } from '../server/src/common/decimal';
+import { D } from '../server/src/common/decimal';
 import { app } from '../server/src/app';
 import { prisma } from '../server/src/prisma/prisma.service';
 
@@ -28,7 +28,6 @@ async function runE2ETests() {
     // 1. AUTH & LOGIN TEST
     console.log('--- 1. AUTHENTICATION & LOGIN ---');
     let adminToken = '';
-    let partnerToken = '';
     let sellerToken = '';
 
     const adminRes = await fetch(`${API_BASE}/auth/login`, {
@@ -65,7 +64,6 @@ async function runE2ETests() {
     });
     const partnerData = await partnerRes.json();
     assert(partnerRes.ok && !!partnerData.token, 'Login PARTNER (partner / partner123)');
-    partnerToken = partnerData.token;
 
     const sellerRes = await fetch(`${API_BASE}/auth/login`, {
       method: 'POST',

@@ -1,4 +1,4 @@
-import { D, decimalMin, decimalMax, moneyJson, type MoneyInput } from '../../common/decimal';
+import { D, moneyJson, type MoneyInput } from '../../common/decimal';
 import { prisma } from '../../prisma/prisma.service';
 import { resolveActor } from '../../common/actor';
 import { getRateForDate } from '../exchange-rate/exchange-rate.service';
@@ -7,7 +7,7 @@ import { exchangeCostRestorations, refundOwnerProfit } from './profit';
 import { getStoreCashAccount } from '../finance/account.service';
 import { postTransaction } from '../finance/financial-transaction.service';
 
-export interface RefundInput {
+interface RefundInput {
   saleId: string;
   reason: string;
   refundAmountTjs: MoneyInput;

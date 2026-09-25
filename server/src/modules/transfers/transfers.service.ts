@@ -1,5 +1,4 @@
 import { prisma } from '../../prisma/prisma.service';
-import type { Prisma } from '@prisma/client';
 import { RealtimeSyncGateway } from '../../websocket/websocket.gateway';
 import { resolveActor } from '../../common/actor';
 import crypto from 'node:crypto';

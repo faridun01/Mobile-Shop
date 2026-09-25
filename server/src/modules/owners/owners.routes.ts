@@ -1,4 +1,4 @@
-import { D, decimalMin, decimalMax, moneyJson, type MoneyInput } from '../../common/decimal';
+import { D } from '../../common/decimal';
 import type { Express } from 'express';
 import { authenticateJwt, requireRoles, type AuthenticatedRequest } from '../../auth/auth.middleware';
 import { prisma } from '../../prisma/prisma.service';
@@ -89,16 +89,6 @@ export function registerOwnerRoutes(app: Express) {
       const owner = await OwnersService.reinvest(req.params.id, amountUsd, note, req.user!.userId);
       RealtimeSyncGateway.broadcast('OWNER_TX', { ownerId: owner.id });
       res.json(owner);
-    } catch (error) {
-      next(error);
-    }
-  });
-
-  app.post('/api/owners/rebalance-balances', authenticateJwt, requireRoles('ADMIN', 'PARTNER'), async (req: AuthenticatedRequest, res, next) => {
-    try {
-      const owners = await OwnersService.rebalanceBalancesByShares(req.user!.userId);
-      RealtimeSyncGateway.broadcast('OWNER_TX', {});
-      res.json(owners);
     } catch (error) {
       next(error);
     }

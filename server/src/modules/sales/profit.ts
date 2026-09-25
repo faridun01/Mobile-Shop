@@ -1,5 +1,5 @@
-import { D, decimalMin, decimalMax, moneyJson, type MoneyInput } from '../../common/decimal';
-export interface ProfitAuditRecord {
+import { D, type MoneyInput } from '../../common/decimal';
+interface ProfitAuditRecord {
   action: string;
   financialDetails: unknown;
 }
@@ -82,7 +82,7 @@ export function calculateRecognizedProfit(logs: ProfitAuditRecord[], fallbackPro
   return roundMoney(hasOriginal ? amount : fallbackProfitUsd);
 }
 
-export type ExchangeCostRestoration = { deviceId: string; tradeInCostUsd: MoneyInput; originalCostUsd: MoneyInput };
+type ExchangeCostRestoration = { deviceId: string; tradeInCostUsd: MoneyInput; originalCostUsd: MoneyInput };
 
 /**
  * An exchange brings the customer's device back into stock at the agreed trade-in value.

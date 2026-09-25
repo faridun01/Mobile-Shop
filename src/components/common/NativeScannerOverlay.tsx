@@ -1,4 +1,3 @@
-import React from 'react';
 import { createPortal } from 'react-dom';
 import { useStore } from 'zustand';
 import { Flashlight, FlashlightOff } from 'lucide-react';

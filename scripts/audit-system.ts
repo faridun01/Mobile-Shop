@@ -1,4 +1,4 @@
-import { D, decimalMin, decimalMax, moneyJson, type MoneyInput } from '../server/src/common/decimal';
+import { D, decimalMax, type MoneyInput } from '../server/src/common/decimal';
 import 'dotenv/config';
 import { prisma } from '../server/src/prisma/prisma.service';
 

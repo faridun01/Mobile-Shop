@@ -2,23 +2,6 @@ import React from 'react';
 import { Check } from 'lucide-react';
 import { cn } from '../../utils/cn';
 
-const fieldBase =
-  'min-h-11 rounded-lg bg-surface border border-border px-3 text-sm text-fg-muted placeholder:text-fg-subtle focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent disabled:opacity-50 transition-colors';
-
-export const Input = React.forwardRef<HTMLInputElement, React.InputHTMLAttributes<HTMLInputElement>>(
-  ({ className, ...rest }, ref) => (
-    <input ref={ref} className={cn(fieldBase, 'w-full py-2', className)} {...rest} />
-  )
-);
-Input.displayName = 'Input';
-
-export const Textarea = React.forwardRef<HTMLTextAreaElement, React.TextareaHTMLAttributes<HTMLTextAreaElement>>(
-  ({ className, ...rest }, ref) => (
-    <textarea ref={ref} className={cn(fieldBase, 'w-full min-h-24 py-2 resize-y', className)} {...rest} />
-  )
-);
-Textarea.displayName = 'Textarea';
-
 /** No default width — sizes to content like a native select. Pass `w-full` explicitly for a form-field-style select. */
 export const Select = React.forwardRef<HTMLSelectElement, React.SelectHTMLAttributes<HTMLSelectElement>>(
   ({ className, children, ...rest }, ref) => {

@@ -1,8 +1,8 @@
-import { D, decimalMin, decimalMax, moneyJson, type MoneyInput } from '../../common/decimal';
+import { D, type MoneyInput } from '../../common/decimal';
 import type { TransactionClient } from '../../prisma/prisma.service';
 import { nextTransactionNumber } from './transaction-number.service';
 
-export type FinancialTransactionType =
+type FinancialTransactionType =
   | 'INCOME'
   | 'EXPENSE'
   | 'TRANSFER'
@@ -11,11 +11,11 @@ export type FinancialTransactionType =
   | 'OWNER_WITHDRAWAL'
   | 'REFUND'
   | 'ADJUSTMENT';
-export type FinancialDirection = 'IN' | 'OUT' | 'NEUTRAL';
+type FinancialDirection = 'IN' | 'OUT' | 'NEUTRAL';
 export type LedgerCurrency = 'TJS' | 'USD';
 export type CounterpartyType = 'SUPPLIER' | 'CUSTOMER' | 'EMPLOYEE' | 'OWNER' | 'OTHER';
 
-export interface PostTransactionInput {
+interface PostTransactionInput {
   type: FinancialTransactionType;
   direction: FinancialDirection;
   /** Document number prefix, e.g. "CR"/"CE"/"SP"/"OD"/"OW"/"RF". */

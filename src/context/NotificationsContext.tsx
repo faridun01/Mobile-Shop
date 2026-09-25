@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useCallback, useEffect, useMemo } from 'react';
+import React, { createContext, useContext, useCallback, useEffect, useMemo } from 'react';
 import { NotificationItem } from '../types';
 import { useAuthStore } from '../stores/useAuthStore';
 import { apiClient } from '../api/client';

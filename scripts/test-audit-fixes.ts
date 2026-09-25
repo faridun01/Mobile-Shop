@@ -1,4 +1,4 @@
-import { D, decimalMin, decimalMax, moneyJson, type MoneyInput } from '../server/src/common/decimal';
+import { D, type MoneyInput } from '../server/src/common/decimal';
 import 'dotenv/config';
 import assert from './lib/decimal-assert';
 import { spawnSync } from 'node:child_process';

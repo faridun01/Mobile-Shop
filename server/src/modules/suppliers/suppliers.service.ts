@@ -1,4 +1,4 @@
-import { D, decimalMin, decimalMax, moneyJson, type MoneyInput } from '../../common/decimal';
+import { D, decimalMin, moneyJson, type MoneyInput } from '../../common/decimal';
 import { prisma } from '../../prisma/prisma.service';
 import type { TransactionClient } from '../../prisma/prisma.service';
 import { resolveActor } from '../../common/actor';
@@ -19,7 +19,7 @@ async function deviceHasTransactionHistory(tx: TransactionClient, deviceIds: str
   return Boolean(saleItem || transferItem || repairTicket);
 }
 
-export interface PaySupplierInput {
+interface PaySupplierInput {
   supplierId: string;
   amountUsd: MoneyInput;
   // Always a store's (or the main warehouse's) cash register — the company-wide
@@ -30,7 +30,7 @@ export interface PaySupplierInput {
   createdByUserId: string;
 }
 
-export interface SupplierBonusInput {
+interface SupplierBonusInput {
   supplierId: string;
   campaignTitle?: string;
   bonusType: 'FREE_DEVICES' | 'CASH_DISCOUNT';

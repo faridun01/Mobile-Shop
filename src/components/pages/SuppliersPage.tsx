@@ -34,7 +34,6 @@ export const SuppliersPage: React.FC = () => {
     devices,
     findDevicesByInvoice,
     stores,
-    todayRate,
     createSupplier,
     updateSupplier,
     deleteSupplier,
@@ -42,7 +41,7 @@ export const SuppliersPage: React.FC = () => {
     deleteSupplierInvoice,
     paySupplier,
     paySupplierInvoice
-  } = useAppFields('currentUser', 'suppliers', 'supplierInvoices', 'fetchInvoicesRange', 'devices', 'findDevicesByInvoice', 'stores', 'todayRate', 'createSupplier', 'updateSupplier', 'deleteSupplier', 'updateSupplierInvoice', 'deleteSupplierInvoice', 'paySupplier', 'paySupplierInvoice');
+  } = useAppFields('currentUser', 'suppliers', 'supplierInvoices', 'fetchInvoicesRange', 'devices', 'findDevicesByInvoice', 'stores', 'createSupplier', 'updateSupplier', 'deleteSupplier', 'updateSupplierInvoice', 'deleteSupplierInvoice', 'paySupplier', 'paySupplierInvoice');
 
   const [selectedSupplierId, setSelectedSupplierId] = useState<string | null>(null);
   const [selectedInvoiceId, setSelectedInvoiceId] = useState<string | null>(null);

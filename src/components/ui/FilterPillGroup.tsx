@@ -1,7 +1,6 @@
-import React from 'react';
 import { cn } from '../../utils/cn';
 
-export interface FilterPillOption<T extends string = string> {
+interface FilterPillOption<T extends string = string> {
   value: T;
   label: string;
 }

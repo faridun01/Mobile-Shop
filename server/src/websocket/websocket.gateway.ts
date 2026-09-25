@@ -11,7 +11,7 @@ interface ConnectedClient {
   authenticated: boolean;
 }
 
-export interface BroadcastOptions {
+interface BroadcastOptions {
   // Restrict delivery to these stores' SELLER users (ADMIN/PARTNER always receive everything).
   // Omit for a global event delivered to every authenticated client.
   storeIds?: string[];

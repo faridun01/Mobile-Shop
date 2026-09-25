@@ -48,11 +48,10 @@ export const OwnersPage: React.FC = () => {
     todayRate,
     createOwnerTransaction,
     updateOwnerProfitShares,
-    rebalanceOwnerBalances,
     linkOwnerToUser,
     closeQuarterPeriod,
     initializeOwners
-  } = useAppFields('currentUser', 'owners', 'users', 'ownerTransactions', 'suppliers', 'todayRate', 'createOwnerTransaction', 'updateOwnerProfitShares', 'rebalanceOwnerBalances', 'linkOwnerToUser', 'closeQuarterPeriod', 'initializeOwners');
+  } = useAppFields('currentUser', 'owners', 'users', 'ownerTransactions', 'suppliers', 'todayRate', 'createOwnerTransaction', 'updateOwnerProfitShares', 'linkOwnerToUser', 'closeQuarterPeriod', 'initializeOwners');
 
   const [isInitializing, setIsInitializing] = useState(false);
   const [linkingOwnerId, setLinkingOwnerId] = useState<string | null>(null);

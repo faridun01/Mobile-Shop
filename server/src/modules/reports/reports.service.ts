@@ -1,4 +1,4 @@
-import { D, decimalMin, decimalMax, moneyJson, type MoneyInput } from '../../common/decimal';
+import { D, type MoneyInput } from '../../common/decimal';
 import type { Prisma } from '@prisma/client';
 import { prisma } from '../../prisma/prisma.service';
 import { getRateForDate } from '../exchange-rate/exchange-rate.service';
@@ -8,7 +8,7 @@ import { roundMoney } from '../../common/money';
 import { dateRangeForPeriod, type ReportPeriod } from '../../common/business-date';
 export { dateRangeForPeriod, type ReportPeriod } from '../../common/business-date';
 
-export interface ReportsSummaryInput {
+interface ReportsSummaryInput {
   period: ReportPeriod;
   month?: string; // 'YYYY-MM', required for SPECIFIC_MONTH
   storeId?: string; // retail store id, or 'all'/undefined for every store
@@ -547,7 +547,7 @@ async function computeCategoryBreakdown(accountIds: string[], dateRange?: { gte:
   };
 }
 
-export interface CashFlowReportInput extends PeriodInput {
+interface CashFlowReportInput extends PeriodInput {
   storeId?: string;
 }
 
@@ -588,7 +588,7 @@ export async function computeCashFlowReport(input: CashFlowReportInput) {
   };
 }
 
-export interface AccountStatementInput extends PeriodInput {
+interface AccountStatementInput extends PeriodInput {
   accountId: string;
 }
 
@@ -644,7 +644,7 @@ export async function computeAccountStatement(input: AccountStatementInput) {
   };
 }
 
-export interface IncomeExpenseReportInput extends PeriodInput {
+interface IncomeExpenseReportInput extends PeriodInput {
   storeId?: string;
 }
 

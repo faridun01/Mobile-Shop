@@ -1,11 +1,11 @@
-import { D, decimalMin, decimalMax, moneyJson, type MoneyInput } from '../../common/decimal';
+import { D, type MoneyInput } from '../../common/decimal';
 import { prisma } from '../../prisma/prisma.service';
 import { resolveActor } from '../../common/actor';
 import { createExpense } from '../expenses/expenses.service';
 import { requireNonNegativeMoney, roundMoney } from '../../common/money';
 import { getRateForDate } from '../exchange-rate/exchange-rate.service';
 
-export interface CreateRepairInput {
+interface CreateRepairInput {
   storeId: string;
   userId: string;
   imei: string;

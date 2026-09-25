@@ -1,20 +1,20 @@
 import { useMemo } from 'react';
 import { Device } from '../types';
 
-export interface ColorGroup {
+interface ColorGroup {
   key: string;
   color: string;
   devices: Device[];
 }
 
-export interface StorageGroup {
+interface StorageGroup {
   key: string;
   storage: string;
   colorGroups: ColorGroup[];
   count: number;
 }
 
-export interface DeviceGroup {
+interface DeviceGroup {
   key: string;
   brand: string;
   model: string;

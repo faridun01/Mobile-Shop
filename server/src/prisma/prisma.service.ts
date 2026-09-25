@@ -18,7 +18,6 @@ class PrismaService {
 }
 
 export const prisma = PrismaService.getInstance();
-export type { PrismaClient };
 
 // Money stays Decimal throughout database reads and transactions.
 export type TransactionClient = Prisma.TransactionClient;

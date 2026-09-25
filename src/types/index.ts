@@ -44,24 +44,6 @@ export type ExpenseCategory =
   | 'Другие'
   | (string & {});
 
-export type LedgerType = 
-  | 'SALE'
-  | 'CASH_SALE'
-  | 'CARD_SALE'
-  | 'PURCHASE'
-  | 'EXPENSE'
-  | 'SALARY'
-  | 'SUPPLIER_PAYMENT'
-  | 'OWNER_INVESTMENT'
-  | 'OWNER_CAPITAL_WITHDRAWAL'
-  | 'OWNER_PROFIT_PAYOUT'
-  | 'OWNER_REINVESTMENT'
-  | 'EXCHANGE_SETTLEMENT'
-  | 'SUPPLIER_BONUS'
-  | 'TRANSFER'
-  | 'REFUND'
-  | 'CUSTOMER_PAYMENT';
-
 export type PageId =
   | 'SALE'
   | 'SALES_HISTORY'
@@ -299,23 +281,6 @@ export interface SupplierInvoice {
   groups?: InvoiceGroup[];
 }
 
-export interface SupplierPayment {
-  id: string;
-  supplierId: string;
-  supplierName: string;
-  amountUsd: number;
-  exchangeRate: number;
-  sourceAccount: 'MAIN_ACCOUNT' | 'STORE_CASH';
-  storeId?: string;
-  date: string;
-  appliedToInvoices: {
-    invoiceId: string;
-    invoiceNumber: string;
-    allocatedAmountUsd: number;
-  }[];
-  createdByName: string;
-}
-
 export interface Supplier {
   id: string;
   name: string;
@@ -406,71 +371,6 @@ export interface OwnerTransaction {
   note?: string;
 }
 
-// ---------------------------------------------------------------------------
-// Finance module (Phase 2) — mirrors the FinancialAccount/FinancialTransaction/
-// FinancialCategory Prisma models (see prisma/schema.prisma).
-// ---------------------------------------------------------------------------
-
-export type FinancialAccountType = 'CASH' | 'BANK' | 'MAIN' | 'OTHER';
-export type FinancialTransactionType = 'INCOME' | 'EXPENSE' | 'TRANSFER' | 'SUPPLIER_PAYMENT' | 'OWNER_DEPOSIT' | 'OWNER_WITHDRAWAL' | 'REFUND' | 'ADJUSTMENT';
-export type FinancialDirection = 'IN' | 'OUT' | 'NEUTRAL';
-export type FinancialTransactionStatus = 'POSTED' | 'CANCELLED';
-export type CounterpartyType = 'SUPPLIER' | 'CUSTOMER' | 'EMPLOYEE' | 'OWNER' | 'OTHER';
-export type LedgerCurrency = 'TJS' | 'USD';
-
-export interface FinancialAccount {
-  id: string;
-  name: string;
-  type: FinancialAccountType;
-  storeId?: string;
-  storeName?: string;
-  active: boolean;
-  balanceTjs: number;
-  balanceUsd: number;
-  openingBalanceTjs: number;
-  openingBalanceUsd: number;
-}
-
-export interface FinancialCategory {
-  id: string;
-  name: string;
-  direction: 'IN' | 'OUT';
-  isSystem: boolean;
-  active: boolean;
-}
-
-export interface FinancialTransaction {
-  id: string;
-  transactionNumber: string;
-  type: FinancialTransactionType;
-  direction: FinancialDirection;
-  status: FinancialTransactionStatus;
-  transactionDate: string;
-  accountId: string;
-  accountName?: string;
-  destinationAccountId?: string;
-  destinationAccountName?: string;
-  amount: number;
-  currency: LedgerCurrency;
-  exchangeRate?: number;
-  amountTjs: number;
-  amountUsd: number;
-  balanceCurrency: LedgerCurrency;
-  categoryId?: string;
-  categoryName?: string;
-  counterpartyType?: CounterpartyType;
-  counterpartyId?: string;
-  counterpartyName?: string;
-  shopId?: string;
-  sourceType?: string;
-  sourceId?: string;
-  reversedTransactionId?: string;
-  description: string;
-  comment?: string;
-  createdByUserId: string;
-  createdAt: string;
-}
-
 export interface DailyRate {
   date: string; // YYYY-MM-DD
   rate: number; // 1 USD = X TJS
@@ -519,20 +419,6 @@ export interface AuditLogEntry {
   imei?: string;
   receiptNumber?: number;
   targetId?: string;
-}
-
-export interface LedgerEntry {
-  id: string;
-  timestamp: string;
-  type: LedgerType;
-  description: string;
-  amountTjs?: number;
-  amountUsd?: number;
-  exchangeRate?: number;
-  storeId?: string;
-  storeName?: string;
-  referenceId?: string;
-  userName: string;
 }
 
 export type ThemeMode = 'light' | 'dark';
