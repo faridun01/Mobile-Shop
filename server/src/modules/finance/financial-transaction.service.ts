@@ -12,8 +12,8 @@ type FinancialTransactionType =
   | 'REFUND'
   | 'ADJUSTMENT';
 type FinancialDirection = 'IN' | 'OUT' | 'NEUTRAL';
-export type LedgerCurrency = 'TJS' | 'USD';
-export type CounterpartyType = 'SUPPLIER' | 'CUSTOMER' | 'EMPLOYEE' | 'OWNER' | 'OTHER';
+type LedgerCurrency = 'TJS' | 'USD';
+type CounterpartyType = 'SUPPLIER' | 'CUSTOMER' | 'EMPLOYEE' | 'OWNER' | 'OTHER';
 
 interface PostTransactionInput {
   type: FinancialTransactionType;
@@ -44,8 +44,6 @@ interface PostTransactionInput {
   createdByUserId: string;
   /** Reject the movement if it would take the account balance negative (default true). */
   guardBalance?: boolean;
-  /** Stripe-style idempotency key — see finance.service.ts for the dedupe logic that uses it. */
-  idempotencyKey?: string;
 }
 
 async function adjustBalance(tx: TransactionClient, accountId: string, currency: LedgerCurrency, delta: MoneyInput, guard: boolean) {
@@ -128,7 +126,6 @@ export async function postTransaction(tx: TransactionClient, input: PostTransact
       description: input.description,
       comment: input.comment,
       createdByUserId: input.createdByUserId,
-      idempotencyKey: input.idempotencyKey,
     },
   });
 }
@@ -139,7 +136,7 @@ export async function postTransaction(tx: TransactionClient, input: PostTransact
  * `reversedTransactionId`. The reversal never blocks on insufficient funds — undoing
  * a transaction must always be possible.
  */
-export async function cancelTransaction(tx: TransactionClient, transactionId: string, actorId: string, idempotencyKey?: string) {
+export async function cancelTransaction(tx: TransactionClient, transactionId: string, actorId: string) {
   const original = await tx.financialTransaction.findUnique({ where: { id: transactionId } });
   if (!original) throw new Error('Финансовая операция не найдена');
   if (original.status === 'CANCELLED') throw new Error('Операция уже отменена');
@@ -176,6 +173,5 @@ export async function cancelTransaction(tx: TransactionClient, transactionId: st
     description: `Отмена: ${original.description}`,
     createdByUserId: actorId,
     guardBalance: false,
-    idempotencyKey,
   });
 }

@@ -1,60 +1,50 @@
-import { PrismaClient } from '@prisma/client';
+import 'dotenv/config';
+import { Prisma, PrismaClient } from '@prisma/client';
+
+/**
+ * Wipes all business data while keeping the company's setup:
+ * - employees (users) and their login sessions;
+ * - stores, incl. the main warehouse (sellers are assigned to them) — cash reset to 0;
+ * - partners (owners) with their profit shares and user links — every balance reset to 0;
+ * - each store's cash ledger account — balances reset to 0.
+ * Everything else — devices, sales, suppliers, invoices, transfers, repairs, expenses,
+ * customers, exchange rates, notifications, audit/ledger history, document counters — is
+ * truncated, and id sequences restart so receipt numbers begin at 1 again.
+ *
+ * The table list comes from the Prisma schema, so a newly added model is cleared too
+ * unless it is added to KEEP.
+ */
+const KEEP = new Set(['User', 'AuthSession', 'Store', 'Owner', 'FinancialAccount']);
 
 const prisma = new PrismaClient();
 
 async function main() {
-  console.log('🧹 Clearing all transactional data while preserving employees and stores...');
+  const tables = Prisma.dmmf.datamodel.models
+    .filter((model) => !KEEP.has(model.name))
+    .map((model) => `"${model.dbName ?? model.name}"`);
 
-  // Delete in strict foreign key dependency order
-  await prisma.deviceTimelineEvent.deleteMany();
-  await prisma.transferItem.deleteMany();
-  await prisma.transferRequest.deleteMany();
-  await prisma.saleItem.deleteMany();
-  await prisma.sale.deleteMany();
-  await prisma.repairStatusHistory.deleteMany();
-  await prisma.repairTicket.deleteMany();
-  await prisma.expense.deleteMany();
-  await prisma.ledgerEntry.deleteMany();
-  await prisma.auditLog.deleteMany();
-  await prisma.notification.deleteMany();
-  await prisma.quarterClosure.deleteMany();
-  await prisma.supplierBonusDevice.deleteMany();
-  await prisma.supplierBonus.deleteMany();
-  await prisma.supplierPaymentAllocation.deleteMany();
-  await prisma.supplierPayment.deleteMany();
-  await prisma.invoiceGroup.deleteMany();
+  console.log('Clearing all business data, keeping employees, stores and partners...');
+  await prisma.$transaction([
+    // No CASCADE: if a kept table referenced one of these, Postgres refuses instead of
+    // silently emptying the kept table too.
+    prisma.$executeRawUnsafe(`TRUNCATE TABLE ${tables.join(', ')} RESTART IDENTITY`),
+    prisma.store.updateMany({ data: { cashBalanceTjs: 0 } }),
+    prisma.financialAccount.updateMany({ data: { balanceTjs: 0, balanceUsd: 0 } }),
+    prisma.owner.updateMany({
+      data: { capitalBalanceUsd: 0, totalAccruedProfitUsd: 0, totalPaidProfitUsd: 0, totalReinvestedUsd: 0, availableProfitUsd: 0 },
+    }),
+  ]);
 
-  // Nullify invoice references in Device before deleting invoices & devices
-  await prisma.device.updateMany({ data: { purchaseInvoiceId: null } });
-  await prisma.supplierInvoice.deleteMany();
-  await prisma.supplier.deleteMany();
-
-  await prisma.device.deleteMany();
-  await prisma.ownerTransaction.deleteMany();
-  await prisma.owner.deleteMany();
-
-  // Reset store cash register balances to 0 TJS
-  await prisma.store.updateMany({
-    data: { cashBalanceTjs: 0 }
-  });
-
-  const userCount = await prisma.user.count();
-  const storeCount = await prisma.store.count();
-
-  console.log(`\n==================================================`);
-  console.log(`✅ ALL TEST/TRANSACTION DATA CLEARED!`);
-  console.log(`👥 Preserved Employees (${userCount}):`);
-  const users = await prisma.user.findMany({ select: { login: true, name: true, role: true } });
-  users.forEach(u => console.log(`   - ${u.name} (@${u.login}) [${u.role}]`));
-  console.log(`🏪 Preserved Stores (${storeCount})`);
-  console.log(`==================================================\n`);
+  const users = await prisma.user.findMany({ select: { login: true, name: true, role: true }, orderBy: { createdAt: 'asc' } });
+  console.log(`Done. Cleared ${tables.length} tables.`);
+  console.log(`Employees kept (${users.length}):`);
+  users.forEach((u) => console.log(`  - ${u.name} (@${u.login}) [${u.role}]`));
+  console.log(`Stores kept: ${await prisma.store.count()}, partners kept: ${await prisma.owner.count()}`);
 }
 
 main()
-  .catch((e) => {
-    console.error('Error clearing data:', e);
-    process.exit(1);
+  .catch((error) => {
+    console.error('Error clearing data:', error);
+    process.exitCode = 1;
   })
-  .finally(async () => {
-    await prisma.$disconnect();
-  });
+  .finally(() => prisma.$disconnect());

@@ -21,7 +21,6 @@ import { registerNotificationRoutes } from './modules/notifications/notification
 import { registerExchangeRateRoutes } from './modules/exchange-rate/exchange-rate.routes';
 import { registerStoreRoutes } from './modules/stores/stores.routes';
 import { registerReportRoutes } from './modules/reports/reports.routes';
-import { registerFinanceRoutes } from './modules/finance/finance.routes';
 import { requirePositiveMoney } from './common/money';
 import { requireTodayRate } from './modules/exchange-rate/exchange-rate.service';
 import { decimalJsonReplacer } from './common/decimal';
@@ -58,7 +57,7 @@ app.use((req, res, next) => {
     res.header('Vary', 'Origin');
   }
   res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
-  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, Idempotency-Key');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   if (req.method === 'OPTIONS') {
     res.sendStatus(200);
     return;
@@ -398,7 +397,6 @@ registerNotificationRoutes(app);
 registerExchangeRateRoutes(app);
 registerStoreRoutes(app);
 registerReportRoutes(app);
-registerFinanceRoutes(app);
 
 app.use((error: any, req: Request, res: Response, _next: NextFunction) => {
   // Every error that reaches here gets logged server-side, regardless of what the client

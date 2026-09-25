@@ -1,4 +1,4 @@
-import { D, type MoneyInput } from '../server/src/common/decimal';
+import { D } from '../server/src/common/decimal';
 import 'dotenv/config';
 import assert from './lib/decimal-assert';
 import { spawnSync } from 'node:child_process';
@@ -29,7 +29,6 @@ try {
   }
   const { prisma } = await import('../server/src/prisma/prisma.service');
   disconnect = () => prisma.$disconnect();
-  const finance = await import('../server/src/modules/finance/finance.service');
   const reports = await import('../server/src/modules/reports/reports.service');
   const expenses = await import('../server/src/modules/expenses/expenses.service');
   const { OwnersService } = await import('../server/src/modules/owners/owners.service');
@@ -40,12 +39,6 @@ try {
   RealtimeSyncGateway.init(server);
   await new Promise<void>(resolve => server!.once('listening', resolve));
   const port = (server.address() as import('node:net').AddressInfo).port;
-  const cors = await fetch(`http://127.0.0.1:${port}/api/finance/cash-receipt`, {
-    method: 'OPTIONS', headers: { Origin: 'http://localhost:3000', 'Access-Control-Request-Method': 'POST', 'Access-Control-Request-Headers': 'authorization,content-type,idempotency-key' },
-  });
-  assert.equal(cors.status, 200);
-  assert.match(cors.headers.get('access-control-allow-headers') || '', /Idempotency-Key/i);
-  pass('CORS preflight permits idempotent financial requests');
   const api = async (route: string, token?: string, body?: unknown, method = body ? 'POST' : 'GET') => {
     const res = await fetch(`http://127.0.0.1:${port}/api${route}`, { method,
       headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
@@ -79,57 +72,17 @@ try {
   assert.equal((await api('/stores', otherSession)).status, 401);
   const fresh = await login('ahmad', 'changed123');
   assert.equal((await api('/stores', fresh)).status, 200);
-  assert.equal((await api('/finance/accounts', fresh)).status, 403);
+  assert.equal((await api('/owners', fresh)).status, 403);
   pass('password change revokes existing sessions; new login and role restrictions work');
 
+  // The expense scenarios below pay from this register: top it up directly, moving the
+  // store's cash and its ledger account together as every cash operation does.
   const cash = await prisma.financialAccount.findUniqueOrThrow({ where: { storeId: 'store-siyoma' } });
-  const main = await prisma.financialAccount.create({ data: { name: 'Regression main', type: 'MAIN' } });
-  const receipt = (id: string, amount: MoneyInput, currency: 'TJS' | 'USD' = 'TJS') => finance.createCashReceipt({ accountId: id, amount, currency, categoryName: 'Audit income', description: 'Regression receipt', createdByUserId: 'user-admin' });
-  await receipt(cash.id, 1000);
+  await prisma.$transaction([
+    prisma.store.update({ where: { id: 'store-siyoma' }, data: { cashBalanceTjs: { increment: 1000 } } }),
+    prisma.financialAccount.update({ where: { id: cash.id }, data: { balanceTjs: { increment: 1000 } } }),
+  ]);
   const cashBefore = await prisma.financialAccount.findUniqueOrThrow({ where: { id: cash.id } });
-  const storeBefore = await prisma.store.findUniqueOrThrow({ where: { id: 'store-siyoma' } });
-  const transfer = await finance.createTransfer({ accountId: cash.id, destinationAccountId: main.id, amount: D(100), currency: 'TJS', description: 'Regression transfer', createdByUserId: 'user-admin' });
-  const reversal = await finance.cancelFinancialTransaction(transfer.id, 'user-admin', 'cancel-transfer');
-  assert.equal((await finance.cancelFinancialTransaction(transfer.id, 'user-admin', 'cancel-transfer')).id, reversal.id);
-  assert.equal((await prisma.financialAccount.findUniqueOrThrow({ where: { id: cash.id } })).balanceTjs, cashBefore.balanceTjs);
-  assert.equal((await prisma.financialAccount.findUniqueOrThrow({ where: { id: main.id } })).balanceTjs, 0);
-  assert.equal((await prisma.store.findUniqueOrThrow({ where: { id: 'store-siyoma' } })).cashBalanceTjs, storeBefore.cashBalanceTjs);
-  await assert.rejects(finance.cancelFinancialTransaction(transfer.id, 'user-admin'), /уже отменена/);
-  await assert.rejects(finance.cancelFinancialTransaction(reversal.id, 'user-admin'), /сторнирующую/);
-  pass('transfer cancellation restores both accounts and store cash; duplicates rejected');
-
-  const account = await prisma.financialAccount.create({ data: { name: 'Report regression', type: 'MAIN' } });
-  const totalsBefore = await reports.computeIncomeExpenseReport({ period: 'ALL' });
-  const income = await receipt(account.id, 100);
-  await finance.cancelFinancialTransaction(income.id, 'user-admin');
-  const statement = await reports.computeAccountStatement({ accountId: account.id, period: 'ALL' });
-  assert.equal(statement.openingBalanceTjs, 0); assert.equal(statement.closingBalanceTjs, 0);
-  assert.equal(statement.rows.reduce((sum, r) => D(sum).plus(r.signedAmount), D(0)), 0);
-  assert.equal(statement.rows.length, 2);
-  const totalsAfter = await reports.computeIncomeExpenseReport({ period: 'ALL' });
-  assert.equal(totalsAfter.incomeTotalTjs, totalsBefore.incomeTotalTjs);
-  assert.equal(totalsAfter.expenseTotalTjs, totalsBefore.expenseTotalTjs);
-  pass('cancelled receipt retains both movements and zero opening/closing balances');
-
-  const history = await prisma.financialAccount.create({ data: { name: 'Historical regression', type: 'MAIN' } });
-  const augustCashBefore = await reports.computeCashFlowReport({ period: 'SPECIFIC_MONTH', month: '2026-08' });
-  const first = await receipt(history.id, 100);
-  await prisma.financialTransaction.update({ where: { id: first.id }, data: { transactionDate: new Date('2026-08-15T12:00:00Z') } });
-  const second = await receipt(history.id, 200);
-  await prisma.financialTransaction.update({ where: { id: second.id }, data: { transactionDate: new Date('2026-09-15T12:00:00Z') } });
-  const august = await reports.computeAccountStatement({ accountId: history.id, period: 'SPECIFIC_MONTH', month: '2026-08' });
-  assert.equal(august.openingBalanceTjs, 0); assert.equal(august.closingBalanceTjs, 100);
-  const undo = await finance.cancelFinancialTransaction(first.id, 'user-admin');
-  await prisma.financialTransaction.update({ where: { id: undo.id }, data: { transactionDate: new Date('2026-09-16T12:00:00Z') } });
-  const augustAfter = await reports.computeAccountStatement({ accountId: history.id, period: 'SPECIFIC_MONTH', month: '2026-08' });
-  assert.equal(augustAfter.closingBalanceTjs, 100);
-  const september = await reports.computeAccountStatement({ accountId: history.id, period: 'SPECIFIC_MONTH', month: '2026-09' });
-  assert.equal(september.openingBalanceTjs, 100); assert.equal(september.closingBalanceTjs, 200);
-  const augustCashAfter = await reports.computeCashFlowReport({ period: 'SPECIFIC_MONTH', month: '2026-08' });
-  assert.equal(augustCashAfter.openingBalanceTjs, augustCashBefore.openingBalanceTjs);
-  assert.equal(D(augustCashAfter.closingBalanceTjs).minus(augustCashBefore.closingBalanceTjs), 100);
-  assert.equal(D(augustCashAfter.incomeTotalTjs).minus(augustCashBefore.incomeTotalTjs), 100);
-  pass('historical statement excludes later movements, including a later cancellation');
 
   const shares = (a: number) => OwnersService.updateProfitShares([{ ownerId: 'owner-admin', sharePercent: a }, { ownerId: 'owner-partner', sharePercent: 100 - a }], 'user-admin');
   const balances = async () => (await prisma.owner.findMany({ orderBy: { id: 'asc' } })).map(o => o.availableProfitUsd);

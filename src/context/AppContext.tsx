@@ -687,12 +687,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         return [fetchExpenses, fetchStores, fetchOwners];
       case 'OWNER_TX':
         return [fetchOwners, fetchOwnerTransactions, fetchStores];
-      case 'FINANCIAL_TRANSACTION_CREATED':
-      case 'FINANCIAL_TRANSACTION_CANCELLED':
-        // Manual ledger entries only move store cash registers on screen.
-        return [fetchStores];
-      case 'FINANCIAL_CATEGORY_CREATED':
-        return []; // nothing on screen lists financial categories
       case 'REPAIR_UPDATED':
         return [fetchRepairs, fetchExpenses, fetchStores, fetchOwners];
       case 'STORE_UPDATED':
