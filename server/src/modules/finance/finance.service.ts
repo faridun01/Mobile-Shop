@@ -71,7 +71,7 @@ async function resolveAccountOrThrow(tx: TransactionClient, accountId: string) {
  */
 function assertAccountCurrency(account: { storeId: string | null; name: string }, currency: LedgerCurrency) {
   if (account.storeId && currency !== 'TJS') {
-    throw new Error(`Касса "${account.name}" ведётся только в TJS — для операций в USD выберите Главный счёт`);
+    throw new Error(`Касса "${account.name}" ведётся только в TJS — операции в USD не поддерживаются`);
   }
 }
 

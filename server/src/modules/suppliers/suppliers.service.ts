@@ -3,7 +3,7 @@ import type { TransactionClient } from '../../prisma/prisma.service';
 import { resolveActor } from '../../common/actor';
 import { requireNonNegativeMoney, requirePositiveMoney, roundMoney } from '../../common/money';
 import { requireTodayRate } from '../exchange-rate/exchange-rate.service';
-import { getStoreCashAccount, getMainAccount } from '../finance/account.service';
+import { getStoreCashAccount } from '../finance/account.service';
 import { currentOwnerAllocations, readOwnerAllocations, replaceOwnerAllocations } from '../finance/owner-allocations';
 import type { OwnerProfitAllocation } from '../sales/profit';
 import { postTransaction } from '../finance/financial-transaction.service';
@@ -21,8 +21,10 @@ async function deviceHasTransactionHistory(tx: TransactionClient, deviceIds: str
 export interface PaySupplierInput {
   supplierId: string;
   amountUsd: number;
-  sourceAccount: 'MAIN_ACCOUNT' | 'STORE_CASH';
-  storeId?: string;
+  // Always a store's (or the main warehouse's) cash register — the company-wide
+  // «Главный счёт» was removed, so there is no other place a payment can come from.
+  sourceAccount: 'STORE_CASH';
+  storeId: string;
   note?: string;
   createdByUserId: string;
 }
@@ -47,8 +49,8 @@ export class SuppliersService {
   /** FIFO allocation across the supplier's open invoices, oldest first. */
   public static async pay(input: PaySupplierInput) {
     const amountUsd = requirePositiveMoney(input.amountUsd, 'Сумма оплаты');
-    if (!['MAIN_ACCOUNT', 'STORE_CASH'].includes(input.sourceAccount)) throw new Error('Некорректный источник оплаты');
-    if (input.sourceAccount === 'STORE_CASH' && !input.storeId) throw new Error('Выберите кассу магазина');
+    if (input.sourceAccount !== 'STORE_CASH') throw new Error('Некорректный источник оплаты');
+    if (!input.storeId) throw new Error('Выберите кассу, из которой оплатить');
 
     return prisma.$transaction(async (tx) => {
       const actor = await resolveActor(tx, input.createdByUserId);
@@ -104,31 +106,23 @@ export class SuppliersService {
       });
       if (debtGuard.count !== 1) throw new Error('Задолженность изменилась, обновите данные и повторите оплату');
 
-      let store = null;
-      if (input.sourceAccount === 'STORE_CASH' && input.storeId) {
-        store = await tx.store.findUnique({ where: { id: input.storeId } });
-        if (!store || !store.active) throw new Error('Касса магазина не найдена или неактивна');
-        // Unlike sales/expenses, supplier payments may be funded from the main
-        // warehouse's account — purchases (приходы) are recorded there and its
-        // balance is meant to fund paying those suppliers back, not just retail stores.
-        // amountUsd was collected in USD terms but store registers hold TJS; convert via today's rate if available.
-        const cashAmountTjs = roundMoney(amountUsd * exchangeRate);
-        const cashGuard = await tx.store.updateMany({ where: { id: input.storeId, cashBalanceTjs: { gte: cashAmountTjs } }, data: { cashBalanceTjs: { decrement: cashAmountTjs } } });
-        if (cashGuard.count !== 1) throw new Error('В кассе недостаточно наличных для оплаты поставщику');
-      }
+      const store = await tx.store.findUnique({ where: { id: input.storeId } });
+      if (!store || !store.active) throw new Error('Касса магазина не найдена или неактивна');
+      // Unlike sales/expenses, supplier payments may be funded from the main
+      // warehouse's account — purchases (приходы) are recorded there and its
+      // balance is meant to fund paying those suppliers back, not just retail stores.
+      // amountUsd was collected in USD terms but store registers hold TJS; convert via today's rate if available.
+      const cashAmountTjs = roundMoney(amountUsd * exchangeRate);
+      const cashGuard = await tx.store.updateMany({ where: { id: input.storeId, cashBalanceTjs: { gte: cashAmountTjs } }, data: { cashBalanceTjs: { decrement: cashAmountTjs } } });
+      if (cashGuard.count !== 1) throw new Error('В кассе недостаточно наличных для оплаты поставщику');
 
-      // MAIN_ACCOUNT has no enforced balance guard yet (Phase 1 decision) — it is
-      // still tracked in the ledger/dashboard, but never blocks this payment, matching
-      // today's behavior where paying "from the main account" was never blocked either.
-      const financeAccount = input.sourceAccount === 'STORE_CASH' && input.storeId
-        ? await getStoreCashAccount(tx, input.storeId, store?.name)
-        : await getMainAccount(tx);
+      const financeAccount = await getStoreCashAccount(tx, input.storeId, store.name);
       await postTransaction(tx, {
         type: 'SUPPLIER_PAYMENT',
         direction: 'OUT',
         numberPrefix: 'SP',
         accountId: financeAccount.id,
-        balanceCurrency: input.sourceAccount === 'STORE_CASH' ? 'TJS' : 'USD',
+        balanceCurrency: 'TJS',
         amount: amountUsd,
         currency: 'USD',
         exchangeRate,
@@ -143,7 +137,7 @@ export class SuppliersService {
         sourceId: payment.id,
         description: `Выплата поставщику ${supplier.name}: $${amountUsd}`,
         createdByUserId: actor.id,
-        guardBalance: input.sourceAccount === 'STORE_CASH',
+        guardBalance: true,
       });
 
       await tx.ledgerEntry.create({
@@ -178,10 +172,10 @@ export class SuppliersService {
   }
 
   /** Pays a single specific invoice directly, instead of FIFO across all open invoices. */
-  public static async payInvoice(input: { invoiceId: string; amountUsd: number; sourceAccount: 'MAIN_ACCOUNT' | 'STORE_CASH'; storeId?: string; createdByUserId: string }) {
+  public static async payInvoice(input: { invoiceId: string; amountUsd: number; sourceAccount: 'STORE_CASH'; storeId: string; createdByUserId: string }) {
     const amountUsd = requirePositiveMoney(input.amountUsd, 'Сумма оплаты');
-    if (!['MAIN_ACCOUNT', 'STORE_CASH'].includes(input.sourceAccount)) throw new Error('Некорректный источник оплаты');
-    if (input.sourceAccount === 'STORE_CASH' && !input.storeId) throw new Error('Выберите кассу магазина');
+    if (input.sourceAccount !== 'STORE_CASH') throw new Error('Некорректный источник оплаты');
+    if (!input.storeId) throw new Error('Выберите кассу, из которой оплатить');
 
     return prisma.$transaction(async (tx) => {
       const actor = await resolveActor(tx, input.createdByUserId);
@@ -224,24 +218,19 @@ export class SuppliersService {
       });
       if (debtGuard.count !== 1) throw new Error('Задолженность изменилась, обновите данные и повторите оплату');
 
-      let store = null;
-      if (input.sourceAccount === 'STORE_CASH' && input.storeId) {
-        store = await tx.store.findUnique({ where: { id: input.storeId } });
-        if (!store || !store.active) throw new Error('Касса магазина не найдена или неактивна');
-        const cashAmountTjs = roundMoney(amountUsd * exchangeRate);
-        const cashGuard = await tx.store.updateMany({ where: { id: input.storeId, cashBalanceTjs: { gte: cashAmountTjs } }, data: { cashBalanceTjs: { decrement: cashAmountTjs } } });
-        if (cashGuard.count !== 1) throw new Error('В кассе недостаточно наличных для оплаты поставщику');
-      }
+      const store = await tx.store.findUnique({ where: { id: input.storeId } });
+      if (!store || !store.active) throw new Error('Касса магазина не найдена или неактивна');
+      const cashAmountTjs = roundMoney(amountUsd * exchangeRate);
+      const cashGuard = await tx.store.updateMany({ where: { id: input.storeId, cashBalanceTjs: { gte: cashAmountTjs } }, data: { cashBalanceTjs: { decrement: cashAmountTjs } } });
+      if (cashGuard.count !== 1) throw new Error('В кассе недостаточно наличных для оплаты поставщику');
 
-      const financeAccount = input.sourceAccount === 'STORE_CASH' && input.storeId
-        ? await getStoreCashAccount(tx, input.storeId, store?.name)
-        : await getMainAccount(tx);
+      const financeAccount = await getStoreCashAccount(tx, input.storeId, store.name);
       await postTransaction(tx, {
         type: 'SUPPLIER_PAYMENT',
         direction: 'OUT',
         numberPrefix: 'SP',
         accountId: financeAccount.id,
-        balanceCurrency: input.sourceAccount === 'STORE_CASH' ? 'TJS' : 'USD',
+        balanceCurrency: 'TJS',
         amount: amountUsd,
         currency: 'USD',
         exchangeRate,
@@ -256,7 +245,7 @@ export class SuppliersService {
         sourceId: payment.id,
         description: `Выплата поставщику ${supplier.name} по накладной ${invoice.invoiceNumber}: $${amountUsd}`,
         createdByUserId: actor.id,
-        guardBalance: input.sourceAccount === 'STORE_CASH',
+        guardBalance: true,
       });
 
       await tx.ledgerEntry.create({

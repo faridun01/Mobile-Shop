@@ -38,7 +38,7 @@ beforeEach(() => {
 });
 
 describe('supplier payment safeguards', () => {
-  const input = { supplierId: 'supplier', amountUsd: 50, sourceAccount: 'MAIN_ACCOUNT' as const, createdByUserId: 'admin' };
+  const input = { supplierId: 'supplier', amountUsd: 50, sourceAccount: 'STORE_CASH' as const, storeId: 'store-main', createdByUserId: 'admin' };
   it('rejects an invoice changed by a concurrent payment before allocating funds', async () => {
     db.supplierInvoice.updateMany.mockResolvedValue({ count: 0 });
     await expect(SuppliersService.pay(input)).rejects.toThrow('параллельно');
@@ -55,7 +55,7 @@ describe('supplier payment safeguards', () => {
     expect(db.ledgerEntry.create).not.toHaveBeenCalled();
   });
   it('does not overpay an invoice by even one cent', async () => {
-    await expect(SuppliersService.payInvoice({ invoiceId: 'invoice', amountUsd: 50.01, sourceAccount: 'MAIN_ACCOUNT', createdByUserId: 'admin' })).rejects.toThrow('остаток');
+    await expect(SuppliersService.payInvoice({ invoiceId: 'invoice', amountUsd: 50.01, sourceAccount: 'STORE_CASH', storeId: 'store-main', createdByUserId: 'admin' })).rejects.toThrow('остаток');
     expect(db.supplierPayment.create).not.toHaveBeenCalled();
   });
   it('preserves suppliers with financial history', async () => {

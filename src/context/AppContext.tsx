@@ -1248,13 +1248,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const paySupplier: AppContextType['paySupplier'] = async ({ supplierId, amountUsd, storeId, sourceAccountId, note }) => {
-    const resolvedStoreId = storeId || (sourceAccountId && sourceAccountId !== 'owner-funds' ? sourceAccountId : undefined);
+    const resolvedStoreId = storeId || sourceAccountId;
+    if (!resolvedStoreId) return { success: false, message: 'Выберите кассу, из которой оплатить' };
     try {
       await apiClient(`/suppliers/${supplierId}/payments`, {
         method: 'POST',
         body: JSON.stringify({
           amountUsd,
-          sourceAccount: resolvedStoreId ? 'STORE_CASH' : 'MAIN_ACCOUNT',
+          sourceAccount: 'STORE_CASH',
           storeId: resolvedStoreId,
           note,
         }),
@@ -1268,13 +1269,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const paySupplierInvoice: AppContextType['paySupplierInvoice'] = async ({ invoiceId, amountUsd, storeId, sourceAccountId }) => {
-    const resolvedStoreId = storeId || (sourceAccountId && sourceAccountId !== 'owner-funds' ? sourceAccountId : undefined);
+    const resolvedStoreId = storeId || sourceAccountId;
+    if (!resolvedStoreId) return { success: false, message: 'Выберите кассу, из которой оплатить' };
     try {
       await apiClient(`/supplier-invoices/${invoiceId}/payments`, {
         method: 'POST',
         body: JSON.stringify({
           amountUsd,
-          sourceAccount: resolvedStoreId ? 'STORE_CASH' : 'MAIN_ACCOUNT',
+          sourceAccount: 'STORE_CASH',
           storeId: resolvedStoreId,
         }),
       });

@@ -7,7 +7,7 @@ import type { FinancialTransaction, FinancialCategory } from '../../types';
 import { formatMoney } from '../../utils/formatMoney';
 import { FALLBACK_EXCHANGE_RATE } from '../../utils/exchangeRate';
 import {
-  Wallet, ArrowDownCircle, ArrowUpCircle, ArrowLeftRight, Landmark, BarChart3,
+  Wallet, ArrowDownCircle, ArrowUpCircle, ArrowLeftRight, BarChart3,
   Plus, SlidersHorizontal, RefreshCw, XCircle, Store as StoreIcon,
 } from 'lucide-react';
 import { FilterPillGroup } from '../ui/FilterPillGroup';
@@ -302,8 +302,8 @@ export const FinancePage: React.FC = () => {
                     key={a.id}
                     label={a.name}
                     value={formatMoney(a.balanceTjs, 'TJS')}
-                    subvalue={a.type === 'MAIN' ? formatMoney(a.balanceUsd, 'USD') : a.storeName}
-                    icon={a.type === 'MAIN' ? Landmark : Wallet}
+                    subvalue={a.storeName}
+                    icon={Wallet}
                     tone={a.balanceTjs < 0 ? 'danger' : 'neutral'}
                   />
                 ))}
@@ -434,12 +434,12 @@ export const FinancePage: React.FC = () => {
               >
                 <div className="min-w-0 flex items-center gap-2.5">
                   <div className="p-2 rounded-lg bg-surface-raised text-fg-muted shrink-0">
-                    {a.type === 'MAIN' ? <Landmark className="w-4 h-4" /> : <Wallet className="w-4 h-4" />}
+                    <Wallet className="w-4 h-4" />
                   </div>
                   <div className="min-w-0">
                     <div className="flex items-center gap-1.5">
                       <span className="text-sm font-semibold text-fg-muted truncate">{a.name}</span>
-                      <Badge tone={a.type === 'MAIN' ? 'accent' : 'neutral'}>{a.type === 'MAIN' ? 'Главный счёт' : 'Касса'}</Badge>
+                      <Badge tone="neutral">Касса</Badge>
                     </div>
                     {a.storeName && (
                       <p className="text-xs text-fg-subtle mt-0.5 flex items-center gap-1"><StoreIcon className="w-3 h-3" />{a.storeName}</p>
@@ -448,7 +448,6 @@ export const FinancePage: React.FC = () => {
                 </div>
                 <div className="text-right shrink-0">
                   <p className="text-sm font-bold text-fg-muted">{formatMoney(a.balanceTjs, 'TJS')}</p>
-                  {a.type === 'MAIN' && <p className="text-xs text-fg-subtle">{formatMoney(a.balanceUsd, 'USD')}</p>}
                 </div>
               </button>
             ))}

@@ -13,10 +13,3 @@ export async function getStoreCashAccount(tx: TransactionClient, storeId: string
     data: { name: `Касса ${store?.name ?? ''}`.trim(), type: 'CASH', storeId },
   });
 }
-
-/** Returns the single company-wide Main Account, creating it on first use. */
-export async function getMainAccount(tx: TransactionClient) {
-  const existing = await tx.financialAccount.findFirst({ where: { type: 'MAIN' } });
-  if (existing) return existing;
-  return tx.financialAccount.create({ data: { name: 'Главный счёт', type: 'MAIN' } });
-}

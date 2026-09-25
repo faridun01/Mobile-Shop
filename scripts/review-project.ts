@@ -50,8 +50,6 @@ for (const route of ['/devices', '/sales', '/users', '/finance/accounts', '/stor
   console.log('UNAUTHENTICATED', route, (await api(route)).status);
 }
 console.log('SELLER_FINANCE', (await api('/finance/accounts', seller)).status);
-const { getMainAccount } = await import('../server/src/modules/finance/account.service');
-await prisma.$transaction((tx) => getMainAccount(tx));
 const accounts = (await api('/finance/accounts', admin)).body;
 const source = accounts.find((a: any) => a.storeId === 'store-siyoma');
 const destination = accounts.find((a: any) => a.id !== source.id);

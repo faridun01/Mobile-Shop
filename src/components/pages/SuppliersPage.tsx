@@ -81,15 +81,19 @@ export const SuppliersPage: React.FC = () => {
   const [isPayModalOpen, setIsPayModalOpen] = useState(false);
   const [isAddSupplierOpen, setIsAddSupplierOpen] = useState(false);
 
+  // Supplier payments default to the main warehouse's register — that's where partner
+  // capital lives and what purchases are meant to be paid back from.
+  const defaultPaymentStoreId = stores.find(s => s.isMainWarehouse)?.id || stores[0]?.id || '';
+
   // Pay form state
   const [paymentAmountUsd, setPaymentAmountUsd] = useState('');
-  const [sourceAccountId, setSourceAccountId] = useState(stores[0]?.id || 'main-warehouse');
+  const [sourceAccountId, setSourceAccountId] = useState(defaultPaymentStoreId);
   const [paymentNote, setPaymentNote] = useState('');
 
   // Pay single invoice form state
   const [isPayInvoiceModalOpen, setIsPayInvoiceModalOpen] = useState(false);
   const [payInvoiceAmountUsd, setPayInvoiceAmountUsd] = useState('');
-  const [payInvoiceSourceAccountId, setPayInvoiceSourceAccountId] = useState(stores[0]?.id || 'main-warehouse');
+  const [payInvoiceSourceAccountId, setPayInvoiceSourceAccountId] = useState(defaultPaymentStoreId);
 
   // Add supplier state
   const [newSupplierName, setNewSupplierName] = useState('');
@@ -701,7 +705,6 @@ export const SuppliersPage: React.FC = () => {
                       {s.name} (Остаток: {(s.cashBalanceTjs ?? 0).toLocaleString()} TJS)
                     </option>
                   ))}
-                  <option value="owner-funds">Личные средства инвестора / Партнера</option>
                 </select>
               </div>
 
@@ -776,7 +779,6 @@ export const SuppliersPage: React.FC = () => {
                       {s.name} (Остаток: {(s.cashBalanceTjs ?? 0).toLocaleString()} TJS)
                     </option>
                   ))}
-                  <option value="owner-funds">Личные средства инвестора / Партнера</option>
                 </select>
               </div>
 
