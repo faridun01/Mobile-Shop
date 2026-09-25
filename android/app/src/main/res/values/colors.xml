@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Matches the web app's bg/surface/accent theme colors (src/index.css) so native
+         chrome (recents thumbnail, dialogs) doesn't fall back to the Capacitor
+         template's default Material indigo/pink. -->
+    <color name="colorPrimary">#0F1219</color>
+    <color name="colorPrimaryDark">#0B0E14</color>
+    <color name="colorAccent">#16A34A</color>
+</resources>

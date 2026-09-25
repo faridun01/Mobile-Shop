@@ -1,0 +1,14 @@
+/* ML Kit renders behind the WebView. This class exists only during native scans. */
+html.native-scanner-active,
+html.native-scanner-active body {
+  background: transparent !important;
+}
+html.native-scanner-active #root {
+  visibility: hidden;
+}
+.native-scanner-overlay {
+  padding-top: calc(1rem + env(safe-area-inset-top, 0px));
+  padding-bottom: calc(1rem + env(safe-area-inset-bottom, 0px));
+  padding-left: calc(1rem + env(safe-area-inset-left, 0px));
+  padding-right: calc(1rem + env(safe-area-inset-right, 0px));
+}

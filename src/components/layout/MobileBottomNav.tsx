@@ -66,7 +66,7 @@ export const MobileBottomNav: React.FC = () => {
     return (
       <button
         onClick={onSelect}
-        className={`flex-1 h-full min-h-11 flex flex-col items-center justify-center gap-0.5 transition-colors ${
+        className={`flex-1 min-h-11 flex flex-col items-center justify-center gap-0.5 transition-colors ${
           isActive ? 'text-accent' : 'text-fg-subtle active:text-fg'
         }`}
       >
@@ -77,7 +77,7 @@ export const MobileBottomNav: React.FC = () => {
   };
 
   return (
-    <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 w-full h-16 bg-surface border-t border-border flex items-stretch justify-around select-none safe-area-pb">
+    <nav className="app-bottom-nav md:hidden shrink-0 w-full min-h-16 bg-surface border-t border-border flex items-stretch justify-around select-none safe-area-pb">
       <NavItem
         routePath="/inventory"
         label="Склад"
@@ -126,7 +126,7 @@ export const MobileBottomNav: React.FC = () => {
 
       <button
         onClick={() => setDrawerOpen(true)}
-        className="flex-1 h-full min-h-11 flex flex-col items-center justify-center gap-0.5 text-fg-subtle active:text-fg-muted transition-colors"
+        className="flex-1 min-h-11 flex flex-col items-center justify-center gap-0.5 text-fg-subtle active:text-fg-muted transition-colors"
       >
         <div className="relative">
           <Menu className="w-5 h-5" />

@@ -1,8 +1,11 @@
 import { useAuthStore } from '../stores/useAuthStore';
+import { Capacitor } from '@capacitor/core';
+import { requireNativeUrl } from '../services/nativeConfig';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
 
 export async function apiClient<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
+  if (Capacitor.isNativePlatform()) requireNativeUrl(import.meta.env.VITE_API_URL, 'https:', 'VITE_API_URL');
   const token = useAuthStore.getState().token;
 
   const headers: HeadersInit = {

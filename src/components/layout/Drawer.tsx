@@ -118,7 +118,7 @@ export const Drawer: React.FC = () => {
   const userStoreName = currentUser?.storeId ? (stores.find(s => s.id === currentUser.storeId)?.name || currentUser.storeName) : currentUser?.storeName;
 
   return (
-    <div className="fixed inset-0 z-50 flex md:hidden flex-col bg-bg text-fg-muted w-full h-full overflow-hidden">
+    <div className="app-safe-area fixed inset-0 z-60 flex md:hidden flex-col bg-bg text-fg-muted w-full h-dvh overflow-hidden">
       {/* Header */}
       <div className="p-4 border-b border-border bg-surface flex items-center justify-between shrink-0">
         <div className="flex items-center gap-3 min-w-0">
@@ -146,7 +146,7 @@ export const Drawer: React.FC = () => {
       </div>
 
       {/* Vertical List of Menu Items */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-6 pb-24">
+      <div className="flex-1 min-h-0 overflow-y-auto p-4 space-y-6">
         {NAV_GROUPS.map((group, gIdx) => {
           const visibleItems = group.items.filter(item => item.roles.includes(userRole));
           if (visibleItems.length === 0) return null;
@@ -202,29 +202,10 @@ export const Drawer: React.FC = () => {
             </div>
           );
         })}
-
-        {/* Logout item at the end of the mobile menu list */}
-        <div className="pt-2">
-          <button
-            onClick={() => {
-              setDrawerOpen(false);
-              logout();
-            }}
-            className="w-full flex items-center justify-between px-3.5 py-3.5 rounded-xl border text-left bg-danger/10 hover:bg-danger/15 text-danger border-danger/30 font-semibold transition-all active:scale-[0.99]"
-          >
-            <div className="flex items-center gap-3 min-w-0">
-              <div className="p-2 rounded-lg bg-danger/15 text-danger shrink-0 border border-danger/20">
-                <LogOut className="w-4.5 h-4.5" />
-              </div>
-              <span className="text-xs md:text-sm font-bold truncate">Выйти из системы</span>
-            </div>
-            <ChevronRight className="w-4 h-4 text-danger/60 shrink-0" />
-          </button>
-        </div>
       </div>
 
       {/* Footer */}
-      <div className="p-3 border-t border-border bg-surface flex items-center justify-between shrink-0 fixed bottom-0 left-0 right-0 z-50 safe-area-pb">
+      <div className="p-3 border-t border-border bg-surface flex items-center justify-between shrink-0 safe-area-pb">
         <button
           onClick={() => {
             setDrawerOpen(false);

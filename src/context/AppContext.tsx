@@ -33,6 +33,8 @@ import { useUIStore } from '../stores/useUIStore';
 import { useNotificationsActions } from './NotificationsContext';
 import { apiClient } from '../api/client';
 import { useRealtimeSync } from '../hooks/useRealtimeSync';
+import { scanCode, cancelScan, isNativeScanner } from '../services/scanner/scannerService';
+import { soundEffects } from '../utils/sound';
 import { getBusinessDateKey } from '../utils/businessDate';
 import {
   buildNameLookup,
@@ -930,11 +932,26 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const openScanner = (callback: (code: string) => void) => {
-    setScannerCallback(() => callback);
-    setIsScannerOpen(true);
+    void scanCode({
+      open: (onResult) => {
+        setScannerCallback(() => onResult);
+        setIsScannerOpen(true);
+      },
+      close: () => {
+        setIsScannerOpen(false);
+        setScannerCallback(null);
+      },
+    }).then((code) => {
+      if (code === null) return;
+      if (isNativeScanner()) soundEffects.playAddToCartSuccess();
+      return callback(code);
+    }).catch(() => {
+      window.alert('Не удалось завершить сканирование. Закройте и снова откройте приложение.');
+    });
   };
 
   const closeScanner = () => {
+    cancelScan();
     setIsScannerOpen(false);
     setScannerCallback(null);
   };

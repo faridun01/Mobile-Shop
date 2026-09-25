@@ -57,14 +57,18 @@ export const Dialog: React.FC<DialogProps> = ({
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-60 flex items-end md:items-center justify-center">
-      <div className="absolute inset-0 bg-black/70" onClick={dismissable ? onClose : undefined} aria-hidden="true" />
+    <div className="fixed inset-x-0 top-0 h-dvh max-h-dvh z-60 flex flex-col justify-end md:justify-center items-center overflow-hidden">
+      <div
+        className="absolute inset-0 bg-black/70 transition-opacity"
+        onClick={dismissable ? onClose : undefined}
+        aria-hidden="true"
+      />
       <div
         role="dialog"
         aria-modal="true"
         aria-label={title}
         className={cn(
-          'relative w-full flex flex-col bg-surface border-t md:border border-border rounded-t-2xl md:rounded-2xl max-h-[92vh] md:max-h-[85vh] overflow-hidden',
+          'relative w-full flex flex-col bg-surface border-t md:border border-border rounded-t-2xl md:rounded-2xl max-h-[calc(100dvh-env(safe-area-inset-top,0px)-1rem)] md:max-h-[85dvh] overflow-hidden overscroll-contain shadow-2xl z-10',
           MAX_WIDTH_CLASSES[maxWidth]
         )}
       >
@@ -78,9 +82,20 @@ export const Dialog: React.FC<DialogProps> = ({
           {dismissable && <IconButton icon={X} aria-label="Закрыть" onClick={onClose} size="sm" />}
         </div>
 
-        <div className="flex-1 min-h-0 overflow-y-auto px-4 py-4">{children}</div>
+        <div
+          className={cn(
+            'flex-1 min-h-0 overflow-y-auto px-4 py-4 overscroll-contain [-webkit-overflow-scrolling:touch]',
+            !footer && 'pb-[max(1rem,env(safe-area-inset-bottom,0px))]'
+          )}
+        >
+          {children}
+        </div>
 
-        {footer && <div className="shrink-0 flex gap-2 px-4 py-3 border-t border-border pb-[max(0.75rem,env(safe-area-inset-bottom))]">{footer}</div>}
+        {footer && (
+          <div className="shrink-0 flex gap-2 px-4 py-3 border-t border-border pb-[max(0.75rem,env(safe-area-inset-bottom,0px))]">
+            {footer}
+          </div>
+        )}
       </div>
     </div>
   );

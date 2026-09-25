@@ -106,7 +106,7 @@ export const Sidebar: React.FC = () => {
   const unreadNotifs = notifications.filter(n => !n.read).length;
 
   return (
-    <aside className="hidden lg:flex flex-col w-60 border-r border-border bg-surface text-fg-muted select-none shrink-0 h-screen sticky top-0">
+    <aside className="hidden lg:flex flex-col w-60 border-r border-border bg-surface text-fg-muted select-none shrink-0 h-full sticky top-0">
       <div className="h-14 flex items-center px-4 border-b border-border justify-between shrink-0">
         <div className="flex items-center gap-2.5">
           <div className="w-2.5 h-2.5 rounded-sm bg-accent" />

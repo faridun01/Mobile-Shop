@@ -77,7 +77,7 @@ export const TabletNavRail: React.FC = () => {
   const visibleItems = TABLET_NAV_ITEMS.filter(item => item.roles.includes(userRole));
 
   return (
-    <aside className="hidden md:flex lg:hidden flex-col w-20 border-r border-border bg-surface text-fg-muted select-none shrink-0 h-screen sticky top-0 py-3 items-center justify-between z-30">
+    <aside className="hidden md:flex lg:hidden flex-col w-20 border-r border-border bg-surface text-fg-muted select-none shrink-0 h-full sticky top-0 py-3 items-center justify-between z-30">
       <div className="flex flex-col items-center gap-1">
         <div className="w-10 h-10 rounded-lg bg-accent/10 border border-accent/30 text-accent font-extrabold text-xs flex items-center justify-center">
           POS

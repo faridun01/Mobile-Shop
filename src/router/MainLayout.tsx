@@ -16,11 +16,13 @@ import { useUIStore } from '../stores/useUIStore';
 import { useAppFields } from '../context/AppContext';
 import { LoadingState } from '../components/ui/Skeleton';
 import { useNavigationLayout } from '../hooks/useNavigationLayout';
+import { cancelScan, isNativeScanner } from '../services/scanner/scannerService';
 
 // Lazy-loaded so the ~3MB html5-qrcode dependency it pulls in only downloads the first
 // time a user actually opens the scanner, instead of riding along in the main chunk on
 // every page load for every mobile user (see performance audit, P0-1).
 const ScannerModal = lazy(() => import('../components/common/ScannerModal').then(m => ({ default: m.ScannerModal })));
+const NativeScannerOverlay = lazy(() => import('../components/common/NativeScannerOverlay').then(m => ({ default: m.NativeScannerOverlay })));
 
 // Lazy-loaded page components for Code Splitting
 const SalePage = lazy(() => import('../components/pages/SalePage').then(m => ({ default: m.SalePage })));
@@ -66,6 +68,8 @@ function LoadingFallback() {
 }
 
 export function MainLayout() {
+  const native = isNativeScanner();
+  React.useEffect(() => () => cancelScan(), []);
   const navigationLayout = useNavigationLayout();
   const location = useLocation();
   const { currentUser } = useAuthStore();
@@ -93,14 +97,14 @@ export function MainLayout() {
     || 'Все магазины';
 
   return (
-    <div className="flex h-dvh max-h-dvh w-screen overflow-hidden bg-bg text-fg antialiased selection:bg-accent selection:text-accent-fg">
+    <div className="app-safe-area flex h-dvh max-h-dvh w-full max-w-full overflow-hidden bg-bg text-fg antialiased selection:bg-accent selection:text-accent-fg">
       {navigationLayout === 'mobile' && <Drawer />}
       {navigationLayout === 'tablet' && <TabletNavRail />}
       {navigationLayout === 'desktop' && <Sidebar />}
 
-      <div className="flex-1 flex flex-col min-w-0 h-dvh max-h-dvh overflow-hidden bg-bg relative">
+      <div className="flex-1 flex flex-col min-w-0 h-full min-h-0 overflow-hidden bg-bg relative">
         <TopBar />
-        <main className="flex-1 flex flex-col min-h-0 overflow-y-auto relative bg-bg pb-16 md:pb-0">
+        <main className="flex-1 flex flex-col min-h-0 overflow-y-auto relative bg-bg">
           <Suspense fallback={<LoadingFallback />}>
             <Routes>
               <Route path="/" element={<Navigate to="/sale" replace />} />
@@ -155,13 +159,16 @@ export function MainLayout() {
           closeDailyRateModal();
         }}
       />
-      {isScannerOpen && (
+      {!native && isScannerOpen && (
         <Suspense fallback={null}>
           <ScannerModal />
         </Suspense>
       )}
-      <PWAInstallPrompt />
-      <PWAUpdateNotifier />
+      {native ? (
+        <Suspense fallback={null}><NativeScannerOverlay /></Suspense>
+      ) : (
+        <><PWAInstallPrompt /><PWAUpdateNotifier /></>
+      )}
     </div>
   );
 }

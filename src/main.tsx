@@ -2,6 +2,9 @@ import {StrictMode} from 'react';
 import {createRoot} from 'react-dom/client';
 import App from './App.tsx';
 import './index.css';
+import { initNativeStatusBar } from './services/nativeStatusBar';
+
+void initNativeStatusBar();
 
 // Prevent text/content extraction through the browser UI. This covers keyboard
 // shortcuts, the context menu, dragging, and long-press selection on touch devices.

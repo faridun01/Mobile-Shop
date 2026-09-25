@@ -107,7 +107,7 @@ export const DailyRateModal: React.FC<DailyRateModalProps> = ({ isOpen, onClose 
                 setError(null);
               }}
               onKeyDown={(e) => e.key === 'Enter' && handleSubmit()}
-              autoFocus
+              autoFocus={typeof window !== 'undefined' && window.matchMedia('(pointer: fine)').matches}
               placeholder="например, 9.50"
               className="w-full h-14 rounded-lg bg-bg border border-accent/50 px-4 text-xl font-bold text-accent focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
             />

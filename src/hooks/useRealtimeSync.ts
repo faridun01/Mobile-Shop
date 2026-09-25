@@ -1,4 +1,6 @@
 import { useEffect, useRef } from 'react';
+import { Capacitor, type PluginListenerHandle } from '@capacitor/core';
+import { requireNativeUrl } from '../services/nativeConfig';
 
 /** Subscribes to the backend's authenticated WebSocket and invokes onEvent for every broadcast. */
 export function useRealtimeSync(token: string | null, onEvent: (type: string, payload: any) => void) {
@@ -10,6 +12,7 @@ export function useRealtimeSync(token: string | null, onEvent: (type: string, pa
 
     let wsUrl = '';
     const customWsUrl = import.meta.env.VITE_WS_URL;
+    if (Capacitor.isNativePlatform()) requireNativeUrl(customWsUrl, 'wss:', 'VITE_WS_URL');
 
     if (customWsUrl) {
       const separator = customWsUrl.includes('?') ? '&' : '?';
@@ -24,6 +27,9 @@ export function useRealtimeSync(token: string | null, onEvent: (type: string, pa
     let retryTimer: ReturnType<typeof setTimeout> | undefined;
     let retryDelay = 1000;
     let hasConnected = false;
+    let suspended = false;
+    let authRejected = false;
+    let appListener: PluginListenerHandle | undefined;
 
     function clearRetryTimer() {
       if (retryTimer !== undefined) {
@@ -33,7 +39,7 @@ export function useRealtimeSync(token: string | null, onEvent: (type: string, pa
     }
 
     function scheduleReconnect() {
-      if (stopped || retryTimer !== undefined) return;
+      if (stopped || suspended || authRejected || retryTimer !== undefined) return;
       clearRetryTimer();
       if (import.meta.env.DEV) {
         console.debug(`[WebSocket] scheduling reconnect in ${retryDelay}ms`);
@@ -46,7 +52,7 @@ export function useRealtimeSync(token: string | null, onEvent: (type: string, pa
     }
 
     function connect() {
-      if (stopped) return;
+      if (stopped || suspended || authRejected) return;
       clearRetryTimer();
 
       // Guard: do not open a new socket if an active or connecting socket already exists
@@ -100,7 +106,8 @@ export function useRealtimeSync(token: string | null, onEvent: (type: string, pa
           }
           if (stopped) return;
           // Authorization failures require a new token, not repeated connections.
-          if (event.code !== 1008) {
+          if (event.code === 1008) authRejected = true;
+          if (!authRejected) {
             scheduleReconnect();
           }
         };
@@ -139,8 +146,33 @@ export function useRealtimeSync(token: string | null, onEvent: (type: string, pa
 
     connect();
 
+    if (Capacitor.isNativePlatform()) {
+      const onAppState = ({ isActive }: { isActive: boolean }) => {
+        if (stopped) return;
+        suspended = !isActive;
+        clearRetryTimer();
+        // A WebView may still report OPEN for a socket killed while suspended.
+        // Recreate it on foreground; existing RECONNECTED handling refreshes data.
+        if (socket) {
+          socket.onopen = socket.onclose = socket.onerror = socket.onmessage = null;
+          try { socket.close(1000, 'App lifecycle'); } catch { /* Already closed. */ }
+          socket = null;
+        }
+        if (isActive) connect();
+      };
+      void import('@capacitor/app').then(async ({ App }) => {
+        if (stopped) return;
+        const listener = await App.addListener('appStateChange', onAppState);
+        if (stopped) { await listener.remove(); return; }
+        appListener = listener;
+        const state = await App.getState();
+        if (!state.isActive) onAppState(state);
+      }).catch((error) => console.error('Native realtime lifecycle unavailable', error));
+    }
+
     return () => {
       stopped = true;
+      void appListener?.remove();
       clearRetryTimer();
       if (typeof window !== 'undefined' && typeof window.removeEventListener === 'function') {
         window.removeEventListener('beforeunload', handleBeforeUnload);

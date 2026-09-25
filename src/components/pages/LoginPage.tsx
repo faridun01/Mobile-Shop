@@ -40,7 +40,7 @@ export const LoginPage: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-bg flex flex-col items-center justify-center p-4 text-fg-muted relative">
+    <div className="app-safe-area safe-area-pb min-h-dvh bg-bg flex flex-col items-center justify-center p-4 text-fg-muted relative">
       <div className="w-full max-w-sm">
         {/* Brand header */}
         <div className="text-center mb-6">

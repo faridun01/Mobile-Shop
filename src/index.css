@@ -64,6 +64,8 @@
     -moz-osx-font-smoothing: grayscale;
     transition: background-color 0.2s ease, color 0.2s ease;
     overflow-x: hidden;
+    overscroll-behavior-y: none;
+    -webkit-overflow-scrolling: touch;
   }
 
   /* Responsive proportional font scaling on small mobile screens */
@@ -79,6 +81,15 @@
   select,
   textarea {
     touch-action: manipulation;
+  }
+
+  /* Prevent iOS Safari from zooming in on input focus by ensuring minimum 16px font size on touch/mobile */
+  @media screen and (max-width: 768px) {
+    input:not([type="checkbox"]):not([type="radio"]),
+    select,
+    textarea {
+      font-size: 16px !important;
+    }
   }
 
   /* Simple, flat design overrides (ultra-minimal Loyverse POS UI) */
@@ -101,6 +112,25 @@ input[type="number"]::-webkit-inner-spin-button {
 input[type="number"] {
   -moz-appearance: textfield;
   appearance: textfield;
+}
+
+/* The shell owns the top inset; its header and pages must not add it again.
+   The fixed drawer is a separate viewport layer and uses the same rule. */
+.app-safe-area {
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-left: env(safe-area-inset-left, 0px);
+  padding-right: env(safe-area-inset-right, 0px);
+}
+
+/* The bottom nav is a normal flex sibling of <main> (not a fixed overlay), so
+   flexbox already reserves its space — no compensating padding needed on <main>.
+   The nav itself uses min-height (not height) so safe-area-pb below adds to its
+   total height instead of shrinking the tap targets on devices with a tall inset. */
+@media (width < 48rem) {
+  .app-bottom-nav {
+    padding-left: env(safe-area-inset-left, 0px);
+    padding-right: env(safe-area-inset-right, 0px);
+  }
 }
 
 /* Mobile Safe Area Bottom Padding */
@@ -439,4 +469,10 @@ body {
 [data-theme="light"] [data-active="true"] {
   background-color: transparent !important;
   color: #059669 !important;
+}
+
+/* Ensure fixed overlays respect dynamic viewport height on iOS Safari */
+.fixed.inset-0 {
+  height: 100dvh;
+  max-height: 100dvh;
 }
