@@ -422,7 +422,8 @@ export const EmployeesPage: React.FC = () => {
   const handleExportPayrollReport = () => {
     const headers = ['Сотрудник', 'Должность', 'Торговая точка', 'Оклад (TJS)', 'Выручка продаж (TJS)', 'Комиссия %', 'Начислено (TJS)', 'Взято авансов (TJS)', 'Выплачено ЗП (TJS)', 'Остаток к выплате (TJS)'];
     
-    const rows = users.filter(u => u.isActive ?? u.active).map(u => {
+    const sellers = users.filter(u => (u.isActive ?? u.active) && u.role === 'SELLER');
+    const rows = sellers.map(u => {
       const uSales = sales.filter(s => s.sellerId === u.id && s.status !== 'REFUNDED' && s.date.startsWith(selectedPayrollMonth));
       const salesRev = uSales.reduce((acc, s) => acc + s.totalTjs, 0);
       const baseSal = u.baseSalaryTjs || 0;
@@ -437,8 +438,8 @@ export const EmployeesPage: React.FC = () => {
 
       return [
         u.name,
-        u.role,
-        u.storeName || 'Все филиалы',
+        'Продавец',
+        u.storeName || (u.storeId ? stores.find(s => s.id === u.storeId)?.name : undefined) || 'Магазин не привязан',
         baseSal,
         salesRev,
         `${commPct}% (${commAmt} TJS)`,
@@ -449,15 +450,31 @@ export const EmployeesPage: React.FC = () => {
       ];
     });
 
-    const csvContent = 'data:text/csv;charset=utf-8,\uFEFF'
-      + [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
-    const encodedUri = encodeURI(csvContent);
+    const csvLines = [headers.join(','), ...rows.map(r => r.join(','))].join('\r\n');
+    const blob = new Blob(['\ufeff' + csvLines], { type: 'text/csv;charset=utf-8;' });
+    const fileName = `Зарплатная_ведомость_продавцов_${selectedPayrollMonth}.csv`;
+
+    if (typeof navigator !== 'undefined' && typeof navigator.canShare === 'function') {
+      try {
+        const file = new File([blob], fileName, { type: blob.type });
+        if (navigator.canShare({ files: [file] })) {
+          void navigator.share({ files: [file], title: fileName });
+          return;
+        }
+      } catch (err: any) {
+        if (err.name === 'AbortError') return;
+      }
+    }
+
+    const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
-    link.setAttribute('href', encodedUri);
-    link.setAttribute('download', `Зарплатная_ведомость_${selectedPayrollMonth}.csv`);
+    link.href = url;
+    link.download = fileName;
+    link.rel = 'noopener';
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
   };
 
   // Management (admin/partner) shown ahead of sellers — separate concerns (profit
@@ -534,14 +551,21 @@ export const EmployeesPage: React.FC = () => {
                 <div className="flex items-center justify-between">
                   <span className="text-[10px] text-fg-subtle uppercase">ТОЧКА ПРОДАЖИ:</span>
                   <span className="text-fg-subtle font-mono text-[11px] truncate max-w-35 text-right">
-                    {u.storeName ? (
-                      <span className="text-accent font-medium flex items-center justify-end space-x-1">
-                        <Store className="w-3 h-3 shrink-0" />
-                        <span className="truncate">{u.storeName}</span>
-                      </span>
-                    ) : (
-                      <span className="text-fg-muted">Все филиалы</span>
-                    )}
+                    {(() => {
+                      const resolvedStoreName = u.storeName || (u.storeId ? stores.find(s => s.id === u.storeId)?.name : undefined);
+                      if (resolvedStoreName) {
+                        return (
+                          <span className="text-accent font-medium flex items-center justify-end space-x-1">
+                            <Store className="w-3 h-3 shrink-0" />
+                            <span className="truncate">{resolvedStoreName}</span>
+                          </span>
+                        );
+                      }
+                      if (u.role === 'SELLER') {
+                        return <span className="text-danger font-medium">Магазин не привязан</span>;
+                      }
+                      return <span className="text-fg-muted">Все филиалы</span>;
+                    })()}
                   </span>
                 </div>
 
@@ -680,10 +704,10 @@ export const EmployeesPage: React.FC = () => {
           <button
             onClick={() => setIsPayrollReportModalOpen(true)}
             className="flex items-center space-x-1.5 px-3 py-2 rounded-xl bg-warning/10 hover:bg-warning/20 border border-warning/30 text-warning text-xs font-bold transition-colors"
-            title="Ежемесячная ведомость зарплат сотрудников"
+            title="Ежемесячная ведомость зарплат продавцов"
           >
             <Briefcase className="w-4 h-4 text-warning" />
-            <span className="hidden md:inline">ЗАРПЛАТНЫЙ ОТЧЕТ</span>
+            <span className="hidden md:inline">ЗАРПЛАТНЫЙ ОТЧЕТ ПРОДАВЦОВ</span>
           </button>
 
           <button
@@ -974,7 +998,7 @@ export const EmployeesPage: React.FC = () => {
               <div className="p-2.5 rounded-lg bg-bg border border-border space-y-1">
                 <span className="text-[10px] text-fg-subtle uppercase block">Сотрудник:</span>
                 <strong className="text-sm text-fg-muted">{advanceIssueUser.name}</strong>
-                <p className="text-[10px] text-fg-subtle">{advanceIssueUser.storeName || 'Магазин'}</p>
+                <p className="text-[10px] text-fg-subtle">{advanceIssueUser.storeName || (advanceIssueUser.storeId ? stores.find(s => s.id === advanceIssueUser.storeId)?.name : undefined) || 'Магазин'}</p>
               </div>
 
               <div>
@@ -1071,7 +1095,7 @@ export const EmployeesPage: React.FC = () => {
                     <div className="flex items-center justify-between">
                       <div>
                         <strong className="text-sm text-fg-muted block">{salaryPayoutUser.name}</strong>
-                        <span className="text-[10px] text-fg-subtle">{salaryPayoutUser.storeName || 'Магазин'}</span>
+                        <span className="text-[10px] text-fg-subtle">{salaryPayoutUser.storeName || (salaryPayoutUser.storeId ? stores.find(s => s.id === salaryPayoutUser.storeId)?.name : undefined) || 'Магазин'}</span>
                       </div>
                       <div className="text-right">
                         <span className="text-[10px] text-fg-subtle block uppercase">Авансы за этот месяц:</span>
@@ -1197,7 +1221,7 @@ export const EmployeesPage: React.FC = () => {
                   <Receipt className="w-4 h-4 text-info" />
                   <span>ФИНАНСОВАЯ ИСТОРИЯ И ОПЕРАЦИИ: {financialHistoryUser.name}</span>
                 </h4>
-                <span className="text-[10px] text-fg-subtle">{financialHistoryUser.storeName || 'Все филиалы'}</span>
+                <span className="text-[10px] text-fg-subtle">{financialHistoryUser.storeName || (financialHistoryUser.storeId ? stores.find(s => s.id === financialHistoryUser.storeId)?.name : undefined) || (financialHistoryUser.role === 'SELLER' ? 'Магазин не привязан' : 'Все филиалы')}</span>
               </div>
               <button type="button" onClick={() => setFinancialHistoryUser(null)} className="text-fg-subtle hover:text-fg-muted">
                 <X className="w-4 h-4" />
@@ -1404,7 +1428,7 @@ export const EmployeesPage: React.FC = () => {
             <div className="flex items-center justify-between pb-3 border-b border-border">
               <h4 className="text-xs sm:text-sm font-bold text-warning uppercase tracking-wider flex items-center space-x-2">
                 <Briefcase className="w-4 h-4 text-warning" />
-                <span>📊 ЕЖЕМЕСЯЧНАЯ ЗАРПЛАТНАЯ ВЕДОМОСТЬ СОТРУДНИКОВ</span>
+                <span>📊 ЕЖЕМЕСЯЧНАЯ ЗАРПЛАТНАЯ ВЕДОМОСТЬ ПРОДАВЦОВ</span>
               </h4>
               <button type="button" onClick={() => setIsPayrollReportModalOpen(false)} className="text-fg-subtle hover:text-fg-muted">
                 <X className="w-4 h-4" />
@@ -1439,43 +1463,55 @@ export const EmployeesPage: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border text-[11px]">
-                  {users.filter(u => u.isActive ?? u.active).map(u => {
-                    const stats = employeePayrollStatsByMonthAndId.get(u.id) ?? { salesRev: 0, advances: 0, paidSalary: 0 };
-                    const { salesRev, advances, paidSalary } = stats;
-                    const baseSal = u.baseSalaryTjs || 0;
-                    const commPct = u.salesCommissionPercent || 0;
-                    const commAmt = Math.round(salesRev * (commPct / 100));
-                    const grossAccrued = baseSal + commAmt;
-                    const netPayable = Math.max(0, grossAccrued - advances - paidSalary);
+                  {(() => {
+                    const activeSellers = users.filter(u => (u.isActive ?? u.active) && u.role === 'SELLER');
+                    if (activeSellers.length === 0) {
+                      return (
+                        <tr>
+                          <td colSpan={10} className="p-6 text-center text-xs text-fg-subtle">
+                            Нет активных продавцов за выбранный период
+                          </td>
+                        </tr>
+                      );
+                    }
+                    return activeSellers.map(u => {
+                      const stats = employeePayrollStatsByMonthAndId.get(u.id) ?? { salesRev: 0, advances: 0, paidSalary: 0 };
+                      const { salesRev, advances, paidSalary } = stats;
+                      const baseSal = u.baseSalaryTjs || 0;
+                      const commPct = u.salesCommissionPercent || 0;
+                      const commAmt = Math.round(salesRev * (commPct / 100));
+                      const grossAccrued = baseSal + commAmt;
+                      const netPayable = Math.max(0, grossAccrued - advances - paidSalary);
 
-                    return (
-                      <tr
-                        key={u.id}
-                        onClick={() => {
-                          setIsPayrollReportModalOpen(false);
-                          setSelectedHistoryMonth(selectedPayrollMonth);
-                          setFinancialHistoryUser(u);
-                        }}
-                        className="hover:bg-surface-raised cursor-pointer transition-colors"
-                        title="Нажмите, чтобы открыть подробные операции за этот месяц"
-                      >
-                        <td className="p-2.5 font-bold text-fg-muted">{u.name}</td>
-                        <td className="p-2.5 text-fg-subtle">{u.storeName || 'Все точки'}</td>
-                        <td className="p-2.5 text-right">{baseSal.toLocaleString()}</td>
-                        <td className="p-2.5 text-right font-semibold text-fg-muted">{salesRev.toLocaleString()}</td>
-                        <td className="p-2.5 text-right text-warning">{commAmt.toLocaleString()} ({commPct}%)</td>
-                        <td className="p-2.5 text-right font-bold text-fg-muted">{grossAccrued.toLocaleString()}</td>
-                        <td className="p-2.5 text-right font-bold text-warning">-{advances.toLocaleString()}</td>
-                        <td className="p-2.5 text-right font-bold text-info">{paidSalary.toLocaleString()}</td>
-                        <td className="p-2.5 text-right font-bold text-accent">{netPayable.toLocaleString()} TJS</td>
-                        <td className="p-2.5 text-center">
-                          <span className="px-2 py-0.5 rounded-md bg-info/15 text-info font-bold hover:bg-info/25 text-[10px]">
-                            📜 Операции {selectedPayrollMonth}
-                          </span>
-                        </td>
-                      </tr>
-                    );
-                  })}
+                      return (
+                        <tr
+                          key={u.id}
+                          onClick={() => {
+                            setIsPayrollReportModalOpen(false);
+                            setSelectedHistoryMonth(selectedPayrollMonth);
+                            setFinancialHistoryUser(u);
+                          }}
+                          className="hover:bg-surface-raised cursor-pointer transition-colors"
+                          title="Нажмите, чтобы открыть подробные операции за этот месяц"
+                        >
+                          <td className="p-2.5 font-bold text-fg-muted">{u.name}</td>
+                          <td className="p-2.5 text-fg-subtle">{u.storeName || (u.storeId ? stores.find(s => s.id === u.storeId)?.name : undefined) || 'Магазин не привязан'}</td>
+                          <td className="p-2.5 text-right">{baseSal.toLocaleString()}</td>
+                          <td className="p-2.5 text-right font-semibold text-fg-muted">{salesRev.toLocaleString()}</td>
+                          <td className="p-2.5 text-right text-warning">{commAmt.toLocaleString()} ({commPct}%)</td>
+                          <td className="p-2.5 text-right font-bold text-fg-muted">{grossAccrued.toLocaleString()}</td>
+                          <td className="p-2.5 text-right font-bold text-warning">-{advances.toLocaleString()}</td>
+                          <td className="p-2.5 text-right font-bold text-info">{paidSalary.toLocaleString()}</td>
+                          <td className="p-2.5 text-right font-bold text-accent">{netPayable.toLocaleString()} TJS</td>
+                          <td className="p-2.5 text-center">
+                            <span className="px-2 py-0.5 rounded-md bg-info/15 text-info font-bold hover:bg-info/25 text-[10px]">
+                              📜 Операции {selectedPayrollMonth}
+                            </span>
+                          </td>
+                        </tr>
+                      );
+                    });
+                  })()}
                 </tbody>
               </table>
             </div>

@@ -485,6 +485,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const raw = await apiClient<any[]>('/stores');
     storeNamesRef.current = new Map(raw.map((s) => [s.id, s.name]));
     setStores(raw.map(mapStore));
+    setUsers((prev) => prev.map((u) => ({
+      ...u,
+      storeName: u.storeName || (u.storeId ? storeNamesRef.current.get(u.storeId) : undefined),
+    })));
   }), [coalesceFetch]);
 
   // excludeSold: a SOLD device never leaves the table, so it's the one status that would
@@ -889,7 +893,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         method: 'POST',
         body: JSON.stringify({ login: loginStr.trim(), password: passStr }),
       });
-      const mappedUser: User = { ...result.user, storeName: undefined };
+      const mappedUser: User = {
+        ...result.user,
+        storeName: result.user.storeName || (result.user.storeId ? storeNamesRef.current.get(result.user.storeId) : undefined),
+      };
       useAuthStore.getState().setAuth(mappedUser, result.token);
       setCurrentUserState(mappedUser);
       if (mappedUser.role === 'SELLER' && mappedUser.storeId) {
@@ -1579,6 +1586,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (currentUser?.id === userData.id) {
         const mapped = mapUser(updated, storeNamesRef.current);
         useAuthStore.getState().setAuth(mapped, authToken || '');
+        setCurrentUserState(mapped);
       }
       await fetchOwners();
       return { success: true };

@@ -114,6 +114,9 @@ export const Drawer: React.FC = () => {
   // the user has seen it — informational notifications are created already resolved.
   const unreadNotifs = notifications.filter(n => !n.read).length;
   const userStoreName = currentUser?.storeId ? (stores.find(s => s.id === currentUser.storeId)?.name || currentUser.storeName) : currentUser?.storeName;
+  const storeSubtitle = currentUser?.role === 'SELLER'
+    ? (userStoreName || 'Магазин не привязан')
+    : (userStoreName || 'Все магазины');
 
   return (
     <div className="app-safe-area fixed inset-x-0 top-0 bottom-[calc(3.5rem+max(0.5rem,env(safe-area-inset-bottom,0px)))] z-40 flex md:hidden flex-col bg-bg text-fg-muted w-full overflow-hidden">
@@ -128,7 +131,7 @@ export const Drawer: React.FC = () => {
               {currentUser?.name || 'Пользователь'}
             </h2>
             <p className="text-xs font-medium text-accent truncate">
-              {userStoreName || 'Главный склад'}
+              {storeSubtitle}
             </p>
           </div>
         </div>

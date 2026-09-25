@@ -19,6 +19,7 @@ const SAFE_SELECT = {
   role: true,
   active: true,
   storeId: true,
+  store: { select: { id: true, name: true } },
   baseSalaryTjs: true,
   salesCommissionPercent: true,
   createdAt: true,
@@ -32,6 +33,7 @@ const PUBLIC_SELECT = {
   role: true,
   active: true,
   storeId: true,
+  store: { select: { id: true, name: true } },
   createdAt: true,
   updatedAt: true,
 } as const;

@@ -64,16 +64,45 @@ export interface ReportTable {
  * Clean helper function to trigger CSV file download with UTF-8 BOM
  * ensuring full compatibility with Microsoft Excel, Apple Numbers and Google Sheets.
  */
-function downloadCsv(content: string, fileName: string) {
-  const blob = new Blob(['﻿' + content], { type: 'text/csv;charset=utf-8;' });
+async function downloadBlob(blob: Blob, fileName: string): Promise<void> {
+  // 1. Mobile devices (iOS Safari, iOS PWA, Android):
+  // Use Web Share API if supported for files - this allows "Save to Files" or opening in Excel natively
+  if (typeof navigator !== 'undefined' && typeof navigator.canShare === 'function') {
+    try {
+      const file = new File([blob], fileName, { type: blob.type });
+      if (navigator.canShare({ files: [file] })) {
+        await navigator.share({
+          files: [file],
+          title: fileName,
+        });
+        return;
+      }
+    } catch (shareErr: any) {
+      if (shareErr.name === 'AbortError') {
+        return; // User cancelled the share dialog
+      }
+      console.warn('Web Share failed, falling back to download link:', shareErr);
+    }
+  }
+
+  // 2. Standard browser download link fallback:
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
-  link.setAttribute('href', url);
-  link.setAttribute('download', fileName);
+  link.href = url;
+  link.download = fileName;
+  link.rel = 'noopener';
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
-  URL.revokeObjectURL(url);
+  // Important: Delay revoke so Safari and mobile browsers have time to process the download
+  setTimeout(() => {
+    URL.revokeObjectURL(url);
+  }, 60000);
+}
+
+function downloadCsv(content: string, fileName: string) {
+  const blob = new Blob(['\ufeff' + content], { type: 'text/csv;charset=utf-8;' });
+  void downloadBlob(blob, fileName);
 }
 
 function escapeCsvField(field: any): string {
@@ -270,26 +299,30 @@ function safeWorksheetText(value: string | undefined | null, fallback = '-'): st
   return text || fallback;
 }
 
+function transliterate(str: string): string {
+  const ru: Record<string, string> = {
+    'а': 'a', 'б': 'b', 'в': 'v', 'г': 'g', 'д': 'd', 'е': 'e', 'ё': 'yo', 'ж': 'zh',
+    'з': 'z', 'и': 'i', 'й': 'y', 'к': 'k', 'л': 'l', 'м': 'm', 'н': 'n', 'о': 'o',
+    'п': 'p', 'р': 'r', 'с': 's', 'т': 't', 'у': 'u', 'ф': 'f', 'х': 'kh', 'ц': 'ts',
+    'ч': 'ch', 'ш': 'sh', 'щ': 'shch', 'ъ': '', 'ы': 'y', 'ь': '', 'э': 'e', 'ю': 'yu',
+    'я': 'ya',
+  };
+  return str.toLowerCase().split('').map((char) => ru[char] || char).join('');
+}
+
 function safeFilePart(value: string): string {
-  return value
+  return transliterate(value)
     .trim()
     .replace(/[<>:"/\\|?*\u0000-\u001F]/g, '_')
     .replace(/\s+/g, '_')
     .slice(0, 60) || 'report';
 }
 
-function downloadXlsx(content: ArrayBuffer, fileName: string) {
+async function downloadXlsx(content: ArrayBuffer, fileName: string): Promise<void> {
   const blob = new Blob([content], {
     type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
   });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = fileName;
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-  URL.revokeObjectURL(url);
+  await downloadBlob(blob, fileName);
 }
 
 /**
@@ -685,7 +718,7 @@ export async function exportComprehensiveReport(input: ComprehensiveReportInput)
   const workbook = await buildComprehensiveReportWorkbook(input);
   const buffer = await workbook.xlsx.writeBuffer();
   const date = new Date().toISOString().split('T')[0];
-  downloadXlsx(buffer, `finansovyi_otchet_${safeFilePart(input.summary.storeName)}_${date}.xlsx`);
+  await downloadXlsx(buffer, `finansovyi_otchet_${safeFilePart(input.summary.storeName)}_${date}.xlsx`);
 }
 
 /**

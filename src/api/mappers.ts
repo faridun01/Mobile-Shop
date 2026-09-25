@@ -344,7 +344,7 @@ export function mapUser(u: any, storeNames: NameLookup): User {
     login: u.login || '',
     role: u.role || 'SELLER',
     storeId: u.storeId ?? undefined,
-    storeName: u.storeId ? storeNames.get(u.storeId) : undefined,
+    storeName: u.store?.name ?? u.storeName ?? (u.storeId ? storeNames.get(u.storeId) : undefined),
     active: isAct,
     isActive: isAct,
     createdAt: u.createdAt,

@@ -8,7 +8,8 @@ import {
   Wrench,
   RotateCcw,
   Receipt,
-  ArrowLeft
+  ArrowLeft,
+  Store
 } from 'lucide-react';
 import { SearchBar } from '../ui/SearchBar';
 import { FilterPillGroup } from '../ui/FilterPillGroup';
@@ -242,7 +243,7 @@ export const SalesHistoryPage: React.FC = () => {
               }`}
             />
 
-            {currentUser?.role !== 'SELLER' && retailStores.length > 0 && (
+            {currentUser?.role !== 'SELLER' && retailStores.length > 0 ? (
               <Select
                 value={activeStoreId}
                 onChange={(e) => setSelectedStoreId(e.target.value)}
@@ -250,6 +251,11 @@ export const SalesHistoryPage: React.FC = () => {
               >
                 {retailStores.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
               </Select>
+            ) : (
+              <span className="h-9 px-3 rounded-lg border border-border bg-surface text-xs font-semibold text-fg-muted flex items-center gap-1.5 shrink-0">
+                <Store className="w-3.5 h-3.5 text-accent shrink-0" />
+                <span>{stores.find(s => s.id === activeStoreId)?.name || currentUser?.storeName || 'Магазин'}</span>
+              </span>
             )}
           </div>
         </div>

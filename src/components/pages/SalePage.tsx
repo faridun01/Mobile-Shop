@@ -266,7 +266,7 @@ export const SalePage: React.FC = () => {
 
       {/* Filter bar */}
       <div className="p-3 border-b border-border bg-bg space-y-2.5 shrink-0">
-        {isAdmin && (
+        {isAdmin ? (
           <div className="flex items-center justify-between gap-2">
             <span className="flex items-center gap-1.5 text-xs font-medium text-fg-muted shrink-0">
               <StoreIcon className="w-3.5 h-3.5 text-accent" />
@@ -277,6 +277,16 @@ export const SalePage: React.FC = () => {
                 <option key={s.id} value={s.id}>{s.name}</option>
               ))}
             </Select>
+          </div>
+        ) : (
+          <div className="flex items-center justify-between gap-2">
+            <span className="flex items-center gap-1.5 text-xs font-medium text-fg-muted shrink-0">
+              <StoreIcon className="w-3.5 h-3.5 text-accent" />
+              Точка продажи:
+            </span>
+            <span className="text-xs font-semibold text-accent px-2.5 py-1 rounded bg-surface-raised border border-border flex items-center gap-1.5">
+              <span>{activeStoreName}</span>
+            </span>
           </div>
         )}
 

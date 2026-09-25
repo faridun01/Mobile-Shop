@@ -277,6 +277,7 @@ export const ProfitReport: React.FC<ProfitReportProps> = ({ view, month, onMonth
     setReportDownloading(true);
     try {
       await exportComprehensiveReport({ sales: reportSales, expenses: reportExpenses, summary: reportSummary, generatedBy: currentUser?.name });
+      setSalesReportStoreId(null);
     } catch (error) {
       console.error('Failed to create financial report', error);
       window.alert('Не удалось сформировать Excel-отчёт. Попробуйте ещё раз.');

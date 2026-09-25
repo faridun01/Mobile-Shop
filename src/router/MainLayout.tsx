@@ -92,6 +92,7 @@ export function MainLayout() {
   // Sellers are pinned to their own store; for admin/partner this reflects whichever
   // store is currently active (set on the POS Terminal page), instead of a hardcoded label.
   const activeStoreLabel = currentUser.storeName
+    || (currentUser.storeId ? stores.find(s => s.id === currentUser.storeId)?.name : undefined)
     || (selectedStoreId && selectedStoreId !== 'all' ? stores.find(s => s.id === selectedStoreId)?.name : undefined)
     || 'Все магазины';
 

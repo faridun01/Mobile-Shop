@@ -20,7 +20,8 @@ import {
   Settings,
   Bell,
   LogOut,
-  Landmark
+  Landmark,
+  Store
 } from 'lucide-react';
 
 const PAGE_ROUTES: Record<string, string> = {
@@ -95,10 +96,11 @@ const NAV_GROUPS: NavGroup[] = [
 export const Sidebar: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { currentUser, setActivePage, logout } = useAppFields('currentUser', 'setActivePage', 'logout');
+  const { currentUser, setActivePage, logout, stores } = useAppFields('currentUser', 'setActivePage', 'logout', 'stores');
   const { notifications } = useNotifications();
 
   const userRole = currentUser?.role || 'SELLER';
+  const sellerStoreName = currentUser?.storeId ? (stores.find(s => s.id === currentUser.storeId)?.name || currentUser.storeName) : currentUser?.storeName;
   // `resolved` tracks whether an actionable notification has been handled, not whether
   // the user has seen it — informational notifications are created already resolved.
   const unreadNotifs = notifications.filter(n => !n.read).length;
@@ -168,8 +170,15 @@ export const Sidebar: React.FC = () => {
         </div>
         <div className="min-w-0 flex-1">
           <p className="text-xs font-semibold text-fg-muted truncate">{currentUser?.name || 'Пользователь'}</p>
-          {currentUser?.role === 'ADMIN' && (
-            <p className="text-[10px] text-fg-subtle truncate">Администратор</p>
+          {currentUser?.role === 'SELLER' ? (
+            <p className="text-[10px] text-accent truncate flex items-center gap-1" title={sellerStoreName}>
+              <Store className="w-2.5 h-2.5 shrink-0" />
+              <span className="truncate">{sellerStoreName || 'Магазин не привязан'}</span>
+            </p>
+          ) : (
+            <p className="text-[10px] text-fg-subtle truncate">
+              {currentUser?.role === 'ADMIN' ? 'Администратор' : 'Партнер'}
+            </p>
           )}
         </div>
       </div>

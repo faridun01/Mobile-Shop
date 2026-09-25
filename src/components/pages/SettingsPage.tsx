@@ -408,6 +408,10 @@ export const SettingsPage: React.FC = () => {
               <h4 className="text-xs sm:text-sm font-bold text-fg-muted uppercase">АККАУНТ И СЕССИЯ</h4>
               <p className="text-[11px] text-fg-muted mt-0.5">
                 Вы вошли как <strong className="text-fg-muted">{currentUser?.name}</strong> ({currentUser?.role === 'ADMIN' ? 'Администратор' : currentUser?.role})
+                {(() => {
+                  const sName = currentUser?.storeId ? (stores.find(s => s.id === currentUser.storeId)?.name || currentUser.storeName) : currentUser?.storeName;
+                  return sName ? <span className="text-accent font-medium"> • Магазин: {sName}</span> : null;
+                })()}
               </p>
             </div>
 

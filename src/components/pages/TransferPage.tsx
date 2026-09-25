@@ -30,6 +30,7 @@ export const TransferPage: React.FC = () => {
   } = useAppFields('currentUser', 'stores', 'devices', 'transfers', 'createTransferRequest', 'approveTransfer', 'rejectTransfer', 'openScanner', 'selectedStoreId');
 
   const isSeller = currentUser?.role === 'SELLER';
+  const sellerStoreName = currentUser?.storeName || (currentUser?.storeId ? stores.find(s => s.id === currentUser.storeId)?.name : undefined) || 'Мой магазин';
   const mainWarehouse = stores.find(s => s.isMainWarehouse);
   // A seller's default flow is pulling stock IN from the main warehouse into their own store
   // (the admin isn't always around to move it) — so that's the default, not sending stock out.
@@ -282,12 +283,12 @@ export const TransferPage: React.FC = () => {
                         className="w-full rounded-xl bg-surface-raised border border-border px-3 py-2 text-xs text-fg-muted focus:border-accent focus:outline-none"
                       >
                         <option value={mainWarehouse.id}>{mainWarehouse.name}</option>
-                        <option value={currentUser?.storeId || ''}>{currentUser?.storeName || 'Мой магазин'}</option>
+                        <option value={currentUser?.storeId || ''}>{sellerStoreName}</option>
                       </select>
                     ) : (
                       <div className="p-2.5 rounded-xl bg-surface-raised border border-border text-fg-muted font-bold flex items-center space-x-2">
                         <StoreIcon className="w-4 h-4 text-accent" />
-                        <span>{currentUser?.storeName || 'Мой магазин'}</span>
+                        <span>{sellerStoreName}</span>
                       </div>
                     )
                   ) : (
@@ -311,7 +312,7 @@ export const TransferPage: React.FC = () => {
                   {isSeller && mainWarehouse && fromLocationId === mainWarehouse.id ? (
                     <div className="p-2.5 rounded-xl bg-surface-raised border border-border text-fg-muted font-bold flex items-center space-x-2">
                       <StoreIcon className="w-4 h-4 text-accent" />
-                      <span>{currentUser?.storeName || 'Мой магазин'}</span>
+                      <span>{sellerStoreName}</span>
                     </div>
                   ) : (
                   <select

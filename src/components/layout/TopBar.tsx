@@ -10,8 +10,9 @@ export const TopBar: React.FC = () => {
     currentUser,
     activePage,
     setActivePage,
-    stores
-  } = useAppFields('currentUser', 'activePage', 'setActivePage', 'stores');
+    stores,
+    selectedStoreId
+  } = useAppFields('currentUser', 'activePage', 'setActivePage', 'stores', 'selectedStoreId');
   const { notifications } = useNotifications();
 
   // `resolved` tracks whether an actionable notification (e.g. an approval) has been
@@ -20,6 +21,9 @@ export const TopBar: React.FC = () => {
   // is what makes the badge reflect "new to you", not "still needs action".
   const unreadNotifsCount = notifications.filter(n => !n.read).length;
   const userStoreName = currentUser?.storeId ? (stores.find(s => s.id === currentUser.storeId)?.name || currentUser.storeName) : currentUser?.storeName;
+  const currentStoreDisplay = currentUser?.role === 'SELLER'
+    ? (userStoreName || 'Магазин не привязан')
+    : (userStoreName || (selectedStoreId && selectedStoreId !== 'all' ? stores.find(s => s.id === selectedStoreId)?.name : undefined) || 'Все магазины');
 
   const getPageTitle = () => {
     switch (activePage) {
@@ -52,12 +56,10 @@ export const TopBar: React.FC = () => {
           <h1 className="text-sm md:text-base font-bold text-fg-muted truncate tracking-tight">
             {getPageTitle()}
           </h1>
-          {(userStoreName || currentUser?.role !== 'ADMIN') && (
-            <p className="text-[11px] text-fg-subtle truncate flex items-center">
-              <Store className="w-2.5 h-2.5 mr-1 text-accent shrink-0 inline" />
-              <span className="truncate">{userStoreName || 'Магазин не привязан'}</span>
-            </p>
-          )}
+          <p className="text-[11px] text-fg-subtle truncate flex items-center">
+            <Store className="w-2.5 h-2.5 mr-1 text-accent shrink-0 inline" />
+            <span className="truncate">{currentStoreDisplay}</span>
+          </p>
         </div>
       </div>
 
