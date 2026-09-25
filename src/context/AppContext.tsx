@@ -349,23 +349,25 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const setTheme = (newTheme: ThemeMode) => setThemeState(newTheme);
   const toggleTheme = () => setThemeState((prev) => (prev === 'dark' ? 'light' : 'dark'));
 
-  // Keep local currentUser mirrored to the auth store (source of truth for the session)
-  useEffect(() => {
-    setCurrentUserState(authUser);
-  }, [authUser]);
-
   const checkRatePrompt = useCallback((rate: DailyRate | null) => {
-    if (authUser?.role === 'SELLER') {
-      setIsRateModalOpen(false);
-      return;
-    }
     const todayStr = getBusinessDateKey();
-    if (!rate || rate.date !== todayStr || !rate.rate || rate.rate <= 0) {
+    const isRateSet = !!(rate && rate.date === todayStr && rate.rate && rate.rate > 0);
+    if (!isRateSet) {
       setIsRateModalOpen(true);
+      useUIStore.getState().setDailyRateModalOpen(true);
     } else {
       setIsRateModalOpen(false);
+      useUIStore.getState().setDailyRateModalOpen(false);
     }
-  }, [authUser?.role]);
+  }, []);
+
+  // Keep local currentUser mirrored to the auth store and evaluate rate prompt on session start
+  useEffect(() => {
+    setCurrentUserState(authUser);
+    if (authUser) {
+      checkRatePrompt(todayRate);
+    }
+  }, [authUser, todayRate, checkRatePrompt]);
 
   // ---- Data fetching: the API/Postgres is the single source of truth ----
   const namesRef = useRef(buildNameLookup([]));

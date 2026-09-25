@@ -44,8 +44,9 @@ export const SalePage: React.FC = () => {
     stores,
     openScanner,
     createSale,
-    isInitialLoading
-  } = useAppFields('currentUser', 'devices', 'todayRate', 'selectedStoreId', 'setSelectedStoreId', 'stores', 'openScanner', 'createSale', 'isInitialLoading');
+    isInitialLoading,
+    openDailyRateModal
+  } = useAppFields('currentUser', 'devices', 'todayRate', 'selectedStoreId', 'setSelectedStoreId', 'stores', 'openScanner', 'createSale', 'isInitialLoading', 'openDailyRateModal');
 
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedBrand, setSelectedBrand] = useState<string>('ALL');
@@ -266,29 +267,44 @@ export const SalePage: React.FC = () => {
 
       {/* Filter bar */}
       <div className="p-3 border-b border-border bg-bg space-y-2.5 shrink-0">
-        {isAdmin ? (
-          <div className="flex items-center justify-between gap-2">
-            <span className="flex items-center gap-1.5 text-xs font-medium text-fg-muted shrink-0">
-              <StoreIcon className="w-3.5 h-3.5 text-accent" />
-              Точка продажи:
+        <div className="flex items-center justify-between gap-2">
+          {isAdmin ? (
+            <div className="flex items-center gap-1.5 min-w-0">
+              <span className="flex items-center gap-1.5 text-xs font-medium text-fg-muted shrink-0">
+                <StoreIcon className="w-3.5 h-3.5 text-accent shrink-0" />
+                Точка:
+              </span>
+              <Select value={effectiveStoreId} onChange={(e) => setSelectedStoreId(e.target.value)} className="w-auto min-w-36 py-1 h-8 text-xs">
+                {selectableStores.map(s => (
+                  <option key={s.id} value={s.id}>{s.name}</option>
+                ))}
+              </Select>
+            </div>
+          ) : (
+            <div className="flex items-center gap-1.5 min-w-0">
+              <span className="flex items-center gap-1.5 text-xs font-medium text-fg-muted shrink-0">
+                <StoreIcon className="w-3.5 h-3.5 text-accent shrink-0" />
+                Точка:
+              </span>
+              <span className="text-xs font-semibold text-accent px-2 py-0.5 rounded bg-surface-raised border border-border truncate">
+                {activeStoreName}
+              </span>
+            </div>
+          )}
+
+          {/* Dollar Rate Quick Button */}
+          <button
+            onClick={openDailyRateModal}
+            className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-surface-raised hover:bg-surface border border-border text-fg-muted text-xs font-semibold shrink-0 transition-colors shadow-xs active:scale-95 cursor-pointer"
+            title="Курс доллара на сегодня (нажмите, чтобы изменить)"
+          >
+            <span className="text-accent font-bold">$ 1 =</span>
+            <span className="text-fg-muted font-bold tabular-nums">
+              {todayRate?.rate ? Number(todayRate.rate).toFixed(2) : '—'}
             </span>
-            <Select value={effectiveStoreId} onChange={(e) => setSelectedStoreId(e.target.value)} className="w-auto min-w-40">
-              {selectableStores.map(s => (
-                <option key={s.id} value={s.id}>{s.name}</option>
-              ))}
-            </Select>
-          </div>
-        ) : (
-          <div className="flex items-center justify-between gap-2">
-            <span className="flex items-center gap-1.5 text-xs font-medium text-fg-muted shrink-0">
-              <StoreIcon className="w-3.5 h-3.5 text-accent" />
-              Точка продажи:
-            </span>
-            <span className="text-xs font-semibold text-accent px-2.5 py-1 rounded bg-surface-raised border border-border flex items-center gap-1.5">
-              <span>{activeStoreName}</span>
-            </span>
-          </div>
-        )}
+            <span className="text-[10px] text-fg-subtle">TJS</span>
+          </button>
+        </div>
 
         <SearchBar
           value={searchQuery}
