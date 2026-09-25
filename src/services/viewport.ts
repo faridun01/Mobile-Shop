@@ -4,6 +4,8 @@
 export function initViewport(): () => void {
   const root = document.documentElement;
   const viewport = window.visualViewport;
+  // Fallback for the app shell height where dvh is unsupported (see .app-viewport in index.css).
+  root.classList.toggle('no-dvh', !(window.CSS?.supports?.('height', '100dvh') ?? false));
   let frame = 0;
   const update = () => {
     cancelAnimationFrame(frame);
@@ -11,6 +13,7 @@ export function initViewport(): () => void {
       if (viewport && Math.abs(viewport.scale - 1) > 0.01) return;
       const height = viewport?.height ?? window.innerHeight;
       const top = viewport?.offsetTop ?? 0;
+      root.style.setProperty('--app-height', `${window.innerHeight}px`);
       root.style.setProperty('--app-viewport-height', `${height}px`);
       root.style.setProperty('--app-viewport-top', `${top}px`);
       root.style.setProperty('--app-viewport-bottom', `${Math.max(0, window.innerHeight - height - top)}px`);

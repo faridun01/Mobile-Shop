@@ -78,7 +78,7 @@ export const MobileBottomNav: React.FC = () => {
   };
 
   return (
-    <nav className="app-bottom-nav md:hidden shrink-0 w-full min-h-16 bg-surface border-t border-border flex items-stretch justify-around select-none safe-area-pb">
+    <nav className="app-bottom-nav md:hidden shrink-0 w-full bg-surface border-t border-border flex items-stretch justify-around select-none">
       <NavItem
         routePath="/inventory"
         label="Склад"

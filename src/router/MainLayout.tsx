@@ -97,7 +97,7 @@ export function MainLayout() {
     || 'Все магазины';
 
   return (
-    <div className="app-safe-area flex h-dvh max-h-dvh w-full max-w-full overflow-hidden bg-bg text-fg antialiased selection:bg-accent selection:text-accent-fg">
+    <div className="app-safe-area app-viewport flex w-full max-w-full overflow-hidden bg-bg text-fg antialiased selection:bg-accent selection:text-accent-fg">
       {navigationLayout === 'mobile' && <Drawer />}
       {navigationLayout === 'tablet' && <TabletNavRail />}
       {navigationLayout === 'desktop' && <Sidebar />}

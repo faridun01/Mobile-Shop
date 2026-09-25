@@ -119,7 +119,7 @@ export const Drawer: React.FC = () => {
     : (userStoreName || 'Все магазины');
 
   return (
-    <div className="app-safe-area fixed inset-x-0 top-0 bottom-[calc(3.5rem+max(0.5rem,env(safe-area-inset-bottom,0px)))] z-40 flex md:hidden flex-col bg-bg text-fg-muted w-full overflow-hidden">
+    <div className="app-safe-area fixed inset-x-0 top-0 bottom-[calc(3.5rem+var(--bottom-nav-pb))] z-40 flex md:hidden flex-col bg-bg text-fg-muted w-full overflow-hidden">
       {/* Header */}
       <div className="p-4 border-b border-border bg-surface flex items-center justify-between shrink-0">
         <div className="flex items-center gap-3 min-w-0">
