@@ -3,7 +3,7 @@ import { prisma } from '../../prisma/prisma.service';
 import { resolveActor } from '../../common/actor';
 import { getRateForDate } from '../exchange-rate/exchange-rate.service';
 import { moneyEquals, requireNonNegativeMoney, roundMoney } from '../../common/money';
-import { refundOwnerProfit } from './profit';
+import { exchangeCostRestorations, refundOwnerProfit } from './profit';
 import { getStoreCashAccount } from '../finance/account.service';
 import { postTransaction } from '../finance/financial-transaction.service';
 
@@ -49,7 +49,6 @@ export class RefundService {
         select: { action: true, financialDetails: true },
       });
       const owners = await tx.owner.findMany();
-      const ownerProfitAllocations = refundOwnerProfit(profitLogs, owners, penaltyUsd);
 
       const updatedSale = await tx.sale.update({
         where: { id: input.saleId },
@@ -79,6 +78,24 @@ export class RefundService {
       if (restockResult.count !== deviceIds.length) {
         throw new Error('Не удалось вернуть устройства на склад — состояние изменилось');
       }
+
+      // Undo every trade-in on this sale: a device still on hand gets its pre-exchange cost
+      // basis back. One that was already resold had its profit booked against the trade-in
+      // value instead, so the difference is corrected through owner profit below.
+      let resoldTradeInAdjustmentUsd = D(0);
+      for (const restoration of exchangeCostRestorations(profitLogs)) {
+        const restored = await tx.device.updateMany({
+          where: { id: restoration.deviceId, costBasisUsd: restoration.tradeInCostUsd, status: { not: 'SOLD' } },
+          data: { costBasisUsd: restoration.originalCostUsd },
+        });
+        if (restored.count === 1) continue;
+        const device = await tx.device.findUnique({ where: { id: restoration.deviceId }, select: { status: true } });
+        if (device?.status === 'SOLD') {
+          resoldTradeInAdjustmentUsd = resoldTradeInAdjustmentUsd.plus(D(restoration.tradeInCostUsd).minus(restoration.originalCostUsd));
+        }
+      }
+      resoldTradeInAdjustmentUsd = roundMoney(resoldTradeInAdjustmentUsd);
+      const ownerProfitAllocations = refundOwnerProfit(profitLogs, owners, D(penaltyUsd).plus(resoldTradeInAdjustmentUsd));
 
       await tx.deviceTimelineEvent.createMany({
         data: sale.saleItems.map((item) => ({
@@ -145,7 +162,7 @@ export class RefundService {
           userRole: actor.role,
           action: 'REFUND',
           details: `Чек #${sale.receiptNumber}: возврат на сумму ${actualRefundTjs} TJS. ${D(penaltyFeeTjs).gt(0) ? `Удержан штраф: ${penaltyFeeTjs} TJS.` : ''} Причина: ${input.reason}`,
-          financialDetails: moneyJson({ amountTjs: actualRefundTjs, penaltyTjs: penaltyFeeTjs, penaltyUsd, ownerProfitAllocations: moneyJson(ownerProfitAllocations) }),
+          financialDetails: moneyJson({ amountTjs: actualRefundTjs, penaltyTjs: penaltyFeeTjs, penaltyUsd, resoldTradeInAdjustmentUsd, ownerProfitAllocations: moneyJson(ownerProfitAllocations) }),
           receiptNumber: sale.receiptNumber,
           targetId: sale.id,
         },

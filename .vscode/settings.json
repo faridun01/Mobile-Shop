@@ -1,4 +1,7 @@
 {
   "css.lint.unknownAtRules": "ignore",
-  "tailwindCSS.experimental.configFile": null
+  "tailwindCSS.experimental.configFile": null,
+  // The database is PostgreSQL; the MSSQL extension flags valid Postgres syntax
+  // (e.g. ALTER COLUMN ... TYPE ... USING) in prisma/migrations as T-SQL errors.
+  "mssql.intelliSense.enableErrorChecking": false
 }

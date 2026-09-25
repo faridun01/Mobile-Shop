@@ -24,6 +24,7 @@
     "test:profit-refund": "tsx scripts/test-profit-share-refund.ts",
     "test:audit-fixes": "tsx scripts/test-audit-fixes.ts",
     "audit:system": "tsx scripts/audit-system.ts",
+    "audit:owners": "tsx scripts/check-owner-balances.ts",
     "db:clean": "tsx scripts/clear-data-keep-users.ts",
     "server": "tsx watch server/src/index.ts"
   },

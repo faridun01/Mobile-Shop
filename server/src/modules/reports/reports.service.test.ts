@@ -39,11 +39,13 @@ function result(table: string, rows: any[], select?: any) {
 beforeEach(() => {
   vi.clearAllMocks(); workload = [];
   db.sale.findMany.mockImplementation(async ({ where, select }) => result('sales', sales.filter((sale) =>
-    (!where.storeId || sale.storeId === where.storeId) && (where.status === 'REFUNDED' ? sale.status === 'REFUNDED' : sale.status !== 'REFUNDED')), select));
+    (!where.storeId || sale.storeId === where.storeId) && (!where.id || where.id.in.includes(sale.id)) &&
+    (where.status !== 'REFUNDED' || sale.status === 'REFUNDED')), select));
   db.expense.findMany.mockImplementation(async ({ where, select }) => result('expenses', expenses.filter((expense) => !where?.storeId || expense.storeId === where.storeId), select));
   db.auditLog.findMany.mockImplementation(async ({ where, select }) => {
-    const ids = new Set(where.targetId.in);
-    return result('profitLogs', logs.filter((log) => ids.has(log.targetId)), select);
+    const ids = where.targetId ? new Set(where.targetId.in) : undefined;
+    const actions: string[] = where.action.in ?? [where.action];
+    return result('profitLogs', logs.filter((log) => (!ids || ids.has(log.targetId)) && actions.includes(log.action)), select);
   });
   db.supplierBonus.findMany.mockResolvedValue([{ bonusType: 'CASH_DISCOUNT', amountUsd: 25.5, exchangeRate: 10, dateReceived: date }, { bonusType: 'FREE_DEVICES', dateReceived: date, status: 'IN_STOCK' }]);
   db.supplier.aggregate.mockResolvedValue({ _sum: { totalDebtUsd: 123.45 } });

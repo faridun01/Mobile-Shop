@@ -2,7 +2,7 @@ import { D, decimalMin, decimalMax, moneyJson, type MoneyInput } from '../../com
 import { prisma } from '../../prisma/prisma.service';
 import type { TransactionClient } from '../../prisma/prisma.service';
 import { resolveActor } from '../../common/actor';
-import { requirePositiveMoney, requireNonNegativeMoney, roundMoney } from '../../common/money';
+import { requireFiniteNumber, requirePositiveMoney, roundMoney } from '../../common/money';
 import { requireTodayRate } from '../exchange-rate/exchange-rate.service';
 import { getStoreCashAccount } from '../finance/account.service';
 import { postTransaction } from '../finance/financial-transaction.service';
@@ -194,10 +194,13 @@ export class OwnersService {
 
   public static async updateProfitShares(shares: { ownerId: string; sharePercent: number }[], userId: string, rebalanceBalances = false) {
     if (!Array.isArray(shares) || D(shares.length).eq(0)) throw new Error('Укажите доли владельцев');
-    const normalized = shares.map((share) => ({
-      ownerId: share.ownerId,
-      sharePercent: requireNonNegativeMoney(share.sharePercent, 'Доля владельца'),
-    }));
+    // Stored as DECIMAL(7,4): keep 4 places so e.g. 33.3333/33.3333/33.3334 sums to 100
+    // (money rounding to 2 places made any three-way split impossible to save).
+    const normalized = shares.map((share) => {
+      const sharePercent = D(requireFiniteNumber(share.sharePercent, 'Доля владельца')).toDecimalPlaces(4);
+      if (sharePercent.lt(0) || sharePercent.gt(100)) throw new Error('Доля владельца должна быть от 0 до 100%');
+      return { ownerId: share.ownerId, sharePercent };
+    });
     if (!D(new Set(normalized.map((share) => share.ownerId)).size).eq(normalized.length)) throw new Error('Владелец не может быть указан дважды');
     const total = normalized.reduce((sum, s) => D(sum).plus(s.sharePercent), D(0));
     if (D(D(D(total).minus(100)).abs()).gt(0.000001)) {

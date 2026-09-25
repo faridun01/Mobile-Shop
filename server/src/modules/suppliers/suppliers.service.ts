@@ -300,10 +300,6 @@ export class SuppliersService {
         },
       });
 
-      if (input.bonusType === 'CASH_DISCOUNT' && ownerProfitAllocations.length) {
-        await replaceOwnerAllocations(tx, [], ownerProfitAllocations, 1);
-      }
-
       if (input.bonusType === 'FREE_DEVICES' && input.freeDevices?.length) {
         const imeis = input.freeDevices.map((d) => d.imei);
         const existing = await tx.device.findFirst({ where: { OR: imeis.flatMap((imei) => [{ imei }, { imei2: imei }]) } });

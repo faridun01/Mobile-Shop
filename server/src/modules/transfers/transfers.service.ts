@@ -132,6 +132,9 @@ export class TransfersService {
       if (!fromStore || !toStore) {
         throw new Error('Магазин отправления или назначения не найден в базе данных');
       }
+      if (input.fromStoreId === input.toStoreId) {
+        throw new Error('Магазин отправления и назначения не могут совпадать');
+      }
       const sourceStatuses = sourceStatusesForStore(fromStore.isMainWarehouse);
       const destStatus = destinationStatusForStore(toStore.isMainWarehouse);
 

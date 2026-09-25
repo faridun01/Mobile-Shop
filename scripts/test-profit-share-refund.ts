@@ -1,6 +1,6 @@
 import { D, decimalMin, decimalMax, moneyJson, type MoneyInput } from '../server/src/common/decimal';
 import 'dotenv/config';
-import assert from 'node:assert/strict';
+import assert from './lib/decimal-assert';
 import { spawnSync } from 'node:child_process';
 import { PrismaClient } from '@prisma/client';
 
@@ -78,14 +78,53 @@ try {
   await shares(20);
   await refund(exchanged.sale.id, 2500);
   assert.deepEqual(await balances(), [{ accrued: 0, available: 0 }, { accrued: 0, available: 0 }]);
-  console.log('PASS: original sale and exchange allocations reversed after two share changes');
+  assert.equal((await prisma.device.findUniqueOrThrow({ where: { id: exchanged.item.id } })).costBasisUsd, 100);
+  console.log('PASS: original sale and exchange allocations reversed after two share changes; traded-in device cost restored');
+
+  // Traded-in device resold before the original sale is refunded: its resale profit was
+  // booked against the $150 trade-in value, so the refund must add the $50 difference.
+  await shares(50);
+  const resoldCase = await makeSale();
+  const replacement2 = await device();
+  await ExchangesService.process({ saleId: resoldCase.sale.id,
+    returnedImei: resoldCase.item.imei, returnedBrand: 'Test', returnedModel: 'Refund regression',
+    exchangeInValueTjs: D(1500), replacementDeviceId: replacement2.id, newPriceTjs: D(2500),
+    processedByUserId: 'user-admin', paymentMethod: 'CASH' });
+  await SalesService.executeSale({ storeId: 'store-siyoma', userId: 'user-admin',
+    items: [{ deviceId: resoldCase.item.id, salePriceTjs: D(1800) }], paymentMethod: 'CASH' });
+  await refund(resoldCase.sale.id, 3000);
+  assert.deepEqual(await balances(), [{ accrued: 40, available: 40 }, { accrued: 40, available: 40 }]);
+  console.log('PASS: refund after the traded-in device was resold books its resale against original cost');
 
   await shares(60);
   const penalized = await makeSale();
   await shares(50);
   await refund(penalized.sale.id, 2000, 100);
-  assert.deepEqual(await balances(), [{ accrued: 5, available: 5 }, { accrued: 5, available: 5 }]);
+  assert.deepEqual(await balances(), [{ accrued: 45, available: 45 }, { accrued: 45, available: 45 }]);
   console.log('PASS: only the new penalty is allocated at current 50/50 shares');
+
+  // Reports put a refund in the month it happened: last month's figures stay as they were,
+  // and this month shows the reversal — matching when owner profit actually moved.
+  const reports = await import('../server/src/modules/reports/reports.service');
+  const lastMonthDate = new Date();
+  lastMonthDate.setUTCDate(15);
+  lastMonthDate.setUTCMonth(lastMonthDate.getUTCMonth() - 1);
+  const lastMonth = lastMonthDate.toISOString().slice(0, 7);
+  const monthProfit = async (month?: string) => {
+    const summary = await reports.computeReportsSummary(month ? { period: 'SPECIFIC_MONTH', month } : { period: 'MONTH' });
+    return { revenueUsd: summary.revenueUsd, profitUsd: summary.profitUsd };
+  };
+  const oldSale = await makeSale();
+  await prisma.sale.update({ where: { id: oldSale.sale.id }, data: { createdAt: lastMonthDate } });
+  await prisma.auditLog.updateMany({ where: { targetId: oldSale.sale.id }, data: { createdAt: lastMonthDate } });
+  const lastMonthBefore = await monthProfit(lastMonth);
+  const thisMonthBefore = await monthProfit();
+  await refund(oldSale.sale.id);
+  assert.deepEqual(await monthProfit(lastMonth), lastMonthBefore);
+  const thisMonthAfter = await monthProfit();
+  assert.equal(D(thisMonthAfter.revenueUsd).minus(thisMonthBefore.revenueUsd), -200);
+  assert.equal(D(thisMonthAfter.profitUsd).minus(thisMonthBefore.profitUsd), -100);
+  console.log('PASS: refund of last month\'s sale is reported this month; last month unchanged');
 
   const legacy = await makeSale();
   await prisma.auditLog.updateMany({ where: { targetId: legacy.sale.id, action: 'SALE' },

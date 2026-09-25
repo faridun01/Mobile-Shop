@@ -75,6 +75,13 @@ jobs:
       - name: Run End-to-End Business Flow Suite
         run: npm run test:e2e
 
+      # Each creates and drops its own schema on the service DB. These cover owner-profit
+      # allocation (bonuses, expense edits, refunds after exchanges) that test:e2e doesn't.
+      - name: Run Financial Regression Suites
+        run: |
+          npm run test:audit-fixes
+          npm run test:profit-refund
+
       - name: Build Production Bundle
         run: npm run build
 

@@ -1,4 +1,5 @@
 import { D, decimalMin, decimalMax, moneyJson, type MoneyInput } from '../../common/decimal';
+import type { Prisma } from '@prisma/client';
 import { prisma } from '../../prisma/prisma.service';
 import { getRateForDate } from '../exchange-rate/exchange-rate.service';
 import { calculateRecognizedProfit } from '../sales/profit';
@@ -20,6 +21,29 @@ function dateWithinRange(iso: string | Date | null | undefined, range?: { gte: D
   if (!iso) return false;
   const t = new Date(iso).getTime();
   return t >= range.gte.getTime() && t < range.lt.getTime();
+}
+
+type ProfitEvent = { storeId: string; revenueUsd: Prisma.Decimal; revenueTjs: Prisma.Decimal; profitUsd: Prisma.Decimal; rate: MoneyInput };
+
+function detailNumber(details: unknown, key: string): number | undefined {
+  const value = details && typeof details === 'object' && !Array.isArray(details) ? (details as Record<string, unknown>)[key] : undefined;
+  return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
+}
+
+/** Revenue and cost of goods for a set of dated sale/exchange/refund events (see computeReportsSummary). */
+function sumProfitEvents(events: ProfitEvent[]) {
+  let revenueUsd = D(0);
+  let revenueTjs = D(0);
+  let cogsUsd = D(0);
+  let cogsTjs = D(0);
+  for (const event of events) {
+    const eventCogsUsd = event.revenueUsd.minus(event.profitUsd);
+    revenueUsd = revenueUsd.plus(event.revenueUsd);
+    revenueTjs = revenueTjs.plus(event.revenueTjs);
+    cogsUsd = cogsUsd.plus(eventCogsUsd);
+    cogsTjs = cogsTjs.plus(eventCogsUsd.mul(event.rate));
+  }
+  return { revenueUsd, revenueTjs, cogsUsd, cogsTjs };
 }
 
 function groupByStore<T extends { storeId: string }>(rows: T[]): Map<string, T[]> {
@@ -46,21 +70,24 @@ export async function computeReportsSummary(input: ReportsSummaryInput) {
     periodExpensesAllStores,
     allBonuses,
     refundedSalesAllStores,
+    periodExchangeLogs,
     supplierDebtAgg,
     topSuppliersByDebt,
     mainWarehouseStore,
     retailStores,
   ] = await Promise.all([
     getRateForDate(new Date()),
+    // Every sale made in the period counts in the period, even if it was refunded later —
+    // the refund is reported in its own period as a negative (see refundedSalesAllStores),
+    // so a closed month never changes retroactively and matches owner profit accruals.
     // The breakdown uses the same store scope, so unrelated stores are not needed.
     prisma.sale.findMany({
       where: {
-        status: { not: 'REFUNDED' },
         ...(storeFilter ? { storeId: storeFilter } : {}),
         ...(dateRange ? { createdAt: dateRange } : {}),
       },
       select: {
-        id: true, storeId: true, totalTjs: true, totalUsd: true, exchangeRate: true,
+        id: true, storeId: true, status: true, totalTjs: true, totalUsd: true, exchangeRate: true,
         saleItems: { select: {
           brand: true, model: true, salePriceUsd: true, salePriceTjs: true,
           costBasisUsd: true, purchaseCostUsd: true,
@@ -75,15 +102,23 @@ export async function computeReportsSummary(input: ReportsSummaryInput) {
     // Supplier bonuses aren't a high-growth table (one row per negotiated bonus, not per
     // transaction) so they're just fetched in full and filtered in memory, same as before.
     prisma.supplierBonus.findMany({ select: { bonusType: true, amountUsd: true, dateReceived: true, exchangeRate: true, status: true } }),
-    // Refund penalties use the same scope as sales and the per-store breakdown.
+    // Refunds made in the period (whenever the sale itself happened) — reversed here as a
+    // negative, with the retained penalty counted as profit. Same scope as sales.
     prisma.sale.findMany({
       where: {
         status: 'REFUNDED',
         ...(storeFilter ? { storeId: storeFilter } : {}),
-        penaltyFeeUsd: { not: null },
         ...(dateRange ? { refundedAt: dateRange } : {}),
       },
-      select: { storeId: true, penaltyFeeUsd: true, penaltyFeeTjs: true },
+      select: {
+        id: true, storeId: true, totalTjs: true, totalUsd: true, exchangeRate: true, penaltyFeeUsd: true, penaltyFeeTjs: true,
+        saleItems: { select: { costBasisUsd: true } },
+      },
+    }),
+    // Exchanges processed in the period, whenever the exchanged sale itself happened.
+    prisma.auditLog.findMany({
+      where: { action: 'EXCHANGE', ...(dateRange ? { createdAt: dateRange } : {}) },
+      select: { targetId: true, financialDetails: true },
     }),
     prisma.supplier.aggregate({ _sum: { totalDebtUsd: true } }),
     prisma.supplier.findMany({ where: { totalDebtUsd: { gt: 0 } }, orderBy: { totalDebtUsd: 'desc' }, take: 8,
@@ -95,14 +130,19 @@ export async function computeReportsSummary(input: ReportsSummaryInput) {
   const rate = rateRow || 9.5;
 
   // Second wave: each of these depends on an id from wave one (sale ids / store ids), so it
-  // has to wait — but the three of them are still independent of each other.
+  // has to wait — but they are still independent of each other.
   const saleIds = periodSalesAllStores.map((s) => s.id);
-  const [profitLogs, mainWarehouseStock, retailStock] = await Promise.all([
-    saleIds.length
+  const exchangeSaleIds = [...new Set(periodExchangeLogs.map((log) => log.targetId).filter((id): id is string => Boolean(id)))];
+  const logSaleIds = [...new Set([...saleIds, ...refundedSalesAllStores.map((s) => s.id), ...exchangeSaleIds])];
+  const [profitLogs, exchangeSales, mainWarehouseStock, retailStock] = await Promise.all([
+    logSaleIds.length
       ? prisma.auditLog.findMany({
-          where: { targetId: { in: saleIds }, action: { in: ['SALE', 'SALE_BELOW_COST', 'EXCHANGE'] } },
+          where: { targetId: { in: logSaleIds }, action: { in: ['SALE', 'SALE_BELOW_COST', 'EXCHANGE', 'REFUND'] } },
           select: { targetId: true, action: true, financialDetails: true },
         })
+      : Promise.resolve([]),
+    exchangeSaleIds.length
+      ? prisma.sale.findMany({ where: { id: { in: exchangeSaleIds } }, select: { id: true, storeId: true } })
       : Promise.resolve([]),
     mainWarehouseStore
       ? prisma.device.findMany({ where: { storeId: mainWarehouseStore.id, status: 'MAIN_WAREHOUSE' }, select: { costBasisUsd: true, purchasePriceUsd: true } })
@@ -119,19 +159,76 @@ export async function computeReportsSummary(input: ReportsSummaryInput) {
   for (const log of profitLogs) {
     if (log.targetId) profitsBySale.set(log.targetId, [...(profitsBySale.get(log.targetId) ?? []), log]);
   }
-  const recognizedProfitById = new Map<string, MoneyInput>();
+  const originalSaleProfit = (saleId: string) => {
+    const original = (profitsBySale.get(saleId) ?? []).find((log) => log.action === 'SALE' || log.action === 'SALE_BELOW_COST');
+    return original ? { details: original.financialDetails, profitUsd: detailNumber(original.financialDetails, 'recognizedProfitUsd') } : undefined;
+  };
+
+  // Revenue and profit are built from three kinds of events, each reported in the period
+  // it happened — the same moments owner profit is accrued, so monthly figures match the
+  // Owners page and a closed month never changes when a sale is refunded later.
+  const profitEvents: ProfitEvent[] = [];
   for (const sale of periodSalesAllStores) {
-    const fallbackCost = sale.saleItems.reduce((sum, item) => D(sum).plus(item.costBasisUsd), D(0));
-    recognizedProfitById.set(sale.id, calculateRecognizedProfit(profitsBySale.get(sale.id) ?? [], D(sale.totalUsd).minus(fallbackCost)));
+    const saleRate = sale.exchangeRate || rate;
+    const original = originalSaleProfit(sale.id);
+    if (original?.profitUsd === undefined) {
+      // Legacy sale without an audited original: reported whole (exchanges included), as before.
+      const cost = sale.saleItems.reduce((sum, item) => D(sum).plus(item.costBasisUsd), D(0));
+      profitEvents.push({ storeId: sale.storeId, revenueUsd: D(sale.totalUsd), revenueTjs: D(sale.totalTjs), profitUsd: roundMoney(D(sale.totalUsd).minus(cost)), rate: saleRate });
+    } else {
+      profitEvents.push({
+        storeId: sale.storeId,
+        revenueUsd: D(detailNumber(original.details, 'amountUsd') ?? sale.totalUsd),
+        revenueTjs: D(detailNumber(original.details, 'amountTjs') ?? sale.totalTjs),
+        profitUsd: D(original.profitUsd),
+        rate: saleRate,
+      });
+    }
+  }
+  const exchangeStoreBySale = new Map(exchangeSales.map((sale) => [sale.id, sale.storeId]));
+  let exchangesCount = 0;
+  for (const log of periodExchangeLogs) {
+    const storeId = log.targetId ? exchangeStoreBySale.get(log.targetId) : undefined;
+    const profitUsd = detailNumber(log.financialDetails, 'exchangeProfitUsd');
+    // A legacy sale is already reported whole above, exchanges included.
+    if (!storeId || (storeFilter && storeId !== storeFilter) || profitUsd === undefined || originalSaleProfit(log.targetId!)?.profitUsd === undefined) continue;
+    const newPriceUsd = detailNumber(log.financialDetails, 'newPriceUsd') ?? 0;
+    const newPriceTjs = detailNumber(log.financialDetails, 'newPriceTjs') ?? 0;
+    exchangesCount++;
+    profitEvents.push({
+      storeId,
+      revenueUsd: D(newPriceUsd).minus(detailNumber(log.financialDetails, 'exchangeInValueUsd') ?? 0),
+      revenueTjs: D(newPriceTjs).minus(detailNumber(log.financialDetails, 'exchangeInValueTjs') ?? 0),
+      profitUsd: D(profitUsd),
+      rate: newPriceUsd ? D(newPriceTjs).div(newPriceUsd) : rate,
+    });
+  }
+  let refundsRevenueUsd = D(0);
+  for (const sale of refundedSalesAllStores) {
+    const logs = profitsBySale.get(sale.id) ?? [];
+    const cost = sale.saleItems.reduce((sum, item) => D(sum).plus(item.costBasisUsd), D(0));
+    const reversedProfitUsd = calculateRecognizedProfit(logs, D(sale.totalUsd).minus(cost));
+    const refundLog = logs.find((log) => log.action === 'REFUND');
+    const resoldTradeInAdjustmentUsd = detailNumber(refundLog?.financialDetails, 'resoldTradeInAdjustmentUsd') ?? 0;
+    refundsRevenueUsd = refundsRevenueUsd.plus(sale.totalUsd);
+    profitEvents.push({
+      storeId: sale.storeId,
+      revenueUsd: D(sale.totalUsd).negated(),
+      revenueTjs: D(sale.totalTjs).negated(),
+      profitUsd: D(reversedProfitUsd).negated().plus(resoldTradeInAdjustmentUsd),
+      rate: sale.exchangeRate || rate,
+    });
   }
 
-  const periodSales = storeFilter ? periodSalesAllStores.filter((s) => s.storeId === storeFilter) : periodSalesAllStores;
+  // Unit/receipt/model statistics count only sales that stayed sold: a refunded device goes
+  // back to stock and is counted again when it is resold. (Money is handled by profitEvents.)
+  const keptSalesAllStores = periodSalesAllStores.filter((s) => s.status !== 'REFUNDED');
+  const periodSales = storeFilter ? keptSalesAllStores.filter((s) => s.storeId === storeFilter) : keptSalesAllStores;
   const periodExpenses = storeFilter ? periodExpensesAllStores.filter((e) => e.storeId === storeFilter) : periodExpensesAllStores;
 
-  let revenueUsd = D(0);
-  let cogsUsd = D(0);
-  let historicalRevenueTjs = D(0);
-  let historicalCogsTjs = D(0);
+  const totals = sumProfitEvents(profitEvents);
+  const revenueUsd = totals.revenueUsd;
+  const cogsUsd = totals.cogsUsd;
   let unitsSold = 0;
   const modelCounts: Record<string, { count: number; revenueUsd: MoneyInput; cogsUsd: MoneyInput; profitUsd: MoneyInput }> = {};
   let giftDeviceUnitsSold = 0;
@@ -140,14 +237,6 @@ export async function computeReportsSummary(input: ReportsSummaryInput) {
 
   periodSales.forEach((sale) => {
     const saleRate = sale.exchangeRate || rate;
-    const saleRevenueUsd = sale.totalUsd || D((D(sale.totalTjs).div(saleRate)).toFixed(2));
-    revenueUsd = D(revenueUsd).plus(saleRevenueUsd);
-    historicalRevenueTjs = D(historicalRevenueTjs).plus(sale.totalTjs);
-
-    const saleProfitUsd = recognizedProfitById.get(sale.id) ?? 0;
-    cogsUsd = D(cogsUsd).plus(D(saleRevenueUsd).minus(saleProfitUsd));
-    historicalCogsTjs = D(historicalCogsTjs).plus(D((D(saleRevenueUsd).minus(saleProfitUsd))).mul(saleRate));
-
     sale.saleItems.forEach((item) => {
       unitsSold++;
       const itemCostUsd = item.costBasisUsd ?? item.purchaseCostUsd ?? 0;
@@ -170,8 +259,8 @@ export async function computeReportsSummary(input: ReportsSummaryInput) {
   });
 
   const grossProfitUsd = D((D(revenueUsd).minus(cogsUsd)).toFixed(2));
-  const revenueTjs = roundMoney(historicalRevenueTjs);
-  const cogsTjs = roundMoney(historicalCogsTjs);
+  const revenueTjs = roundMoney(totals.revenueTjs);
+  const cogsTjs = roundMoney(totals.cogsTjs);
   const grossProfitTjs = D(revenueTjs).minus(cogsTjs);
   const grossMarginPercent = D(revenueUsd).gt(0) ? D((D((D(grossProfitUsd).div(revenueUsd))).mul(100)).toFixed(1)) : 0;
 
@@ -206,7 +295,8 @@ export async function computeReportsSummary(input: ReportsSummaryInput) {
   const mainWarehouseCashTjs = mainWarehouseStore?.cashBalanceTjs || 0;
   const mainWarehouseCashUsd = D((D(mainWarehouseCashTjs).div(rate)).toFixed(2));
 
-  const salesByStore = groupByStore(periodSalesAllStores);
+  const salesByStore = groupByStore(keptSalesAllStores);
+  const profitEventsByStore = groupByStore(profitEvents);
   const stockByStore = groupByStore(retailStock);
   // Expenses with no store, or booked to the main warehouse (e.g. payroll), belong to no
   // retail store — they're reported on the main-warehouse card instead.
@@ -241,25 +331,17 @@ export async function computeReportsSummary(input: ReportsSummaryInput) {
   const storeBreakdown = retailStores
     .map((store) => {
       const storeSales = (salesByStore.get(store.id) ?? []);
-      let storeRevenueUsd = D(0);
-      let storeRevenueTjs = D(0);
-      let storeCogsUsd = D(0);
-      let storeCogsTjs = D(0);
-      let storeProfitUsd = D(0);
-      let storeProfitTjs = D(0);
+      const storeTotals = sumProfitEvents(profitEventsByStore.get(store.id) ?? []);
+      const storeRevenueUsd = storeTotals.revenueUsd;
+      const storeRevenueTjs = storeTotals.revenueTjs;
+      const storeCogsUsd = storeTotals.cogsUsd;
+      const storeCogsTjs = storeTotals.cogsTjs;
+      const storeProfitUsd = storeRevenueUsd.minus(storeCogsUsd);
+      const storeProfitTjs = storeRevenueTjs.minus(storeCogsTjs);
       let storeUnits = 0;
       const storeModels = new Map<string, { name: string; count: number; revenueUsd: MoneyInput; profitUsd: MoneyInput }>();
       storeSales.forEach((sale) => {
         const saleRate = sale.exchangeRate || rate;
-        const saleRevenueUsd = sale.totalUsd || D((D(sale.totalTjs).div(saleRate)).toFixed(2));
-        const saleProfitUsd = recognizedProfitById.get(sale.id) ?? 0;
-        const saleCogsUsd = D(saleRevenueUsd).minus(saleProfitUsd);
-        storeRevenueUsd = D(storeRevenueUsd).plus(saleRevenueUsd);
-        storeRevenueTjs = D(storeRevenueTjs).plus(sale.totalTjs);
-        storeCogsUsd = D(storeCogsUsd).plus(saleCogsUsd);
-        storeCogsTjs = D(storeCogsTjs).plus(D(saleCogsUsd).mul(saleRate));
-        storeProfitUsd = D(storeProfitUsd).plus(saleProfitUsd);
-        storeProfitTjs = D(storeProfitTjs).plus(D(sale.totalTjs).minus(D(saleCogsUsd).mul(saleRate)));
         storeUnits += sale.saleItems.length;
         for (const item of sale.saleItems) {
           const name = `${item.brand} ${item.model}`.trim();
@@ -272,8 +354,8 @@ export async function computeReportsSummary(input: ReportsSummaryInput) {
       const storeExpenses = summarizeExpenses(expensesByStore.get(store.id) ?? []);
       const stock = (stockByStore.get(store.id) ?? []);
       const stockCostUsd = stock.reduce((sum, d) => D(sum).plus((d.costBasisUsd ?? d.purchasePriceUsd ?? 0)), D(0));
-      // Same "с учетом возвратов" treatment as the overall totals: a refund's original
-      // margin is gone, but the withheld penalty is real retained profit and counts here.
+      // Same "с учетом возвратов" treatment as the overall totals: a refund reverses the
+      // sale's margin in the refund's own period; the withheld penalty is retained profit.
       const storePenalty = refundPenaltiesByStore.get(store.id) || { usd: D(0), tjs: D(0) };
       return {
         storeId: store.id,
@@ -294,6 +376,7 @@ export async function computeReportsSummary(input: ReportsSummaryInput) {
           .slice(0, 5),
         unitsSold: storeUnits,
         salesCount: storeSales.length,
+        refundsCount: refundedSalesAllStores.filter((sale) => sale.storeId === store.id).length,
         cashTjs: store.cashBalanceTjs,
         stockCount: stock.length,
         stockCostUsd: D(stockCostUsd.toFixed(2)),
@@ -311,6 +394,10 @@ export async function computeReportsSummary(input: ReportsSummaryInput) {
     // Lets the frontend show "X чеков" per store/overall straight from this summary,
     // instead of fetching the full sales list (only actually needed for the Excel export).
     salesCount: periodSales.length,
+    // Refunds/exchanges processed in the period (revenue/profit above already include them).
+    refundsCount: refundedSalesAllStores.length,
+    refundsRevenueUsd: roundMoney(refundsRevenueUsd),
+    exchangesCount,
     revenueUsd: D(revenueUsd.toFixed(2)),
     revenueTjs,
     cogsUsd: D(cogsUsd.toFixed(2)),

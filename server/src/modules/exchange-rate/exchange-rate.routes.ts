@@ -18,8 +18,9 @@ export function registerExchangeRateRoutes(app: Express) {
 
   app.post('/api/exchange-rate/today', authenticateJwt, requireRoles('ADMIN', 'PARTNER'), async (req: AuthenticatedRequest, res, next) => {
     try {
-      const rate = D(req.body?.rate);
-      if (!rate.isFinite() || rate.lte(0)) {
+      const raw = req.body?.rate;
+      const rate = (typeof raw === 'number' || (typeof raw === 'string' && raw.trim())) && Number.isFinite(Number(raw)) ? D(raw) : null;
+      if (!rate || rate.lte(0)) {
         res.status(400).json({ message: 'Укажите корректный курс валюты' });
         return;
       }

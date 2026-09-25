@@ -84,7 +84,7 @@ export function registerRefundRoutes(app: Express) {
   app.post('/api/sales/:id/refund', authenticateJwt, requireRoles('ADMIN', 'PARTNER'), async (req: AuthenticatedRequest, res, next) => {
     try {
       const { reason, refundAmountTjs, penaltyFeeTjs, paymentMethod } = req.body ?? {};
-      if (!reason || refundAmountTjs === null || !paymentMethod) {
+      if (!reason || refundAmountTjs == null || !paymentMethod) {
         res.status(400).json({ message: 'reason, refundAmountTjs и paymentMethod обязательны' });
         return;
       }
@@ -92,8 +92,10 @@ export function registerRefundRoutes(app: Express) {
       const sale = await RefundService.refund({
         saleId: req.params.id,
         reason,
-        refundAmountTjs: D(refundAmountTjs),
-        penaltyFeeTjs: penaltyFeeTjs !== null ? D(penaltyFeeTjs) : undefined,
+        // Validated (with a readable message) by RefundService — wrapping in D() here
+        // turned a missing optional penalty into a raw DecimalError.
+        refundAmountTjs,
+        penaltyFeeTjs: penaltyFeeTjs ?? undefined,
         paymentMethod,
         refundedByUserId: req.user!.userId,
       });

@@ -1,7 +1,7 @@
 import { D, moneyJson } from '../../common/decimal';
 import '../../common/decimal-test-setup';
 import { describe, expect, it } from 'vitest';
-import { allocateOwnerProfit, calculateRecognizedProfit, refundOwnerProfit } from './profit';
+import { allocateOwnerProfit, calculateRecognizedProfit, exchangeCostRestorations, refundOwnerProfit } from './profit';
 
 describe('recognized sale profit', () => {
   it('adds original sale and every exchange profit impact', () => {
@@ -95,5 +95,18 @@ describe('exact owner allocation', () => {
   });
   it('rejects invalid shares before booking money', () => {
     expect(() => allocateOwnerProfit(100, [{ id: 'a', profitSharePercent: 99.99 }])).toThrow('100%');
+  });
+});
+
+describe('exchange cost restorations', () => {
+  it('returns each traded-in device with its trade-in and original cost', () => {
+    expect(exchangeCostRestorations([
+      { action: 'SALE', financialDetails: { recognizedProfitUsd: 100 } },
+      { action: 'EXCHANGE', financialDetails: { returnedDeviceId: 'a', exchangeInValueUsd: 150, returnedCostBasisUsd: 100.004 } },
+    ])).toEqual([{ deviceId: 'a', tradeInCostUsd: D(150), originalCostUsd: D(100) }]);
+  });
+
+  it('skips legacy exchanges that never recorded the original cost', () => {
+    expect(exchangeCostRestorations([{ action: 'EXCHANGE', financialDetails: { exchangeInValueUsd: 150 } }])).toEqual([]);
   });
 });

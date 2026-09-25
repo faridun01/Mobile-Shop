@@ -114,6 +114,10 @@ export const OwnersPage: React.FC = () => {
 
   // Shares edit state
   const [sharesInput, setSharesInput] = useState<Record<string, string>>({});
+  // Off by default: redistributing balances pools every owner's accrued/available profit
+  // and re-splits it by the new shares, ignoring what each one was already paid — it moves
+  // money between partners, so it must be a deliberate choice, never a side effect of Save.
+  const [rebalanceOnSave, setRebalanceOnSave] = useState(false);
 
   // Tx state
   const [selectedOwnerId, setSelectedOwnerId] = useState(owners[0]?.id || '');
@@ -233,6 +237,7 @@ export const OwnersPage: React.FC = () => {
       init[o.id] = (o.profitSharePercent ?? 0).toString();
     });
     setSharesInput(init);
+    setRebalanceOnSave(false);
     setStatusBanner(null);
     setIsSharesModalOpen(true);
   };
@@ -255,7 +260,7 @@ export const OwnersPage: React.FC = () => {
         if (otherOwner) {
           const parsed = parseFloat(valueStr);
           if (!isNaN(parsed)) {
-            const complement = Math.max(0, Math.min(100, Math.round((100 - parsed) * 10) / 10));
+            const complement = Math.max(0, Math.min(100, Math.round((100 - parsed) * 10000) / 10000));
             nextState[otherOwner.id] = complement.toString();
           } else if (valueStr === '') {
             nextState[otherOwner.id] = '';
@@ -275,7 +280,7 @@ export const OwnersPage: React.FC = () => {
     }));
 
     const total = payload.reduce((acc, p) => acc + p.sharePercent, 0);
-    if (Math.abs(total - 100) > 0.01) {
+    if (Math.abs(total - 100) > 0.00005) {
       setStatusBanner({
         tone: 'error',
         text: `Сумма долей должна быть строго 100% (сейчас ${total}%)`
@@ -285,14 +290,16 @@ export const OwnersPage: React.FC = () => {
 
     setIsSubmitting(true);
     try {
-      // Pass the full per-owner payload with rebalanceBalances=true so
-      // available and accrued balances are rebalanced according to the new shares.
-      const res = await updateOwnerProfitShares(payload, undefined, true);
+      // New shares apply to future operations only, unless the admin explicitly opted
+      // into redistributing the existing balances as well.
+      const res = await updateOwnerProfitShares(payload, undefined, rebalanceOnSave);
       if (res.success) {
         setIsSharesModalOpen(false);
         setStatusBanner({
           tone: 'success',
-          text: 'Доли партнеров сохранены, остатки прибыли пересчитаны строго по долям'
+          text: rebalanceOnSave
+            ? 'Доли партнеров сохранены, остатки прибыли пересчитаны строго по долям'
+            : 'Доли партнеров сохранены и будут применяться к новым операциям'
         });
       } else {
         setStatusBanner({ tone: 'error', text: res.message || 'Ошибка сохранения долей' });
@@ -594,7 +601,7 @@ export const OwnersPage: React.FC = () => {
           <div className="space-y-2">
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
               {/* Search Input */}
-              <div className="relative flex-1 min-w-[200px]">
+              <div className="relative flex-1 min-w-50">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-fg-subtle pointer-events-none" />
                 <input
                   type="text"
@@ -857,7 +864,7 @@ export const OwnersPage: React.FC = () => {
                       type="number"
                       min="0"
                       max="100"
-                      step="0.1"
+                      step="any"
                       required
                       value={sharesInput[owner.id] ?? ''}
                       onChange={(e) => handleShareInputChange(owner.id, e.target.value)}
@@ -883,8 +890,26 @@ export const OwnersPage: React.FC = () => {
               ))}
             </div>
 
-            {/* Live recalculation preview */}
-            <div className="p-3 bg-surface-raised rounded-xl border border-border space-y-2">
+            <label className="flex items-start gap-2 p-3 rounded-xl border border-border bg-surface-raised cursor-pointer">
+              <input
+                type="checkbox"
+                checked={rebalanceOnSave}
+                onChange={(e) => setRebalanceOnSave(e.target.checked)}
+                className="rounded bg-surface border-border text-warning focus:ring-0 mt-0.5"
+              />
+              <span className="space-y-1">
+                <span className="block font-semibold text-fg-muted">Перераспределить текущие остатки прибыли по новым долям</span>
+                <span className="block text-[10px] text-fg-subtle">
+                  Без галочки новые доли применяются только к будущим продажам, расходам и бонусам.
+                </span>
+              </span>
+            </label>
+
+            {rebalanceOnSave && (
+            <div className="p-3 bg-surface-raised rounded-xl border border-warning space-y-2">
+              <p className="text-[11px] font-semibold text-warning">
+                Внимание: вся накопленная и доступная прибыль партнёров будет сложена и заново разделена по долям без учёта уже выплаченного каждому. Это переносит деньги между партнёрами и не отменяется автоматически.
+              </p>
               <div className="flex items-center justify-between text-[11px] font-bold uppercase text-fg-subtle border-b border-border pb-1.5">
                 <span>Перерасчет остатка прибыли ({totalAvailableProfit.toLocaleString()} USD):</span>
               </div>
@@ -906,6 +931,7 @@ export const OwnersPage: React.FC = () => {
                 Остаток к выплате каждого партнера будет автоматически пересчитан пропорционально указанным долям.
               </p>
             </div>
+            )}
 
             <div className="flex space-x-2 pt-2 border-t border-border">
               <button

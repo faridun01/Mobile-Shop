@@ -223,7 +223,9 @@ export class ExchangesService {
           userRole: actor.role,
           action: 'EXCHANGE',
           details: `Чек #${sale.receiptNumber}: обмен ${returnedDevice.model} (IMEI ${returnedDevice.imei}) на ${replacementDevice.model} (IMEI ${replacementDevice.imei}). Расчет: ${D(diffTjs).gte(0) ? '+' : ''}${diffTjs} TJS`,
-          financialDetails: moneyJson({ exchangeInValueTjs, exchangeInValueUsd, newPriceTjs, newPriceUsd, differenceTjs: diffTjs, exchangeProfitUsd, ownerProfitAllocations: moneyJson(ownerProfitAllocations) }),
+          // returnedDeviceId/returnedCostBasisUsd let a later refund of this sale restore the
+          // traded-in device's original cost basis (see exchangeCostRestorations).
+          financialDetails: moneyJson({ returnedDeviceId: returnedDevice.id, returnedCostBasisUsd: returnedDevice.costBasisUsd, exchangeInValueTjs, exchangeInValueUsd, newPriceTjs, newPriceUsd, differenceTjs: diffTjs, exchangeProfitUsd, ownerProfitAllocations: moneyJson(ownerProfitAllocations) }),
           receiptNumber: sale.receiptNumber,
           targetId: sale.id,
         },

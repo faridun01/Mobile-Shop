@@ -1,6 +1,6 @@
 import { D, decimalMin, decimalMax, moneyJson, type MoneyInput } from '../server/src/common/decimal';
 import 'dotenv/config';
-import assert from 'node:assert/strict';
+import assert from './lib/decimal-assert';
 import { spawnSync } from 'node:child_process';
 import { PrismaClient } from '@prisma/client';
 import { WebSocket } from 'ws';

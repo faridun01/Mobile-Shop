@@ -47,6 +47,11 @@ interface StoreBreakdown extends ExpenseBreakdown {
 interface ReportsSummary {
   unitsSold: number;
   salesCount: number;
+  /** Refunds processed in the period — already subtracted from revenue/profit below, even
+   *  when the refunded sale itself was made in an earlier period. */
+  refundsCount: number;
+  refundsRevenueUsd: number;
+  exchangesCount: number;
   revenueUsd: number;
   revenueTjs: number;
   cogsUsd: number;
@@ -79,7 +84,7 @@ interface ReportsSummary {
 
 const EMPTY_EXPENSES: ExpenseBreakdown = { expensesUsd: 0, expensesTjs: 0, unpaidExpensesTjs: 0, expensesByCategory: [] };
 const EMPTY_SUMMARY: ReportsSummary = {
-  unitsSold: 0, salesCount: 0, revenueUsd: 0, revenueTjs: 0, cogsUsd: 0, cogsTjs: 0,
+  unitsSold: 0, salesCount: 0, refundsCount: 0, refundsRevenueUsd: 0, exchangesCount: 0, revenueUsd: 0, revenueTjs: 0, cogsUsd: 0, cogsTjs: 0,
   grossProfitUsd: 0, grossProfitTjs: 0, grossMarginPercent: 0,
   profitUsd: 0, profitTjs: 0, expensesTjs: 0, expensesUsd: 0,
   periodRefundPenaltiesUsd: 0, periodRefundPenaltiesTjs: 0,
@@ -334,7 +339,7 @@ export const ProfitReport: React.FC<ProfitReportProps> = ({ view, month, onMonth
                 Итог за {periodLabel}{selectedStore !== 'all' ? ` — ${retailStores.find((s) => s.id === selectedStore)?.name ?? ''}` : ''}
               </h3>
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3">
-                <StatCard label="Выручка" value={usd(data.revenueUsd)} subvalue={`${tjs(data.revenueTjs)} · ${data.salesCount} чеков`} icon={Receipt} tone="neutral" />
+                <StatCard label="Выручка" value={usd(data.revenueUsd)} subvalue={`${tjs(data.revenueTjs)} · ${data.salesCount} чеков${data.refundsCount ? ` · ${data.refundsCount} возвр.` : ''}`} icon={Receipt} tone="neutral" />
                 <StatCard label="Прибыль с продаж" value={signedUsd(data.profitUsd)} subvalue="с учётом возвратов" icon={TrendingUp} tone={data.profitUsd >= 0 ? 'accent' : 'danger'} />
                 <StatCard label="Расходы" value={`−${usd(data.expensesUsd)}`} subvalue={tjs(data.expensesTjs)} icon={Wallet} tone="danger" />
                 <StatCard label="Чистая прибыль" value={signedUsd(data.netProfitUsd)} subvalue="после вычета расходов" icon={PiggyBank} tone={data.netProfitUsd >= 0 ? 'accent' : 'danger'} />
@@ -345,7 +350,12 @@ export const ProfitReport: React.FC<ProfitReportProps> = ({ view, month, onMonth
             <div className="p-3.5 rounded-xl bg-surface border border-border space-y-1.5 text-sm">
               <h4 className="text-[10px] font-bold text-fg-subtle uppercase tracking-wider mb-1">Как считается чистая прибыль</h4>
               {[
-                { label: 'Выручка', value: usd(data.revenueUsd) },
+                ...(data.refundsCount
+                  ? [
+                      { label: 'Продажи и обмены', value: usd(data.revenueUsd + data.refundsRevenueUsd) },
+                      { label: `Возвраты за период (${data.refundsCount})`, value: `−${usd(data.refundsRevenueUsd)}` },
+                    ]
+                  : [{ label: 'Выручка', value: usd(data.revenueUsd) }]),
                 { label: 'Себестоимость проданного', value: `−${usd(data.cogsUsd)}` },
                 ...(data.periodRefundPenaltiesUsd ? [{ label: 'Удержано при возвратах', value: `+${usd(data.periodRefundPenaltiesUsd)}` }] : []),
                 ...(data.periodCashBonusesUsd ? [{ label: 'Бонусы поставщиков', value: `+${usd(data.periodCashBonusesUsd)}` }] : []),

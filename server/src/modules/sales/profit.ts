@@ -81,3 +81,26 @@ export function calculateRecognizedProfit(logs: ProfitAuditRecord[], fallbackPro
 
   return roundMoney(hasOriginal ? amount : fallbackProfitUsd);
 }
+
+export type ExchangeCostRestoration = { deviceId: string; tradeInCostUsd: MoneyInput; originalCostUsd: MoneyInput };
+
+/**
+ * An exchange brings the customer's device back into stock at the agreed trade-in value.
+ * If the whole sale is later refunded that trade-in is undone too, so the device's cost
+ * basis must go back to what it was before. Exchanges logged before these fields existed
+ * are skipped (their original cost was never recorded).
+ */
+export function exchangeCostRestorations(logs: ProfitAuditRecord[]): ExchangeCostRestoration[] {
+  const restorations: ExchangeCostRestoration[] = [];
+  for (const log of logs) {
+    if (log.action !== 'EXCHANGE') continue;
+    const details = log.financialDetails as Record<string, unknown> | null;
+    const deviceId = details?.returnedDeviceId;
+    const tradeIn = details?.exchangeInValueUsd;
+    const original = details?.returnedCostBasisUsd;
+    if (typeof deviceId !== 'string' || typeof tradeIn !== 'number' || typeof original !== 'number' ||
+        !Number.isFinite(tradeIn) || !Number.isFinite(original)) continue;
+    restorations.push({ deviceId, tradeInCostUsd: roundMoney(tradeIn), originalCostUsd: roundMoney(original) });
+  }
+  return restorations;
+}
