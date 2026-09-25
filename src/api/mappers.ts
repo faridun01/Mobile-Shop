@@ -299,6 +299,8 @@ export function mapExpense(e: any, names: NameLookup): Expense {
     description: e.description ?? undefined,
     createdByName: names.get(e.createdByUserId) || e.createdByUserId,
     paidFromCashRegister: e.paidFromCashRegister,
+    status: e.status === 'UNPAID' ? 'UNPAID' : 'PAID',
+    paidAt: e.paidAt ?? undefined,
     employeeId: e.employeeId ?? undefined,
     employeeName: e.employeeId ? names.get(e.employeeId) : undefined,
     isEmployeeAdvance: e.isEmployeeAdvance,

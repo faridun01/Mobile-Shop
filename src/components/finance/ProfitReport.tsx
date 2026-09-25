@@ -8,22 +8,39 @@ import {
   ArrowDownRight,
   Download,
   Store as StoreIcon,
+  Warehouse,
   Receipt,
   TrendingUp,
   Wallet,
-  PiggyBank
+  PiggyBank,
+  ChevronDown,
 } from 'lucide-react';
 import { MonthPicker } from '../ui/MonthPicker';
 import { StatCard } from '../ui/StatCard';
+import { Badge } from '../ui/Badge';
 import {
   exportComprehensiveReport,
   buildSalesReportTable,
   type ComprehensiveReportSummary,
 } from '../../utils/exportReports';
 import { FALLBACK_EXCHANGE_RATE } from '../../utils/exchangeRate';
+import { expenseCategoryLabel } from '../../utils/expenseCategories';
 import { ReportPreviewModal } from '../common/ReportPreviewModal';
 
-type Period = 'TODAY' | 'MONTH' | 'SPECIFIC_MONTH' | 'ALL';
+interface ExpenseBreakdown {
+  expensesUsd: number;
+  expensesTjs: number;
+  unpaidExpensesTjs: number;
+  expensesByCategory: { category: string; amountUsd: number; amountTjs: number }[];
+}
+
+interface StoreBreakdown extends ExpenseBreakdown {
+  storeId: string; storeName: string; revenueUsd: number; revenueTjs: number; cogsUsd: number; cogsTjs: number;
+  profitUsd: number; profitTjs: number; refundPenaltiesUsd: number; netProfitUsd: number; netProfitTjs: number;
+  unitsSold: number; salesCount: number; cashTjs: number;
+  stockCount: number; stockCostUsd: number; stockCostTjs: number;
+  topModels: { name: string; count: number; revenueUsd: number; profitUsd: number }[];
+}
 
 interface ReportsSummary {
   unitsSold: number;
@@ -47,28 +64,72 @@ interface ReportsSummary {
   netProfitTjs: number;
   periodCashBonusesUsd: number;
   periodCashBonusesTjs: number;
-  giftDeviceUnitsSold: number;
-  giftDeviceProfitUsd: number;
-  giftDeviceProfitTjs: number;
-  periodFreeDeviceBonusesReceived: number;
-  freeDeviceBonusesInStock: number;
   totalSupplierDebtUsd: number;
-  totalSupplierDebtTjs: number;
   mainWarehouseStockCount: number;
   mainWarehouseStockCostUsd: number;
-  mainWarehouseStockCostTjs: number;
   mainWarehouseCashUsd: number;
   mainWarehouseCashTjs: number;
+  mainWarehouseExpenses: ExpenseBreakdown;
   topSuppliersByDebt: { id: string; name: string; totalPurchasedUsd: number; totalPaidUsd: number; totalDebtUsd: number }[];
-  storeBreakdown: {
-    storeId: string; storeName: string; revenueUsd: number; revenueTjs: number; cogsUsd: number; cogsTjs: number;
-    profitUsd: number; profitTjs: number; unitsSold: number; salesCount: number; cashTjs: number;
-    stockCount: number; stockCostUsd: number; stockCostTjs: number;
-  }[];
+  storeBreakdown: StoreBreakdown[];
   modelCounts: { name: string; count: number; revenueUsd: number; cogsUsd: number; profitUsd: number }[];
 }
 
-export const ReportsPage: React.FC = () => {
+const EMPTY_EXPENSES: ExpenseBreakdown = { expensesUsd: 0, expensesTjs: 0, unpaidExpensesTjs: 0, expensesByCategory: [] };
+const EMPTY_SUMMARY: ReportsSummary = {
+  unitsSold: 0, salesCount: 0, revenueUsd: 0, revenueTjs: 0, cogsUsd: 0, cogsTjs: 0,
+  grossProfitUsd: 0, grossProfitTjs: 0, grossMarginPercent: 0,
+  profitUsd: 0, profitTjs: 0, expensesTjs: 0, expensesUsd: 0,
+  periodRefundPenaltiesUsd: 0, periodRefundPenaltiesTjs: 0,
+  netProfitUsd: 0, netProfitTjs: 0, periodCashBonusesUsd: 0, periodCashBonusesTjs: 0,
+  totalSupplierDebtUsd: 0,
+  mainWarehouseStockCount: 0, mainWarehouseStockCostUsd: 0, mainWarehouseCashUsd: 0, mainWarehouseCashTjs: 0,
+  mainWarehouseExpenses: EMPTY_EXPENSES,
+  topSuppliersByDebt: [], storeBreakdown: [], modelCounts: [],
+};
+
+const usd = (v: number) => `$${v.toLocaleString(undefined, { maximumFractionDigits: 2 })}`;
+const signedUsd = (v: number) => `${v >= 0 ? '+' : '−'}${usd(Math.abs(v))}`;
+const tjs = (v: number) => `${v.toLocaleString(undefined, { maximumFractionDigits: 2 })} TJS`;
+
+function monthLabel(month: string): string {
+  const [y, m] = month.split('-').map(Number);
+  if (!y || !m) return month;
+  return new Date(y, m - 1, 1).toLocaleDateString('ru-RU', { month: 'long', year: 'numeric' });
+}
+
+const Metric: React.FC<{ label: string; value: string; sub?: string; tone?: 'default' | 'success' | 'danger' | 'accent' }> = ({ label, value, sub, tone = 'default' }) => (
+  <div className="min-w-0">
+    <p className="text-[10px] text-fg-subtle uppercase tracking-wide truncate">{label}</p>
+    <p className={`text-sm font-bold truncate ${tone === 'success' ? 'text-success' : tone === 'danger' ? 'text-danger' : tone === 'accent' ? 'text-accent' : 'text-fg-muted'}`}>{value}</p>
+    {sub && <p className="text-[11px] text-fg-subtle truncate">{sub}</p>}
+  </div>
+);
+
+const ExpenseCategoryList: React.FC<{ data: ExpenseBreakdown }> = ({ data }) => (
+  data.expensesByCategory.length === 0 ? (
+    <p className="text-xs text-fg-subtle">Расходов за период нет</p>
+  ) : (
+    <div className="rounded-lg border border-border overflow-hidden">
+      {data.expensesByCategory.map((c) => (
+        <div key={c.category} className="flex items-center justify-between gap-2 px-2.5 py-2 border-b border-border last:border-0 text-xs">
+          <span className="text-fg-muted truncate">{expenseCategoryLabel(c.category)}</span>
+          <span className="font-semibold text-danger shrink-0">−{usd(c.amountUsd)} <span className="font-normal text-fg-subtle">({tjs(c.amountTjs)})</span></span>
+        </div>
+      ))}
+    </div>
+  )
+);
+
+interface ProfitReportProps {
+  /** 'summary' — the whole business for the month; 'stores' — every store in detail. */
+  view: 'summary' | 'stores';
+  month: string;
+  onMonthChange: (month: string) => void;
+}
+
+/** "Отчёт" / "По складам" tabs of FinancePage — SELLER gating is done by FinancePage itself. */
+export const ProfitReport: React.FC<ProfitReportProps> = ({ view, month, onMonthChange }) => {
   const {
     currentUser,
     stores,
@@ -77,72 +138,49 @@ export const ReportsPage: React.FC = () => {
     selectedStoreId: globalSelectedStoreId
   } = useAppFields('currentUser', 'stores', 'users', 'todayRate', 'selectedStoreId');
 
-  const [period, setPeriod] = useState<Period>('SPECIFIC_MONTH');
-  const [selectedMonth, setSelectedMonth] = useState<string>(new Date().toISOString().substring(0, 7));
-  // Defaults to whichever store is currently ACTIVE on the POS Terminal page — not just
-  // the raw global selection. SalePage falls back to its first selectable store when an
-  // admin hasn't touched its dropdown yet (see SalePage's own effectiveStoreId), without
-  // ever writing that fallback back into shared context — so mirror the exact same
-  // fallback here, otherwise this would show "все магазины" while POS Terminal is quietly
-  // operating on a specific store the admin never explicitly chose.
+  const period = 'SPECIFIC_MONTH';
+  // Summary view defaults to whichever store is active on the POS Terminal page (same
+  // fallback SalePage uses); the per-store view always needs every store.
   const [selectedStore, setSelectedStore] = useState<string>(() => {
-    if (currentUser?.role === 'SELLER' && currentUser.storeId) return currentUser.storeId;
     const retail = stores.filter((s) => !s.isMainWarehouse);
     if (retail.some((s) => s.id === globalSelectedStoreId)) return globalSelectedStoreId;
-    return retail[0]?.id || 'all';
+    return 'all';
   });
-  // Which store's "Отчет по продажам" preview/download modal is open — 'all' for the
-  // combined report across every store, a store id for a single one, null when closed.
+  const scopeStoreId = view === 'stores' ? 'all' : selectedStore;
+  // Which store's Excel preview is open — 'all' for every store combined, null when closed.
   const [salesReportStoreId, setSalesReportStoreId] = useState<string | null>(null);
+  const [expandedStoreId, setExpandedStoreId] = useState<string | null>(null);
 
   const rate = todayRate?.rate || FALLBACK_EXCHANGE_RATE;
-  const isSeller = currentUser?.role === 'SELLER';
   const namesLookup = useMemo(() => buildNameLookup(users), [users]);
-
-  const periodLabel = period === 'TODAY' ? 'сегодня' : period === 'MONTH' ? 'текущий месяц' : period === 'SPECIFIC_MONTH' ? selectedMonth : 'весь период';
+  const periodLabel = monthLabel(month);
   const retailStores = useMemo(() => stores.filter((s) => !s.isMainWarehouse), [stores]);
+  const mainWarehouse = useMemo(() => stores.find((s) => s.isMainWarehouse), [stores]);
 
-  // Everything below used to be derived client-side from the FULL sales/expenses/repairs
-  // history fetched on every login — as that history grows over months/years this only got
-  // slower. Now the period/store filtering happens on the server (see /api/reports/summary
-  // and the matching query params on /api/sales, /api/expenses, /api/repairs), so what
-  // actually crosses the network and gets processed here scales with the selected period,
-  // not with the business's entire lifetime.
+  // Period/store filtering happens on the server (/api/reports/summary), so what crosses the
+  // network scales with the selected month, not with the business's entire history.
   const [summary, setSummary] = useState<ReportsSummary | null>(null);
   const [summaryLoading, setSummaryLoading] = useState(true);
   const [reportDownloading, setReportDownloading] = useState(false);
 
   useEffect(() => {
-    if (isSeller) return;
     let cancelled = false;
     const controller = new AbortController();
     setSummaryLoading(true);
 
-    const params = new URLSearchParams({ period });
-    if (period === 'SPECIFIC_MONTH') params.set('month', selectedMonth);
-    if (selectedStore !== 'all') params.set('storeId', selectedStore);
-    const query = params.toString();
+    const params = new URLSearchParams({ period, month });
+    if (scopeStoreId !== 'all') params.set('storeId', scopeStoreId);
 
-    apiClient<ReportsSummary>(`/reports/summary?${query}`, { signal: controller.signal })
-      .then((summaryData) => {
-        if (cancelled) return;
-        setSummary(summaryData);
-      })
-      .catch(() => {
-        if (cancelled) return;
-        setSummary(null);
-      })
-      .finally(() => {
-        if (!cancelled) setSummaryLoading(false);
-      });
+    apiClient<ReportsSummary>(`/reports/summary?${params.toString()}`, { signal: controller.signal })
+      .then((data) => { if (!cancelled) setSummary(data); })
+      .catch(() => { if (!cancelled) setSummary(null); })
+      .finally(() => { if (!cancelled) setSummaryLoading(false); });
 
     return () => { cancelled = true; controller.abort(); };
-  }, [isSeller, period, selectedMonth, selectedStore]);
+  }, [month, scopeStoreId]);
 
-  // The full itemized sales/expenses list is only ever needed for the "Просмотр и скачивание"
-  // preview — everything else on the page reads totals off `summary`. So it's fetched only
-  // once that preview is opened, and scoped to just the one store being previewed, instead of
-  // eagerly pulling every store's full sales+expenses detail on every page/filter load.
+  // The itemized sales/expenses list is only needed for the Excel preview, so it's fetched
+  // only once that preview is opened, scoped to just the one store being previewed.
   const [reportSales, setReportSales] = useState<Sale[]>([]);
   const [reportExpenses, setReportExpenses] = useState<Expense[]>([]);
   const [reportDataLoading, setReportDataLoading] = useState(false);
@@ -153,8 +191,7 @@ export const ReportsPage: React.FC = () => {
     const controller = new AbortController();
     setReportDataLoading(true);
 
-    const params = new URLSearchParams({ period });
-    if (period === 'SPECIFIC_MONTH') params.set('month', selectedMonth);
+    const params = new URLSearchParams({ period, month });
     if (salesReportStoreId !== 'all') params.set('storeId', salesReportStoreId);
     const query = params.toString();
 
@@ -172,76 +209,42 @@ export const ReportsPage: React.FC = () => {
         setReportSales([]);
         setReportExpenses([]);
       })
-      .finally(() => {
-        if (!cancelled) setReportDataLoading(false);
-      });
+      .finally(() => { if (!cancelled) setReportDataLoading(false); });
 
     return () => { cancelled = true; controller.abort(); };
-  }, [salesReportStoreId, period, selectedMonth, namesLookup]);
+  }, [salesReportStoreId, month, namesLookup]);
+
+  const data: ReportsSummary = summary ?? EMPTY_SUMMARY;
 
   const salesReportTable = useMemo(() => {
     if (!salesReportStoreId || reportDataLoading) return null;
-    // periodCashBonusesUsd isn't store-scoped on the backend (supplier bonuses aren't tied
-    // to a retail store), so it's the same figure regardless of which store's report this is —
-    // safe to reuse from filteredData even when salesReportStoreId differs from selectedStore.
-    return buildSalesReportTable(
-      reportSales,
-      rate,
-      salesReportStoreId === 'all' ? (summary?.periodCashBonusesUsd ?? 0) : 0,
-    );
-  }, [salesReportStoreId, reportSales, reportDataLoading, rate, summary?.periodCashBonusesUsd]);
+    // Supplier cash bonuses aren't tied to a retail store — only the combined report shows them.
+    return buildSalesReportTable(reportSales, rate, salesReportStoreId === 'all' ? data.periodCashBonusesUsd : 0);
+  }, [salesReportStoreId, reportSales, reportDataLoading, rate, data.periodCashBonusesUsd]);
 
   const salesReportStoreName = salesReportStoreId === 'all'
     ? 'Все магазины'
     : (retailStores.find((s) => s.id === salesReportStoreId)?.name || '');
 
-  const filteredData: ReportsSummary = summary ?? {
-    unitsSold: 0, revenueUsd: 0, revenueTjs: 0, cogsUsd: 0, cogsTjs: 0,
-    grossProfitUsd: 0, grossProfitTjs: 0, grossMarginPercent: 0,
-    profitUsd: 0, profitTjs: 0,
-    expensesTjs: 0, expensesUsd: 0,
-    periodRefundPenaltiesUsd: 0, periodRefundPenaltiesTjs: 0,
-    netProfitUsd: 0, netProfitTjs: 0,
-    periodCashBonusesUsd: 0, periodCashBonusesTjs: 0,
-    giftDeviceUnitsSold: 0, giftDeviceProfitUsd: 0, giftDeviceProfitTjs: 0,
-    periodFreeDeviceBonusesReceived: 0, freeDeviceBonusesInStock: 0,
-    totalSupplierDebtUsd: 0, totalSupplierDebtTjs: 0,
-    mainWarehouseStockCount: 0, mainWarehouseStockCostUsd: 0, mainWarehouseStockCostTjs: 0,
-    mainWarehouseCashUsd: 0, mainWarehouseCashTjs: 0,
-    topSuppliersByDebt: [], storeBreakdown: [], modelCounts: [], salesCount: 0,
-  };
-
   const downloadFinancialReport = async () => {
     if (!salesReportStoreId || !summary || reportDownloading) return;
 
-    const reportStoreId = salesReportStoreId;
-
     let reportSummary: ComprehensiveReportSummary;
-    if (reportStoreId === 'all') {
+    const breakdown = data.storeBreakdown.find((item) => item.storeId === salesReportStoreId);
+    if (salesReportStoreId === 'all') {
       reportSummary = {
-        periodLabel,
-        storeName: salesReportStoreName,
-        exchangeRate: rate,
-        unitsSold: filteredData.unitsSold,
-        revenueTjs: filteredData.revenueTjs,
-        revenueUsd: filteredData.revenueUsd,
-        cogsTjs: filteredData.cogsTjs,
-        cogsUsd: filteredData.cogsUsd,
-        grossProfitTjs: filteredData.grossProfitTjs,
-        grossProfitUsd: filteredData.grossProfitUsd,
-        refundPenaltiesTjs: filteredData.periodRefundPenaltiesTjs,
-        refundPenaltiesUsd: filteredData.periodRefundPenaltiesUsd,
-        profitTjs: filteredData.profitTjs,
-        profitUsd: filteredData.profitUsd,
-        cashBonusesTjs: filteredData.periodCashBonusesTjs,
-        cashBonusesUsd: filteredData.periodCashBonusesUsd,
-        expensesTjs: filteredData.expensesTjs,
-        expensesUsd: filteredData.expensesUsd,
-        netProfitTjs: filteredData.netProfitTjs,
-        netProfitUsd: filteredData.netProfitUsd,
+        periodLabel, storeName: salesReportStoreName, exchangeRate: rate,
+        unitsSold: data.unitsSold,
+        revenueTjs: data.revenueTjs, revenueUsd: data.revenueUsd,
+        cogsTjs: data.cogsTjs, cogsUsd: data.cogsUsd,
+        grossProfitTjs: data.grossProfitTjs, grossProfitUsd: data.grossProfitUsd,
+        refundPenaltiesTjs: data.periodRefundPenaltiesTjs, refundPenaltiesUsd: data.periodRefundPenaltiesUsd,
+        profitTjs: data.profitTjs, profitUsd: data.profitUsd,
+        cashBonusesTjs: data.periodCashBonusesTjs, cashBonusesUsd: data.periodCashBonusesUsd,
+        expensesTjs: data.expensesTjs, expensesUsd: data.expensesUsd,
+        netProfitTjs: data.netProfitTjs, netProfitUsd: data.netProfitUsd,
       };
     } else {
-      const breakdown = filteredData.storeBreakdown.find((item) => item.storeId === reportStoreId);
       const expensesTjs = reportExpenses.reduce((total, expense) => total + (expense.amountTjs || 0), 0);
       const expensesUsd = reportExpenses.reduce(
         (total, expense) => total + (expense.amountUsd ?? ((expense.amountTjs || 0) / (expense.exchangeRate || rate))),
@@ -257,22 +260,13 @@ export const ReportsPage: React.FC = () => {
       const profitUsd = breakdown?.profitUsd ?? grossProfitUsd;
 
       reportSummary = {
-        periodLabel,
-        storeName: salesReportStoreName,
-        exchangeRate: rate,
+        periodLabel, storeName: salesReportStoreName, exchangeRate: rate,
         unitsSold: breakdown?.unitsSold ?? 0,
-        revenueTjs,
-        revenueUsd,
-        cogsTjs,
-        cogsUsd,
-        grossProfitTjs,
-        grossProfitUsd,
+        revenueTjs, revenueUsd, cogsTjs, cogsUsd, grossProfitTjs, grossProfitUsd,
         refundPenaltiesTjs: profitTjs - grossProfitTjs,
         refundPenaltiesUsd: profitUsd - grossProfitUsd,
-        profitTjs,
-        profitUsd,
-        cashBonusesTjs: 0,
-        cashBonusesUsd: 0,
+        profitTjs, profitUsd,
+        cashBonusesTjs: 0, cashBonusesUsd: 0,
         expensesTjs: +expensesTjs.toFixed(2),
         expensesUsd: +expensesUsd.toFixed(2),
         netProfitTjs: +(profitTjs - expensesTjs).toFixed(2),
@@ -282,12 +276,7 @@ export const ReportsPage: React.FC = () => {
 
     setReportDownloading(true);
     try {
-      await exportComprehensiveReport({
-        sales: reportSales,
-        expenses: reportExpenses,
-        summary: reportSummary,
-        generatedBy: currentUser?.name,
-      });
+      await exportComprehensiveReport({ sales: reportSales, expenses: reportExpenses, summary: reportSummary, generatedBy: currentUser?.name });
     } catch (error) {
       console.error('Failed to create financial report', error);
       window.alert('Не удалось сформировать Excel-отчёт. Попробуйте ещё раз.');
@@ -296,232 +285,254 @@ export const ReportsPage: React.FC = () => {
     }
   };
 
-  if (currentUser?.role === 'SELLER') {
-    return (
-      <div className="p-8 text-center text-fg-subtle text-xs">
-        <p className="font-bold text-fg-muted">ДОСТУП ОГРАНИЧЕН</p>
-        <p className="mt-1">Финансовые отчеты доступны только руководству</p>
-      </div>
-    );
-  }
+  const monthPicker = (
+    <MonthPicker
+      value={month}
+      onChange={onMonthChange}
+      className="h-9 px-3 rounded-lg border border-accent bg-surface text-xs font-semibold text-accent focus:outline-none"
+    />
+  );
 
   return (
-    <div className="flex-1 flex flex-col h-full overflow-hidden bg-bg text-fg-muted">
-      {/* Top Filter Bar */}
-      <div className="p-3 border-b border-border bg-surface flex flex-col lg:flex-row lg:items-center justify-end gap-2.5 shrink-0">
-        <div className="flex flex-wrap items-center gap-2 text-xs">
-          {/* Period selector — just the month; picking one shows every report for it. */}
-          <div className="flex items-center space-x-1.5">
-            <span className="text-[10px] text-fg-subtle font-bold uppercase hidden md:inline">ВЫБОР МЕСЯЦА:</span>
-            <MonthPicker
-              value={selectedMonth}
-              onChange={(v) => {
-                setSelectedMonth(v);
-                setPeriod('SPECIFIC_MONTH');
-              }}
-              className="px-2 py-1 rounded-lg border border-accent text-accent text-xs font-bold bg-surface-raised focus:outline-none"
-            />
-          </div>
-
-          {/* Store selector */}
+    <div className="flex flex-col">
+      {/* Filter bar */}
+      <div className="px-3 py-2.5 border-b border-border bg-surface flex flex-wrap items-center gap-2">
+        {monthPicker}
+        {view === 'summary' && (
           <select
             value={selectedStore}
             onChange={(e) => setSelectedStore(e.target.value)}
-            className="rounded-lg bg-surface-raised border border-border px-2.5 py-1.5 text-xs text-fg-muted focus:outline-none focus:border-accent"
+            className="h-9 rounded-lg bg-surface-raised border border-border px-2.5 text-xs font-semibold text-fg-muted focus:outline-none focus:border-accent"
           >
-            <option value="all">ВСЕ МАГАЗИНЫ</option>
-            {stores.filter(s => !s.isMainWarehouse).map(s => (
-              <option key={s.id} value={s.id}>{s.name.toUpperCase()}</option>
-            ))}
+            <option value="all">Все магазины</option>
+            {retailStores.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
           </select>
-        </div>
+        )}
+        {view === 'summary' && (
+          <button
+            type="button"
+            onClick={() => setSalesReportStoreId(selectedStore)}
+            className="h-9 ml-auto px-3 rounded-lg bg-accent hover:bg-accent-strong text-accent-fg font-semibold text-xs flex items-center gap-1.5 transition-colors"
+          >
+            <Download className="w-3.5 h-3.5" />
+            <span>Excel</span>
+          </button>
+        )}
       </div>
 
-      {/* Main Content Area */}
-      <div className={`flex-1 overflow-y-auto p-3 sm:p-4 space-y-4 transition-opacity ${summaryLoading ? 'opacity-60' : ''}`}>
+      <div className={`p-3 sm:p-4 space-y-4 transition-opacity ${summaryLoading ? 'opacity-60' : ''}`}>
+        {view === 'summary' ? (
+          <>
+            <div>
+              <h3 className="text-xs font-semibold text-fg-subtle uppercase tracking-wide mb-2 px-0.5">
+                Итог за {periodLabel}{selectedStore !== 'all' ? ` — ${retailStores.find((s) => s.id === selectedStore)?.name ?? ''}` : ''}
+              </h3>
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3">
+                <StatCard label="Выручка" value={usd(data.revenueUsd)} subvalue={`${tjs(data.revenueTjs)} · ${data.salesCount} чеков`} icon={Receipt} tone="neutral" />
+                <StatCard label="Прибыль с продаж" value={signedUsd(data.profitUsd)} subvalue="с учётом возвратов" icon={TrendingUp} tone={data.profitUsd >= 0 ? 'accent' : 'danger'} />
+                <StatCard label="Расходы" value={`−${usd(data.expensesUsd)}`} subvalue={tjs(data.expensesTjs)} icon={Wallet} tone="danger" />
+                <StatCard label="Чистая прибыль" value={signedUsd(data.netProfitUsd)} subvalue="после вычета расходов" icon={PiggyBank} tone={data.netProfitUsd >= 0 ? 'accent' : 'danger'} />
+              </div>
+            </div>
 
-        {/* KPI SUMMARY: revenue / profit / expenses / net profit for the current
-            period+store filter — all four straight from filteredData, so they always
-            agree with the per-store cards and tables below (same source of truth). */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3">
-          <StatCard
-            label="Выручка"
-            value={`${filteredData.revenueTjs.toLocaleString()} TJS`}
-            subvalue={`≈ $${filteredData.revenueUsd.toLocaleString()}`}
-            icon={Receipt}
-            tone="neutral"
-          />
-          <StatCard
-            label="Прибыль (с учетом возвратов)"
-            value={`${filteredData.profitUsd >= 0 ? '+' : ''}$${filteredData.profitUsd.toLocaleString()}`}
-            icon={TrendingUp}
-            tone={filteredData.profitUsd >= 0 ? 'accent' : 'danger'}
-          />
-          <StatCard
-            label="Общий расход"
-            value={`$${filteredData.expensesUsd.toLocaleString()}`}
-            icon={Wallet}
-            tone="danger"
-          />
-          <StatCard
-            label="Чистая прибыль"
-            value={`${filteredData.netProfitUsd >= 0 ? '+' : ''}$${filteredData.netProfitUsd.toLocaleString()}`}
-            subvalue="После вычета расходов"
-            icon={PiggyBank}
-            tone={filteredData.netProfitUsd >= 0 ? 'accent' : 'danger'}
-          />
-        </div>
+            {/* How net profit is built — the same numbers as the cards, laid out as a sum. */}
+            <div className="p-3.5 rounded-xl bg-surface border border-border space-y-1.5 text-sm">
+              <h4 className="text-[10px] font-bold text-fg-subtle uppercase tracking-wider mb-1">Как считается чистая прибыль</h4>
+              {[
+                { label: 'Выручка', value: usd(data.revenueUsd) },
+                { label: 'Себестоимость проданного', value: `−${usd(data.cogsUsd)}` },
+                ...(data.periodRefundPenaltiesUsd ? [{ label: 'Удержано при возвратах', value: `+${usd(data.periodRefundPenaltiesUsd)}` }] : []),
+                ...(data.periodCashBonusesUsd ? [{ label: 'Бонусы поставщиков', value: `+${usd(data.periodCashBonusesUsd)}` }] : []),
+                { label: 'Расходы', value: `−${usd(data.expensesUsd)}` },
+              ].map((row) => (
+                <div key={row.label} className="flex items-center justify-between text-fg-muted">
+                  <span>{row.label}</span>
+                  <span className="font-semibold">{row.value}</span>
+                </div>
+              ))}
+              <div className="flex items-center justify-between pt-1.5 mt-1 border-t border-border font-bold">
+                <span>Чистая прибыль</span>
+                <span className={data.netProfitUsd >= 0 ? 'text-accent' : 'text-danger'}>{signedUsd(data.netProfitUsd)}</span>
+              </div>
+            </div>
 
-        {/* SALES REPORT PER STORE: replaces the old multi-metric card dashboard — just the
-            report that matters (revenue, profit, receipt count) plus a download button,
-            one panel per store and one for every store combined. */}
-        <div>
-          <h4 className="text-[10px] font-bold text-fg-subtle uppercase tracking-wider mb-2 flex items-center space-x-1.5">
-            <Receipt className="w-3.5 h-3.5 text-accent" />
-            <span>ОТЧЕТ ПО ПРОДАЖАМ</span>
-            <span className="text-[9px] font-normal normal-case text-fg-subtle">({periodLabel})</span>
-          </h4>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5 sm:gap-3">
-            {[...(selectedStore === 'all' ? [{ id: 'all', name: 'Все магазины' }] : []), ...retailStores].map((store) => {
-              // Same recognized-profit figures (and now sales count too) as the summary card
-              // above (filteredData.storeBreakdown), instead of a second, independent
-              // per-item calculation that could disagree with it.
-              const breakdown = filteredData.storeBreakdown.find((b) => b.storeId === store.id);
-              const revenueTjs = store.id === 'all' ? filteredData.revenueTjs : (breakdown?.revenueTjs ?? 0);
-              const profitUsd = store.id === 'all' ? filteredData.profitUsd : (breakdown?.profitUsd ?? 0);
-              const salesCount = store.id === 'all' ? filteredData.salesCount : (breakdown?.salesCount ?? 0);
+            {data.topSuppliersByDebt.length > 0 && (
+              <div className="p-3.5 rounded-xl bg-surface border border-border space-y-2.5">
+                <h4 className="text-[10px] font-bold text-fg-subtle uppercase tracking-wider flex items-center gap-1.5">
+                  <ArrowDownRight className="w-3.5 h-3.5 text-danger" />
+                  <span>Долг поставщикам: {usd(data.totalSupplierDebtUsd)}</span>
+                </h4>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs">
+                    <thead>
+                      <tr className="border-b border-border text-[10px] text-fg-subtle uppercase">
+                        <th className="py-2 px-3">Поставщик</th>
+                        <th className="py-2 px-3 text-right">Закуплено</th>
+                        <th className="py-2 px-3 text-right">Оплачено</th>
+                        <th className="py-2 px-3 text-right">Долг</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border">
+                      {data.topSuppliersByDebt.map((s) => (
+                        <tr key={s.id}>
+                          <td className="py-2 px-3 font-bold text-fg-muted">{s.name}</td>
+                          <td className="py-2 px-3 text-right text-fg-subtle">{usd(s.totalPurchasedUsd)}</td>
+                          <td className="py-2 px-3 text-right text-fg-muted">{usd(s.totalPaidUsd)}</td>
+                          <td className="py-2 px-3 text-right font-bold text-danger">{usd(s.totalDebtUsd)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {data.modelCounts.length > 0 && (
+              <div className="p-3.5 rounded-xl bg-surface border border-border space-y-2.5">
+                <h4 className="text-[10px] font-bold text-fg-subtle uppercase tracking-wider flex items-center gap-1.5">
+                  <Smartphone className="w-3.5 h-3.5 text-accent" />
+                  <span>Самые прибыльные модели</span>
+                </h4>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs">
+                    <thead>
+                      <tr className="border-b border-border text-[10px] text-fg-subtle uppercase">
+                        <th className="py-2 px-3">Модель</th>
+                        <th className="py-2 px-3 text-center">Шт</th>
+                        <th className="py-2 px-3 text-right">Выручка</th>
+                        <th className="py-2 px-3 text-right">Себестоимость</th>
+                        <th className="py-2 px-3 text-right">Прибыль</th>
+                        <th className="py-2 px-3 text-right">Маржа</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border">
+                      {data.modelCounts.slice(0, 10).map((m) => (
+                        <tr key={m.name}>
+                          <td className="py-2 px-3 font-bold text-fg-muted">{m.name}</td>
+                          <td className="py-2 px-3 text-center text-fg-muted font-bold">{m.count}</td>
+                          <td className="py-2 px-3 text-right text-fg-muted">{usd(m.revenueUsd)}</td>
+                          <td className="py-2 px-3 text-right text-fg-subtle">{usd(m.cogsUsd)}</td>
+                          <td className={`py-2 px-3 text-right font-bold ${m.profitUsd >= 0 ? 'text-accent' : 'text-danger'}`}>{signedUsd(m.profitUsd)}</td>
+                          <td className="py-2 px-3 text-right text-fg-muted">{m.revenueUsd > 0 ? ((m.profitUsd / m.revenueUsd) * 100).toFixed(1) : '0.0'}%</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+          </>
+        ) : (
+          <>
+            <p className="text-xs text-fg-subtle px-0.5">Отчёт за {periodLabel}. Нажмите на магазин, чтобы увидеть расходы по статьям и лучшие модели.</p>
+
+            {data.storeBreakdown.map((store) => {
+              const expanded = expandedStoreId === store.storeId;
+              const margin = store.revenueUsd > 0 ? ((store.profitUsd / store.revenueUsd) * 100).toFixed(1) : '0.0';
               return (
-                <div key={store.id} className="p-3.5 rounded-xl bg-surface border border-border space-y-2.5 flex flex-col">
-                  <div className="flex items-center justify-between">
-                    <span className="font-bold text-fg-muted text-sm flex items-center gap-1.5">
-                      <StoreIcon className="w-3.5 h-3.5 text-accent" />
-                      {store.name}
-                    </span>
-                    <span className="text-[10px] text-accent bg-accent/10 px-1.5 py-0.5 rounded-md border border-accent/20">
-                      {salesCount} чеков
-                    </span>
-                  </div>
-                  <div className="grid grid-cols-2 gap-2">
-                    <div>
-                      <p className="text-fg-subtle text-[10px] uppercase">Выручка</p>
-                      <p className="font-bold text-fg-muted text-sm">{Number(revenueTjs).toLocaleString()} TJS</p>
-                    </div>
-                    <div>
-                      <p className="text-fg-subtle text-[10px] uppercase">Прибыль (с учетом возвратов)</p>
-                      <p className={`font-bold text-sm ${profitUsd >= 0 ? 'text-accent' : 'text-danger'}`}>
-                        {profitUsd >= 0 ? '+' : ''}${profitUsd.toLocaleString()}
-                      </p>
-                    </div>
-                    {/* Supplier bonuses are tied to the supplier/main warehouse, not a specific
-                        retail store — shown only on the combined "Все магазины" card so it
-                        never looks like one branch personally received the bonus. */}
-                    {store.id === 'all' && filteredData.periodCashBonusesUsd !== 0 && (
-                      <div className="col-span-2">
-                        <p className="text-fg-subtle text-[10px] uppercase">Бонусы поставщиков (наличными)</p>
-                        <p className="font-bold text-accent text-sm">
-                          +${filteredData.periodCashBonusesUsd.toLocaleString()}
-                        </p>
-                      </div>
-                    )}
-                  </div>
+                <div key={store.storeId} className="rounded-xl bg-surface border border-border overflow-hidden">
                   <button
-                    onClick={() => setSalesReportStoreId(store.id)}
-                    className="w-full py-2 px-3 rounded-lg bg-accent hover:bg-accent-strong text-accent-fg font-bold text-xs flex items-center justify-center space-x-2 transition-colors mt-auto"
+                    type="button"
+                    onClick={() => setExpandedStoreId(expanded ? null : store.storeId)}
+                    className="w-full p-3.5 flex items-center justify-between gap-3 text-left hover:bg-surface-raised transition-colors"
                   >
-                    <Download className="w-3.5 h-3.5" />
-                    <span>ПРОСМОТР И СКАЧИВАНИЕ</span>
+                    <span className="flex items-center gap-2 min-w-0">
+                      <StoreIcon className="w-4 h-4 text-accent shrink-0" />
+                      <span className="font-bold text-sm text-fg-muted truncate">{store.storeName}</span>
+                      <Badge tone="neutral">{store.salesCount} чеков</Badge>
+                    </span>
+                    <span className="flex items-center gap-2 shrink-0">
+                      <span className={`text-sm font-bold ${store.netProfitUsd >= 0 ? 'text-accent' : 'text-danger'}`}>{signedUsd(store.netProfitUsd)}</span>
+                      <ChevronDown className={`w-4 h-4 text-fg-subtle transition-transform ${expanded ? 'rotate-180' : ''}`} />
+                    </span>
                   </button>
+
+                  <div className="px-3.5 pb-3.5 grid grid-cols-2 sm:grid-cols-4 gap-x-3 gap-y-2.5">
+                    <Metric label="Выручка" value={usd(store.revenueUsd)} sub={tjs(store.revenueTjs)} />
+                    <Metric label="Себестоимость" value={usd(store.cogsUsd)} sub={`${store.unitsSold} шт продано`} />
+                    <Metric label="Прибыль с продаж" value={signedUsd(store.profitUsd)} sub={`маржа ${margin}%`} tone={store.profitUsd >= 0 ? 'accent' : 'danger'} />
+                    <Metric
+                      label="Расходы"
+                      value={`−${usd(store.expensesUsd)}`}
+                      sub={store.unpaidExpensesTjs > 0 ? `не оплачено ${tjs(store.unpaidExpensesTjs)}` : tjs(store.expensesTjs)}
+                      tone="danger"
+                    />
+                    <Metric label="Чистая прибыль" value={signedUsd(store.netProfitUsd)} tone={store.netProfitUsd >= 0 ? 'accent' : 'danger'} />
+                    <Metric label="Касса сейчас" value={tjs(store.cashTjs)} />
+                    <Metric label="Товар на складе" value={`${store.stockCount} шт`} sub={usd(store.stockCostUsd)} />
+                    {store.refundPenaltiesUsd > 0 && <Metric label="Удержано при возвратах" value={`+${usd(store.refundPenaltiesUsd)}`} />}
+                  </div>
+
+                  {expanded && (
+                    <div className="px-3.5 pb-3.5 pt-3 border-t border-border grid sm:grid-cols-2 gap-4">
+                      <div>
+                        <h5 className="text-[10px] font-bold text-fg-subtle uppercase tracking-wider mb-2">Расходы по статьям</h5>
+                        <ExpenseCategoryList data={store} />
+                      </div>
+                      <div>
+                        <h5 className="text-[10px] font-bold text-fg-subtle uppercase tracking-wider mb-2">Что продавали больше всего</h5>
+                        {store.topModels.length === 0 ? (
+                          <p className="text-xs text-fg-subtle">Продаж за период нет</p>
+                        ) : (
+                          <div className="rounded-lg border border-border overflow-hidden">
+                            {store.topModels.map((m) => (
+                              <div key={m.name} className="flex items-center justify-between gap-2 px-2.5 py-2 border-b border-border last:border-0 text-xs">
+                                <span className="text-fg-muted truncate">{m.name} <span className="text-fg-subtle">× {m.count}</span></span>
+                                <span className={`font-semibold shrink-0 ${m.profitUsd >= 0 ? 'text-accent' : 'text-danger'}`}>{signedUsd(m.profitUsd)}</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setSalesReportStoreId(store.storeId)}
+                        className="sm:col-span-2 w-full py-2 px-3 rounded-lg bg-accent hover:bg-accent-strong text-accent-fg font-semibold text-xs flex items-center justify-center gap-2 transition-colors"
+                      >
+                        <Download className="w-3.5 h-3.5" />
+                        <span>Продажи и расходы магазина — Excel</span>
+                      </button>
+                    </div>
+                  )}
                 </div>
               );
             })}
-          </div>
-        </div>
 
-        {/* TOP SUPPLIERS BY DEBT */}
-        {filteredData.topSuppliersByDebt.length > 0 && (
-          <div className="p-3.5 rounded-xl bg-surface border border-border space-y-2.5">
-            <h4 className="text-[10px] font-bold text-fg-subtle uppercase tracking-wider flex items-center space-x-1.5">
-              <ArrowDownRight className="w-3.5 h-3.5 text-danger" />
-              <span>ПОСТАВЩИКИ С НАИБОЛЬШИМ ДОЛГОМ</span>
-            </h4>
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs">
-                <thead>
-                  <tr className="border-b border-border text-[10px] text-fg-subtle uppercase">
-                    <th className="py-2 px-3">#</th>
-                    <th className="py-2 px-3">Поставщик</th>
-                    <th className="py-2 px-3 text-right">Закуплено всего ($)</th>
-                    <th className="py-2 px-3 text-right">Оплачено ($)</th>
-                    <th className="py-2 px-3 text-right">Долг ($)</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border">
-                  {filteredData.topSuppliersByDebt.map((s, idx) => (
-                    <tr key={s.id} className="hover:bg-surface-raised transition-colors">
-                      <td className="py-2 px-3 text-fg-subtle font-bold">{idx + 1}</td>
-                      <td className="py-2 px-3 font-bold text-fg-muted">{s.name}</td>
-                      <td className="py-2 px-3 text-right text-fg-subtle">${s.totalPurchasedUsd.toLocaleString()}</td>
-                      <td className="py-2 px-3 text-right text-fg-muted">${s.totalPaidUsd.toLocaleString()}</td>
-                      <td className="py-2 px-3 text-right font-bold text-danger">${s.totalDebtUsd.toLocaleString()}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
+            {mainWarehouse && (
+              <div className="rounded-xl bg-surface border border-border overflow-hidden">
+                <button
+                  type="button"
+                  onClick={() => setExpandedStoreId(expandedStoreId === 'MAIN' ? null : 'MAIN')}
+                  className="w-full p-3.5 flex items-center justify-between gap-3 text-left hover:bg-surface-raised transition-colors"
+                >
+                  <span className="flex items-center gap-2 min-w-0">
+                    <Warehouse className="w-4 h-4 text-accent shrink-0" />
+                    <span className="font-bold text-sm text-fg-muted truncate">{mainWarehouse.name}</span>
+                    <Badge tone="accent">Главный склад</Badge>
+                  </span>
+                  <ChevronDown className={`w-4 h-4 text-fg-subtle shrink-0 transition-transform ${expandedStoreId === 'MAIN' ? 'rotate-180' : ''}`} />
+                </button>
+                <div className="px-3.5 pb-3.5 grid grid-cols-2 sm:grid-cols-4 gap-x-3 gap-y-2.5">
+                  <Metric label="Товар на складе" value={`${data.mainWarehouseStockCount} шт`} sub={usd(data.mainWarehouseStockCostUsd)} />
+                  <Metric label="Касса сейчас" value={usd(data.mainWarehouseCashUsd)} sub={tjs(data.mainWarehouseCashTjs)} />
+                  <Metric
+                    label="Общие расходы"
+                    value={`−${usd(data.mainWarehouseExpenses.expensesUsd)}`}
+                    sub={data.mainWarehouseExpenses.unpaidExpensesTjs > 0 ? `не оплачено ${tjs(data.mainWarehouseExpenses.unpaidExpensesTjs)}` : 'не привязаны к магазину'}
+                    tone="danger"
+                  />
+                  <Metric label="Долг поставщикам" value={usd(data.totalSupplierDebtUsd)} tone={data.totalSupplierDebtUsd > 0 ? 'danger' : 'default'} />
+                </div>
+                {expandedStoreId === 'MAIN' && (
+                  <div className="px-3.5 pb-3.5 pt-3 border-t border-border">
+                    <h5 className="text-[10px] font-bold text-fg-subtle uppercase tracking-wider mb-2">Общие расходы по статьям</h5>
+                    <ExpenseCategoryList data={data.mainWarehouseExpenses} />
+                  </div>
+                )}
+              </div>
+            )}
+          </>
         )}
-
-        {/* TOP SELLING MODELS TABLE */}
-        {filteredData.modelCounts.length > 0 && (
-          <div className="p-3.5 rounded-xl bg-surface border border-border space-y-2.5">
-            <div className="flex items-center justify-between">
-              <h4 className="text-[10px] font-bold text-fg-subtle uppercase tracking-wider flex items-center space-x-1.5">
-                <Smartphone className="w-3.5 h-3.5 text-accent" />
-                <span>РЕЙТИНГ ПРОДАЖ И МАРЖИНАЛЬНОСТЬ МОДЕЛЕЙ</span>
-              </h4>
-              <span className="text-[10px] text-fg-subtle">
-                Топ-{Math.min(10, filteredData.modelCounts.length)} по марже
-              </span>
-            </div>
-
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs">
-                <thead>
-                  <tr className="border-b border-border text-[10px] text-fg-subtle uppercase">
-                    <th className="py-2 px-3">#</th>
-                    <th className="py-2 px-3">Модель</th>
-                    <th className="py-2 px-3 text-center">Продано (шт)</th>
-                    <th className="py-2 px-3 text-right">Выручка ($)</th>
-                    <th className="py-2 px-3 text-right">Себестоимость ($)</th>
-                    <th className="py-2 px-3 text-right">Валовая прибыль ($)</th>
-                    <th className="py-2 px-3 text-right">Рентабельность (%)</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border">
-                  {filteredData.modelCounts.slice(0, 10).map((m, idx) => {
-                    const marginPct = m.revenueUsd > 0 ? ((m.profitUsd / m.revenueUsd) * 100).toFixed(1) : '0.0';
-                    return (
-                      <tr key={m.name} className="hover:bg-surface-raised transition-colors">
-                        <td className="py-2 px-3 text-fg-subtle font-bold">{idx + 1}</td>
-                        <td className="py-2 px-3 font-bold text-fg-muted">{m.name}</td>
-                        <td className="py-2 px-3 text-center text-fg-muted font-bold">{m.count}</td>
-                        <td className="py-2 px-3 text-right text-fg-muted">${m.revenueUsd.toFixed(2)}</td>
-                        <td className="py-2 px-3 text-right text-fg-subtle">${m.cogsUsd.toFixed(2)}</td>
-                        <td className={`py-2 px-3 text-right font-bold ${m.profitUsd >= 0 ? 'text-accent' : 'text-danger'}`}>
-                          {m.profitUsd >= 0 ? '+' : ''}${m.profitUsd.toFixed(2)}
-                        </td>
-                        <td className="py-2 px-3 text-right font-bold text-accent">
-                          {marginPct}%
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
-
       </div>
 
       <ReportPreviewModal

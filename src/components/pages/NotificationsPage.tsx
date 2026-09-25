@@ -20,7 +20,7 @@ const PAGE_ROUTES: Record<string, string> = {
   EXPENSES: '/expenses',
   OWNERS: '/owners',
   EMPLOYEES: '/employees',
-  REPORTS: '/reports',
+  REPORTS: '/finance',
   AUDIT_LOG: '/audit-log',
   SETTINGS: '/settings',
   NOTIFICATIONS: '/notifications',

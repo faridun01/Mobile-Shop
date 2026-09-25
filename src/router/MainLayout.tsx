@@ -37,7 +37,6 @@ const BonusesPage = lazy(() => import('../components/pages/BonusesPage').then(m 
 const ExpensesPage = lazy(() => import('../components/pages/ExpensesPage').then(m => ({ default: m.ExpensesPage })));
 const OwnersPage = lazy(() => import('../components/pages/OwnersPage').then(m => ({ default: m.OwnersPage })));
 const EmployeesPage = lazy(() => import('../components/pages/EmployeesPage').then(m => ({ default: m.EmployeesPage })));
-const ReportsPage = lazy(() => import('../components/pages/ReportsPage').then(m => ({ default: m.ReportsPage })));
 const FinancePage = lazy(() => import('../components/pages/FinancePage').then(m => ({ default: m.FinancePage })));
 const AuditLogPage = lazy(() => import('../components/pages/AuditLogPage').then(m => ({ default: m.AuditLogPage })));
 const SettingsPage = lazy(() => import('../components/pages/SettingsPage').then(m => ({ default: m.SettingsPage })));
@@ -104,7 +103,7 @@ export function MainLayout() {
 
       <div className="flex-1 flex flex-col min-w-0 h-full min-h-0 overflow-hidden bg-bg relative">
         <TopBar />
-        <main className="flex-1 flex flex-col min-h-0 overflow-y-auto relative bg-bg">
+        <main className="flex-1 flex flex-col min-w-0 max-w-full min-h-0 overflow-y-auto overflow-x-hidden relative bg-bg">
           <Suspense fallback={<LoadingFallback />}>
             <Routes>
               <Route path="/" element={<Navigate to="/sale" replace />} />
@@ -121,7 +120,8 @@ export function MainLayout() {
               <Route path="/expenses" element={<ExpensesPage />} />
               <Route path="/owners" element={<OwnersPage />} />
               <Route path="/employees" element={<EmployeesPage />} />
-              <Route path="/reports" element={<ReportsPage />} />
+              {/* «Финансовые отчёты» merged into Финансы (opens on the «Отчёт» tab) */}
+              <Route path="/reports" element={<Navigate to="/finance" replace />} />
               <Route path="/finance" element={<FinancePage />} />
               <Route path="/audit-log" element={<AuditLogPage />} />
               <Route path="/settings" element={<SettingsPage />} />

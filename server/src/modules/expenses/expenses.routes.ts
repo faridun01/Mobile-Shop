@@ -1,7 +1,7 @@
 import type { Express } from 'express';
 import { authenticateJwt, enforceBodyStoreScope, requireRoles, type AuthenticatedRequest } from '../../auth/auth.middleware';
 import { prisma } from '../../prisma/prisma.service';
-import { createExpenseStandalone, updateExpense, deleteExpense } from './expenses.service';
+import { createExpenseStandalone, updateExpense, deleteExpense, payExpense } from './expenses.service';
 import { RealtimeSyncGateway } from '../../websocket/websocket.gateway';
 import { dateRangeForPeriod, type ReportPeriod } from '../reports/reports.service';
 
@@ -74,7 +74,18 @@ export function registerExpenseRoutes(app: Express) {
     }
   });
 
-  app.put('/api/expenses/:id', authenticateJwt, requireRoles('ADMIN', 'PARTNER'), async (req: AuthenticatedRequest, res, next) => {
+  app.post('/api/expenses/:id/pay', authenticateJwt, requireRoles('ADMIN', 'PARTNER'), async (req: AuthenticatedRequest, res, next) => {
+    try {
+      const storeId = typeof req.body?.storeId === 'string' ? req.body.storeId : undefined;
+      const expense = await payExpense(req.params.id, req.user!.userId, storeId);
+      RealtimeSyncGateway.broadcast('EXPENSE_UPDATED', { expenseId: expense.id }, expense.storeId ? { storeIds: [expense.storeId] } : undefined);
+      res.json(expense);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.put('/api/expenses/:id',authenticateJwt, requireRoles('ADMIN', 'PARTNER'), async (req: AuthenticatedRequest, res, next) => {
     try {
       const expense = await updateExpense(req.params.id, req.body ?? {}, req.user!.userId);
       RealtimeSyncGateway.broadcast('EXPENSE_UPDATED', { expenseId: expense.id });

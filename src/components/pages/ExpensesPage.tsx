@@ -2,6 +2,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { useAppFields } from '../../context/AppContext';
 import { Expense, ExpenseCategory } from '../../types';
 import { FALLBACK_EXCHANGE_RATE } from '../../utils/exchangeRate';
+import { STANDARD_EXPENSE_CATEGORIES, LEGACY_EXPENSE_LABELS } from '../../utils/expenseCategories';
 import {
   Receipt,
   Plus,
@@ -17,7 +18,8 @@ import {
   Store as StoreIcon,
   Edit2,
   Trash2,
-  SlidersHorizontal
+  SlidersHorizontal,
+  Banknote
 } from 'lucide-react';
 import { SearchBar } from '../ui/SearchBar';
 import { FilterPillGroup } from '../ui/FilterPillGroup';
@@ -34,20 +36,7 @@ import { ConfirmDialog } from '../ui/ConfirmDialog';
 import { RestrictedAccess } from '../ui/RestrictedAccess';
 import { StatusBanner, StatusMessage } from '../ui/StatusBanner';
 
-// Single source of truth for expense categories — the old filter dropdown and the
-// create/edit modals each maintained their own separate option list, which had drifted
-// out of sync (e.g. EMPLOYEE_ADVANCE was creatable but not filterable).
-const STANDARD_CATEGORIES = [
-  { id: 'RENT', label: 'Аренда помещения' },
-  { id: 'SALARY', label: 'Зарплата сотрудников' },
-  { id: 'EMPLOYEE_ADVANCE', label: 'Аванс / Подотчет сотрудника' },
-  { id: 'UTILITIES', label: 'Коммуналка и интернет' },
-  { id: 'MARKETING', label: 'Реклама и маркетинг' },
-  { id: 'REPAIR_PARTS', label: 'Запчасти для ремонта' },
-  { id: 'TAXES', label: 'Налоги и сборы' },
-  { id: 'SUPPLIES', label: 'Расходные материалы' },
-  { id: 'OTHER', label: 'Прочие расходы' },
-];
+const STANDARD_CATEGORIES = STANDARD_EXPENSE_CATEGORIES;
 
 const CATEGORY_ICONS: Record<string, React.ElementType> = {
   RENT: Home, 'Аренда': Home,
@@ -60,18 +49,6 @@ const CATEGORY_ICONS: Record<string, React.ElementType> = {
   OTHER: Tag, 'Другие': Tag,
 };
 
-const LEGACY_LABELS: Record<string, string> = {
-  'Аренда': 'Аренда помещения',
-  'Зарплата': 'Зарплата сотрудников',
-  'Аванс сотрудника': 'Аванс / Подотчет сотрудника',
-  'Коммунальные': 'Коммуналка и интернет',
-  'Ремонт': 'Ремонт и запчасти',
-  'Транспорт': 'Транспорт и доставка',
-  'Реклама': 'Реклама и маркетинг',
-  'Хозяйственные': 'Хозяйственные товары',
-  'Другие': 'Прочие расходы',
-};
-
 type CustomCategory = { id: string; label: string };
 
 function getCategoryLabel(key: string, customCategories: CustomCategory[]): string {
@@ -79,7 +56,7 @@ function getCategoryLabel(key: string, customCategories: CustomCategory[]): stri
   if (std) return std.label;
   const custom = customCategories.find(c => c.id === key || c.label === key);
   if (custom) return custom.label;
-  return LEGACY_LABELS[key] || key || 'Прочие расходы';
+  return LEGACY_EXPENSE_LABELS[key] || key || 'Прочие расходы';
 }
 
 function getCategoryIcon(key: string): React.ElementType {
@@ -87,7 +64,7 @@ function getCategoryIcon(key: string): React.ElementType {
 }
 
 export const ExpensesPage: React.FC = () => {
-  const { currentUser, expenses, fetchExpensesRange, stores, users, todayRate, createExpense, updateExpense, deleteExpense, isInitialLoading, selectedStoreId: globalSelectedStoreId } = useAppFields('currentUser', 'expenses', 'fetchExpensesRange', 'stores', 'users', 'todayRate', 'createExpense', 'updateExpense', 'deleteExpense', 'isInitialLoading', 'selectedStoreId');
+  const { currentUser, expenses, fetchExpensesRange, stores, users, todayRate, createExpense, updateExpense, deleteExpense, payExpense, isInitialLoading, selectedStoreId: globalSelectedStoreId } = useAppFields('currentUser', 'expenses', 'fetchExpensesRange', 'stores', 'users', 'todayRate', 'createExpense', 'updateExpense', 'deleteExpense', 'payExpense', 'isInitialLoading', 'selectedStoreId');
 
   const isSeller = currentUser?.role === 'SELLER';
   const canAddCategory = currentUser?.role === 'ADMIN' || currentUser?.role === 'PARTNER';
@@ -97,6 +74,9 @@ export const ExpensesPage: React.FC = () => {
   const [status, setStatus] = useState<StatusMessage | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const [payingExpense, setPayingExpense] = useState<Expense | null>(null);
+  const [payStoreId, setPayStoreId] = useState('');
 
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
   const [editCategory, setEditCategory] = useState<ExpenseCategory>('RENT');
@@ -207,6 +187,27 @@ export const ExpensesPage: React.FC = () => {
     }
   };
 
+  const handleStartPay = (exp: Expense) => {
+    setPayingExpense(exp);
+    setPayStoreId(exp.storeId || retailStores[0]?.id || '');
+  };
+
+  const handleConfirmPay = async () => {
+    if (!payingExpense || isSubmitting) return;
+    setIsSubmitting(true);
+    try {
+      const res = await payExpense(payingExpense.id, payingExpense.storeId ? undefined : payStoreId);
+      if (res.success) {
+        setStatus({ tone: 'success', text: `Расход оплачен: ${payingExpense.amountTjs.toLocaleString()} TJS списано из кассы` });
+        setPayingExpense(null);
+      } else {
+        setStatus({ tone: 'error', text: res.message || 'Не удалось оплатить расход' });
+      }
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   const handleAddExpense = async (e: React.FormEvent) => {
     e.preventDefault();
     if (isSubmitting) return;
@@ -238,7 +239,8 @@ export const ExpensesPage: React.FC = () => {
         setAmountTjs('');
         setDescription('');
         setSelectedEmployeeId('');
-        setStatus({ tone: 'success', text: `Расход на сумму ${val} TJS проведён${selectedEmp ? ` (зачислен сотруднику ${selectedEmp.name})` : ''}` });
+        const paidNote = paidFromCashRegister ? 'оплачен из кассы' : 'записан как не оплаченный';
+        setStatus({ tone: 'success', text: `Расход на сумму ${val} TJS ${paidNote}${selectedEmp ? ` (зачислен сотруднику ${selectedEmp.name})` : ''}` });
       } else {
         setStatus({ tone: 'error', text: res.message || 'Ошибка проведения расхода' });
       }
@@ -324,6 +326,11 @@ export const ExpensesPage: React.FC = () => {
     () => +filteredExpenses.reduce((acc, e) => acc + (e.amountUsd ?? ((e.amountTjs || 0) / (e.exchangeRate || rate))), 0).toFixed(2),
     [filteredExpenses, rate]
   );
+  const unpaidTotalTjs = useMemo(
+    () => filteredExpenses.reduce((acc, e) => acc + (e.status === 'UNPAID' ? e.amountTjs || 0 : 0), 0),
+    [filteredExpenses]
+  );
+  const deletingExpense = deletingId ? expenses.find(e => e.id === deletingId) : undefined;
 
   const allCategoryOptions = [...STANDARD_CATEGORIES, ...customCategories];
   const hasActiveFilters = periodFilter !== 'SPECIFIC_MONTH' || selectedStoreFilter !== 'ALL' || selectedCategoryTab !== 'ALL';
@@ -353,6 +360,9 @@ export const ExpensesPage: React.FC = () => {
                   <span className="text-lg font-bold text-danger">-{totalExpensesTjs.toLocaleString()} TJS</span>
                   <span className="text-xs text-fg-subtle">≈ -${totalExpensesUsd.toLocaleString()}</span>
                 </div>
+                {unpaidTotalTjs > 0 && (
+                  <span className="text-xs font-semibold text-warning block">из них не оплачено: {unpaidTotalTjs.toLocaleString()} TJS</span>
+                )}
               </div>
             </div>
 
@@ -440,7 +450,10 @@ export const ExpensesPage: React.FC = () => {
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-1.5">
                       <span className="text-sm font-semibold text-fg-muted">{label}</span>
-                      {exp.sourceAccount?.toLowerCase().includes('касса') && <Badge tone="neutral">Из кассы</Badge>}
+                      {exp.status === 'UNPAID'
+                        ? <Badge tone="warning">Не оплачено</Badge>
+                        : <Badge tone="success">Оплачено</Badge>}
+                      {exp.status === 'PAID' && exp.sourceAccount?.toLowerCase().includes('касса') && <Badge tone="neutral">Из кассы</Badge>}
                       {exp.employeeName && <Badge tone="accent">{exp.employeeName}</Badge>}
                     </div>
                     <p className="text-sm text-fg-muted mt-0.5">{exp.comment || exp.description || 'Операционный расход'}</p>
@@ -460,6 +473,9 @@ export const ExpensesPage: React.FC = () => {
                     <p className="text-xs text-fg-subtle">≈ -${costUsd.toLocaleString()}</p>
                     {(currentUser?.role === 'ADMIN' || currentUser?.role === 'PARTNER') && (
                       <div className="flex items-center gap-1 mt-1.5 justify-end">
+                        {exp.status === 'UNPAID' && (
+                          <IconButton icon={Banknote} tone="accent" size="sm" aria-label="Оплатить расход" onClick={() => handleStartPay(exp)} />
+                        )}
                         <IconButton icon={Edit2} size="sm" aria-label="Редактировать расход" onClick={() => handleStartEdit(exp)} />
                         <IconButton icon={Trash2} tone="danger" size="sm" aria-label="Удалить расход" onClick={() => setDeletingId(exp.id)} />
                       </div>
@@ -475,7 +491,9 @@ export const ExpensesPage: React.FC = () => {
       <ConfirmDialog
         open={!!deletingId}
         title="Удалить расход?"
-        message="Средства вернутся в баланс кассы. Это действие нельзя отменить."
+        message={deletingExpense?.status === 'UNPAID'
+          ? 'Расход не был оплачен — касса не изменится. Это действие нельзя отменить.'
+          : 'Средства вернутся в баланс кассы. Это действие нельзя отменить.'}
         confirmLabel="Удалить"
         loading={isSubmitting}
         onConfirm={handleConfirmDelete}
@@ -592,7 +610,47 @@ export const ExpensesPage: React.FC = () => {
             onChange={setPaidFromCashRegister}
             label="Списать сумму из наличной кассы"
           />
+
+          <div className="flex items-center justify-between gap-2 px-0.5">
+            <span className="text-xs text-fg-subtle">Статус оплаты</span>
+            {paidFromCashRegister
+              ? <Badge tone="success">Оплачено</Badge>
+              : <Badge tone="warning">Не оплачено</Badge>}
+          </div>
+          {!paidFromCashRegister && (
+            <p className="text-xs text-fg-subtle px-0.5">Касса не изменится. Оплатить расход можно позже кнопкой «Оплатить» в списке.</p>
+          )}
         </form>
+      </Dialog>
+
+      <Dialog
+        open={!!payingExpense}
+        onClose={() => setPayingExpense(null)}
+        title="Оплатить расход"
+        maxWidth="sm"
+        footer={
+          <>
+            <Button variant="secondary" fullWidth disabled={isSubmitting} onClick={() => setPayingExpense(null)}>Отмена</Button>
+            <Button variant="primary" fullWidth loading={isSubmitting} disabled={!payingExpense?.storeId && !payStoreId} onClick={handleConfirmPay}>Оплатить</Button>
+          </>
+        }
+      >
+        {payingExpense && (
+          <div className="space-y-3.5">
+            <p className="text-sm text-fg-muted">
+              {getCategoryLabel(payingExpense.category, customCategories)}: <span className="font-semibold text-danger">{payingExpense.amountTjs.toLocaleString()} TJS</span>
+            </p>
+            {payingExpense.storeId ? (
+              <p className="text-xs text-fg-subtle">Сумма будет списана из кассы «{payingExpense.storeName || 'магазина'}».</p>
+            ) : (
+              <FormField label="Из какой кассы оплатить" required>
+                <Select value={payStoreId} onChange={(e) => setPayStoreId(e.target.value)} className="w-full">
+                  {retailStores.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                </Select>
+              </FormField>
+            )}
+          </div>
+        )}
       </Dialog>
 
       <Dialog

@@ -31,8 +31,12 @@ export async function createExpense(tx: TransactionClient, input: CreateExpenseI
   const resolvedTargetType = input.targetType || (input.storeId ? 'STORE' : 'BUSINESS');
 
   const store = input.storeId ? await tx.store.findUnique({ where: { id: input.storeId } }) : null;
-  const resolvedSource = input.sourceAccount || (input.paidFromCashRegister ? (store ? `Касса ${store.name}` : 'Касса') : 'Счет компании');
   const paidFromCashRegister = input.paidFromCashRegister ?? true;
+  const writesOffCash = Boolean(input.storeId && store && (paidFromCashRegister || input.sourceAccount?.toLowerCase().includes('касса')));
+  // Not written off the cash register → nothing has actually been paid yet; the expense is
+  // recorded as UNPAID and settled later from the register via payExpense.
+  const status = writesOffCash ? 'PAID' : 'UNPAID';
+  const resolvedSource = writesOffCash ? (input.sourceAccount || `Касса ${store!.name}`) : input.sourceAccount || null;
   const ownerProfitAllocations = await currentOwnerAllocations(tx, amountUsd);
 
   const expense = await tx.expense.create({
@@ -48,13 +52,15 @@ export async function createExpense(tx: TransactionClient, input: CreateExpenseI
       comment: input.comment,
       description: input.description,
       createdByUserId: actor.id,
-      paidFromCashRegister,
+      paidFromCashRegister: writesOffCash,
+      status,
+      paidAt: writesOffCash ? new Date() : null,
       employeeId: input.employeeId,
       isEmployeeAdvance: input.isEmployeeAdvance ?? false,
     },
   });
 
-  if (input.storeId && store && (paidFromCashRegister || resolvedSource.toLowerCase().includes('касса'))) {
+  if (writesOffCash && store && input.storeId) {
     if (store.isMainWarehouse) throw new Error('Главный склад не является торговой кассой');
     const cashGuard = await tx.store.updateMany({ where: { id: input.storeId, cashBalanceTjs: { gte: amountTjs } }, data: { cashBalanceTjs: { decrement: amountTjs } } });
     if (cashGuard.count !== 1) throw new Error('В кассе недостаточно наличных для расхода');
@@ -103,7 +109,7 @@ export async function createExpense(tx: TransactionClient, input: CreateExpenseI
       userName: actor.name,
       userRole: actor.role,
       action: 'EXPENSE',
-      details: `Зарегистрирован расход [${input.category}]: ${amountTjs} TJS ($${amountUsd}) (${store?.name || 'Бизнес'})`,
+      details: `Зарегистрирован расход [${input.category}]: ${amountTjs} TJS ($${amountUsd}) (${store?.name || 'Бизнес'})${status === 'UNPAID' ? ' — не оплачено' : ''}`,
       financialDetails: { amountTjs, amountUsd, exchangeRate: rate },
       targetId: expense.id,
     },
@@ -114,6 +120,80 @@ export async function createExpense(tx: TransactionClient, input: CreateExpenseI
 
 export async function createExpenseStandalone(input: CreateExpenseInput) {
   return prisma.$transaction((tx) => createExpense(tx, input), { maxWait: 10000, timeout: 25000 });
+}
+
+/** Pays an UNPAID expense in full from its store's cash register. */
+export async function payExpense(id: string, actorId: string, storeIdForBusinessExpense?: string) {
+  return prisma.$transaction(async (tx) => {
+    await tx.$queryRaw`SELECT id FROM expenses WHERE id = ${id} FOR UPDATE`;
+    const existing = await tx.expense.findUnique({ where: { id } });
+    if (!existing) throw new Error('Расход не найден');
+    if (existing.cancelledAt) throw new Error('Нельзя оплатить отменённый расход');
+    if (existing.status !== 'UNPAID') throw new Error('Расход уже оплачен');
+
+    const actor = await resolveActor(tx, actorId);
+    const storeId = existing.storeId || storeIdForBusinessExpense;
+    if (!storeId) throw new Error('Выберите кассу для оплаты расхода');
+    const store = await tx.store.findUnique({ where: { id: storeId } });
+    if (!store || store.isMainWarehouse) throw new Error('Главный склад не является торговой кассой');
+
+    const cashGuard = await tx.store.updateMany({
+      where: { id: storeId, cashBalanceTjs: { gte: existing.amountTjs } },
+      data: { cashBalanceTjs: { decrement: existing.amountTjs } },
+    });
+    if (cashGuard.count !== 1) throw new Error('В кассе недостаточно наличных для оплаты расхода');
+
+    const rate = existing.exchangeRate || (await getRateForDate(new Date()));
+    if (!rate) throw new Error('Не найден курс валют для расхода');
+    const amountUsd = existing.amountUsd ?? roundMoney(existing.amountTjs / rate);
+    const description = existing.comment || existing.description || `Расход: ${existing.category}`;
+
+    const cashAccount = await getStoreCashAccount(tx, storeId, store.name);
+    await postTransaction(tx, {
+      type: 'EXPENSE',
+      direction: 'OUT',
+      numberPrefix: 'CE',
+      accountId: cashAccount.id,
+      balanceCurrency: 'TJS',
+      amount: existing.amountTjs,
+      currency: 'TJS',
+      exchangeRate: rate,
+      amountTjs: existing.amountTjs,
+      amountUsd,
+      categoryName: existing.category,
+      shopId: storeId,
+      sourceType: 'EXPENSE',
+      sourceId: id,
+      description,
+      comment: existing.comment ?? undefined,
+      createdByUserId: actor.id,
+    });
+
+    const updated = await tx.expense.update({
+      where: { id },
+      data: {
+        status: 'PAID',
+        paidAt: new Date(),
+        paidFromCashRegister: true,
+        storeId,
+        sourceAccount: `Касса ${store.name}`,
+      },
+    });
+
+    await tx.auditLog.create({
+      data: {
+        userId: actor.id,
+        userName: actor.name,
+        userRole: actor.role,
+        action: 'EXPENSE_PAID',
+        details: `Оплачен расход [${existing.category}]: ${existing.amountTjs} TJS ($${amountUsd}) из кассы ${store.name}`,
+        financialDetails: { amountTjs: existing.amountTjs, amountUsd, exchangeRate: rate },
+        targetId: id,
+      },
+    });
+
+    return updated;
+  }, { maxWait: 10000, timeout: 25000 });
 }
 
 export async function updateExpense(

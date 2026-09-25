@@ -270,6 +270,7 @@ interface AppContextType {
   }) => Promise<{ success: boolean; message?: string }>;
   updateExpense: (id: string, data: { category?: string; amountTjs?: number; storeId?: string; comment?: string; description?: string }) => Promise<{ success: boolean; message?: string }>;
   deleteExpense: (id: string) => Promise<{ success: boolean; message?: string }>;
+  payExpense: (id: string, storeId?: string) => Promise<{ success: boolean; message?: string }>;
 
   createFinancialCategory: (params: { name: string; direction: 'IN' | 'OUT' }) => Promise<{ success: boolean; message?: string }>;
   createCashReceipt: (params: {
@@ -1322,6 +1323,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
+  const payExpense: AppContextType['payExpense'] = async (id, storeId) => {
+    try {
+      await apiClient(`/expenses/${id}/pay`, { method: 'POST', body: JSON.stringify({ storeId }) });
+      markLocalMutation(['expenses', 'stores']);
+      await Promise.all([fetchExpenses(), fetchStores()]);
+      return { success: true };
+    } catch (err) {
+      return { success: false, message: errorMessage(err, 'Не удалось оплатить расход') };
+    }
+  };
+
   const createFinancialCategory: AppContextType['createFinancialCategory'] = async ({ name, direction }) => {
     try {
       await apiClient('/finance/categories', { method: 'POST', body: JSON.stringify({ name, direction }) });
@@ -1722,6 +1734,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         createExpense,
         updateExpense,
         deleteExpense,
+        payExpense,
         createFinancialCategory,
         createCashReceipt,
         createCashExpense,

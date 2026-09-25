@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useAppFields } from '../../context/AppContext';
 import { apiClient } from '../../api/client';
 import { mapFinancialTransaction } from '../../api/mappers';
@@ -24,10 +25,17 @@ import { Dialog } from '../ui/Dialog';
 import { FormField } from '../ui/FormField';
 import { RestrictedAccess } from '../ui/RestrictedAccess';
 import { StatusBanner, StatusMessage } from '../ui/StatusBanner';
-import { ManualEntryModal } from '../finance/ManualEntryModal';
-import { TransferModal } from '../finance/TransferModal';
+import { ProfitReport } from '../finance/ProfitReport';
 
-type Tab = 'OVERVIEW' | 'JOURNAL' | 'ACCOUNTS' | 'CATEGORIES' | 'REPORTS';
+type Tab = 'REPORT' | 'STORES' | 'OVERVIEW' | 'JOURNAL' | 'ACCOUNTS' | 'CATEGORIES';
+const TABS: { value: Tab; label: string }[] = [
+  { value: 'REPORT', label: 'Отчёт' },
+  { value: 'STORES', label: 'По складам' },
+  { value: 'OVERVIEW', label: 'Деньги' },
+  { value: 'JOURNAL', label: 'Операции' },
+  { value: 'ACCOUNTS', label: 'Счета' },
+  { value: 'CATEGORIES', label: 'Категории' },
+];
 type ReportPeriod = 'TODAY' | 'MONTH' | 'SPECIFIC_MONTH' | 'ALL';
 
 const TYPE_LABELS: Record<string, string> = {
@@ -68,12 +76,15 @@ export const FinancePage: React.FC = () => {
   const isSeller = currentUser?.role === 'SELLER';
   const rate = todayRate?.rate || FALLBACK_EXCHANGE_RATE;
 
-  const [tab, setTab] = useState<Tab>('OVERVIEW');
+  // The tab lives in the URL (?tab=STORES) so a reload keeps the tab the user was on;
+  // no tab param means the report, which is what the page opens on.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const urlTab = searchParams.get('tab') as Tab | null;
+  const tab: Tab = urlTab && TABS.some((t) => t.value === urlTab) ? urlTab : 'REPORT';
+  const setTab = (next: Tab) => setSearchParams(next === 'REPORT' ? {} : { tab: next }, { replace: true });
   const [status, setStatus] = useState<StatusMessage | null>(null);
-
-  const [receiptModalOpen, setReceiptModalOpen] = useState(false);
-  const [expenseModalOpen, setExpenseModalOpen] = useState(false);
-  const [transferModalOpen, setTransferModalOpen] = useState(false);
+  // Shared by the "Отчёт" and "По складам" tabs so switching between them keeps the month.
+  const [reportMonth, setReportMonth] = useState(new Date().toISOString().substring(0, 7));
 
   // --- Overview: latest 5 operations, fetched independently of the journal tab's own
   // paginated/filtered state below ---
@@ -143,12 +154,6 @@ export const FinancePage: React.FC = () => {
     loadJournal(true, null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filters, tab, isSeller]);
-
-  const refreshAfterMutation = useCallback((message: string) => {
-    setStatus({ tone: 'success', text: message });
-    loadRecent();
-    if (tab === 'JOURNAL') loadJournal(true, null);
-  }, [loadRecent, loadJournal, tab]);
 
   const [cancellingId, setCancellingId] = useState<string | null>(null);
   const [isCancelling, setIsCancelling] = useState(false);
@@ -224,32 +229,6 @@ export const FinancePage: React.FC = () => {
     }
   };
 
-  // --- Отчёты ---
-  const [reportStoreId, setReportStoreId] = useState('all');
-  const [reportPeriod, setReportPeriod] = useState<ReportPeriod>('MONTH');
-  const [reportMonth, setReportMonth] = useState(new Date().toISOString().substring(0, 7));
-  const [cashFlow, setCashFlow] = useState<any | null>(null);
-  const [incomeExpense, setIncomeExpense] = useState<any | null>(null);
-  const [reportsLoading, setReportsLoading] = useState(false);
-  useEffect(() => {
-    if (isSeller || tab !== 'REPORTS') return;
-    let cancelled = false;
-    setReportsLoading(true);
-    const qs = new URLSearchParams({ period: reportPeriod });
-    if (reportPeriod === 'SPECIFIC_MONTH') qs.set('month', reportMonth);
-    if (reportStoreId !== 'all') qs.set('storeId', reportStoreId);
-    Promise.all([
-      apiClient<any>(`/reports/cash-flow?${qs.toString()}`),
-      apiClient<any>(`/reports/income-expense?${qs.toString()}`),
-    ]).then(([cf, ie]) => {
-      if (cancelled) return;
-      setCashFlow(cf);
-      setIncomeExpense(ie);
-    }).catch((e) => console.error('Failed to load finance reports', e))
-      .finally(() => { if (!cancelled) setReportsLoading(false); });
-    return () => { cancelled = true; };
-  }, [isSeller, tab, reportPeriod, reportMonth, reportStoreId]);
-
   const totalUsdEquivalent = useMemo(
     () => +(financialAccounts.reduce((sum, a) => sum + a.balanceTjs / rate + a.balanceUsd, 0)).toFixed(2),
     [financialAccounts, rate]
@@ -305,13 +284,7 @@ export const FinancePage: React.FC = () => {
 
       <div className="border-b border-border bg-bg shrink-0 px-3 pt-3 pb-3">
         <FilterPillGroup
-          options={[
-            { value: 'OVERVIEW' as Tab, label: 'Обзор' },
-            { value: 'JOURNAL' as Tab, label: 'Операции' },
-            { value: 'ACCOUNTS' as Tab, label: 'Счета' },
-            { value: 'CATEGORIES' as Tab, label: 'Категории' },
-            { value: 'REPORTS' as Tab, label: 'Отчёты' },
-          ]}
+          options={TABS}
           value={tab}
           onChange={setTab}
           scrollable
@@ -321,33 +294,21 @@ export const FinancePage: React.FC = () => {
       <div className="flex-1 overflow-y-auto">
         {tab === 'OVERVIEW' && (
           <div className="p-3 space-y-4">
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
-              {financialAccounts.map((a) => (
-                <StatCard
-                  key={a.id}
-                  label={a.name}
-                  value={formatMoney(a.balanceTjs, 'TJS')}
-                  subvalue={a.type === 'MAIN' ? formatMoney(a.balanceUsd, 'USD') : a.storeName}
-                  icon={a.type === 'MAIN' ? Landmark : Wallet}
-                  tone={a.balanceTjs < 0 ? 'danger' : 'neutral'}
-                />
-              ))}
-              <StatCard label="Итого (эквивалент)" value={`$${totalUsdEquivalent.toLocaleString()}`} icon={BarChart3} tone="accent" />
-            </div>
-
-            <div className="grid grid-cols-3 gap-2">
-              <button type="button" onClick={() => setReceiptModalOpen(true)} className="h-16 rounded-lg border border-border flex flex-col items-center justify-center gap-1 transition-colors hover:border-success hover:bg-success/10 hover:text-success text-fg-muted">
-                <ArrowDownCircle className="w-4 h-4" />
-                <span className="text-xs font-semibold">Приход</span>
-              </button>
-              <button type="button" onClick={() => setExpenseModalOpen(true)} className="h-16 rounded-lg border border-border flex flex-col items-center justify-center gap-1 transition-colors hover:border-danger hover:bg-danger/10 hover:text-danger text-fg-muted">
-                <ArrowUpCircle className="w-4 h-4" />
-                <span className="text-xs font-semibold">Расход</span>
-              </button>
-              <button type="button" onClick={() => setTransferModalOpen(true)} className="h-16 rounded-lg border border-border flex flex-col items-center justify-center gap-1 transition-colors hover:border-accent hover:bg-accent/10 hover:text-accent text-fg-muted">
-                <ArrowLeftRight className="w-4 h-4" />
-                <span className="text-xs font-semibold">Перевод</span>
-              </button>
+            <div>
+              <h3 className="text-xs font-semibold text-fg-subtle uppercase tracking-wide mb-2 px-0.5">Сколько денег сейчас</h3>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+                {financialAccounts.map((a) => (
+                  <StatCard
+                    key={a.id}
+                    label={a.name}
+                    value={formatMoney(a.balanceTjs, 'TJS')}
+                    subvalue={a.type === 'MAIN' ? formatMoney(a.balanceUsd, 'USD') : a.storeName}
+                    icon={a.type === 'MAIN' ? Landmark : Wallet}
+                    tone={a.balanceTjs < 0 ? 'danger' : 'neutral'}
+                  />
+                ))}
+                <StatCard label="Итого (эквивалент)" value={`$${totalUsdEquivalent.toLocaleString()}`} icon={BarChart3} tone="accent" />
+              </div>
             </div>
 
             <div>
@@ -524,81 +485,10 @@ export const FinancePage: React.FC = () => {
           </div>
         )}
 
-        {tab === 'REPORTS' && (
-          <div className="p-3 space-y-5">
-            <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none">
-              <FilterPillGroup options={[{ value: 'TODAY' as ReportPeriod, label: 'Сегодня' }, { value: 'MONTH' as ReportPeriod, label: 'Месяц' }, { value: 'SPECIFIC_MONTH' as ReportPeriod, label: 'Другой месяц' }, { value: 'ALL' as ReportPeriod, label: 'Всё время' }]} value={reportPeriod} onChange={setReportPeriod} />
-              {reportPeriod === 'SPECIFIC_MONTH' && (
-                <MonthPicker value={reportMonth} onChange={setReportMonth} className="h-9 px-3 rounded-lg border border-accent bg-surface text-xs font-semibold text-accent focus:outline-none" />
-              )}
-              <Select value={reportStoreId} onChange={(e) => setReportStoreId(e.target.value)} className="h-9 px-3 pr-8 text-xs font-semibold w-auto shrink-0">
-                <option value="all">Все счета</option>
-                {financialAccounts.filter((a) => a.storeId).map((a) => <option key={a.storeId} value={a.storeId}>{a.name}</option>)}
-              </Select>
-            </div>
-
-            {reportsLoading ? <LoadingState label="Расчёт отчётов…" /> : (
-              <>
-                <div>
-                  <h3 className="text-sm font-semibold text-fg-muted mb-2">Движение денежных средств (Cash Flow)</h3>
-                  {cashFlow && (
-                    <div className="grid grid-cols-2 gap-2.5 mb-3">
-                      <StatCard label="Начальный остаток" value={formatMoney(cashFlow.openingBalanceTjs, 'TJS')} subvalue={formatMoney(cashFlow.openingBalanceUsd, 'USD')} icon={Wallet} />
-                      <StatCard label="Конечный остаток" value={formatMoney(cashFlow.closingBalanceTjs, 'TJS')} subvalue={formatMoney(cashFlow.closingBalanceUsd, 'USD')} icon={Wallet} tone={cashFlow.closingBalanceTjs < 0 ? 'danger' : 'accent'} />
-                    </div>
-                  )}
-                </div>
-
-                <div className="grid sm:grid-cols-2 gap-4">
-                  <div>
-                    <h4 className="text-xs font-semibold text-success uppercase tracking-wide mb-2">Доходы по статьям</h4>
-                    {!incomeExpense || incomeExpense.income.length === 0 ? (
-                      <EmptyState icon={ArrowDownCircle} title="Нет доходов за период" className="py-6" />
-                    ) : (
-                      <div className="rounded-lg border border-border overflow-hidden">
-                        {incomeExpense.income.map((r: any) => (
-                          <div key={r.categoryId || 'none'} className="flex items-center justify-between p-2.5 border-b border-border last:border-0 text-sm">
-                            <span className="text-fg-muted">{r.categoryName}</span>
-                            <span className="font-semibold text-success">{formatMoney(r.amountTjs, 'TJS')}</span>
-                          </div>
-                        ))}
-                        <div className="flex items-center justify-between p-2.5 bg-surface-raised text-sm font-bold">
-                          <span>Итого</span>
-                          <span className="text-success">{formatMoney(incomeExpense.incomeTotalTjs, 'TJS')}</span>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-
-                  <div>
-                    <h4 className="text-xs font-semibold text-danger uppercase tracking-wide mb-2">Расходы по статьям</h4>
-                    {!incomeExpense || incomeExpense.expense.length === 0 ? (
-                      <EmptyState icon={ArrowUpCircle} title="Нет расходов за период" className="py-6" />
-                    ) : (
-                      <div className="rounded-lg border border-border overflow-hidden">
-                        {incomeExpense.expense.map((r: any) => (
-                          <div key={r.categoryId || 'none'} className="flex items-center justify-between p-2.5 border-b border-border last:border-0 text-sm">
-                            <span className="text-fg-muted">{r.categoryName}</span>
-                            <span className="font-semibold text-danger">{formatMoney(r.amountTjs, 'TJS')}</span>
-                          </div>
-                        ))}
-                        <div className="flex items-center justify-between p-2.5 bg-surface-raised text-sm font-bold">
-                          <span>Итого</span>
-                          <span className="text-danger">{formatMoney(incomeExpense.expenseTotalTjs, 'TJS')}</span>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </>
-            )}
-          </div>
+        {(tab === 'REPORT' || tab === 'STORES') && (
+          <ProfitReport key={tab} view={tab === 'REPORT' ? 'summary' : 'stores'} month={reportMonth} onMonthChange={setReportMonth} />
         )}
       </div>
-
-      <ManualEntryModal kind="RECEIPT" open={receiptModalOpen} onClose={() => setReceiptModalOpen(false)} onSuccess={refreshAfterMutation} onError={(m) => setStatus({ tone: 'error', text: m })} />
-      <ManualEntryModal kind="EXPENSE" open={expenseModalOpen} onClose={() => setExpenseModalOpen(false)} onSuccess={refreshAfterMutation} onError={(m) => setStatus({ tone: 'error', text: m })} />
-      <TransferModal open={transferModalOpen} onClose={() => setTransferModalOpen(false)} onSuccess={refreshAfterMutation} onError={(m) => setStatus({ tone: 'error', text: m })} />
 
       <ConfirmDialog
         open={!!cancellingId}

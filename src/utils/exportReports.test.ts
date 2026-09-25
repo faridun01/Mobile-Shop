@@ -51,6 +51,7 @@ const fixture: ComprehensiveReportInput = {
       sourceAccount: 'Касса',
       comment: 'Аренда',
       createdByName: 'Администратор',
+      status: 'PAID',
     },
   ],
   summary: {

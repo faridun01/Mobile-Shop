@@ -16,7 +16,6 @@ import {
   Wallet,
   Users,
   UserCheck,
-  BarChart3,
   FileText,
   Settings,
   Bell,
@@ -39,7 +38,7 @@ const PAGE_ROUTES: Record<string, string> = {
   EXPENSES: '/expenses',
   OWNERS: '/owners',
   EMPLOYEES: '/employees',
-  REPORTS: '/reports',
+  REPORTS: '/finance',
   FINANCE: '/finance',
   AUDIT_LOG: '/audit-log',
   SETTINGS: '/settings',
@@ -78,7 +77,6 @@ const NAV_GROUPS: NavGroup[] = [
   {
     title: 'Финансы и учёт',
     items: [
-      { id: 'REPORTS', label: 'Финансовые отчёты', icon: BarChart3, roles: ['ADMIN', 'PARTNER'] },
       { id: 'FINANCE', label: 'Финансы', icon: Landmark, roles: ['ADMIN', 'PARTNER'] },
       { id: 'EXPENSES', label: 'Расходы магазина', icon: Wallet, roles: ['ADMIN', 'PARTNER'] },
       { id: 'BONUSES', label: 'Бонусы продавцов', icon: Gift, roles: ['ADMIN', 'PARTNER'] },

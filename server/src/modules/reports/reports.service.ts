@@ -69,7 +69,7 @@ export async function computeReportsSummary(input: ReportsSummaryInput) {
     }),
     prisma.expense.findMany({
       where: { cancelledAt: null, ...(dateRange ? { createdAt: dateRange } : {}), ...(storeFilter ? { storeId: storeFilter } : {}) },
-      select: { storeId: true, amountTjs: true, amountUsd: true, exchangeRate: true },
+      select: { storeId: true, category: true, status: true, amountTjs: true, amountUsd: true, exchangeRate: true },
     }),
     // Supplier bonuses aren't a high-growth table (one row per negotiated bonus, not per
     // transaction) so they're just fetched in full and filtered in memory, same as before.
@@ -207,6 +207,36 @@ export async function computeReportsSummary(input: ReportsSummaryInput) {
 
   const salesByStore = groupByStore(periodSalesAllStores);
   const stockByStore = groupByStore(retailStock);
+  // Expenses with no store, or booked to the main warehouse (e.g. payroll), belong to no
+  // retail store — they're reported on the main-warehouse card instead.
+  const expensesByStore = new Map<string, typeof periodExpenses>();
+  const unassignedExpenses: typeof periodExpenses = [];
+  for (const e of periodExpenses) {
+    if (!e.storeId || e.storeId === mainWarehouseStore?.id) { unassignedExpenses.push(e); continue; }
+    expensesByStore.set(e.storeId, [...(expensesByStore.get(e.storeId) ?? []), e]);
+  }
+  const summarizeExpenses = (rows: typeof periodExpenses) => {
+    const byCategory = new Map<string, { category: string; amountUsd: number; amountTjs: number }>();
+    let usd = 0;
+    let tjs = 0;
+    let unpaidTjs = 0;
+    for (const e of rows) {
+      const eUsd = e.amountUsd ?? ((e.amountTjs || 0) / (e.exchangeRate || rate));
+      usd += eUsd;
+      tjs += e.amountTjs || 0;
+      if (e.status === 'UNPAID') unpaidTjs += e.amountTjs || 0;
+      const prev = byCategory.get(e.category) ?? { category: e.category, amountUsd: 0, amountTjs: 0 };
+      byCategory.set(e.category, { category: e.category, amountUsd: prev.amountUsd + eUsd, amountTjs: prev.amountTjs + (e.amountTjs || 0) });
+    }
+    return {
+      expensesUsd: +usd.toFixed(2),
+      expensesTjs: roundMoney(tjs),
+      unpaidExpensesTjs: roundMoney(unpaidTjs),
+      expensesByCategory: [...byCategory.values()]
+        .map((c) => ({ ...c, amountUsd: +c.amountUsd.toFixed(2), amountTjs: roundMoney(c.amountTjs) }))
+        .sort((a, b) => b.amountUsd - a.amountUsd),
+    };
+  };
   const storeBreakdown = retailStores
     .map((store) => {
       const storeSales = (salesByStore.get(store.id) ?? []);
@@ -217,6 +247,7 @@ export async function computeReportsSummary(input: ReportsSummaryInput) {
       let storeProfitUsd = 0;
       let storeProfitTjs = 0;
       let storeUnits = 0;
+      const storeModels = new Map<string, { name: string; count: number; revenueUsd: number; profitUsd: number }>();
       storeSales.forEach((sale) => {
         const saleRate = sale.exchangeRate || rate;
         const saleRevenueUsd = sale.totalUsd || +(sale.totalTjs / saleRate).toFixed(2);
@@ -229,7 +260,15 @@ export async function computeReportsSummary(input: ReportsSummaryInput) {
         storeProfitUsd += saleProfitUsd;
         storeProfitTjs += sale.totalTjs - saleCogsUsd * saleRate;
         storeUnits += sale.saleItems.length;
+        for (const item of sale.saleItems) {
+          const name = `${item.brand} ${item.model}`.trim();
+          const itemPriceUsd = item.salePriceUsd || +(item.salePriceTjs / saleRate).toFixed(2);
+          const itemCostUsd = item.costBasisUsd ?? item.purchaseCostUsd ?? 0;
+          const prev = storeModels.get(name) ?? { name, count: 0, revenueUsd: 0, profitUsd: 0 };
+          storeModels.set(name, { name, count: prev.count + 1, revenueUsd: prev.revenueUsd + itemPriceUsd, profitUsd: prev.profitUsd + itemPriceUsd - itemCostUsd });
+        }
       });
+      const storeExpenses = summarizeExpenses(expensesByStore.get(store.id) ?? []);
       const stock = (stockByStore.get(store.id) ?? []);
       const stockCostUsd = stock.reduce((sum, d) => sum + (d.costBasisUsd ?? d.purchasePriceUsd ?? 0), 0);
       // Same "с учетом возвратов" treatment as the overall totals: a refund's original
@@ -244,6 +283,14 @@ export async function computeReportsSummary(input: ReportsSummaryInput) {
         cogsTjs: roundMoney(storeCogsTjs),
         profitUsd: +(storeProfitUsd + storePenalty.usd).toFixed(2),
         profitTjs: roundMoney(storeProfitTjs + storePenalty.tjs),
+        refundPenaltiesUsd: roundMoney(storePenalty.usd),
+        ...storeExpenses,
+        netProfitUsd: +(storeProfitUsd + storePenalty.usd - storeExpenses.expensesUsd).toFixed(2),
+        netProfitTjs: roundMoney(storeProfitTjs + storePenalty.tjs - storeExpenses.expensesTjs),
+        topModels: [...storeModels.values()]
+          .map((m) => ({ ...m, revenueUsd: +m.revenueUsd.toFixed(2), profitUsd: +m.profitUsd.toFixed(2) }))
+          .sort((a, b) => b.count - a.count || b.profitUsd - a.profitUsd)
+          .slice(0, 5),
         unitsSold: storeUnits,
         salesCount: storeSales.length,
         cashTjs: store.cashBalanceTjs,
@@ -295,6 +342,8 @@ export async function computeReportsSummary(input: ReportsSummaryInput) {
     mainWarehouseStockCostTjs,
     mainWarehouseCashUsd,
     mainWarehouseCashTjs,
+    // Expenses not tied to any retail store (general business + main-warehouse bookings).
+    mainWarehouseExpenses: summarizeExpenses(unassignedExpenses),
     topSuppliersByDebt: topSuppliersByDebt.map((s) => ({
       id: s.id,
       name: s.name,

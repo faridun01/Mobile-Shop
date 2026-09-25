@@ -627,6 +627,10 @@ model Expense {
   description          String?
   createdByUserId      String
   paidFromCashRegister Boolean   @default(true)
+  // 'PAID' | 'UNPAID' — an expense not written off the store's cash register at creation
+  // is recorded as UNPAID and later paid from the register via payExpense.
+  status               String    @default("PAID")
+  paidAt               DateTime?
   employeeId           String?
   isEmployeeAdvance    Boolean   @default(false)
   createdAt            DateTime  @default(now())

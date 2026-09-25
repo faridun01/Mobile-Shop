@@ -374,6 +374,8 @@ export interface Expense {
   description?: string;
   createdByName: string;
   paidFromCashRegister?: boolean;
+  status: 'PAID' | 'UNPAID';
+  paidAt?: string;
   employeeId?: string;
   employeeName?: string;
   isEmployeeAdvance?: boolean;

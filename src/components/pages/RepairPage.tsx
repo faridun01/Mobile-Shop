@@ -349,15 +349,15 @@ export const RepairPage: React.FC = () => {
   };
 
   return (
-    <div className="flex-1 flex flex-col h-full overflow-hidden bg-bg text-fg-muted">
+    <div className="flex-1 flex flex-col h-full min-w-0 max-w-full overflow-hidden bg-bg text-fg-muted">
       <StatusBanner message={statusBanner} onDismiss={() => setStatusBanner(null)} />
 
       {/* Row 1: Header Tabs Bar */}
-      <div className="p-3 border-b border-border bg-surface flex items-center justify-between shrink-0">
-        <div className="flex items-center space-x-1.5 bg-surface-raised p-1 rounded-xl border border-border">
+      <div className="p-2.5 sm:p-3 border-b border-border bg-surface flex items-center justify-between shrink-0 overflow-x-auto scrollbar-none">
+        <div className="flex items-center space-x-1.5 bg-surface-raised p-1 rounded-xl border border-border shrink-0">
           <button
             onClick={() => setActiveTab('list')}
-            className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all ${
+            className={`px-3 sm:px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all shrink-0 ${
               activeTab === 'list'
                 ? 'bg-accent text-accent-fg shadow-xs'
                 : 'text-fg-muted hover:text-fg'
@@ -367,20 +367,20 @@ export const RepairPage: React.FC = () => {
           </button>
           <button
             onClick={() => setActiveTab('create')}
-            className={`px-3.5 py-1.5 rounded-lg text-xs font-bold flex items-center space-x-1.5 transition-all ${
+            className={`px-3 sm:px-3.5 py-1.5 rounded-lg text-xs font-bold flex items-center space-x-1.5 transition-all shrink-0 ${
               activeTab === 'create'
                 ? 'bg-accent text-accent-fg shadow-xs'
                 : 'text-fg-muted hover:text-fg'
             }`}
           >
-            <Plus className="w-3.5 h-3.5" />
+            <Plus className="w-3.5 h-3.5 shrink-0" />
             <span>Прием в ремонт</span>
           </button>
         </div>
 
-        <div className="hidden sm:flex items-center space-x-2 text-xs font-medium text-fg-muted">
-          <Wrench className="w-4 h-4 text-accent" />
-          <span>{currentStoreName}</span>
+        <div className="hidden sm:flex items-center space-x-2 text-xs font-medium text-fg-muted shrink-0">
+          <Wrench className="w-4 h-4 text-accent shrink-0" />
+          <span className="truncate">{currentStoreName}</span>
         </div>
       </div>
 
@@ -422,7 +422,7 @@ export const RepairPage: React.FC = () => {
       )}
 
       {/* Main Content Area */}
-      <div className="flex-1 overflow-y-auto bg-bg p-3 sm:p-4">
+      <div className="flex-1 overflow-y-auto overflow-x-hidden bg-bg p-3 sm:p-4 min-w-0 max-w-full">
         {statusMessage && (
           <div
             className={`max-w-xl mx-auto mb-3 p-3 rounded-xl text-xs flex items-center space-x-2 ${
@@ -437,51 +437,51 @@ export const RepairPage: React.FC = () => {
         )}
 
         {activeTab === 'create' ? (
-          <form onSubmit={handleCreateTicket} className="max-w-xl mx-auto space-y-4">
-            <div className="border border-border rounded-xl bg-surface p-5 space-y-4 shadow-xs">
-              <h3 className="text-xs md:text-sm font-bold uppercase tracking-wide text-fg-muted flex items-center space-x-2 border-b border-border pb-3">
-                <Wrench className="w-4 h-4 text-accent" />
-                <span>ОФОРМЛЕНИЕ ПРИЕМА НА ГАРАНТИЙНЫЙ РЕМОНТ</span>
+          <form onSubmit={handleCreateTicket} className="w-full max-w-xl mx-auto space-y-4 min-w-0">
+            <div className="border border-border rounded-xl bg-surface p-3.5 sm:p-5 space-y-4 shadow-xs min-w-0">
+              <h3 className="text-xs md:text-sm font-bold uppercase tracking-wide text-fg-muted flex items-center gap-2 border-b border-border pb-3 flex-wrap sm:flex-nowrap">
+                <Wrench className="w-4 h-4 text-accent shrink-0" />
+                <span className="min-w-0 break-words">ОФОРМЛЕНИЕ ПРИЕМА НА ГАРАНТИЙНЫЙ РЕМОНТ</span>
               </h3>
 
               {/* RECEIPT / IMEI SEARCH BAR */}
-              <div className="p-3 bg-surface-raised rounded-xl border border-accent/40 space-y-2">
-                <label className="block text-[10px] uppercase font-bold text-accent">
+              <div className="p-3 bg-surface-raised rounded-xl border border-accent/40 space-y-2 min-w-0">
+                <label className="block text-[10px] uppercase font-bold text-accent truncate">
                   ПОИСК В БАЗЕ ПРОДАЖ ПО НОМЕРУ ЧЕКА ИЛИ IMEI:
                 </label>
-                <div className="flex space-x-2">
+                <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
                   <input
                     type="text"
                     value={receiptSearch ?? ''}
                     onChange={(e) => setReceiptSearch(e.target.value)}
-                    placeholder="Введите номер чека или IMEI..."
-                    className="flex-1 rounded-lg bg-surface border border-border px-3 py-1.5 text-xs text-fg-muted placeholder-fg-subtle focus:border-accent focus:outline-none"
+                    placeholder="Номер чека или IMEI..."
+                    className="flex-1 min-w-0 w-full rounded-lg bg-surface border border-border px-2.5 sm:px-3 py-1.5 text-xs text-fg-muted placeholder-fg-subtle focus:border-accent focus:outline-none"
                   />
                   <button
                     type="button"
                     onClick={() => handleFindSoldDevice(receiptSearch)}
-                    className="px-3 py-1.5 bg-accent hover:bg-accent-strong text-xs font-bold rounded-lg text-accent-fg"
+                    className="shrink-0 px-2.5 sm:px-3 py-1.5 bg-accent hover:bg-accent-strong active:scale-95 text-xs font-bold rounded-lg text-accent-fg transition-all"
                   >
                     НАЙТИ
                   </button>
                   <button
                     type="button"
                     onClick={handleScanTicket}
-                    className="px-3 py-1.5 bg-surface hover:bg-surface-raised text-accent rounded-lg border border-border"
+                    className="shrink-0 p-1.5 sm:px-3 sm:py-1.5 bg-surface hover:bg-surface-raised active:scale-95 text-accent rounded-lg border border-border transition-all"
                     title="Сканировать"
                   >
-                    <Scan className="w-4 h-4" />
+                    <Scan className="w-4 h-4 shrink-0" />
                   </button>
                 </div>
               </div>
 
               {!isSeller && (
-                <div>
-                  <label className="block text-fg-subtle mb-1 text-[11px] uppercase font-bold">Торговая точка (Где было продано / принято) *</label>
+                <div className="min-w-0">
+                  <label className="block text-fg-subtle mb-1 text-[11px] uppercase font-bold truncate">Торговая точка (Где было продано / принято) *</label>
                   <select
                     value={createTicketStoreId}
                     onChange={(e) => setCreateTicketStoreId(e.target.value)}
-                    className="w-full rounded-xl bg-surface-raised border border-border px-3 py-2 text-fg-muted text-xs font-semibold focus:border-accent focus:outline-none"
+                    className="w-full min-w-0 max-w-full rounded-xl bg-surface-raised border border-border px-3 py-2 text-fg-muted text-xs font-semibold focus:border-accent focus:outline-none truncate"
                   >
                     {retailStores.map(s => (
                       <option key={s.id} value={s.id}>{s.name}</option>
@@ -491,76 +491,76 @@ export const RepairPage: React.FC = () => {
               )}
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-                <div>
-                  <label className="block text-fg-subtle mb-1 text-[11px] uppercase">ФИО клиента *</label>
+                <div className="min-w-0">
+                  <label className="block text-fg-subtle mb-1 text-[11px] uppercase truncate">ФИО клиента *</label>
                   <input
                     type="text"
                     required
                     value={clientName ?? ''}
                     onChange={(e) => setClientName(e.target.value)}
                     placeholder="Иван Иванов"
-                    className="w-full rounded-xl bg-surface-raised border border-border px-3 py-2 text-fg-muted focus:border-accent focus:outline-none"
+                    className="w-full min-w-0 rounded-xl bg-surface-raised border border-border px-3 py-2 text-fg-muted focus:border-accent focus:outline-none"
                   />
                 </div>
 
-                <div>
-                  <label className="block text-fg-subtle mb-1 text-[11px] uppercase">Телефон *</label>
+                <div className="min-w-0">
+                  <label className="block text-fg-subtle mb-1 text-[11px] uppercase truncate">Телефон *</label>
                   <input
                     type="text"
                     required
                     value={clientPhone ?? ''}
                     onChange={(e) => setClientPhone(e.target.value)}
                     placeholder="+992 900 000 000"
-                    className="w-full rounded-xl bg-surface-raised border border-border px-3 py-2 text-fg-muted focus:border-accent focus:outline-none"
+                    className="w-full min-w-0 rounded-xl bg-surface-raised border border-border px-3 py-2 text-fg-muted focus:border-accent focus:outline-none"
                   />
                 </div>
               </div>
 
               <div className="space-y-3 text-xs">
-                <div>
-                  <label className="block text-fg-subtle mb-1 text-[11px] uppercase">Модель устройства *</label>
+                <div className="min-w-0">
+                  <label className="block text-fg-subtle mb-1 text-[11px] uppercase truncate">Модель устройства *</label>
                   <input
                     type="text"
                     required
                     value={deviceModel ?? ''}
                     onChange={(e) => setDeviceModel(e.target.value)}
                     placeholder="iPhone 15 Pro Max 256GB"
-                    className="w-full rounded-xl bg-surface-raised border border-border px-3 py-2 text-fg-muted focus:border-accent focus:outline-none"
+                    className="w-full min-w-0 rounded-xl bg-surface-raised border border-border px-3 py-2 text-fg-muted focus:border-accent focus:outline-none"
                   />
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-fg-subtle mb-1 text-[11px] uppercase">IMEI 1</label>
+                  <div className="min-w-0">
+                    <label className="block text-fg-subtle mb-1 text-[11px] uppercase truncate">IMEI 1</label>
                     <input
                       type="text"
                       value={imei ?? ''}
                       onChange={(e) => setImei(e.target.value)}
                       placeholder="354891100234561"
-                      className="w-full rounded-xl bg-surface-raised border border-border px-3 py-2 text-fg-muted focus:border-accent focus:outline-none"
+                      className="w-full min-w-0 rounded-xl bg-surface-raised border border-border px-3 py-2 text-fg-muted focus:border-accent focus:outline-none"
                     />
                   </div>
-                  <div>
-                    <label className="block text-fg-subtle mb-1 text-[11px] uppercase">IMEI 2 (опционально / по желанию)</label>
+                  <div className="min-w-0">
+                    <label className="block text-fg-subtle mb-1 text-[11px] uppercase truncate">IMEI 2 (опционально / по желанию)</label>
                     <input
                       type="text"
                       value={imei2 ?? ''}
                       onChange={(e) => setImei2(e.target.value)}
                       placeholder="354891100234562 (по желанию)"
-                      className="w-full rounded-xl bg-surface-raised border border-border px-3 py-2 text-fg-muted focus:border-accent focus:outline-none"
+                      className="w-full min-w-0 rounded-xl bg-surface-raised border border-border px-3 py-2 text-fg-muted focus:border-accent focus:outline-none"
                     />
                   </div>
                 </div>
 
-                <div>
-                  <label className="block text-fg-subtle mb-1 text-[11px] uppercase">Описание дефекта / Неисправности *</label>
+                <div className="min-w-0">
+                  <label className="block text-fg-subtle mb-1 text-[11px] uppercase truncate">Описание дефекта / Неисправности *</label>
                   <textarea
                     required
                     rows={3}
                     value={defectDescription ?? ''}
                     onChange={(e) => setDefectDescription(e.target.value)}
                     placeholder="Не заряжается, разбито стекло дисплея..."
-                    className="w-full rounded-xl bg-surface-raised border border-border px-3 py-2 text-fg-muted placeholder-fg-subtle focus:border-accent focus:outline-none"
+                    className="w-full min-w-0 rounded-xl bg-surface-raised border border-border px-3 py-2 text-fg-muted placeholder-fg-subtle focus:border-accent focus:outline-none resize-none"
                   />
                 </div>
 
@@ -571,8 +571,8 @@ export const RepairPage: React.FC = () => {
                 disabled={isSubmitting}
                 className="w-full py-3 rounded-xl bg-accent hover:bg-accent-strong active:scale-95 text-xs font-bold text-accent-fg uppercase tracking-wider transition-all shadow-xs mt-2 disabled:opacity-60 flex items-center justify-center gap-1.5"
               >
-                {isSubmitting && <Loader2 className="w-4 h-4 animate-spin" />}
-                {isSubmitting ? 'ОФОРМЛЕНИЕ…' : 'ОФОРМИТЬ И ВЫДАТЬ КВИТАНЦИЮ'}
+                {isSubmitting && <Loader2 className="w-4 h-4 animate-spin shrink-0" />}
+                <span className="truncate">{isSubmitting ? 'ОФОРМЛЕНИЕ…' : 'ОФОРМИТЬ И ВЫДАТЬ КВИТАНЦИЮ'}</span>
               </button>
             </div>
           </form>
