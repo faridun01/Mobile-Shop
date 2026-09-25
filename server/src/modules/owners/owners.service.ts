@@ -5,6 +5,7 @@ import { requirePositiveMoney, requireNonNegativeMoney, roundMoney } from '../..
 import { requireTodayRate } from '../exchange-rate/exchange-rate.service';
 import { getStoreCashAccount } from '../finance/account.service';
 import { postTransaction } from '../finance/financial-transaction.service';
+import { allocateOwnerProfit } from '../sales/profit';
 
 export class OwnersService {
   /**
@@ -190,7 +191,7 @@ export class OwnersService {
     }, { maxWait: 10000, timeout: 25000 });
   }
 
-  public static async updateProfitShares(shares: { ownerId: string; sharePercent: number }[], userId: string) {
+  public static async updateProfitShares(shares: { ownerId: string; sharePercent: number }[], userId: string, rebalanceBalances = false) {
     if (!Array.isArray(shares) || shares.length === 0) throw new Error('Укажите доли владельцев');
     const normalized = shares.map((share) => ({
       ownerId: share.ownerId,
@@ -204,23 +205,96 @@ export class OwnersService {
 
     return prisma.$transaction(async (tx) => {
       const actor = await resolveActor(tx, userId);
-      const owners = await tx.owner.findMany({ select: { id: true } });
+      const owners = await tx.owner.findMany();
       const actualIds = new Set(owners.map((owner) => owner.id));
       if (normalized.length !== owners.length || normalized.some((share) => !actualIds.has(share.ownerId))) {
         throw new Error('Необходимо указать долю каждого владельца');
       }
-      for (const s of normalized) {
-        await tx.owner.update({ where: { id: s.ownerId }, data: { profitSharePercent: s.sharePercent } });
+
+      if (rebalanceBalances) {
+        const totalAvailable = roundMoney(owners.reduce((sum, o) => sum + (o.availableProfitUsd || 0), 0));
+        const totalAccrued = roundMoney(owners.reduce((sum, o) => sum + (o.totalAccruedProfitUsd || 0), 0));
+
+        const availAllocations = allocateOwnerProfit(
+          totalAvailable,
+          normalized.map(s => ({ id: s.ownerId, profitSharePercent: s.sharePercent }))
+        );
+        const accruedAllocations = allocateOwnerProfit(
+          totalAccrued,
+          normalized.map(s => ({ id: s.ownerId, profitSharePercent: s.sharePercent }))
+        );
+
+        for (const s of normalized) {
+          const avail = availAllocations.find(a => a.ownerId === s.ownerId)?.amountUsd ?? 0;
+          const accrued = accruedAllocations.find(a => a.ownerId === s.ownerId)?.amountUsd ?? 0;
+          await tx.owner.update({
+            where: { id: s.ownerId },
+            data: {
+              profitSharePercent: s.sharePercent,
+              availableProfitUsd: avail,
+              totalAccruedProfitUsd: accrued,
+            },
+          });
+        }
+      } else {
+        for (const s of normalized) {
+          await tx.owner.update({ where: { id: s.ownerId }, data: { profitSharePercent: s.sharePercent } });
+        }
       }
+
       await tx.auditLog.create({
         data: {
           userId: actor.id,
           userName: actor.name,
           userRole: actor.role,
           action: 'PROFIT_SHARE_CHANGE',
-          details: `Изменены доли партнеров: ${normalized.map((s) => `${s.sharePercent}%`).join(', ')}`,
+          details: `Изменены доли партнеров: ${normalized.map((s) => `${s.sharePercent}%`).join(', ')}${rebalanceBalances ? ' (остатки прибыли пересчитаны по долям)' : ''}`,
         },
       });
+      return tx.owner.findMany();
+    });
+  }
+
+  public static async rebalanceBalancesByShares(userId: string) {
+    return prisma.$transaction(async (tx) => {
+      const actor = await resolveActor(tx, userId);
+      const owners = await tx.owner.findMany();
+      if (!owners.length) throw new Error('Владельцы не найдены');
+
+      const totalAvailable = roundMoney(owners.reduce((sum, o) => sum + (o.availableProfitUsd || 0), 0));
+      const totalAccrued = roundMoney(owners.reduce((sum, o) => sum + (o.totalAccruedProfitUsd || 0), 0));
+
+      const availAllocations = allocateOwnerProfit(
+        totalAvailable,
+        owners.map(o => ({ id: o.id, profitSharePercent: o.profitSharePercent }))
+      );
+      const accruedAllocations = allocateOwnerProfit(
+        totalAccrued,
+        owners.map(o => ({ id: o.id, profitSharePercent: o.profitSharePercent }))
+      );
+
+      for (const o of owners) {
+        const avail = availAllocations.find(a => a.ownerId === o.id)?.amountUsd ?? 0;
+        const accrued = accruedAllocations.find(a => a.ownerId === o.id)?.amountUsd ?? 0;
+        await tx.owner.update({
+          where: { id: o.id },
+          data: {
+            availableProfitUsd: avail,
+            totalAccruedProfitUsd: accrued,
+          },
+        });
+      }
+
+      await tx.auditLog.create({
+        data: {
+          userId: actor.id,
+          userName: actor.name,
+          userRole: actor.role,
+          action: 'PROFIT_SHARE_CHANGE',
+          details: `Остатки прибыли партнеров пересчитаны строго по долям (${owners.map(o => `${o.name}: ${o.profitSharePercent}%`).join(', ')})`,
+        },
+      });
+
       return tx.owner.findMany();
     });
   }

@@ -48,10 +48,11 @@ export const OwnersPage: React.FC = () => {
     todayRate,
     createOwnerTransaction,
     updateOwnerProfitShares,
+    rebalanceOwnerBalances,
     linkOwnerToUser,
     closeQuarterPeriod,
     initializeOwners
-  } = useAppFields('currentUser', 'owners', 'users', 'ownerTransactions', 'suppliers', 'todayRate', 'createOwnerTransaction', 'updateOwnerProfitShares', 'linkOwnerToUser', 'closeQuarterPeriod', 'initializeOwners');
+  } = useAppFields('currentUser', 'owners', 'users', 'ownerTransactions', 'suppliers', 'todayRate', 'createOwnerTransaction', 'updateOwnerProfitShares', 'rebalanceOwnerBalances', 'linkOwnerToUser', 'closeQuarterPeriod', 'initializeOwners');
 
   const [isInitializing, setIsInitializing] = useState(false);
   const [linkingOwnerId, setLinkingOwnerId] = useState<string | null>(null);
@@ -284,15 +285,14 @@ export const OwnersPage: React.FC = () => {
 
     setIsSubmitting(true);
     try {
-      // Pass the full per-owner payload — the (owner1Share, owner2Share) positional
-      // overload only ever covers the first two owners and silently drops the rest,
-      // which the backend then rejects for having fewer shares than owners exist.
-      const res = await updateOwnerProfitShares(payload);
+      // Pass the full per-owner payload with rebalanceBalances=true so
+      // available and accrued balances are rebalanced according to the new shares.
+      const res = await updateOwnerProfitShares(payload, undefined, true);
       if (res.success) {
         setIsSharesModalOpen(false);
         setStatusBanner({
           tone: 'success',
-          text: 'Доли партнеров успешно обновлены'
+          text: 'Доли партнеров сохранены, остатки прибыли пересчитаны строго по долям'
         });
       } else {
         setStatusBanner({ tone: 'error', text: res.message || 'Ошибка сохранения долей' });
@@ -825,6 +825,30 @@ export const OwnersPage: React.FC = () => {
                   </div>
                 </div>
               ))}
+            </div>
+
+            {/* Live recalculation preview */}
+            <div className="p-3 bg-surface-raised rounded-xl border border-border space-y-2">
+              <div className="flex items-center justify-between text-[11px] font-bold uppercase text-fg-subtle border-b border-border pb-1.5">
+                <span>Перерасчет остатка прибыли ({totalAvailableProfit.toLocaleString()} USD):</span>
+              </div>
+              <div className="space-y-1.5 text-xs">
+                {displayOwners.map(o => {
+                  const pct = parseFloat(sharesInput[o.id] || '0') || 0;
+                  const shareVal = Math.round(totalAvailableProfit * pct) / 100;
+                  return (
+                    <div key={o.id} className="flex justify-between items-center">
+                      <span className="text-fg-muted font-medium">{getOwnerDetails(o).name} ({pct}%):</span>
+                      <strong className={`font-bold ${shareVal < 0 ? 'text-warning' : 'text-accent'}`}>
+                        ${shareVal.toFixed(2)} USD
+                      </strong>
+                    </div>
+                  );
+                })}
+              </div>
+              <p className="text-[10px] text-fg-subtle mt-1">
+                Остаток к выплате каждого партнера будет автоматически пересчитан пропорционально указанным долям.
+              </p>
             </div>
 
             <div className="flex space-x-2 pt-2 border-t border-border">

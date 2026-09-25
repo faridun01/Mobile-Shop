@@ -93,14 +93,25 @@ export function registerOwnerRoutes(app: Express) {
     }
   });
 
+  app.post('/api/owners/rebalance-balances', authenticateJwt, requireRoles('ADMIN', 'PARTNER'), async (req: AuthenticatedRequest, res, next) => {
+    try {
+      const owners = await OwnersService.rebalanceBalancesByShares(req.user!.userId);
+      RealtimeSyncGateway.broadcast('OWNER_TX', {});
+      res.json(owners);
+    } catch (error) {
+      next(error);
+    }
+  });
+
   app.post('/api/owners/profit-shares', authenticateJwt, requireRoles('ADMIN', 'PARTNER'), async (req: AuthenticatedRequest, res, next) => {
     try {
-      const shares = req.body?.shares;
+      const { shares, rebalanceBalances } = req.body ?? {};
       if (!Array.isArray(shares) || shares.length === 0) {
         res.status(400).json({ message: 'shares обязателен и должен быть непустым массивом' });
         return;
       }
-      const owners = await OwnersService.updateProfitShares(shares, req.user!.userId);
+      const owners = await OwnersService.updateProfitShares(shares, req.user!.userId, Boolean(rebalanceBalances));
+      RealtimeSyncGateway.broadcast('OWNER_TX', {});
       res.json(owners);
     } catch (error) {
       next(error);

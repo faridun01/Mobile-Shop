@@ -325,8 +325,10 @@ interface AppContextType {
   ownerInvestment: (ownerId: string, amountUsd: number, destination: string, note?: string) => Promise<{ success: boolean; message?: string }>;
   ownerCapitalWithdrawal: (ownerId: string, amountUsd: number, source: string, note?: string) => Promise<{ success: boolean; message?: string }>;
   ownerProfitPayout: (ownerId: string, amountUsd: number, source: string, note?: string) => Promise<{ success: boolean; message?: string }>;
+  ownerProfitPayoutDistributed: (amountUsd: number, source?: string, note?: string) => Promise<{ success: boolean; message?: string }>;
   ownerReinvest: (ownerId: string, amountUsd: number, note?: string) => Promise<{ success: boolean; message?: string }>;
-  updateOwnerProfitShares: (owner1Share: number | { ownerId: string; sharePercent: number }[], owner2Share?: number) => Promise<{ success: boolean; message?: string }>;
+  updateOwnerProfitShares: (owner1Share: number | { ownerId: string; sharePercent: number }[], owner2Share?: number, rebalanceBalances?: boolean) => Promise<{ success: boolean; message?: string }>;
+  rebalanceOwnerBalances: () => Promise<{ success: boolean; message?: string }>;
   linkOwnerToUser: (ownerId: string, userId: string | null) => Promise<{ success: boolean; message?: string }>;
 
   createUser: (user: Omit<User, 'id' | 'createdAt'>) => Promise<{ success: boolean; message?: string }>;
@@ -1453,6 +1455,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
+  const ownerProfitPayoutDistributed: AppContextType['ownerProfitPayoutDistributed'] = async (amountUsd, source = 'Главный счет', note) => {
+    try {
+      await apiClient('/owners/payout-distributed', { method: 'POST', body: JSON.stringify({ amountUsd, source, note }) });
+      markLocalMutation(['owners', 'ownerTransactions', 'stores']);
+      await Promise.all([fetchOwners(), fetchOwnerTransactions(), fetchStores()]);
+      return { success: true };
+    } catch (err) {
+      return { success: false, message: errorMessage(err, 'Сумма выплаты превышает доступную прибыль партнеров') };
+    }
+  };
+
   const ownerReinvest: AppContextType['ownerReinvest'] = async (ownerId, amountUsd, note) => {
     try {
       await apiClient(`/owners/${ownerId}/reinvest`, { method: 'POST', body: JSON.stringify({ amountUsd, note }) });
@@ -1467,12 +1480,28 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const createOwnerTransaction: AppContextType['createOwnerTransaction'] = async ({ ownerId, type, amountUsd, note }) => {
     if (type === 'INVESTMENT') return ownerInvestment(ownerId, amountUsd, 'Главный счет', note);
     if (type === 'WITHDRAWAL') return ownerCapitalWithdrawal(ownerId, amountUsd, 'Главный счет', note);
-    if (type === 'PROFIT_PAYOUT') return ownerProfitPayout(ownerId, amountUsd, 'Главный счет', note);
+    if (type === 'PROFIT_PAYOUT') {
+      if (ownerId === 'ALL') {
+        return ownerProfitPayoutDistributed(amountUsd, 'Главный счет', note);
+      }
+      return ownerProfitPayout(ownerId, amountUsd, 'Главный счет', note);
+    }
     if (type === 'REINVEST') return ownerReinvest(ownerId, amountUsd, note);
     return { success: false, message: 'Неизвестный тип операции' };
   };
 
-  const updateOwnerProfitShares: AppContextType['updateOwnerProfitShares'] = async (owner1ShareOrShares, owner2Share) => {
+  const rebalanceOwnerBalances: AppContextType['rebalanceOwnerBalances'] = async () => {
+    try {
+      await apiClient('/owners/rebalance-balances', { method: 'POST' });
+      markLocalMutation(['owners']);
+      await fetchOwners();
+      return { success: true };
+    } catch (err) {
+      return { success: false, message: errorMessage(err, 'Ошибка перерасчета остатков по долям') };
+    }
+  };
+
+  const updateOwnerProfitShares: AppContextType['updateOwnerProfitShares'] = async (owner1ShareOrShares, owner2Share, rebalanceBalances = true) => {
     const shares = Array.isArray(owner1ShareOrShares)
       ? owner1ShareOrShares
       : [
@@ -1480,7 +1509,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           { ownerId: owners[1]?.id, sharePercent: owner2Share ?? 100 - owner1ShareOrShares },
         ];
     try {
-      await apiClient('/owners/profit-shares', { method: 'POST', body: JSON.stringify({ shares }) });
+      await apiClient('/owners/profit-shares', { method: 'POST', body: JSON.stringify({ shares, rebalanceBalances }) });
       markLocalMutation(['owners']);
       await fetchOwners();
       return { success: true };
@@ -1745,8 +1774,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         ownerInvestment,
         ownerCapitalWithdrawal,
         ownerProfitPayout,
+        ownerProfitPayoutDistributed,
         ownerReinvest,
         updateOwnerProfitShares,
+        rebalanceOwnerBalances,
         linkOwnerToUser,
         createUser,
         updateUser,

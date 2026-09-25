@@ -1,7 +1,8 @@
-import React, { useEffect } from 'react';
+import React from 'react';
 import { X } from 'lucide-react';
 import { cn } from '../../utils/cn';
 import { IconButton } from './IconButton';
+import { ModalLayer } from './ModalLayer';
 
 type MaxWidth = 'sm' | 'md' | 'lg' | 'xl';
 
@@ -40,24 +41,10 @@ export const Dialog: React.FC<DialogProps> = ({
   maxWidth = 'md',
   dismissable = true,
 }) => {
-  useEffect(() => {
-    if (!open) return;
-    const prevOverflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && dismissable) onClose();
-    };
-    window.addEventListener('keydown', onKey);
-    return () => {
-      document.body.style.overflow = prevOverflow;
-      window.removeEventListener('keydown', onKey);
-    };
-  }, [open, onClose, dismissable]);
-
   if (!open) return null;
 
   return (
-    <div className="fixed inset-x-0 top-0 h-dvh max-h-dvh z-60 flex flex-col justify-end md:justify-center items-center overflow-hidden">
+    <ModalLayer variant="sheet" label={title} onClose={dismissable ? onClose : undefined}>
       <div
         className="absolute inset-0 bg-black/70 transition-opacity"
         onClick={dismissable ? onClose : undefined}
@@ -68,7 +55,7 @@ export const Dialog: React.FC<DialogProps> = ({
         aria-modal="true"
         aria-label={title}
         className={cn(
-          'relative w-full flex flex-col bg-surface border-t md:border border-border rounded-t-2xl md:rounded-2xl max-h-[calc(100dvh-env(safe-area-inset-top,0px)-1rem)] md:max-h-[85dvh] overflow-hidden overscroll-contain shadow-2xl z-10',
+          'dialog-panel relative w-full min-h-0 flex flex-col bg-surface border-t md:border border-border rounded-t-2xl md:rounded-2xl overflow-auto overscroll-contain shadow-2xl z-10',
           MAX_WIDTH_CLASSES[maxWidth]
         )}
       >
@@ -85,18 +72,18 @@ export const Dialog: React.FC<DialogProps> = ({
         <div
           className={cn(
             'flex-1 min-h-0 overflow-y-auto px-4 py-4 overscroll-contain [-webkit-overflow-scrolling:touch]',
-            !footer && 'pb-[max(1rem,env(safe-area-inset-bottom,0px))]'
+            !footer && 'dialog-bottom-space'
           )}
         >
           {children}
         </div>
 
         {footer && (
-          <div className="shrink-0 flex gap-2 px-4 py-3 border-t border-border pb-[max(0.75rem,env(safe-area-inset-bottom,0px))]">
+          <div className="dialog-bottom-space shrink-0 flex flex-wrap gap-2 px-4 py-3 border-t border-border">
             {footer}
           </div>
         )}
       </div>
-    </div>
+    </ModalLayer>
   );
 };
