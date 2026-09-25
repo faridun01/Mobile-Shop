@@ -1,13 +1,18 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Html5Qrcode, Html5QrcodeSupportedFormats } from 'html5-qrcode';
+import { Html5QrcodeSupportedFormats } from 'html5-qrcode';
+import { Html5QrcodeShim } from 'html5-qrcode/esm/code-decoder';
+import { BaseLoggger } from 'html5-qrcode/esm/core';
 import { AlertCircle, Flashlight, FlashlightOff, Focus, ZoomIn } from 'lucide-react';
 import { useAppFields } from '../../context/AppContext';
 import { Dialog } from '../ui/Dialog';
 import { soundEffects } from '../../utils/sound';
+import { extractImeis, SCAN_HINTS } from '../../services/scanner/imei';
 
-const READER_ELEMENT_ID = 'ms-barcode-scanner-viewport';
 const CONFIRMATION_WINDOW_MS = 800;
 const REQUIRED_MATCHING_FRAMES = 2;
+const DECODE_INTERVAL_MS = 60;
+// The aiming band is cropped at camera resolution, capped here to bound decode time.
+const MAX_DECODE_WIDTH = 1280;
 // Shared across remounts: a new camera waits for the previous stream to stop.
 let cameraRelease: Promise<void> = Promise.resolve();
 
@@ -33,27 +38,36 @@ type ZoomRange = {
   step: number;
 };
 
-// Phone boxes carry 1D barcodes (IMEI/S/N/EAN) plus the occasional QR — restricting to
-// exactly these formats stops the decoder from latching onto a stray/irrelevant symbology
-// and cuts the per-frame work, both of which speed up recognition.
+// IMEI labels are Code 128 (occasionally Code 39); some brands add a QR/DataMatrix with
+// both IMEIs. EAN/ITF can never hold a 15-digit IMEI, so they aren't decoded at all —
+// fewer symbologies also means less per-frame work and faster recognition.
 const SUPPORTED_FORMATS = [
   Html5QrcodeSupportedFormats.CODE_128,
-  Html5QrcodeSupportedFormats.EAN_13,
   Html5QrcodeSupportedFormats.CODE_39,
-  Html5QrcodeSupportedFormats.ITF,
   Html5QrcodeSupportedFormats.QR_CODE,
+  Html5QrcodeSupportedFormats.DATA_MATRIX,
 ];
+
+/** Aiming band in CSS pixels of the preview: narrow enough to isolate IMEI 1 from IMEI 2. */
+function aimingBand(previewWidth: number) {
+  const width = Math.min(420, previewWidth * 0.88);
+  return { width, height: Math.min(130, Math.max(70, width * 0.3)) };
+}
 
 /**
  * The single scanner surface for the whole app — every page's "Сканировать" button calls
  * openScanner(callback) from AppContext, which just flips isScannerOpen/scannerCallback.
- * Without this component mounted, that state had nothing rendering it, so every scan
- * button in the app was a no-op. Camera-only (via html5-qrcode) — hardware wedge scanner
- * support was removed since the app is used with phone/tablet cameras exclusively.
+ *
+ * The camera loop is our own rather than html5-qrcode's: that one shrinks the scan box to
+ * its on-screen size (~340px on a phone) before decoding, which merges the thin bars of a
+ * 15-digit IMEI barcode. Here the band under the aiming frame is cropped from the camera
+ * frame at full resolution and handed to the same html5-qrcode decoder (ZXing, or the
+ * browser's BarcodeDetector where available).
  */
 export const ScannerModal: React.FC = () => {
   const { isScannerOpen, scannerCallback, closeScanner } = useAppFields('isScannerOpen', 'scannerCallback', 'closeScanner');
-  const scannerRef = useRef<Html5Qrcode | null>(null);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const trackRef = useRef<MediaStreamTrack | null>(null);
   const pendingScanRef = useRef({ code: '', matches: 0, seenAt: 0 });
   const scanLockedRef = useRef(false);
   const [cameraError, setCameraError] = useState<string | null>(null);
@@ -63,18 +77,14 @@ export const ScannerModal: React.FC = () => {
   const [isFocusing, setIsFocusing] = useState(false);
   const [zoomRange, setZoomRange] = useState<ZoomRange | null>(null);
   const [zoomValue, setZoomValue] = useState(1);
-  const [scanHint, setScanHint] = useState('Поместите один штрих-код внутрь рамки');
+  const [scanHint, setScanHint] = useState(SCAN_HINTS.aim);
   const [manualCode, setManualCode] = useState('');
+  const [band, setBand] = useState(() => aimingBand(340));
 
   const resolveScan = (code: string) => {
     const trimmed = code.trim();
     if (!trimmed || scanLockedRef.current) return;
     scanLockedRef.current = true;
-    try {
-      scannerRef.current?.pause(true);
-    } catch {
-      // Closing the dialog will stop the camera even if pause is unavailable.
-    }
     soundEffects.playAddToCartSuccess();
     try {
       scannerCallback?.(trimmed);
@@ -83,9 +93,17 @@ export const ScannerModal: React.FC = () => {
     }
   };
 
+  // Camera scans accept IMEIs only (15 digits, valid check digit); anything else on the box
+  // is ignored with a hint. The manual field below stays free-form (e.g. receipt numbers).
   const confirmScan = (decodedText: string) => {
-    const code = decodedText.trim();
-    if (!code || scanLockedRef.current) return;
+    if (scanLockedRef.current) return;
+    const imeis = extractImeis(decodedText);
+    if (imeis.length === 0) {
+      setScanHint(SCAN_HINTS.notImei);
+      return;
+    }
+    // A QR/DataMatrix listing both IMEIs yields IMEI 1.
+    const code = imeis[0];
 
     const now = Date.now();
     const pending = pendingScanRef.current;
@@ -94,7 +112,7 @@ export const ScannerModal: React.FC = () => {
       pending.seenAt = now;
     } else {
       pendingScanRef.current = { code, matches: 1, seenAt: now };
-      setScanHint('Код найден — держите камеру неподвижно');
+      setScanHint(SCAN_HINTS.hold);
     }
 
     if (pendingScanRef.current.matches >= REQUIRED_MATCHING_FRAMES) {
@@ -102,12 +120,13 @@ export const ScannerModal: React.FC = () => {
     }
   };
 
+  const applyConstraint = (constraint: BarcodeCameraConstraint) =>
+    trackRef.current?.applyConstraints({ advanced: [constraint] }) ?? Promise.resolve();
+
   const toggleTorch = async () => {
-    const instance = scannerRef.current;
-    if (!instance) return;
     const next = !torchOn;
     try {
-      await instance.applyVideoConstraints({ advanced: [{ torch: next } as MediaTrackConstraintSet] });
+      await applyConstraint({ torch: next });
       setTorchOn(next);
     } catch {
       // Some devices report torch capability but reject the constraint — ignore.
@@ -115,36 +134,27 @@ export const ScannerModal: React.FC = () => {
   };
 
   const changeZoom = async (value: number) => {
-    const instance = scannerRef.current;
-    if (!instance || !zoomRange) return;
+    if (!zoomRange) return;
     const next = Math.min(zoomRange.max, Math.max(zoomRange.min, value));
     setZoomValue(next);
     try {
-      await instance.applyVideoConstraints({ advanced: [{ zoom: next } as BarcodeCameraConstraint] });
+      await applyConstraint({ zoom: next });
     } catch {
       // Capability reporting differs across Android browsers; keep scanning.
     }
   };
 
   const refocus = async () => {
-    const instance = scannerRef.current;
-    if (!instance || isFocusing) return;
+    const track = trackRef.current;
+    if (!track || isFocusing) return;
     setIsFocusing(true);
     try {
-      const capabilities = instance.getRunningTrackCapabilities() as BarcodeCameraCapabilities;
-      const modes = capabilities.focusMode ?? [];
+      const modes = (track.getCapabilities?.() as BarcodeCameraCapabilities | undefined)?.focusMode ?? [];
       const requestedMode = modes.includes('single-shot') ? 'single-shot' : 'continuous';
-      await instance.applyVideoConstraints({
-        advanced: [{ focusMode: requestedMode } as BarcodeCameraConstraint],
-      });
-
+      await applyConstraint({ focusMode: requestedMode });
       if (requestedMode === 'single-shot' && modes.includes('continuous')) {
         window.setTimeout(() => {
-          if (scannerRef.current === instance) {
-            instance.applyVideoConstraints({
-              advanced: [{ focusMode: 'continuous' } as BarcodeCameraConstraint],
-            }).catch(() => {});
-          }
+          if (trackRef.current === track) applyConstraint({ focusMode: 'continuous' }).catch(() => {});
         }, 700);
       }
     } catch {
@@ -163,113 +173,122 @@ export const ScannerModal: React.FC = () => {
       setIsFocusing(false);
       setZoomRange(null);
       setZoomValue(1);
-      setScanHint('Поместите один штрих-код внутрь рамки');
+      setScanHint(SCAN_HINTS.aim);
       setManualCode('');
       return;
     }
 
     let cancelled = false;
+    let timer = 0;
+    let stream: MediaStream | null = null;
     scanLockedRef.current = false;
     pendingScanRef.current = { code: '', matches: 0, seenAt: 0 };
-    let instance: Html5Qrcode | null = null;
 
-    const startScannerWithFacing = async (qrcode: Html5Qrcode, facing: 'environment' | 'user') => {
-      await qrcode.start(
-        { facingMode: facing },
-        {
-          fps: 18,
-          aspectRatio: 16 / 9,
-          // Keep the active decoder area narrow enough to isolate IMEI 1 from IMEI 2,
-          // while sizing it to the actual phone/tablet viewport instead of fixed pixels.
-          qrbox: (viewfinderWidth, viewfinderHeight) => {
-            const width = Math.floor(Math.min(420, viewfinderWidth * 0.88));
-            const height = Math.floor(Math.min(130, Math.max(70, width * 0.3), viewfinderHeight * 0.55));
-            return { width, height };
-          },
-          disableFlip: facing === 'environment',
-          videoConstraints: {
-            facingMode: { ideal: facing },
+    const openCamera = async () => {
+      if (!navigator.mediaDevices?.getUserMedia) throw Object.assign(new Error('no camera API'), { name: 'NotFoundError' });
+      try {
+        return await navigator.mediaDevices.getUserMedia({
+          audio: false,
+          video: {
+            facingMode: { ideal: 'environment' },
             width: { ideal: 1920 },
             height: { ideal: 1080 },
             advanced: [{ focusMode: 'continuous' } as BarcodeCameraConstraint],
           },
-        },
-        (decodedText) => {
-          if (!cancelled) confirmScan(decodedText);
-        },
-        () => {
-          // Per-frame "nothing decoded yet" — not an error, ignore.
+        });
+      } catch (error) {
+        const name = typeof error === 'object' && error && 'name' in error ? String(error.name) : '';
+        if (name === 'NotAllowedError' || name === 'NotFoundError') throw error;
+        // Over-constrained or odd devices: any camera beats none.
+        return navigator.mediaDevices.getUserMedia({ audio: false, video: true });
+      }
+    };
+
+    const decoder = new Html5QrcodeShim(SUPPORTED_FORMATS, true, false, new BaseLoggger(false));
+    const canvas = document.createElement('canvas');
+    const context = canvas.getContext('2d', { willReadFrequently: true });
+
+    const decodeLoop = async () => {
+      const video = videoRef.current;
+      if (cancelled) return;
+      if (video && context && video.readyState >= 2 && video.videoWidth && video.clientWidth) {
+        // Map the on-screen aiming band (video is object-cover) back to camera pixels.
+        const { videoWidth: vw, videoHeight: vh, clientWidth: cw, clientHeight: ch } = video;
+        const scale = Math.max(cw / vw, ch / vh);
+        const { width, height } = aimingBand(cw);
+        // Whole-pixel crop, copied 1:1 without smoothing: a fractional offset makes the
+        // browser resample the frame, which blurs 1–2px bars enough that ZXing misses them.
+        const cropW = Math.round(Math.min(vw, width / scale));
+        const cropH = Math.round(Math.min(vh, height / scale));
+        const outScale = Math.min(1, MAX_DECODE_WIDTH / cropW);
+        canvas.width = Math.round(cropW * outScale);
+        canvas.height = Math.round(cropH * outScale);
+        context.imageSmoothingEnabled = outScale < 1;
+        context.drawImage(video, Math.floor((vw - cropW) / 2), Math.floor((vh - cropH) / 2), cropW, cropH, 0, 0, canvas.width, canvas.height);
+        try {
+          const result = await decoder.decodeAsync(canvas);
+          if (!cancelled) confirmScan(result.text);
+        } catch {
+          // Per-frame "nothing decoded yet" — not an error.
         }
-      );
+      }
+      if (!cancelled) timer = window.setTimeout(() => void decodeLoop(), DECODE_INTERVAL_MS);
     };
 
     const startPromise = cameraRelease.then(async () => {
       if (cancelled) return;
-      instance = new Html5Qrcode(READER_ELEMENT_ID, {
-        formatsToSupport: SUPPORTED_FORMATS,
-        useBarCodeDetectorIfSupported: true,
-        verbose: false,
-      });
-      scannerRef.current = instance;
+      stream = await openCamera();
+      if (cancelled) return;
+      const track = stream.getVideoTracks()[0] ?? null;
+      trackRef.current = track;
+      const video = videoRef.current;
+      if (!video) return;
+      video.srcObject = stream;
+      await video.play().catch(() => {});
+      if (cancelled) return;
+      setBand(aimingBand(video.clientWidth || 340));
+      void decodeLoop();
 
       try {
-        await startScannerWithFacing(instance, 'environment');
-      } catch (primaryErr) {
-        if (cancelled || !instance) return;
-        try {
-          await startScannerWithFacing(instance, 'user');
-        } catch {
-          throw primaryErr;
-        }
-      }
-
-      if (cancelled || !instance) return;
-      try {
-        const capabilities = instance.getRunningTrackCapabilities() as BarcodeCameraCapabilities;
+        const capabilities = (track?.getCapabilities?.() ?? {}) as BarcodeCameraCapabilities;
         setTorchSupported(!!capabilities.torch);
         const modes = capabilities.focusMode ?? [];
         setFocusSupported(modes.includes('continuous') || modes.includes('single-shot'));
-
-        if (modes.includes('continuous')) {
-          instance.applyVideoConstraints({
-            advanced: [{ focusMode: 'continuous' } as BarcodeCameraConstraint],
-          }).catch(() => {});
-        }
+        if (modes.includes('continuous')) applyConstraint({ focusMode: 'continuous' }).catch(() => {});
 
         const zoom = capabilities.zoom;
         if (zoom && Number.isFinite(zoom.min) && Number.isFinite(zoom.max) && zoom.max > zoom.min) {
           const range = { min: zoom.min, max: zoom.max, step: zoom.step && zoom.step > 0 ? zoom.step : 0.1 };
-          const currentZoom = (instance.getRunningTrackSettings() as BarcodeCameraSettings).zoom;
+          const currentZoom = (track?.getSettings() as BarcodeCameraSettings | undefined)?.zoom;
+          // A little zoom lets the phone stay far enough away to focus on the thin bars.
           const preferredZoom = Math.min(range.max, Math.max(range.min, Math.max(currentZoom ?? range.min, 1.5)));
           setZoomRange(range);
           setZoomValue(preferredZoom);
-          await instance.applyVideoConstraints({
-            advanced: [{ zoom: preferredZoom } as BarcodeCameraConstraint],
-          }).catch(() => {});
+          await applyConstraint({ zoom: preferredZoom }).catch(() => {});
         }
       } catch {
         setTorchSupported(false);
       }
     }).catch((error: unknown) => {
-        if (!cancelled) {
-          const errorName = typeof error === 'object' && error && 'name' in error ? String(error.name) : '';
-          setCameraError(
-            errorName === 'NotAllowedError'
-              ? 'Доступ к камере запрещён. Разрешите использование камеры в настройках браузера.'
-              : errorName === 'NotFoundError'
-                ? 'Камера не найдена на этом устройстве.'
-                : 'Не удалось запустить камеру. Закройте другие приложения, использующие камеру, и попробуйте снова.'
-          );
-        }
-      });
+      if (!cancelled) {
+        const errorName = typeof error === 'object' && error && 'name' in error ? String(error.name) : '';
+        setCameraError(
+          errorName === 'NotAllowedError'
+            ? 'Доступ к камере запрещён. Разрешите использование камеры в настройках браузера.'
+            : errorName === 'NotFoundError'
+              ? 'Камера не найдена на этом устройстве.'
+              : 'Не удалось запустить камеру. Закройте другие приложения, использующие камеру, и попробуйте снова.'
+        );
+      }
+    });
 
     return () => {
       cancelled = true;
-      if (scannerRef.current === instance) scannerRef.current = null;
-      cameraRelease = startPromise.then(async () => {
-        if (!instance) return;
-        try { await instance.stop(); } catch { /* Start may have failed. */ }
-        try { instance.clear(); } catch { /* Viewport may already be unmounted. */ }
+      window.clearTimeout(timer);
+      cameraRelease = startPromise.then(() => {
+        stream?.getTracks().forEach((track) => track.stop());
+        if (trackRef.current && stream?.getVideoTracks().includes(trackRef.current)) trackRef.current = null;
+        if (videoRef.current?.srcObject === stream) videoRef.current.srcObject = null;
       });
     };
   }, [isScannerOpen]);
@@ -278,14 +297,20 @@ export const ScannerModal: React.FC = () => {
     <Dialog
       open={isScannerOpen}
       onClose={closeScanner}
-      title="Сканирование"
+      title="Сканирование IMEI"
       maxWidth="sm"
     >
       <div className="space-y-3">
-        <div className="relative">
-          <div id={READER_ELEMENT_ID} className="w-full rounded-lg overflow-hidden bg-black min-h-55" />
+        <div className="relative aspect-4/3 w-full overflow-hidden rounded-lg bg-black">
+          <video ref={videoRef} className="absolute inset-0 h-full w-full object-cover" playsInline muted autoPlay />
           {!cameraError && (
-            <div className="pointer-events-none absolute left-[6%] right-[6%] top-1/2 h-0.5 -translate-y-1/2 bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.9)]" />
+            <div
+              className="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-lg border-2 border-accent"
+              style={{ width: band.width, height: band.height }}
+              aria-hidden="true"
+            >
+              <div className="absolute left-[6%] right-[6%] top-1/2 h-0.5 -translate-y-1/2 bg-red-500" />
+            </div>
           )}
           {torchSupported && (
             <button

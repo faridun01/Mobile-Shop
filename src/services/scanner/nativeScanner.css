@@ -6,9 +6,31 @@ html.native-scanner-active body {
 html.native-scanner-active #root {
   visibility: hidden;
 }
+/* --sa-* (index.css) include the Android system-bar sizes Capacitor injects. */
 .native-scanner-overlay {
-  padding-top: calc(1rem + env(safe-area-inset-top, 0px));
-  padding-bottom: calc(1rem + env(safe-area-inset-bottom, 0px));
-  padding-left: calc(1rem + env(safe-area-inset-left, 0px));
-  padding-right: calc(1rem + env(safe-area-inset-right, 0px));
+  padding-top: calc(1rem + var(--sa-top, env(safe-area-inset-top, 0px)));
+  padding-bottom: calc(1rem + var(--sa-bottom, env(safe-area-inset-bottom, 0px)));
+  padding-left: calc(1rem + var(--sa-left, env(safe-area-inset-left, 0px)));
+  padding-right: calc(1rem + var(--sa-right, env(safe-area-inset-right, 0px)));
+}
+/* Aiming frame at the exact screen centre — chooseImei() prefers the IMEI nearest to it. */
+.native-scanner-target {
+  position: fixed;
+  left: 50%;
+  top: 50%;
+  width: min(85vw, 420px);
+  height: 7.5rem;
+  transform: translate(-50%, -50%);
+  border: 2px solid #22c55e; /* visible on white labels and dark boxes alike */
+  border-radius: 0.75rem;
+  pointer-events: none;
+}
+.native-scanner-target::after {
+  content: '';
+  position: absolute;
+  left: 6%;
+  right: 6%;
+  top: 50%;
+  height: 2px;
+  background: #ef4444;
 }
