@@ -1,5 +1,13 @@
 // One-off generator for native app icon + splash source images (resources/*.png),
 // consumed by `npx capacitor-assets generate`. Run again only if the brand mark changes.
+//
+// sharp and @capacitor/assets are intentionally NOT project dependencies (their
+// transitive deps carry unfixed high/critical advisories — see npm audit). Install
+// them on demand, generate, then remove:
+//   npm install --no-save sharp @capacitor/assets
+//   node scripts/generate-native-assets.mjs
+//   npx capacitor-assets generate
+//   npm uninstall sharp @capacitor/assets
 import sharp from 'sharp';
 import { mkdirSync, readFileSync, writeFileSync } from 'fs';
 import path from 'path';
