@@ -13,12 +13,11 @@ interface DailyRateModalProps {
 
 export const DailyRateModal: React.FC<DailyRateModalProps> = ({ isOpen, onClose }) => {
   const { todayRate, setDailyRate, currentUser } = useAppFields('todayRate', 'setDailyRate', 'currentUser');
-  const todayStr = getBusinessDateKey();
-  const isRateSetForToday = todayRate && todayRate.date === todayStr && todayRate.rate > 0;
+  const hasRate = !!(todayRate && Number(todayRate.rate) > 0);
   // Only ADMIN/PARTNER can actually set the rate (server-enforced) — a SELLER can't act
   // on this, so blocking them behind a non-dismissable modal would be a dead end.
   const canSetRate = currentUser?.role === 'ADMIN' || currentUser?.role === 'PARTNER';
-  const isMandatory = !isRateSetForToday && canSetRate;
+  const isMandatory = !hasRate && canSetRate;
 
   const [rateInput, setRateInput] = useState<string>('');
   const [error, setError] = useState<string | null>(null);
@@ -47,7 +46,7 @@ export const DailyRateModal: React.FC<DailyRateModalProps> = ({ isOpen, onClose 
     }
   };
 
-  if (!isRateSetForToday && !canSetRate) {
+  if (!hasRate && !canSetRate) {
     // A SELLER can't set the rate — show a dismissable notice instead of a dead-end modal.
     return (
       <Dialog
@@ -55,7 +54,7 @@ export const DailyRateModal: React.FC<DailyRateModalProps> = ({ isOpen, onClose 
         onClose={() => onClose?.()}
         dismissable
         title="Курс доллара ещё не задан"
-        subtitle={`Дата: ${todayStr}`}
+        subtitle="Первоначальная настройка"
         maxWidth="sm"
         footer={
           onClose && (
@@ -67,7 +66,7 @@ export const DailyRateModal: React.FC<DailyRateModalProps> = ({ isOpen, onClose 
       >
         <div className="flex items-start gap-3 text-sm text-fg-muted">
           <Clock className="w-5 h-5 text-warning shrink-0 mt-0.5" />
-          <p>Администратор или партнёр ещё не установил курс USD/TJS на сегодня. Продажа будет недоступна, пока курс не задан — обратитесь к администратору.</p>
+          <p>Администратор или партнёр ещё не установил базовый курс USD/TJS. Обратитесь к администратору для первоначальной настройки курса.</p>
         </div>
       </Dialog>
     );
@@ -78,8 +77,8 @@ export const DailyRateModal: React.FC<DailyRateModalProps> = ({ isOpen, onClose 
       open={isOpen}
       onClose={() => onClose?.()}
       dismissable={!isMandatory}
-      title="Курс доллара на сегодня"
-      subtitle={isMandatory ? 'Новый день — установите курс, чтобы продолжить' : `Дата: ${todayStr}`}
+      title={hasRate ? "Изменение курса доллара" : "Установка курса доллара"}
+      subtitle={isMandatory ? 'Первоначальная настройка — установите курс для начала работы' : todayRate?.rate ? `Текущий курс: ${Number(todayRate.rate).toFixed(2)} TJS` : undefined}
       maxWidth="sm"
       footer={
         <>

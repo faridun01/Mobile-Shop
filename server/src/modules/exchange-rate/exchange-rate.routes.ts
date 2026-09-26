@@ -9,7 +9,12 @@ export function registerExchangeRateRoutes(app: Express) {
   app.get('/api/exchange-rate/today', authenticateJwt, async (_req, res, next) => {
     try {
       const today = getBusinessDateKey();
-      const rate = await prisma.exchangeRate.findUnique({ where: { date: today } });
+      let rate = await prisma.exchangeRate.findUnique({ where: { date: today } });
+      if (!rate) {
+        rate = await prisma.exchangeRate.findFirst({
+          orderBy: { date: 'desc' },
+        });
+      }
       res.json(rate);
     } catch (error) {
       next(error);

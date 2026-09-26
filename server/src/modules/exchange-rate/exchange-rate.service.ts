@@ -5,18 +5,34 @@ import { getBusinessDateKey } from '../../common/business-date';
 export { getBusinessDateKey } from '../../common/business-date';
 
 export async function getRateForDate(date: Date) {
-  const rate = await prisma.exchangeRate.findUnique({ where: { date: getBusinessDateKey(date) } });
-  return rate?.rate ?? null;
+  const dateKey = getBusinessDateKey(date);
+  const rate = await prisma.exchangeRate.findUnique({ where: { date: dateKey } });
+  if (rate?.rate && D(rate.rate).gt(0)) {
+    return rate.rate;
+  }
+  const fallback = await prisma.exchangeRate.findFirst({
+    where: { date: { lte: dateKey } },
+    orderBy: { date: 'desc' },
+  }) ?? await prisma.exchangeRate.findFirst({
+    orderBy: { date: 'desc' },
+  });
+  return fallback?.rate ?? null;
 }
 
 export async function requireTodayRate(
   db: Pick<TransactionClient, 'exchangeRate'> = prisma,
 ) {
   const rate = await db.exchangeRate.findUnique({ where: { date: getBusinessDateKey() } });
-  if (!rate?.rate || D(rate.rate).lte(0)) {
-    throw new Error('Сначала задайте курс USD/TJS на сегодня');
+  if (rate?.rate && D(rate.rate).gt(0)) {
+    return rate.rate;
   }
-  return rate.rate;
+  const latest = await db.exchangeRate.findFirst({
+    orderBy: { date: 'desc' },
+  });
+  if (!latest?.rate || D(latest.rate).lte(0)) {
+    throw new Error('Сначала задайте курс USD/TJS в настройках системы');
+  }
+  return latest.rate;
 }
 
 export async function setTodayRate(rate: MoneyInput, userId: string) {

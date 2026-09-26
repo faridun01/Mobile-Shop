@@ -2,8 +2,7 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAppFields } from '../../context/AppContext';
 import { useNotifications } from '../../context/NotificationsContext';
-import { Bell, Store, DollarSign } from 'lucide-react';
-import { getBusinessDateKey } from '../../utils/businessDate';
+import { Bell, Store } from 'lucide-react';
 
 export const TopBar: React.FC = () => {
   const navigate = useNavigate();
@@ -13,21 +12,14 @@ export const TopBar: React.FC = () => {
     setActivePage,
     stores,
     selectedStoreId,
-    todayRate,
-    openDailyRateModal,
   } = useAppFields(
     'currentUser',
     'activePage',
     'setActivePage',
     'stores',
-    'selectedStoreId',
-    'todayRate',
-    'openDailyRateModal'
+    'selectedStoreId'
   );
   const { notifications } = useNotifications();
-
-  const todayStr = getBusinessDateKey();
-  const isRateSetForToday = !!(todayRate && todayRate.date === todayStr && Number(todayRate.rate) > 0);
 
   // `resolved` tracks whether an actionable notification (e.g. an approval) has been
   // handled — it says nothing about whether the user has actually seen it. Purely
@@ -77,24 +69,8 @@ export const TopBar: React.FC = () => {
         </div>
       </div>
 
-      {/* Right: Dollar Rate Badge + Notifications */}
+      {/* Right: Notifications */}
       <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
-        {/* Dollar Rate Display / Trigger Button */}
-        <button
-          onClick={openDailyRateModal}
-          className={`flex items-center gap-1 sm:gap-1.5 px-2.5 py-1.5 rounded-xl border text-xs font-bold transition-all active:scale-95 shadow-xs ${
-            isRateSetForToday
-              ? 'bg-accent/10 hover:bg-accent/20 border-accent/30 text-accent'
-              : 'bg-warning/15 hover:bg-warning/25 border-warning/40 text-warning animate-pulse'
-          }`}
-          title={isRateSetForToday ? 'Текущий курс доллара на сегодня. Нажмите, чтобы просмотреть или изменить' : 'Курс доллара на сегодня не задан! Нажмите, чтобы установить'}
-        >
-          <DollarSign className="w-3.5 h-3.5 shrink-0" />
-          <span className="font-extrabold tabular-nums">
-            {isRateSetForToday ? Number(todayRate?.rate).toFixed(2) : 'Не задан'}
-          </span>
-          <span className="text-[10px] text-fg-subtle font-medium hidden xs:inline sm:inline">TJS</span>
-        </button>
 
         <button
           onClick={() => {

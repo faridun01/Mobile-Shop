@@ -45,9 +45,8 @@ export const SalePage: React.FC = () => {
     stores,
     openScanner,
     createSale,
-    isInitialLoading,
-    openDailyRateModal
-  } = useAppFields('currentUser', 'devices', 'todayRate', 'selectedStoreId', 'setSelectedStoreId', 'stores', 'openScanner', 'createSale', 'isInitialLoading', 'openDailyRateModal');
+    isInitialLoading
+  } = useAppFields('currentUser', 'devices', 'todayRate', 'selectedStoreId', 'setSelectedStoreId', 'stores', 'openScanner', 'createSale', 'isInitialLoading');
 
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedBrand, setSelectedBrand] = useState<string>('ALL');
@@ -292,19 +291,6 @@ export const SalePage: React.FC = () => {
               </span>
             </div>
           )}
-
-          {/* Dollar Rate Quick Button */}
-          <button
-            onClick={openDailyRateModal}
-            className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-surface-raised hover:bg-surface border border-border text-fg-muted text-xs font-semibold shrink-0 transition-colors shadow-xs active:scale-95 cursor-pointer"
-            title="Курс доллара на сегодня (нажмите, чтобы изменить)"
-          >
-            <span className="text-accent font-bold">$ 1 =</span>
-            <span className="text-fg-muted font-bold tabular-nums">
-              {todayRate?.rate ? Number(todayRate.rate).toFixed(2) : '—'}
-            </span>
-            <span className="text-[10px] text-fg-subtle">TJS</span>
-          </button>
         </div>
 
         <SearchBar

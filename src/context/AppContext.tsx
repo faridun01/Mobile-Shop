@@ -12,7 +12,6 @@ import { apiClient } from '../api/client';
 import { useRealtimeSync } from '../hooks/useRealtimeSync';
 import { scanCode, cancelScan, isNativeScanner } from '../services/scanner/scannerService';
 import { soundEffects } from '../utils/sound';
-import { getBusinessDateKey } from '../utils/businessDate';
 import {
   buildNameLookup,
   mapDevice,
@@ -352,8 +351,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const toggleTheme = () => setThemeState((prev) => (prev === 'dark' ? 'light' : 'dark'));
 
   const checkRatePrompt = useCallback((rate: DailyRate | null) => {
-    const todayStr = getBusinessDateKey();
-    const isRateSet = !!(rate && rate.date === todayStr && rate.rate && rate.rate > 0);
+    const isRateSet = !!(rate && rate.rate && Number(rate.rate) > 0);
     if (!isRateSet) {
       setIsRateModalOpen(true);
       useUIStore.getState().setDailyRateModalOpen(true);

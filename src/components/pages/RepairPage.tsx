@@ -443,7 +443,7 @@ export const RepairPage: React.FC = () => {
             <div className="border border-border rounded-xl bg-surface p-3.5 sm:p-5 space-y-4 shadow-xs min-w-0">
               <h3 className="text-xs md:text-sm font-bold uppercase tracking-wide text-fg-muted flex items-center gap-2 border-b border-border pb-3 flex-wrap sm:flex-nowrap">
                 <Wrench className="w-4 h-4 text-accent shrink-0" />
-                <span className="min-w-0 break-words">ОФОРМЛЕНИЕ ПРИЕМА НА ГАРАНТИЙНЫЙ РЕМОНТ</span>
+                <span className="min-w-0 wrap-break-word">ОФОРМЛЕНИЕ ПРИЕМА НА ГАРАНТИЙНЫЙ РЕМОНТ</span>
               </h3>
 
               {/* RECEIPT / IMEI SEARCH BAR */}
