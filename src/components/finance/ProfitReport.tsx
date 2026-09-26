@@ -172,34 +172,45 @@ export const ProfitReport: React.FC<ProfitReportProps> = ({ view, month, onMonth
   const [summary, setSummary] = useState<ReportsSummary | null>(null);
   const [summaryLoading, setSummaryLoading] = useState(true);
   const [reportDownloading, setReportDownloading] = useState(false);
+  const [summaryError, setSummaryError] = useState<string | null>(null);
+  const [revision, setRevision] = useState(0);
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const refresh = () => { clearTimeout(timer); timer = setTimeout(() => setRevision(v => v + 1), 150); };
+    window.addEventListener('business-data-changed', refresh);
+    return () => { clearTimeout(timer); window.removeEventListener('business-data-changed', refresh); };
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
     const controller = new AbortController();
     setSummaryLoading(true);
+    setSummaryError(null);
 
     const params = new URLSearchParams({ period, month });
     if (scopeStoreId !== 'all') params.set('storeId', scopeStoreId);
 
     apiClient<ReportsSummary>(`/reports/summary?${params.toString()}`, { signal: controller.signal })
       .then((data) => { if (!cancelled) setSummary(data); })
-      .catch(() => { if (!cancelled) setSummary(null); })
+      .catch((error) => { if (!cancelled) { setSummary(null); setSummaryError(error.message || 'Не удалось загрузить отчёт'); } })
       .finally(() => { if (!cancelled) setSummaryLoading(false); });
 
     return () => { cancelled = true; controller.abort(); };
-  }, [month, scopeStoreId]);
+  }, [month, scopeStoreId, revision]);
 
   // The itemized sales/expenses list is only needed for the Excel preview, so it's fetched
   // only once that preview is opened, scoped to just the one store being previewed.
   const [reportSales, setReportSales] = useState<Sale[]>([]);
   const [reportExpenses, setReportExpenses] = useState<Expense[]>([]);
   const [reportDataLoading, setReportDataLoading] = useState(false);
+  const [reportDataError, setReportDataError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!salesReportStoreId) return;
     let cancelled = false;
     const controller = new AbortController();
     setReportDataLoading(true);
+    setReportDataError(null);
 
     const params = new URLSearchParams({ period, month });
     if (salesReportStoreId !== 'all') params.set('storeId', salesReportStoreId);
@@ -214,15 +225,16 @@ export const ProfitReport: React.FC<ProfitReportProps> = ({ view, month, onMonth
         setReportSales(rawSales.map((s) => mapSale(s, namesLookup)));
         setReportExpenses(rawExpenses.map((expense) => mapExpense(expense, namesLookup)));
       })
-      .catch(() => {
+      .catch((error) => {
         if (cancelled) return;
+        setReportDataError(error.message || 'Не удалось загрузить строки отчёта');
         setReportSales([]);
         setReportExpenses([]);
       })
       .finally(() => { if (!cancelled) setReportDataLoading(false); });
 
     return () => { cancelled = true; controller.abort(); };
-  }, [salesReportStoreId, month, namesLookup]);
+  }, [salesReportStoreId, month, namesLookup, revision]);
 
   const data: ReportsSummary = summary ?? EMPTY_SUMMARY;
 
@@ -237,7 +249,7 @@ export const ProfitReport: React.FC<ProfitReportProps> = ({ view, month, onMonth
     : (retailStores.find((s) => s.id === salesReportStoreId)?.name || '');
 
   const downloadFinancialReport = async () => {
-    if (!salesReportStoreId || !summary || reportDownloading) return;
+    if (!salesReportStoreId || !summary || reportDownloading || reportDataLoading || reportDataError) return;
 
     let reportSummary: ComprehensiveReportSummary;
     const breakdown = data.storeBreakdown.find((item) => item.storeId === salesReportStoreId);
@@ -303,6 +315,12 @@ export const ProfitReport: React.FC<ProfitReportProps> = ({ view, month, onMonth
       className="h-9 px-3 rounded-lg border border-accent bg-surface text-xs font-semibold text-accent focus:outline-none"
     />
   );
+
+  if (summaryError) return <div className="p-4 space-y-3" role="alert">
+    {monthPicker}<p>Не удалось загрузить финансовый отчёт. Итоги недоступны.</p>
+    <p>{summaryError}</p><button type="button" onClick={() => setRevision(v => v + 1)}>Повторить загрузку</button>
+  </div>;
+  if (!summary) return <div className="p-4" role="status">{monthPicker}<p>Загрузка финансового отчёта…</p></div>;
 
   return (
     <div className="flex flex-col">
@@ -378,7 +396,7 @@ export const ProfitReport: React.FC<ProfitReportProps> = ({ view, month, onMonth
                 <div className="flex items-center justify-between pb-1.5 border-b border-border">
                   <h4 className="text-[10px] font-bold text-fg-subtle uppercase tracking-wider flex items-center gap-1.5">
                     <Users className="w-3.5 h-3.5 text-accent" />
-                    <span>Распределение чистой прибыли между партнерами</span>
+                    <span>Партнёры: текущие доли и начисленный остаток</span>
                   </h4>
                   <button
                     type="button"
@@ -394,13 +412,12 @@ export const ProfitReport: React.FC<ProfitReportProps> = ({ view, month, onMonth
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-0.5">
                   {owners.map((owner) => {
                     const percent = owner.profitSharePercent || 0;
-                    const periodShare = Math.round((data.netProfitUsd * percent) / 100 * 100) / 100;
                     return (
                       <div key={owner.id} className="p-2.5 rounded-lg bg-surface-raised border border-border flex items-center justify-between gap-2">
                         <div className="min-w-0">
                           <p className="text-xs font-bold text-fg-muted truncate">{owner.name} ({percent}%)</p>
                           <p className="text-[11px] text-fg-subtle truncate">
-                            За период: <span className="font-semibold text-accent">{signedUsd(periodShare)}</span>
+                            Текущая доля; начисления учитывают долю на дату операции
                           </p>
                         </div>
                         <div className="text-right shrink-0">
@@ -597,13 +614,13 @@ export const ProfitReport: React.FC<ProfitReportProps> = ({ view, month, onMonth
         open={salesReportStoreId !== null}
         onClose={() => setSalesReportStoreId(null)}
         title={`Финансовый отчёт — ${salesReportStoreName}`}
-        subtitle={`${periodLabel} • Excel: продажи, расходы и итого`}
+        subtitle={reportDataError || `${periodLabel} • Excel: продажи, расходы и итого`}
         table={salesReportTable}
         loading={reportDataLoading}
         onDownload={() => void downloadFinancialReport()}
         downloadLabel="Скачать Excel"
         downloading={reportDownloading}
-        canDownload={!!summary && !reportDataLoading}
+        canDownload={!!summary && !reportDataLoading && !reportDataError}
       />
     </div>
   );

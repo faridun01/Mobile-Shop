@@ -1,3 +1,5 @@
+import { fetchAllPages } from '../api/pagination';
+import { refreshAfterMutation } from '../utils/refreshAfterMutation';
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, useRef, useLayoutEffect } from 'react';
 import { User, Store, Device, Sale, Supplier, SupplierInvoice, SupplierBonus, Expense, Owner, OwnerTransaction, RepairTicket, RepairStatus, TransferRequest, AuditLogEntry, DailyRate, PageId, PaymentMethod, ExpenseCategory, ThemeMode } from '../types';
 import { useSharedState } from '../hooks/useSharedState';
@@ -472,7 +474,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // Bounded — no page needs the full transfer history for correctness (no cross-page
   // lookup depends on it, unlike sales/devices), so a generous cap is enough.
   const fetchTransfers = useCallback(() => coalesceFetch('transfers', async () => {
-    const raw = await apiClient<any[]>('/transfers?limit=500');
+    const raw = await fetchAllPages<any>('/transfers');
     setTransfers(raw.map((t) => mapTransfer(t, namesRef.current)).sort((a, b) => new Date(b.requestedAt).getTime() - new Date(a.requestedAt).getTime()));
   }), [coalesceFetch]);
 
@@ -501,8 +503,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     try {
       const raw = await apiClient<any[]>('/suppliers');
       setSuppliers(raw.map(mapSupplier));
-    } catch {
+    } catch (error) {
       // ADMIN/PARTNER only — leave empty for SELLER users
+      if ((error as { status?: number }).status !== 403) throw error;
     }
   }), [coalesceFetch]);
 
@@ -512,8 +515,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     try {
       const raw = await apiClient<any[]>('/supplier-invoices?limit=500');
       setInvoices(raw.map(mapSupplierInvoice).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
-    } catch {
+    } catch (error) {
       // ADMIN/PARTNER only — leave empty for SELLER users
+      if ((error as { status?: number }).status !== 403) throw error;
     }
   }), [coalesceFetch]);
 
@@ -537,10 +541,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // generous cap is enough (no search/widen infrastructure needed).
   const fetchBonuses = useCallback(() => coalesceFetch('bonuses', async () => {
     try {
-      const raw = await apiClient<any[]>('/supplier-bonuses?limit=500');
+      const raw = await fetchAllPages<any>('/supplier-bonuses');
       setBonuses(raw.map(mapSupplierBonus).sort((a, b) => new Date(b.dateReceived || b.date || 0).getTime() - new Date(a.dateReceived || a.date || 0).getTime()));
-    } catch {
+    } catch (error) {
       // ADMIN/PARTNER only — leave empty for SELLER users
+      if ((error as { status?: number }).status !== 403) throw error;
     }
   }), [coalesceFetch]);
 
@@ -572,8 +577,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const raw = await apiClient<any[]>('/owners');
       ownerNamesRef.current = new Map(raw.map((o) => [o.id, o.name]));
       setOwners(raw.map(mapOwner));
-    } catch {
+    } catch (error) {
       // SELLER role is forbidden from this endpoint — leave owners empty, not an error.
+      if ((error as { status?: number }).status !== 403) throw error;
     }
   }), [coalesceFetch]);
 
@@ -581,19 +587,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // nowhere near per-sale volume, so a generous cap is enough.
   const fetchOwnerTransactions = useCallback(() => coalesceFetch('ownerTransactions', async () => {
     try {
-      const raw = await apiClient<any[]>('/owner-transactions?limit=2000');
+      const raw = await fetchAllPages<any>('/owner-transactions');
       setOwnerTransactions(raw.map((t) => mapOwnerTransaction(t, ownerNamesRef.current, namesRef.current)).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
-    } catch {
+    } catch (error) {
       // ADMIN/PARTNER only
+      if ((error as { status?: number }).status !== 403) throw error;
     }
   }), [coalesceFetch]);
 
   const fetchAuditLogs = useCallback(() => coalesceFetch('auditLogs', async () => {
     try {
-      const raw = await apiClient<any[]>('/audit-logs');
+      const raw = await fetchAllPages<any>('/audit-logs');
       setAuditLogs(raw.map(mapAuditLog).sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()));
-    } catch {
+    } catch (error) {
       // ADMIN only
+      if ((error as { status?: number }).status !== 403) throw error;
     }
   }), [coalesceFetch]);
 
@@ -767,6 +775,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, [refetchAll, pageFetchers, fetcherKeyMap]);
 
   useRealtimeSync(authToken, (type: string) => {
+    window.dispatchEvent(new Event('business-data-changed'));
     const tasks = tasksForRealtimeEvent(type);
     if (tasks) {
       for (const t of tasks) pendingRealtimeTasks.current.add(t);
@@ -881,7 +890,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         }),
       });
       markLocalMutation(['sales', 'devices', 'stores', 'owners']);
-      await Promise.all([fetchSales(), fetchDevices(), fetchStores(), fetchOwners()]);
+      await refreshAfterMutation([fetchSales(), fetchDevices(), fetchStores(), fetchOwners()]);
       return { success: true, receiptNumber: sale.receiptNumber };
     } catch (err) {
       return { success: false, message: errorMessage(err, 'Не удалось выполнить продажу') };
@@ -934,7 +943,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         }),
       });
       markLocalMutation(['sales', 'devices', 'stores', 'owners']);
-      await Promise.all([fetchSales(), fetchDevices(), fetchStores(), fetchOwners()]);
+      await refreshAfterMutation([fetchSales(), fetchDevices(), fetchStores(), fetchOwners()]);
       return { success: true };
     } catch (err) {
       return { success: false, message: errorMessage(err, 'Не удалось выполнить обмен') };
@@ -948,7 +957,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         body: JSON.stringify({ reason, refundAmountTjs, penaltyFeeTjs, paymentMethod }),
       });
       markLocalMutation(['sales', 'devices', 'stores', 'owners']);
-      await Promise.all([fetchSales(), fetchDevices(), fetchStores(), fetchOwners()]);
+      await refreshAfterMutation([fetchSales(), fetchDevices(), fetchStores(), fetchOwners()]);
       return { success: true };
     } catch (err) {
       return { success: false, message: errorMessage(err, 'Не удалось выполнить возврат') };
@@ -963,7 +972,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         body: JSON.stringify({ supplierId, invoiceNumber, date, isStorePurchase, storeId: destStoreId, groups }),
       });
       markLocalMutation(['devices', 'suppliers', 'invoices', 'bonuses']);
-      await Promise.all([fetchDevices(), fetchSuppliers(), fetchInvoices(), fetchBonuses()]);
+      await refreshAfterMutation([fetchDevices(), fetchSuppliers(), fetchInvoices(), fetchBonuses()]);
       return { success: true };
     } catch (err) {
       return { success: false, message: errorMessage(err, 'Не удалось создать приход') };
@@ -974,7 +983,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     try {
       await apiClient('/suppliers', { method: 'POST', body: JSON.stringify({ name, phone, contactPerson }) });
       markLocalMutation(['suppliers']);
-      await fetchSuppliers();
+      await refreshAfterMutation([fetchSuppliers()]);
       return { success: true };
     } catch (err) {
       return { success: false, message: errorMessage(err, 'Не удалось добавить поставщика') };
@@ -985,7 +994,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     try {
       await apiClient(`/suppliers/${id}`, { method: 'PUT', body: JSON.stringify(data) });
       markLocalMutation(['devices', 'suppliers', 'invoices', 'bonuses']);
-      await Promise.all([fetchDevices(), fetchSuppliers(), fetchInvoices(), fetchBonuses()]);
+      await refreshAfterMutation([fetchDevices(), fetchSuppliers(), fetchInvoices(), fetchBonuses()]);
       return { success: true };
     } catch (err) {
       return { success: false, message: errorMessage(err, 'Не удалось обновить поставщика') };
@@ -996,7 +1005,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     try {
       await apiClient(`/suppliers/${id}`, { method: 'DELETE' });
       markLocalMutation(['devices', 'suppliers', 'invoices', 'bonuses']);
-      await Promise.all([fetchDevices(), fetchSuppliers(), fetchInvoices(), fetchBonuses()]);
+      await refreshAfterMutation([fetchDevices(), fetchSuppliers(), fetchInvoices(), fetchBonuses()]);
       return { success: true };
     } catch (err) {
       return { success: false, message: errorMessage(err, 'Не удалось удалить поставщика') };
@@ -1007,7 +1016,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     try {
       await apiClient(`/supplier-invoices/${id}`, { method: 'PUT', body: JSON.stringify(data) });
       markLocalMutation(['devices', 'suppliers', 'invoices', 'bonuses']);
-      await Promise.all([fetchDevices(), fetchSuppliers(), fetchInvoices(), fetchBonuses()]);
+      await refreshAfterMutation([fetchDevices(), fetchSuppliers(), fetchInvoices(), fetchBonuses()]);
       return { success: true };
     } catch (err) {
       return { success: false, message: errorMessage(err, 'Не удалось обновить накладную') };
@@ -1018,7 +1027,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     try {
       await apiClient(`/supplier-invoices/${id}`, { method: 'DELETE' });
       markLocalMutation(['devices', 'suppliers', 'invoices', 'bonuses']);
-      await Promise.all([fetchDevices(), fetchSuppliers(), fetchInvoices(), fetchBonuses()]);
+      await refreshAfterMutation([fetchDevices(), fetchSuppliers(), fetchInvoices(), fetchBonuses()]);
       return { success: true };
     } catch (err) {
       return { success: false, message: errorMessage(err, 'Не удалось удалить накладную') };
@@ -1029,7 +1038,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // every module in the app (refetchAll) after each save was why this felt slow.
   const refetchAfterBonusChange = () => {
     markLocalMutation(['bonuses', 'devices', 'owners']);
-    return Promise.all([fetchBonuses(), fetchDevices(), fetchOwners()]);
+    return refreshAfterMutation([fetchBonuses(), fetchDevices(), fetchOwners()]);
   };
 
   const createSupplierBonus: AppContextType['createSupplierBonus'] = async ({ supplierId, campaignTitle, bonusType, amountUsd, freeDevices, destinationLocationId }) => {
@@ -1085,7 +1094,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         body: JSON.stringify({ fromStoreId: fromLocId, toStoreId: toLocationId, deviceIds }),
       });
       markLocalMutation(['transfers', 'devices']);
-      await Promise.all([fetchTransfers(), fetchDevices()]);
+      await refreshAfterMutation([fetchTransfers(), fetchDevices()]);
       return { success: true };
     } catch (err) {
       return { success: false, message: errorMessage(err, 'Не удалось создать перемещение') };
@@ -1096,7 +1105,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     try {
       await apiClient(`/transfers/${transferId}/approve`, { method: 'POST' });
       markLocalMutation(['transfers', 'devices']);
-      await Promise.all([fetchTransfers(), fetchDevices()]);
+      await refreshAfterMutation([fetchTransfers(), fetchDevices()]);
       return { success: true };
     } catch (err) {
       return { success: false, message: errorMessage(err, 'Не удалось подтвердить перемещение') };
@@ -1107,7 +1116,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     try {
       await apiClient(`/transfers/${transferId}/reject`, { method: 'POST', body: JSON.stringify({ reason }) });
       markLocalMutation(['transfers', 'devices']);
-      await Promise.all([fetchTransfers(), fetchDevices()]);
+      await refreshAfterMutation([fetchTransfers(), fetchDevices()]);
       return { success: true };
     } catch (err) {
       return { success: false, message: errorMessage(err, 'Не удалось отклонить перемещение') };
@@ -1124,7 +1133,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         body: JSON.stringify({ ...data, storeId }),
       });
       markLocalMutation(['repairs']);
-      await fetchRepairs();
+      await refreshAfterMutation([fetchRepairs()]);
       return { success: true, ticketNumber: ticket.ticketNumber };
     } catch (err) {
       return { success: false, message: errorMessage(err, 'Не удалось оформить ремонт') };
@@ -1138,7 +1147,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         body: JSON.stringify({ status: newStatus, note, finalCostTjs: costTjs }),
       });
       markLocalMutation(['repairs', 'expenses', 'stores', 'owners']);
-      await Promise.all([fetchRepairs(), fetchExpenses(), fetchStores(), fetchOwners()]);
+      await refreshAfterMutation([fetchRepairs(), fetchExpenses(), fetchStores(), fetchOwners()]);
       return { success: true };
     } catch (err) {
       return { success: false, message: errorMessage(err, 'Не удалось обновить статус ремонта') };
@@ -1159,7 +1168,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         }),
       });
       markLocalMutation(['suppliers', 'invoices', 'stores']);
-      await Promise.all([fetchSuppliers(), fetchInvoices(), fetchStores()]);
+      await refreshAfterMutation([fetchSuppliers(), fetchInvoices(), fetchStores()]);
       return { success: true };
     } catch (err) {
       return { success: false, message: errorMessage(err, 'Не удалось провести оплату поставщику') };
@@ -1179,7 +1188,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         }),
       });
       markLocalMutation(['suppliers', 'invoices', 'stores']);
-      await Promise.all([fetchSuppliers(), fetchInvoices(), fetchStores()]);
+      await refreshAfterMutation([fetchSuppliers(), fetchInvoices(), fetchStores()]);
       return { success: true };
     } catch (err) {
       return { success: false, message: errorMessage(err, 'Не удалось провести оплату по накладной') };
@@ -1193,7 +1202,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         body: JSON.stringify({ category, amountTjs, targetType, storeId, sourceAccount, comment, description, paidFromCashRegister, employeeId, isEmployeeAdvance }),
       });
       markLocalMutation(['expenses', 'stores', 'owners']);
-      await Promise.all([fetchExpenses(), fetchStores(), fetchOwners()]);
+      await refreshAfterMutation([fetchExpenses(), fetchStores(), fetchOwners()]);
       return { success: true };
     } catch (err) {
       return { success: false, message: errorMessage(err, 'Не удалось зарегистрировать расход') };
@@ -1207,7 +1216,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         body: JSON.stringify(data),
       });
       markLocalMutation(['expenses', 'stores', 'owners']);
-      await Promise.all([fetchExpenses(), fetchStores(), fetchOwners()]);
+      await refreshAfterMutation([fetchExpenses(), fetchStores(), fetchOwners()]);
       return { success: true };
     } catch (err) {
       return { success: false, message: errorMessage(err, 'Не удалось обновить расход') };
@@ -1218,7 +1227,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     try {
       await apiClient(`/expenses/${id}`, { method: 'DELETE' });
       markLocalMutation(['expenses', 'stores', 'owners']);
-      await Promise.all([fetchExpenses(), fetchStores(), fetchOwners()]);
+      await refreshAfterMutation([fetchExpenses(), fetchStores(), fetchOwners()]);
       return { success: true };
     } catch (err) {
       return { success: false, message: errorMessage(err, 'Не удалось удалить расход') };
@@ -1229,7 +1238,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     try {
       await apiClient(`/expenses/${id}/pay`, { method: 'POST', body: JSON.stringify({ storeId }) });
       markLocalMutation(['expenses', 'stores']);
-      await Promise.all([fetchExpenses(), fetchStores()]);
+      await refreshAfterMutation([fetchExpenses(), fetchStores()]);
       return { success: true };
     } catch (err) {
       return { success: false, message: errorMessage(err, 'Не удалось оплатить расход') };
@@ -1240,11 +1249,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     try {
       await apiClient('/owners/init', { method: 'POST' });
       markLocalMutation(['owners', 'ownerTransactions']);
-      await Promise.all([fetchOwners(), fetchOwnerTransactions()]);
+      await refreshAfterMutation([fetchOwners(), fetchOwnerTransactions()]);
       return { success: true };
     } catch (err) {
       try {
-        await fetchOwners();
+        await refreshAfterMutation([fetchOwners()]);
         return { success: true };
       } catch (innerErr) {
         return { success: false, message: errorMessage(err, 'Не удалось инициализировать владельцев') };
@@ -1256,7 +1265,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     try {
       await apiClient(`/owners/${ownerId}/investment`, { method: 'POST', body: JSON.stringify({ amountUsd, destination, note }) });
       markLocalMutation(['owners', 'ownerTransactions', 'stores']);
-      await Promise.all([fetchOwners(), fetchOwnerTransactions(), fetchStores()]);
+      await refreshAfterMutation([fetchOwners(), fetchOwnerTransactions(), fetchStores()]);
       return { success: true };
     } catch (err) {
       return { success: false, message: errorMessage(err, 'Нет прав') };
@@ -1267,7 +1276,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     try {
       await apiClient(`/owners/${ownerId}/withdrawal`, { method: 'POST', body: JSON.stringify({ amountUsd, source, note }) });
       markLocalMutation(['owners', 'ownerTransactions', 'stores']);
-      await Promise.all([fetchOwners(), fetchOwnerTransactions(), fetchStores()]);
+      await refreshAfterMutation([fetchOwners(), fetchOwnerTransactions(), fetchStores()]);
       return { success: true };
     } catch (err) {
       return { success: false, message: errorMessage(err, 'Сумма изъятия превышает текущий капитал') };
@@ -1278,7 +1287,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     try {
       await apiClient(`/owners/${ownerId}/payout`, { method: 'POST', body: JSON.stringify({ amountUsd, source, note }) });
       markLocalMutation(['owners', 'ownerTransactions', 'stores']);
-      await Promise.all([fetchOwners(), fetchOwnerTransactions(), fetchStores()]);
+      await refreshAfterMutation([fetchOwners(), fetchOwnerTransactions(), fetchStores()]);
       return { success: true };
     } catch (err) {
       return { success: false, message: errorMessage(err, 'Сумма выплаты превышает доступную прибыль') };
@@ -1289,7 +1298,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     try {
       await apiClient(`/owners/${ownerId}/reinvest`, { method: 'POST', body: JSON.stringify({ amountUsd, note }) });
       markLocalMutation(['owners', 'ownerTransactions']);
-      await Promise.all([fetchOwners(), fetchOwnerTransactions()]);
+      await refreshAfterMutation([fetchOwners(), fetchOwnerTransactions()]);
       return { success: true };
     } catch (err) {
       return { success: false, message: errorMessage(err, 'Сумма реинвестирования превышает доступную прибыль') };
@@ -1314,7 +1323,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     try {
       await apiClient('/owners/profit-shares', { method: 'POST', body: JSON.stringify({ shares, rebalanceBalances }) });
       markLocalMutation(['owners']);
-      await fetchOwners();
+      await refreshAfterMutation([fetchOwners()]);
       return { success: true };
     } catch (err) {
       return { success: false, message: errorMessage(err, 'Сумма долей должна равняться 100%') };
@@ -1325,7 +1334,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     try {
       await apiClient(`/owners/${ownerId}/link-user`, { method: 'POST', body: JSON.stringify({ userId }) });
       markLocalMutation(['owners']);
-      await fetchOwners();
+      await refreshAfterMutation([fetchOwners()]);
       return { success: true };
     } catch (err) {
       return { success: false, message: errorMessage(err, 'Не удалось привязать аккаунт') };
@@ -1347,7 +1356,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         }),
       });
       markLocalMutation(['users']);
-      await fetchUsers();
+      await refreshAfterMutation([fetchUsers()]);
       return { success: true };
     } catch (err) {
       return { success: false, message: errorMessage(err, 'Пользователь с таким логином уже существует') };
@@ -1376,13 +1385,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         await apiClient(`/users/${userData.id}/status`, { method: 'PATCH', body: JSON.stringify({ active: nextActive }) });
       }
       markLocalMutation(['users', 'owners']);
-      await fetchUsers();
+      await refreshAfterMutation([fetchUsers()]);
       if (currentUser?.id === userData.id) {
         const mapped = mapUser(updated, storeNamesRef.current);
         useAuthStore.getState().setAuth(mapped, authToken || '');
         setCurrentUserState(mapped);
       }
-      await fetchOwners();
+      await refreshAfterMutation([fetchOwners()]);
       return { success: true };
     } catch (err) {
       return { success: false, message: errorMessage(err, 'Не удалось обновить данные сотрудника') };
@@ -1393,7 +1402,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     try {
       await apiClient(`/users/${userId}`, { method: 'DELETE' });
       markLocalMutation(['users']);
-      await fetchUsers();
+      await refreshAfterMutation([fetchUsers()]);
       return { success: true };
     } catch (err) {
       return { success: false, message: errorMessage(err, 'Не удалось удалить сотрудника (возможно, у него есть история операций)') };
@@ -1417,7 +1426,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     try {
       await apiClient('/stores', { method: 'POST', body: JSON.stringify({ name, address }) });
       markLocalMutation(['stores']);
-      await fetchStores();
+      await refreshAfterMutation([fetchStores()]);
       return { success: true };
     } catch (err) {
       return { success: false, message: errorMessage(err, 'Укажите название магазина') };
@@ -1468,7 +1477,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     try {
       await apiClient('/owners/quarter-close', { method: 'POST', body: JSON.stringify({ quarterName, transferRemainingToCapital }) });
       markLocalMutation(['owners']);
-      await fetchOwners();
+      await refreshAfterMutation([fetchOwners()]);
       return { success: true };
     } catch (err) {
       return { success: false, message: errorMessage(err, 'Нет прав') };

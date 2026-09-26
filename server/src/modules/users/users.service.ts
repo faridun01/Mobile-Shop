@@ -3,11 +3,21 @@ import { prisma } from '../../prisma/prisma.service';
 import { AuthService } from '../../auth/auth.service';
 import { resolveActor } from '../../common/actor';
 import { RealtimeSyncGateway } from '../../websocket/websocket.gateway';
+import { D } from '../../common/decimal';
+import { requireNonNegativeMoney } from '../../common/money';
+
+function validateCompensation(input: { baseSalaryTjs?: MoneyInput; salesCommissionPercent?: number }) {
+  if (input.baseSalaryTjs !== undefined) input.baseSalaryTjs = requireNonNegativeMoney(input.baseSalaryTjs, 'Оклад');
+  if (input.salesCommissionPercent !== undefined) {
+    const value = D(input.salesCommissionPercent);
+    if (value.lt(0) || value.gt(100)) throw new Error('Комиссия должна быть от 0 до 100%');
+  }
+}
 
 const MIN_PASSWORD_LENGTH = 6;
 
 function requireValidPassword(password: string): string {
-  if (password.length < MIN_PASSWORD_LENGTH) {
+  if (typeof password !== 'string' || password.length < MIN_PASSWORD_LENGTH) {
     throw new Error(`Пароль должен содержать не менее ${MIN_PASSWORD_LENGTH} символов`);
   }
   return password;
@@ -57,6 +67,9 @@ export class UsersService {
     salesCommissionPercent?: number;
     createdByUserId: string;
   }) {
+    validateCompensation(input);
+    if (typeof input.name !== 'string' || !input.name.trim() || typeof input.login !== 'string' || !input.login.trim()) throw new Error('Укажите имя и логин');
+    input.name = input.name.trim(); input.login = input.login.trim();
     return prisma.$transaction(async (tx) => {
       const actor = await resolveActor(tx, input.createdByUserId);
       const existing = await tx.user.findUnique({ where: { login: input.login } });
@@ -100,6 +113,7 @@ export class UsersService {
     },
     updatedByUserId: string,
   ) {
+    validateCompensation(input);
     const updatedUser = await prisma.$transaction(async (tx) => {
       const actor = await resolveActor(tx, updatedByUserId);
       const targetUser = await tx.user.findUnique({ where: { id: userId } });

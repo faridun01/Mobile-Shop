@@ -2,6 +2,9 @@ import { D, moneyJson, type MoneyInput } from '../../common/decimal';
 import { prisma } from '../../prisma/prisma.service';
 import { resolveActor } from '../../common/actor';
 import { getStoreCashAccount } from '../finance/account.service';
+import { postTransaction } from '../finance/financial-transaction.service';
+import { requireTodayRate } from '../exchange-rate/exchange-rate.service';
+import { roundMoney } from '../../common/money';
 
 export class StoresService {
   public static async create(name: string, address: string | undefined, userId: string) {
@@ -38,10 +41,15 @@ export class StoresService {
 
   public static async remove(storeId: string, userId: string) {
     return prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM stores WHERE id = ${storeId} FOR UPDATE`;
       const actor = await resolveActor(tx, userId);
       const store = await tx.store.findUnique({ where: { id: storeId } });
       if (!store) throw new Error('Магазин не найден');
       if (store.isMainWarehouse) throw new Error('Центральный (Главный) склад нельзя удалить. Он всегда остается в системе.');
+      const cashAccount = await tx.financialAccount.findUnique({ where: { storeId } });
+      if (!D(store.cashBalanceTjs).isZero() || (cashAccount && (!D(cashAccount.balanceTjs).isZero() || !D(cashAccount.balanceUsd).isZero()))) {
+        throw new Error('Нельзя удалить филиал с ненулевым остатком кассы. Сначала выполните объединение филиалов.');
+      }
 
       const mainWarehouse = await tx.store.findFirst({ where: { isMainWarehouse: true } });
       if (!mainWarehouse) throw new Error('Главный склад не найден в системе');
@@ -82,8 +90,8 @@ export class StoresService {
    * Manually corrects a store's cash balance to an exact value — for reconciling
    * drift from historical bugs/edge cases (e.g. legacy data inconsistencies) without
    * needing direct database access. Logged to the audit trail with the reason and
-   * the old→new values; deliberately NOT written to the ledger, since a correction
-   * isn't a real cash movement and shouldn't appear as fake revenue/expense in P&L.
+   * the old→new values. A distinct ADJUSTMENT preserves cash reconciliation without
+   * changing sales/expense-based profit reports.
    */
   public static async adjustCashBalance(storeId: string, newBalanceTjs: MoneyInput, reason: string, userId: string) {
     if (!D(newBalanceTjs).isFinite()) throw new Error('Укажите корректную сумму');
@@ -91,17 +99,22 @@ export class StoresService {
 
     return prisma.$transaction(async (tx) => {
       const actor = await resolveActor(tx, userId);
+      await tx.$queryRaw`SELECT id FROM stores WHERE id = ${storeId} FOR UPDATE`;
       const store = await tx.store.findUnique({ where: { id: storeId } });
       if (!store) throw new Error('Магазин не найден');
 
       const roundedBalance = D(D(D(newBalanceTjs).mul(100)).round()).div(100);
-      const updated = await tx.store.update({ where: { id: storeId }, data: { cashBalanceTjs: roundedBalance } });
-
-      // Keep the linked FinancialAccount's balance in lockstep with the store's —
-      // same "set to an exact value, not logged as a ledger movement" correction,
-      // just mirrored onto the account the finance module actually reads.
       const account = await getStoreCashAccount(tx, storeId, store.name);
-      await tx.financialAccount.update({ where: { id: account.id }, data: { balanceTjs: roundedBalance } });
+      const delta = roundedBalance.minus(account.balanceTjs);
+      const updated = await tx.store.update({ where: { id: storeId }, data: { cashBalanceTjs: roundedBalance } });
+      if (!delta.isZero()) {
+        const rate = await requireTodayRate(tx);
+        await postTransaction(tx, { type: 'ADJUSTMENT', direction: delta.gt(0) ? 'IN' : 'OUT', numberPrefix: 'ADJ',
+          accountId: account.id, balanceCurrency: 'TJS', amount: delta.abs(), currency: 'TJS', exchangeRate: rate,
+          amountTjs: delta.abs(), amountUsd: roundMoney(delta.abs().div(rate)), categoryName: 'Корректировка кассы',
+          shopId: storeId, sourceType: 'STORE_ADJUSTMENT', sourceId: storeId, guardBalance: false,
+          description: reason.trim(), createdByUserId: actor.id });
+      }
 
       await tx.auditLog.create({
         data: {

@@ -1,3 +1,4 @@
+import { getBusinessDateKey } from '../../utils/businessDate';
 import React, { useState, useMemo } from 'react';
 import { useAppFields } from '../../context/AppContext';
 import {
@@ -46,9 +47,9 @@ const getLogCategory = (log: { action?: string; details?: string; category?: str
 };
 
 export const AuditLogPage: React.FC = () => {
-  const { auditLogs } = useAppFields('auditLogs');
+  const { auditLogs, currentUser } = useAppFields('auditLogs', 'currentUser');
 
-  const todayStr = useMemo(() => new Date().toISOString().substring(0, 10), []);
+  const todayStr = useMemo(() => getBusinessDateKey(), []);
 
   const [dateFilterMode, setDateFilterMode] = useState<DateFilterMode>('TODAY');
   const [selectedDate, setSelectedDate] = useState<string>(todayStr);
@@ -60,10 +61,10 @@ export const AuditLogPage: React.FC = () => {
   const filteredLogs = useMemo(() => {
     return auditLogs.filter((log) => {
       if (dateFilterMode === 'TODAY') {
-        const logDateStr = log.timestamp ? log.timestamp.substring(0, 10) : '';
+        const logDateStr = log.timestamp ? getBusinessDateKey(new Date(log.timestamp)) : '';
         if (logDateStr !== todayStr) return false;
       } else if (dateFilterMode === 'SPECIFIC') {
-        const logDateStr = log.timestamp ? log.timestamp.substring(0, 10) : '';
+        const logDateStr = log.timestamp ? getBusinessDateKey(new Date(log.timestamp)) : '';
         if (logDateStr !== selectedDate) return false;
       }
 
@@ -124,6 +125,8 @@ export const AuditLogPage: React.FC = () => {
       default: return 'СИСТЕМНОЕ';
     }
   };
+
+  if (currentUser?.role !== 'ADMIN') return <div role="alert" className="p-6">??? ??????? ? ??????? ??????</div>;
 
   return (
     <div className="flex-1 flex flex-col h-full overflow-hidden bg-bg text-fg-muted">

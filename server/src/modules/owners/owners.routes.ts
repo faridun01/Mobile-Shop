@@ -43,8 +43,9 @@ export function registerOwnerRoutes(app: Express) {
       // Owner-level capital moves (investment/withdrawal/payout/reinvest) are nowhere near
       // per-sale volume, so a generous opt-in cap is enough — existing callers that don't
       // pass it keep today's full-history behavior.
+      const cursor = typeof req.query.cursor === 'string' ? req.query.cursor : undefined;
       const limit = req.query.limit !== undefined ? Math.min(Math.max(Number(req.query.limit) || 0, 1), 5000) : undefined;
-      res.json(await prisma.ownerTransaction.findMany({ orderBy: { createdAt: 'desc' }, ...(limit ? { take: limit } : {}) }));
+      res.json(await prisma.ownerTransaction.findMany({ orderBy: [{ createdAt: 'desc' }, { id: 'desc' }], ...(cursor ? { skip: 1, cursor: { id: cursor } } : {}), ...(limit ? { take: limit } : {}) }));
     } catch (error) {
       next(error);
     }

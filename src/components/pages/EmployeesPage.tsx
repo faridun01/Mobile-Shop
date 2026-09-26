@@ -1,3 +1,5 @@
+import { decimal, moneyNumber } from '../../utils/money';
+import { getBusinessDateKey } from '../../utils/businessDate';
 import React, { useState, useEffect, useMemo } from 'react';
 import { useAppFields } from '../../context/AppContext';
 import { User, Role } from '../../types';
@@ -61,7 +63,7 @@ export const EmployeesPage: React.FC = () => {
   const [financialHistoryUser, setFinancialHistoryUser] = useState<User | null>(null);
   const [selectedHistoryMonth, setSelectedHistoryMonth] = useState<string>('ALL');
   const [isPayrollReportModalOpen, setIsPayrollReportModalOpen] = useState(false);
-  const [selectedPayrollMonth, setSelectedPayrollMonth] = useState<string>(new Date().toISOString().substring(0, 7));
+  const [selectedPayrollMonth, setSelectedPayrollMonth] = useState<string>(getBusinessDateKey().substring(0, 7));
 
   // Form fields
   const [name, setName] = useState('');
@@ -369,7 +371,7 @@ export const EmployeesPage: React.FC = () => {
 
     // Calculate advances to deduct — scoped to the current month only, since advances
     // already deducted in a past payout must not be subtracted again every month.
-    const currentMonth = new Date().toISOString().substring(0, 7);
+    const currentMonth = getBusinessDateKey().substring(0, 7);
     const empExpenses = expenses.filter(e =>
       (e.employeeId === salaryPayoutUser.id || (e.isEmployeeAdvance && e.employeeName === salaryPayoutUser.name)) &&
       (e.category === 'EMPLOYEE_ADVANCE' || e.isEmployeeAdvance) &&
@@ -517,13 +519,14 @@ export const EmployeesPage: React.FC = () => {
 
                 <div className="flex items-center space-x-1 shrink-0">
                   <button
+                    hidden={currentUser?.role !== 'ADMIN'}
                     onClick={() => handleOpenEdit(u)}
                     className="p-2 rounded-xl bg-surface-raised hover:bg-surface text-fg-subtle hover:text-fg-muted border border-border transition-colors"
                     title="Редактировать сотрудника"
                   >
                     <Edit2 className="w-3.5 h-3.5" />
                   </button>
-                  {currentUser?.id !== u.id && (
+                  {currentUser?.role === 'ADMIN' && currentUser.id !== u.id && (
                     <button
                       onClick={() => handleDeleteUserClick(u)}
                       className="p-2 rounded-xl bg-surface-raised hover:bg-danger/20 text-fg-subtle hover:text-danger border border-border transition-colors"
@@ -636,12 +639,12 @@ export const EmployeesPage: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => {
-                      const thisMonth = new Date().toISOString().substring(0, 7);
-                      const empSales = sales.filter(s => s.sellerId === u.id && s.status !== 'REFUNDED' && s.date.startsWith(thisMonth));
+                      const thisMonth = getBusinessDateKey().substring(0, 7);
+                      const empSales = sales.filter(s => s.sellerId === u.id && s.status !== 'REFUNDED' && getBusinessDateKey(new Date(s.date)).startsWith(thisMonth));
                       const salesRevTjs = empSales.reduce((sum, s) => sum + s.totalTjs, 0);
                       const baseSal = u.baseSalaryTjs || 0;
                       const commPct = u.salesCommissionPercent || 0;
-                      const commAmount = Math.round(salesRevTjs * (commPct / 100));
+                      const commAmount = moneyNumber(decimal(salesRevTjs).mul(commPct).div(100));
                       const autoGross = baseSal + commAmount;
 
                       setSalaryPayoutUser(u);
@@ -667,13 +670,14 @@ export const EmployeesPage: React.FC = () => {
 
                 <div className="flex space-x-1.5">
                   <button
+                    hidden={currentUser?.role !== 'ADMIN'}
                     onClick={() => handleOpenEdit(u)}
                     className="flex-1 py-1.5 rounded-lg bg-surface-raised hover:bg-surface border border-border text-[11px] font-bold text-fg-muted hover:text-accent flex items-center justify-center space-x-1 transition-colors"
                   >
                     <Edit2 className="w-3 h-3 text-accent" />
                     <span>ИЗМЕНИТЬ</span>
                   </button>
-                  {currentUser?.id !== u.id && (
+                  {currentUser?.role === 'ADMIN' && currentUser.id !== u.id && (
                     <button
                       onClick={() => handleDeleteUserClick(u)}
                       className="py-1.5 px-2.5 rounded-lg bg-danger/10 hover:bg-danger/20 border border-danger/30 text-[11px] text-danger hover:text-danger flex items-center justify-center transition-colors"
@@ -710,7 +714,7 @@ export const EmployeesPage: React.FC = () => {
           </button>
 
           <button
-            onClick={handleOpenAdd}
+            hidden={currentUser?.role !== 'ADMIN'} onClick={handleOpenAdd}
             className="px-3.5 py-2 rounded-xl bg-accent hover:bg-accent-strong text-xs font-bold text-accent-fg uppercase tracking-wider flex items-center space-x-1.5 transition-colors shadow-xs shrink-0"
           >
             <Plus className="w-4 h-4" />
@@ -871,7 +875,7 @@ export const EmployeesPage: React.FC = () => {
                 <div className="grid grid-cols-2 gap-2.5 p-3 rounded-lg bg-surface-raised border border-border">
                   <div>
                     <label className="block text-accent text-[10px] uppercase mb-1 font-bold">ОКЛАД (TJS/МЕС)</label>
-                    <input
+                    <input step="0.01"
                       type="number"
                       min="0"
                       value={baseSalaryTjs}
@@ -886,7 +890,7 @@ export const EmployeesPage: React.FC = () => {
                       type="number"
                       min="0"
                       max="100"
-                      step="0.1"
+                      step="0.0001"
                       value={salesCommissionPercent}
                       onChange={(e) => setSalesCommissionPercent(e.target.value)}
                       placeholder="2.5"
@@ -1003,9 +1007,9 @@ export const EmployeesPage: React.FC = () => {
               <div>
                 <label className="block text-warning text-[10px] uppercase mb-1 font-bold">СУММА АВАНСА (TJS) *</label>
                 <div className="relative">
-                  <input
+                  <input step="0.01"
                     type="number"
-                    min="1"
+                    min="0.01"
                     required
                     value={advanceAmountInput}
                     onChange={(e) => setAdvanceAmountInput(e.target.value)}
@@ -1069,19 +1073,19 @@ export const EmployeesPage: React.FC = () => {
             </div>
 
             {(() => {
-              const thisMonth = new Date().toISOString().substring(0, 7);
+              const thisMonth = getBusinessDateKey().substring(0, 7);
               const empExpenses = expenses.filter(e =>
                 (e.employeeId === salaryPayoutUser.id || (e.isEmployeeAdvance && e.employeeName === salaryPayoutUser.name)) &&
                 (e.category === 'EMPLOYEE_ADVANCE' || e.isEmployeeAdvance) &&
-                e.date.startsWith(thisMonth)
+                getBusinessDateKey(new Date(e.date)).startsWith(thisMonth)
               );
               const totalAdvances = empExpenses.reduce((sum, e) => sum + (e.amountTjs || 0), 0);
 
-              const empSales = sales.filter(s => s.sellerId === salaryPayoutUser.id && s.status !== 'REFUNDED' && s.date.startsWith(thisMonth));
+              const empSales = sales.filter(s => s.sellerId === salaryPayoutUser.id && s.status !== 'REFUNDED' && getBusinessDateKey(new Date(s.date)).startsWith(thisMonth));
               const salesRevTjs = empSales.reduce((sum, s) => sum + s.totalTjs, 0);
               const baseSal = salaryPayoutUser.baseSalaryTjs || 0;
               const commPct = salaryPayoutUser.salesCommissionPercent || 0;
-              const commAmount = Math.round(salesRevTjs * (commPct / 100));
+              const commAmount = moneyNumber(decimal(salesRevTjs).mul(commPct).div(100));
               const autoGross = baseSal + commAmount;
 
               const grossVal = parseFloat(grossSalaryInput) || 0;
@@ -1131,9 +1135,9 @@ export const EmployeesPage: React.FC = () => {
                   <div>
                     <label className="block text-accent text-[10px] uppercase mb-1 font-bold">НАЧИСЛЕНО ЗАРПЛАТЫ / БОНУСОВ (TJS) *</label>
                     <div className="relative">
-                      <input
+                      <input step="0.01"
                         type="number"
-                        min="1"
+                        min="0.01"
                         required
                         value={grossSalaryInput}
                         onChange={(e) => setGrossSalaryInput(e.target.value)}

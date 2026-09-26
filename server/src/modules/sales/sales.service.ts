@@ -1,4 +1,5 @@
 import { D, moneyJson, type MoneyInput } from '../../common/decimal';
+import { Prisma } from '@prisma/client';
 import { prisma } from '../../prisma/prisma.service';
 import type { TransactionClient } from '../../prisma/prisma.service';
 import { getRateForDate } from '../exchange-rate/exchange-rate.service';
@@ -61,6 +62,7 @@ export class SalesService {
       if (!store || !store.active || store.isMainWarehouse) {
         throw new Error('Продажа возможна только из активной торговой точки');
       }
+      await tx.$queryRaw(Prisma.sql`SELECT id FROM devices WHERE id IN (${Prisma.join(deviceIds)}) ORDER BY id FOR UPDATE`);
       const devices = await tx.device.findMany({
         where: {
           id: { in: deviceIds },

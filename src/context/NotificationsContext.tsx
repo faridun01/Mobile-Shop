@@ -35,7 +35,9 @@ export const NotificationsProvider: React.FC<{ children: React.ReactNode }> = ({
   const [notifications, setNotifications] = useSharedState<NotificationItem[]>([]);
 
   const fetchNotifications = useCallback(async () => {
+    const token = useAuthStore.getState().token;
     const raw = await apiClient<any[]>('/notifications');
+    if (useAuthStore.getState().token !== token) return;
     setNotifications(raw.map(mapNotification).sort((a, b) => new Date(b.date || b.timestamp || 0).getTime() - new Date(a.date || a.timestamp || 0).getTime()));
   }, []);
 
@@ -50,19 +52,22 @@ export const NotificationsProvider: React.FC<{ children: React.ReactNode }> = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authToken, authUser?.id]);
 
-  const markNotificationRead = useCallback((id: string) => {
+  const markNotificationRead = useCallback(async (id: string) => {
+    try { await apiClient(`/notifications/${id}/read`, { method: 'PATCH' }); }
+    catch { window.alert('Не удалось отметить уведомление прочитанным. Попробуйте ещё раз.'); return; }
     setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, read: true, isRead: true } : n)));
-    apiClient(`/notifications/${id}/read`, { method: 'PATCH' }).catch((e) => console.error(e));
   }, []);
 
-  const markAllNotificationsAsRead = useCallback(() => {
+  const markAllNotificationsAsRead = useCallback(async () => {
+    try { await apiClient('/notifications/read-all', { method: 'POST' }); }
+    catch { window.alert('Не удалось отметить уведомления прочитанными. Попробуйте ещё раз.'); return; }
     setNotifications((prev) => prev.map((n) => ({ ...n, read: true, isRead: true })));
-    apiClient('/notifications/read-all', { method: 'POST' }).catch((e) => console.error(e));
   }, []);
 
-  const resolveNotification = useCallback((id: string) => {
+  const resolveNotification = useCallback(async (id: string) => {
+    try { await apiClient(`/notifications/${id}/resolve`, { method: 'PATCH' }); }
+    catch { window.alert('Не удалось закрыть уведомление. Попробуйте ещё раз.'); return; }
     setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, resolved: true, read: true, isRead: true } : n)));
-    apiClient(`/notifications/${id}/resolve`, { method: 'PATCH' }).catch((e) => console.error(e));
   }, []);
 
   const value = useMemo<NotificationsContextType>(() => ({

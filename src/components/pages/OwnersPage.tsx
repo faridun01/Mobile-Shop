@@ -1,3 +1,4 @@
+import { getBusinessDateKey } from '../../utils/businessDate';
 import React, { useState, useMemo, useEffect } from 'react';
 import { useAppFields } from '../../context/AppContext';
 import { FALLBACK_EXCHANGE_RATE } from '../../utils/exchangeRate';
@@ -140,7 +141,7 @@ export const OwnersPage: React.FC = () => {
   // "Начислено прибыли" cards above) — a month filter is opt-in, not the default, so
   // nothing that was visible before this filter existed suddenly disappears.
   const [periodFilter, setPeriodFilter] = useState<'ALL' | 'SPECIFIC_MONTH'>('ALL');
-  const [selectedMonth, setSelectedMonth] = useState<string>(new Date().toISOString().substring(0, 7));
+  const [selectedMonth, setSelectedMonth] = useState<string>(getBusinessDateKey().substring(0, 7));
   const TRANSACTIONS_PAGE_SIZE = 15;
   const [transactionsPage, setTransactionsPage] = useState(1);
 
@@ -158,7 +159,7 @@ export const OwnersPage: React.FC = () => {
       if (selectedOwnerFilter !== 'ALL' && tx.ownerId !== selectedOwnerFilter) {
         return false;
       }
-      if (periodFilter === 'SPECIFIC_MONTH' && !(tx.date || '').split('T')[0].startsWith(selectedMonth)) {
+      if (periodFilter === 'SPECIFIC_MONTH' && !getBusinessDateKey(new Date(tx.date)).startsWith(selectedMonth)) {
         return false;
       }
       if (searchQuery.trim()) {
@@ -1034,9 +1035,9 @@ export const OwnersPage: React.FC = () => {
               <div>
                 <label className="block text-fg-subtle text-[11px] uppercase mb-1 font-semibold">СУММА ($ USD) *</label>
                 <div className="relative">
-                  <input
+                  <input step="0.01"
                     type="number"
-                    min="1"
+                    min="0.01"
                     required
                     value={amountUsd ?? ''}
                     onChange={(e) => setAmountUsd(e.target.value)}

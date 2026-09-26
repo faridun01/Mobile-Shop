@@ -1,3 +1,4 @@
+import { decimal, moneyNumber, sumMoney } from '../../utils/money';
 import React, { useState, useMemo } from 'react';
 import { useAppFields } from '../../context/AppContext';
 import { Device, PaymentMethod, Sale, SaleItem } from '../../types';
@@ -195,7 +196,7 @@ export const ExchangePage: React.FC = () => {
   };
 
   const differenceTjs = useMemo(() => {
-    return newPriceTjs - exchangeInValueTjs;
+    return moneyNumber(decimal(newPriceTjs).minus(exchangeInValueTjs));
   }, [newPriceTjs, exchangeInValueTjs]);
 
   const handleSubmitExchange = async (e: React.FormEvent) => {
@@ -371,7 +372,7 @@ export const ExchangePage: React.FC = () => {
                       ОЦЕНОЧНАЯ ЗАЧЕТНАЯ СТОИМОСТЬ (TJS):
                     </label>
                     <div className="relative">
-                      <input
+                      <input step="0.01"
                         type="number"
                         min="0"
                         value={exchangeInValueTjs !== 0 ? exchangeInValueTjs : ''}
@@ -430,7 +431,7 @@ export const ExchangePage: React.FC = () => {
                     </label>
                   </div>
                   <div className="relative">
-                    <input
+                    <input step="0.01"
                       type="number"
                       min="0"
                       value={newPriceTjs !== 0 ? newPriceTjs : ''}
@@ -563,7 +564,7 @@ export const ExchangePage: React.FC = () => {
                           ВНЕСЕНО КЛИЕНТОМ:
                         </label>
                         <div className="relative">
-                          <input
+                          <input step="0.01"
                             type="number"
                             min="0"
                             placeholder={differenceTjs.toString()}

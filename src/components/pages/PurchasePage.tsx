@@ -1,3 +1,4 @@
+import { decimal, moneyNumber, sumMoney } from '../../utils/money';
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { useAppFields } from '../../context/AppContext';
 import { SupplierInvoice, Device } from '../../types';
@@ -135,7 +136,7 @@ export const PurchasePage: React.FC = () => {
   // List search & filters
   const [searchQuery, setSearchQuery] = useState('');
   const [periodFilter, setPeriodFilter] = useState<'TODAY' | 'SPECIFIC_MONTH' | 'ALL'>('SPECIFIC_MONTH');
-  const [selectedMonth, setSelectedMonth] = useState<string>(new Date().toISOString().substring(0, 7));
+  const [selectedMonth, setSelectedMonth] = useState<string>(getBusinessDateKey().substring(0, 7));
   const [selectedSupplierFilter, setSelectedSupplierFilter] = useState<string>('all');
   const [selectedInvoiceId, setSelectedInvoiceId] = useState<string | null>(null);
   const selectedInvoice = supplierInvoices.find((inv) => inv.id === selectedInvoiceId) || null;
@@ -217,7 +218,7 @@ export const PurchasePage: React.FC = () => {
     // the company (e.g. a payment changing one invoice's status elsewhere).
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [supplierInvoices?.length]);
-  const [purchaseDate] = useState<string>(new Date().toISOString().split('T')[0]);
+  const [purchaseDate] = useState<string>(getBusinessDateKey());
   
   // Destination mode (Main Warehouse intake is ADMIN ONLY)
   const [isStorePurchase, setIsStorePurchase] = useState<boolean>(currentUser?.role !== 'ADMIN');
@@ -459,7 +460,7 @@ export const PurchasePage: React.FC = () => {
 
   // Quick batch paste IMEI helper
   const handleBatchImeiPaste = (groupIdx: number, text: string) => {
-    const rawLines = text.split(/[\n,\s]+/).map(s => s.trim()).filter(Boolean);
+    const rawLines = text.match(/\d{15}\s*\/\s*\d{15}|[^\s,]+/g)?.map(s => s.trim()) ?? [];
     if (rawLines.length > 0) {
       soundEffects.playAddToCartSuccess();
       setGroups(prev => {
@@ -477,10 +478,10 @@ export const PurchasePage: React.FC = () => {
 
   // Calculate totals for new intake form
   const totalFormUnits = groups.reduce((acc, g) => acc + g.items.filter(i => i.imei.trim().length > 0).length, 0);
-  const totalFormUsd = groups.reduce((acc, g) => {
+  const totalFormUsd = moneyNumber(groups.reduce((acc, g) => {
     const count = g.items.filter(i => i.imei.trim().length > 0).length;
-    return acc + (count * g.purchasePriceUsd);
-  }, 0);
+    return acc.plus(decimal(g.purchasePriceUsd || 0).mul(count));
+  }, decimal(0)));
 
   // Building the invoice no longer saves it straight away — validating the form opens a
   // receipt-style preview (like a чек) first, and only confirming that preview actually
@@ -1286,7 +1287,7 @@ export const PurchasePage: React.FC = () => {
                     type="number"
                     required
                     min="0"
-                    step="1"
+                    step="0.01"
                     value={group.purchasePriceUsd || ''}
                     onChange={(e) => handleUpdateGroup(groupIdx, 'purchasePriceUsd', parseFloat(e.target.value) || 0)}
                     className="w-full rounded-lg bg-surface-raised border border-border px-2.5 py-1.5 text-xs text-accent font-bold focus:border-accent focus:outline-none font-mono"

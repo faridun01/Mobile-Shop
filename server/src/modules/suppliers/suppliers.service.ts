@@ -8,6 +8,7 @@ import { getStoreCashAccount } from '../finance/account.service';
 import { currentOwnerAllocations, readOwnerAllocations, replaceOwnerAllocations } from '../finance/owner-allocations';
 import type { OwnerProfitAllocation } from '../sales/profit';
 import { postTransaction } from '../finance/financial-transaction.service';
+import { allocateMoney } from '../../common/allocation';
 
 /** True if any of these devices has a sale, transfer, or repair record referencing it (hard FK, no cascade). */
 async function deviceHasTransactionHistory(tx: TransactionClient, deviceIds: string[]): Promise<boolean> {
@@ -40,11 +41,22 @@ interface SupplierBonusInput {
   createdByUserId: string;
 }
 
+async function recordSupplierAudit(tx: TransactionClient, actorId: string | undefined, action: string, targetId: string, before: unknown, after: unknown) {
+  if (!actorId) return;
+  const actor = await resolveActor(tx, actorId);
+  await tx.auditLog.create({ data: { userId: actor.id, userName: actor.name, userRole: actor.role, action, targetId,
+    details: action, financialDetails: moneyJson({ before, after }) } });
+}
+
 export class SuppliersService {
-  public static async create(input: { name: string; phone?: string; contactPerson?: string }) {
+  public static async create(input: { name: string; phone?: string; contactPerson?: string }, actorId?: string) {
     const name = input.name?.trim();
     if (!name) throw new Error('Укажите название поставщика');
-    return prisma.supplier.create({ data: { name, phone: input.phone, contactPerson: input.contactPerson } });
+    return prisma.$transaction(async tx => {
+      const result = await tx.supplier.create({ data: { name, phone: input.phone, contactPerson: input.contactPerson } });
+      await recordSupplierAudit(tx, actorId, 'SUPPLIER_CREATE', result.id, null, result);
+      return result;
+    });
   }
 
   /** FIFO allocation across the supplier's open invoices, oldest first. */
@@ -60,6 +72,7 @@ export class SuppliersService {
       if (!supplier) throw new Error('Поставщик не найден');
       if (D(amountUsd).gt(supplier.totalDebtUsd)) throw new Error('Сумма оплаты превышает задолженность поставщику');
 
+      await tx.$queryRaw`SELECT id FROM supplier_invoices WHERE "supplierId" = ${input.supplierId} ORDER BY id FOR UPDATE`;
       const openInvoices = await tx.supplierInvoice.findMany({
         where: { supplierId: input.supplierId },
         orderBy: { date: 'asc' },
@@ -181,6 +194,7 @@ export class SuppliersService {
     return prisma.$transaction(async (tx) => {
       const actor = await resolveActor(tx, input.createdByUserId);
       const exchangeRate = await requireTodayRate(tx);
+      await tx.$queryRaw`SELECT id FROM supplier_invoices WHERE id = ${input.invoiceId} FOR UPDATE`;
       const invoice = await tx.supplierInvoice.findUnique({ where: { id: input.invoiceId } });
       if (!invoice) throw new Error('Накладная не найдена');
       const supplier = await tx.supplier.findUnique({ where: { id: invoice.supplierId } });
@@ -498,19 +512,24 @@ export class SuppliersService {
     }, { maxWait: 10000, timeout: 25000 });
   }
 
-  public static async update(id: string, input: { name?: string; phone?: string; contactPerson?: string }) {
+  public static async update(id: string, input: { name?: string; phone?: string; contactPerson?: string }, actorId?: string) {
     const data: any = {};
-    if (input.name !== undefined) data.name = input.name.trim();
+    if (input.name !== undefined) {
+      if (typeof input.name !== 'string' || !input.name.trim()) throw new Error('Укажите название поставщика');
+      data.name = input.name.trim();
+    }
     if (input.phone !== undefined) data.phone = input.phone.trim() || null;
     if (input.contactPerson !== undefined) data.contactPerson = input.contactPerson.trim() || null;
 
-    return prisma.supplier.update({
-      where: { id },
-      data,
+    return prisma.$transaction(async tx => {
+      const before = await tx.supplier.findUnique({ where: { id } });
+      const result = await tx.supplier.update({ where: { id }, data });
+      await recordSupplierAudit(tx, actorId, 'SUPPLIER_EDIT', id, before, result);
+      return result;
     });
   }
 
-  public static async delete(id: string) {
+  public static async delete(id: string, actorId?: string) {
     return prisma.$transaction(async (tx) => {
       const supplier = await tx.supplier.findUnique({
         where: { id },
@@ -526,12 +545,16 @@ export class SuppliersService {
         throw new Error('Нельзя удалить поставщика: у него есть финансовую историю. Пометьте его как неактивного');
       }
 
-      return tx.supplier.delete({ where: { id } });
+      const result = await tx.supplier.delete({ where: { id } });
+      await recordSupplierAudit(tx, actorId, 'SUPPLIER_DELETE', id, result, null);
+      return result;
     }, { maxWait: 10000, timeout: 25000 });
   }
 
-  public static async updateInvoice(id: string, input: { invoiceNumber?: string; date?: string; totalAmountUsd?: MoneyInput }) {
+  public static async updateInvoice(id: string, input: { invoiceNumber?: string; date?: string; totalAmountUsd?: MoneyInput }, actorId?: string) {
     return prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM supplier_invoices WHERE id = ${id} FOR UPDATE`;
+      await tx.$queryRaw`SELECT id FROM devices WHERE "purchaseInvoiceId" = ${id} ORDER BY id FOR UPDATE`;
       const invoice = await tx.supplierInvoice.findUnique({ where: { id } });
       if (!invoice) throw new Error('Накладная не найдена');
 
@@ -546,7 +569,7 @@ export class SuppliersService {
       if (input.totalAmountUsd !== undefined) {
         const oldTotal = invoice.totalAmountUsd;
         const newTotal = requireNonNegativeMoney(input.totalAmountUsd, 'Сумма накладной');
-        if (D(D(newTotal).plus(0.01)).lt(invoice.paidAmountUsd)) throw new Error('Сумма накладной не может быть меньше уже оплаченной суммы');
+        if (newTotal.lt(invoice.paidAmountUsd)) throw new Error('Сумма накладной не может быть меньше уже оплаченной суммы');
         const diff = D(newTotal).minus(oldTotal);
 
         data.totalAmountUsd = newTotal;
@@ -557,15 +580,14 @@ export class SuppliersService {
             throw new Error('Нельзя менять сумму накладной после продажи, перемещения или ремонта её устройств');
           }
           if (D(oldTotal).lte(0) && invoiceDevices.length > 0) throw new Error('Для изменения нулевой накладной отредактируйте состав прихода');
-          const ratio = D(oldTotal).gt(0) ? D(newTotal).div(oldTotal) : 1;
-          const groups = await tx.invoiceGroup.findMany({ where: { invoiceId: id } });
-          for (const group of groups) {
-            await tx.invoiceGroup.update({ where: { id: group.id }, data: { purchasePriceUsd: D((D(group.purchasePriceUsd).mul(ratio)).toFixed(2)) } });
-          }
-          const devices = await tx.device.findMany({ where: { purchaseInvoiceId: id } });
-          for (const device of devices) {
-            const adjustedCost = D((D(device.purchasePriceUsd).mul(ratio)).toFixed(2));
+          const devices = await tx.device.findMany({ where: { purchaseInvoiceId: id }, orderBy: { id: 'asc' } });
+          const costs = devices.length ? allocateMoney(newTotal, devices.map(d => d.purchasePriceUsd)) : [];
+          await tx.invoiceGroup.deleteMany({ where: { invoiceId: id } });
+          for (const [index, device] of devices.entries()) {
+            const adjustedCost = costs[index];
             await tx.device.update({ where: { id: device.id }, data: { purchasePriceUsd: adjustedCost, costBasisUsd: adjustedCost } });
+            await tx.invoiceGroup.create({ data: { invoiceId: id, brand: device.brand, model: device.model,
+              ram: device.ram, storage: device.storage, color: device.color, quantity: 1, purchasePriceUsd: adjustedCost } });
           }
           await tx.supplier.update({
             where: { id: invoice.supplierId },
@@ -589,12 +611,15 @@ export class SuppliersService {
         });
       }
 
+      await recordSupplierAudit(tx, actorId, 'INVOICE_EDIT', id, invoice, updated);
       return updated;
     }, { maxWait: 10000, timeout: 25000 });
   }
 
-  public static async deleteInvoice(id: string) {
+  public static async deleteInvoice(id: string, actorId?: string) {
     return prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM supplier_invoices WHERE id = ${id} FOR UPDATE`;
+      await tx.$queryRaw`SELECT id FROM devices WHERE "purchaseInvoiceId" = ${id} ORDER BY id FOR UPDATE`;
       const invoice = await tx.supplierInvoice.findUnique({ where: { id } });
       if (!invoice) throw new Error('Накладная не найдена');
       if (D(invoice.paidAmountUsd).gt(0)) throw new Error('Нельзя удалить уже оплаченную или частично оплаченную накладную');
@@ -635,7 +660,9 @@ export class SuppliersService {
       });
       if (supplierGuard.count !== 1) throw new Error('Данные поставщика изменились, обновите страницу и повторите удаление');
 
-      return tx.supplierInvoice.delete({ where: { id } });
+      const result = await tx.supplierInvoice.delete({ where: { id } });
+      await recordSupplierAudit(tx, actorId, 'INVOICE_DELETE', id, invoice, null);
+      return result;
     }, { maxWait: 10000, timeout: 25000 });
   }
 }

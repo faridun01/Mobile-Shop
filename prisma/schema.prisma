@@ -228,6 +228,7 @@ model Device {
   saleItems       SaleItem[]
   repairTickets   RepairTicket[]
   transferItems   TransferItem[]
+  identifiers     DeviceIdentifier[]
 
   @@index([imei])
   @@index([storeId, status])
@@ -236,6 +237,22 @@ model Device {
   @@index([supplierId])
   @@index([purchaseInvoiceId])
   @@map("devices")
+}
+
+model DeviceIdentifier {
+  identifier String @id
+  deviceId String @map("device_id")
+  device Device @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  @@index([deviceId], map: "device_identifiers_device_idx")
+  @@map("device_identifiers")
+}
+
+model OperationRequest {
+  key String @id
+  fingerprint String
+  result Json
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+  @@map("operation_requests")
 }
 
 model DeviceTimelineEvent {

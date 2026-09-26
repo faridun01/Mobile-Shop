@@ -24,6 +24,7 @@ import { registerReportRoutes } from './modules/reports/reports.routes';
 import { requirePositiveMoney } from './common/money';
 import { requireTodayRate } from './modules/exchange-rate/exchange-rate.service';
 import { decimalJsonReplacer } from './common/decimal';
+import { operationContext } from './common/request-operation';
 
 export const app = express();
 app.set('json replacer', decimalJsonReplacer);
@@ -57,7 +58,7 @@ app.use((req, res, next) => {
     res.header('Vary', 'Origin');
   }
   res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
-  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, Idempotency-Key');
   if (req.method === 'OPTIONS') {
     res.sendStatus(200);
     return;
@@ -66,6 +67,7 @@ app.use((req, res, next) => {
 });
 
 app.use(express.json({ limit: '1mb' }));
+app.use(operationContext);
 
 app.get('/api/health', async (_req, res, next) => {
   try {
@@ -226,7 +228,7 @@ app.get('/api/devices', authenticateJwt, async (req: AuthenticatedRequest, res, 
 
     const devices = await prisma.device.findMany({
       where,
-      include: { store: true },
+      include: { store: true, timeline: { orderBy: { date: 'asc' as const } } },
       orderBy: { createdAt: 'desc' },
       ...(search ? { take: 5 } : {}),
     });
@@ -250,6 +252,7 @@ app.post('/api/purchases', authenticateJwt, requireRoles('ADMIN', 'PARTNER'), en
       const supplier = await transaction.supplier.findUnique({ where: { id: supplierId } });
       const store = await transaction.store.findUnique({ where: { id: storeId } });
       if (!supplier || !store || !supplier.active || !store.active) throw new Error('Поставщик или магазин не найден либо неактивен');
+      if (store.isMainWarehouse && req.user!.role !== 'ADMIN') throw Object.assign(new Error('Приход на главный склад разрешён только администратору'), { statusCode: 403 });
 
       const normalizedDevices = groups.flatMap((group: any) => {
         if (Array.isArray(group.items) && group.items.length > 0) {
@@ -403,6 +406,9 @@ app.use((error: any, req: Request, res: Response, _next: NextFunction) => {
   // ends up seeing — previously nothing was logged at all, so a production failure left no
   // diagnostic trail.
   console.error(`[${req.method} ${req.originalUrl}]`, error);
+  if (error?.statusCode === 409 || error?.statusCode === 403) {
+    res.status(error.statusCode).json({ message: error.message }); return;
+  }
 
   if (error && typeof error === 'object' && 'code' in error && error.code === 'P2002') {
     res.status(409).json({ message: 'Запись с такими уникальными данными уже существует' });

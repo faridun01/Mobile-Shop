@@ -42,7 +42,7 @@ export const SalesHistoryPage: React.FC = () => {
 
   // Defaults to "all" for ADMIN/PARTNER or "today"
   const [periodFilter, setPeriodFilter] = useState<'TODAY' | 'SPECIFIC_MONTH' | 'ALL'>('ALL');
-  const [selectedMonth, setSelectedMonth] = useState<string>(new Date().toISOString().substring(0, 7));
+  const [selectedMonth, setSelectedMonth] = useState<string>(getBusinessDateKey().substring(0, 7));
 
   const retailStores = useMemo(() => stores.filter((s) => !s.isMainWarehouse), [stores]);
 
@@ -479,7 +479,7 @@ export const SalesHistoryPage: React.FC = () => {
                 <span className="text-warning font-normal">100% в чистую прибыль</span>
               </label>
               <div className="flex items-center gap-1.5 mb-2">
-                <input
+                <input step="0.01"
                   type="number"
                   min="0"
                   max={selectedSale.totalTjs - (selectedSale.debtAmountTjs ?? 0)}

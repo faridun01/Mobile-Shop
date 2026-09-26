@@ -67,11 +67,12 @@ export function registerSupplierRoutes(app: Express) {
     try {
       // Bonus campaigns are infrequent (nowhere near sale/device volume), so a generous
       // opt-in cap is enough here — no search/period infrastructure needed.
+      const cursor = typeof req.query.cursor === 'string' ? req.query.cursor : undefined;
       const limit = req.query.limit !== undefined ? Math.min(Math.max(Number(req.query.limit) || 0, 1), 2000) : undefined;
       res.json(await prisma.supplierBonus.findMany({
         // Only the supplier name is ever read (mapSupplierBonus) — the full row isn't needed.
         include: { freeDevices: true, supplier: { select: { name: true } } },
-        orderBy: { createdAt: 'desc' },
+        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }], ...(cursor ? { skip: 1, cursor: { id: cursor } } : {}),
         ...(limit ? { take: limit } : {}),
       }));
     } catch (error) {
@@ -81,7 +82,8 @@ export function registerSupplierRoutes(app: Express) {
 
   app.post('/api/suppliers', authenticateJwt, requireRoles('ADMIN', 'PARTNER'), async (req: AuthenticatedRequest, res, next) => {
     try {
-      const supplier = await SuppliersService.create(req.body ?? {});
+      const supplier = await SuppliersService.create(req.body ?? {}, req.user!.userId);
+      RealtimeSyncGateway.broadcast('INVENTORY_UPDATE', {});
       res.status(201).json(supplier);
     } catch (error) {
       next(error);
@@ -167,7 +169,7 @@ export function registerSupplierRoutes(app: Express) {
 
   app.put('/api/suppliers/:id', authenticateJwt, requireRoles('ADMIN', 'PARTNER'), async (req: AuthenticatedRequest, res, next) => {
     try {
-      const supplier = await SuppliersService.update(req.params.id, req.body ?? {});
+      const supplier = await SuppliersService.update(req.params.id, req.body ?? {}, req.user!.userId);
       RealtimeSyncGateway.broadcast('INVENTORY_UPDATE', {});
       res.json(supplier);
     } catch (error) {
@@ -177,7 +179,7 @@ export function registerSupplierRoutes(app: Express) {
 
   app.delete('/api/suppliers/:id', authenticateJwt, requireRoles('ADMIN', 'PARTNER'), async (req: AuthenticatedRequest, res, next) => {
     try {
-      const result = await SuppliersService.delete(req.params.id);
+      const result = await SuppliersService.delete(req.params.id, req.user!.userId);
       RealtimeSyncGateway.broadcast('INVENTORY_UPDATE', {});
       res.json(result);
     } catch (error) {
@@ -187,7 +189,7 @@ export function registerSupplierRoutes(app: Express) {
 
   app.put('/api/supplier-invoices/:id', authenticateJwt, requireRoles('ADMIN', 'PARTNER'), async (req: AuthenticatedRequest, res, next) => {
     try {
-      const invoice = await SuppliersService.updateInvoice(req.params.id, req.body ?? {});
+      const invoice = await SuppliersService.updateInvoice(req.params.id, req.body ?? {}, req.user!.userId);
       RealtimeSyncGateway.broadcast('INVENTORY_UPDATE', {});
       res.json(invoice);
     } catch (error) {
@@ -197,7 +199,7 @@ export function registerSupplierRoutes(app: Express) {
 
   app.delete('/api/supplier-invoices/:id', authenticateJwt, requireRoles('ADMIN', 'PARTNER'), async (req: AuthenticatedRequest, res, next) => {
     try {
-      const result = await SuppliersService.deleteInvoice(req.params.id);
+      const result = await SuppliersService.deleteInvoice(req.params.id, req.user!.userId);
       RealtimeSyncGateway.broadcast('INVENTORY_UPDATE', {});
       res.json(result);
     } catch (error) {

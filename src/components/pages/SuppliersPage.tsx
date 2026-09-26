@@ -681,9 +681,9 @@ export const SuppliersPage: React.FC = () => {
               <div>
                 <label className="block text-fg-subtle mb-1">Сумма оплаты ($ USD):</label>
                 <div className="relative">
-                  <input
+                  <input step="0.01"
                     type="number"
-                    min="1"
+                    min="0.01"
                     value={paymentAmountUsd ?? ''}
                     onChange={(e) => setPaymentAmountUsd(e.target.value)}
                     className="w-full rounded-lg bg-surface-raised border border-border px-3 py-2 text-accent text-sm font-bold focus:border-accent focus:outline-none"
@@ -754,9 +754,9 @@ export const SuppliersPage: React.FC = () => {
               <div>
                 <label className="block text-fg-subtle mb-1">Сумма оплаты ($ USD):</label>
                 <div className="relative">
-                  <input
+                  <input step="0.01"
                     type="number"
-                    min="1"
+                    min="0.01"
                     max={selectedInvoice.remainingAmountUsd}
                     value={payInvoiceAmountUsd ?? ''}
                     onChange={(e) => setPayInvoiceAmountUsd(e.target.value)}

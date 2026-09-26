@@ -1,3 +1,4 @@
+import { getBusinessDateKey } from '../../utils/businessDate';
 import React, { useState, useMemo, useEffect } from 'react';
 import { useAppFields } from '../../context/AppContext';
 import { Expense, ExpenseCategory } from '../../types';
@@ -98,7 +99,7 @@ export const ExpensesPage: React.FC = () => {
 
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [periodFilter, setPeriodFilter] = useState<'TODAY' | 'SPECIFIC_MONTH' | 'ALL'>('SPECIFIC_MONTH');
-  const [selectedMonth, setSelectedMonth] = useState<string>(new Date().toISOString().substring(0, 7));
+  const [selectedMonth, setSelectedMonth] = useState<string>(getBusinessDateKey().substring(0, 7));
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategoryTab, setSelectedCategoryTab] = useState('ALL');
   // Defaults to whichever store is currently active on the POS Terminal page —
@@ -113,8 +114,8 @@ export const ExpensesPage: React.FC = () => {
   // older month reaches further back, so fetch that exact range from the server and merge
   // it in. Guarded against a stale response overwriting a newer one on fast clicks.
   useEffect(() => {
-    const thisMonth = new Date().toISOString().substring(0, 7);
-    if (periodFilter === 'SPECIFIC_MONTH' && selectedMonth === thisMonth) return;
+    const thisMonth = getBusinessDateKey().substring(0, 7);
+
     let cancelled = false;
     fetchExpensesRange({
       period: periodFilter,
@@ -280,13 +281,13 @@ export const ExpensesPage: React.FC = () => {
   const rate = todayRate?.rate || FALLBACK_EXCHANGE_RATE;
 
   const filteredExpenses = useMemo(() => {
-    const todayStr = new Date().toISOString().split('T')[0];
+    const todayStr = getBusinessDateKey();
 
     return expenses.filter(e => {
       if (isSeller && e.storeId !== currentUser.storeId) return false;
       if (selectedStoreFilter !== 'ALL' && e.storeId !== selectedStoreFilter) return false;
 
-      const expDateStr = (e.date || '').split('T')[0];
+      const expDateStr = getBusinessDateKey(new Date(e.date));
       if (periodFilter === 'TODAY' && expDateStr !== todayStr) return false;
       if (periodFilter === 'SPECIFIC_MONTH' && !expDateStr.startsWith(selectedMonth)) return false;
 
@@ -580,8 +581,8 @@ export const ExpensesPage: React.FC = () => {
 
           <FormField label="Сумма расхода (TJS)" required>
             <div className="relative">
-              <input
-                type="number" min="1" required value={amountTjs} onChange={(e) => setAmountTjs(e.target.value)}
+              <input step="0.01"
+                type="number" min="0.01" required value={amountTjs} onChange={(e) => setAmountTjs(e.target.value)}
                 placeholder="500"
                 className="w-full h-11 rounded-lg bg-bg border border-border px-3 pr-12 text-sm font-semibold text-danger focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent"
               />

@@ -1,3 +1,5 @@
+import { sumMoney } from '../../utils/money';
+import { getBusinessDateKey } from '../../utils/businessDate';
 import React, { useState, useMemo, useEffect } from 'react';
 import { useAppFields } from '../../context/AppContext';
 import { RepairTicket, RepairStatus } from '../../types';
@@ -32,7 +34,7 @@ export const RepairPage: React.FC = () => {
   } = useAppFields('currentUser', 'repairs', 'fetchRepairsRange', 'sales', 'fetchSalesRange', 'devices', 'findDeviceByImei', 'stores', 'createRepairTicket', 'updateRepairStatus', 'openScanner', 'selectedStoreId');
 
   const [activeTab, setActiveTab] = useState<'list' | 'create'>('list');
-  const [selectedMonth, setSelectedMonth] = useState<string>(new Date().toISOString().substring(0, 7));
+  const [selectedMonth, setSelectedMonth] = useState<string>(getBusinessDateKey().substring(0, 7));
   const [searchQuery, setSearchQuery] = useState('');
 
   // Form states for NEW TICKET
@@ -66,7 +68,7 @@ export const RepairPage: React.FC = () => {
   // or an older month reaches further back, so fetch that exact range from the server and
   // merge it in. Guarded against a stale response overwriting a newer one on fast clicks.
   useEffect(() => {
-    const thisMonth = new Date().toISOString().substring(0, 7);
+    const thisMonth = getBusinessDateKey().substring(0, 7);
     if (selectedMonth === thisMonth) return;
     let cancelled = false;
     fetchRepairsRange({
@@ -139,7 +141,7 @@ export const RepairPage: React.FC = () => {
   // Statistics for selected month
   const totalRepairsCount = filteredRepairs.length;
   const readyRepairsCount = filteredRepairs.filter((t: RepairTicket) => t.status === 'READY' || t.status === 'ISSUED').length;
-  const totalExpensesTjs = filteredRepairs.reduce((acc: number, t: RepairTicket) => acc + (t.estimatedCostTjs || 0), 0);
+  const totalExpensesTjs = sumMoney(filteredRepairs.map(t => t.status === 'ISSUED' ? (t.finalCostTjs || 0) : 0));
 
   // Returns true (and fills the form) if a matching sale was found in the given list.
   const applySoldDeviceMatch = (list: typeof sales, q: string): boolean => {
@@ -700,7 +702,7 @@ export const RepairPage: React.FC = () => {
             <div className="space-y-3">
               <div>
                 <label className="block text-fg-subtle mb-1 text-[11px] uppercase">Итоговая стоимость ремонта (TJS):</label>
-                <input
+                <input step="0.01"
                   type="number"
                   min="0"
                   value={issueFinalCost}

@@ -1,3 +1,4 @@
+import { getBusinessDateKey } from '../../utils/businessDate';
 import React, { useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useAppFields } from '../../context/AppContext';
@@ -25,7 +26,7 @@ export const FinancePage: React.FC = () => {
   const setTab = (next: Tab) => setSearchParams(next === 'REPORT' ? {} : { tab: next }, { replace: true });
   const [status, setStatus] = useState<StatusMessage | null>(null);
   // Shared by the "Отчёт" and "По складам" tabs so switching between them keeps the month.
-  const [reportMonth, setReportMonth] = useState(new Date().toISOString().substring(0, 7));
+  const [reportMonth, setReportMonth] = useState(getBusinessDateKey().substring(0, 7));
 
   // Hooks are unconditional above this point — RestrictedAccess for SELLER is decided
   // only in the render output, matching ExpensesPage/ReportsPage's own gating pattern.

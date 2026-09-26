@@ -645,7 +645,7 @@ export const SettingsPage: React.FC = () => {
               </div>
               <div>
                 <label className="block text-fg-subtle mb-1 text-[11px] uppercase">Новый остаток (TJS) *</label>
-                <input
+                <input step="0.01"
                   type="number"
                   value={adjustNewBalance}
                   onChange={(e) => setAdjustNewBalance(e.target.value)}

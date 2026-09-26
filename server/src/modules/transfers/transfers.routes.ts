@@ -15,13 +15,14 @@ export function registerTransferRoutes(app: Express) {
 
       // Explicit opt-in cap — existing callers that don't pass it keep today's full-history
       // behavior. Pending approvals still surface via Notifications regardless of this cap.
+      const cursor = typeof req.query.cursor === 'string' ? req.query.cursor : undefined;
       const limit = req.query.limit !== undefined ? Math.min(Math.max(Number(req.query.limit) || 0, 1), 2000) : undefined;
 
       const transfers = await prisma.transferRequest.findMany({
         where: storeScope,
         // Only the store name is ever read (mapTransfer) — the full row isn't needed.
         include: { items: true, fromStore: { select: { name: true } }, toStore: { select: { name: true } } },
-        orderBy: { requestedAt: 'desc' },
+        orderBy: [{ requestedAt: 'desc' }, { id: 'desc' }], ...(cursor ? { skip: 1, cursor: { id: cursor } } : {}),
         ...(limit ? { take: limit } : {}),
       });
       res.json(transfers);

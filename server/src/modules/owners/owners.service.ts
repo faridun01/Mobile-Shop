@@ -209,6 +209,7 @@ export class OwnersService {
 
     return prisma.$transaction(async (tx) => {
       const actor = await resolveActor(tx, userId);
+      await tx.$queryRaw`SELECT id FROM owners ORDER BY id FOR UPDATE`;
       const owners = await tx.owner.findMany();
       const actualIds = new Set(owners.map((owner) => owner.id));
       if (normalized.length !== owners.length || normalized.some((share) => !actualIds.has(share.ownerId))) {
@@ -216,6 +217,11 @@ export class OwnersService {
       }
 
       if (rebalanceBalances) {
+        // Settled profit belongs to its recipient. Rewriting lifetime accruals while
+        // keeping payouts/reinvestments would create an unsupported partner debt.
+        if (owners.some(o => !D(o.totalPaidProfitUsd).isZero() || !D(o.totalReinvestedUsd).isZero())) {
+          throw new Error('Перераспределение остатков после выплат или реинвестирования запрещено. Новые доли можно сохранить без перерасчёта истории.');
+        }
         const totalAvailable = roundMoney(owners.reduce((sum, o) => D(sum).plus((o.availableProfitUsd || 0)), D(0)));
         const totalAccrued = roundMoney(owners.reduce((sum, o) => D(sum).plus((o.totalAccruedProfitUsd || 0)), D(0)));
 
@@ -363,31 +369,11 @@ export class OwnersService {
   /**
    * Returns owners with their display name always resolved live from the linked
    * User account — never a manually-copied snapshot that can silently drift out of
-   * sync with a rename. Any owner still missing a link (e.g. created before this
-   * feature existed) is auto-linked here, best-effort, to an as-yet-unlinked
-   * ADMIN/PARTNER account — so production data self-heals the first time this loads
-   * instead of needing a manual database fix.
+   * sync with a rename. Linking/unlinking is an explicit mutation; reading never
+   * recreates a link the administrator deliberately removed.
    */
   public static async listWithResolvedNames() {
-    let owners = await prisma.owner.findMany({ include: { user: { select: { id: true, name: true } } }, orderBy: { createdAt: 'asc' } });
-
-    const unlinked = owners.filter((o) => !o.userId);
-    if (unlinked.length > 0) {
-      const linkedUserIds = owners.filter((o) => o.userId).map((o) => o.userId as string);
-      const candidates = await prisma.user.findMany({
-        where: { role: { in: ['ADMIN', 'PARTNER'] }, id: { notIn: linkedUserIds } },
-        orderBy: { createdAt: 'asc' },
-      });
-      for (let i = 0; i < unlinked.length && i < candidates.length; i++) {
-        const owner = unlinked[i];
-        const user = candidates[i];
-        await prisma.owner.update({ where: { id: owner.id }, data: { userId: user.id, name: user.name } });
-      }
-      if (candidates.length > 0) {
-        owners = await prisma.owner.findMany({ include: { user: { select: { id: true, name: true } } }, orderBy: { createdAt: 'asc' } });
-      }
-    }
-
+    const owners = await prisma.owner.findMany({ include: { user: { select: { id: true, name: true } } }, orderBy: { createdAt: 'asc' } });
     return owners.map((o) => ({ ...o, name: o.user?.name ?? o.name }));
   }
 

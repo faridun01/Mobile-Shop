@@ -1,3 +1,4 @@
+import { decimal, moneyNumber, sumMoney } from '../../utils/money';
 import React, { useState, useMemo } from 'react';
 import { useAppFields } from '../../context/AppContext';
 import { Device, PaymentMethod } from '../../types';
@@ -191,7 +192,7 @@ export const SalePage: React.FC = () => {
     setIsCartOpen(false);
   };
 
-  const totalTjs = cart.reduce((acc, item) => acc + (item.salePriceTjs && item.salePriceTjs > 0 ? item.salePriceTjs : 0), 0);
+  const totalTjs = sumMoney(cart.map(item => item.salePriceTjs && item.salePriceTjs > 0 ? item.salePriceTjs : 0));
   const hasEmptyPrice = cart.some(item => item.salePriceTjs === undefined || item.salePriceTjs <= 0);
   const totalUsd = todayRate ? +(totalTjs / todayRate.rate).toFixed(2) : 0;
   const rate = todayRate?.rate || FALLBACK_EXCHANGE_RATE;
@@ -500,10 +501,10 @@ export const SalePage: React.FC = () => {
                     Цена продажи (TJS) <span className="text-danger">*</span>
                   </label>
                   <div className="relative">
-                    <input
+                    <input step="0.01"
                       type="number"
                       inputMode="numeric"
-                      min="1"
+                      min="0.01"
                       placeholder="Укажите цену продажи..."
                       value={item.salePriceTjs !== undefined ? item.salePriceTjs : ''}
                       onChange={(e) => {
@@ -562,7 +563,7 @@ export const SalePage: React.FC = () => {
                   setPaymentMethod(id);
                   if (id === 'CASH') { setCashAmountInput(totalTjs.toString()); setCardAmountInput('0'); }
                   else if (id === 'CARD') { setCardAmountInput(totalTjs.toString()); setCashAmountInput('0'); }
-                  else { const half = Math.floor(totalTjs / 2); setCashAmountInput(half.toString()); setCardAmountInput((totalTjs - half).toString()); }
+                  else { const half = Math.floor(totalTjs / 2); setCashAmountInput(half.toString()); setCardAmountInput(moneyNumber(decimal(totalTjs).minus(half)).toString()); }
                 }}
                 className={`h-16 rounded-lg border flex flex-col items-center justify-center gap-1 transition-colors ${
                   paymentMethod === id ? 'border-accent bg-accent/10 text-accent' : 'border-border text-fg-muted'
@@ -578,7 +579,7 @@ export const SalePage: React.FC = () => {
             <div className="grid grid-cols-2 gap-2">
               <div>
                 <span className="text-xs text-fg-muted block mb-1">Наличные</span>
-                <input
+                <input step="0.01"
                   type="number"
                   min="0"
                   max={totalTjs}
@@ -600,7 +601,7 @@ export const SalePage: React.FC = () => {
               </div>
               <div>
                 <span className="text-xs text-fg-muted block mb-1">Карта</span>
-                <input
+                <input step="0.01"
                   type="number"
                   min="0"
                   max={totalTjs}

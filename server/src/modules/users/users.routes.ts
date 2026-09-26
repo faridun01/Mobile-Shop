@@ -48,6 +48,7 @@ export function registerUserRoutes(app: Express) {
 
   app.patch('/api/users/:id/status', authenticateJwt, requireRoles('ADMIN'), async (req: AuthenticatedRequest, res, next) => {
     try {
+      if (typeof req.body?.active !== 'boolean') { res.status(400).json({ message: 'active должен быть true или false' }); return; }
       const user = await UsersService.setActive(req.params.id, Boolean(req.body?.active), req.user!.userId);
       RealtimeSyncGateway.broadcast('USER_UPDATED', { userId: user.id });
       res.json(user);

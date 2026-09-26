@@ -29,6 +29,10 @@ interface CreateRepairInput {
 
 export class RepairsService {
   public static async create(input: CreateRepairInput) {
+    if (input.estimatedCostTjs !== undefined) input.estimatedCostTjs = requireNonNegativeMoney(input.estimatedCostTjs, 'Предварительная стоимость');
+    if (input.prepaymentTjs !== undefined && requireNonNegativeMoney(input.prepaymentTjs, 'Предоплата').gt(0)) {
+      throw new Error('Приём предоплаты за ремонт не поддерживается');
+    }
     return prisma.$transaction(async (tx) => {
       const actor = await resolveActor(tx, input.userId);
       const matchedDevice = await tx.device.findFirst({

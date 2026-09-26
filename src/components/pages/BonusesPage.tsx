@@ -559,7 +559,7 @@ export const BonusesPage: React.FC = () => {
                       <span className="block text-[10px] text-fg-subtle mb-1 uppercase font-bold">В долларах ($ USD):</span>
                       <div className="relative">
                         <span className="absolute left-2.5 top-2 text-accent font-bold">$</span>
-                        <input
+                        <input step="0.01"
                           type="number"
                           value={amountUsd ?? ''}
                           onChange={(e) => setAmountUsd(e.target.value)}
@@ -572,7 +572,7 @@ export const BonusesPage: React.FC = () => {
                       <span className="block text-[10px] text-fg-subtle mb-1 uppercase font-bold">В сомони (TJS):</span>
                       <div className="relative">
                         <span className="absolute left-2 top-2 text-accent font-bold text-[11px]">SM</span>
-                        <input
+                        <input step="0.01"
                           type="number"
                           value={amountUsd ? Math.round((parseFloat(amountUsd) || 0) * rate) : ''}
                           onChange={(e) => {
@@ -756,7 +756,7 @@ export const BonusesPage: React.FC = () => {
                   </label>
                   <div className="relative">
                     <span className="absolute left-2.5 top-2 text-accent font-bold">$</span>
-                    <input
+                    <input step="0.01"
                       type="number"
                       value={editAmountUsd}
                       onChange={(e) => setEditAmountUsd(e.target.value)}

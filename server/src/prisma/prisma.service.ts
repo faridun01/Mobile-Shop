@@ -1,9 +1,15 @@
 import { PrismaClient, Prisma } from '@prisma/client';
+import { executeOperation } from '../common/request-operation';
 
 function createClient() {
-  return new PrismaClient({
+  const client = new PrismaClient({
     log: process.env.NODE_ENV === 'development' ? ['query', 'info', 'warn', 'error'] : ['error'],
   });
+  const transaction = client.$transaction.bind(client);
+  client.$transaction = ((action: any, options?: any) => typeof action === 'function'
+    ? transaction((tx) => executeOperation(tx, action), options)
+    : transaction(action, options)) as typeof client.$transaction;
+  return client;
 }
 
 class PrismaService {
