@@ -228,9 +228,12 @@ export const Drawer: React.FC = () => {
       if (e.key === 'Escape') setDrawerOpen(false);
     };
     window.addEventListener('keydown', handleKeyDown);
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
     document.documentElement.setAttribute('data-drawer-open', 'true');
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
+      document.body.style.overflow = prevOverflow;
       document.documentElement.removeAttribute('data-drawer-open');
     };
   }, [drawerOpen, setDrawerOpen]);
@@ -241,12 +244,12 @@ export const Drawer: React.FC = () => {
     <>
       {/* Backdrop overlay for outside click to collapse */}
       <div
-        className="fixed inset-0 bg-black/60 backdrop-blur-xs z-40 md:hidden transition-opacity"
+        className="fixed inset-0 bg-black/60 backdrop-blur-xs z-40 md:hidden transition-opacity touch-none"
         onClick={() => setDrawerOpen(false)}
         aria-hidden="true"
       />
 
-      <div className="app-safe-area fixed inset-0 z-50 flex md:hidden flex-col bg-bg text-fg-muted w-full h-full overflow-hidden shadow-2xl animate-in slide-in-from-top-2 duration-200">
+      <div className="app-safe-area fixed inset-0 z-50 flex md:hidden flex-col bg-bg text-fg-muted w-full h-[100dvh] max-h-[100dvh] overflow-hidden shadow-2xl overscroll-none animate-in slide-in-from-top-2 duration-200">
         {/* Header */}
         <div className="p-3.5 border-b border-border bg-surface flex items-center justify-between shrink-0 shadow-2xs">
           <div className="flex items-center gap-3 min-w-0">
@@ -405,7 +408,7 @@ export const Drawer: React.FC = () => {
         )}
 
         {/* Vertical List of Menu Items with Collapsible/Expandable Sections */}
-        <div className="flex-1 min-h-0 overflow-y-auto p-3 pb-[calc(2rem+var(--bottom-nav-pb))] space-y-3">
+        <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain [-webkit-overflow-scrolling:touch] touch-pan-y p-3 pb-[calc(2.5rem+var(--bottom-nav-pb))] space-y-3">
           {navGroups.map((group, gIdx) => {
             const visibleItems = group.items.filter(item => item.roles.includes(userRole));
             if (visibleItems.length === 0) return null;

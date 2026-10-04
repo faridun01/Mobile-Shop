@@ -427,6 +427,11 @@ body:has(.fixed.inset-0.z-50) .app-bottom-nav {
   pointer-events: none;
 }
 
+html[data-drawer-open] body {
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+
 /* Consistent touch targets in daily operations; compact desktop tables stay intact. */
 :root {
   --choice-font-size: 12px;
