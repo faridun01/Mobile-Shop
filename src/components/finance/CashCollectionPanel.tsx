@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { AlertTriangle, ArrowDownToLine, Landmark, Store as StoreIcon, Undo2, Gift } from 'lucide-react';
+import { AlertTriangle, ArrowDownToLine, Landmark, Store as StoreIcon, Undo2, Gift, Banknote, CreditCard } from 'lucide-react';
 import { apiClient } from '../../api/client';
 import { formatMoney, formatTjs, formatUsd } from '../../utils/money';
 import { Button } from '../ui/Button';
@@ -19,6 +19,8 @@ interface RegisterBalance {
   regularCashUsd?: string;
   regularCashTjs?: string;
   bonusCount?: number;
+  cashOnlyTjs?: string;
+  cardOnlyTjs?: string;
 }
 
 interface BonusAccountBalance {
@@ -210,6 +212,20 @@ export const CashCollectionPanel: React.FC<{ month: string; storeId?: string | n
                         <span className="text-xs sm:text-sm font-bold font-mono text-fg tabular-nums">{formatTjs(store.cashTjs)}</span>
                         <span className="text-[10px] sm:text-xs text-fg-subtle tabular-nums">({formatUsd(store.cashUsd)})</span>
                       </div>
+                      {!empty && (
+                        <div className="flex items-center gap-1.5 sm:gap-2 mt-1.5 text-[11px] font-medium flex-wrap">
+                          <span className="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-1.5 py-0.5 rounded-md font-mono">
+                            <Banknote className="w-3 h-3 shrink-0" />
+                            <span>Наличные: {formatTjs(store.cashOnlyTjs ?? store.cashTjs)}</span>
+                          </span>
+                          {Number(store.cardOnlyTjs || 0) > 0 && (
+                            <span className="inline-flex items-center gap-1 text-blue-600 dark:text-blue-400 bg-blue-500/10 border border-blue-500/20 px-1.5 py-0.5 rounded-md font-mono">
+                              <CreditCard className="w-3 h-3 shrink-0" />
+                              <span>Карта: {formatTjs(store.cardOnlyTjs)}</span>
+                            </span>
+                          )}
+                        </div>
+                      )}
                       {unreconciled && (
                         <p className="text-[11px] text-warning mt-0.5 font-medium">Не сверена (расхождение {formatUsd(store.unreconciledUsd)})</p>
                       )}
@@ -311,6 +327,24 @@ export const CashCollectionPanel: React.FC<{ month: string; storeId?: string | n
               <div className="flex justify-between items-center text-sm font-bold text-fg">
                 <span>Инкассируется всего:</span>
                 <span className="tabular-nums">{formatTjs(collecting.cashTjs)} · {formatUsd(collecting.cashUsd)}</span>
+              </div>
+              <div className="pt-2 border-t border-border/60 space-y-1.5 text-xs">
+                <div className="flex justify-between items-center text-emerald-600 dark:text-emerald-400">
+                  <span className="flex items-center gap-1.5 font-medium">
+                    <Banknote className="w-3.5 h-3.5 shrink-0" />
+                    Наличными в кассе:
+                  </span>
+                  <span className="font-semibold tabular-nums font-mono">{formatTjs(collecting.cashOnlyTjs ?? collecting.cashTjs)}</span>
+                </div>
+                {Number(collecting.cardOnlyTjs || 0) > 0 && (
+                  <div className="flex justify-between items-center text-blue-600 dark:text-blue-400">
+                    <span className="flex items-center gap-1.5 font-medium">
+                      <CreditCard className="w-3.5 h-3.5 shrink-0" />
+                      На карте / переводами:
+                    </span>
+                    <span className="font-semibold tabular-nums font-mono">{formatTjs(collecting.cardOnlyTjs)}</span>
+                  </div>
+                )}
               </div>
               {Number(collecting.bonusCashUsd || 0) > 0 ? (
                 <div className="pt-2 border-t border-border/60 space-y-1.5 text-fg-subtle">

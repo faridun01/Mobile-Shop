@@ -1,6 +1,6 @@
 import '../../common/decimal-test-setup';
 import { describe, expect, it } from 'vitest';
-import { splitRegister } from './cash-collection.service';
+import { splitRegister, splitPaymentBreakdown } from './cash-collection.service';
 
 // Pure split of a register into its bonus and regular parts. The full collection and
 // cancellation flows run against a real database in scripts/test-collection-bonus-split.ts.
@@ -36,3 +36,32 @@ describe('splitRegister', () => {
     expect(r.bonusTjs.plus(r.regularTjs).toString()).toBe('4400');
   });
 });
+
+describe('splitPaymentBreakdown', () => {
+  it('accurately isolates card and physical cash in a mixed register', () => {
+    const res = splitPaymentBreakdown('17500', '8000');
+    expect(res).toEqual({ cashOnlyTjs: '9500', cardOnlyTjs: '8000' });
+  });
+
+  it('reports zero card and full cash when all sales are cash', () => {
+    const res = splitPaymentBreakdown('12000', '0');
+    expect(res).toEqual({ cashOnlyTjs: '12000', cardOnlyTjs: '0' });
+  });
+
+  it('reports full card and zero cash when all sales are digital/card', () => {
+    const res = splitPaymentBreakdown('15000', '15000');
+    expect(res).toEqual({ cashOnlyTjs: '0', cardOnlyTjs: '15000' });
+  });
+
+  it('caps card payments at total register cash if expenses reduced the register below card total', () => {
+    // e.g. Register only has 4000 left
+    const res = splitPaymentBreakdown('4000', '6000');
+    expect(res).toEqual({ cashOnlyTjs: '0', cardOnlyTjs: '4000' });
+  });
+
+  it('handles empty register (0 TJS)', () => {
+    const res = splitPaymentBreakdown('0', '0');
+    expect(res).toEqual({ cashOnlyTjs: '0', cardOnlyTjs: '0' });
+  });
+});
+

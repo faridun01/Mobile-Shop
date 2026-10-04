@@ -10,7 +10,7 @@ import { dateRangeForPeriod, type ReportPeriod } from '../reports/reports.servic
 import { cashBalanceFromLedger, loadCashLedger, registerLedgerBalance } from './cash-balance';
 import { notifyAdmins } from '../notifications/notification.service';
 
-type Db = Pick<TransactionClient, 'financialAccount' | 'financialTransaction' | 'auditLog' | 'cashHandover' | 'bonusPoolEntry'>;
+type Db = Pick<TransactionClient, 'financialAccount' | 'financialTransaction' | 'auditLog' | 'cashHandover' | 'bonusPoolEntry' | 'sale'>;
 type Money = ReturnType<typeof D>;
 
 export interface RegisterBalance {
@@ -31,6 +31,10 @@ export interface RegisterBalance {
   regularCashTjs: string;
   /** Bonus phones sold in this store since its last collection. */
   bonusCount: number;
+  /** Informational breakdown: cash in register (physical banknotes in drawer). */
+  cashOnlyTjs: string;
+  /** Informational breakdown: card and digital transfer payments. */
+  cardOnlyTjs: string;
 }
 
 /**
@@ -86,6 +90,55 @@ export function splitRegister(cash: { usd: MoneyInput; tjs: MoneyInput }, due: {
 }
 
 /**
+ * Pure helper to split register cash into card payments and physical cash.
+ * Guarantees cardOnly + cashOnly = totalCashTjs exactly down to the last diram.
+ */
+export function splitPaymentBreakdown(totalCashTjs: MoneyInput, cardSumTjs: MoneyInput): { cashOnlyTjs: string; cardOnlyTjs: string } {
+  const total = D(totalCashTjs);
+  if (total.lte(0)) return { cashOnlyTjs: '0', cardOnlyTjs: '0' };
+  const card = D(cardSumTjs);
+  const cardOnly = card.gt(0) ? decimalMin(card, total) : D(0);
+  const cashOnly = total.minus(cardOnly);
+  return { cashOnlyTjs: cashOnly.toString(), cardOnlyTjs: cardOnly.toString() };
+}
+
+/**
+ * Informational breakdown of how much of a store's uncollected cash balance
+ * was received via digital cards / bank transfers versus physical cash in drawer.
+ */
+async function paymentBreakdown(db: Db, storeId: string, totalCashTjs: Money): Promise<{ cashOnlyTjs: string; cardOnlyTjs: string }> {
+  if (totalCashTjs.lte(0)) {
+    return { cashOnlyTjs: '0', cardOnlyTjs: '0' };
+  }
+
+  const lastHandover = await db.cashHandover.findFirst({
+    where: { storeId, cancelledAt: null },
+    orderBy: { createdAt: 'desc' },
+    select: { createdAt: true },
+  });
+  const cutoff = lastHandover?.createdAt ?? null;
+
+  const sales = await db.sale.findMany({
+    where: {
+      storeId,
+      status: { in: ['COMPLETED', 'EXCHANGED'] },
+      cardAmountTjs: { gt: 0 },
+      ...(cutoff ? { createdAt: { gt: cutoff } } : {}),
+    },
+    select: {
+      cardAmountTjs: true,
+    },
+  });
+
+  let cardSum = D(0);
+  for (const s of sales) {
+    cardSum = cardSum.plus(s.cardAmountTjs);
+  }
+
+  return splitPaymentBreakdown(totalCashTjs, cardSum);
+}
+
+/**
  * A register's cash in TJS and USD. Registers are kept in USD; the TJS figure is rebuilt from
  * the TJS amount each ledger row froze on its own day. Balances converted when registers moved
  * to USD have no rows: their original TJS and USD come from that migration's audit record.
@@ -96,6 +149,7 @@ async function registerBalance(db: Db, store: { id: string; name: string; isMain
 
   const due = store.isMainWarehouse ? { usd: D(0), tjs: D(0), count: 0 } : await bonusDue(db, store.id);
   const split = splitRegister({ usd: cashUsd, tjs }, due);
+  const breakdown = store.isMainWarehouse ? { cashOnlyTjs: tjs.toString(), cardOnlyTjs: '0' } : await paymentBreakdown(db, store.id, tjs);
 
   return {
     storeId: store.id,
@@ -109,6 +163,8 @@ async function registerBalance(db: Db, store: { id: string; name: string; isMain
     regularCashUsd: split.regularUsd.toString(),
     regularCashTjs: split.regularTjs.toString(),
     bonusCount: due.count,
+    cashOnlyTjs: breakdown.cashOnlyTjs,
+    cardOnlyTjs: breakdown.cardOnlyTjs,
   };
 }
 
