@@ -22,7 +22,6 @@ import {
   FileText,
   Settings,
   Bell,
-  LogOut,
   X,
   ChevronRight,
   ChevronDown,
@@ -71,7 +70,6 @@ export const Drawer: React.FC = () => {
     setActivePage,
     drawerOpen,
     setDrawerOpen,
-    logout,
     stores,
     selectedStoreId,
     setSelectedStoreId,
@@ -80,7 +78,6 @@ export const Drawer: React.FC = () => {
     'setActivePage',
     'drawerOpen',
     'setDrawerOpen',
-    'logout',
     'stores',
     'selectedStoreId',
     'setSelectedStoreId'
@@ -408,7 +405,7 @@ export const Drawer: React.FC = () => {
         )}
 
         {/* Vertical List of Menu Items with Collapsible/Expandable Sections */}
-        <div className="flex-1 min-h-0 overflow-y-auto p-3 space-y-3">
+        <div className="flex-1 min-h-0 overflow-y-auto p-3 pb-[calc(2rem+var(--bottom-nav-pb))] space-y-3">
           {navGroups.map((group, gIdx) => {
             const visibleItems = group.items.filter(item => item.roles.includes(userRole));
             if (visibleItems.length === 0) return null;
@@ -479,18 +476,6 @@ export const Drawer: React.FC = () => {
               </div>
             );
           })}
-        </div>
-
-        {/* Footer */}
-        <div className="p-3 pb-[calc(1rem+var(--bottom-nav-pb))] border-t border-border bg-surface shrink-0">
-          <button
-            type="button"
-            onClick={logout}
-            className="w-full flex items-center justify-center gap-2 h-10 rounded-xl bg-surface-raised hover:bg-danger/10 border border-border hover:border-danger/30 text-fg-muted hover:text-danger text-xs font-semibold transition-all active:scale-[0.98] cursor-pointer shadow-2xs"
-          >
-            <LogOut className="w-4 h-4" />
-            <span>Выйти из аккаунта</span>
-          </button>
         </div>
       </div>
     </>
