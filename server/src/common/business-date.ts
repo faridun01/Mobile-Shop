@@ -1,4 +1,4 @@
-export type ReportPeriod = 'TODAY' | 'MONTH' | 'SPECIFIC_MONTH' | 'ALL';
+export type ReportPeriod = 'TODAY' | 'MONTH' | 'SPECIFIC_MONTH' | 'ALL' | 'CUSTOM_RANGE';
 
 const formatters = new Map<string, Intl.DateTimeFormat>();
 function formatter() {

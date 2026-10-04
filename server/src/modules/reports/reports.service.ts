@@ -6,12 +6,14 @@ import { getBusinessDateKey } from '../../common/business-date';
 import { calculateRecognizedProfit } from '../sales/profit';
 import { roundMoney } from '../../common/money';
 
-import { dateRangeForPeriod, type ReportPeriod } from '../../common/business-date';
+import { dateRangeForPeriod, dateRangeForCustomDates, type ReportPeriod } from '../../common/business-date';
 export { dateRangeForPeriod, dateRangeForCustomDates, type ReportPeriod } from '../../common/business-date';
 
 interface ReportsSummaryInput {
-  period: ReportPeriod;
+  period?: ReportPeriod;
   month?: string; // 'YYYY-MM', required for SPECIFIC_MONTH
+  startDate?: string; // 'YYYY-MM-DD'
+  endDate?: string;   // 'YYYY-MM-DD'
   storeId?: string; // retail store id, or 'all'/undefined for every store
 }
 
@@ -64,7 +66,9 @@ function groupByStore<T extends { storeId: string }>(rows: T[]): Map<string, T[]
 }
 
 export async function computeReportsSummary(input: ReportsSummaryInput) {
-  const dateRange = dateRangeForPeriod(input.period, input.month);
+  const dateRange = input.startDate
+    ? dateRangeForCustomDates(input.startDate, input.endDate)
+    : dateRangeForPeriod(input.period || 'TODAY', input.month);
   const storeFilter = input.storeId && input.storeId !== 'all' ? input.storeId : undefined;
 
   // First wave: every query here is independent of the others, so they go to the DB

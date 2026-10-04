@@ -22,7 +22,8 @@ import {
   Package,
   Banknote
 } from 'lucide-react';
-import { MonthPicker } from '../ui/MonthPicker';
+import { DateRangePicker } from '../ui/DateRangePicker';
+import { currentBusinessMonth, getBusinessDateKey, wholeMonthOf } from '../../utils/businessDate';
 import { StatCard } from '../ui/StatCard';
 import {
   exportComprehensiveReport,
@@ -122,6 +123,30 @@ function monthLabel(month: string): string {
   return new Date(y, m - 1, 1).toLocaleDateString('ru-RU', { month: 'long', year: 'numeric' });
 }
 
+function formatPeriodLabel(startDate?: string, endDate?: string, month?: string): string {
+  if (startDate) {
+    const end = endDate || startDate;
+    if (month && wholeMonthOf(startDate, end)) {
+      return monthLabel(month);
+    }
+    const [y1, m1, d1] = startDate.split('-').map(Number);
+    const [y2, m2, d2] = end.split('-').map(Number);
+    if (startDate === end) {
+      const isToday = startDate === getBusinessDateKey();
+      const dateName = new Date(y1, m1 - 1, d1).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' });
+      return `${dateName}${isToday ? ' (Сегодня)' : ''}`;
+    }
+    if (y1 === y2 && m1 === m2) {
+      const monthGenitive = new Date(y1, m1 - 1, 1).toLocaleDateString('ru-RU', { month: 'long', year: 'numeric' });
+      return `${d1} — ${d2} ${monthGenitive}`;
+    }
+    const d1Str = new Date(y1, m1 - 1, d1).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short', year: 'numeric' });
+    const d2Str = new Date(y2, m2 - 1, d2).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short', year: 'numeric' });
+    return `${d1Str} — ${d2Str}`;
+  }
+  return month ? monthLabel(month) : 'Текущий период';
+}
+
 const ExpenseCategoryList: React.FC<{ data: ExpenseBreakdown }> = ({ data }) => (
   data.expensesByCategory.length === 0 ? (
     <p className="text-xs text-fg-subtle">Расходов за период нет</p>
@@ -138,14 +163,24 @@ const ExpenseCategoryList: React.FC<{ data: ExpenseBreakdown }> = ({ data }) => 
 );
 
 interface ProfitReportProps {
-  /** 'summary' — the whole business for the month; 'stores' — every store in detail. */
+  /** 'summary' — the whole business for the period; 'stores' — every store in detail. */
   view: 'summary' | 'stores';
   month: string;
-  onMonthChange: (month: string) => void;
+  startDate?: string;
+  endDate?: string;
+  onDateChange: (start: string, end: string, monthStr?: string) => void;
+  onResetToCurrentMonth: () => void;
 }
 
 /** "Отчёт" / "По складам" tabs of FinancePage — SELLER gating is done by FinancePage itself. */
-export const ProfitReport: React.FC<ProfitReportProps> = ({ view, month, onMonthChange }) => {
+export const ProfitReport: React.FC<ProfitReportProps> = ({
+  view,
+  month,
+  startDate,
+  endDate,
+  onDateChange,
+  onResetToCurrentMonth,
+}) => {
   const navigate = useNavigate();
   const {
     currentUser,
@@ -185,7 +220,7 @@ export const ProfitReport: React.FC<ProfitReportProps> = ({ view, month, onMonth
 
   const rate = todayRate?.rate || FALLBACK_EXCHANGE_RATE;
   const namesLookup = useMemo(() => buildNameLookup(users), [users]);
-  const periodLabel = monthLabel(month);
+  const periodLabel = useMemo(() => formatPeriodLabel(startDate, endDate, month), [startDate, endDate, month]);
   const retailStores = useMemo(() => stores.filter((s) => !s.isMainWarehouse), [stores]);
   const mainWarehouse = useMemo(() => stores.find((s) => s.isMainWarehouse), [stores]);
 
@@ -275,7 +310,16 @@ export const ProfitReport: React.FC<ProfitReportProps> = ({ view, month, onMonth
     setSummaryLoading(true);
     setSummaryError(null);
 
-    const params = new URLSearchParams({ period, month });
+    const params = new URLSearchParams();
+    if (startDate) {
+      params.set('startDate', startDate);
+      if (endDate) params.set('endDate', endDate);
+    } else if (month) {
+      params.set('period', 'SPECIFIC_MONTH');
+      params.set('month', month);
+    } else {
+      params.set('period', 'TODAY');
+    }
     if (scopeStoreId !== 'all') params.set('storeId', scopeStoreId);
 
     apiClient<ReportsSummary>(`/reports/summary?${params.toString()}`, { signal: controller.signal })
@@ -284,7 +328,7 @@ export const ProfitReport: React.FC<ProfitReportProps> = ({ view, month, onMonth
       .finally(() => { if (!cancelled) setSummaryLoading(false); });
 
     return () => { cancelled = true; controller.abort(); };
-  }, [month, scopeStoreId, revision]);
+  }, [month, startDate, endDate, scopeStoreId, revision]);
 
   // The itemized sales/expenses list is only needed for the Excel preview, so it's fetched
   // only once that preview is opened, scoped to just the one store being previewed.
@@ -300,7 +344,16 @@ export const ProfitReport: React.FC<ProfitReportProps> = ({ view, month, onMonth
     setReportDataLoading(true);
     setReportDataError(null);
 
-    const params = new URLSearchParams({ period, month });
+    const params = new URLSearchParams();
+    if (startDate) {
+      params.set('startDate', startDate);
+      if (endDate) params.set('endDate', endDate);
+    } else if (month) {
+      params.set('period', 'SPECIFIC_MONTH');
+      params.set('month', month);
+    } else {
+      params.set('period', 'TODAY');
+    }
     if (salesReportStoreId !== 'all') params.set('storeId', salesReportStoreId);
     const query = params.toString();
 
@@ -322,7 +375,7 @@ export const ProfitReport: React.FC<ProfitReportProps> = ({ view, month, onMonth
       .finally(() => { if (!cancelled) setReportDataLoading(false); });
 
     return () => { cancelled = true; controller.abort(); };
-  }, [salesReportStoreId, month, namesLookup, revision]);
+  }, [salesReportStoreId, month, startDate, endDate, namesLookup, revision]);
 
   const data: ReportsSummary = summary ?? EMPTY_SUMMARY;
 
@@ -424,25 +477,31 @@ export const ProfitReport: React.FC<ProfitReportProps> = ({ view, month, onMonth
     }
   };
 
-  const monthPicker = (
-    <MonthPicker
-      value={month}
-      onChange={onMonthChange}
-      className="h-9 px-3 rounded-lg border border-accent bg-surface text-xs font-semibold text-accent focus:outline-none"
+  const isTodaySelected = Boolean(startDate && (!endDate || startDate === endDate) && startDate === getBusinessDateKey());
+  const datePicker = (
+    <DateRangePicker
+      startDate={startDate || ''}
+      endDate={endDate || ''}
+      selectedMonth={month || undefined}
+      currentMonthStr={currentBusinessMonth()}
+      isToday={isTodaySelected}
+      onChange={onDateChange}
+      onResetMonth={onResetToCurrentMonth}
+      className="shrink-0"
     />
   );
 
   if (summaryError) return <div className="p-4 space-y-3" role="alert">
-    {monthPicker}<p>Не удалось загрузить финансовый отчёт. Итоги недоступны.</p>
+    {datePicker}<p>Не удалось загрузить финансовый отчёт. Итоги недоступны.</p>
     <p>{summaryError}</p><button type="button" onClick={() => setRevision(v => v + 1)}>Повторить загрузку</button>
   </div>;
-  if (!summary) return <div className="p-4" role="status">{monthPicker}<p>Загрузка финансового отчёта…</p></div>;
+  if (!summary) return <div className="p-4" role="status">{datePicker}<p>Загрузка финансового отчёта…</p></div>;
 
   return (
     <div className="flex flex-col">
       {/* Filter bar */}
       <div className="px-3 py-2.5 border-b border-border bg-surface flex flex-wrap items-center gap-2">
-        {monthPicker}
+        {datePicker}
         {view === 'summary' && storeCtx.mode === 'CENTRAL' && (
           <select
             value={selectedStore}

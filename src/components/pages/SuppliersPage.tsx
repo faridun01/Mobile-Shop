@@ -290,7 +290,7 @@ export const SuppliersPage: React.FC = () => {
       {/* Main Split Grid for Desktop & List for Mobile */}
       <div className="flex-1 grid grid-cols-1 lg:grid-cols-3 divide-y lg:divide-y-0 lg:divide-x divide-border overflow-hidden">
         {/* Left Column: Suppliers list */}
-        <div className="lg:col-span-1 flex flex-col overflow-hidden bg-surface">
+        <div className="lg:col-span-1 flex flex-col overflow-hidden bg-bg">
           {/* Search bar & counter */}
           <div className="px-3 py-2 border-b border-border bg-surface-raised/40 flex items-center justify-between gap-2 shrink-0">
             <div className="relative flex-1">

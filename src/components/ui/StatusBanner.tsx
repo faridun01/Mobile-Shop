@@ -9,11 +9,11 @@ export interface StatusMessage {
   text: string;
 }
 
-const TONE_CONFIG: Record<StatusTone, { icon: React.ElementType; classes: string; autoDismissMs: number | null }> = {
-  success: { icon: CheckCircle2, classes: 'bg-success/15 border-success/30 text-success', autoDismissMs: 3500 },
-  info: { icon: Info, classes: 'bg-info/15 border-info/30 text-info', autoDismissMs: 3500 },
-  warning: { icon: AlertTriangle, classes: 'bg-warning/15 border-warning/30 text-warning', autoDismissMs: null },
-  error: { icon: AlertCircle, classes: 'bg-danger/15 border-danger/30 text-danger', autoDismissMs: null },
+const TONE_CONFIG: Record<StatusTone, { icon: React.ElementType; classes: string; iconColor: string; autoDismissMs: number | null }> = {
+  success: { icon: CheckCircle2, classes: 'bg-surface border-success/40 text-fg shadow-xl ring-1 ring-success/25', iconColor: 'text-success', autoDismissMs: 3500 },
+  info: { icon: Info, classes: 'bg-surface border-info/40 text-fg shadow-xl ring-1 ring-info/25', iconColor: 'text-info', autoDismissMs: 3500 },
+  warning: { icon: AlertTriangle, classes: 'bg-surface border-warning/40 text-fg shadow-xl ring-1 ring-warning/25', iconColor: 'text-warning', autoDismissMs: null },
+  error: { icon: AlertCircle, classes: 'bg-surface border-danger/40 text-fg shadow-xl ring-1 ring-danger/25', iconColor: 'text-danger', autoDismissMs: null },
 };
 
 interface StatusBannerProps {
@@ -22,10 +22,8 @@ interface StatusBannerProps {
 }
 
 /**
- * App-wide toast: fixed to the top of the viewport so it's never scrolled out of
- * view (a real bug seen on pages whose success banner rendered inline at the top
- * of a long scrollable page). Success/info auto-dismiss; warning/error require
- * an explicit tap so a financial mistake can't scroll away unnoticed.
+ * App-wide toast: fixed below the top bar and safe area so it never collides with
+ * the iPhone notch / Dynamic Island or clock. Renders above all modals (z-[200]).
  */
 export const StatusBanner: React.FC<StatusBannerProps> = ({ message, onDismiss }) => {
   const tone = message?.tone;
@@ -40,20 +38,25 @@ export const StatusBanner: React.FC<StatusBannerProps> = ({ message, onDismiss }
   }, [message]);
 
   if (!message || !tone) return null;
-  const { icon: Icon, classes } = TONE_CONFIG[tone];
+  const { icon: Icon, classes, iconColor } = TONE_CONFIG[tone];
 
   return (
-    <div className="fixed top-[calc(0.75rem+var(--sa-top))] inset-x-[calc(0.75rem+max(var(--sa-left),var(--sa-right)))] z-100 flex justify-center pointer-events-none">
+    <div className="fixed top-[calc(max(4rem,env(safe-area-inset-top,0px)+3.75rem))] inset-x-3 sm:inset-x-auto sm:max-w-md mx-auto z-[200] flex justify-center pointer-events-none animate-in fade-in slide-in-from-top-2 duration-200">
       <div
         role="status"
         className={cn(
-          'pointer-events-auto flex items-start gap-2 rounded-lg border px-3 py-2.5 text-sm shadow-none max-w-md w-full',
+          'pointer-events-auto flex items-start gap-2.5 rounded-xl border px-3.5 py-3 text-xs sm:text-sm font-medium backdrop-blur-md max-w-md w-full shadow-2xl',
           classes
         )}
       >
-        <Icon className="w-4 h-4 shrink-0 mt-0.5" />
-        <span className="flex-1 min-w-0">{message.text}</span>
-        <button type="button" onClick={onDismiss} aria-label="Закрыть" className="shrink-0 opacity-70 hover:opacity-100">
+        <Icon className={cn('w-4 h-4 shrink-0 mt-0.5', iconColor)} />
+        <span className="flex-1 min-w-0 leading-snug">{message.text}</span>
+        <button
+          type="button"
+          onClick={onDismiss}
+          aria-label="Закрыть"
+          className="shrink-0 text-fg-subtle hover:text-fg p-0.5 rounded-md hover:bg-surface-raised transition-colors cursor-pointer"
+        >
           <X className="w-4 h-4" />
         </button>
       </div>

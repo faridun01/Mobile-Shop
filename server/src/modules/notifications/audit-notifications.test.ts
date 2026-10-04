@@ -8,17 +8,20 @@ const row = (over: Record<string, unknown>) => ({
 const store = { id: 'store-siyoma', name: 'Сиёма' };
 
 describe('buildAuditNotification', () => {
-  it('turns a sale audit into an admin notification with store, employee, money, document and link', () => {
-    const n = buildAuditNotification(row({}), { store, actorName: 'Ахмад' })!;
-    expect(n).toMatchObject({
-      actionType: 'SALE', title: 'Продажа', message: 'Чек #12: продажа 1 устройств на сумму 9500 TJS ($871.56)',
-      dedupeKey: 'AUDIT:audit-1', store, actor: { id: 'u1', name: 'Ахмад' }, amountTjs: 9500, amountUsd: 871.56,
-      documentRef: 'Чек #12', targetId: 'sale-1', targetRoute: '/sales-history',
-    });
+  it('does not create an admin notification for regular sales', () => {
+    expect(buildAuditNotification(row({ action: 'SALE' }), { store, actorName: 'Ахмад' })).toBeNull();
   });
 
-  it('flags below-cost sales separately', () => {
-    expect(buildAuditNotification(row({ action: 'SALE_BELOW_COST' }), { store })!.title).toBe('Продажа ниже себестоимости');
+  it('flags below-cost sales as an alert', () => {
+    const n = buildAuditNotification(row({ action: 'SALE_BELOW_COST' }), { store, actorName: 'Ахмад' })!;
+    expect(n).toMatchObject({
+      actionType: 'SALE_BELOW_COST',
+      title: 'Продажа ниже себестоимости',
+      dedupeKey: 'AUDIT:audit-1',
+      store,
+      actor: { id: 'u1', name: 'Ахмад' },
+      targetRoute: '/sales-history',
+    });
   });
 
   it('takes the amount each event actually reports', () => {
@@ -33,13 +36,14 @@ describe('buildAuditNotification', () => {
   });
 
   it('ignores events that are not business transactions or already notify on their own', () => {
-    for (const action of ['LOGIN', 'USER_UPDATE', 'STORE_UPDATE', 'CASH_COLLECTION', 'STORE_RECEIPT', 'TRANSFER_REQUEST']) {
+    for (const action of ['SALE', 'LOGIN', 'USER_UPDATE', 'STORE_UPDATE', 'CASH_COLLECTION', 'STORE_RECEIPT', 'TRANSFER_REQUEST']) {
       expect(buildAuditNotification(row({ action }), {})).toBeNull();
     }
   });
 
   it('covers every money and stock event of the business', () => {
-    for (const action of ['SALE', 'SALE_BELOW_COST', 'REFUND', 'EXCHANGE', 'EXPENSE', 'EXPENSE_PAID', 'EXPENSE_EDIT', 'EXPENSE_DELETE',
+    expect(AUDIT_NOTIFICATION_RULES['SALE']).toBeUndefined();
+    for (const action of ['SALE_BELOW_COST', 'REFUND', 'EXCHANGE', 'EXPENSE', 'EXPENSE_PAID', 'EXPENSE_EDIT', 'EXPENSE_DELETE',
       'PAYROLL_PAYOUT', 'SUPPLIER_PAYMENT', 'SUPPLIER_BONUS', 'BONUS_EDIT', 'BONUS_DELETE', 'BONUS_PROFIT_DISTRIBUTED', 'BONUS_POOL_ANNULLED',
       'PURCHASE', 'TRANSFER', 'TRANSFER_APPROVAL', 'TRANSFER_REJECT', 'STORE_CASH_ADJUSTMENT', 'OWNER_INVESTMENT', 'OWNER_WITHDRAWAL',
       'PROFIT_PAYOUT', 'REINVEST', 'QUARTER_CLOSE', 'REPAIR_STATUS_CHANGE']) {

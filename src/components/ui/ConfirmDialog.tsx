@@ -11,6 +11,7 @@ interface ConfirmDialogProps {
   cancelLabel?: string;
   tone?: 'danger' | 'default';
   loading?: boolean;
+  confirmDisabled?: boolean;
   onConfirm: () => void;
   onCancel: () => void;
 }
@@ -28,6 +29,7 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
   cancelLabel = 'Отмена',
   tone = 'danger',
   loading,
+  confirmDisabled = false,
   onConfirm,
   onCancel,
 }) => {
@@ -43,7 +45,7 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
           <Button variant="secondary" fullWidth onClick={onCancel} disabled={loading}>
             {cancelLabel}
           </Button>
-          <Button variant={tone === 'danger' ? 'danger' : 'primary'} fullWidth onClick={onConfirm} loading={loading}>
+          <Button variant={tone === 'danger' ? 'danger' : 'primary'} fullWidth onClick={onConfirm} loading={loading} disabled={confirmDisabled}>
             {confirmLabel}
           </Button>
         </>

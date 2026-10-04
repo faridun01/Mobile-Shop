@@ -186,55 +186,64 @@ export const InventoryLocationsView: React.FC<InventoryLocationsViewProps> = ({
           >
             <div
               onClick={() => setExpandedLocationId(isExpanded ? null : mainWarehouse.id)}
-              className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 cursor-pointer select-none"
+              className="p-3 sm:p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-3 cursor-pointer select-none"
             >
-              <div className="flex items-start space-x-3">
-                <div className="p-2.5 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-500 shrink-0">
-                  <Warehouse className="w-5 h-5" />
+              <div className="flex items-center space-x-3 min-w-0">
+                <div className="p-2 sm:p-2.5 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-500 shrink-0">
+                  <Warehouse className="w-4 h-4 sm:w-5 sm:h-5" />
                 </div>
-                <div className="space-y-0.5">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <h4 className="text-sm font-bold text-fg-muted">Центральный склад ({mainWarehouse.name})</h4>
-                  </div>
+                <div className="min-w-0">
+                  <h4 className="text-xs sm:text-sm font-bold text-fg-muted truncate">
+                    Центральный склад ({mainWarehouse.name})
+                  </h4>
+                  <p className="text-[11px] text-amber-400/90 font-medium">
+                    Основной хаб приходов
+                  </p>
                 </div>
               </div>
 
-              <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
-                <div className="text-right mr-1">
-                  <span className="text-sm font-bold text-amber-400 block">{stat.unitCount} шт.</span>
+              <div className="flex items-center justify-between sm:justify-end gap-2.5 sm:gap-3 pt-1.5 sm:pt-0 border-t border-border/40 sm:border-0">
+                <div className="text-left sm:text-right">
+                  <span className="text-xs sm:text-sm font-bold text-amber-400 block">
+                    {stat.unitCount} шт.
+                  </span>
                   {isAdmin && (
-                    <span className="text-[11px] text-fg-subtle block">
+                    <span className="text-[10px] sm:text-[11px] text-fg-subtle block">
                       {formatUsd(stat.valueUsd)}
                       {approxTjs(stat.valueUsd, rate) ? ` · ${approxTjs(stat.valueUsd, rate)}` : ''}
                     </span>
                   )}
                 </div>
 
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setExpandedLocationId(isExpanded ? null : mainWarehouse.id);
-                  }}
-                  className="px-3 py-1.5 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 text-amber-400 border border-amber-500/30 font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer"
-                >
-                  <span>{isExpanded ? 'Свернуть' : 'Детали склада'}</span>
-                  <ChevronDown
-                    className={`w-3.5 h-3.5 transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`}
-                  />
-                </button>
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onSelectLocationAndSwitch(mainWarehouse.id);
+                    }}
+                    className="px-2.5 py-1.5 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-400 border border-amber-500/40 font-semibold text-xs flex items-center gap-1 transition-colors cursor-pointer"
+                    title="Открыть товары склада в общем списке"
+                  >
+                    <span>В список</span>
+                    <ArrowRight className="w-3.5 h-3.5" />
+                  </button>
 
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onSelectLocationAndSwitch(mainWarehouse.id);
-                  }}
-                  className="p-1.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-black font-bold text-xs transition-colors cursor-pointer shadow-xs"
-                  title="Открыть товары склада в общем списке"
-                >
-                  <ArrowRight className="w-3.5 h-3.5" />
-                </button>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setExpandedLocationId(isExpanded ? null : mainWarehouse.id);
+                    }}
+                    className="px-2.5 py-1.5 rounded-lg bg-surface-raised hover:bg-surface text-fg border border-border font-semibold text-xs flex items-center gap-1 transition-colors cursor-pointer"
+                    title={isExpanded ? 'Свернуть' : 'Детали склада'}
+                  >
+                    <span>{isExpanded ? 'Свернуть' : 'Детали'}</span>
+                    <ChevronDown
+                      className={`w-3.5 h-3.5 transition-transform duration-200 ${isExpanded ? 'rotate-180 text-amber-400' : 'text-fg-subtle'}`}
+                    />
+                  </button>
+                </div>
               </div>
             </div>
 
@@ -274,62 +283,64 @@ export const InventoryLocationsView: React.FC<InventoryLocationsViewProps> = ({
                 >
                   <div
                     onClick={() => setExpandedLocationId(isExpanded ? null : store.id)}
-                    className="p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 cursor-pointer select-none"
+                    className="p-3 sm:p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-3 cursor-pointer select-none"
                   >
                     <div className="flex items-center space-x-3 min-w-0">
-                      <div className="p-2 rounded-xl bg-accent/10 border border-accent/25 text-accent shrink-0">
-                        <Store className="w-4 h-4" />
+                      <div className="p-2 sm:p-2.5 rounded-xl bg-accent/10 border border-accent/25 text-accent shrink-0">
+                        <Store className="w-4 h-4 sm:w-5 sm:h-5" />
                       </div>
                       <div className="min-w-0">
-                        <div className="flex items-center gap-2">
-                          <h5 className="font-bold text-xs sm:text-sm text-fg-muted truncate">
-                            {store.name}
-                          </h5>
-                        </div>
+                        <h5 className="font-bold text-xs sm:text-sm text-fg-muted truncate">
+                          {store.name}
+                        </h5>
                         <p className="text-[11px] text-fg-subtle truncate">
                           Касса: {formatUsd(store.cashBalanceUsd)}
                         </p>
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
-                      <div className="text-right mr-1">
+                    <div className="flex items-center justify-between sm:justify-end gap-2.5 sm:gap-3 pt-1.5 sm:pt-0 border-t border-border/40 sm:border-0">
+                      <div className="text-left sm:text-right">
                         <span className="text-xs sm:text-sm font-bold text-fg-muted block">
                           {stat.unitCount} шт.
                         </span>
                         {isAdmin && (
-                          <span className="text-[11px] text-fg-subtle block">
+                          <span className="text-[10px] sm:text-[11px] text-fg-subtle block">
                             {formatUsd(stat.valueUsd)}
                             {approxTjs(stat.valueUsd, rate) ? ` · ${approxTjs(stat.valueUsd, rate)}` : ''}
                           </span>
                         )}
                       </div>
 
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setExpandedLocationId(isExpanded ? null : store.id);
-                        }}
-                        className="px-3 py-1.5 rounded-lg bg-accent/15 hover:bg-accent/25 text-accent border border-accent/30 font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer"
-                      >
-                        <span>{isExpanded ? 'Свернуть' : 'Детали товаров'}</span>
-                        <ChevronDown
-                          className={`w-3.5 h-3.5 transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`}
-                        />
-                      </button>
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onSelectLocationAndSwitch(store.id);
+                          }}
+                          className="px-2.5 py-1.5 rounded-lg bg-accent/15 hover:bg-accent/25 text-accent border border-accent/30 font-semibold text-xs flex items-center gap-1 transition-colors cursor-pointer"
+                          title="Открыть товары магазина в общем списке"
+                        >
+                          <span>В список</span>
+                          <ArrowRight className="w-3.5 h-3.5" />
+                        </button>
 
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onSelectLocationAndSwitch(store.id);
-                        }}
-                        className="p-1.5 rounded-lg bg-accent/15 hover:bg-accent/25 text-accent border border-accent/30 font-bold text-xs transition-colors cursor-pointer"
-                        title="Открыть товары магазина в общем списке"
-                      >
-                        <ArrowRight className="w-3.5 h-3.5" />
-                      </button>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setExpandedLocationId(isExpanded ? null : store.id);
+                          }}
+                          className="px-2.5 py-1.5 rounded-lg bg-surface-raised hover:bg-surface text-fg border border-border font-semibold text-xs flex items-center gap-1 transition-colors cursor-pointer"
+                          title={isExpanded ? 'Свернуть' : 'Детали товаров'}
+                        >
+                          <span>{isExpanded ? 'Свернуть' : 'Детали'}</span>
+                          <ChevronDown
+                            className={`w-3.5 h-3.5 transition-transform duration-200 ${isExpanded ? 'rotate-180 text-accent' : 'text-fg-subtle'}`}
+                          />
+                        </button>
+                      </div>
                     </div>
                   </div>
 

@@ -6,10 +6,9 @@ import {
   History,
   Package,
   Menu,
-  RefreshCw,
   Landmark,
-  Wallet,
-  Truck
+  Truck,
+  ArrowLeftRight,
 } from 'lucide-react';
 
 export const MobileBottomNav: React.FC = () => {
@@ -37,7 +36,7 @@ export const MobileBottomNav: React.FC = () => {
     return (
       <button
         onClick={onSelect}
-        className={`flex-1 min-h-11 flex flex-col items-center justify-center gap-0.5 transition-colors ${
+        className={`flex-1 pt-2 pb-1 flex flex-col items-center justify-start gap-1 transition-colors ${
           isActive ? 'text-accent' : 'text-fg-subtle active:text-fg'
         }`}
       >
@@ -53,21 +52,21 @@ export const MobileBottomNav: React.FC = () => {
     return (
       <nav className="app-bottom-nav md:hidden shrink-0 w-full bg-surface border-t border-border flex items-stretch justify-around select-none">
         <NavItem
+          routePath="/inventory"
+          label="Склад"
+          icon={Package}
+          onSelect={() => {
+            setActivePage('INVENTORY');
+            navigate('/inventory');
+          }}
+        />
+        <NavItem
           routePath="/suppliers"
           label="Поставщики"
           icon={Truck}
           onSelect={() => {
             setActivePage('SUPPLIERS');
             navigate('/suppliers');
-          }}
-        />
-        <NavItem
-          routePath="/expenses"
-          label="Расходы"
-          icon={Wallet}
-          onSelect={() => {
-            setActivePage('EXPENSES');
-            navigate('/expenses');
           }}
         />
 
@@ -78,7 +77,7 @@ export const MobileBottomNav: React.FC = () => {
               setActivePage('FINANCE');
               navigate('/finance');
             }}
-            className={`w-14 h-14 -mt-5 rounded-full flex flex-col items-center justify-center active:scale-95 transition-transform shadow-md ${
+            className={`w-13 h-13 -mt-4 rounded-full flex flex-col items-center justify-center active:scale-95 transition-transform shadow-md ${
               isFinanceActive ? 'bg-accent-strong text-accent-fg' : 'bg-accent text-accent-fg'
             }`}
             title="Центральная касса и финансы"
@@ -89,18 +88,18 @@ export const MobileBottomNav: React.FC = () => {
         </div>
 
         <NavItem
-          routePath="/inventory"
-          label="Склад"
-          icon={Package}
+          routePath="/transfer"
+          label="Перемещение"
+          icon={ArrowLeftRight}
           onSelect={() => {
-            setActivePage('INVENTORY');
-            navigate('/inventory');
+            setActivePage('TRANSFER');
+            navigate('/transfer');
           }}
         />
 
         <button
           onClick={() => setDrawerOpen(!drawerOpen)}
-          className={`flex-1 min-h-11 flex flex-col items-center justify-center gap-0.5 transition-colors ${
+          className={`flex-1 pt-2 pb-1 flex flex-col items-center justify-start gap-1 transition-colors ${
             drawerOpen ? 'text-accent' : 'text-fg-subtle active:text-fg'
           }`}
         >
@@ -113,7 +112,7 @@ export const MobileBottomNav: React.FC = () => {
     );
   }
 
-  // Retail Store mode / Seller
+  // Retail Store mode / Seller / Partner
   const isSaleActive = location.pathname === '/sale' || location.pathname === '/';
 
   return (
@@ -144,7 +143,7 @@ export const MobileBottomNav: React.FC = () => {
             setActivePage('SALE');
             navigate('/sale');
           }}
-          className={`w-14 h-14 -mt-5 rounded-full flex flex-col items-center justify-center active:scale-95 transition-transform shadow-md ${
+          className={`w-13 h-13 -mt-4 rounded-full flex flex-col items-center justify-center active:scale-95 transition-transform shadow-md ${
             isSaleActive ? 'bg-accent-strong text-accent-fg' : 'bg-accent text-accent-fg'
           }`}
           title="POS Терминал"
@@ -155,18 +154,18 @@ export const MobileBottomNav: React.FC = () => {
       </div>
 
       <NavItem
-        routePath="/exchange"
-        label="Обмен"
-        icon={RefreshCw}
+        routePath="/transfer"
+        label="Перемещение"
+        icon={ArrowLeftRight}
         onSelect={() => {
-          setActivePage('EXCHANGE');
-          navigate('/exchange');
+          setActivePage('TRANSFER');
+          navigate('/transfer');
         }}
       />
 
       <button
         onClick={() => setDrawerOpen(!drawerOpen)}
-        className={`flex-1 min-h-11 flex flex-col items-center justify-center gap-0.5 transition-colors ${
+        className={`flex-1 pt-2 pb-1 flex flex-col items-center justify-start gap-1 transition-colors ${
           drawerOpen ? 'text-accent' : 'text-fg-subtle active:text-fg'
         }`}
       >

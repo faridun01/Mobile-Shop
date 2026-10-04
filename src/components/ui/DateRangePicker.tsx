@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useLayoutEffect, useRef, useMemo, useCallback } from 'react';
-import { Calendar, X, ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Calendar, X, ChevronDown, ChevronLeft, ChevronRight, CalendarDays } from 'lucide-react';
 import { cn } from '../../utils/cn';
 import { ModalLayer } from './ModalLayer';
-import { currentBusinessMonth, getBusinessDateKey, monthBounds, wholeMonthOf } from '../../utils/businessDate';
+import { currentBusinessMonth, getBusinessDateKey, monthBounds, wholeMonthOf, addMonths } from '../../utils/businessDate';
 
 const MONTH_NAMES_RU = [
   'Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь',
@@ -20,6 +20,11 @@ const MONTH_NAMES_SHORT_RU = [
 ];
 
 const WEEKDAY_NAMES_RU = ['П', 'В', 'С', 'Ч', 'П', 'С', 'В'];
+
+const RU_MONTHS_GRID = [
+  'Янв', 'Фев', 'Мар', 'Апр', 'Май', 'Июн',
+  'Июл', 'Авг', 'Сен', 'Окт', 'Ноя', 'Дек',
+];
 
 export interface DateRangePickerProps {
   startDate: string; // 'YYYY-MM-DD'
@@ -92,6 +97,7 @@ export const DateRangePicker: React.FC<DateRangePickerProps> = ({
   const hasUserInteracted = useRef(false);
 
   // Draft selection inside the modal
+  const [pickerTab, setPickerTab] = useState<'days' | 'months'>('days');
   const [draftStart, setDraftStart] = useState<string>(startDate || todayKey);
   const [draftEnd, setDraftEnd] = useState<string>(endDate || startDate || todayKey);
   const [viewYear, setViewYear] = useState<number>(Number(activeMonth.slice(0, 4)));
@@ -99,7 +105,6 @@ export const DateRangePicker: React.FC<DateRangePickerProps> = ({
   const pendingScrollMonth = useRef<string | null>(null);
 
   // When modal opens, sync draft and the shown year with the active filter.
-  // Instead of selecting the whole month bounds, default to auto-selecting ONLY today's date!
   useEffect(() => {
     if (!open) return;
 
@@ -109,19 +114,23 @@ export const DateRangePicker: React.FC<DateRangePickerProps> = ({
       // User previously had a single day selected
       setDraftStart(startDate);
       setDraftEnd(startDate);
+      setPickerTab('days');
     } else if (startDate && endDate && (!selectedMonth || selectedMonth !== thisMonth)) {
       // User previously had an explicit custom multi-day range selected
       setDraftStart(startDate);
       setDraftEnd(endDate);
+      setPickerTab(wholeMonthOf(startDate, endDate) ? 'months' : 'days');
     } else if (selectedMonth && selectedMonth !== thisMonth) {
       // Explicit past month selected (e.g. 2026-08)
       const { start, end } = monthBounds(selectedMonth);
       setDraftStart(start);
       setDraftEnd(end);
+      setPickerTab('months');
     } else {
       // Current month or default: automatically select ONLY today's date
       setDraftStart(todayKey);
       setDraftEnd(todayKey);
+      setPickerTab('days');
     }
 
     setViewYear(Number(activeMonth.slice(0, 4)));
@@ -194,16 +203,37 @@ export const DateRangePicker: React.FC<DateRangePickerProps> = ({
     scrollToMonth(month, 'instant');
   }, [scrollToMonth]);
 
+  const yesterdayKey = useMemo(() => {
+    const d = new Date();
+    d.setDate(d.getDate() - 1);
+    return getBusinessDateKey(d);
+  }, []);
+
   const handleQuickToday = useCallback(() => {
     hasUserInteracted.current = true;
     setDraftStart(todayKey);
     setDraftEnd(todayKey);
+    setPickerTab('days');
     jumpToMonth(thisMonth);
   }, [todayKey, thisMonth, jumpToMonth]);
+
+  const handleQuickYesterday = useCallback(() => {
+    hasUserInteracted.current = true;
+    setDraftStart(yesterdayKey);
+    setDraftEnd(yesterdayKey);
+    setPickerTab('days');
+    jumpToMonth(yesterdayKey.slice(0, 7));
+  }, [yesterdayKey, jumpToMonth]);
 
   const handleQuickThisMonth = useCallback(() => {
     handleSelectWholeMonth(thisMonth);
     jumpToMonth(thisMonth);
+  }, [handleSelectWholeMonth, jumpToMonth, thisMonth]);
+
+  const handleQuickLastMonth = useCallback(() => {
+    const lastMonth = addMonths(thisMonth, -1);
+    handleSelectWholeMonth(lastMonth);
+    jumpToMonth(lastMonth);
   }, [handleSelectWholeMonth, jumpToMonth, thisMonth]);
 
   const handleApply = useCallback(() => {
@@ -339,36 +369,85 @@ export const DateRangePicker: React.FC<DateRangePickerProps> = ({
                 >
                   <X className="w-6 h-6" />
                 </button>
-                <div className="flex items-center gap-1.5">
+                <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none py-0.5">
                   <button
                     type="button"
                     onClick={handleQuickToday}
-                    className="h-9 text-xs px-2.5 rounded-lg border border-border bg-surface-raised hover:bg-surface text-fg font-medium transition-colors cursor-pointer"
+                    className="h-8 text-xs px-2.5 rounded-lg border border-border bg-surface-raised hover:bg-surface text-fg font-medium transition-colors shrink-0 cursor-pointer"
                   >
                     Сегодня
                   </button>
                   <button
                     type="button"
+                    onClick={handleQuickYesterday}
+                    className="h-8 text-xs px-2.5 rounded-lg border border-border bg-surface-raised hover:bg-surface text-fg font-medium transition-colors shrink-0 cursor-pointer"
+                  >
+                    Вчера
+                  </button>
+                  <button
+                    type="button"
                     onClick={handleQuickThisMonth}
-                    className="h-9 text-xs px-2.5 rounded-lg border border-border bg-surface-raised hover:bg-surface text-fg font-medium transition-colors cursor-pointer"
+                    className="h-8 text-xs px-2.5 rounded-lg border border-border bg-surface-raised hover:bg-surface text-fg font-medium transition-colors shrink-0 cursor-pointer"
                   >
                     Этот месяц
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleQuickLastMonth}
+                    className="h-8 text-xs px-2.5 rounded-lg border border-border bg-surface-raised hover:bg-surface text-fg font-medium transition-colors shrink-0 cursor-pointer"
+                  >
+                    Прошлый
                   </button>
                   {onSelectAllTime && (
                     <button
                       type="button"
                       onClick={() => { onSelectAllTime(); setOpen(false); }}
-                      className="h-9 text-xs px-2.5 rounded-lg border border-border bg-surface-raised hover:bg-surface text-fg font-medium transition-colors cursor-pointer"
+                      className="h-8 text-xs px-2.5 rounded-lg border border-border bg-surface-raised hover:bg-surface text-fg font-medium transition-colors shrink-0 cursor-pointer"
                     >
                       Всё время
                     </button>
                   )}
                 </div>
               </div>
-              <h2 className="text-xl font-bold text-fg mt-2 tracking-tight">Выберите дату</h2>
-              <p className="text-xs text-accent font-semibold mt-0.5 truncate">
-                {draftSummary}
-              </p>
+
+              <div className="flex items-center justify-between mt-2.5">
+                <div>
+                  <h2 className="text-lg font-bold text-fg tracking-tight">Выберите период</h2>
+                  <p className="text-xs text-accent font-semibold mt-0.5 truncate max-w-xs">
+                    {draftSummary}
+                  </p>
+                </div>
+              </div>
+
+              {/* Segmented View Toggle: Days & Range vs Whole Month */}
+              <div className="flex p-1 bg-surface-raised rounded-xl border border-border mt-3">
+                <button
+                  type="button"
+                  onClick={() => setPickerTab('days')}
+                  className={cn(
+                    'flex-1 py-1.5 text-xs font-semibold rounded-lg transition-all flex items-center justify-center gap-1.5 cursor-pointer',
+                    pickerTab === 'days'
+                      ? 'bg-surface text-accent font-bold shadow-xs border border-border/60'
+                      : 'text-fg-subtle hover:text-fg'
+                  )}
+                >
+                  <Calendar className="w-3.5 h-3.5" />
+                  <span>Дни и диапазон</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPickerTab('months')}
+                  className={cn(
+                    'flex-1 py-1.5 text-xs font-semibold rounded-lg transition-all flex items-center justify-center gap-1.5 cursor-pointer',
+                    pickerTab === 'months'
+                      ? 'bg-surface text-accent font-bold shadow-xs border border-border/60'
+                      : 'text-fg-subtle hover:text-fg'
+                  )}
+                >
+                  <CalendarDays className="w-3.5 h-3.5" />
+                  <span>По месяцам</span>
+                </button>
+              </div>
             </div>
 
             {/* Year switcher: any past year can be opened; the future is not offered */}
@@ -393,19 +472,61 @@ export const DateRangePicker: React.FC<DateRangePickerProps> = ({
               </button>
             </div>
 
-            {/* Pinned weekday headers matching user photo (П В С Ч П С В) */}
-            <div className="grid grid-cols-7 text-center py-2.5 px-4 border-b border-border/40 text-xs font-semibold text-fg-subtle shrink-0 bg-surface select-none">
-              {WEEKDAY_NAMES_RU.map((day, idx) => (
-                <span key={`${day}-${idx}`}>{day}</span>
-              ))}
-            </div>
+            {pickerTab === 'months' ? (
+              /* Month Grid View (3 columns x 4 rows) exactly matching user screenshot */
+              <div className="flex-1 p-4 overflow-y-auto">
+                <div className="grid grid-cols-3 gap-3 select-none">
+                  {RU_MONTHS_GRID.map((name, idx) => {
+                    const monthNum = String(idx + 1).padStart(2, '0');
+                    const monthKey = `${viewYear}-${monthNum}`;
+                    const isFuture = monthKey > thisMonth;
+                    const bounds = monthBounds(monthKey);
+                    const isSelected = draftStart === bounds.start && draftEnd === bounds.end;
+                    const isThisMonth = monthKey === thisMonth;
 
-            {/* Scrollable Month List */}
-            <div
-              ref={scrollContainerRef}
-              className="flex-1 overflow-y-auto px-4 py-4 space-y-6 overscroll-contain"
-            >
-              {monthsList.map((m) => {
+                    return (
+                      <button
+                        key={monthKey}
+                        type="button"
+                        disabled={isFuture}
+                        onClick={() => {
+                          hasUserInteracted.current = true;
+                          setDraftStart(bounds.start);
+                          setDraftEnd(bounds.end);
+                        }}
+                        className={cn(
+                          'h-14 rounded-2xl border text-sm font-semibold transition-all flex flex-col items-center justify-center cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed',
+                          isSelected
+                            ? 'bg-accent text-accent-fg border-accent font-bold shadow-md scale-102 ring-2 ring-accent/30'
+                            : isThisMonth
+                            ? 'border-accent/60 bg-accent/10 text-accent font-bold hover:bg-accent/15'
+                            : 'border-border bg-surface hover:bg-surface-raised text-fg hover:border-accent/40'
+                        )}
+                      >
+                        <span className="text-sm leading-tight">{name}</span>
+                        <span className={cn('text-[10px] mt-0.5', isSelected ? 'text-accent-fg/80' : 'text-fg-subtle')}>
+                          {viewYear}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            ) : (
+              <>
+                {/* Pinned weekday headers matching user photo (П В С Ч П С В) */}
+                <div className="grid grid-cols-7 text-center py-2 px-4 border-b border-border/40 text-xs font-semibold text-fg-subtle shrink-0 bg-surface select-none">
+                  {WEEKDAY_NAMES_RU.map((day, idx) => (
+                    <span key={`${day}-${idx}`}>{day}</span>
+                  ))}
+                </div>
+
+                {/* Scrollable Month List */}
+                <div
+                  ref={scrollContainerRef}
+                  className="flex-1 overflow-y-auto px-4 py-4 space-y-6 overscroll-contain"
+                >
+                  {monthsList.map((m) => {
                 return (
                   <div key={m.key} id={`cal-month-${m.key}`} className="space-y-3">
                     <div className="flex items-center justify-between px-1">
@@ -489,6 +610,8 @@ export const DateRangePicker: React.FC<DateRangePickerProps> = ({
                 );
               })}
             </div>
+          </>
+        )}
 
             {/* Bottom Bar: Full-width green "Подтвердить" button matching photo */}
             <div className="p-4 border-t border-border bg-surface shrink-0">

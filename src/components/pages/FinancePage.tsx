@@ -33,8 +33,27 @@ export const FinancePage: React.FC = () => {
   const tab: Tab = urlTab && tabs.some((t) => t.value === urlTab) ? urlTab : 'REPORT';
   const setTab = (next: Tab) => setSearchParams(next === 'REPORT' ? {} : { tab: next }, { replace: true });
   const [status, setStatus] = useState<StatusMessage | null>(null);
-  // Shared by the "Отчёт" and "По складам" tabs so switching between them keeps the month.
-  const [reportMonth, setReportMonth] = useState(getBusinessDateKey().substring(0, 7));
+
+  const todayKey = getBusinessDateKey();
+  const currentMonth = todayKey.substring(0, 7);
+  // Date filter state: month, custom startDate and endDate
+  const [selectedMonth, setSelectedMonth] = useState<string>(currentMonth);
+  const [startDate, setStartDate] = useState<string>('');
+  const [endDate, setEndDate] = useState<string>('');
+
+  const handleDateChange = (start: string, end: string, monthStr?: string) => {
+    setStartDate(start);
+    setEndDate(end);
+    setSelectedMonth(monthStr || '');
+  };
+
+  const handleResetToCurrentMonth = () => {
+    setSelectedMonth(currentMonth);
+    setStartDate('');
+    setEndDate('');
+  };
+
+  const activeMonth = selectedMonth || (startDate ? startDate.slice(0, 7) : currentMonth);
 
   // Hooks are unconditional above this point — RestrictedAccess for SELLER is decided
   // only in the render output, matching ExpensesPage/ReportsPage's own gating pattern.
@@ -50,7 +69,7 @@ export const FinancePage: React.FC = () => {
     <div className="flex-1 flex flex-col h-full overflow-hidden bg-bg text-fg-muted">
       <StatusBanner message={status} onDismiss={() => setStatus(null)} />
 
-      <div className="border-b border-border bg-bg shrink-0 px-3 pt-3 pb-3">
+      <div className="border-b border-border bg-bg shrink-0 px-3 pt-2 pb-2.5">
         <FilterPillGroup
           options={tabs}
           value={tab}
@@ -61,11 +80,26 @@ export const FinancePage: React.FC = () => {
 
       <div className="flex-1 overflow-y-auto">
         {tab === 'BONUSES' ? (
-          <BonusesFinancePanel month={reportMonth} onMonthChange={setReportMonth} />
+          <BonusesFinancePanel
+            month={activeMonth}
+            onMonthChange={(m) => {
+              setSelectedMonth(m);
+              setStartDate('');
+              setEndDate('');
+            }}
+          />
         ) : tab === 'CASH' ? (
-          <CashCollectionPanel month={reportMonth} storeId={storeCtx.storeId} />
+          <CashCollectionPanel month={activeMonth} storeId={storeCtx.storeId} />
         ) : (
-          <ProfitReport key={tab} view={tab === 'REPORT' ? 'summary' : 'stores'} month={reportMonth} onMonthChange={setReportMonth} />
+          <ProfitReport
+            key={tab}
+            view={tab === 'REPORT' ? 'summary' : 'stores'}
+            month={selectedMonth}
+            startDate={startDate}
+            endDate={endDate}
+            onDateChange={handleDateChange}
+            onResetToCurrentMonth={handleResetToCurrentMonth}
+          />
         )}
       </div>
     </div>

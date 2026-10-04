@@ -138,6 +138,20 @@ export const CashCollectionPanel: React.FC<{ month: string; storeId?: string | n
   }
   if (!balances) return <LoadingState label="Загрузка касс…" />;
 
+  const centralCashUsd = Number(balances.central?.cashUsd ?? 0);
+  const bonusCashUsd = Number(balances.bonusAccount?.balanceUsd ?? 0);
+
+  const neededCentralUsd = cancelling
+    ? (cancelling.bonusAmountUsd !== undefined && cancelling.bonusAmountUsd > 0
+        ? (cancelling.regularAmountUsd ?? 0)
+        : cancelling.amountUsd)
+    : 0;
+  const neededBonusUsd = cancelling?.bonusAmountUsd ?? 0;
+
+  const isCentralInsufficient = cancelling ? centralCashUsd < (neededCentralUsd - 0.001) : false;
+  const isBonusInsufficient = cancelling && neededBonusUsd > 0 ? bonusCashUsd < (neededBonusUsd - 0.001) : false;
+  const isCancelDisabled = isCentralInsufficient || isBonusInsufficient;
+
   return (
     <div className="p-2.5 sm:p-4 space-y-3.5 max-w-3xl mx-auto">
       <StatusBanner message={status} onDismiss={() => setStatus(null)} />
@@ -381,10 +395,11 @@ export const CashCollectionPanel: React.FC<{ month: string; storeId?: string | n
         title="Отменить инкассацию?"
         confirmLabel="Отменить инкассацию"
         loading={busy}
+        confirmDisabled={isCancelDisabled}
         onConfirm={confirmCancel}
         onCancel={() => { if (!busy) setCancelling(null); }}
         message={cancelling && (
-          <div className="space-y-2 text-xs">
+          <div className="space-y-2.5 text-xs">
             <p>
               {formatTjs(cancelling.amountTjs)} ({formatUsd(cancelling.amountUsd)}) вернутся в кассу «{cancelling.storeName}».
             </p>
@@ -394,8 +409,32 @@ export const CashCollectionPanel: React.FC<{ month: string; storeId?: string | n
               </p>
             ) : (
               <p className="text-fg-subtle">
-                Сумма {formatMoney(cancelling.amountUsd)} должна быть в Центральной кассе.
+                Сумма {formatUsd(cancelling.amountUsd)} должна быть в Центральной кассе.
               </p>
+            )}
+
+            {isCentralInsufficient && (
+              <div className="p-2.5 rounded-lg bg-danger/10 border border-danger/25 text-danger text-xs space-y-1">
+                <div className="font-semibold flex items-center gap-1.5">
+                  <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+                  Недостаточно средств в Центральной кассе
+                </div>
+                <div>
+                  В Центральной кассе сейчас {formatUsd(centralCashUsd)}, а для отмены требуется {formatUsd(neededCentralUsd)}.
+                </div>
+              </div>
+            )}
+
+            {isBonusInsufficient && (
+              <div className="p-2.5 rounded-lg bg-danger/10 border border-danger/25 text-danger text-xs space-y-1">
+                <div className="font-semibold flex items-center gap-1.5">
+                  <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+                  Недостаточно средств на Бонусном счёте
+                </div>
+                <div>
+                  На счёте сейчас {formatUsd(bonusCashUsd)}, а для отмены требуется {formatUsd(neededBonusUsd)}.
+                </div>
+              </div>
             )}
           </div>
         )}

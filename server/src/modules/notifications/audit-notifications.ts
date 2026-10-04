@@ -30,7 +30,8 @@ const fromFd: Rule['amounts'] = (fd) => ({ tjs: fd.amountTjs, usd: fd.amountUsd 
  * are left out: they create richer notifications themselves.
  */
 export const AUDIT_NOTIFICATION_RULES: Record<string, Rule> = {
-  SALE: { title: 'Продажа', route: '/sales-history', subject: 'sale', amounts: fromFd },
+  // Regular sales do not notify the admin to prevent spamming.
+  // Below-cost sales remain enabled as a warning for losses/fraud.
   SALE_BELOW_COST: { title: 'Продажа ниже себестоимости', route: '/sales-history', subject: 'sale', amounts: fromFd },
   REFUND: { title: 'Возврат', route: '/sales-history', subject: 'sale', amounts: fromFd },
   EXCHANGE: { title: 'Обмен', route: '/sales-history', subject: 'sale', amounts: (fd) => ({ tjs: fd.differenceTjs }) },

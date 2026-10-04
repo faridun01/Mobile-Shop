@@ -99,9 +99,19 @@ export const Drawer: React.FC = () => {
 
   const unreadNotifs = Array.isArray(notifications) ? notifications.filter(n => !n.read).length : 0;
 
+  const bottomNavIds = useMemo<Set<PageId>>(() => {
+    if (isCentralCashMode) {
+      return new Set<PageId>(['INVENTORY', 'SUPPLIERS', 'FINANCE', 'TRANSFER']);
+    }
+    // Retail Store mode / Seller / Partner
+    return new Set<PageId>(['INVENTORY', 'SALES_HISTORY', 'SALE', 'TRANSFER']);
+  }, [isCentralCashMode]);
+
   const navGroups = useMemo<NavGroup[]>(() => {
+    let rawGroups: NavGroup[] = [];
+
     if (isSeller) {
-      return [
+      rawGroups = [
         {
           title: 'Основные операции',
           items: [
@@ -116,15 +126,13 @@ export const Drawer: React.FC = () => {
           items: [
             { id: 'INVENTORY', label: 'Склад товаров', icon: Package, roles: ['SELLER'] },
             { id: 'RECEIPTS', label: 'Приход товара', icon: PackagePlus, roles: ['SELLER'] },
-            { id: 'TRANSFER', label: 'Отправка на склад', icon: ArrowLeftRight, roles: ['SELLER'] },
+            { id: 'TRANSFER', label: 'Перемещение', icon: ArrowLeftRight, roles: ['SELLER'] },
             { id: 'EXPENSES', label: 'Расходы кассы', icon: Wallet, roles: ['SELLER'] },
           ],
         },
       ];
-    }
-
-    if (isPartner) {
-      return [
+    } else if (isPartner) {
+      rawGroups = [
         {
           title: 'Магазин',
           items: [
@@ -139,7 +147,7 @@ export const Drawer: React.FC = () => {
           items: [
             { id: 'INVENTORY', label: 'Склад магазина', icon: Package, roles: ['PARTNER'] },
             { id: 'RECEIPTS', label: 'Приход товара', icon: PackagePlus, roles: ['PARTNER'] },
-            { id: 'TRANSFER', label: 'Отправка на склад', icon: ArrowLeftRight, roles: ['PARTNER'] },
+            { id: 'TRANSFER', label: 'Перемещение', icon: ArrowLeftRight, roles: ['PARTNER'] },
           ],
         },
         {
@@ -150,10 +158,8 @@ export const Drawer: React.FC = () => {
           ],
         },
       ];
-    }
-
-    if (isCentralCashMode) {
-      return [
+    } else if (isCentralCashMode) {
+      rawGroups = [
         {
           title: 'Центральная касса и финансы',
           items: [
@@ -185,42 +191,50 @@ export const Drawer: React.FC = () => {
           ],
         },
       ];
+    } else {
+      // Retail Store mode for Admin
+      rawGroups = [
+        {
+          title: `Продажи: ${activeRetailStore?.name || 'Магазин'}`,
+          items: [
+            { id: 'SALE', label: 'POS Терминал', icon: ShoppingBag, roles: ['ADMIN'] },
+            { id: 'SALES_HISTORY', label: 'История продаж', icon: History, roles: ['ADMIN'] },
+            { id: 'EXCHANGE', label: 'Обмен (Trade-In)', icon: RefreshCw, roles: ['ADMIN'] },
+            { id: 'REPAIR', label: 'Сервис и ремонт', icon: Wrench, roles: ['ADMIN'] },
+            { id: 'INVENTORY', label: 'Склад магазина', icon: Package, roles: ['ADMIN'] },
+            { id: 'TRANSFER', label: 'Перемещение', icon: ArrowLeftRight, roles: ['ADMIN'] },
+            { id: 'RECEIPTS', label: 'Приходы магазина', icon: PackagePlus, roles: ['ADMIN'] },
+          ],
+        },
+        {
+          title: 'Финансы (Центральный офис)',
+          items: [
+            { id: 'FINANCE', label: 'Финансы', icon: Landmark, roles: ['ADMIN'] },
+            { id: 'EXPENSES', label: 'Расходы', icon: Wallet, roles: ['ADMIN'] },
+            { id: 'BONUSES', label: 'Бонусы', icon: Gift, roles: ['ADMIN'] },
+            { id: 'OWNERS', label: 'Партнеры и капитал', icon: Users, roles: ['ADMIN'] },
+          ],
+        },
+        {
+          title: 'Система и доступ',
+          items: [
+            { id: 'EMPLOYEES', label: 'Сотрудники', icon: UserCheck, roles: ['ADMIN'] },
+            { id: 'AUDIT_LOG', label: 'Журнал аудита', icon: FileText, roles: ['ADMIN'] },
+            { id: 'NOTIFICATIONS', label: 'Уведомления', icon: Bell, roles: ['ADMIN'] },
+            { id: 'SETTINGS', label: 'Настройки системы', icon: Settings, roles: ['ADMIN'] },
+          ],
+        },
+      ];
     }
 
-    // Retail Store mode for Admin
-    return [
-      {
-        title: `Продажи: ${activeRetailStore?.name || 'Магазин'}`,
-        items: [
-          { id: 'SALE', label: 'POS Терминал', icon: ShoppingBag, roles: ['ADMIN'] },
-          { id: 'SALES_HISTORY', label: 'История продаж', icon: History, roles: ['ADMIN'] },
-          { id: 'EXCHANGE', label: 'Обмен (Trade-In)', icon: RefreshCw, roles: ['ADMIN'] },
-          { id: 'REPAIR', label: 'Сервис и ремонт', icon: Wrench, roles: ['ADMIN'] },
-          { id: 'INVENTORY', label: 'Склад магазина', icon: Package, roles: ['ADMIN'] },
-          { id: 'TRANSFER', label: 'Перемещение', icon: ArrowLeftRight, roles: ['ADMIN'] },
-          { id: 'RECEIPTS', label: 'Приходы магазина', icon: PackagePlus, roles: ['ADMIN'] },
-        ],
-      },
-      {
-        title: 'Финансы (Центральный офис)',
-        items: [
-          { id: 'FINANCE', label: 'Финансы', icon: Landmark, roles: ['ADMIN'] },
-          { id: 'EXPENSES', label: 'Расходы', icon: Wallet, roles: ['ADMIN'] },
-          { id: 'BONUSES', label: 'Бонусы', icon: Gift, roles: ['ADMIN'] },
-          { id: 'OWNERS', label: 'Партнеры и капитал', icon: Users, roles: ['ADMIN'] },
-        ],
-      },
-      {
-        title: 'Система и доступ',
-        items: [
-          { id: 'EMPLOYEES', label: 'Сотрудники', icon: UserCheck, roles: ['ADMIN'] },
-          { id: 'AUDIT_LOG', label: 'Журнал аудита', icon: FileText, roles: ['ADMIN'] },
-          { id: 'NOTIFICATIONS', label: 'Уведомления', icon: Bell, roles: ['ADMIN'] },
-          { id: 'SETTINGS', label: 'Настройки системы', icon: Settings, roles: ['ADMIN'] },
-        ],
-      },
-    ];
-  }, [isSeller, isPartner, isCentralCashMode, activeRetailStore, userStoreName]);
+    // Do not show in the drawer menu items that are already present in the mobile bottom bar
+    return rawGroups
+      .map((group) => ({
+        ...group,
+        items: group.items.filter((item) => !bottomNavIds.has(item.id)),
+      }))
+      .filter((group) => group.items.length > 0);
+  }, [isSeller, isPartner, isCentralCashMode, activeRetailStore, bottomNavIds]);
 
   React.useEffect(() => {
     if (!drawerOpen) return;

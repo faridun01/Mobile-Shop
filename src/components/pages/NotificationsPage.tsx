@@ -34,7 +34,6 @@ import { useStoreContext } from '../../utils/storeContext';
 /** Names of the business events, for the action filter and the item label. */
 export const ACTION_LABELS: Record<string, string> = {
   STORE_RECEIPT: 'Приход в магазин',
-  SALE: 'Продажа',
   SALE_BELOW_COST: 'Продажа ниже себестоимости',
   REFUND: 'Возврат',
   EXCHANGE: 'Обмен',
