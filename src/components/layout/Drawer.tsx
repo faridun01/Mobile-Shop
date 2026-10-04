@@ -125,7 +125,6 @@ export const Drawer: React.FC = () => {
           title: 'Склад и касса',
           items: [
             { id: 'INVENTORY', label: 'Склад товаров', icon: Package, roles: ['SELLER'] },
-            { id: 'RECEIPTS', label: 'Приход товара', icon: PackagePlus, roles: ['SELLER'] },
             { id: 'TRANSFER', label: 'Перемещение', icon: ArrowLeftRight, roles: ['SELLER'] },
             { id: 'EXPENSES', label: 'Расходы кассы', icon: Wallet, roles: ['SELLER'] },
           ],
@@ -146,7 +145,6 @@ export const Drawer: React.FC = () => {
           title: 'Склад',
           items: [
             { id: 'INVENTORY', label: 'Склад магазина', icon: Package, roles: ['PARTNER'] },
-            { id: 'RECEIPTS', label: 'Приход товара', icon: PackagePlus, roles: ['PARTNER'] },
             { id: 'TRANSFER', label: 'Перемещение', icon: ArrowLeftRight, roles: ['PARTNER'] },
           ],
         },
@@ -176,7 +174,6 @@ export const Drawer: React.FC = () => {
             { id: 'INVENTORY', label: 'Склад товаров', icon: Package, roles: ['ADMIN'] },
             { id: 'PURCHASE', label: 'Приходы (партии)', icon: PlusCircle, roles: ['ADMIN'] },
             { id: 'TRANSFER', label: 'Перемещение', icon: ArrowLeftRight, roles: ['ADMIN'] },
-            { id: 'RECEIPTS', label: 'Приходы магазинов', icon: PackagePlus, roles: ['ADMIN'] },
             { id: 'REPAIR', label: 'Сервис и ремонт', icon: Wrench, roles: ['ADMIN'] },
             { id: 'SUPPLIERS', label: 'Поставщики', icon: Truck, roles: ['ADMIN'] },
           ],
@@ -203,7 +200,6 @@ export const Drawer: React.FC = () => {
             { id: 'REPAIR', label: 'Сервис и ремонт', icon: Wrench, roles: ['ADMIN'] },
             { id: 'INVENTORY', label: 'Склад магазина', icon: Package, roles: ['ADMIN'] },
             { id: 'TRANSFER', label: 'Перемещение', icon: ArrowLeftRight, roles: ['ADMIN'] },
-            { id: 'RECEIPTS', label: 'Приходы магазина', icon: PackagePlus, roles: ['ADMIN'] },
           ],
         },
         {
@@ -422,7 +418,7 @@ export const Drawer: React.FC = () => {
         )}
 
         {/* Vertical List of Menu Items with Collapsible/Expandable Sections */}
-        <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain [-webkit-overflow-scrolling:touch] touch-pan-y p-3 pb-[calc(2.5rem+var(--bottom-nav-pb))] space-y-3">
+        <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain [-webkit-overflow-scrolling:touch] touch-pan-y p-3 pb-[calc(1.5rem+var(--sa-bottom))] space-y-3">
           {navGroups.map((group, gIdx) => {
             const visibleItems = group.items.filter(item => item.roles.includes(userRole));
             if (visibleItems.length === 0) return null;

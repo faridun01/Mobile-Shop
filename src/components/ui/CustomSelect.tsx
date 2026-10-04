@@ -151,7 +151,7 @@ export function CustomSelect<T extends string = string>({
           />
 
           {/* Bottom Sheet Drawer */}
-          <div className="relative bg-surface border-t border-border rounded-t-2xl p-4 shadow-2xl max-h-[80vh] flex flex-col space-y-3 z-10 animate-in slide-in-from-bottom duration-200">
+          <div className="relative bg-surface border-t border-border rounded-t-2xl p-4 pb-[calc(1rem+var(--sa-bottom))] shadow-2xl max-h-[80vh] flex flex-col space-y-3 z-10 animate-in slide-in-from-bottom duration-200">
             {/* Grab Handle */}
             <div className="w-10 h-1 bg-border rounded-full mx-auto shrink-0 mb-1" />
 

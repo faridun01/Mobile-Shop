@@ -143,7 +143,7 @@ interface AppContextType {
     supplierId: string;
     invoiceNumber: string;
     date: string;
-    isStorePurchase: boolean;
+    isStorePurchase?: boolean;
     storeId?: string;
     groups: {
       brand: string;
@@ -1049,12 +1049,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
-  const createPurchase: AppContextType['createPurchase'] = async ({ supplierId, invoiceNumber, date, isStorePurchase, storeId, groups }) => {
-    const destStoreId = isStorePurchase && storeId ? storeId : 'main-warehouse';
+  const createPurchase: AppContextType['createPurchase'] = async ({ supplierId, invoiceNumber, date, groups }) => {
+    const mainStore = stores.find((s) => s.isMainWarehouse);
+    const destStoreId = mainStore?.id || 'main-warehouse';
     try {
       await apiClient('/purchases', {
         method: 'POST',
-        body: JSON.stringify({ supplierId, invoiceNumber, date, isStorePurchase, storeId: destStoreId, groups }),
+        body: JSON.stringify({ supplierId, invoiceNumber, date, isStorePurchase: false, storeId: destStoreId, groups }),
       });
       markLocalMutation(['devices', 'suppliers', 'invoices', 'bonuses']);
       await refreshAfterMutation([fetchDevices(), fetchSuppliers(), fetchInvoices(), fetchBonuses()]);

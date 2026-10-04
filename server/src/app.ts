@@ -294,18 +294,20 @@ app.patch('/api/devices/:id', authenticateJwt, requireRoles('ADMIN', 'PARTNER'),
 
 app.post('/api/purchases', authenticateJwt, requireRoles('ADMIN'), enforceBodyStoreScope, async (req: AuthenticatedRequest, res, next) => {
   try {
-    const { supplierId, invoiceNumber, date, storeId, groups } = req.body ?? {};
-    if (!supplierId || !invoiceNumber || !storeId || !Array.isArray(groups) || groups.length === 0) {
-      res.status(400).json({ message: 'supplierId, invoiceNumber, storeId и groups обязательны' });
+    const { supplierId, invoiceNumber, date, groups } = req.body ?? {};
+    if (!supplierId || !invoiceNumber || !Array.isArray(groups) || groups.length === 0) {
+      res.status(400).json({ message: 'supplierId, invoiceNumber и groups обязательны' });
       return;
     }
 
     const result = await prisma.$transaction(async (transaction: TransactionClient) => {
       const exchangeRate = await requireTodayRate(transaction);
       const supplier = await transaction.supplier.findUnique({ where: { id: supplierId } });
-      const store = await transaction.store.findUnique({ where: { id: storeId } });
-      if (!supplier || !store || !supplier.active || !store.active) throw new Error('Поставщик или магазин не найден либо неактивен');
-      if (store.isMainWarehouse && req.user!.role !== 'ADMIN') throw Object.assign(new Error('Приход на главный склад разрешён только администратору'), { statusCode: 403 });
+      const mainWarehouse = await transaction.store.findFirst({ where: { isMainWarehouse: true } });
+      if (!supplier || !supplier.active) throw new Error('Поставщик не найден либо неактивен');
+      if (!mainWarehouse) throw new Error('Главный склад не найден в системе');
+      const store = mainWarehouse;
+      const targetStoreId = mainWarehouse.id;
 
       const normalizedDevices = groups.flatMap((group: any) => {
         const isBonus = Boolean(group.isBonus);
@@ -373,8 +375,8 @@ app.post('/api/purchases', authenticateJwt, requireRoles('ADMIN'), enforceBodySt
           totalAmountUsd,
           exchangeRate,
           devicesCount: normalizedDevices.length,
-          isStorePurchase: !store.isMainWarehouse,
-          storeId,
+          isStorePurchase: false,
+          storeId: targetStoreId,
           groups: {
             create: groups.map((group: any) => {
               const isBonus = Boolean(group.isBonus);
@@ -395,11 +397,11 @@ app.post('/api/purchases', authenticateJwt, requireRoles('ADMIN'), enforceBodySt
         },
       });
 
-      const targetStatus = store.isMainWarehouse ? ('MAIN_WAREHOUSE' as const) : ('STORE_STOCK' as const);
+      const targetStatus = 'MAIN_WAREHOUSE' as const;
       const devices = await transaction.device.createManyAndReturn({
         data: normalizedDevices.map((device) => ({
           ...device,
-          storeId,
+          storeId: targetStoreId,
           status: targetStatus,
           costBasisUsd: device.purchasePriceUsd,
           supplierId,
@@ -420,7 +422,7 @@ app.post('/api/purchases', authenticateJwt, requireRoles('ADMIN'), enforceBodySt
           description: `Приход по накладной ${invoice.invoiceNumber} (${supplier.name}): ${devices.length} устройств`,
           amountUsd: totalAmountUsd,
           exchangeRate,
-          storeId,
+          storeId: store.id,
           storeName: store.name,
           referenceId: invoice.id,
         },
@@ -439,7 +441,8 @@ app.post('/api/purchases', authenticateJwt, requireRoles('ADMIN'), enforceBodySt
       return { invoice, devices };
     }, { maxWait: 10000, timeout: 25000 });
 
-    RealtimeSyncGateway.broadcast('INVENTORY_UPDATE', { storeId }, { storeIds: [storeId] });
+    const updatedStoreId = result.invoice.storeId || undefined;
+    RealtimeSyncGateway.broadcast('INVENTORY_UPDATE', { storeId: updatedStoreId }, updatedStoreId ? { storeIds: [updatedStoreId] } : undefined);
     res.status(201).json(result);
   } catch (error) {
     next(error);

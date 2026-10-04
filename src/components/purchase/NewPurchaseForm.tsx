@@ -19,10 +19,6 @@ interface NewPurchaseFormProps {
   currentUser: User | null;
   selectedSupplierId: string;
   onSelectSupplierId: (id: string) => void;
-  isStorePurchase: boolean;
-  onSetIsStorePurchase: (val: boolean) => void;
-  storeId: string;
-  onSetStoreId: (id: string) => void;
   groups: PurchaseItemGroup[];
   onUpdateGroup: (idx: number, field: keyof Omit<PurchaseItemGroup, 'items'>, value: any) => void;
   onAddGroup: () => void;
@@ -54,10 +50,6 @@ export const NewPurchaseForm: React.FC<NewPurchaseFormProps> = ({
   currentUser,
   selectedSupplierId,
   onSelectSupplierId,
-  isStorePurchase,
-  onSetIsStorePurchase,
-  storeId,
-  onSetStoreId,
   groups,
   onUpdateGroup,
   onAddGroup,
@@ -143,48 +135,18 @@ export const NewPurchaseForm: React.FC<NewPurchaseFormProps> = ({
             </div>
           </div>
 
-          {/* Destination location selector */}
-          <div className="pt-2 border-t border-border flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
-            <div className="flex items-center space-x-4">
-              {currentUser?.role === 'ADMIN' && (
-                <label className="flex items-center space-x-2 cursor-pointer">
-                  <input
-                    type="radio"
-                    name="dest"
-                    checked={!isStorePurchase}
-                    onChange={() => onSetIsStorePurchase(false)}
-                    className="text-accent focus:ring-accent"
-                  />
-                  <span className="text-fg-muted font-medium">Приход на Центральный склад</span>
-                </label>
-              )}
-
-              <label className="flex items-center space-x-2 cursor-pointer">
-                <input
-                  type="radio"
-                  name="dest"
-                  checked={isStorePurchase}
-                  onChange={() => onSetIsStorePurchase(true)}
-                  className="text-accent focus:ring-accent"
-                />
-                <span className="text-fg-muted font-medium">Прямой приход в магазин</span>
-              </label>
+          {/* Destination location: All receipts go to Main Warehouse */}
+          <div className="pt-2 border-t border-border flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
+            <div className="flex items-center gap-2">
+              <span className="text-fg-subtle font-medium">Склад поступления:</span>
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-accent/10 border border-accent/25 text-accent font-semibold text-xs">
+                <span className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse" />
+                Главный склад (Центральный)
+              </span>
             </div>
-
-            {isStorePurchase && (
-              <div className="flex items-center space-x-2">
-                <span className="text-fg-subtle">Магазин:</span>
-                <select
-                  value={storeId}
-                  onChange={(e) => onSetStoreId(e.target.value)}
-                  className="rounded-lg bg-surface-raised border border-border px-3 py-1.5 text-xs text-fg-muted focus:border-accent focus:outline-none"
-                >
-                  {stores.filter(s => !s.isMainWarehouse).map(s => (
-                    <option key={s.id} value={s.id}>{s.name}</option>
-                  ))}
-                </select>
-              </div>
-            )}
+            <span className="text-[11px] text-fg-subtle">
+              Все приходы оформляются через главный склад. В магазины товар распределяется через перемещение.
+            </span>
           </div>
         </div>
 

@@ -92,7 +92,6 @@ export const Sidebar: React.FC = () => {
           title: 'Склад',
           items: [
             { id: 'INVENTORY', label: 'Склад товаров', icon: Package, roles: ['SELLER'] },
-            { id: 'RECEIPTS', label: 'Приход товара', icon: PackagePlus, roles: ['SELLER'] },
             { id: 'TRANSFER', label: 'Перемещение', icon: ArrowLeftRight, roles: ['SELLER'] },
           ],
         },
@@ -116,7 +115,6 @@ export const Sidebar: React.FC = () => {
           title: 'Склад',
           items: [
             { id: 'INVENTORY', label: 'Склад магазина', icon: Package, roles: ['PARTNER'] },
-            { id: 'RECEIPTS', label: 'Приход товара', icon: PackagePlus, roles: ['PARTNER'] },
             { id: 'TRANSFER', label: 'Перемещение', icon: ArrowLeftRight, roles: ['PARTNER'] },
           ],
         },
@@ -150,7 +148,6 @@ export const Sidebar: React.FC = () => {
             { id: 'INVENTORY', label: 'Склад товаров', icon: Package, roles: ['ADMIN'] },
             { id: 'PURCHASE', label: 'Приходы (партии)', icon: PlusCircle, roles: ['ADMIN'] },
             { id: 'TRANSFER', label: 'Перемещение', icon: ArrowLeftRight, roles: ['ADMIN'] },
-            { id: 'RECEIPTS', label: 'Приходы магазинов', icon: PackagePlus, roles: ['ADMIN'] },
             { id: 'REPAIR', label: 'Сервис и ремонт', icon: Wrench, roles: ['ADMIN'] },
             { id: 'SUPPLIERS', label: 'Поставщики', icon: Truck, roles: ['ADMIN'] },
           ],
@@ -178,7 +175,6 @@ export const Sidebar: React.FC = () => {
           { id: 'REPAIR', label: 'Сервис и ремонт', icon: Wrench, roles: ['ADMIN'] },
           { id: 'INVENTORY', label: 'Склад магазина', icon: Package, roles: ['ADMIN'] },
           { id: 'TRANSFER', label: 'Перемещение', icon: ArrowLeftRight, roles: ['ADMIN'] },
-          { id: 'RECEIPTS', label: 'Приходы магазина', icon: PackagePlus, roles: ['ADMIN'] },
         ],
       },
       {

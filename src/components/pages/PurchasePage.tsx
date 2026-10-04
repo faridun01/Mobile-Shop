@@ -119,9 +119,8 @@ export const PurchasePage: React.FC = () => {
 
   const [purchaseDate] = useState<string>(getBusinessDateKey());
 
-  // Destination mode (Main Warehouse intake is ADMIN ONLY)
-  const [isStorePurchase, setIsStorePurchase] = useState<boolean>(currentUser?.role !== 'ADMIN');
-  const [storeId, setStoreId] = useState<string>(stores.find((s) => !s.isMainWarehouse)?.id || 'store-1');
+  // All purchases go exclusively to Main Warehouse
+  const mainWarehouseId = stores.find((s) => s.isMainWarehouse)?.id || 'main-warehouse';
 
   // Groups of devices
   const [groups, setGroups] = useState<PurchaseItemGroup[]>([
@@ -435,8 +434,8 @@ export const PurchasePage: React.FC = () => {
       setStatusMessage({ type: 'error', text: 'Укажите номер накладной' });
       return;
     }
-    if (!isStorePurchase && currentUser?.role !== 'ADMIN') {
-      setStatusMessage({ type: 'error', text: 'Приход на Главный Склад разрешен только Администратору' });
+    if (currentUser?.role !== 'ADMIN') {
+      setStatusMessage({ type: 'error', text: 'Оформление прихода разрешено только Администратору' });
       return;
     }
 
@@ -500,8 +499,8 @@ export const PurchasePage: React.FC = () => {
       supplierId: selectedSupplierId,
       invoiceNumber: invoiceNumber.trim(),
       date: purchaseDate,
-      isStorePurchase,
-      storeId: isStorePurchase ? storeId : undefined,
+      isStorePurchase: false,
+      storeId: mainWarehouseId,
       groups: cleanGroups,
     });
   };
@@ -589,10 +588,6 @@ export const PurchasePage: React.FC = () => {
           currentUser={currentUser}
           selectedSupplierId={selectedSupplierId}
           onSelectSupplierId={setSelectedSupplierId}
-          isStorePurchase={isStorePurchase}
-          onSetIsStorePurchase={setIsStorePurchase}
-          storeId={storeId}
-          onSetStoreId={setStoreId}
           groups={groups}
           onUpdateGroup={handleUpdateGroup}
           onAddGroup={handleAddGroup}

@@ -58,11 +58,7 @@ export const ReceiptPreviewModal: React.FC<ReceiptPreviewModalProps> = ({
             </div>
             <div>
               <span className="block text-[10px] text-fg-subtle">Назначение</span>
-              <span className="font-bold text-fg-muted">
-                {previewInvoice.isStorePurchase
-                  ? (stores.find(s => s.id === previewInvoice.storeId)?.name || 'Магазин')
-                  : 'Главный склад'}
-              </span>
+              <span className="font-bold text-accent">Главный склад</span>
             </div>
           </div>
 

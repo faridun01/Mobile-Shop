@@ -17,8 +17,11 @@ export function initViewport(): () => void {
       root.style.setProperty('--app-viewport-height', `${height}px`);
       root.style.setProperty('--app-viewport-top', `${top}px`);
       root.style.setProperty('--app-viewport-bottom', `${Math.max(0, window.innerHeight - height - top)}px`);
-      const editing = document.activeElement?.matches('input, textarea, [contenteditable="true"]');
-      root.toggleAttribute('data-keyboard-open', !!editing && window.innerHeight - height > 120);
+      const editing = Boolean(document.activeElement?.matches('input, textarea, [contenteditable="true"]'));
+      root.toggleAttribute('data-keyboard-open', editing && window.innerHeight - height > 80);
+      if (window.scrollY > 0) {
+        window.scrollTo(0, 0);
+      }
     });
   };
   viewport?.addEventListener('resize', update);
