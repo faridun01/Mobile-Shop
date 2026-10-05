@@ -66,6 +66,7 @@ export const TabletNavRail: React.FC = () => {
         { id: 'EXCHANGE' as PageId, label: 'Обмен', icon: RefreshCw },
         { id: 'REPAIR' as PageId, label: 'Ремонт', icon: Wrench },
         { id: 'INVENTORY' as PageId, label: 'Склад', icon: Package },
+        { id: 'RECEIPTS' as PageId, label: 'Приходы', icon: PackagePlus },
         { id: 'TRANSFER' as PageId, label: 'Перемещ.', icon: ArrowLeftRight },
       ];
     }
@@ -77,6 +78,7 @@ export const TabletNavRail: React.FC = () => {
         { id: 'EXCHANGE' as PageId, label: 'Обмен', icon: RefreshCw },
         { id: 'REPAIR' as PageId, label: 'Ремонт', icon: Wrench },
         { id: 'INVENTORY' as PageId, label: 'Склад', icon: Package },
+        { id: 'RECEIPTS' as PageId, label: 'Приходы', icon: PackagePlus },
         { id: 'TRANSFER' as PageId, label: 'Перемещ.', icon: ArrowLeftRight },
         { id: 'EXPENSES' as PageId, label: 'Расходы', icon: Wallet },
         { id: 'SETTINGS' as PageId, label: 'Опции', icon: Settings },
@@ -91,6 +93,7 @@ export const TabletNavRail: React.FC = () => {
         { id: 'BONUSES' as PageId, label: 'Бонусы', icon: Gift },
         { id: 'INVENTORY' as PageId, label: 'Склад', icon: Package },
         { id: 'PURCHASE' as PageId, label: 'Приход', icon: PlusCircle },
+        { id: 'RECEIPTS' as PageId, label: 'Приёмка', icon: PackagePlus },
         { id: 'TRANSFER' as PageId, label: 'Перемещ.', icon: ArrowLeftRight },
         { id: 'REPAIR' as PageId, label: 'Ремонт', icon: Wrench },
         { id: 'SUPPLIERS' as PageId, label: 'Поставщ.', icon: Truck },
@@ -108,6 +111,7 @@ export const TabletNavRail: React.FC = () => {
       { id: 'SALE' as PageId, label: 'POS', icon: ShoppingBag },
       { id: 'SALES_HISTORY' as PageId, label: 'Продажи', icon: History },
       { id: 'PURCHASE' as PageId, label: 'Приход', icon: PlusCircle },
+      { id: 'RECEIPTS' as PageId, label: 'Приходы', icon: PackagePlus },
       { id: 'REPAIR' as PageId, label: 'Ремонт', icon: Wrench },
       { id: 'INVENTORY' as PageId, label: 'Склад', icon: Package },
       { id: 'TRANSFER' as PageId, label: 'Перемещ.', icon: ArrowLeftRight },

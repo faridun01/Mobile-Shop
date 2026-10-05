@@ -128,6 +128,7 @@ export const Drawer: React.FC = () => {
           title: 'Склад и касса',
           items: [
             { id: 'INVENTORY', label: 'Склад товаров', icon: Package, roles: ['SELLER'] },
+            { id: 'RECEIPTS', label: 'Приходы', icon: PackagePlus, roles: ['SELLER'] },
             { id: 'TRANSFER', label: 'Перемещение', icon: ArrowLeftRight, roles: ['SELLER'] },
             { id: 'EXPENSES', label: 'Расходы кассы', icon: Wallet, roles: ['SELLER'] },
           ],
@@ -148,6 +149,7 @@ export const Drawer: React.FC = () => {
           title: 'Склад',
           items: [
             { id: 'INVENTORY', label: 'Склад магазина', icon: Package, roles: ['PARTNER'] },
+            { id: 'RECEIPTS', label: 'Приходы', icon: PackagePlus, roles: ['PARTNER'] },
             { id: 'TRANSFER', label: 'Перемещение', icon: ArrowLeftRight, roles: ['PARTNER'] },
           ],
         },
@@ -176,6 +178,7 @@ export const Drawer: React.FC = () => {
           items: [
             { id: 'INVENTORY', label: 'Склад товаров', icon: Package, roles: ['ADMIN'] },
             { id: 'PURCHASE', label: 'Приходы (партии)', icon: PlusCircle, roles: ['ADMIN'] },
+            { id: 'RECEIPTS', label: 'Приходы в магазины', icon: PackagePlus, roles: ['ADMIN'] },
             { id: 'TRANSFER', label: 'Перемещение', icon: ArrowLeftRight, roles: ['ADMIN'] },
             { id: 'REPAIR', label: 'Сервис и ремонт', icon: Wrench, roles: ['ADMIN'] },
             { id: 'SUPPLIERS', label: 'Поставщики', icon: Truck, roles: ['ADMIN'] },
@@ -200,6 +203,7 @@ export const Drawer: React.FC = () => {
             { id: 'SALE', label: 'POS Терминал', icon: ShoppingBag, roles: ['ADMIN'] },
             { id: 'SALES_HISTORY', label: 'История продаж', icon: History, roles: ['ADMIN'] },
             { id: 'PURCHASE', label: 'Приход товара', icon: PlusCircle, roles: ['ADMIN'] },
+            { id: 'RECEIPTS', label: 'Приходы в магазины', icon: PackagePlus, roles: ['ADMIN'] },
             { id: 'EXCHANGE', label: 'Обмен (Trade-In)', icon: RefreshCw, roles: ['ADMIN'] },
             { id: 'REPAIR', label: 'Сервис и ремонт', icon: Wrench, roles: ['ADMIN'] },
             { id: 'INVENTORY', label: 'Склад магазина', icon: Package, roles: ['ADMIN'] },
