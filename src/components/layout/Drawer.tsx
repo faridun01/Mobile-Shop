@@ -107,7 +107,7 @@ export const Drawer: React.FC = () => {
     if (isAdmin) {
       return new Set<PageId>(['INVENTORY', 'SALES_HISTORY', 'SALE', 'PURCHASE']);
     }
-    return new Set<PageId>(['INVENTORY', 'SALES_HISTORY', 'SALE', 'TRANSFER']);
+    return new Set<PageId>(['INVENTORY', 'SALES_HISTORY', 'SALE', 'RECEIPTS']);
   }, [isCentralCashMode, isAdmin]);
 
   const navGroups = useMemo<NavGroup[]>(() => {

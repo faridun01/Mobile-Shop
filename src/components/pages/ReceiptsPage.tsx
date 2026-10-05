@@ -686,14 +686,6 @@ export const ReceiptsPage: React.FC = () => {
                   <p className="text-xs text-fg-subtle mt-1.5 max-w-sm leading-relaxed">
                     Отсканируйте телефоны, которые поступили со склада. Каждый телефон автоматически сверяется с базой.
                   </p>
-                  <Button
-                    size="md"
-                    leftIcon={Scan}
-                    onClick={startScan}
-                    className="mt-4 !h-9 !px-4 text-xs font-bold shadow-xs cursor-pointer"
-                  >
-                    Начать сканирование
-                  </Button>
                   <p className="text-[11px] text-fg-subtle/80 mt-4 leading-normal">
                     💡 Поддерживаются проводные и Bluetooth сканеры штрихкодов в режиме HID-клавиатуры.
                   </p>
@@ -855,9 +847,6 @@ export const ReceiptsPage: React.FC = () => {
                   <p className="text-xs text-fg-subtle mt-1.5 max-w-xs leading-relaxed">
                     Отсканируйте телефоны, которые поступили со склада. Каждый телефон автоматически сверяется с базой.
                   </p>
-                  <Button size="md" leftIcon={Scan} onClick={startScan} className="mt-4 !h-8.5 !px-3.5 text-xs shadow-xs">
-                    Начать сканирование
-                  </Button>
                 </div>
               ) : (
                 <ul className="space-y-1.5">

@@ -10,6 +10,7 @@ import {
   Landmark,
   Truck,
   ArrowLeftRight,
+  PackagePlus,
 } from 'lucide-react';
 
 export const MobileBottomNav: React.FC = () => {
@@ -175,12 +176,13 @@ export const MobileBottomNav: React.FC = () => {
         />
       ) : (
         <NavItem
-          routePath="/transfer"
-          label="Перемещение"
-          icon={ArrowLeftRight}
+          routePath="/receipts"
+          label="Приходы"
+          title="Приходы"
+          icon={PackagePlus}
           onSelect={() => {
-            setActivePage('TRANSFER');
-            navigate('/transfer');
+            setActivePage('RECEIPTS');
+            navigate('/receipts');
           }}
         />
       )}
