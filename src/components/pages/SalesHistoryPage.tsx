@@ -31,6 +31,7 @@ import { StatusBanner, StatusMessage } from '../ui/StatusBanner';
 
 import { currentBusinessMonth, getBusinessDateKey, monthBounds } from '../../utils/businessDate';
 import { summarizeSales } from '../../utils/salesSummary';
+import { computeSaleProfit, computeSaleItemProfit } from '../../utils/saleProfit';
 import { looksLikeDeviceCode, normalizeScanCode } from '../../utils/scanLookup';
 import { useStoreContext, formatStoreName } from '../../utils/storeContext';
 
@@ -50,6 +51,7 @@ export const SalesHistoryPage: React.FC = () => {
     processRefund,
     isInitialLoading,
     selectedStoreId: globalSelectedStoreId,
+    todayRate,
   } = useAppFields(
     'currentUser',
     'sales',
@@ -60,7 +62,8 @@ export const SalesHistoryPage: React.FC = () => {
     'setActivePage',
     'processRefund',
     'isInitialLoading',
-    'selectedStoreId'
+    'selectedStoreId',
+    'todayRate'
   );
 
   const todayStr = getBusinessDateKey();
@@ -195,6 +198,25 @@ export const SalesHistoryPage: React.FC = () => {
   }, [sales, currentUser, isSeller, selectedStoreFilter, periodFilter, selectedStartDate, selectedEndDate, selectedMonth, searchQuery]);
 
   const periodSummary = useMemo(() => summarizeSales(filteredSales), [filteredSales]);
+
+  const periodProfitSummary = useMemo(() => {
+    if (!isAdmin) return { profitUsd: 0, profitTjs: 0, costUsd: 0 };
+    let totalProfitUsd = 0;
+    let totalProfitTjs = 0;
+    let totalCostUsd = 0;
+    const fallbackRate = todayRate?.rate || 1;
+    for (const sale of filteredSales) {
+      const res = computeSaleProfit(sale, fallbackRate);
+      totalProfitUsd += res.profitUsd;
+      totalProfitTjs += res.profitTjs;
+      totalCostUsd += res.costUsd;
+    }
+    return {
+      profitUsd: Math.round(totalProfitUsd * 100) / 100,
+      profitTjs: Math.round(totalProfitTjs),
+      costUsd: Math.round(totalCostUsd * 100) / 100,
+    };
+  }, [filteredSales, isAdmin, todayRate?.rate]);
 
   const findByReceiptOrImei = (list: typeof sales, code: string) =>
     list.find(s => s.receiptNumber.toString() === code || s.items.some(i => i.imei === code || i.imei2 === code));
@@ -433,6 +455,18 @@ export const SalesHistoryPage: React.FC = () => {
             <span className="px-2 py-0.5 rounded-md bg-accent/10 border border-accent/20 text-accent font-bold shrink-0">
               {formatMoney(periodSummary.totalTjs)} TJS
             </span>
+            {isAdmin && (
+              <span className={cn(
+                "px-2 py-0.5 rounded-md border font-bold shrink-0 font-mono flex items-center gap-1.5",
+                periodProfitSummary.profitUsd >= 0
+                  ? "bg-emerald-500/15 border-emerald-500/30 text-emerald-400"
+                  : "bg-danger/15 border-danger/30 text-danger"
+              )}>
+                <span className="text-[10px] text-fg-subtle font-sans font-semibold">Прибыль:</span>
+                <span>{periodProfitSummary.profitUsd >= 0 ? '+' : ''}${periodProfitSummary.profitUsd.toLocaleString()}</span>
+                <span className="opacity-80 font-normal text-[10px]">(~{formatMoney(periodProfitSummary.profitTjs)} TJS)</span>
+              </span>
+            )}
             <span className="px-2 py-0.5 rounded-md bg-surface-raised border border-border shrink-0">
               Нал: <strong className="text-fg-muted font-medium">{formatMoney(periodSummary.cashTjs)}</strong>
             </span>
@@ -525,6 +559,7 @@ export const SalesHistoryPage: React.FC = () => {
                     <th className="py-2.5 px-3">Покупатель</th>
                     <th className="py-2.5 px-3">Оплата</th>
                     <th className="py-2.5 px-3 text-right">Сумма</th>
+                    {isAdmin && <th className="py-2.5 px-3 text-right">Прибыль</th>}
                     <th className="py-2.5 px-3 text-center">Статус</th>
                   </tr>
                 </thead>
@@ -576,6 +611,39 @@ export const SalesHistoryPage: React.FC = () => {
                             <span className="font-bold text-fg text-xs">{formatMoney(sale.totalTjs)} TJS</span>
                           )}
                         </td>
+                        {isAdmin && (() => {
+                          const profit = computeSaleProfit(sale, todayRate?.rate || 1);
+                          return (
+                            <td className="py-2.5 px-3 text-right whitespace-nowrap font-mono">
+                              {sale.status === 'REFUNDED' ? (
+                                profit.profitUsd > 0 ? (
+                                  <div>
+                                    <span className="text-emerald-400 font-bold text-xs block">
+                                      +${profit.profitUsd}
+                                    </span>
+                                    <span className="text-[10px] text-warning block">
+                                      штраф {formatMoney(profit.profitTjs)} TJS
+                                    </span>
+                                  </div>
+                                ) : (
+                                  <span className="text-fg-subtle text-xs">$0 (возврат)</span>
+                                )
+                              ) : (
+                                <div>
+                                  <span className={cn(
+                                    "text-xs font-bold block",
+                                    profit.profitUsd >= 0 ? "text-emerald-400" : "text-danger"
+                                  )}>
+                                    {profit.profitUsd >= 0 ? '+' : ''}${profit.profitUsd.toFixed(2)}
+                                  </span>
+                                  <span className="text-[10px] text-fg-subtle block">
+                                    ~{profit.profitTjs >= 0 ? '+' : ''}{formatMoney(profit.profitTjs)} TJS
+                                  </span>
+                                </div>
+                              )}
+                            </td>
+                          );
+                        })()}
                         <td className="py-2.5 px-3 text-center whitespace-nowrap">
                           {sale.status === 'EXCHANGED' && <Badge tone="accent">Обмен</Badge>}
                           {sale.status === 'REFUNDED' && <Badge tone="danger">Возврат</Badge>}
@@ -627,6 +695,17 @@ export const SalesHistoryPage: React.FC = () => {
                         ) : (
                           <>
                             <p className="text-sm font-semibold text-fg-muted">{formatMoney(sale.totalTjs)} TJS</p>
+                            {isAdmin && (() => {
+                              const profit = computeSaleProfit(sale, todayRate?.rate || 1);
+                              return (
+                                <p className={cn(
+                                  "text-[11px] font-bold font-mono",
+                                  profit.profitUsd >= 0 ? "text-emerald-400" : "text-danger"
+                                )}>
+                                  {profit.profitUsd >= 0 ? '+' : ''}${profit.profitUsd.toFixed(2)}
+                                </p>
+                              );
+                            })()}
                             <p className={`text-xs ${sale.paymentMethod === 'DEBT' && (sale.debtAmountTjs ?? 0) > 0 ? 'text-danger font-semibold' : 'text-fg-subtle'}`}>
                               {sale.paymentMethod === 'CASH' ? 'Наличные' : sale.paymentMethod === 'CARD' ? 'Карта' : sale.paymentMethod === 'DEBT' ? ((sale.debtAmountTjs ?? 0) > 0 ? `В долг (${formatMoney(sale.debtAmountTjs ?? 0)} TJS)` : 'В долг (погашено)') : 'Смешанная'}
                             </p>
@@ -767,6 +846,27 @@ export const SalesHistoryPage: React.FC = () => {
                         <p className="text-[11px] text-fg-subtle font-mono mt-0.5 font-medium">
                           ≈ ${formatMoney(item.salePriceUsd)}
                         </p>
+
+                        {isAdmin && (() => {
+                          const itemProfit = computeSaleItemProfit(item, selectedSale.exchangeRate || todayRate?.rate || 1);
+                          return (
+                            <div className="mt-1.5 pt-1 border-t border-border/60 text-right">
+                              <div className="text-[10px] text-fg-subtle flex items-center justify-end gap-1">
+                                <span>Закупка:</span>
+                                <span className="font-mono text-fg-muted font-medium">${itemProfit.costUsd}</span>
+                              </div>
+                              <div className={cn(
+                                "text-xs font-bold font-mono mt-0.5",
+                                itemProfit.profitUsd >= 0 ? "text-emerald-400" : "text-danger"
+                              )}>
+                                <span>{itemProfit.profitUsd >= 0 ? '+' : ''}${itemProfit.profitUsd.toFixed(2)}</span>
+                                <span className="text-[10px] font-normal opacity-80 ml-1">
+                                  ({itemProfit.marginPercent >= 0 ? `+${itemProfit.marginPercent}` : itemProfit.marginPercent}%)
+                                </span>
+                              </div>
+                            </div>
+                          );
+                        })()}
                       </div>
                     </div>
                   );
@@ -823,6 +923,51 @@ export const SalesHistoryPage: React.FC = () => {
                   {formatMoney(selectedSale.totalTjs)} TJS
                 </span>
               </div>
+
+              {isAdmin && (() => {
+                const saleProfit = computeSaleProfit(selectedSale, todayRate?.rate || 1);
+                return (
+                  <div className="flex justify-between items-center pt-2.5 mt-2 border-t border-border/80 bg-surface-raised/70 -mx-3.5 -mb-3.5 px-3.5 py-2.5 rounded-b-xl">
+                    <div className="flex flex-col">
+                      <span className="text-xs font-bold text-fg uppercase tracking-wider flex items-center gap-1.5">
+                        <span className="w-2 h-2 rounded-full bg-emerald-400 inline-block shadow-2xs" />
+                        Чистая прибыль
+                      </span>
+                      <span className="text-[10px] text-fg-subtle">
+                        Себестоимость: ${saleProfit.costUsd.toLocaleString()}
+                      </span>
+                    </div>
+                    <div className="text-right">
+                      {selectedSale.status === 'REFUNDED' ? (
+                        saleProfit.profitUsd > 0 ? (
+                          <div>
+                            <span className="text-base sm:text-lg font-black font-mono text-emerald-400 block leading-tight">
+                              +${saleProfit.profitUsd}
+                            </span>
+                            <span className="text-[11px] text-warning font-mono block">
+                              штраф {formatMoney(saleProfit.profitTjs)} TJS
+                            </span>
+                          </div>
+                        ) : (
+                          <span className="text-xs text-fg-subtle font-mono block">$0 (возврат)</span>
+                        )
+                      ) : (
+                        <div>
+                          <span className={cn(
+                            "text-base sm:text-lg font-black font-mono block leading-tight",
+                            saleProfit.profitUsd >= 0 ? "text-emerald-400" : "text-danger"
+                          )}>
+                            {saleProfit.profitUsd >= 0 ? '+' : ''}${saleProfit.profitUsd.toFixed(2)}
+                          </span>
+                          <span className="text-[11px] text-fg-subtle font-mono block">
+                            ≈ {saleProfit.profitTjs >= 0 ? '+' : ''}{formatMoney(saleProfit.profitTjs)} TJS
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })()}
             </div>
 
             {selectedSale.status === 'REFUNDED' && (

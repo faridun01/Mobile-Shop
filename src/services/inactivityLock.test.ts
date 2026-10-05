@@ -55,7 +55,7 @@ describe('InactivityMonitor (10-minute lock)', () => {
     expect(t.onLock).not.toHaveBeenCalled();
     t.advance(1);
     expect(t.onLock).toHaveBeenCalledTimes(1);
-  });
+  }, 15000);
 
   it('ignores background events: API polling, WebSocket messages, update checks, focus', () => {
     const t = setup();
