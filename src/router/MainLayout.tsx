@@ -13,6 +13,7 @@ import { Drawer } from '../components/layout/Drawer';
 import { MobileBottomNav } from '../components/layout/MobileBottomNav';
 import { DailyRateModal } from '../components/common/DailyRateModal';
 import { StoreSwitchModal } from '../components/common/StoreSwitchModal';
+import { DailyCashClosingModal } from '../components/finance/DailyCashClosingModal';
 import { StoreTransitionOverlay } from '../components/common/StoreTransitionOverlay';
 import { PWAInstallPrompt } from '../components/pwa/PWAInstallPrompt';
 import { useUIStore } from '../stores/useUIStore';
@@ -81,7 +82,15 @@ export function MainLayout() {
   const { currentUser } = useAuthStore();
   // Locks after 10 minutes without user activity (all roles).
   useInactivityLock();
-  const { isDailyRateModalOpen, setDailyRateModalOpen, isStoreSwitchModalOpen, setStoreSwitchModalOpen } = useUIStore();
+  const {
+    isDailyRateModalOpen,
+    setDailyRateModalOpen,
+    isStoreSwitchModalOpen,
+    setStoreSwitchModalOpen,
+    isDailyClosingModalOpen,
+    setDailyClosingModalOpen,
+    dailyClosingStoreId,
+  } = useUIStore();
   const { isRateModalOpen, closeDailyRateModal, activePage, setActivePage, selectedStoreId, stores, isScannerOpen } = useAppFields('isRateModalOpen', 'closeDailyRateModal', 'activePage', 'setActivePage', 'selectedStoreId', 'stores', 'isScannerOpen');
 
   React.useEffect(() => {
@@ -182,6 +191,11 @@ export function MainLayout() {
           onClose={() => setStoreSwitchModalOpen(false)}
         />
       )}
+      <DailyCashClosingModal
+        isOpen={isDailyClosingModalOpen}
+        onClose={() => setDailyClosingModalOpen(false)}
+        storeId={dailyClosingStoreId}
+      />
       <StoreTransitionOverlay />
       {!native && isScannerOpen && (
         <Suspense fallback={null}>

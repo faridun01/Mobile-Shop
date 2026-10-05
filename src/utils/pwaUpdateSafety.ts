@@ -80,6 +80,9 @@ export function getUpdateSafetyAssessment(): UpdateSafetyAssessment {
   if (ui.isDailyRateModalOpen) {
     return { safe: false, reason: 'Открыто окно установки курса валют' };
   }
+  if (ui.isDailyClosingModalOpen) {
+    return { safe: false, reason: 'Открыто окно закрытия смены (Z-отчёт)' };
+  }
   if (ui.storeTransition?.active) {
     return { safe: false, reason: 'Выполняется переключение магазина' };
   }

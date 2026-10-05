@@ -17,6 +17,7 @@ import {
   Store as StoreIcon,
   Plus,
   Share2,
+  FileCheck2,
 } from 'lucide-react';
 import { SearchBar } from '../ui/SearchBar';
 import { formatRam, formatStorage, getPhoneColorHex } from '../../utils/phoneSpecs';
@@ -39,7 +40,7 @@ interface CartItem {
 }
 
 export const SalePage: React.FC = () => {
-  const { setStoreSwitchModalOpen } = useUIStore();
+  const { setStoreSwitchModalOpen, setDailyClosingModalOpen } = useUIStore();
   const {
     currentUser,
     devices,
@@ -339,13 +340,26 @@ export const SalePage: React.FC = () => {
           <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden">
             {/* Filter bar */}
             <div className="p-2 sm:p-2.5 border-b border-border bg-surface shrink-0 space-y-2">
-              <SearchBar
-                value={searchQuery}
-                onChange={setSearchQuery}
-                onScan={handleTriggerScanner}
-                onSubmit={(value) => handleDeviceCode(value, 'enter')}
-                placeholder="Поиск по IMEI / штрихкоду / модели..."
-              />
+              <div className="flex items-center gap-2">
+                <div className="flex-1 min-w-0">
+                  <SearchBar
+                    value={searchQuery}
+                    onChange={setSearchQuery}
+                    onScan={handleTriggerScanner}
+                    onSubmit={(value) => handleDeviceCode(value, 'enter')}
+                    placeholder="Поиск по IMEI / штрихкоду / модели..."
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setDailyClosingModalOpen(true, effectiveStoreId)}
+                  className="h-11 px-3 rounded-xl bg-surface-raised hover:bg-surface border border-border text-xs font-semibold text-fg-muted hover:text-accent transition-colors flex items-center gap-1.5 shrink-0 cursor-pointer shadow-2xs"
+                  title="Закрытие кассовой смены (Z-отчёт)"
+                >
+                  <FileCheck2 className="w-4 h-4 text-accent" />
+                  <span className="hidden sm:inline">Z-Отчёт</span>
+                </button>
+              </div>
 
               {brands.length > 2 && (
                 <div className="flex items-center justify-between gap-2 overflow-hidden pt-0.5">
@@ -526,6 +540,14 @@ export const SalePage: React.FC = () => {
             </div>
 
             <div className="flex items-center gap-1.5 shrink-0">
+              <button
+                type="button"
+                onClick={() => setDailyClosingModalOpen(true, effectiveStoreId)}
+                className="p-1.5 rounded-lg text-fg-subtle hover:text-accent hover:bg-accent/10 transition-colors cursor-pointer"
+                title="Закрыть смену / Z-отчёт"
+              >
+                <FileCheck2 className="w-4 h-4" />
+              </button>
               <span className="px-2 py-0.5 rounded-full bg-accent/15 border border-accent/30 text-accent font-bold font-mono text-xs">
                 {cart.length} шт
               </span>

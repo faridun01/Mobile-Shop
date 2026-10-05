@@ -535,3 +535,60 @@ export interface BonusDistributionLog {
   performedByName?: string;
   createdAt: string;
 }
+
+export interface DailyCashClosing {
+  id: string;
+  storeId: string;
+  businessDate: string;
+  closedByUserId: string;
+  closedByName: string;
+  openingCashTjs: number | string;
+  openingCashUsd: number | string;
+  salesCashTjs: number | string;
+  salesCashUsd: number | string;
+  salesCardTjs: number | string;
+  expensesCashTjs: number | string;
+  expensesCashUsd: number | string;
+  refundsCashTjs: number | string;
+  refundsCashUsd: number | string;
+  collectionsCashTjs: number | string;
+  collectionsCashUsd: number | string;
+  expectedCashTjs: number | string;
+  expectedCashUsd: number | string;
+  actualCashTjs: number | string;
+  actualCashUsd: number | string;
+  differenceTjs: number | string;
+  differenceUsd: number | string;
+  comment?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  store?: {
+    id: string;
+    name: string;
+  };
+}
+
+export interface DailyClosingSummary {
+  storeId: string;
+  storeName: string;
+  businessDate: string;
+  alreadyClosed: boolean;
+  closing?: DailyCashClosing;
+  openingCashTjs: string;
+  openingCashUsd: string;
+  salesCashTjs: string;
+  salesCashUsd: string;
+  salesCardTjs: string;
+  salesCount: number;
+  expensesCashTjs: string;
+  expensesCashUsd: string;
+  expensesCount: number;
+  refundsCashTjs: string;
+  refundsCashUsd: string;
+  refundsCount: number;
+  collectionsCashTjs: string;
+  collectionsCashUsd: string;
+  collectionsCount: number;
+  expectedCashTjs: string;
+  expectedCashUsd: string;
+}

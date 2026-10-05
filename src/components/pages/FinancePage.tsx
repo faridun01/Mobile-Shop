@@ -8,13 +8,15 @@ import { StatusBanner, StatusMessage } from '../ui/StatusBanner';
 import { ProfitReport } from '../finance/ProfitReport';
 import { BonusesFinancePanel } from '../finance/BonusesFinancePanel';
 import { CashCollectionPanel } from '../finance/CashCollectionPanel';
+import { DailyCashClosingListPanel } from '../finance/DailyCashClosingListPanel';
 import { useStoreContext } from '../../utils/storeContext';
 
-type Tab = 'REPORT' | 'STORES' | 'CASH' | 'BONUSES';
+type Tab = 'REPORT' | 'STORES' | 'CASH' | 'CLOSINGS' | 'BONUSES';
 const TABS: { value: Tab; label: string }[] = [
   { value: 'REPORT', label: 'Отчёт' },
   { value: 'STORES', label: 'По магазинам' },
   { value: 'CASH', label: 'Инкассация' },
+  { value: 'CLOSINGS', label: 'Закрытие смен' },
   { value: 'BONUSES', label: 'Бонусы' },
 ];
 
@@ -90,6 +92,8 @@ export const FinancePage: React.FC = () => {
           />
         ) : tab === 'CASH' ? (
           <CashCollectionPanel month={activeMonth} storeId={storeCtx.storeId} />
+        ) : tab === 'CLOSINGS' ? (
+          <DailyCashClosingListPanel month={activeMonth} storeId={storeCtx.storeId} />
         ) : (
           <ProfitReport
             key={tab}

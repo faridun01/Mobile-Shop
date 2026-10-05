@@ -29,6 +29,7 @@ import {
   Store,
   ArrowRight,
   PackagePlus,
+  FileCheck2,
 } from 'lucide-react';
 import { NAV_PAGE_ROUTES } from '../../router/navRoutes';
 
@@ -83,7 +84,7 @@ export const Drawer: React.FC = () => {
     'setSelectedStoreId'
   );
   const { notifications } = useNotifications();
-  const { setStoreSwitchModalOpen, triggerStoreTransition } = useUIStore();
+  const { setStoreSwitchModalOpen, triggerStoreTransition, setDailyClosingModalOpen } = useUIStore();
 
   const { isCollapsed: isGroupCollapsed, toggle: toggleGroup } = useCollapsedNavGroups();
 
@@ -425,6 +426,28 @@ export const Drawer: React.FC = () => {
                 </div>
               </div>
             )}
+          </div>
+        )}
+
+        {/* Quick Shift Closing Button for Store Cashiers / Partners */}
+        {(!isAdmin || !isCentralCashMode) && (
+          <div className="px-3 pt-2.5 shrink-0">
+            <button
+              type="button"
+              onClick={() => {
+                setDrawerOpen(false);
+                setDailyClosingModalOpen(true, currentUser?.storeId || (selectedStoreId !== 'all' ? selectedStoreId : undefined));
+              }}
+              className="w-full py-2.5 px-3 rounded-xl bg-accent/10 hover:bg-accent/15 border border-accent/25 text-accent text-xs font-bold flex items-center justify-between transition-colors shadow-2xs cursor-pointer"
+            >
+              <span className="flex items-center gap-2">
+                <FileCheck2 className="w-4 h-4 text-accent shrink-0" />
+                <span>Закрыть смену (Z-отчёт)</span>
+              </span>
+              <span className="text-[10px] uppercase font-mono px-1.5 py-0.5 rounded bg-accent/20">
+                Сверка кассы
+              </span>
+            </button>
           </div>
         )}
 
