@@ -5,13 +5,11 @@ import {
   Banknote,
   Calendar,
   CheckCircle2,
-  Clock,
   CreditCard,
   FileSpreadsheet,
   Gift,
   Receipt,
   Search,
-  Store as StoreIcon,
   X,
 } from 'lucide-react';
 import { apiClient } from '../../api/client';
@@ -62,15 +60,6 @@ export interface BreakdownSale {
   items: BreakdownItem[];
 }
 
-export interface BreakdownExpense {
-  id: string;
-  category: string;
-  description: string;
-  amountTjs: number;
-  amountUsd: number | null;
-  createdAt: string;
-}
-
 export interface StoreBreakdown {
   store: {
     id: string;
@@ -107,13 +96,10 @@ export interface StoreBreakdown {
     salesCashTjs: string;
     salesCardTjs: string;
     salesDebtTjs: string;
-    expensesCount: number;
-    expensesTotalTjs: string;
     refundedCount: number;
     refundedTotalTjs: string;
   };
   sales: BreakdownSale[];
-  expenses: BreakdownExpense[];
 }
 
 interface CashReconciliationModalProps {
@@ -155,7 +141,6 @@ export const CashReconciliationModal: React.FC<CashReconciliationModalProps> = (
   const [data, setData] = useState<StoreBreakdown | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'ALL' | 'SALES' | 'EXPENSES'>('ALL');
   const [search, setSearch] = useState('');
 
   useEffect(() => {
@@ -163,7 +148,6 @@ export const CashReconciliationModal: React.FC<CashReconciliationModalProps> = (
       setData(null);
       setError(null);
       setSearch('');
-      setActiveTab('ALL');
       return;
     }
 
@@ -176,7 +160,7 @@ export const CashReconciliationModal: React.FC<CashReconciliationModalProps> = (
         if (!cancelled) setData(res);
       })
       .catch((err) => {
-        if (!cancelled) setError(err instanceof Error ? err.message : 'Не удалось загрузить данные сверки');
+        if (!cancelled) setError(err instanceof Error ? err.message : 'Не удалось загрузить историю продаж');
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -202,18 +186,6 @@ export const CashReconciliationModal: React.FC<CashReconciliationModalProps> = (
     });
   }, [data?.sales, search]);
 
-  const filteredExpenses = useMemo(() => {
-    if (!data?.expenses) return [];
-    const q = search.trim().toLowerCase();
-    if (!q) return data.expenses;
-
-    return data.expenses.filter((e) => {
-      if (e.category.toLowerCase().includes(q)) return true;
-      if (e.description.toLowerCase().includes(q)) return true;
-      return false;
-    });
-  }, [data?.expenses, search]);
-
   if (!open || !store) return null;
 
   const isZeroCash = Number(store.cashUsd) === 0;
@@ -237,7 +209,7 @@ export const CashReconciliationModal: React.FC<CashReconciliationModalProps> = (
             <div className="min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
                 <h3 className="text-sm sm:text-base font-bold text-fg truncate">
-                  Сверка кассы: «{store.storeName}»
+                  Сверка с продажами: «{store.storeName}»
                 </h3>
                 {data?.period && (
                   <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-accent/15 text-accent border border-accent/25">
@@ -251,8 +223,8 @@ export const CashReconciliationModal: React.FC<CashReconciliationModalProps> = (
               </div>
               <p className="text-[11px] text-fg-subtle truncate mt-0.5">
                 {data?.period?.since
-                  ? `С момента последней инкассации (${formatDate(data.period.since)})`
-                  : 'За весь период с момента открытия кассы'}
+                  ? `Продажи с момента последней инкассации (${formatDate(data.period.since)})`
+                  : 'Продажи за весь период с момента открытия кассы'}
               </p>
             </div>
           </div>
@@ -268,7 +240,7 @@ export const CashReconciliationModal: React.FC<CashReconciliationModalProps> = (
 
         {/* Modal Body */}
         <div className="flex-1 overflow-y-auto p-3.5 sm:p-5 space-y-4">
-          {loading && <LoadingState label="Загрузка чеков и истории кассы…" />}
+          {loading && <LoadingState label="Загрузка чеков продаж…" />}
 
           {error && (
             <div className="p-4 rounded-xl bg-danger/10 border border-danger/20 text-danger text-xs space-y-2">
@@ -296,7 +268,7 @@ export const CashReconciliationModal: React.FC<CashReconciliationModalProps> = (
                 <div className="flex items-center gap-2 text-fg font-medium">
                   <Calendar className="w-4 h-4 text-accent shrink-0" />
                   <span>
-                    Период:{' '}
+                    Период продаж:{' '}
                     <strong className="text-fg">
                       {formatDate(data.period.periodStart)} — {formatDate(data.period.until)}
                     </strong>
@@ -304,66 +276,52 @@ export const CashReconciliationModal: React.FC<CashReconciliationModalProps> = (
                 </div>
                 {data.lastCollection && (
                   <div className="text-[11px] text-fg-subtle">
-                    Предыдущая: {data.lastCollection.transactionNumber} ({formatTjs(data.lastCollection.amountTjs)})
+                    Предыдущая инкассация: {data.lastCollection.transactionNumber} ({formatTjs(data.lastCollection.amountTjs)})
                   </div>
                 )}
               </div>
 
-              {/* 4 Cards Summary */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-2.5">
+              {/* 3 Summary Cards - purely sales & cash */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
                 {/* 1. Cash In Register */}
-                <div className="p-2.5 sm:p-3 rounded-xl border border-emerald-500/30 bg-emerald-500/5 space-y-1">
-                  <div className="flex items-center gap-1.5 text-[11px] font-semibold text-emerald-600 dark:text-emerald-400">
-                    <Banknote className="w-3.5 h-3.5 shrink-0" />
-                    <span>В кассе (нал)</span>
+                <div className="p-3 rounded-xl border border-emerald-500/30 bg-emerald-500/5 space-y-1">
+                  <div className="flex items-center gap-1.5 text-xs font-semibold text-emerald-600 dark:text-emerald-400">
+                    <Banknote className="w-4 h-4 shrink-0" />
+                    <span>В кассе (к инкассации)</span>
                   </div>
-                  <p className="text-sm sm:text-base font-bold font-mono text-fg tabular-nums">
-                    {formatTjs(data.summary.cashOnlyTjs)}
+                  <p className="text-base sm:text-lg font-bold font-mono text-fg tabular-nums">
+                    {formatTjs(data.summary.cashOnlyTjs ?? data.summary.currentCashTjs)}
                   </p>
-                  <p className="text-[10px] text-fg-subtle">
+                  <p className="text-[11px] text-fg-subtle">
                     ≈ {formatUsd(data.summary.currentCashUsd)}
                   </p>
                 </div>
 
                 {/* 2. Sales Cash */}
-                <div className="p-2.5 sm:p-3 rounded-xl border border-border bg-surface-raised/50 space-y-1">
-                  <div className="flex items-center gap-1.5 text-[11px] font-semibold text-fg-subtle">
-                    <Receipt className="w-3.5 h-3.5 text-accent shrink-0" />
-                    <span>Продажи (нал)</span>
+                <div className="p-3 rounded-xl border border-border bg-surface-raised/50 space-y-1">
+                  <div className="flex items-center gap-1.5 text-xs font-semibold text-fg-subtle">
+                    <Receipt className="w-4 h-4 text-accent shrink-0" />
+                    <span>Выручка наличными</span>
                   </div>
-                  <p className="text-sm sm:text-base font-bold font-mono text-emerald-600 dark:text-emerald-400 tabular-nums">
+                  <p className="text-base sm:text-lg font-bold font-mono text-emerald-600 dark:text-emerald-400 tabular-nums">
                     +{formatTjs(data.summary.salesCashTjs)}
                   </p>
-                  <p className="text-[10px] text-fg-subtle">
-                    {data.summary.salesCount} чеков
+                  <p className="text-[11px] text-fg-subtle">
+                    {data.summary.salesCount} чеков за период
                   </p>
                 </div>
 
                 {/* 3. Sales Card / Transfer */}
-                <div className="p-2.5 sm:p-3 rounded-xl border border-border bg-surface-raised/50 space-y-1">
-                  <div className="flex items-center gap-1.5 text-[11px] font-semibold text-fg-subtle">
-                    <CreditCard className="w-3.5 h-3.5 text-blue-500 shrink-0" />
-                    <span>Переводы/Карта</span>
+                <div className="p-3 rounded-xl border border-border bg-surface-raised/50 space-y-1">
+                  <div className="flex items-center gap-1.5 text-xs font-semibold text-fg-subtle">
+                    <CreditCard className="w-4 h-4 text-blue-500 shrink-0" />
+                    <span>Переводы / Карта</span>
                   </div>
-                  <p className="text-sm sm:text-base font-bold font-mono text-blue-600 dark:text-blue-400 tabular-nums">
+                  <p className="text-base sm:text-lg font-bold font-mono text-blue-600 dark:text-blue-400 tabular-nums">
                     {formatTjs(data.summary.salesCardTjs)}
                   </p>
-                  <p className="text-[10px] text-fg-subtle">
-                    безналично на счёт
-                  </p>
-                </div>
-
-                {/* 4. Expenses from register */}
-                <div className="p-2.5 sm:p-3 rounded-xl border border-border bg-surface-raised/50 space-y-1">
-                  <div className="flex items-center gap-1.5 text-[11px] font-semibold text-fg-subtle">
-                    <AlertTriangle className="w-3.5 h-3.5 text-amber-500 shrink-0" />
-                    <span>Расходы кассы</span>
-                  </div>
-                  <p className="text-sm sm:text-base font-bold font-mono text-rose-500 tabular-nums">
-                    -{formatTjs(data.summary.expensesTotalTjs)}
-                  </p>
-                  <p className="text-[10px] text-fg-subtle">
-                    {data.summary.expensesCount} выплат
+                  <p className="text-[11px] text-fg-subtle">
+                    безналично на счёт магазина
                   </p>
                 </div>
               </div>
@@ -376,7 +334,7 @@ export const CashReconciliationModal: React.FC<CashReconciliationModalProps> = (
                     <span className="font-semibold">Бонусные устройства в выручке:</span>{' '}
                     <span>
                       {formatUsd(data.summary.bonusCashUsd)} ({data.summary.bonusCount} шт.) при инкассации
-                      автоматически поступят на Бонусный счёт, а остальное — в Центр. кассу.
+                      автоматически поступят на Бонусный счёт, а остальное — в Центральную кассу.
                     </span>
                   </div>
                 </div>
@@ -386,56 +344,29 @@ export const CashReconciliationModal: React.FC<CashReconciliationModalProps> = (
               <div className="p-2.5 rounded-xl bg-accent/5 border border-accent/20 flex items-center gap-2 text-xs text-fg-subtle">
                 <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
                 <span>
-                  Сверка сходится: Наличная выручка чеков ({formatTjs(data.summary.salesCashTjs)}) за вычетом
-                  расходов ({formatTjs(data.summary.expensesTotalTjs)}) точно совпадает с остатком в кассе ({formatTjs(data.summary.cashOnlyTjs)}).
+                  Сверка сходится: Наличная выручка чеков ({formatTjs(data.summary.salesCashTjs)}) в точности равна
+                  сумме наличных в кассе ({formatTjs(data.summary.cashOnlyTjs)}).
                 </span>
               </div>
 
-              {/* Tabs & Search */}
+              {/* Sales List Header & Search */}
               <div className="flex items-center justify-between gap-2 flex-wrap pt-1">
-                <div className="flex items-center gap-1 bg-surface-raised p-1 rounded-xl border border-border text-xs">
-                  <button
-                    type="button"
-                    onClick={() => setActiveTab('ALL')}
-                    className={`px-2.5 py-1 rounded-lg font-medium transition-colors cursor-pointer ${
-                      activeTab === 'ALL'
-                        ? 'bg-surface text-fg shadow-2xs font-semibold'
-                        : 'text-fg-subtle hover:text-fg'
-                    }`}
-                  >
-                    Все ({data.sales.length + data.expenses.length})
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setActiveTab('SALES')}
-                    className={`px-2.5 py-1 rounded-lg font-medium transition-colors cursor-pointer ${
-                      activeTab === 'SALES'
-                        ? 'bg-surface text-fg shadow-2xs font-semibold'
-                        : 'text-fg-subtle hover:text-fg'
-                    }`}
-                  >
-                    Продажи ({data.sales.length})
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setActiveTab('EXPENSES')}
-                    className={`px-2.5 py-1 rounded-lg font-medium transition-colors cursor-pointer ${
-                      activeTab === 'EXPENSES'
-                        ? 'bg-surface text-fg shadow-2xs font-semibold'
-                        : 'text-fg-subtle hover:text-fg'
-                    }`}
-                  >
-                    Расходы ({data.expenses.length})
-                  </button>
+                <div className="flex items-center gap-2">
+                  <h4 className="text-xs font-bold text-fg uppercase tracking-wide">
+                    Чеки продаж за период
+                  </h4>
+                  <span className="text-[11px] font-semibold px-2 py-0.2 rounded-full bg-surface-raised border border-border text-fg-subtle">
+                    {filteredSales.length}
+                  </span>
                 </div>
 
-                <div className="relative flex-1 sm:w-56 min-w-[180px]">
+                <div className="relative flex-1 sm:w-64 min-w-[200px]">
                   <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-fg-subtle" />
                   <input
                     type="text"
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
-                    placeholder="Поиск по чеку, товару…"
+                    placeholder="Поиск по чеку, товару, продавцу…"
                     className="w-full h-8 pl-8 pr-7 text-xs bg-surface-raised border border-border rounded-xl focus:outline-none focus:ring-1 focus:ring-accent"
                   />
                   {search && (
@@ -450,111 +381,80 @@ export const CashReconciliationModal: React.FC<CashReconciliationModalProps> = (
                 </div>
               </div>
 
-              {/* Transactions List */}
+              {/* Sales Transactions List */}
               <div className="rounded-xl border border-border bg-surface divide-y divide-border/60 overflow-hidden text-xs">
-                {activeTab !== 'EXPENSES' &&
-                  filteredSales.map((sale) => (
-                    <div
-                      key={sale.id}
-                      className="p-3 sm:p-3.5 hover:bg-surface-raised/40 transition-colors flex items-start justify-between gap-3"
-                    >
-                      <div className="min-w-0 space-y-1">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className="font-bold text-fg">Чек #{sale.receiptNumber}</span>
-                          <span className="text-[10px] text-fg-subtle">
-                            {formatShortDate(sale.createdAt)}
+                {filteredSales.map((sale) => (
+                  <div
+                    key={sale.id}
+                    className="p-3 sm:p-3.5 hover:bg-surface-raised/40 transition-colors flex items-start justify-between gap-3"
+                  >
+                    <div className="min-w-0 space-y-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-bold text-fg">Чек #{sale.receiptNumber}</span>
+                        <span className="text-[10px] text-fg-subtle">
+                          {formatShortDate(sale.createdAt)}
+                        </span>
+                        <span className="text-[10px] px-1.5 py-0.2 rounded bg-surface-raised border border-border text-fg-subtle font-medium">
+                          {sale.sellerName}
+                        </span>
+                        {sale.status === 'REFUNDED' && (
+                          <span className="text-[10px] px-1.5 py-0.2 rounded bg-danger/10 text-danger border border-danger/20 font-semibold">
+                            Возврат
                           </span>
-                          <span className="text-[10px] px-1.5 py-0.2 rounded bg-surface-raised border border-border text-fg-subtle font-medium">
-                            {sale.sellerName}
-                          </span>
-                          {sale.status === 'REFUNDED' && (
-                            <span className="text-[10px] px-1.5 py-0.2 rounded bg-danger/10 text-danger border border-danger/20 font-semibold">
-                              Возврат
-                            </span>
-                          )}
-                        </div>
-
-                        {/* Sold Items */}
-                        <div className="flex items-center gap-1.5 flex-wrap pt-0.5">
-                          {sale.items.map((it) => (
-                            <span
-                              key={it.id}
-                              className={`text-[11px] px-1.5 py-0.5 rounded-md border flex items-center gap-1 ${
-                                it.isBonus
-                                  ? 'bg-amber-500/10 border-amber-500/25 text-amber-600 dark:text-amber-400 font-medium'
-                                  : 'bg-surface-raised border-border text-fg'
-                              }`}
-                            >
-                              {it.isBonus && <Gift className="w-3 h-3 shrink-0" />}
-                              <span>
-                                {it.brand} {it.model} {it.storage}
-                              </span>
-                            </span>
-                          ))}
-                        </div>
-
-                        {/* Customer */}
-                        {sale.customerName && (
-                          <p className="text-[10px] text-fg-subtle">Клиент: {sale.customerName}</p>
                         )}
                       </div>
 
-                      <div className="text-right shrink-0 space-y-0.5 tabular-nums">
-                        <p className="font-bold font-mono text-sm text-fg">
-                          {formatTjs(sale.totalTjs)}
-                        </p>
-                        <div className="text-[10px] flex items-center justify-end gap-1.5 flex-wrap font-medium">
-                          {sale.cashAmountTjs > 0 && (
-                            <span className="text-emerald-600 dark:text-emerald-400">
-                              Нал: {formatTjs(sale.cashAmountTjs)}
+                      {/* Sold Items */}
+                      <div className="flex items-center gap-1.5 flex-wrap pt-0.5">
+                        {sale.items.map((it) => (
+                          <span
+                            key={it.id}
+                            className={`text-[11px] px-1.5 py-0.5 rounded-md border flex items-center gap-1 ${
+                              it.isBonus
+                                ? 'bg-amber-500/10 border-amber-500/25 text-amber-600 dark:text-amber-400 font-medium'
+                                : 'bg-surface-raised border-border text-fg'
+                            }`}
+                          >
+                            {it.isBonus && <Gift className="w-3 h-3 shrink-0" />}
+                            <span>
+                              {it.brand} {it.model} {it.storage}
                             </span>
-                          )}
-                          {sale.cardAmountTjs > 0 && (
-                            <span className="text-blue-600 dark:text-blue-400">
-                              Карта: {formatTjs(sale.cardAmountTjs)}
-                            </span>
-                          )}
-                        </div>
+                          </span>
+                        ))}
                       </div>
+
+                      {/* Customer */}
+                      {sale.customerName && (
+                        <p className="text-[10px] text-fg-subtle">Клиент: {sale.customerName}</p>
+                      )}
                     </div>
-                  ))}
 
-                {activeTab !== 'SALES' &&
-                  filteredExpenses.map((exp) => (
-                    <div
-                      key={exp.id}
-                      className="p-3 sm:p-3.5 hover:bg-surface-raised/40 transition-colors flex items-start justify-between gap-3 bg-rose-500/3"
-                    >
-                      <div className="min-w-0 space-y-1">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className="font-bold text-rose-500">Расход из кассы</span>
-                          <span className="text-[10px] text-fg-subtle">
-                            {formatShortDate(exp.createdAt)}
+                    <div className="text-right shrink-0 space-y-0.5 tabular-nums">
+                      <p className="font-bold font-mono text-sm text-fg">
+                        {formatTjs(sale.totalTjs)}
+                      </p>
+                      <div className="text-[10px] flex items-center justify-end gap-1.5 flex-wrap font-medium">
+                        {sale.cashAmountTjs > 0 && (
+                          <span className="text-emerald-600 dark:text-emerald-400 font-mono">
+                            Нал: {formatTjs(sale.cashAmountTjs)}
                           </span>
-                          <span className="text-[10px] px-1.5 py-0.2 rounded bg-rose-500/10 text-rose-500 border border-rose-500/20 font-medium">
-                            {exp.category}
+                        )}
+                        {sale.cardAmountTjs > 0 && (
+                          <span className="text-blue-600 dark:text-blue-400 font-mono">
+                            Карта: {formatTjs(sale.cardAmountTjs)}
                           </span>
-                        </div>
-                        <p className="text-[11px] text-fg-subtle">{exp.description}</p>
-                      </div>
-
-                      <div className="text-right shrink-0 tabular-nums">
-                        <p className="font-bold font-mono text-sm text-rose-500">
-                          -{formatTjs(exp.amountTjs)}
-                        </p>
-                        {exp.amountUsd && (
-                          <p className="text-[10px] text-fg-subtle">≈ {formatUsd(exp.amountUsd)}</p>
                         )}
                       </div>
                     </div>
-                  ))}
+                  </div>
+                ))}
 
-                {filteredSales.length === 0 && filteredExpenses.length === 0 && (
+                {filteredSales.length === 0 && (
                   <div className="p-8 text-center text-fg-subtle space-y-1">
                     <Receipt className="w-8 h-8 mx-auto text-fg-subtle/50 mb-2" />
-                    <p className="font-semibold text-fg">Операций не найдено</p>
+                    <p className="font-semibold text-fg">Чеков продаж не найдено</p>
                     <p className="text-[11px]">
-                      {search ? 'Попробуйте изменить поисковый запрос' : 'За этот период операций не было'}
+                      {search ? 'Попробуйте изменить поисковый запрос' : 'За этот период продаж не было'}
                     </p>
                   </div>
                 )}

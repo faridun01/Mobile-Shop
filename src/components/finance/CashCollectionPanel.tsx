@@ -253,11 +253,11 @@ export const CashCollectionPanel: React.FC<{ month: string; storeId?: string | n
                       type="button"
                       onClick={() => setInspectingStore(store)}
                       className="h-8 px-2.5 rounded-lg border border-border bg-surface hover:bg-surface-raised text-fg text-xs font-semibold flex items-center gap-1.5 transition-all shadow-2xs active:scale-95 cursor-pointer"
-                      title="Посмотреть детализацию и сверить с историей продаж"
+                      title="Сверить чеки продаж за период перед инкассацией"
                     >
                       <FileSpreadsheet className="w-3.5 h-3.5 text-accent" />
-                      <span className="hidden sm:inline">Сверка</span>
-                      <span className="sm:hidden">Детали</span>
+                      <span className="hidden sm:inline">Сверить продажи</span>
+                      <span className="sm:hidden">Продажи</span>
                     </button>
                     {empty ? (
                       <span className="h-8 px-2.5 rounded-lg bg-surface-raised border border-border text-fg-subtle text-xs font-medium flex items-center gap-1.5 select-none">
@@ -409,7 +409,7 @@ export const CashCollectionPanel: React.FC<{ month: string; storeId?: string | n
                 className="text-xs text-accent hover:underline flex items-center gap-1.5 font-semibold cursor-pointer"
               >
                 <FileSpreadsheet className="w-3.5 h-3.5" />
-                <span>Сверить с историей продаж и расходов перед инкассацией →</span>
+                <span>Сверить с историей продаж перед инкассацией →</span>
               </button>
             </div>
           </div>
