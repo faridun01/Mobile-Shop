@@ -11,7 +11,6 @@ import {
   Coins,
 } from 'lucide-react';
 import { formatStoreName } from '../../utils/storeContext';
-import { formatUserName } from '../../utils/formatUser';
 
 export const TopBar: React.FC = () => {
   const navigate = useNavigate();
@@ -187,19 +186,6 @@ export const TopBar: React.FC = () => {
             )}
           </button>
         )}
-
-        {/* User Identity Chip on Desktop */}
-        <div className="hidden lg:flex items-center gap-2 pl-2 border-l border-border/80">
-          <div className="w-8 h-8 rounded-lg bg-accent/10 border border-accent/25 text-accent font-bold text-xs flex items-center justify-center shrink-0">
-            {formatUserName(currentUser?.name).substring(0, 2).toUpperCase()}
-          </div>
-          <div className="text-left text-xs leading-tight">
-            <div className="font-semibold text-fg truncate max-w-28 xl:max-w-36">{formatUserName(currentUser?.name)}</div>
-            <div className="text-[10px] text-fg-subtle font-medium">
-              {currentUser?.role === 'ADMIN' ? 'Администратор' : currentUser?.role === 'PARTNER' ? 'Партнёр' : 'Продавец'}
-            </div>
-          </div>
-        </div>
       </div>
       </div>
     </header>
