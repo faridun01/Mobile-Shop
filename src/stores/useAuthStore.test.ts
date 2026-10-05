@@ -63,13 +63,12 @@ describe('auth session storage and lock', () => {
     expect(a.useAuthStore.getState().currentUser?.id).toBe('u1');
   });
 
-  it('does not restore a session whose last activity is 10 minutes old (page reloaded after a long background)', async () => {
-    const a = await load({ ms_jwt_token: future(), ms_user: JSON.stringify(user), [LAST_ACTIVITY_KEY]: String(Date.now() - 600_000) });
-    expect(a.useAuthStore.getState().token).toBeNull();
-    expect(a.useAuthStore.getState().currentUser).toBeNull();
-    expect(a.sessionStorage.data.has('ms_jwt_token')).toBe(false);
-    // The abandoned token is handed over so the server session can be revoked.
-    expect(a.takeLegacyPersistedToken()).toBeTruthy();
+  it('restores a session even if last activity was more than 10 minutes ago (inactivity lock removed)', async () => {
+    const token = future();
+    const a = await load({ ms_jwt_token: token, ms_user: JSON.stringify(user), [LAST_ACTIVITY_KEY]: String(Date.now() - 600_000) });
+    expect(a.useAuthStore.getState().token).toBe(token);
+    expect(a.useAuthStore.getState().currentUser?.id).toBe('u1');
+    expect(a.sessionStorage.data.has('ms_jwt_token')).toBe(true);
   });
 
   it('lock() drops the credential everywhere but keeps who was signed in, so the work stays on screen', async () => {

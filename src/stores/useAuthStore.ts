@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { stripRoleSuffix } from '../utils/formatUser';
 import { User } from '../types';
-import { isStoredActivityExpired, LAST_ACTIVITY_KEY } from '../services/inactivityLock';
+import { LAST_ACTIVITY_KEY } from '../services/inactivityLock';
 
 interface AuthState {
   currentUser: User | null;
@@ -100,10 +100,10 @@ const getInitialSession = (): { user: User | null; token: string | null } => {
     if (!savedUser || !savedToken) return { user: null, token: null };
     const exp = decodeJwtExpiry(savedToken);
     const expired = exp !== null && exp * 1000 <= Date.now();
-    // A page restored after 10+ minutes in the background (the OS discarded and reloaded it)
-    // must not skip the inactivity lock.
-    if (expired || isStoredActivityExpired(store, Date.now())) {
-      if (!expired) abandonedToken = savedToken;
+    // Only expire if the JWT token itself has expired (12h server lifetime).
+    // Inactivity lock is removed per user request: session stays logged in until explicit logout or window closure.
+    if (expired) {
+      abandonedToken = savedToken;
       store?.removeItem(TOKEN_KEY);
       store?.removeItem(USER_KEY);
       return { user: null, token: null };

@@ -33,32 +33,9 @@ function safeSessionStorage(): Storage | null {
 }
 
 /**
- * Locks the app after 10 minutes without user input while someone is signed in (all roles).
- * The inactive time is recomputed whenever the app returns to the foreground — browser
- * visibility/pageshow/focus, and the native app's resume event.
+ * Inactivity auto-lock disabled by user request.
+ * The session remains permanently active until explicitly closed or logged out.
  */
 export function useInactivityLock() {
-  const signedIn = useAuthStore((s) => !!s.token && !!s.currentUser && !s.locked);
-  useEffect(() => {
-    if (!signedIn) return;
-    const monitor = new InactivityMonitor({
-      windowTarget: window,
-      documentTarget: document,
-      isVisible: () => document.visibilityState === 'visible',
-      // Never cut a request in flight (e.g. a sale being saved); lock right after it.
-      canLockNow: () => !hasActiveMutations(),
-      storage: safeSessionStorage(),
-      onLock: lockSession,
-    });
-    monitor.start();
-    let removeResume: (() => void) | undefined;
-    let disposed = false;
-    if (Capacitor.isNativePlatform()) {
-      void App.addListener('resume', () => monitor.check()).then((handle) => {
-        if (disposed) void handle.remove();
-        else removeResume = () => void handle.remove();
-      });
-    }
-    return () => { disposed = true; monitor.stop(); removeResume?.(); };
-  }, [signedIn]);
+  // Disabled: do not monitor inactivity or lock after 10 minutes
 }
