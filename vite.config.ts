@@ -23,6 +23,18 @@ function getCommitSha(): string {
 function versionJsonPlugin(commit: string, builtAt: string, version: string): Plugin {
   return {
     name: 'version-json-plugin',
+    configureServer(server) {
+      server.middlewares.use((req, res, next) => {
+        const url = req.url?.split('?')[0];
+        if (url === '/version.json') {
+          res.setHeader('Content-Type', 'application/json');
+          res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
+          res.end(JSON.stringify({ commit, builtAt, version }, null, 2));
+          return;
+        }
+        next();
+      });
+    },
     generateBundle() {
       this.emitFile({
         type: 'asset',

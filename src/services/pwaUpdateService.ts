@@ -205,16 +205,19 @@ class PWAUpdateService {
       this.trySafeAutoUpdate();
     });
 
-    // E. Periodic Heartbeat (~30 seconds) while active
-    this.checkIntervalId = setInterval(() => {
-      if (typeof document !== 'undefined' && document.visibilityState === 'visible' && navigator.onLine) {
-        if (this.state.hasUpdate && !this.state.isUpdating) {
-          this.trySafeAutoUpdate();
-        } else {
-          this.checkForUpdates();
+    // E. Periodic Heartbeat (~30 seconds) while active in production/test
+    const isDev = typeof import.meta !== 'undefined' && Boolean(import.meta.env?.DEV) && import.meta.env?.MODE !== 'test';
+    if (!isDev) {
+      this.checkIntervalId = setInterval(() => {
+        if (typeof document !== 'undefined' && document.visibilityState === 'visible' && navigator.onLine) {
+          if (this.state.hasUpdate && !this.state.isUpdating) {
+            this.trySafeAutoUpdate();
+          } else {
+            this.checkForUpdates();
+          }
         }
-      }
-    }, 30_000);
+      }, 30_000);
+    }
   }
 
   /**
@@ -325,6 +328,11 @@ class PWAUpdateService {
   public trySafeAutoUpdate(): boolean {
     if (!this.state.hasUpdate || this.state.isUpdating) return false;
 
+    // Suppress automated reloads in development
+    if (typeof import.meta !== 'undefined' && Boolean(import.meta.env?.DEV) && import.meta.env?.MODE !== 'test') {
+      return false;
+    }
+
     const safety = getUpdateSafetyAssessment();
     if (safety.safe) {
       this.applyUpdate();
@@ -369,6 +377,14 @@ class PWAUpdateService {
    * Reloads the page safely while preventing infinite reload loops (Requirement 13).
    */
   private performSafeReload() {
+    // In development mode (Vite dev server), do not automatically reload the page
+    if (typeof import.meta !== 'undefined' && Boolean(import.meta.env?.DEV) && import.meta.env?.MODE !== 'test') {
+      console.info('[PWA] Automatic page reload suppressed in development mode.');
+      this.state.isUpdating = false;
+      this.notify();
+      return;
+    }
+
     const RELOAD_KEY = 'ms_pwa_last_reload_timestamp';
     const now = Date.now();
     const lastReload = Number(sessionStorage.getItem(RELOAD_KEY) || '0');
