@@ -638,6 +638,9 @@ export const PurchasePage: React.FC = () => {
       {/* Edit Invoice Modal */}
       <EditInvoiceModal
         invoice={editingInvoiceModal}
+        devices={devices}
+        suppliers={suppliers}
+        stores={stores}
         onClose={() => setEditingInvoiceModal(null)}
         onSave={handleSaveEditInvoice}
         onSuccess={(msg) => {

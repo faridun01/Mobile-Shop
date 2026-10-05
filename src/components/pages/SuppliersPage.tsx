@@ -410,6 +410,8 @@ export const SuppliersPage: React.FC = () => {
       {/* MODAL: Edit Invoice */}
       <EditSupplierInvoiceModal
         invoice={editingInvoice}
+        devices={devices}
+        stores={stores}
         supplierName={selectedSupplier?.name}
         rateNumber={rateNumber}
         onClose={() => setEditingInvoice(null)}
