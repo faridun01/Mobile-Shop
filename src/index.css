@@ -409,6 +409,28 @@ html[data-keyboard-open] .fixed.inset-0:not(.app-safe-area) > form {
   -webkit-overflow-scrolling: touch !important;
 }
 
+/* Ensure all centered modal dialog overlays strictly respect iOS/Android safe area insets (Dynamic Island, Notch, Home Indicator) */
+.fixed.inset-0.items-center:not(.app-safe-area):not(.modal-layer):not([data-modal-layer]) {
+  padding-top: max(0.75rem, var(--sa-top)) !important;
+  padding-bottom: max(0.75rem, var(--sa-bottom)) !important;
+  padding-left: max(0.75rem, var(--sa-left)) !important;
+  padding-right: max(0.75rem, var(--sa-right)) !important;
+}
+
+@media (min-width: 640px) {
+  .fixed.inset-0.items-center:not(.app-safe-area):not(.modal-layer):not([data-modal-layer]) {
+    padding-top: max(1rem, var(--sa-top)) !important;
+    padding-bottom: max(1rem, var(--sa-bottom)) !important;
+    padding-left: max(1rem, var(--sa-left)) !important;
+    padding-right: max(1rem, var(--sa-right)) !important;
+  }
+}
+
+/* While on-screen keyboard is open on iOS, collapse bottom padding so the inputs and submit buttons have maximum room */
+html[data-keyboard-open] .fixed.inset-0.items-center:not(.app-safe-area):not(.modal-layer):not([data-modal-layer]) {
+  padding-bottom: 0.5rem !important;
+}
+
 /* =========================================================================
    MODAL LAYER & DIALOG SHEETS (Consistent across all mobile screens & desktop)
    ========================================================================= */
