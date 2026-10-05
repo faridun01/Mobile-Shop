@@ -400,6 +400,15 @@ html[data-keyboard-open] .fixed.inset-0 {
   max-height: var(--app-viewport-height, 100dvh);
 }
 
+/* While keyboard is open, prevent modal dialog cards from overflowing visible area */
+html[data-keyboard-open] .fixed.inset-0:not(.app-safe-area) > div:not(.modal-layer):not([data-modal-layer]),
+html[data-keyboard-open] .fixed.inset-0:not(.app-safe-area) > form {
+  max-height: calc(var(--app-viewport-height, 100dvh) - 1rem) !important;
+  overflow-y: auto !important;
+  overscroll-behavior: contain !important;
+  -webkit-overflow-scrolling: touch !important;
+}
+
 /* =========================================================================
    MODAL LAYER & DIALOG SHEETS (Consistent across all mobile screens & desktop)
    ========================================================================= */
@@ -468,14 +477,22 @@ html[data-drawer-open] body {
   --choice-font-size: 12px;
 }
 
-/* Native selects and editable suggestion lists share one size across all pages.
-   Pixels keep this stable even when the small-screen root font changes. */
+/* Native selects and editable suggestion lists share one size on desktop/tablet.
+   On mobile (<= 768px), font-size: 16px !important from line 105 is strictly preserved to prevent iOS auto-zoom. */
+@media screen and (min-width: 769px) {
+  select,
+  select option,
+  select optgroup,
+  .app-combobox input,
+  .app-combobox button {
+    font-size: var(--choice-font-size) !important;
+  }
+}
 select,
 select option,
 select optgroup,
 .app-combobox input,
 .app-combobox button {
-  font-size: var(--choice-font-size) !important;
   font-family: 'Plus Jakarta Sans', 'Roboto', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   font-weight: 500;
   text-transform: none;
