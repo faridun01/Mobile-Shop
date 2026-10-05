@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { CreditCard, X, Users, ArrowDownLeft, ArrowUpRight, Warehouse, Store, Loader2, AlertTriangle } from 'lucide-react';
+import { CreditCard, X, Users, ArrowDownLeft, ArrowUpRight, Warehouse, Store, Loader2, AlertTriangle, Landmark } from 'lucide-react';
 import { CustomSelect } from '../ui/CustomSelect';
 import { formatMoney } from '../../utils/money';
 import { formatStoreName } from '../../utils/storeContext';
@@ -40,9 +40,9 @@ export const OwnerTransactionModal: React.FC<OwnerTransactionModalProps> = ({
   initialTxType = 'INVESTMENT',
   isSubmitting,
 }) => {
+  const centralStore = mainWarehouse || stores.find(s => s.isMainWarehouse) || stores[0];
   const [selectedOwnerId, setSelectedOwnerId] = useState(initialOwnerId || displayOwners[0]?.id || '');
   const [txType, setTxType] = useState<'INVESTMENT' | 'WITHDRAWAL'>(initialTxType);
-  const [selectedTxStoreId, setSelectedTxStoreId] = useState('');
   const [amountUsd, setAmountUsd] = useState('');
   const [note, setNote] = useState('');
 
@@ -50,30 +50,19 @@ export const OwnerTransactionModal: React.FC<OwnerTransactionModalProps> = ({
     if (open) {
       const targetOwnerId = initialOwnerId || (displayOwners.length > 0 ? displayOwners[0].id : '');
       setSelectedOwnerId(targetOwnerId);
-      const owner = displayOwners.find(o => o.id === targetOwnerId);
-      if (owner?.storeId) {
-        setSelectedTxStoreId(owner.storeId);
-      } else if (stores.length > 0) {
-        const defaultStore = stores.find(s => !s.isMainWarehouse) || stores[0];
-        setSelectedTxStoreId(defaultStore.id);
-      }
       setTxType(initialTxType);
       setAmountUsd('');
       setNote('');
     }
-  }, [open, initialOwnerId, initialTxType, displayOwners, stores]);
+  }, [open, initialOwnerId, initialTxType, displayOwners]);
 
   if (!open) return null;
 
   const handleOwnerChange = (id: string) => {
     setSelectedOwnerId(id);
-    const owner = displayOwners.find(o => o.id === id);
-    if (owner?.storeId) {
-      setSelectedTxStoreId(owner.storeId);
-    }
   };
 
-  const selectedStore = stores.find(s => s.id === selectedTxStoreId);
+  const selectedStore = centralStore;
   const selectedOwner = displayOwners.find(o => o.id === selectedOwnerId);
   const storeCash = selectedStore?.cashBalanceUsd ?? 0;
   const ownerCapital = selectedOwner?.capitalBalanceUsd ?? 0;
@@ -82,19 +71,19 @@ export const OwnerTransactionModal: React.FC<OwnerTransactionModalProps> = ({
   const isStoreCashInsufficient = txType === 'WITHDRAWAL' && val > 0 && val > storeCash;
   const isCapitalInsufficient = txType === 'WITHDRAWAL' && val > 0 && val > ownerCapital;
   const hasError = isStoreCashInsufficient || isCapitalInsufficient;
-  const isSubmitDisabled = isSubmitting || val <= 0 || !selectedTxStoreId || !selectedOwnerId || hasError;
+  const isSubmitDisabled = isSubmitting || val <= 0 || !selectedStore?.id || !selectedOwnerId || hasError;
 
   const maxWithdrawable = txType === 'WITHDRAWAL' ? Math.max(0, Math.min(storeCash, ownerCapital)) : null;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (isSubmitDisabled) return;
+    if (isSubmitDisabled || !selectedStore) return;
 
     await onSubmit({
       ownerId: selectedOwnerId,
       type: txType,
       amountUsd: val,
-      storeId: selectedTxStoreId,
+      storeId: selectedStore.id,
       note: note.trim() || undefined,
     });
   };
@@ -170,37 +159,33 @@ export const OwnerTransactionModal: React.FC<OwnerTransactionModalProps> = ({
             />
           </div>
 
+          {/* Central Cash Field - Fixed / Locked */}
           <div>
-            <label className="block text-fg-subtle text-[11px] uppercase mb-1 font-semibold">Объект (магазин / склад) *</label>
-            <CustomSelect
-              value={selectedTxStoreId}
-              onChange={setSelectedTxStoreId}
-              options={[
-                ...(mainWarehouse ? [{
-                  value: mainWarehouse.id,
-                  label: `Центральный склад (${mainWarehouse.name})`,
-                  sublabel: txType === 'WITHDRAWAL' ? `В кассе: $${formatMoney(mainWarehouse.cashBalanceUsd ?? 0)}` : undefined,
-                  icon: <Warehouse className="w-3.5 h-3.5 text-warning" />,
-                }] : []),
-                ...retailStores.map(store => ({
-                  value: store.id,
-                  label: formatStoreName(store.name),
-                  sublabel: txType === 'WITHDRAWAL' ? `В кассе: $${formatMoney(store.cashBalanceUsd ?? 0)}` : undefined,
-                  icon: <Store className="w-3.5 h-3.5 text-accent" />,
-                })),
-              ]}
-              title="Выберите объект"
-              className="w-full"
-              triggerClassName="w-full justify-between"
-            />
-            {txType === 'WITHDRAWAL' && selectedStore && (
-              <div className="flex items-center justify-between text-[11px] mt-1 px-2 py-1 rounded-lg bg-surface-raised border border-border/60">
-                <span className="text-fg-subtle">Наличных в кассе:</span>
-                <span className={`font-mono font-bold ${storeCash <= 0 ? 'text-danger' : 'text-accent'}`}>
+            <label className="block text-fg-subtle text-[11px] uppercase mb-1 font-semibold">Касса (Централизованная) *</label>
+            <div className="p-2.5 rounded-xl bg-surface-raised border border-border flex items-center justify-between gap-2 shadow-2xs">
+              <div className="flex items-center gap-2 min-w-0">
+                <div className="w-8 h-8 rounded-lg bg-accent/10 border border-accent/20 flex items-center justify-center text-accent shrink-0">
+                  <Landmark className="w-4 h-4" />
+                </div>
+                <div className="min-w-0">
+                  <div className="flex items-center gap-1.5">
+                    <span className="font-bold text-xs text-fg truncate">Центральная касса</span>
+                    <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-accent/15 text-accent border border-accent/25 shrink-0">
+                      Всегда
+                    </span>
+                  </div>
+                  <span className="text-[10px] text-fg-subtle block truncate">
+                    {selectedStore?.name || 'Главный склад'}
+                  </span>
+                </div>
+              </div>
+              <div className="text-right shrink-0 pl-2">
+                <span className="text-[9px] text-fg-subtle uppercase block font-semibold">В кассе</span>
+                <span className={`font-mono font-bold text-xs ${storeCash <= 0 ? 'text-danger' : 'text-accent'}`}>
                   ${formatMoney(storeCash)}
                 </span>
               </div>
-            )}
+            </div>
           </div>
 
           <div>
@@ -249,7 +234,7 @@ export const OwnerTransactionModal: React.FC<OwnerTransactionModalProps> = ({
               <ul className="list-disc list-inside space-y-0.5 text-[11px] leading-snug">
                 {isStoreCashInsufficient && (
                   <li>
-                    В кассе «{formatStoreName(selectedStore?.name || '')}» доступно только <strong>${formatMoney(storeCash)}</strong>.
+                    В центральной кассе («{formatStoreName(selectedStore?.name || 'Центральная касса')}») доступно только <strong>${formatMoney(storeCash)}</strong>.
                   </li>
                 )}
                 {isCapitalInsufficient && (

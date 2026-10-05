@@ -233,9 +233,9 @@ export const OwnersPage: React.FC = () => {
     if (isSubmitting) return;
     setStatusBanner(null);
 
-    const targetStore = stores.find(s => s.id === data.storeId);
+    const targetStore = mainWarehouse || stores.find(s => s.id === data.storeId || s.isMainWarehouse) || stores[0];
     if (!targetStore) {
-      setStatusBanner({ tone: 'error', text: 'Выберите кассу: магазин или центральный склад' });
+      setStatusBanner({ tone: 'error', text: 'Центральная касса не найдена' });
       return;
     }
 

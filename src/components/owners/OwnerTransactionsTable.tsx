@@ -4,17 +4,15 @@ import {
   Search,
   X,
   Users,
-  Building2,
   Coins,
   ArrowDownLeft,
   ArrowUpRight,
   Wallet,
-  Warehouse,
+  Landmark,
   Store,
 } from 'lucide-react';
 import { CustomSelect, CustomSelectOption } from '../ui/CustomSelect';
 import { MonthPicker } from '../ui/MonthPicker';
-import { formatStoreName } from '../../utils/storeContext';
 import { getBusinessDateKey } from '../../utils/businessDate';
 import { OwnerTransaction, Owner, Store as StoreType } from '../../types';
 
@@ -50,20 +48,14 @@ function formatTxDate(dateVal?: string): string {
 
 export const OwnerTransactionsTable: React.FC<OwnerTransactionsTableProps> = ({
   ownerTransactions,
-  stores,
   mainWarehouse,
-  retailStores,
   displayOwners,
   getOwnerDetails,
   rate,
-  isCentralMode,
-  defaultStoreId,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [typeFilter, setTypeFilter] = useState<'ALL' | 'PROFIT_PAYOUT' | 'INVESTMENT' | 'WITHDRAWAL' | 'REINVEST'>('ALL');
   const [selectedOwnerFilter, setSelectedOwnerFilter] = useState<string>('ALL');
-  const [storeFilterChoice, setSelectedStoreFilter] = useState<string>('ALL');
-  const selectedStoreFilter = isCentralMode ? storeFilterChoice : (defaultStoreId || 'ALL');
   const [periodFilter, setPeriodFilter] = useState<'ALL' | 'SPECIFIC_MONTH'>('ALL');
   const [selectedMonth, setSelectedMonth] = useState<string>(getBusinessDateKey().substring(0, 7));
   const [transactionsPage, setTransactionsPage] = useState(1);
@@ -81,21 +73,7 @@ export const OwnerTransactionsTable: React.FC<OwnerTransactionsTableProps> = ({
     }),
   ], [displayOwners, getOwnerDetails]);
 
-  const storeFilterOptions = useMemo<CustomSelectOption[]>(() => [
-    { value: 'ALL', label: 'Все объекты', icon: <Building2 className="w-3.5 h-3.5" /> },
-    ...retailStores.map((s) => ({
-      value: s.id,
-      label: formatStoreName(s.name),
-      icon: <Store className="w-3.5 h-3.5" />,
-    })),
-    ...(mainWarehouse ? [{
-      value: mainWarehouse.id,
-      label: `Центральный склад (${mainWarehouse.name})`,
-      icon: <Warehouse className="w-3.5 h-3.5 text-warning" />,
-    }] : []),
-  ], [retailStores, mainWarehouse]);
-
-  // Filtered transactions
+  // Filtered transactions (all capital deposits/withdrawals belong to Central Cash)
   const filteredTransactions = useMemo(() => {
     return ownerTransactions.filter((tx) => {
       if (typeFilter !== 'ALL' && tx.type !== typeFilter) {
@@ -103,13 +81,6 @@ export const OwnerTransactionsTable: React.FC<OwnerTransactionsTableProps> = ({
       }
       if (selectedOwnerFilter !== 'ALL' && tx.ownerId !== selectedOwnerFilter) {
         return false;
-      }
-      if (selectedStoreFilter !== 'ALL') {
-        const targetStore = stores.find(s => s.id === selectedStoreFilter);
-        const storeName = targetStore?.name || selectedStoreFilter;
-        if (tx.sourceOrDestination !== storeName && tx.sourceOrDestination !== selectedStoreFilter) {
-          return false;
-        }
       }
       if (periodFilter === 'SPECIFIC_MONTH' && !getBusinessDateKey(new Date(tx.date)).startsWith(selectedMonth)) {
         return false;
@@ -127,11 +98,11 @@ export const OwnerTransactionsTable: React.FC<OwnerTransactionsTableProps> = ({
       }
       return true;
     }).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-  }, [ownerTransactions, typeFilter, selectedOwnerFilter, selectedStoreFilter, periodFilter, selectedMonth, searchQuery, stores]);
+  }, [ownerTransactions, typeFilter, selectedOwnerFilter, periodFilter, selectedMonth, searchQuery]);
 
   useEffect(() => {
     setTransactionsPage(1);
-  }, [typeFilter, selectedOwnerFilter, selectedStoreFilter, periodFilter, selectedMonth, searchQuery]);
+  }, [typeFilter, selectedOwnerFilter, periodFilter, selectedMonth, searchQuery]);
 
   const totalTransactionsPages = Math.max(1, Math.ceil(filteredTransactions.length / TRANSACTIONS_PAGE_SIZE));
   const paginatedTransactions = useMemo(() => {
@@ -189,19 +160,6 @@ export const OwnerTransactionsTable: React.FC<OwnerTransactionsTableProps> = ({
               triggerClassName="w-full sm:w-auto"
             />
 
-            {/* Store Dropdown (Central Cash only) */}
-            {isCentralMode && (
-              <CustomSelect
-                value={selectedStoreFilter}
-                onChange={setSelectedStoreFilter}
-                options={storeFilterOptions}
-                title="Объекты"
-                icon={<Building2 className="w-3.5 h-3.5" />}
-                className="flex-1 sm:flex-initial"
-                triggerClassName="w-full sm:w-auto"
-              />
-            )}
-
             {/* Period Filter */}
             <div className="flex items-center gap-0.5 bg-surface-raised border border-border p-0.5 rounded-xl shrink-0">
               <button
@@ -236,13 +194,12 @@ export const OwnerTransactionsTable: React.FC<OwnerTransactionsTableProps> = ({
               />
             )}
 
-            {(searchQuery || typeFilter !== 'ALL' || selectedOwnerFilter !== 'ALL' || selectedStoreFilter !== 'ALL' || periodFilter !== 'ALL') && (
+            {(searchQuery || typeFilter !== 'ALL' || selectedOwnerFilter !== 'ALL' || periodFilter !== 'ALL') && (
               <button
                 onClick={() => {
                   setSearchQuery('');
                   setTypeFilter('ALL');
                   setSelectedOwnerFilter('ALL');
-                  setSelectedStoreFilter('ALL');
                   setPeriodFilter('ALL');
                 }}
                 className="p-1.5 text-fg-subtle hover:text-danger hover:bg-danger/10 rounded-xl transition-colors shrink-0 cursor-pointer"
@@ -310,7 +267,7 @@ export const OwnerTransactionsTable: React.FC<OwnerTransactionsTableProps> = ({
                     <th className="py-2.5 px-3">Дата</th>
                     <th className="py-2.5 px-3">Учредитель</th>
                     <th className="py-2.5 px-3">Операция</th>
-                    <th className="py-2.5 px-3">Объект / Касса</th>
+                    <th className="py-2.5 px-3">Касса</th>
                     <th className="py-2.5 px-3 text-right">Сумма USD</th>
                     <th className="py-2.5 px-3 text-right">Сумма TJS</th>
                     <th className="py-2.5 px-3">Провел</th>
@@ -366,18 +323,20 @@ export const OwnerTransactionsTable: React.FC<OwnerTransactionsTableProps> = ({
                           </span>
                         </td>
                         <td className="py-2.5 px-3 whitespace-nowrap">
-                          {tx.sourceOrDestination ? (
+                          {tx.sourceOrDestination &&
+                          !tx.sourceOrDestination.toLowerCase().includes('главный') &&
+                          !tx.sourceOrDestination.toLowerCase().includes('центральн') &&
+                          tx.sourceOrDestination !== mainWarehouse?.id &&
+                          tx.sourceOrDestination !== mainWarehouse?.name ? (
                             <span className="inline-flex items-center gap-1 text-[11px] font-medium text-fg-muted">
-                              {mainWarehouse &&
-                              (tx.sourceOrDestination === mainWarehouse.name || tx.sourceOrDestination === mainWarehouse.id) ? (
-                                <Warehouse className="w-3 h-3 text-warning shrink-0" />
-                              ) : (
-                                <Store className="w-3 h-3 text-accent shrink-0" />
-                              )}
+                              <Store className="w-3 h-3 text-accent shrink-0" />
                               <span>{tx.sourceOrDestination}</span>
                             </span>
                           ) : (
-                            <span className="text-fg-subtle">—</span>
+                            <span className="inline-flex items-center gap-1 text-[11px] font-medium text-fg-muted">
+                              <Landmark className="w-3 h-3 text-accent shrink-0" />
+                              <span>Центральная касса</span>
+                            </span>
                           )}
                         </td>
                         <td className="py-2.5 px-3 text-right whitespace-nowrap font-mono">
@@ -467,17 +426,23 @@ export const OwnerTransactionsTable: React.FC<OwnerTransactionsTableProps> = ({
 
                           <span className="font-bold text-fg truncate">{tx.ownerName}</span>
 
-                          {tx.sourceOrDestination && (
-                            <span className="text-[10px] font-medium px-1.5 py-0.2 rounded bg-surface border border-border text-fg-muted flex items-center gap-1 truncate">
-                              {mainWarehouse &&
-                              (tx.sourceOrDestination === mainWarehouse.name || tx.sourceOrDestination === mainWarehouse.id) ? (
-                                <Warehouse className="w-3 h-3 text-warning shrink-0" />
-                              ) : (
+                          <span className="text-[10px] font-medium px-1.5 py-0.2 rounded bg-surface border border-border text-fg-muted flex items-center gap-1 truncate">
+                            {tx.sourceOrDestination &&
+                            !tx.sourceOrDestination.toLowerCase().includes('главный') &&
+                            !tx.sourceOrDestination.toLowerCase().includes('центральн') &&
+                            tx.sourceOrDestination !== mainWarehouse?.id &&
+                            tx.sourceOrDestination !== mainWarehouse?.name ? (
+                              <>
                                 <Store className="w-3 h-3 text-accent shrink-0" />
-                              )}
-                              <span className="truncate">{tx.sourceOrDestination}</span>
-                            </span>
-                          )}
+                                <span className="truncate">{tx.sourceOrDestination}</span>
+                              </>
+                            ) : (
+                              <>
+                                <Landmark className="w-3 h-3 text-accent shrink-0" />
+                                <span className="truncate">Центральная касса</span>
+                              </>
+                            )}
+                          </span>
                         </div>
 
                         {tx.note && (

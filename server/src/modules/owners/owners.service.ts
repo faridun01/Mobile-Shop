@@ -40,7 +40,7 @@ export class OwnersService {
       const owner = await tx.owner.findUnique({ where: { id: ownerId } });
       if (!owner) throw new Error('Владелец не найден');
 
-      const targetStore = await OwnersService.resolveTargetStore(tx, destination);
+      const targetStore = await OwnersService.getMainWarehouse(tx);
       const cashAmountTjs = roundMoney(D(amountUsd).mul(exchangeRate));
       // The register is kept in USD, so owner money moves dollar for dollar — capital and cash never drift with the rate.
       await tx.store.update({ where: { id: targetStore.id }, data: { cashBalanceUsd: { increment: amountUsd } } });
@@ -89,10 +89,10 @@ export class OwnersService {
       const guard = await tx.owner.updateMany({ where: { id: ownerId, capitalBalanceUsd: { gte: amountUsd } }, data: { capitalBalanceUsd: { decrement: amountUsd } } });
       if (guard.count !== 1) throw new Error('Сумма изъятия превышает текущий капитал');
 
-      const targetStore = await OwnersService.resolveTargetStore(tx, source);
+      const targetStore = await OwnersService.getMainWarehouse(tx);
       const cashAmountTjs = roundMoney(D(amountUsd).mul(exchangeRate));
       const cashGuard = await tx.store.updateMany({ where: { id: targetStore.id, cashBalanceUsd: { gte: amountUsd } }, data: { cashBalanceUsd: { decrement: amountUsd } } });
-      if (!D(cashGuard.count).eq(1)) throw new Error(`В кассе "${targetStore.name}" недостаточно наличных для изъятия`);
+      if (!D(cashGuard.count).eq(1)) throw new Error(`В центральной кассе («${targetStore.name}») недостаточно наличных для изъятия`);
 
       const updated = await tx.owner.findUniqueOrThrow({ where: { id: ownerId } });
       const ownerTx = await tx.ownerTransaction.create({
