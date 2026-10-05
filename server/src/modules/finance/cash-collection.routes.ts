@@ -26,6 +26,16 @@ export function registerCashCollectionRoutes(app: Express) {
     }
   });
 
+  // Detailed breakdown of uncollected sales & expenses for reconciliation before collection — ADMIN only.
+  app.get('/api/cash-collections/stores/:storeId/breakdown', authenticateJwt, requireRoles('ADMIN'), async (req: AuthenticatedRequest, res, next) => {
+    try {
+      const data = await CashCollectionService.getUncollectedBreakdown(req.params.storeId);
+      res.json(data);
+    } catch (error) {
+      next(error);
+    }
+  });
+
   app.post('/api/cash-collections', authenticateJwt, requireRoles('ADMIN'), async (req: AuthenticatedRequest, res, next) => {
     try {
       // The whole register is collected; the client confirms the balance it showed the admin.

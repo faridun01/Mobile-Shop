@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { AlertTriangle, ArrowDownToLine, Landmark, Store as StoreIcon, Undo2, Gift, Banknote, CreditCard } from 'lucide-react';
+import { AlertTriangle, ArrowDownToLine, Landmark, Store as StoreIcon, Undo2, Gift, Banknote, CreditCard, FileSpreadsheet } from 'lucide-react';
 import { apiClient } from '../../api/client';
 import { formatMoney, formatTjs, formatUsd } from '../../utils/money';
 import { Button } from '../ui/Button';
@@ -7,6 +7,7 @@ import { ConfirmDialog } from '../ui/ConfirmDialog';
 import { EmptyState } from '../ui/EmptyState';
 import { LoadingState } from '../ui/Skeleton';
 import { StatusBanner, type StatusMessage } from '../ui/StatusBanner';
+import { CashReconciliationModal } from './CashReconciliationModal';
 
 interface RegisterBalance {
   storeId: string;
@@ -63,6 +64,7 @@ export const CashCollectionPanel: React.FC<{ month: string; storeId?: string | n
   const [loadError, setLoadError] = useState<string | null>(null);
   const [revision, setRevision] = useState(0);
   const [collecting, setCollecting] = useState<RegisterBalance | null>(null);
+  const [inspectingStore, setInspectingStore] = useState<RegisterBalance | null>(null);
   const [cancelling, setCancelling] = useState<CashCollection | null>(null);
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState<StatusMessage | null>(null);
@@ -246,9 +248,19 @@ export const CashCollectionPanel: React.FC<{ month: string; storeId?: string | n
                     </div>
                   </div>
 
-                  <div className="shrink-0">
+                  <div className="shrink-0 flex items-center gap-1.5 sm:gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setInspectingStore(store)}
+                      className="h-8 px-2.5 rounded-lg border border-border bg-surface hover:bg-surface-raised text-fg text-xs font-semibold flex items-center gap-1.5 transition-all shadow-2xs active:scale-95 cursor-pointer"
+                      title="Посмотреть детализацию и сверить с историей продаж"
+                    >
+                      <FileSpreadsheet className="w-3.5 h-3.5 text-accent" />
+                      <span className="hidden sm:inline">Сверка</span>
+                      <span className="sm:hidden">Детали</span>
+                    </button>
                     {empty ? (
-                      <span className="h-7.5 px-2.5 rounded-lg bg-surface-raised border border-border text-fg-subtle text-xs font-medium flex items-center gap-1.5 select-none">
+                      <span className="h-8 px-2.5 rounded-lg bg-surface-raised border border-border text-fg-subtle text-xs font-medium flex items-center gap-1.5 select-none">
                         <span className="w-1.5 h-1.5 rounded-full bg-fg-subtle/50" />
                         <span>Касса пуста</span>
                       </span>
@@ -386,6 +398,20 @@ export const CashCollectionPanel: React.FC<{ month: string; storeId?: string | n
             <p className="text-[11px] text-fg-subtle">
               Кассир сдает всю сумму целиком — система автоматически распределит средства по счетам.
             </p>
+            <div className="pt-1.5 border-t border-border/60">
+              <button
+                type="button"
+                onClick={() => {
+                  const s = collecting;
+                  setCollecting(null);
+                  setInspectingStore(s);
+                }}
+                className="text-xs text-accent hover:underline flex items-center gap-1.5 font-semibold cursor-pointer"
+              >
+                <FileSpreadsheet className="w-3.5 h-3.5" />
+                <span>Сверить с историей продаж и расходов перед инкассацией →</span>
+              </button>
+            </div>
           </div>
         )}
       />
@@ -438,6 +464,14 @@ export const CashCollectionPanel: React.FC<{ month: string; storeId?: string | n
             )}
           </div>
         )}
+      />
+
+      <CashReconciliationModal
+        open={inspectingStore !== null}
+        store={inspectingStore}
+        onClose={() => setInspectingStore(null)}
+        onCollect={(storeToCollect) => setCollecting(storeToCollect)}
+        busy={busy}
       />
     </div>
   );

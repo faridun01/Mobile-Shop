@@ -29,4 +29,10 @@ describe('CashCollectionService validation and safety', () => {
       })
     ).rejects.toThrow();
   });
+
+  it('rejects uncollected breakdown for non-existent store', async () => {
+    await expect(
+      CashCollectionService.getUncollectedBreakdown('non-existent-store-id')
+    ).rejects.toThrow('Магазин не найден');
+  });
 });

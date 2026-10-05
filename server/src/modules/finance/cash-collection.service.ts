@@ -192,7 +192,265 @@ const destinationName = (regularUsd: Money, bonusUsd: Money, centralName = 'Це
   bonusUsd.gt(0) && regularUsd.gt(0) ? `${centralName} + Бонусный счёт` : bonusUsd.gt(0) ? 'Бонусный счёт' : centralName;
 const rateOf = (tjs: Money, usd: Money) => (usd.gt(0) ? tjs.div(usd).toDecimalPlaces(4) : null);
 
+export interface CashCollectionBreakdownItem {
+  id: string;
+  brand: string;
+  model: string;
+  storage: string;
+  color: string;
+  salePriceTjs: number;
+  salePriceUsd: number;
+  isBonus: boolean;
+}
+
+export interface CashCollectionBreakdownSale {
+  id: string;
+  receiptNumber: number;
+  createdAt: string;
+  sellerName: string;
+  customerName: string | null;
+  paymentMethod: string;
+  totalTjs: number;
+  totalUsd: number;
+  cashAmountTjs: number;
+  cardAmountTjs: number;
+  debtAmountTjs: number;
+  status: string;
+  itemsCount: number;
+  items: CashCollectionBreakdownItem[];
+}
+
+export interface CashCollectionBreakdownExpense {
+  id: string;
+  category: string;
+  description: string;
+  amountTjs: number;
+  amountUsd: number | null;
+  createdAt: string;
+}
+
+export interface CashCollectionBreakdown {
+  store: {
+    id: string;
+    name: string;
+    isMainWarehouse: boolean;
+  };
+  balance: RegisterBalance;
+  period: {
+    since: string | null;
+    periodStart: string;
+    until: string;
+    daysCount: number;
+    hoursCount: number;
+    isFirstCollection: boolean;
+  };
+  lastCollection: {
+    id: string;
+    transactionNumber: string;
+    createdAt: string;
+    amountTjs: number;
+    amountUsd: number;
+    acceptedByName: string;
+  } | null;
+  summary: {
+    currentCashTjs: string;
+    currentCashUsd: string;
+    cashOnlyTjs: string;
+    cardOnlyTjs: string;
+    bonusCashTjs: string;
+    bonusCashUsd: string;
+    bonusCount: number;
+    salesCount: number;
+    salesTotalTjs: string;
+    salesCashTjs: string;
+    salesCardTjs: string;
+    salesDebtTjs: string;
+    expensesCount: number;
+    expensesTotalTjs: string;
+    refundedCount: number;
+    refundedTotalTjs: string;
+  };
+  sales: CashCollectionBreakdownSale[];
+  expenses: CashCollectionBreakdownExpense[];
+}
+
 export class CashCollectionService {
+  /**
+   * Detailed breakdown and sales reconciliation of a store's uncollected register balance.
+   * Allows the owner/admin to inspect every sale, expense, and payment method accumulated
+   * over multiple days (e.g. 3 days without collection) before confirming collection.
+   */
+  public static async getUncollectedBreakdown(storeId: string): Promise<CashCollectionBreakdown> {
+    const db = prisma as unknown as TransactionClient;
+    const store = await prisma.store.findUnique({ where: { id: storeId } });
+    if (!store) throw Object.assign(new Error('Магазин не найден'), { statusCode: 404 });
+
+    const balance = await registerBalance(db, store);
+
+    // Find the last posted (uncancelled) cash handover for this store
+    const lastHandover = await prisma.cashHandover.findFirst({
+      where: { storeId, cancelledAt: null },
+      orderBy: { createdAt: 'desc' },
+      include: {
+        store: { select: { name: true } },
+      },
+    });
+
+    let lastTx: { transactionNumber: string } | null = null;
+    if (lastHandover) {
+      lastTx = await prisma.financialTransaction.findUnique({
+        where: { id: lastHandover.financialTransactionId },
+        select: { transactionNumber: true },
+      });
+    }
+
+    const cutoff = lastHandover?.createdAt ?? null;
+
+    // Fetch sales since cutoff
+    const sales = await prisma.sale.findMany({
+      where: {
+        storeId,
+        ...(cutoff ? { createdAt: { gt: cutoff } } : {}),
+      },
+      include: {
+        user: { select: { id: true, name: true } },
+        saleItems: {
+          select: {
+            id: true,
+            brand: true,
+            model: true,
+            color: true,
+            storage: true,
+            salePriceTjs: true,
+            salePriceUsd: true,
+            isBonus: true,
+          },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    // Fetch expenses paid from this cash register since cutoff
+    const expenses = await prisma.expense.findMany({
+      where: {
+        storeId,
+        paidFromCashRegister: true,
+        status: 'PAID',
+        cancelledAt: null,
+        ...(cutoff ? { createdAt: { gt: cutoff } } : {}),
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    // Calculate aggregations
+    let salesTotalTjs = D(0);
+    let salesCashTjs = D(0);
+    let salesCardTjs = D(0);
+    let salesDebtTjs = D(0);
+    let activeSalesCount = 0;
+    let refundedCount = 0;
+    let refundedTjs = D(0);
+
+    for (const s of sales) {
+      if (s.status === 'REFUNDED') {
+        refundedCount++;
+        refundedTjs = refundedTjs.plus(s.actualRefundAmountTjs ?? s.cashAmountTjs ?? s.totalTjs);
+      } else {
+        activeSalesCount++;
+        salesTotalTjs = salesTotalTjs.plus(s.totalTjs);
+        salesCashTjs = salesCashTjs.plus(s.cashAmountTjs);
+        salesCardTjs = salesCardTjs.plus(s.cardAmountTjs);
+        salesDebtTjs = salesDebtTjs.plus(s.debtAmountTjs);
+      }
+    }
+
+    let expensesTotalTjs = D(0);
+    for (const e of expenses) {
+      expensesTotalTjs = expensesTotalTjs.plus(e.amountTjs);
+    }
+
+    const now = new Date();
+    const periodStart = cutoff ?? (sales.length > 0 ? sales[sales.length - 1].createdAt : store.createdAt);
+    const msDiff = Math.max(0, now.getTime() - new Date(periodStart).getTime());
+    const hoursDiff = Math.floor(msDiff / (1000 * 60 * 60));
+    const daysDiff = Math.floor(hoursDiff / 24);
+
+    return {
+      store: {
+        id: store.id,
+        name: store.name,
+        isMainWarehouse: store.isMainWarehouse,
+      },
+      balance,
+      period: {
+        since: cutoff ? cutoff.toISOString() : null,
+        periodStart: periodStart.toISOString(),
+        until: now.toISOString(),
+        daysCount: daysDiff,
+        hoursCount: hoursDiff,
+        isFirstCollection: !cutoff,
+      },
+      lastCollection: lastHandover ? {
+        id: lastHandover.id,
+        transactionNumber: lastTx?.transactionNumber || `INK-${lastHandover.id.slice(0, 8)}`,
+        createdAt: lastHandover.createdAt.toISOString(),
+        amountTjs: Number(lastHandover.amountTjs),
+        amountUsd: Number(lastHandover.amountUsd),
+        acceptedByName: lastHandover.acceptedByName,
+      } : null,
+      summary: {
+        currentCashTjs: balance.cashTjs,
+        currentCashUsd: balance.cashUsd,
+        cashOnlyTjs: balance.cashOnlyTjs,
+        cardOnlyTjs: balance.cardOnlyTjs,
+        bonusCashTjs: balance.bonusCashTjs,
+        bonusCashUsd: balance.bonusCashUsd,
+        bonusCount: balance.bonusCount,
+        salesCount: activeSalesCount,
+        salesTotalTjs: salesTotalTjs.toString(),
+        salesCashTjs: salesCashTjs.toString(),
+        salesCardTjs: salesCardTjs.toString(),
+        salesDebtTjs: salesDebtTjs.toString(),
+        expensesCount: expenses.length,
+        expensesTotalTjs: expensesTotalTjs.toString(),
+        refundedCount,
+        refundedTotalTjs: refundedTjs.toString(),
+      },
+      sales: sales.map((s) => ({
+        id: s.id,
+        receiptNumber: s.receiptNumber,
+        createdAt: s.createdAt.toISOString(),
+        sellerName: s.user?.name || 'Сотрудник',
+        customerName: s.customerName || null,
+        paymentMethod: s.paymentMethod,
+        totalTjs: Number(s.totalTjs),
+        totalUsd: Number(s.totalUsd),
+        cashAmountTjs: Number(s.cashAmountTjs),
+        cardAmountTjs: Number(s.cardAmountTjs),
+        debtAmountTjs: Number(s.debtAmountTjs),
+        status: s.status,
+        itemsCount: s.saleItems.length,
+        items: s.saleItems.map((item) => ({
+          id: item.id,
+          brand: item.brand,
+          model: item.model,
+          storage: item.storage,
+          color: item.color,
+          salePriceTjs: Number(item.salePriceTjs),
+          salePriceUsd: Number(item.salePriceUsd),
+          isBonus: item.isBonus,
+        })),
+      })),
+      expenses: expenses.map((e) => ({
+        id: e.id,
+        category: e.category,
+        description: e.description || e.comment || 'Расход из кассы',
+        amountTjs: Number(e.amountTjs),
+        amountUsd: e.amountUsd ? Number(e.amountUsd) : null,
+        createdAt: e.createdAt.toISOString(),
+      })),
+    };
+  }
   /** Every active register in TJS and USD: retail stores to collect from, Central Cash, and the Bonus Account. Read-only. */
   public static async balances(): Promise<{
     stores: RegisterBalance[];
