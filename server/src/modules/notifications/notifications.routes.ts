@@ -18,12 +18,15 @@ export function registerNotificationRoutes(app: Express) {
         return;
       }
       const user = req.user!;
-      // Notification Center history (ADMIN): every notification, filtered and paged by cursor.
+      const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+
+      // Notification Center history (ADMIN): only notifications from the last 24 hours to keep the list compact.
       if (req.query.view === 'history' && user.role === 'ADMIN') {
         const limit = Math.min(Math.max(Number(req.query.limit) || 50, 1), 100);
         const cursor = typeof req.query.cursor === 'string' ? req.query.cursor : undefined;
         const filters = [
           notificationScope(user),
+          { createdAt: { gte: oneDayAgo } },
           ...(req.query.unread === '1' ? [{ read: false }] : []),
           ...(typeof req.query.storeId === 'string' && req.query.storeId ? [{ storeId: req.query.storeId }] : []),
           ...(typeof req.query.actionType === 'string' && req.query.actionType ? [{ actionType: req.query.actionType }] : []),
@@ -37,16 +40,13 @@ export function registerNotificationRoutes(app: Express) {
         res.json({ items: rows.slice(0, limit), nextCursor: rows.length > limit ? rows[limit - 1].id : null });
         return;
       }
-      // Unbounded before: this ran on every login and every realtime resync, so it only got
-      // slower as the business operated longer. Anything still unresolved stays visible no
-      // matter its age (a pending transfer approval shouldn't silently vanish), but resolved/
-      // read notifications older than a day are dropped, with a hard cap as a final backstop.
-      const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+
+      // Notifications list & badge: only show notifications created within the last 24 hours
       const notifications = await prisma.notification.findMany({
         where: {
           AND: [
             notificationScope(user),
-            { OR: [{ resolved: false }, { createdAt: { gte: oneDayAgo } }] },
+            { createdAt: { gte: oneDayAgo } },
           ],
         },
         orderBy: { createdAt: 'desc' },

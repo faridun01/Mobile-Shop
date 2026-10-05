@@ -38,7 +38,16 @@ export const NotificationsProvider: React.FC<{ children: React.ReactNode }> = ({
     const token = useAuthStore.getState().token;
     const raw = await apiClient<any[]>('/notifications');
     if (useAuthStore.getState().token !== token) return;
-    setNotifications(raw.map(mapNotification).sort((a, b) => new Date(b.date || b.timestamp || 0).getTime() - new Date(a.date || a.timestamp || 0).getTime()));
+    const oneDayAgoMs = Date.now() - 24 * 60 * 60 * 1000;
+    setNotifications(
+      raw
+        .map(mapNotification)
+        .filter((n) => {
+          const t = new Date(n.date || n.timestamp || 0).getTime();
+          return !isNaN(t) && t >= oneDayAgoMs;
+        })
+        .sort((a, b) => new Date(b.date || b.timestamp || 0).getTime() - new Date(a.date || a.timestamp || 0).getTime())
+    );
   }, []);
 
   // Mirrors AppContext's own authToken/authUser gate — loads once a session exists,

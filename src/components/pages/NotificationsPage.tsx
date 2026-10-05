@@ -245,7 +245,7 @@ export const NotificationsPage: React.FC = () => {
           </div>
           <div>
             <h1 className="text-sm font-bold text-fg leading-none">Уведомления</h1>
-            <p className="text-[11px] text-fg-subtle mt-0.5">Журнал событий и системные оповещения</p>
+            <p className="text-[11px] text-fg-subtle mt-0.5">Оповещения за последние 24 часа</p>
           </div>
         </div>
         {hasUnread && (
@@ -327,8 +327,8 @@ export const NotificationsPage: React.FC = () => {
         ) : items.length === 0 ? (
           <EmptyState
             icon={Bell}
-            title={view === 'UNREAD' ? 'Нет непрочитанных уведомлений' : 'Уведомлений нет'}
-            description={view === 'UNREAD' ? 'Все события просмотрены' : undefined}
+            title={view === 'UNREAD' ? 'Нет непрочитанных оповещений' : 'Оповещений нет'}
+            description={view === 'UNREAD' ? 'Все события за 24 часа просмотрены' : 'За последние 24 часа новых событий не зафиксировано'}
           />
         ) : (
           <div className="p-2 sm:p-3 space-y-2">
