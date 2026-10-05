@@ -22,10 +22,9 @@ export function lockSession() {
   if (token) void revokeAbandonedSession(token);
 }
 
-/** Revokes a server session left by an earlier launch (never reused). Call once at startup. */
+/** Revokes a server session left by an earlier launch. Disabled: sessions persist across launches. */
 export function revokeLeftoverSession() {
-  const token = takeLegacyPersistedToken();
-  if (token) void revokeAbandonedSession(token);
+  // Disabled: persistent sessions must not be revoked on startup
 }
 
 function safeSessionStorage(): Storage | null {

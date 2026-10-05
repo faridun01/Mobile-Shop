@@ -33,27 +33,24 @@ describe('auth session storage and lock', () => {
   beforeEach(() => { vi.useRealTimers(); });
   afterEach(() => { vi.unstubAllGlobals(); });
 
-  it('keeps the session only for this browser session: a fresh launch requires login', async () => {
+  it('persists the session in storage so the user stays logged in across launches', async () => {
     const a = await load();
-    a.useAuthStore.getState().setAuth(user as any, future());
-    expect(a.sessionStorage.data.get('ms_jwt_token')).toBeTruthy();
-    expect(a.localStorage.data.has('ms_jwt_token')).toBe(false);
-    expect(a.localStorage.data.has('ms_user')).toBe(false);
+    const token = future();
+    a.useAuthStore.getState().setAuth(user as any, token);
+    expect(a.localStorage.data.get('ms_jwt_token')).toBe(token);
+    expect(a.sessionStorage.data.get('ms_jwt_token')).toBe(token);
 
-    // Fresh launch: the OS/browser starts with an empty session storage.
+    // Fresh launch: loads from persistent localStorage and stays logged in
     const b = await load({}, Object.fromEntries(a.localStorage.data));
-    expect(b.useAuthStore.getState().currentUser).toBeNull();
-    expect(b.useAuthStore.getState().token).toBeNull();
+    expect(b.useAuthStore.getState().currentUser?.id).toBe('u1');
+    expect(b.useAuthStore.getState().token).toBe(token);
   });
 
-  it('removes a token an earlier version persisted across launches and hands it over for revocation', async () => {
+  it('restores the session from localStorage on fresh page launch', async () => {
     const legacy = future();
     const a = await load({}, { ms_jwt_token: legacy, ms_user: JSON.stringify(user) });
-    expect(a.useAuthStore.getState().token).toBeNull();
-    expect(a.localStorage.data.has('ms_jwt_token')).toBe(false);
-    expect(a.localStorage.data.has('ms_user')).toBe(false);
-    expect(a.takeLegacyPersistedToken()).toBe(legacy);
-    expect(a.takeLegacyPersistedToken()).toBeNull();
+    expect(a.useAuthStore.getState().token).toBe(legacy);
+    expect(a.useAuthStore.getState().currentUser?.id).toBe('u1');
   });
 
   it('restores the session after a reload in the same session with recent activity', async () => {

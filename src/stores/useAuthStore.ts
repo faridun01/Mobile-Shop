@@ -80,30 +80,24 @@ export function takeLegacyPersistedToken(): string | null {
 }
 
 /**
- * The session lives in sessionStorage only: it survives a reload (e.g. applying an update) but
- * not a fresh launch of the app, which always starts at the login screen. No default-admin
- * fallback: only a real, non-expired token with recent activity restores a session.
+ * The session lives in persistent storage (localStorage) and sessionStorage:
+ * it survives reloads, launches, and backgrounding without locking after 10 minutes.
+ * It remains logged in until explicitly closed or logged out.
  */
 const getInitialSession = (): { user: User | null; token: string | null } => {
   if (typeof window === 'undefined') return { user: null, token: null };
   const local = persistent();
   const store = session();
   try {
-    // Earlier versions kept the session across launches: never reuse it.
-    const legacy = local?.getItem(TOKEN_KEY) ?? null;
-    if (legacy) abandonedToken = legacy;
-    local?.removeItem(TOKEN_KEY);
-    local?.removeItem(USER_KEY);
-
-    const savedUser = store?.getItem(USER_KEY);
-    const savedToken = store?.getItem(TOKEN_KEY);
+    const savedToken = local?.getItem(TOKEN_KEY) || store?.getItem(TOKEN_KEY);
+    const savedUser = local?.getItem(USER_KEY) || store?.getItem(USER_KEY);
     if (!savedUser || !savedToken) return { user: null, token: null };
     const exp = decodeJwtExpiry(savedToken);
     const expired = exp !== null && exp * 1000 <= Date.now();
     // Only expire if the JWT token itself has expired (12h server lifetime).
-    // Inactivity lock is removed per user request: session stays logged in until explicit logout or window closure.
     if (expired) {
-      abandonedToken = savedToken;
+      local?.removeItem(TOKEN_KEY);
+      local?.removeItem(USER_KEY);
       store?.removeItem(TOKEN_KEY);
       store?.removeItem(USER_KEY);
       return { user: null, token: null };
@@ -127,10 +121,15 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   setAuth: (user: User, token: string) => {
     const cleanUser = user ? withCleanName(user) : user;
     const store = session();
+    const local = persistent();
     store?.setItem(TOKEN_KEY, token);
     store?.setItem(USER_KEY, JSON.stringify(cleanUser));
-    // A fresh sign-in is activity: a reload right after it must not count as abandoned.
-    try { store?.setItem(LAST_ACTIVITY_KEY, String(Date.now())); } catch { /* storage unavailable */ }
+    local?.setItem(TOKEN_KEY, token);
+    local?.setItem(USER_KEY, JSON.stringify(cleanUser));
+    try {
+      store?.setItem(LAST_ACTIVITY_KEY, String(Date.now()));
+      local?.setItem(LAST_ACTIVITY_KEY, String(Date.now()));
+    } catch { /* storage unavailable */ }
     scheduleAutoLogout(token);
     set({ currentUser: cleanUser, token, isAuthenticated: true, locked: false });
   },
@@ -139,8 +138,11 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     const { token } = get();
     clearAutoLogoutTimer();
     const store = session();
+    const local = persistent();
     store?.removeItem(TOKEN_KEY);
     store?.removeItem(USER_KEY);
+    local?.removeItem(TOKEN_KEY);
+    local?.removeItem(USER_KEY);
     set({ token: null, isAuthenticated: false, locked: true });
     return token;
   },
@@ -148,8 +150,11 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   logout: () => {
     clearAutoLogoutTimer();
     const store = session();
+    const local = persistent();
     store?.removeItem(TOKEN_KEY);
     store?.removeItem(USER_KEY);
+    local?.removeItem(TOKEN_KEY);
+    local?.removeItem(USER_KEY);
     set({ currentUser: null, token: null, isAuthenticated: false, locked: false });
   },
 }));
