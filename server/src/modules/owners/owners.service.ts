@@ -304,23 +304,6 @@ export class OwnersService {
 
       const owners = await tx.owner.findMany();
 
-      // Snapshot the pre-close figures so quarterly history survives the reset below —
-      // the original mock logic zeroed these counters with no historical record at all.
-      const snapshot = owners.map((o) => ({
-        ownerId: o.id,
-        name: o.name,
-        capitalBalanceUsd: o.capitalBalanceUsd,
-        totalAccruedProfitUsd: o.totalAccruedProfitUsd,
-        totalPaidProfitUsd: o.totalPaidProfitUsd,
-        availableProfitUsd: o.availableProfitUsd,
-      }));
-      await tx.quarterClosure.create({ data: { quarterName: cleanQuarterName, closedByUserId: actor.id, snapshot: moneyJson(snapshot) } });
-
-      // totalAccruedProfitUsd / totalPaidProfitUsd are lifetime counters — the same
-      // fields drive the always-visible KPI cards on the main Owners dashboard, which
-      // carry no "this quarter" qualifier. Closing a quarter must not zero them; only
-      // the yet-unclaimed availableProfitUsd is affected, and only if the admin opts
-      // to sweep it into capital instead of leaving it payable into next quarter.
       const swept: { ownerId: string; name: string; amountUsd: MoneyInput }[] = [];
       if (transferRemainingToCapital) {
         const sweptOwners = owners.filter((owner) => D((owner.availableProfitUsd || 0)).gt(0));
@@ -357,13 +340,45 @@ export class OwnersService {
         }
       }
 
+      // Re-read owners after potential reinvestment so snapshot reflects final quarter values
+      const currentOwners = await tx.owner.findMany();
+
+      // Snapshot the figures so quarterly history survives the reset below
+      const snapshot = currentOwners.map((o) => {
+        const sweptAmount = swept.find((s) => s.ownerId === o.id)?.amountUsd ?? 0;
+        return {
+          ownerId: o.id,
+          name: o.name,
+          profitSharePercent: o.profitSharePercent,
+          capitalBalanceUsd: o.capitalBalanceUsd,
+          totalAccruedProfitUsd: o.totalAccruedProfitUsd,
+          totalPaidProfitUsd: o.totalPaidProfitUsd,
+          totalReinvestedUsd: o.totalReinvestedUsd,
+          availableProfitUsd: o.availableProfitUsd,
+          sweptToCapital: sweptAmount,
+        };
+      });
+      await tx.quarterClosure.create({ data: { quarterName: cleanQuarterName, closedByUserId: actor.id, snapshot: moneyJson(snapshot) } });
+
+      // Reset the quarterly counters for the new period:
+      // totalAccruedProfitUsd, totalPaidProfitUsd, totalReinvestedUsd are reset to 0.
+      // If transferRemainingToCapital was true, availableProfitUsd is also 0.
+      await tx.owner.updateMany({
+        data: {
+          totalAccruedProfitUsd: D(0),
+          totalPaidProfitUsd: D(0),
+          totalReinvestedUsd: D(0),
+          ...(transferRemainingToCapital ? { availableProfitUsd: D(0) } : {}),
+        },
+      });
+
       await tx.auditLog.create({
         data: {
           userId: actor.id,
           userName: actor.name,
           userRole: actor.role,
           action: 'QUARTER_CLOSE',
-          details: `Закрыт квартальный период (${cleanQuarterName})${transferRemainingToCapital ? ', неполученный остаток прибыли зачислен в капитал' : ', неполученный остаток прибыли перенесён на следующий период'}`,
+          details: `Закрыт квартальный период (${cleanQuarterName})${transferRemainingToCapital ? ', остаток прибыли зачислен в оборотный капитал' : ', остаток прибыли перенесён на следующий период'}. Счетчики периода обнулены и сохранены в истории.`,
           financialDetails: moneyJson({ quarterName: cleanQuarterName, transferRemainingToCapital, sweptToCapital: swept }),
         },
       });

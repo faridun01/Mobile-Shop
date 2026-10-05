@@ -112,6 +112,17 @@ export function registerOwnerRoutes(app: Express) {
     }
   });
 
+  app.get('/api/owners/quarter-closures', authenticateJwt, requireRoles('ADMIN'), async (_req, res, next) => {
+    try {
+      const closures = await prisma.quarterClosure.findMany({
+        orderBy: { closedAt: 'desc' },
+      });
+      res.json(closures);
+    } catch (error) {
+      next(error);
+    }
+  });
+
   app.post('/api/owners/quarter-close', authenticateJwt, requireRoles('ADMIN'), async (req: AuthenticatedRequest, res, next) => {
     try {
       const { quarterName, transferRemainingToCapital } = req.body ?? {};
@@ -120,6 +131,7 @@ export function registerOwnerRoutes(app: Express) {
         return;
       }
       const owners = await OwnersService.closeQuarter(quarterName, Boolean(transferRemainingToCapital), req.user!.userId);
+      RealtimeSyncGateway.broadcast('OWNER_TX', {});
       res.json(owners);
     } catch (error) {
       next(error);

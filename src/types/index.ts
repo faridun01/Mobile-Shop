@@ -373,6 +373,26 @@ export interface StoreProfitShare {
   sharePercent: number;
 }
 
+export interface QuarterClosureOwnerSnapshot {
+  ownerId: string;
+  name: string;
+  profitSharePercent?: number;
+  capitalBalanceUsd: number;
+  totalAccruedProfitUsd: number;
+  totalPaidProfitUsd: number;
+  totalReinvestedUsd?: number;
+  availableProfitUsd: number;
+  sweptToCapital?: number;
+}
+
+export interface QuarterClosure {
+  id: string;
+  quarterName: string;
+  closedByUserId: string;
+  snapshot: QuarterClosureOwnerSnapshot[];
+  closedAt: string;
+}
+
 export interface OwnerTransaction {
   id: string;
   ownerId: string;

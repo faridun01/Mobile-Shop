@@ -160,8 +160,11 @@ export const OwnerCard: React.FC<OwnerCardProps> = ({
           </div>
         )}
 
-        {/* Lifetime Financial Metrics */}
-        <div className="p-1.5 rounded-lg bg-surface-raised/50 border border-border flex items-center justify-around text-center text-xs">
+        {/* Quarterly Financial Metrics (reset on quarter close) */}
+        <div
+          title="Счетчики за текущий период (обнуляются при закрытии квартала и сохраняются в архиве)"
+          className="p-1.5 rounded-lg bg-surface-raised/50 border border-border flex items-center justify-around text-center text-xs"
+        >
           <div>
             <span className="text-[9px] text-fg-subtle block">Начислено</span>
             <span className="font-bold font-mono text-fg text-[10px] sm:text-[11px] block">

@@ -1579,8 +1579,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const closeQuarterPeriod: AppContextType['closeQuarterPeriod'] = async ({ quarterName, transferRemainingToCapital }) => {
     try {
       await apiClient('/owners/quarter-close', { method: 'POST', body: JSON.stringify({ quarterName, transferRemainingToCapital }) });
-      markLocalMutation(['owners']);
-      await refreshAfterMutation([fetchOwners()]);
+      markLocalMutation(['owners', 'ownerTransactions']);
+      await refreshAfterMutation([fetchOwners(), fetchOwnerTransactions(), fetchStores()]);
       return { success: true };
     } catch (err) {
       return { success: false, message: errorMessage(err, 'Нет прав') };
