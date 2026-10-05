@@ -60,14 +60,14 @@ jobs:
       - name: Generate Prisma Client
         run: npx prisma generate
 
+      - name: Apply Database Migrations
+        run: npx prisma migrate deploy
+
       - name: TypeScript Type Check
         run: npm run lint
 
       - name: Run Unit Test Suite
         run: npm test
-
-      - name: Apply Database Migrations
-        run: npx prisma migrate deploy
 
       - name: Seed Reference Data
         run: npx prisma db seed
