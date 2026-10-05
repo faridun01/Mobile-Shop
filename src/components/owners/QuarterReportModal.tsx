@@ -46,8 +46,13 @@ export const QuarterReportModal: React.FC<QuarterReportModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-3 sm:p-4 backdrop-blur-xs">
-      <div className="w-full max-w-xl max-h-[92vh] overflow-y-auto rounded-2xl bg-surface border border-border p-3.5 sm:p-4 text-fg shadow-2xl space-y-3 text-xs">
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="quarter-report-title"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-3 sm:p-4 backdrop-blur-xs"
+    >
+      <div className="modal-card w-full max-w-xl max-h-[min(92vh,var(--visual-viewport-height,92vh))] overflow-y-auto rounded-2xl bg-surface border border-border p-3.5 sm:p-4 text-fg shadow-2xl space-y-3 text-xs">
         {/* Header */}
         <div className="flex items-center justify-between pb-2 border-b border-border">
           <div className="flex items-center gap-2">
@@ -55,7 +60,7 @@ export const QuarterReportModal: React.FC<QuarterReportModalProps> = ({
               <FileText className="w-3.5 h-3.5" />
             </div>
             <div>
-              <h4 className="text-xs sm:text-sm font-bold text-fg leading-tight">
+              <h4 id="quarter-report-title" className="text-xs sm:text-sm font-bold text-fg leading-tight">
                 Закрытие периода ({selectedQuarter} {selectedQuarterYear})
               </h4>
               <p className="text-[10px] text-fg-subtle">
@@ -114,8 +119,8 @@ export const QuarterReportModal: React.FC<QuarterReportModalProps> = ({
             <span className="font-mono">{displayOwners.length} {ownerCountLabel(displayOwners.length)}</span>
           </div>
 
-          <div className="overflow-x-auto rounded-xl border border-border bg-surface-raised/40">
-            <table className="w-full text-left text-xs">
+          <div className="overflow-x-auto scrollbar-thin rounded-xl border border-border bg-surface-raised/40">
+            <table className="w-full text-left text-xs min-w-[460px]">
               <thead className="bg-surface text-[10px] text-fg-subtle uppercase border-b border-border">
                 <tr>
                   <th className="py-2 px-2.5 font-semibold">Партнер / Доля</th>
@@ -217,7 +222,7 @@ export const QuarterReportModal: React.FC<QuarterReportModalProps> = ({
             type="button"
             disabled={isSubmitting}
             onClick={onClose}
-            className="px-3.5 py-2 rounded-xl text-xs font-semibold text-fg-subtle hover:text-fg hover:bg-surface-raised transition-colors cursor-pointer disabled:opacity-50"
+            className="px-3.5 py-2 rounded-xl text-xs font-semibold text-fg-subtle hover:text-fg hover:bg-surface-raised transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
           >
             Отмена
           </button>
@@ -225,7 +230,7 @@ export const QuarterReportModal: React.FC<QuarterReportModalProps> = ({
             type="button"
             disabled={isSubmitting}
             onClick={handleConfirm}
-            className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-black font-bold text-xs flex items-center justify-center gap-1.5 shadow-xs transition-all cursor-pointer disabled:opacity-60"
+            className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-black font-bold text-xs flex items-center justify-center gap-1.5 shadow-xs transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
           >
             {isSubmitting ? (
               <>

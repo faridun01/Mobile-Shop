@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { decimal, formatMoney, moneyNumber } from '../../utils/money';
+import { decimal, formatMoney, moneyNumber, formatUsd, formatTjs } from '../../utils/money';
 import { formatUserName } from '../../utils/formatUser';
 import { capitalByLocation } from '../../utils/ownerCapital';
 import { useAppFields } from '../../context/AppContext';
@@ -355,6 +355,7 @@ export const OwnersPage: React.FC = () => {
                 >
                   <Percent className="w-3.5 h-3.5 text-accent" />
                   <span className="hidden sm:inline">Доли партнеров</span>
+                  <span className="sm:hidden">Доли</span>
                 </button>
 
                 <button
@@ -364,7 +365,8 @@ export const OwnersPage: React.FC = () => {
                   title="Сводная ведомость и закрытие квартального периода"
                 >
                   <FileText className="w-3.5 h-3.5" />
-                  <span>Закрыть квартал</span>
+                  <span className="hidden sm:inline">Закрыть квартал</span>
+                  <span className="sm:hidden">Квартал</span>
                 </button>
 
                 <button
@@ -466,20 +468,34 @@ export const OwnersPage: React.FC = () => {
             {/* Available Profit */}
             <div className="p-2 sm:p-2.5 rounded-xl bg-surface border border-border flex flex-col justify-between space-y-1 shadow-2xs">
               <div className="flex items-center justify-between gap-1">
-                <span className="text-[10px] font-semibold text-fg-subtle uppercase truncate">Прибыль</span>
-                <div className="w-5 h-5 rounded-md bg-warning/10 border border-warning/20 flex items-center justify-center text-warning shrink-0">
+                <span className={`text-[10px] font-semibold uppercase truncate ${
+                  totalAvailableProfit < 0 ? 'text-danger' : totalAvailableProfit > 0 ? 'text-accent' : 'text-fg-subtle'
+                }`}>
+                  {totalAvailableProfit < 0 ? 'Убыток' : 'Прибыль'}
+                </span>
+                <div className={`w-5 h-5 rounded-md border flex items-center justify-center shrink-0 ${
+                  totalAvailableProfit < 0
+                    ? 'bg-danger/10 border-danger/20 text-danger'
+                    : totalAvailableProfit > 0
+                    ? 'bg-accent/10 border-accent/20 text-accent'
+                    : 'bg-surface-raised border-border text-fg-subtle'
+                }`}>
                   <Wallet className="w-2.5 h-2.5" />
                 </div>
               </div>
               <div>
                 <div className="flex items-baseline gap-1">
-                  <span className="text-sm sm:text-base lg:text-lg font-black font-mono text-warning truncate">
-                    ${formatMoney(totalAvailableProfit)}
+                  <span className={`text-sm sm:text-base lg:text-lg font-black font-mono truncate ${
+                    totalAvailableProfit < 0 ? 'text-danger' : totalAvailableProfit > 0 ? 'text-accent' : 'text-fg-muted'
+                  }`}>
+                    {formatUsd(totalAvailableProfit)}
                   </span>
                   <span className="text-[9px] font-bold text-fg-subtle">USD</span>
                 </div>
-                <span className="text-[9px] sm:text-[10px] text-fg-subtle block font-mono truncate">
-                  ≈ {formatMoney(moneyNumber(decimal(totalAvailableProfit).mul(rate)))} TJS
+                <span className={`text-[9px] sm:text-[10px] block font-mono truncate ${
+                  totalAvailableProfit < 0 ? 'text-danger/80' : totalAvailableProfit > 0 ? 'text-accent/80' : 'text-fg-subtle'
+                }`}>
+                  ≈ {formatTjs(moneyNumber(decimal(totalAvailableProfit).mul(rate)))}
                 </span>
               </div>
               <div className="pt-1 border-t border-border/60 text-[9px] sm:text-[10px] text-fg-subtle truncate">

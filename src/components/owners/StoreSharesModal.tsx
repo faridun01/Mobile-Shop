@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Percent, X, Store, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react';
 import { formatUserName } from '../../utils/formatUser';
+import { formatStoreName } from '../../utils/storeContext';
 import { Store as StoreType, Owner } from '../../types';
 
 interface StoreSharesModalProps {
@@ -94,13 +95,18 @@ export const StoreSharesModal: React.FC<StoreSharesModalProps> = ({
   const isValid = Math.abs(total - 100) < 0.001;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-3 sm:p-4 backdrop-blur-xs">
-      <div className="w-full max-w-md rounded-2xl bg-surface border border-border p-4 sm:p-5 text-fg shadow-2xl space-y-3.5 text-xs">
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="shares-modal-title"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-3 sm:p-4 backdrop-blur-xs"
+    >
+      <div className="modal-card w-full max-w-md max-h-[min(92vh,var(--visual-viewport-height,92vh))] overflow-y-auto rounded-2xl bg-surface border border-border p-4 sm:p-5 text-fg shadow-2xl space-y-3.5 text-xs">
         {/* Header */}
         <div className="flex items-center justify-between pb-2.5 border-b border-border">
           <div className="flex items-center gap-2">
             <Percent className="w-4 h-4 text-accent" />
-            <h4 className="text-sm font-bold text-fg uppercase">
+            <h4 id="shares-modal-title" className="text-sm font-bold text-fg uppercase">
               Настройка долей по магазинам
             </h4>
           </div>
@@ -136,7 +142,7 @@ export const StoreSharesModal: React.FC<StoreSharesModalProps> = ({
                 >
                   <div className="flex items-center gap-1.5 mb-1">
                     <Store className={`w-3.5 h-3.5 shrink-0 ${isSelected ? 'text-accent' : 'text-fg-subtle'}`} />
-                    <span className="font-bold text-xs truncate text-fg">{store.name}</span>
+                    <span className="font-bold text-xs truncate text-fg">{formatStoreName(store.name)}</span>
                   </div>
                   <div className="text-[10px] text-fg-subtle">
                     {storePartner ? (
@@ -282,14 +288,14 @@ export const StoreSharesModal: React.FC<StoreSharesModalProps> = ({
                 type="button"
                 disabled={isSubmitting}
                 onClick={onClose}
-                className="flex-1 py-2.5 rounded-xl bg-surface-raised hover:bg-surface text-xs font-bold text-fg border border-border uppercase disabled:opacity-50 transition-colors cursor-pointer"
+                className="flex-1 py-2.5 rounded-xl bg-surface-raised hover:bg-surface text-xs font-bold text-fg border border-border uppercase disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
               >
                 Отмена
               </button>
               <button
                 type="submit"
                 disabled={isSubmitting || !currentStorePartner || !isValid}
-                className="flex-1 py-2.5 rounded-xl bg-accent hover:bg-accent-strong text-xs font-bold text-accent-fg uppercase disabled:opacity-60 flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                className="flex-1 py-2.5 rounded-xl bg-accent hover:bg-accent-strong text-xs font-bold text-accent-fg uppercase disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
               >
                 {isSubmitting && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
                 {isSubmitting ? 'Сохранение…' : 'Сохранить'}
@@ -305,7 +311,7 @@ export const StoreSharesModal: React.FC<StoreSharesModalProps> = ({
                 <span className="text-xs font-bold">Партнёр не назначен</span>
               </div>
               <p className="text-[11px] text-fg leading-relaxed">
-                Для магазина <strong>«{currentSharesStore?.name}»</strong> ещё не создан или не прикреплён партнёр.
+                Для магазина <strong>«{formatStoreName(currentSharesStore?.name || '')}»</strong> ещё не создан или не прикреплён партнёр.
               </p>
               <p className="text-[10px] text-fg-subtle">
                 Перейдите во вкладку <strong>«Сотрудники»</strong>, создайте или отредактируйте сотрудника с ролью <strong>«Партнёр»</strong> и выберите этот магазин.

@@ -35,6 +35,7 @@ export interface PurchasePreviewData {
   isStorePurchase: boolean;
   storeId?: string;
   groups: PurchasePreviewGroup[];
+  paidAmountUsd?: number;
 }
 
 export const formatInvoiceDate = (dateVal?: string): string => {

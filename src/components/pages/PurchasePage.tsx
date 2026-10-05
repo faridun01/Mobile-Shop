@@ -505,11 +505,14 @@ export const PurchasePage: React.FC = () => {
     });
   };
 
-  const handleConfirmSavePurchase = async () => {
+  const handleConfirmSavePurchase = async (paidAmountUsd: number = 0) => {
     if (!previewInvoice || isSubmitting) return;
     setIsSubmitting(true);
     try {
-      const res = await createPurchase(previewInvoice);
+      const res = await createPurchase({
+        ...previewInvoice,
+        paidAmountUsd,
+      });
 
       if (res.success) {
         const savedNum = previewInvoice.invoiceNumber;
@@ -531,9 +534,12 @@ export const PurchasePage: React.FC = () => {
         setSelectedSupplierId('');
 
         setViewMode('list');
+        const paymentNote = paidAmountUsd > 0
+          ? ` и оплачен на $${paidAmountUsd.toLocaleString()} из Центральной кассы`
+          : ' (в долг)';
         setStatusMessage({
           type: 'success',
-          text: `Приход по накладной ${savedNum} успешно сохранен (${previewInvoice.groups.reduce((a, b) => a + b.items.length, 0)} шт.)!`,
+          text: `Приход по накладной ${savedNum} успешно сохранен (${previewInvoice.groups.reduce((a, b) => a + b.items.length, 0)} шт.)${paymentNote}!`,
         });
       } else {
         setStatusMessage({ type: 'error', text: res.message || 'Ошибка сохранения прихода' });

@@ -1,6 +1,7 @@
 import React from 'react';
 import { Plus, ArrowUpRight, Warehouse, Store } from 'lucide-react';
-import { formatMoney, decimal, moneyNumber } from '../../utils/money';
+import { formatMoney, decimal, moneyNumber, formatUsd, formatTjs } from '../../utils/money';
+import { formatStoreName } from '../../utils/storeContext';
 import { Owner, Store as StoreType } from '../../types';
 
 interface OwnerCardProps {
@@ -34,6 +35,7 @@ export const OwnerCard: React.FC<OwnerCardProps> = ({
   const capTjs = moneyNumber(decimal(capUsd).mul(rate));
   const profitUsd = owner.availableProfitUsd ?? 0;
   const profitTjs = moneyNumber(decimal(profitUsd).mul(rate));
+  const isNegativeProfit = profitUsd < 0;
 
   return (
     <div className="rounded-xl sm:rounded-2xl bg-surface border border-border p-2.5 sm:p-3.5 space-y-2 hover:border-fg-subtle/50 transition-all shadow-xs flex flex-col justify-between">
@@ -60,7 +62,7 @@ export const OwnerCard: React.FC<OwnerCardProps> = ({
                 </span>
                 {ownerStore ? (
                   <span className="text-[9px] font-bold px-1.5 py-0.2 rounded uppercase tracking-wider bg-warning/10 border border-warning/30 text-warning truncate max-w-28 sm:max-w-36">
-                    {ownerStore.name}
+                    {formatStoreName(ownerStore.name)}
                   </span>
                 ) : info.roleTag === 'Администратор' ? (
                   <span className="text-[9px] font-bold px-1.5 py-0.2 rounded uppercase tracking-wider bg-accent/10 border border-accent/30 text-accent">
@@ -97,23 +99,44 @@ export const OwnerCard: React.FC<OwnerCardProps> = ({
               Капитал в обороте
             </span>
             <div className="text-xs sm:text-sm font-bold font-mono text-fg mt-0.5">
-              ${formatMoney(capUsd)}
+              {formatUsd(capUsd)}
             </div>
             <span className="text-[9px] sm:text-[10px] text-fg-subtle block font-mono truncate">
-              ≈ {formatMoney(capTjs)} TJS
+              ≈ {formatTjs(capTjs)}
             </span>
           </div>
 
           {/* Profit not yet capitalized */}
-          <div className="p-2 rounded-xl bg-warning/10 border border-warning/25">
-            <span className="text-[9px] font-semibold text-warning uppercase block truncate">
-              Прибыль до закрытия
+          <div
+            className={`p-2 rounded-xl border ${
+              isNegativeProfit
+                ? 'bg-danger/10 border-danger/25'
+                : profitUsd > 0
+                ? 'bg-accent/10 border-accent/25'
+                : 'bg-surface-raised border-border'
+            }`}
+          >
+            <span
+              className={`text-[9px] font-semibold uppercase block truncate ${
+                isNegativeProfit ? 'text-danger' : profitUsd > 0 ? 'text-accent' : 'text-fg-subtle'
+              }`}
+              title="Накопленная прибыль за текущий период (до закрытия квартала)"
+            >
+              {isNegativeProfit ? 'Убыток до закрытия' : 'Прибыль до закрытия'}
             </span>
-            <div className="text-xs sm:text-sm font-bold font-mono text-warning mt-0.5">
-              ${formatMoney(profitUsd)}
+            <div
+              className={`text-xs sm:text-sm font-bold font-mono mt-0.5 ${
+                isNegativeProfit ? 'text-danger' : profitUsd > 0 ? 'text-accent' : 'text-fg-muted'
+              }`}
+            >
+              {formatUsd(profitUsd)}
             </div>
-            <span className="text-[9px] sm:text-[10px] text-warning/80 block font-mono truncate">
-              ≈ {formatMoney(profitTjs)} TJS
+            <span
+              className={`text-[9px] sm:text-[10px] block font-mono truncate ${
+                isNegativeProfit ? 'text-danger/80' : profitUsd > 0 ? 'text-accent/80' : 'text-fg-subtle'
+              }`}
+            >
+              ≈ {formatTjs(profitTjs)}
             </span>
           </div>
         </div>
@@ -123,7 +146,7 @@ export const OwnerCard: React.FC<OwnerCardProps> = ({
           <div className="p-1.5 sm:p-2 rounded-lg bg-surface-raised border border-border text-[10px] sm:text-[11px] flex flex-wrap items-center justify-between gap-1 shadow-2xs">
             <span className="text-fg-subtle flex items-center gap-1 font-semibold truncate">
               <Store className="w-3 h-3 text-accent shrink-0" />
-              {partnerStoreAssets.name}:
+              {formatStoreName(partnerStoreAssets.name)}:
             </span>
             <div className="flex items-center gap-1.5 shrink-0 font-mono text-[10px]">
               <span className="text-fg-muted">
@@ -142,21 +165,21 @@ export const OwnerCard: React.FC<OwnerCardProps> = ({
           <div>
             <span className="text-[9px] text-fg-subtle block">Начислено</span>
             <span className="font-bold font-mono text-fg text-[10px] sm:text-[11px] block">
-              ${formatMoney(owner.totalAccruedProfitUsd)}
+              {formatUsd(owner.totalAccruedProfitUsd)}
             </span>
           </div>
           <div className="h-4 w-px bg-border" />
           <div>
             <span className="text-[9px] text-fg-subtle block">Выплачено</span>
             <span className="font-bold font-mono text-info text-[10px] sm:text-[11px] block">
-              ${formatMoney(owner.totalPaidProfitUsd)}
+              {formatUsd(owner.totalPaidProfitUsd)}
             </span>
           </div>
           <div className="h-4 w-px bg-border" />
           <div>
             <span className="text-[9px] text-fg-subtle block">Реинвест</span>
             <span className="font-bold font-mono text-accent text-[10px] sm:text-[11px] block">
-              ${formatMoney(owner.totalReinvestedUsd)}
+              {formatUsd(owner.totalReinvestedUsd)}
             </span>
           </div>
         </div>
@@ -181,7 +204,7 @@ export const OwnerCard: React.FC<OwnerCardProps> = ({
                     ) : (
                       <Store className="w-3 h-3 text-accent shrink-0" />
                     )}
-                    <span className="font-medium text-fg-muted truncate max-w-24 sm:max-w-32">{s.name}:</span>
+                    <span className="font-medium text-fg-muted truncate max-w-24 sm:max-w-32">{formatStoreName(s.name)}:</span>
                     <span className="font-bold font-mono text-fg">${formatMoney(storeAmt)}</span>
                   </div>
                 );

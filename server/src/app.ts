@@ -26,10 +26,13 @@ import { registerCashCollectionRoutes } from './modules/finance/cash-collection.
 import { registerStoreReceiptRoutes } from './modules/store-receipts/store-receipts.routes';
 import { decorateTransactions } from './prisma/prisma.service';
 import { withAuditNotifications } from './modules/notifications/audit-notifications';
-import { requireNonNegativeMoney, requirePositiveMoney } from './common/money';
+import { requireNonNegativeMoney, requirePositiveMoney, roundMoney } from './common/money';
 import { requireTodayRate } from './modules/exchange-rate/exchange-rate.service';
 import { decimalJsonReplacer } from './common/decimal';
 import { operationContext } from './common/request-operation';
+import { lockCashRegister } from './modules/finance/account.service';
+import { postTransaction } from './modules/finance/financial-transaction.service';
+import { resolveActor } from './common/actor';
 
 export const app = express();
 app.set('json replacer', decimalJsonReplacer);
@@ -294,11 +297,15 @@ app.patch('/api/devices/:id', authenticateJwt, requireRoles('ADMIN', 'PARTNER'),
 
 app.post('/api/purchases', authenticateJwt, requireRoles('ADMIN'), enforceBodyStoreScope, async (req: AuthenticatedRequest, res, next) => {
   try {
-    const { supplierId, invoiceNumber, date, groups } = req.body ?? {};
+    const { supplierId, invoiceNumber, date, groups, paidAmountUsd: rawPaidAmount } = req.body ?? {};
     if (!supplierId || !invoiceNumber || !Array.isArray(groups) || groups.length === 0) {
       res.status(400).json({ message: 'supplierId, invoiceNumber и groups обязательны' });
       return;
     }
+
+    const paidAmountUsd = rawPaidAmount !== undefined && rawPaidAmount !== null
+      ? requireNonNegativeMoney(rawPaidAmount, 'Сумма оплаты')
+      : D(0);
 
     const result = await prisma.$transaction(async (transaction: TransactionClient) => {
       const exchangeRate = await requireTodayRate(transaction);
@@ -367,6 +374,25 @@ app.post('/api/purchases', authenticateJwt, requireRoles('ADMIN'), enforceBodySt
       if (existing) throw new Error(`IMEI ${existing.imei} уже зарегистрирован`);
 
       const totalAmountUsd = normalizedDevices.reduce((sum, device) => D(sum).plus(device.purchasePriceUsd), D(0));
+
+      if (D(paidAmountUsd).gt(totalAmountUsd)) {
+        throw new Error(`Сумма оплаты ($${paidAmountUsd}) не может превышать стоимость партии ($${totalAmountUsd})`);
+      }
+
+      let cashAccount: any = null;
+      if (D(paidAmountUsd).gt(0)) {
+        const actor = await resolveActor(transaction, req.user!.userId);
+        const locked = await lockCashRegister(transaction, mainWarehouse.id, actor, 'оплата прихода товара');
+        cashAccount = locked.account;
+        if (D(locked.store.cashBalanceUsd).lt(paidAmountUsd)) {
+          throw new Error(`В Центральной кассе недостаточно средств: доступно $${locked.store.cashBalanceUsd}, требуется $${paidAmountUsd}`);
+        }
+        await transaction.store.update({
+          where: { id: mainWarehouse.id },
+          data: { cashBalanceUsd: { decrement: paidAmountUsd } },
+        });
+      }
+
       const invoice = await transaction.supplierInvoice.create({
         data: {
           invoiceNumber: String(invoiceNumber).trim(),
@@ -374,6 +400,7 @@ app.post('/api/purchases', authenticateJwt, requireRoles('ADMIN'), enforceBodySt
           date: date ? new Date(date) : new Date(),
           totalAmountUsd,
           exchangeRate,
+          paidAmountUsd,
           devicesCount: normalizedDevices.length,
           isStorePurchase: false,
           storeId: targetStoreId,
@@ -411,10 +438,71 @@ app.post('/api/purchases', authenticateJwt, requireRoles('ADMIN'), enforceBodySt
         })),
       });
 
+      const unpaidAmountUsd = D(totalAmountUsd).minus(paidAmountUsd);
       await transaction.supplier.update({
         where: { id: supplierId },
-        data: { totalPurchasedUsd: { increment: totalAmountUsd }, totalDebtUsd: { increment: totalAmountUsd } },
+        data: {
+          totalPurchasedUsd: { increment: totalAmountUsd },
+          totalPaidUsd: { increment: paidAmountUsd },
+          totalDebtUsd: { increment: unpaidAmountUsd },
+        },
       });
+
+      if (D(paidAmountUsd).gt(0)) {
+        const payment = await transaction.supplierPayment.create({
+          data: {
+            supplierId,
+            amountUsd: paidAmountUsd,
+            exchangeRate,
+            sourceAccount: 'STORE_CASH',
+            storeId: mainWarehouse.id,
+            createdByUserId: req.user!.userId,
+          },
+        });
+
+        await transaction.supplierPaymentAllocation.create({
+          data: {
+            paymentId: payment.id,
+            invoiceId: invoice.id,
+            allocatedAmountUsd: paidAmountUsd,
+          },
+        });
+
+        const cashAmountTjs = roundMoney(D(paidAmountUsd).mul(exchangeRate));
+        await postTransaction(transaction, {
+          type: 'SUPPLIER_PAYMENT',
+          direction: 'OUT',
+          numberPrefix: 'SP',
+          accountId: cashAccount.id,
+          balanceCurrency: 'USD',
+          amount: paidAmountUsd,
+          currency: 'USD',
+          exchangeRate,
+          amountTjs: cashAmountTjs,
+          amountUsd: paidAmountUsd,
+          categoryName: 'Оплата поставщику',
+          counterpartyType: 'SUPPLIER',
+          counterpartyId: supplierId,
+          counterpartyName: supplier.name,
+          shopId: mainWarehouse.id,
+          sourceType: 'SUPPLIER_PAYMENT',
+          sourceId: payment.id,
+          description: `Оплата при приходе по накладной ${invoice.invoiceNumber} (${supplier.name}): $${paidAmountUsd}`,
+          createdByUserId: req.user!.userId,
+        });
+
+        await transaction.ledgerEntry.create({
+          data: {
+            type: 'SUPPLIER_PAYMENT',
+            description: `Оплата при приходе: накладная ${invoice.invoiceNumber} (${supplier.name}) — $${paidAmountUsd}`,
+            amountUsd: paidAmountUsd,
+            exchangeRate,
+            storeId: mainWarehouse.id,
+            storeName: mainWarehouse.name,
+            referenceId: invoice.id,
+          },
+        });
+      }
 
       await transaction.ledgerEntry.create({
         data: {
@@ -428,21 +516,30 @@ app.post('/api/purchases', authenticateJwt, requireRoles('ADMIN'), enforceBodySt
         },
       });
 
+      const paymentAuditNote = D(paidAmountUsd).gt(0)
+        ? `, оплачено из Центральной кассы $${paidAmountUsd}${D(paidAmountUsd).lt(totalAmountUsd) ? `, в долг $${unpaidAmountUsd}` : ' (полная оплата)'}`
+        : ', принято в долг (без оплаты)';
+
       await transaction.auditLog.create({
         data: {
           userId: req.user!.userId,
           userRole: req.user!.role,
           action: 'PURCHASE',
-          details: `Создан приход по накладной ${invoice.invoiceNumber} (${supplier.name}): ${devices.length} устройств, сумма $${totalAmountUsd}`,
-          financialDetails: moneyJson({ amountUsd: totalAmountUsd, exchangeRate }),
+          details: `Создан приход по накладной ${invoice.invoiceNumber} (${supplier.name}): ${devices.length} устройств, сумма $${totalAmountUsd}${paymentAuditNote}`,
+          financialDetails: moneyJson({ amountUsd: totalAmountUsd, paidAmountUsd, exchangeRate }),
         },
       });
 
-      return { invoice, devices };
+      return { invoice, devices, paidAmountUsd: Number(paidAmountUsd), mainWarehouseId: mainWarehouse.id };
     }, { maxWait: 10000, timeout: 25000 });
 
     const updatedStoreId = result.invoice.storeId || undefined;
     RealtimeSyncGateway.broadcast('INVENTORY_UPDATE', { storeId: updatedStoreId }, updatedStoreId ? { storeIds: [updatedStoreId] } : undefined);
+    RealtimeSyncGateway.broadcast('PURCHASE', { invoiceId: result.invoice.id });
+    if (result.paidAmountUsd > 0) {
+      RealtimeSyncGateway.broadcast('STORE_CASH', { storeId: result.mainWarehouseId });
+      RealtimeSyncGateway.broadcast('SUPPLIER_PAYMENT', { supplierId: result.invoice.supplierId });
+    }
     res.status(201).json(result);
   } catch (error) {
     next(error);

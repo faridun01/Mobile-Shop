@@ -32,6 +32,22 @@ interface OwnerTransactionsTableProps {
 
 const TRANSACTIONS_PAGE_SIZE = 12;
 
+function formatTxDate(dateVal?: string): string {
+  if (!dateVal) return '—';
+  try {
+    const d = new Date(dateVal);
+    if (isNaN(d.getTime())) return dateVal;
+    const day = String(d.getDate()).padStart(2, '0');
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const year = d.getFullYear();
+    const hours = String(d.getHours()).padStart(2, '0');
+    const minutes = String(d.getMinutes()).padStart(2, '0');
+    return `${day}.${month}.${year}, ${hours}:${minutes}`;
+  } catch {
+    return dateVal;
+  }
+}
+
 export const OwnerTransactionsTable: React.FC<OwnerTransactionsTableProps> = ({
   ownerTransactions,
   stores,
@@ -147,7 +163,7 @@ export const OwnerTransactionsTable: React.FC<OwnerTransactionsTableProps> = ({
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Поиск по учредителю, примечанию или сумме..."
+              placeholder="Поиск по операциям, сумме..."
               className="w-full rounded-xl bg-surface-raised border border-border pl-8 pr-7 py-1.5 text-xs text-fg placeholder-fg-subtle focus:border-accent focus:outline-none transition-colors"
             />
             {searchQuery && (
@@ -312,7 +328,7 @@ export const OwnerTransactionsTable: React.FC<OwnerTransactionsTableProps> = ({
                     return (
                       <tr key={tx.id} className="hover:bg-surface-raised/70 transition-colors">
                         <td className="py-2.5 px-3 whitespace-nowrap text-fg-subtle font-mono text-[11px]">
-                          {tx.date}
+                          {formatTxDate(tx.date)}
                         </td>
                         <td className="py-2.5 px-3 whitespace-nowrap">
                           <span className="font-bold text-fg">{tx.ownerName}</span>
@@ -367,7 +383,7 @@ export const OwnerTransactionsTable: React.FC<OwnerTransactionsTableProps> = ({
                         <td className="py-2.5 px-3 text-right whitespace-nowrap font-mono">
                           <span
                             className={`text-xs font-bold ${
-                              isCapitalIncrease ? 'text-accent' : 'text-warning'
+                              isCapitalIncrease ? 'text-accent' : tx.type === 'WITHDRAWAL' ? 'text-danger' : 'text-warning'
                             }`}
                           >
                             {isCapitalIncrease ? '+' : '-'}${tx.amountUsd?.toLocaleString()} USD
@@ -471,7 +487,7 @@ export const OwnerTransactionsTable: React.FC<OwnerTransactionsTableProps> = ({
                         )}
 
                         <div className="flex items-center gap-1.5 text-[10px] text-fg-subtle">
-                          <span>{tx.date}</span>
+                          <span>{formatTxDate(tx.date)}</span>
                           <span>•</span>
                           <span>Провел: <strong className="text-fg-muted font-medium">{tx.createdByName || 'Администратор'}</strong></span>
                         </div>
@@ -481,7 +497,7 @@ export const OwnerTransactionsTable: React.FC<OwnerTransactionsTableProps> = ({
                     <div className="text-left sm:text-right shrink-0 border-t sm:border-t-0 border-border pt-1 sm:pt-0 flex items-center justify-between sm:block">
                       <span
                         className={`text-xs sm:text-sm font-bold font-mono ${
-                          isCapitalIncrease ? 'text-accent' : 'text-warning'
+                          isCapitalIncrease ? 'text-accent' : tx.type === 'WITHDRAWAL' ? 'text-danger' : 'text-warning'
                         }`}
                       >
                         {isCapitalIncrease ? '+' : '-'}${tx.amountUsd?.toLocaleString()} USD

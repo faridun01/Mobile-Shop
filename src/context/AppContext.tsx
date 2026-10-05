@@ -145,6 +145,7 @@ interface AppContextType {
     date: string;
     isStorePurchase?: boolean;
     storeId?: string;
+    paidAmountUsd?: number;
     groups: {
       brand: string;
       model: string;
@@ -1049,16 +1050,24 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
-  const createPurchase: AppContextType['createPurchase'] = async ({ supplierId, invoiceNumber, date, groups }) => {
+  const createPurchase: AppContextType['createPurchase'] = async ({ supplierId, invoiceNumber, date, groups, paidAmountUsd }) => {
     const mainStore = stores.find((s) => s.isMainWarehouse);
     const destStoreId = mainStore?.id || 'main-warehouse';
     try {
       await apiClient('/purchases', {
         method: 'POST',
-        body: JSON.stringify({ supplierId, invoiceNumber, date, isStorePurchase: false, storeId: destStoreId, groups }),
+        body: JSON.stringify({
+          supplierId,
+          invoiceNumber,
+          date,
+          isStorePurchase: false,
+          storeId: destStoreId,
+          groups,
+          paidAmountUsd: paidAmountUsd ?? 0,
+        }),
       });
-      markLocalMutation(['devices', 'suppliers', 'invoices', 'bonuses']);
-      await refreshAfterMutation([fetchDevices(), fetchSuppliers(), fetchInvoices(), fetchBonuses()]);
+      markLocalMutation(['devices', 'suppliers', 'invoices', 'bonuses', 'stores']);
+      await refreshAfterMutation([fetchDevices(), fetchSuppliers(), fetchInvoices(), fetchBonuses(), fetchStores()]);
       return { success: true };
     } catch (err) {
       return { success: false, message: errorMessage(err, 'Не удалось создать приход') };
