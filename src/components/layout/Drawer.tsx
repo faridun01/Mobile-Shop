@@ -261,8 +261,10 @@ export const Drawer: React.FC = () => {
 
       <div className="app-safe-area fixed inset-0 z-50 flex md:hidden flex-col bg-bg text-fg-muted w-full h-[100dvh] max-h-[100dvh] overflow-hidden shadow-2xl overscroll-none animate-in slide-in-from-top-2 duration-200">
         {/* Header */}
-        <div className="p-3.5 border-b border-border bg-surface flex items-center justify-between shrink-0 shadow-2xs">
-          <div className="flex items-center gap-3 min-w-0">
+        <div className="border-b border-border bg-surface shrink-0 shadow-2xs">
+          <div className="w-full shrink-0" style={{ height: 'var(--sa-top)' }} />
+          <div className="p-3.5 flex items-center justify-between">
+            <div className="flex items-center gap-3 min-w-0">
             <div className="relative shrink-0">
               <div className="w-10 h-10 rounded-xl bg-accent/15 border border-accent/30 text-accent font-bold text-xs flex items-center justify-center shadow-xs">
                 {cleanDisplayName.substring(0, 2).toUpperCase()}
@@ -311,6 +313,7 @@ export const Drawer: React.FC = () => {
           >
             <X className="w-4 h-4" />
           </button>
+          </div>
         </div>
 
         {/* Mode Switcher Banner for Admin only */}

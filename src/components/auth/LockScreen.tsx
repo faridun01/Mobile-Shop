@@ -121,7 +121,7 @@ export const LockScreen: React.FC = () => {
       aria-modal="true"
       aria-labelledby="lock-title"
       data-pwa-ignore="true"
-      className="app-safe-area safe-area-pb fixed inset-0 z-[2147483000] bg-bg flex items-center justify-center p-4 overflow-y-auto"
+      className="app-safe-area safe-area-pt safe-area-pb fixed inset-0 z-[2147483000] bg-bg flex items-center justify-center p-4 overflow-y-auto"
     >
       <div className="w-full max-w-sm">
         <div className="text-center mb-5">

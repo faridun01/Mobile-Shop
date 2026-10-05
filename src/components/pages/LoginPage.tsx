@@ -51,7 +51,7 @@ export const LoginPage: React.FC = () => {
   };
 
   return (
-    <div data-login-page="true" data-pwa-ignore="true" className="app-safe-area safe-area-pb min-h-dvh bg-bg flex flex-col items-center justify-center p-4 text-fg-muted relative">
+    <div data-login-page="true" data-pwa-ignore="true" className="app-safe-area safe-area-pt safe-area-pb min-h-dvh bg-bg flex flex-col items-center justify-center p-4 text-fg-muted relative">
       <div className="w-full max-w-sm">
         {/* Brand header */}
         <div className="text-center mb-6">

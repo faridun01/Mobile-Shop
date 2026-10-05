@@ -203,36 +203,39 @@ export const Sidebar: React.FC = () => {
       sidebarCollapsed ? 'w-16' : 'w-60'
     }`}>
       {/* Brand Header */}
-      <div className={`h-14 flex items-center border-b border-border shrink-0 ${
-        sidebarCollapsed ? 'justify-center px-2' : 'justify-between px-4'
-      }`}>
-        {sidebarCollapsed ? (
-          <button
-            type="button"
-            onClick={toggleSidebar}
-            title="Развернуть боковое меню"
-            aria-label="Развернуть боковое меню"
-            className="w-10 h-10 flex items-center justify-center rounded-xl bg-surface-raised hover:bg-surface border border-border text-accent transition-all active:scale-95 cursor-pointer shadow-2xs"
-          >
-            <PanelLeftOpen className="w-4 h-4 text-fg-muted hover:text-fg" />
-          </button>
-        ) : (
-          <>
-            <div className="flex items-center gap-2.5 min-w-0">
-              <div className="w-2.5 h-2.5 rounded-sm bg-accent shrink-0" />
-              <span className="font-bold text-xs tracking-wider text-fg-muted uppercase truncate">Mobile Shop</span>
-            </div>
+      <div className="border-b border-border shrink-0 bg-surface">
+        <div className="w-full shrink-0" style={{ height: 'var(--sa-top)' }} />
+        <div className={`h-14 flex items-center ${
+          sidebarCollapsed ? 'justify-center px-2' : 'justify-between px-4'
+        }`}>
+          {sidebarCollapsed ? (
             <button
               type="button"
               onClick={toggleSidebar}
-              title="Свернуть боковое меню"
-              aria-label="Свернуть боковое меню"
-              className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-surface-raised text-fg-subtle hover:text-fg transition-colors cursor-pointer"
+              title="Развернуть боковое меню"
+              aria-label="Развернуть боковое меню"
+              className="w-10 h-10 flex items-center justify-center rounded-xl bg-surface-raised hover:bg-surface border border-border text-accent transition-all active:scale-95 cursor-pointer shadow-2xs"
             >
-              <PanelLeftClose className="w-4 h-4" />
+              <PanelLeftOpen className="w-4 h-4 text-fg-muted hover:text-fg" />
             </button>
-          </>
-        )}
+          ) : (
+            <>
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className="w-2.5 h-2.5 rounded-sm bg-accent shrink-0" />
+                <span className="font-bold text-xs tracking-wider text-fg-muted uppercase truncate">Mobile Shop</span>
+              </div>
+              <button
+                type="button"
+                onClick={toggleSidebar}
+                title="Свернуть боковое меню"
+                aria-label="Свернуть боковое меню"
+                className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-surface-raised text-fg-subtle hover:text-fg transition-colors cursor-pointer"
+              >
+                <PanelLeftClose className="w-4 h-4" />
+              </button>
+            </>
+          )}
+        </div>
       </div>
 
 

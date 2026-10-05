@@ -188,22 +188,25 @@ export const SupplierDetailsPanel: React.FC<SupplierDetailsPanelProps> = ({
       {supplier && (
         <div className="app-safe-area lg:hidden fixed inset-0 z-40 bg-bg flex flex-col pb-[var(--sa-bottom)]">
           {/* Header */}
-          <div className="p-3.5 border-b border-border bg-surface flex items-center justify-between shrink-0">
-            <div className="flex items-center space-x-2">
-              <Truck className="w-4 h-4 text-accent" />
-              <h3 className="text-sm font-bold text-fg-muted truncate max-w-50">
-                {supplier.name}
-              </h3>
-            </div>
+          <div className="border-b border-border bg-surface shrink-0">
+            <div className="w-full shrink-0" style={{ height: 'var(--sa-top)' }} />
+            <div className="p-3.5 flex items-center justify-between">
+              <div className="flex items-center space-x-2">
+                <Truck className="w-4 h-4 text-accent" />
+                <h3 className="text-sm font-bold text-fg-muted truncate max-w-50">
+                  {supplier.name}
+                </h3>
+              </div>
 
-            <button
-              type="button"
-              onClick={onClose}
-              className="p-1.5 rounded-lg bg-surface-raised text-fg-muted hover:text-fg-muted hover:bg-surface transition-colors flex items-center justify-center border border-border cursor-pointer"
-              title="Закрыть окно"
-            >
-              <X className="w-5 h-5" />
-            </button>
+              <button
+                type="button"
+                onClick={onClose}
+                className="p-1.5 rounded-lg bg-surface-raised text-fg-muted hover:text-fg-muted hover:bg-surface transition-colors flex items-center justify-center border border-border cursor-pointer"
+                title="Закрыть окно"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
           </div>
 
           {/* Metrics */}

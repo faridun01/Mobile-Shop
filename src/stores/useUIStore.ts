@@ -34,6 +34,20 @@ interface UIState {
   clearStoreTransition: () => void;
 }
 
+import { updateNativeStatusBar } from '../services/nativeStatusBar';
+
+const syncThemeMetaAndStatus = (theme: ThemeMode) => {
+  if (typeof document !== 'undefined') {
+    document.documentElement.setAttribute('data-theme', theme);
+    const color = theme === 'light' ? '#FFFFFF' : '#0F1219';
+    const meta = document.getElementById('theme-color-meta') || document.querySelector('meta[name="theme-color"]');
+    if (meta) {
+      meta.setAttribute('content', color);
+    }
+  }
+  void updateNativeStatusBar(theme);
+};
+
 export const useUIStore = create<UIState>((set) => ({
   theme: (typeof localStorage !== 'undefined' ? (localStorage.getItem('ms_theme') as ThemeMode) : null) || 'light',
   drawerOpen: false,
@@ -49,9 +63,7 @@ export const useUIStore = create<UIState>((set) => ({
     if (typeof localStorage !== 'undefined') {
       localStorage.setItem('ms_theme', theme);
     }
-    if (typeof document !== 'undefined') {
-      document.documentElement.setAttribute('data-theme', theme);
-    }
+    syncThemeMetaAndStatus(theme);
     set({ theme });
   },
 
@@ -61,9 +73,7 @@ export const useUIStore = create<UIState>((set) => ({
       if (typeof localStorage !== 'undefined') {
         localStorage.setItem('ms_theme', nextTheme);
       }
-      if (typeof document !== 'undefined') {
-        document.documentElement.setAttribute('data-theme', nextTheme);
-      }
+      syncThemeMetaAndStatus(nextTheme);
       return { theme: nextTheme };
     }),
 

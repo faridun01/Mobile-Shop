@@ -72,9 +72,12 @@ export const TopBar: React.FC = () => {
   };
 
   return (
-    <header className="sticky top-0 z-30 flex h-12 md:h-14 w-full items-center justify-between border-b border-border bg-surface px-3 md:px-4 select-none shrink-0 gap-2">
-      {/* Left: Page Title (on phones the menu opens from the bottom navigation) */}
-      <div className="flex items-center gap-2.5 min-w-0">
+    <header className="app-top-bar sticky top-0 z-30 flex flex-col w-full border-b border-border bg-surface select-none shrink-0 transition-colors">
+      {/* Top Safe Area spacer: seamlessly carries bg-surface behind iOS Dynamic Island / notch and status bar */}
+      <div className="w-full shrink-0" style={{ height: 'var(--sa-top)' }} />
+      <div className="flex h-12 md:h-14 w-full items-center justify-between px-3 md:px-4 gap-2">
+        {/* Left: Page Title (on phones the menu opens from the bottom navigation) */}
+        <div className="flex items-center gap-2.5 min-w-0">
         <div className="min-w-0">
           <h1 className="text-sm md:text-base font-bold text-fg truncate tracking-tight">
             {getPageTitle()}
@@ -197,6 +200,7 @@ export const TopBar: React.FC = () => {
             </div>
           </div>
         </div>
+      </div>
       </div>
     </header>
   );

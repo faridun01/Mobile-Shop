@@ -121,8 +121,9 @@ export const TabletNavRail: React.FC = () => {
   }, [isSeller, isPartner, isCentralCashMode]);
 
   return (
-    <aside className="hidden md:flex lg:hidden flex-col w-20 border-r border-border bg-surface text-fg-muted select-none shrink-0 h-full sticky top-0 py-3 items-center justify-between z-30">
-      <div className="flex flex-col items-center gap-1.5 w-full px-2">
+    <aside className="hidden md:flex lg:hidden flex-col w-20 border-r border-border bg-surface text-fg-muted select-none shrink-0 h-full sticky top-0 pb-3 items-center justify-between z-30">
+      <div className="w-full shrink-0" style={{ height: 'var(--sa-top)' }} />
+      <div className="flex flex-col items-center gap-1.5 w-full px-2 pt-3">
         {isAdmin ? (
           <button
             type="button"

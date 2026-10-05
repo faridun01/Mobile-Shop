@@ -1,19 +1,20 @@
 import { Capacitor } from '@capacitor/core';
 
-// The app is dark-themed everywhere (--color-bg / --color-surface, src/index.css).
-// Without an explicit style, iOS defaults to dark status bar text on a transparent
-// bar — invisible against this background — while Android's default varies by OEM.
-// Style.Dark here means "status bar tuned for a dark background", i.e. light icons/text.
-export async function initNativeStatusBar(): Promise<void> {
+export async function updateNativeStatusBar(theme: 'dark' | 'light'): Promise<void> {
   if (!Capacitor.isNativePlatform()) return;
   try {
     const { StatusBar, Style } = await import('@capacitor/status-bar');
     await StatusBar.setOverlaysWebView({ overlay: true });
-    await StatusBar.setStyle({ style: Style.Dark });
+    await StatusBar.setStyle({ style: theme === 'light' ? Style.Light : Style.Dark });
     if (Capacitor.getPlatform() === 'android') {
-      await StatusBar.setBackgroundColor({ color: '#0B0E14' });
+      await StatusBar.setBackgroundColor({ color: theme === 'light' ? '#FFFFFF' : '#0F1219' });
     }
   } catch {
     // Best-effort cosmetic setup; the app remains fully usable without it.
   }
+}
+
+export async function initNativeStatusBar(): Promise<void> {
+  const savedTheme = (typeof localStorage !== 'undefined' ? localStorage.getItem('ms_theme') : null) === 'dark' ? 'dark' : 'light';
+  await updateNativeStatusBar(savedTheme);
 }

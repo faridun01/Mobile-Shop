@@ -170,10 +170,11 @@ html[data-keyboard-open] .app-bottom-nav {
   display: none !important;
 }
 
-/* The shell owns the top and side insets; its header, pages and bottom nav must not add
-   them again. The fixed drawer is a separate viewport layer and uses the same rule. */
+/* The shell owns the side insets. The top inset belongs to the top header (.app-top-bar),
+   extending bg-surface seamlessly all the way behind the iOS Dynamic Island / status bar,
+   completely eliminating the two-tone mismatch and blur scrim. The bottom inset on mobile is
+   owned by the bottom nav (.app-bottom-nav). */
 .app-safe-area {
-  padding-top: var(--sa-top);
   padding-left: var(--sa-left);
   padding-right: var(--sa-right);
 }
@@ -184,6 +185,11 @@ html[data-keyboard-open] .app-bottom-nav {
   .app-safe-area {
     padding-bottom: var(--sa-bottom);
   }
+}
+
+/* Standalone full-screen views (login, lock screen) safe area top padding */
+.safe-area-pt {
+  padding-top: var(--sa-top);
 }
 
 /* The bottom nav is a normal flex sibling of <main> (not a fixed overlay), so
