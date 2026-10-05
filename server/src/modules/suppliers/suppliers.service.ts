@@ -606,7 +606,16 @@ export class SuppliersService {
         data.invoiceNumber = input.invoiceNumber.trim();
       }
       if (input.date !== undefined) {
-        data.date = new Date(input.date);
+        let updatedDate = new Date();
+        if (typeof input.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(input.date.trim())) {
+          const [y, m, d] = input.date.trim().split('-').map(Number);
+          const prevTime = invoice.date ? new Date(invoice.date) : new Date();
+          updatedDate = new Date(Date.UTC(y, m - 1, d, prevTime.getUTCHours(), prevTime.getUTCMinutes(), prevTime.getUTCSeconds(), prevTime.getUTCMilliseconds()));
+        } else {
+          const parsed = new Date(input.date);
+          if (!isNaN(parsed.getTime())) updatedDate = parsed;
+        }
+        data.date = updatedDate;
       }
 
       if (input.totalAmountUsd !== undefined) {

@@ -18,6 +18,7 @@ import { DeleteSupplierConfirmModal } from '../suppliers/DeleteSupplierConfirmMo
 import { SupplierInvoiceDetailsModal } from '../suppliers/SupplierInvoiceDetailsModal';
 import { EditSupplierInvoiceModal } from '../suppliers/EditSupplierInvoiceModal';
 import { DeleteSupplierInvoiceModal } from '../suppliers/DeleteSupplierInvoiceModal';
+import { compareInvoicesDesc } from '../purchase/types';
 
 export const SuppliersPage: React.FC = () => {
   const {
@@ -90,7 +91,7 @@ export const SuppliersPage: React.FC = () => {
     if (!selectedSupplier) return [];
     return supplierInvoices
       .filter(inv => inv.supplierId === selectedSupplier.id)
-      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+      .sort(compareInvoicesDesc);
   }, [supplierInvoices, selectedSupplier]);
 
   const [searchQuery, setSearchQuery] = useState('');

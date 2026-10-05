@@ -393,11 +393,23 @@ app.post('/api/purchases', authenticateJwt, requireRoles('ADMIN'), enforceBodySt
         });
       }
 
+      let invoiceDate = new Date();
+      if (date) {
+        if (typeof date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(date.trim())) {
+          const [y, m, d] = date.trim().split('-').map(Number);
+          const now = new Date();
+          invoiceDate = new Date(Date.UTC(y, m - 1, d, now.getUTCHours(), now.getUTCMinutes(), now.getUTCSeconds(), now.getUTCMilliseconds()));
+        } else {
+          const parsed = new Date(date);
+          if (!isNaN(parsed.getTime())) invoiceDate = parsed;
+        }
+      }
+
       const invoice = await transaction.supplierInvoice.create({
         data: {
           invoiceNumber: String(invoiceNumber).trim(),
           supplierId,
-          date: date ? new Date(date) : new Date(),
+          date: invoiceDate,
           totalAmountUsd,
           exchangeRate,
           paidAmountUsd,

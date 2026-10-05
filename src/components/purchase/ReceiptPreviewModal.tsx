@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { Supplier, Store } from '../../types';
-import { PurchasePreviewData } from './types';
+import { PurchasePreviewData, formatInvoiceDate } from './types';
 import { formatMoney } from '../../utils/money';
 import {
   FileText,
@@ -149,7 +149,7 @@ export const ReceiptPreviewModal: React.FC<ReceiptPreviewModalProps> = ({
             </div>
             <div>
               <span className="block text-[10px] text-fg-subtle uppercase font-semibold">Дата</span>
-              <span className="font-medium font-mono text-fg-muted">{previewInvoice.date}</span>
+              <span className="font-medium font-mono text-fg-muted">{formatInvoiceDate(previewInvoice.date)}</span>
             </div>
             <div>
               <span className="block text-[10px] text-fg-subtle uppercase font-semibold">Склад приёма</span>

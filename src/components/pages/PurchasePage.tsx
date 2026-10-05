@@ -12,6 +12,7 @@ import {
   PurchasePreviewGroup,
   PurchasePreviewData,
   getImeiPair,
+  compareInvoicesDesc,
 } from '../purchase/types';
 import { AddSupplierModal } from '../purchase/AddSupplierModal';
 import { EditInvoiceModal } from '../purchase/EditInvoiceModal';
@@ -98,9 +99,21 @@ export const PurchasePage: React.FC = () => {
   // Inline "add new supplier"
   const [isAddSupplierOpen, setIsAddSupplierOpen] = useState(false);
 
+  const getNextInvoiceNumber = (invoices: SupplierInvoice[]) => {
+    let max = 0;
+    for (const inv of invoices || []) {
+      const match = inv.invoiceNumber?.match(/(\d+)/);
+      if (match) {
+        const num = parseInt(match[1], 10);
+        if (!isNaN(num) && num > max) max = num;
+      }
+    }
+    return `INV-${(max + 1).toString().padStart(4, '0')}`;
+  };
+
   // Auto-generate sequential invoice number
   const [invoiceNumber, setInvoiceNumber] = useState<string>(() => {
-    return `INV-${((supplierInvoices?.length || 0) + 1).toString().padStart(4, '0')}`;
+    return getNextInvoiceNumber(supplierInvoices || []);
   });
 
   // If the currently selected supplier is deleted, clear selection
@@ -111,8 +124,8 @@ export const PurchasePage: React.FC = () => {
   }, [suppliers, selectedSupplierId]);
 
   useEffect(() => {
-    if (supplierInvoices) {
-      setInvoiceNumber(`INV-${(supplierInvoices.length + 1).toString().padStart(4, '0')}`);
+    if (supplierInvoices && supplierInvoices.length > 0) {
+      setInvoiceNumber(getNextInvoiceNumber(supplierInvoices));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [supplierInvoices?.length]);
@@ -242,8 +255,14 @@ export const PurchasePage: React.FC = () => {
 
         return true;
       })
-      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-  }, [supplierInvoices, devices, selectedMonth, selectedSupplierFilter, searchQuery]);
+      .sort((a, b) => {
+        if (justSavedInvoice) {
+          if (a.invoiceNumber === justSavedInvoice) return -1;
+          if (b.invoiceNumber === justSavedInvoice) return 1;
+        }
+        return compareInvoicesDesc(a, b);
+      });
+  }, [supplierInvoices, devices, selectedMonth, selectedSupplierFilter, searchQuery, justSavedInvoice]);
 
   // Scan finder to locate purchase
   const handleScanFinder = () => {
@@ -498,7 +517,7 @@ export const PurchasePage: React.FC = () => {
     setPreviewInvoice({
       supplierId: selectedSupplierId,
       invoiceNumber: invoiceNumber.trim(),
-      date: purchaseDate,
+      date: new Date().toISOString(),
       isStorePurchase: false,
       storeId: mainWarehouseId,
       groups: cleanGroups,
@@ -532,6 +551,14 @@ export const PurchasePage: React.FC = () => {
         ]);
         setPreviewInvoice(null);
         setSelectedSupplierId('');
+
+        // Ensure newly saved invoice is visible immediately at the top
+        setSearchQuery('');
+        setSelectedSupplierFilter('all');
+        const currentMonthKey = getBusinessDateKey().substring(0, 7);
+        if (!selectedMonth.startsWith(currentMonthKey)) {
+          setSelectedMonth(currentMonthKey);
+        }
 
         setViewMode('list');
         const paymentNote = paidAmountUsd > 0
@@ -579,6 +606,7 @@ export const PurchasePage: React.FC = () => {
           onNewPurchaseClick={() => {
             setStatusMessage(null);
             setSelectedSupplierId('');
+            setInvoiceNumber(getNextInvoiceNumber(supplierInvoices || []));
             setViewMode('form');
           }}
           onSelectInvoice={setSelectedInvoiceId}

@@ -31,6 +31,7 @@ import {
   mapAuditLog,
   mapDailyRate,
 } from '../api/mappers';
+import { compareInvoicesDesc } from '../components/purchase/types';
 
 type ActionResult = { success: boolean; message?: string };
 
@@ -546,7 +547,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const fetchInvoices = useCallback(() => coalesceFetch('invoices', async () => {
     try {
       const raw = await apiClient<any[]>('/supplier-invoices?limit=500');
-      setInvoices(raw.map(mapSupplierInvoice).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
+      setInvoices(raw.map(mapSupplierInvoice).sort(compareInvoicesDesc));
     } catch (error) {
       // ADMIN/PARTNER only — leave empty for SELLER users
       if ((error as { status?: number }).status !== 403) throw error;
@@ -564,7 +565,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setInvoices((prev) => {
       const byId = new Map(prev.map((i) => [i.id, i]));
       for (const i of mapped) byId.set(i.id, i);
-      return Array.from(byId.values()).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+      return Array.from(byId.values()).sort(compareInvoicesDesc);
     });
     return mapped;
   }, []);

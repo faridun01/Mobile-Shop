@@ -56,3 +56,29 @@ export const getImeiPair = (value: string): [string, string] => {
   const [imei1 = '', imei2 = ''] = (value || '').split(/[\/,]/).map(part => part.trim());
   return [imei1, imei2];
 };
+
+/**
+ * Compare two supplier invoices in descending order (newest first).
+ * 1. Date/time descending (newest timestamp first).
+ * 2. If timestamps are equal (e.g. both created on the same day or legacy midnight dates),
+ *    natural numeric comparison of invoice numbers descending (e.g. INV-0010 before INV-0009).
+ * 3. Tie-breaker: ID descending.
+ */
+export const compareInvoicesDesc = (
+  a: { date?: string; invoiceNumber?: string; id?: string },
+  b: { date?: string; invoiceNumber?: string; id?: string }
+): number => {
+  const timeA = new Date(a.date || 0).getTime();
+  const timeB = new Date(b.date || 0).getTime();
+  if (timeB !== timeA) {
+    return timeB - timeA;
+  }
+  const numA = (a.invoiceNumber || '').trim();
+  const numB = (b.invoiceNumber || '').trim();
+  const numCompare = numB.localeCompare(numA, undefined, { numeric: true, sensitivity: 'base' });
+  if (numCompare !== 0) {
+    return numCompare;
+  }
+  return (b.id || '').localeCompare(a.id || '');
+};
+

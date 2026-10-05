@@ -48,7 +48,11 @@ export function registerSupplierRoutes(app: Express) {
         where,
         // Only the supplier name is ever read (mapSupplierInvoice) — the full row isn't needed.
         include: { groups: true, supplier: { select: { name: true } } },
-        orderBy: { date: 'desc' },
+        orderBy: [
+          { date: 'desc' },
+          { invoiceNumber: 'desc' },
+          { id: 'desc' },
+        ],
         ...(search ? { take: 20 } : limit ? { take: limit } : {}),
       });
       const withComputed = invoices.map((inv) => ({
