@@ -3,7 +3,7 @@ import { Device, Store as StoreType } from '../../types';
 import { formatUsd } from '../../utils/money';
 import { Sparkles, ChevronDown, Smartphone, SlidersHorizontal } from 'lucide-react';
 import { DeviceRow } from './DeviceRow';
-import { approxTjs, BrandGroupItem, getBrandBadgeStyle } from './types';
+import { approxTjs, BrandGroupItem } from './types';
 
 interface BrandGroupedListProps {
   brandGroups: BrandGroupItem[];
@@ -76,8 +76,6 @@ export const BrandGroupedList: React.FC<BrandGroupedListProps> = ({
 
       {brandGroups.map((bGroup) => {
         const isBrandExpanded = !!expandedBrandKeys[bGroup.key];
-        const brandBadgeStyle = getBrandBadgeStyle(bGroup.brand);
-
         return (
           <div key={bGroup.key} className="transition-colors">
             {/* Brand Row Button */}
@@ -85,27 +83,20 @@ export const BrandGroupedList: React.FC<BrandGroupedListProps> = ({
               onClick={() => onToggleBrandKey(bGroup.key)}
               className="w-full px-3 sm:px-4 py-2.5 sm:py-3 flex items-center justify-between gap-3 active:bg-surface-raised transition-colors hover:bg-surface-raised/40 cursor-pointer select-none"
             >
-              {/* Left: Brand name, badge, and model count */}
-              <div className="flex items-center gap-3 min-w-0 flex-1">
-                <div
-                  className={`w-9 h-9 rounded-xl border flex items-center justify-center shrink-0 font-black text-xs tracking-wider shadow-2xs ${brandBadgeStyle.bg} ${brandBadgeStyle.border}`}
-                >
-                  <span className={brandBadgeStyle.text}>{bGroup.brand.substring(0, 2).toUpperCase()}</span>
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <h3 className="text-sm sm:text-base font-extrabold text-fg truncate">
-                      {bGroup.brand}
-                    </h3>
-                    <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-surface-raised text-fg-subtle border border-border">
-                      {bGroup.distinctModelsCount}{' '}
-                      {bGroup.distinctModelsCount === 1
-                        ? 'модель'
-                        : bGroup.distinctModelsCount < 5
-                        ? 'модели'
-                        : 'моделей'}
-                    </span>
-                  </div>
+              {/* Left: Brand name and model count */}
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h3 className="text-sm sm:text-base font-extrabold text-fg truncate">
+                    {bGroup.brand}
+                  </h3>
+                  <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-surface-raised text-fg-subtle border border-border">
+                    {bGroup.distinctModelsCount}{' '}
+                    {bGroup.distinctModelsCount === 1
+                      ? 'модель'
+                      : bGroup.distinctModelsCount < 5
+                      ? 'модели'
+                      : 'моделей'}
+                  </span>
                 </div>
               </div>
 
