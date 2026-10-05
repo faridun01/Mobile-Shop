@@ -171,6 +171,7 @@ export const Sidebar: React.FC = () => {
         items: [
           { id: 'SALE', label: 'POS Терминал', icon: ShoppingBag, roles: ['ADMIN'] },
           { id: 'SALES_HISTORY', label: 'История продаж', icon: History, roles: ['ADMIN'] },
+          { id: 'PURCHASE', label: 'Приход товара', icon: PlusCircle, roles: ['ADMIN'] },
           { id: 'EXCHANGE', label: 'Обмен Trade-In', icon: RefreshCw, roles: ['ADMIN'] },
           { id: 'REPAIR', label: 'Сервис и ремонт', icon: Wrench, roles: ['ADMIN'] },
           { id: 'INVENTORY', label: 'Склад магазина', icon: Package, roles: ['ADMIN'] },

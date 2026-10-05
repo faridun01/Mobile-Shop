@@ -107,10 +107,11 @@ export const TabletNavRail: React.FC = () => {
     return [
       { id: 'SALE' as PageId, label: 'POS', icon: ShoppingBag },
       { id: 'SALES_HISTORY' as PageId, label: 'Продажи', icon: History },
-      { id: 'EXCHANGE' as PageId, label: 'Обмен', icon: RefreshCw },
+      { id: 'PURCHASE' as PageId, label: 'Приход', icon: PlusCircle },
       { id: 'REPAIR' as PageId, label: 'Ремонт', icon: Wrench },
       { id: 'INVENTORY' as PageId, label: 'Склад', icon: Package },
       { id: 'TRANSFER' as PageId, label: 'Перемещ.', icon: ArrowLeftRight },
+      { id: 'EXCHANGE' as PageId, label: 'Обмен', icon: RefreshCw },
       { id: 'FINANCE' as PageId, label: 'Финансы', icon: Landmark },
       { id: 'EXPENSES' as PageId, label: 'Расходы', icon: Wallet },
       { id: 'BONUSES' as PageId, label: 'Бонусы', icon: Gift },

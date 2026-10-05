@@ -104,8 +104,11 @@ export const Drawer: React.FC = () => {
       return new Set<PageId>(['INVENTORY', 'SUPPLIERS', 'FINANCE', 'TRANSFER']);
     }
     // Retail Store mode / Seller / Partner
+    if (isAdmin) {
+      return new Set<PageId>(['INVENTORY', 'SALES_HISTORY', 'SALE', 'PURCHASE']);
+    }
     return new Set<PageId>(['INVENTORY', 'SALES_HISTORY', 'SALE', 'TRANSFER']);
-  }, [isCentralCashMode]);
+  }, [isCentralCashMode, isAdmin]);
 
   const navGroups = useMemo<NavGroup[]>(() => {
     let rawGroups: NavGroup[] = [];
@@ -196,6 +199,7 @@ export const Drawer: React.FC = () => {
           items: [
             { id: 'SALE', label: 'POS Терминал', icon: ShoppingBag, roles: ['ADMIN'] },
             { id: 'SALES_HISTORY', label: 'История продаж', icon: History, roles: ['ADMIN'] },
+            { id: 'PURCHASE', label: 'Приход товара', icon: PlusCircle, roles: ['ADMIN'] },
             { id: 'EXCHANGE', label: 'Обмен (Trade-In)', icon: RefreshCw, roles: ['ADMIN'] },
             { id: 'REPAIR', label: 'Сервис и ремонт', icon: Wrench, roles: ['ADMIN'] },
             { id: 'INVENTORY', label: 'Склад магазина', icon: Package, roles: ['ADMIN'] },

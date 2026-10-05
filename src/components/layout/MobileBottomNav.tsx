@@ -5,6 +5,7 @@ import {
   ShoppingBag,
   History,
   Package,
+  PlusCircle,
   Menu,
   Landmark,
   Truck,
@@ -26,16 +27,24 @@ export const MobileBottomNav: React.FC = () => {
   const isAdmin = userRole === 'ADMIN';
   const isCentralCashMode = isAdmin && (!selectedStoreId || selectedStoreId === 'all');
 
-  const NavItem: React.FC<{ routePath: string; label: string; icon: React.ElementType; onSelect: () => void }> = ({
+  const NavItem: React.FC<{
+    routePath: string;
+    label: string;
+    icon: React.ElementType;
+    title?: string;
+    onSelect: () => void;
+  }> = ({
     routePath,
     label,
     icon: Icon,
+    title,
     onSelect,
   }) => {
     const isActive = location.pathname === routePath;
     return (
       <button
         onClick={onSelect}
+        title={title || label}
         className={`flex-1 pt-2 pb-1 flex flex-col items-center justify-start gap-1 transition-colors ${
           isActive ? 'text-accent' : 'text-fg-subtle active:text-fg'
         }`}
@@ -153,15 +162,28 @@ export const MobileBottomNav: React.FC = () => {
         </button>
       </div>
 
-      <NavItem
-        routePath="/transfer"
-        label="Перемещение"
-        icon={ArrowLeftRight}
-        onSelect={() => {
-          setActivePage('TRANSFER');
-          navigate('/transfer');
-        }}
-      />
+      {isAdmin ? (
+        <NavItem
+          routePath="/purchase"
+          label="Приход"
+          title="Приход товара"
+          icon={PlusCircle}
+          onSelect={() => {
+            setActivePage('PURCHASE');
+            navigate('/purchase');
+          }}
+        />
+      ) : (
+        <NavItem
+          routePath="/transfer"
+          label="Перемещение"
+          icon={ArrowLeftRight}
+          onSelect={() => {
+            setActivePage('TRANSFER');
+            navigate('/transfer');
+          }}
+        />
+      )}
 
       <button
         onClick={() => setDrawerOpen(!drawerOpen)}
