@@ -59,6 +59,9 @@ export class DailyClosingService {
     if (!store) {
       throw Object.assign(new Error('Магазин не найден'), { statusCode: 404 });
     }
+    if (store.isMainWarehouse) {
+      throw Object.assign(new Error('Центральная касса не имеет розничных смен: закрытие смены применимо только к магазинам'), { statusCode: 400 });
+    }
 
     // 1. Check if already closed
     const existing = await prisma.dailyCashClosing.findUnique({
@@ -195,12 +198,27 @@ export class DailyClosingService {
     }
 
     // 3d. Cash collections (инкассация)
+    // Any collections on this businessDate, or collections performed between the previous
+    // closing and this business day, are accounted for so money handed over to Central Cash
+    // is never falsely expected in the retail store's drawer.
+    const collectionsWhere: any = {
+      storeId,
+      cancelledAt: null,
+    };
+    if (prevClosing) {
+      collectionsWhere.OR = [
+        { businessDate },
+        {
+          createdAt: { gt: prevClosing.createdAt },
+          businessDate: { lte: businessDate },
+        },
+      ];
+    } else {
+      collectionsWhere.businessDate = businessDate;
+    }
+
     const collections = await prisma.cashHandover.findMany({
-      where: {
-        storeId,
-        businessDate,
-        cancelledAt: null,
-      },
+      where: collectionsWhere,
       select: {
         id: true,
         amountTjs: true,
@@ -277,6 +295,9 @@ export class DailyClosingService {
       });
       if (!store || !store.active) {
         throw Object.assign(new Error('Магазин не найден или не активен'), { statusCode: 404 });
+      }
+      if (store.isMainWarehouse) {
+        throw Object.assign(new Error('Центральная касса не имеет розничных смен: закрытие смены применимо только к магазинам'), { statusCode: 400 });
       }
 
       // Check if already closed

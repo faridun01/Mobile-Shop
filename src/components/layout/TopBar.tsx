@@ -142,7 +142,7 @@ export const TopBar: React.FC = () => {
               <div className="flex items-center gap-1 sm:gap-1.5">
                 <button
                   type="button"
-                  onClick={() => setDailyClosingModalOpen(true, selectedStoreId)}
+                  onClick={() => setDailyClosingModalOpen(true, selectedStoreId && selectedStoreId !== 'all' ? selectedStoreId : undefined)}
                   className="inline-flex items-center gap-1 px-2 py-1 rounded-xl bg-surface-raised hover:bg-accent hover:text-accent-fg border border-border text-xs font-semibold text-fg transition-all shadow-2xs active:scale-95 cursor-pointer shrink-0"
                   title="Закрыть смену / Z-отчёт"
                 >

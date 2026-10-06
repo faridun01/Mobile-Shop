@@ -23,7 +23,9 @@ import {
   FileText,
   Printer,
   Sparkles,
+  Store as StoreIcon,
 } from 'lucide-react';
+import { formatStoreName } from '../../utils/storeContext';
 
 interface DailyCashClosingModalProps {
   isOpen: boolean;
@@ -44,15 +46,34 @@ export const DailyCashClosingModal: React.FC<DailyCashClosingModalProps> = ({
 }) => {
   const { currentUser, stores, selectedStoreId } = useAppFields('currentUser', 'stores', 'selectedStoreId');
 
+  const retailStores = useMemo(
+    () => stores.filter((s) => !s.isMainWarehouse && s.active),
+    [stores]
+  );
+
+  // Store selector state inside modal
+  const [selectedStoreIdState, setSelectedStoreIdState] = useState<string>('');
+
+  useEffect(() => {
+    if (explicitStoreId) {
+      setSelectedStoreIdState(explicitStoreId);
+    } else if (currentUser?.role === 'SELLER' || currentUser?.role === 'PARTNER') {
+      setSelectedStoreIdState(currentUser.storeId || '');
+    } else if (selectedStoreId && selectedStoreId !== 'all') {
+      setSelectedStoreIdState(selectedStoreId);
+    } else if (retailStores.length > 0) {
+      setSelectedStoreIdState((prev) => (prev && retailStores.some(s => s.id === prev) ? prev : retailStores[0].id));
+    }
+  }, [explicitStoreId, currentUser?.role, currentUser?.storeId, selectedStoreId, retailStores, isOpen]);
+
   // Determine effective store
   const effectiveStoreId = useMemo(() => {
+    if (selectedStoreIdState) return selectedStoreIdState;
     if (explicitStoreId) return explicitStoreId;
-    if (currentUser?.storeId) return currentUser.storeId;
+    if (currentUser?.role === 'SELLER' || currentUser?.role === 'PARTNER') return currentUser.storeId || '';
     if (selectedStoreId && selectedStoreId !== 'all') return selectedStoreId;
-    // Fallback to first non-warehouse store
-    const firstRetail = stores.find((s) => !s.isMainWarehouse);
-    return firstRetail?.id || '';
-  }, [explicitStoreId, currentUser?.storeId, selectedStoreId, stores]);
+    return retailStores[0]?.id || '';
+  }, [selectedStoreIdState, explicitStoreId, currentUser?.role, currentUser?.storeId, selectedStoreId, retailStores]);
 
   const activeStore = useMemo(
     () => stores.find((s) => s.id === effectiveStoreId),
@@ -75,12 +96,13 @@ export const DailyCashClosingModal: React.FC<DailyCashClosingModalProps> = ({
 
   // Fetch summary when modal opens
   const fetchSummary = async () => {
-    if (!effectiveStoreId) return;
+    const targetStoreId = effectiveStoreId || explicitStoreId || selectedStoreIdState;
+    if (!targetStoreId) return;
     setLoading(true);
     setError(null);
     setShowConfirmDiscrepancy(false);
     try {
-      let url = `/daily-closings/summary?storeId=${encodeURIComponent(effectiveStoreId)}`;
+      let url = `/daily-closings/summary?storeId=${encodeURIComponent(targetStoreId)}`;
       if (explicitBusinessDate) {
         url += `&businessDate=${encodeURIComponent(explicitBusinessDate)}`;
       }
@@ -108,7 +130,7 @@ export const DailyCashClosingModal: React.FC<DailyCashClosingModalProps> = ({
   };
 
   useEffect(() => {
-    if (isOpen) {
+    if (isOpen && effectiveStoreId) {
       void fetchSummary();
     }
   }, [isOpen, effectiveStoreId, explicitBusinessDate]);
@@ -156,6 +178,12 @@ export const DailyCashClosingModal: React.FC<DailyCashClosingModalProps> = ({
 
   // Submit closing
   const handleSubmitClosing = async () => {
+    const finalStoreId = summary?.storeId || effectiveStoreId || selectedStoreIdState || explicitStoreId;
+    if (!finalStoreId) {
+      setError('Пожалуйста, выберите магазин для закрытия смены.');
+      return;
+    }
+
     if (parsedActualTjs === null || parsedActualUsd === null) {
       setError('Пожалуйста, укажите фактические суммы в кассе (TJS и USD).');
       return;
@@ -170,7 +198,7 @@ export const DailyCashClosingModal: React.FC<DailyCashClosingModalProps> = ({
     setSubmitting(true);
     try {
       const payload: any = {
-        storeId: effectiveStoreId,
+        storeId: finalStoreId,
         businessDate: explicitBusinessDate || summary?.businessDate,
         actualCashTjs: parsedActualTjs,
         actualCashUsd: parsedActualUsd,
@@ -242,7 +270,7 @@ export const DailyCashClosingModal: React.FC<DailyCashClosingModalProps> = ({
       open={isOpen}
       onClose={onClose}
       title="Закрытие кассовой смены (Z-отчёт)"
-      subtitle={`${effectiveStoreName} · ${summary?.businessDate || 'Сегодня'}`}
+      subtitle={`${effectiveStoreName} · ${summary?.businessDate || explicitBusinessDate || 'Сегодня'}`}
       maxWidth="lg"
       footer={
         <div className="w-full flex items-center justify-between gap-3">
@@ -291,6 +319,35 @@ export const DailyCashClosingModal: React.FC<DailyCashClosingModalProps> = ({
         </div>
       }
     >
+      {/* Admin Store Switcher (if admin has access to multiple retail stores) */}
+      {currentUser?.role === 'ADMIN' && retailStores.length > 1 && !summary?.alreadyClosed && (
+        <div className="flex items-center justify-between gap-3 p-2.5 sm:p-3 bg-surface-raised border border-border rounded-xl mb-4">
+          <div className="flex items-center gap-2 min-w-0">
+            <StoreIcon className="w-4 h-4 text-accent shrink-0" />
+            <span className="text-xs font-semibold text-fg shrink-0">Касса магазина:</span>
+          </div>
+          <select
+            value={effectiveStoreId}
+            onChange={(e) => {
+              setSelectedStoreIdState(e.target.value);
+              setActualCashTjs('');
+              setActualCashUsd('');
+              setComment('');
+              setError(null);
+              setShowConfirmDiscrepancy(false);
+            }}
+            disabled={submitting || loading}
+            className="text-xs font-semibold bg-surface text-fg border border-border rounded-lg px-2.5 py-1.5 focus:outline-hidden focus:ring-2 focus:ring-accent/40 cursor-pointer"
+          >
+            {retailStores.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.name}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
+
       {loading ? (
         <div className="p-8 text-center text-fg-subtle space-y-3">
           <div className="w-8 h-8 mx-auto border-2 border-accent border-t-transparent rounded-full animate-spin" />

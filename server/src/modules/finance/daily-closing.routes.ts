@@ -7,7 +7,9 @@ export function registerDailyClosingRoutes(app: Express) {
   app.get('/api/daily-closings/summary', authenticateJwt, async (req: AuthenticatedRequest, res, next) => {
     try {
       const user = req.user!;
-      let storeId = typeof req.query.storeId === 'string' ? req.query.storeId : undefined;
+      let storeId = typeof req.query.storeId === 'string' && req.query.storeId.trim() !== ''
+        ? req.query.storeId.trim()
+        : undefined;
 
       if (user.role === 'SELLER' || user.role === 'PARTNER') {
         if (!user.storeId) {
@@ -37,7 +39,9 @@ export function registerDailyClosingRoutes(app: Express) {
   app.post('/api/daily-closings', authenticateJwt, async (req: AuthenticatedRequest, res, next) => {
     try {
       const user = req.user!;
-      let storeId = req.body?.storeId;
+      let storeId = typeof req.body?.storeId === 'string' && req.body.storeId.trim() !== ''
+        ? req.body.storeId.trim()
+        : undefined;
 
       if (user.role === 'SELLER' || user.role === 'PARTNER') {
         if (!user.storeId) {
