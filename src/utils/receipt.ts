@@ -28,7 +28,11 @@ export function formatReceiptText(sale: Sale, opts: { showStore?: boolean } = {}
     '',
     `Итого: ${formatMoney(sale.totalTjs)} TJS`,
     `Оплата: ${paymentSummary(sale)}`,
-    ...(sale.customerName ? [`Покупатель: ${sale.customerName}`] : []),
+    ...(sale.customerName
+      ? [`Покупатель: ${sale.customerName}${sale.customerPhone ? ` (${sale.customerPhone})` : ''}`]
+      : sale.customerPhone
+      ? [`Покупатель: ${sale.customerPhone}`]
+      : []),
   ];
   return lines.join('\n');
 }

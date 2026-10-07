@@ -148,44 +148,85 @@ export class SalesService {
       let finalCustomerName = input.customerName?.trim() || null;
       const cleanPhone = input.customerPhone?.trim() || null;
 
-      if (input.paymentMethod === 'DEBT') {
-        if (input.customerId) {
-          const cust = await tx.customer.findUnique({ where: { id: input.customerId } });
-          if (!cust) throw new Error('Выбранный клиент не найден');
+      // 1. If an existing customer ID was explicitly provided (e.g. chosen from autocomplete)
+      if (input.customerId) {
+        const cust = await tx.customer.findUnique({ where: { id: input.customerId } });
+        if (!cust) {
+          if (input.paymentMethod === 'DEBT') throw new Error('Выбранный клиент не найден');
+        } else {
           finalCustomerId = cust.id;
-          finalCustomerName = cust.name;
-        } else if (cleanPhone || finalCustomerName) {
-          if (cleanPhone) {
-            let cust = await tx.customer.findUnique({ where: { phone: cleanPhone } });
-            if (!cust) {
-              cust = await tx.customer.create({
-                data: {
-                  name: finalCustomerName || `Клиент ${cleanPhone}`,
-                  phone: cleanPhone,
-                },
-              });
-            } else if (finalCustomerName && cust.name !== finalCustomerName) {
-              cust = await tx.customer.update({
-                where: { id: cust.id },
-                data: { name: finalCustomerName },
-              });
-            }
-            finalCustomerId = cust.id;
-            finalCustomerName = cust.name;
-          } else if (finalCustomerName) {
-            const cust = await tx.customer.create({
+          if (finalCustomerName && cust.name !== finalCustomerName && cust.name.startsWith('Клиент ')) {
+            const updated = await tx.customer.update({
+              where: { id: cust.id },
+              data: { name: finalCustomerName },
+            });
+            finalCustomerName = updated.name;
+          } else {
+            finalCustomerName = finalCustomerName || cust.name;
+          }
+          if (cleanPhone && !cust.phone) {
+            await tx.customer.update({
+              where: { id: cust.id },
+              data: { phone: cleanPhone },
+            });
+          }
+        }
+      }
+
+      // 2. If no customer was matched yet, but phone or name was provided: find or save into Customer DB
+      if (!finalCustomerId && (cleanPhone || finalCustomerName)) {
+        if (cleanPhone) {
+          const phoneVariants = [
+            cleanPhone,
+            ...(cleanPhone.startsWith('+992') ? [cleanPhone.slice(4), cleanPhone.slice(1)] : []),
+            ...(!cleanPhone.startsWith('+') ? [`+${cleanPhone}`, `+992${cleanPhone}`] : []),
+          ];
+          let cust = await tx.customer.findFirst({
+            where: {
+              phone: { in: phoneVariants },
+            },
+          });
+          if (!cust) {
+            cust = await tx.customer.create({
+              data: {
+                name: finalCustomerName || `Клиент ${cleanPhone}`,
+                phone: cleanPhone,
+              },
+            });
+          } else if (finalCustomerName && cust.name !== finalCustomerName && cust.name.startsWith('Клиент ')) {
+            cust = await tx.customer.update({
+              where: { id: cust.id },
+              data: { name: finalCustomerName },
+            });
+          }
+          finalCustomerId = cust.id;
+          finalCustomerName = finalCustomerName || cust.name;
+        } else if (finalCustomerName) {
+          let cust = await tx.customer.findFirst({
+            where: {
+              name: { equals: finalCustomerName, mode: 'insensitive' },
+              phone: null,
+            },
+          });
+          if (!cust) {
+            cust = await tx.customer.create({
               data: {
                 name: finalCustomerName,
               },
             });
-            finalCustomerId = cust.id;
           }
-        } else {
-          throw new Error('Для продажи в долг обязательно укажите клиента (имя или номер телефона)');
+          finalCustomerId = cust.id;
+          finalCustomerName = cust.name;
         }
+      }
 
+      // 3. For DEBT sales, a customer is mandatory and totalDebtTjs is incremented
+      if (input.paymentMethod === 'DEBT') {
+        if (!finalCustomerId) {
+          throw new Error('Для продажи в долг обязательно укажите клиента (номер телефона или имя)');
+        }
         await tx.customer.update({
-          where: { id: finalCustomerId! },
+          where: { id: finalCustomerId },
           data: { totalDebtTjs: { increment: debtAmountTjs } },
         });
       }

@@ -92,7 +92,7 @@ await withDisposableApi('bonusadmin', async ({ db, env, call, login }) => {
   for (const [body, label] of [[{ amountUsd: 0 }, 'zero'], [{ amountUsd: 900 }, 'more than the balance']] as const) {
     assert.equal((await call('POST', '/bonus-account/transfer', body)).status, 400, label);
   }
-  assert.equal((await call('POST', '/bonus-account/payout', { amountUsd: 10 })).status, 400, 'payout needs a recipient/purpose');
+  assert.equal((await call('POST', '/bonus-account/payout', { amountUsd: 0 })).status, 400, 'payout needs positive amount');
   assert.equal((await call('POST', '/bonus-account/transfer', { amountUsd: 10 }, { token: seller })).status, 403);
   assert.deepEqual(await bonus(), b);
 

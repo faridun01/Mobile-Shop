@@ -62,8 +62,8 @@ export const TopBar: React.FC = () => {
       case 'EXPENSES': return 'Расходы';
       case 'OWNERS': return 'Партнеры и капитал';
       case 'EMPLOYEES': return 'Сотрудники';
-      case 'REPORTS': return 'Финансовые отчёты';
-      case 'FINANCE': return 'Финансы';
+      case 'REPORTS': return 'Отчёты';
+      case 'FINANCE': return 'Отчёты';
       case 'CASH_COLLECTION': return 'Инкассация';
       case 'CASH_DESK': return 'Касса';
       case 'CUSTOMERS': return 'База клиентов';
@@ -96,17 +96,13 @@ export const TopBar: React.FC = () => {
 
       {/* Center/Right: Quick Actions & Profile on Desktop */}
       <div className="flex items-center gap-2 shrink-0">
-        {/* Live Daily Exchange Rate (desktop/tablet) */}
-        {todayRate && (
+        {/* Live Daily Exchange Rate (desktop/tablet) - ADMIN only */}
+        {isAdmin && todayRate && (
           <button
             type="button"
-            onClick={() => {
-              if (isAdmin) setDailyRateModalOpen(true);
-            }}
-            className={`hidden md:inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-surface-raised border border-border text-xs font-semibold text-fg transition-all shadow-2xs select-none ${
-              isAdmin ? 'hover:bg-surface hover:border-accent/40 active:scale-95 cursor-pointer' : 'cursor-default'
-            }`}
-            title={isAdmin ? "Курс валют на сегодня. Нажмите для изменения" : "Курс валют на сегодня"}
+            onClick={() => setDailyRateModalOpen(true)}
+            className="hidden md:inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-surface-raised hover:bg-surface border border-border hover:border-accent/40 text-xs font-semibold text-fg transition-all shadow-2xs select-none active:scale-95 cursor-pointer"
+            title="Курс валют на сегодня. Нажмите для изменения"
           >
             <Coins className="w-3.5 h-3.5 text-accent shrink-0" />
             <span className="text-[10px] uppercase font-bold text-fg-subtle">USD/TJS</span>
@@ -169,8 +165,8 @@ export const TopBar: React.FC = () => {
                       isCentral: true,
                     });
                     setSelectedStoreId('all');
-                    setActivePage('FINANCE');
-                    navigate('/finance');
+                    setActivePage('CASH_DESK');
+                    navigate('/cash');
                   }}
                   className="inline-flex items-center gap-1 px-2 sm:px-2.5 py-1 rounded-xl bg-surface-raised hover:bg-accent hover:text-accent-fg border border-border text-xs font-semibold text-fg transition-all shadow-2xs active:scale-95 cursor-pointer shrink-0"
                   title="Вернуться в Центральную кассу"
@@ -189,8 +185,8 @@ export const TopBar: React.FC = () => {
           <button
             onClick={() => {
               if (activePage === 'NOTIFICATIONS') {
-                setActivePage(isStoreScoped ? 'SALE' : 'FINANCE');
-                navigate(isStoreScoped ? '/sale' : '/finance');
+                setActivePage(isStoreScoped ? 'SALE' : 'REPORTS');
+                navigate(isStoreScoped ? '/sale' : '/reports');
               } else {
                 setActivePage('NOTIFICATIONS');
                 navigate('/notifications');

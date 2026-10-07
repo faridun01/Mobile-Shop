@@ -25,6 +25,7 @@ import {
   Bell,
   LogOut,
   Landmark,
+  TrendingUp,
   Store,
   ChevronDown,
   PanelLeftClose,
@@ -122,7 +123,8 @@ export const Sidebar: React.FC = () => {
         {
           title: 'Управление точкой',
           items: [
-            { id: 'FINANCE', label: 'Касса магазина', icon: Wallet, roles: ['PARTNER'] },
+            { id: 'CASH_DESK', label: 'Касса', icon: Wallet, roles: ['PARTNER'] },
+            { id: 'REPORTS', label: 'Отчёты', icon: TrendingUp, roles: ['PARTNER'] },
             { id: 'CASH_COLLECTION', label: 'Инкассация', icon: HandCoins, roles: ['PARTNER'] },
             { id: 'EXPENSES', label: 'Расходы кассы', icon: Wallet, roles: ['PARTNER'] },
             { id: 'SETTINGS', label: 'Настройки', icon: Settings, roles: ['PARTNER'] },
@@ -138,7 +140,8 @@ export const Sidebar: React.FC = () => {
         {
           title: 'Центральная касса и финансы',
           items: [
-            { id: 'FINANCE', label: 'Финансы и касса', icon: Landmark, roles: ['ADMIN'] },
+            { id: 'CASH_DESK', label: 'Касса', icon: Wallet, roles: ['ADMIN'] },
+            { id: 'REPORTS', label: 'Отчёты', icon: TrendingUp, roles: ['ADMIN'] },
             { id: 'CASH_COLLECTION', label: 'Инкассация', icon: HandCoins, roles: ['ADMIN'] },
             { id: 'CUSTOMERS', label: 'База клиентов', icon: Users, roles: ['ADMIN'] },
             { id: 'SALES_HISTORY', label: 'История продаж', icon: History, roles: ['ADMIN'] },
@@ -191,7 +194,8 @@ export const Sidebar: React.FC = () => {
       {
         title: 'Управление точкой',
         items: [
-          { id: 'FINANCE', label: 'Касса магазина', icon: Wallet, roles: ['ADMIN'] },
+          { id: 'CASH_DESK', label: 'Касса', icon: Wallet, roles: ['ADMIN'] },
+          { id: 'REPORTS', label: 'Отчёты', icon: TrendingUp, roles: ['ADMIN'] },
           { id: 'CASH_COLLECTION', label: 'Инкассация', icon: HandCoins, roles: ['ADMIN'] },
           { id: 'EXPENSES', label: 'Расходы кассы', icon: Wallet, roles: ['ADMIN'] },
           { id: 'SETTINGS', label: 'Настройки', icon: Settings, roles: ['ADMIN'] },

@@ -30,6 +30,8 @@ export interface RegisterBalance {
   bonusCount?: number;
   cashOnlyTjs?: string;
   cardOnlyTjs?: string;
+  lastCollectedAt?: string | null;
+  daysWithoutCollection?: number;
 }
 
 export interface BreakdownItem {
@@ -58,6 +60,44 @@ export interface BreakdownSale {
   status: string;
   itemsCount: number;
   items: BreakdownItem[];
+}
+
+export interface BreakdownExpense {
+  id: string;
+  category: string;
+  description: string;
+  amountTjs: number;
+  amountUsd: number | null;
+  createdAt: string;
+}
+
+export interface BreakdownDailyItem {
+  date: string;
+  dateLabel: string;
+  daysAgo: number;
+  isToday: boolean;
+  salesCount: number;
+  salesTotalTjs: number;
+  salesCashTjs: number;
+  salesCardTjs: number;
+  salesDebtTjs: number;
+  expensesCount: number;
+  expensesTotalTjs: number;
+  netCashTjs: number;
+  hasClosing: boolean;
+  closing?: {
+    id: string;
+    businessDate: string;
+    closedByName: string;
+    createdAt: string;
+    openingCashTjs: number;
+    expectedCashTjs: number;
+    actualCashTjs: number;
+    differenceTjs: number;
+    comment?: string | null;
+  } | null;
+  sales: BreakdownSale[];
+  expenses: BreakdownExpense[];
 }
 
 export interface StoreBreakdown {
@@ -96,10 +136,14 @@ export interface StoreBreakdown {
     salesCashTjs: string;
     salesCardTjs: string;
     salesDebtTjs: string;
+    expensesCount?: number;
+    expensesTotalTjs?: string;
     refundedCount: number;
     refundedTotalTjs: string;
   };
+  days?: BreakdownDailyItem[];
   sales: BreakdownSale[];
+  expenses?: BreakdownExpense[];
 }
 
 interface CashReconciliationModalProps {
@@ -108,6 +152,7 @@ interface CashReconciliationModalProps {
   onClose: () => void;
   onCollect: (store: RegisterBalance) => void;
   busy?: boolean;
+  initialDate?: string | null;
 }
 
 const formatDate = (dateStr: string) => {
@@ -137,18 +182,27 @@ export const CashReconciliationModal: React.FC<CashReconciliationModalProps> = (
   onClose,
   onCollect,
   busy,
+  initialDate,
 }) => {
   const [data, setData] = useState<StoreBreakdown | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
+  const [selectedDate, setSelectedDate] = useState<string>(initialDate || 'ALL');
 
   useEffect(() => {
     if (!open || !store) {
       setData(null);
       setError(null);
       setSearch('');
+      setSelectedDate('ALL');
       return;
+    }
+
+    if (initialDate) {
+      setSelectedDate(initialDate);
+    } else {
+      setSelectedDate('ALL');
     }
 
     let cancelled = false;
@@ -173,10 +227,14 @@ export const CashReconciliationModal: React.FC<CashReconciliationModalProps> = (
 
   const filteredSales = useMemo(() => {
     if (!data?.sales) return [];
+    let list = data.sales;
+    if (selectedDate !== 'ALL') {
+      list = list.filter((s) => s.createdAt.slice(0, 10) === selectedDate);
+    }
     const q = search.trim().toLowerCase();
-    if (!q) return data.sales;
+    if (!q) return list;
 
-    return data.sales.filter((s) => {
+    return list.filter((s) => {
       if (s.receiptNumber.toString().includes(q)) return true;
       if (s.sellerName.toLowerCase().includes(q)) return true;
       if (s.customerName?.toLowerCase().includes(q)) return true;
@@ -184,7 +242,7 @@ export const CashReconciliationModal: React.FC<CashReconciliationModalProps> = (
         (it) => it.brand.toLowerCase().includes(q) || it.model.toLowerCase().includes(q)
       );
     });
-  }, [data?.sales, search]);
+  }, [data?.sales, search, selectedDate]);
 
   if (!open || !store) return null;
 
@@ -348,6 +406,42 @@ export const CashReconciliationModal: React.FC<CashReconciliationModalProps> = (
                   сумме наличных в кассе ({formatTjs(data.summary.cashOnlyTjs)}).
                 </span>
               </div>
+
+              {/* Day filter pills if multi-day */}
+              {data.days && data.days.length > 1 && (
+                <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedDate('ALL')}
+                    className={`h-7 px-2.5 rounded-lg text-xs font-semibold shrink-0 transition-colors cursor-pointer ${
+                      selectedDate === 'ALL'
+                        ? 'bg-accent text-accent-fg shadow-2xs'
+                        : 'bg-surface-raised hover:bg-surface border border-border text-fg-subtle hover:text-fg'
+                    }`}
+                  >
+                    Все дни ({data.sales.length})
+                  </button>
+                  {data.days.map((day) => (
+                    <button
+                      key={day.date}
+                      type="button"
+                      onClick={() => setSelectedDate(day.date)}
+                      className={`h-7 px-2.5 rounded-lg text-xs font-semibold shrink-0 transition-colors cursor-pointer flex items-center gap-1.5 ${
+                        selectedDate === day.date
+                          ? 'bg-accent text-accent-fg shadow-2xs'
+                          : 'bg-surface-raised hover:bg-surface border border-border text-fg-subtle hover:text-fg'
+                      }`}
+                    >
+                      <span>{day.dateLabel}</span>
+                      <span className={`text-[10px] px-1 py-0.2 rounded ${
+                        selectedDate === day.date ? 'bg-accent-fg/20 text-accent-fg' : 'bg-surface text-fg-subtle'
+                      }`}>
+                        {day.salesCount} ч.
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              )}
 
               {/* Sales List Header & Search */}
               <div className="flex items-center justify-between gap-2 flex-wrap pt-1">

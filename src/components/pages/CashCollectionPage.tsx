@@ -1,22 +1,33 @@
 import React, { useState } from 'react';
-import { HandCoins, RefreshCw, Calendar, Store as StoreIcon } from 'lucide-react';
+import { HandCoins, Store as StoreIcon } from 'lucide-react';
 import { useAppFields } from '../../context/AppContext';
 import { CashCollectionPanel } from '../finance/CashCollectionPanel';
-import { Button } from '../ui/Button';
+import { DateRangePicker } from '../ui/DateRangePicker';
+import { getBusinessDateKey, currentBusinessMonth } from '../../utils/businessDate';
 
 export const CashCollectionPage: React.FC = () => {
   const { stores } = useAppFields('stores');
-  const now = new Date();
-  const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-  const [selectedMonth, setSelectedMonth] = useState(currentMonth);
-  const [selectedStoreId, setSelectedStoreId] = useState<string>('all');
-  const [refreshKey, setRefreshKey] = useState(0);
+  const todayKey = getBusinessDateKey();
+  const currentMonth = todayKey.substring(0, 7);
 
-  const handleRefresh = () => {
-    window.dispatchEvent(new CustomEvent('business-data-changed'));
-    setRefreshKey((k) => k + 1);
+  const [selectedMonth, setSelectedMonth] = useState<string>(currentMonth);
+  const [startDate, setStartDate] = useState<string>('');
+  const [endDate, setEndDate] = useState<string>('');
+  const [selectedStoreId, setSelectedStoreId] = useState<string>('all');
+
+  const handleDateChange = (start: string, end: string, monthStr?: string) => {
+    setStartDate(start);
+    setEndDate(end);
+    setSelectedMonth(monthStr || '');
   };
 
+  const handleResetToCurrentMonth = () => {
+    setSelectedMonth(currentMonth);
+    setStartDate('');
+    setEndDate('');
+  };
+
+  const isTodaySelected = Boolean(startDate && (!endDate || startDate === endDate) && startDate === todayKey);
   const selectableStores = stores.filter((s) => !s.isMainWarehouse);
 
   return (
@@ -31,6 +42,9 @@ export const CashCollectionPage: React.FC = () => {
             <h1 className="text-base sm:text-lg font-bold text-fg leading-tight">
               Инкассация
             </h1>
+            <p className="text-[11px] text-fg-subtle">
+              Сдача наличных касс магазинов в центральную кассу и на бонусный счёт
+            </p>
           </div>
         </div>
 
@@ -53,41 +67,30 @@ export const CashCollectionPage: React.FC = () => {
             </select>
           </div>
 
-          {/* Month Picker */}
-          <div className="flex items-center gap-1.5 bg-surface-raised border border-border rounded-xl px-2.5 h-9">
-            <Calendar className="w-3.5 h-3.5 text-fg-subtle" />
-            <input
-              type="month"
-              value={selectedMonth}
-              onChange={(e) => setSelectedMonth(e.target.value)}
-              className="bg-transparent text-xs font-semibold text-fg focus:outline-none cursor-pointer"
-            />
-          </div>
-
-          {/* Refresh Button */}
-          <Button
-            variant="secondary"
-            size="sm"
-            leftIcon={RefreshCw}
-            onClick={handleRefresh}
-            className="h-9 px-3"
-            title="Обновить"
-          >
-            <span className="hidden sm:inline">Обновить</span>
-          </Button>
+          {/* Date Range Picker (Range, Month, Day) */}
+          <DateRangePicker
+            startDate={startDate}
+            endDate={endDate}
+            selectedMonth={selectedMonth || undefined}
+            currentMonthStr={currentBusinessMonth()}
+            isToday={isTodaySelected}
+            onChange={handleDateChange}
+            onResetMonth={handleResetToCurrentMonth}
+            className="shrink-0"
+          />
         </div>
       </div>
 
       {/* Main Content Area */}
-      <div key={refreshKey} className="flex-1 min-h-0 overflow-y-auto p-3 sm:p-5">
-        <div className="max-w-7xl mx-auto">
-          <div className="bg-surface rounded-2xl border border-border shadow-xs p-4 sm:p-5">
-            <CashCollectionPanel
-              month={selectedMonth}
-              storeId={selectedStoreId === 'all' ? null : selectedStoreId}
-              onSelectStoreId={(id) => setSelectedStoreId(id || 'all')}
-            />
-          </div>
+      <div className="flex-1 min-h-0 overflow-y-auto p-3 sm:p-5">
+        <div className="max-w-4xl mx-auto">
+          <CashCollectionPanel
+            month={selectedMonth}
+            startDate={startDate}
+            endDate={endDate}
+            storeId={selectedStoreId === 'all' ? null : selectedStoreId}
+            onSelectStoreId={(id) => setSelectedStoreId(id || 'all')}
+          />
         </div>
       </div>
     </div>

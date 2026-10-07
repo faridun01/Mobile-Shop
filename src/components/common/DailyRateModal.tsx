@@ -14,11 +14,13 @@ interface DailyRateModalProps {
 
 export const DailyRateModal: React.FC<DailyRateModalProps> = ({ isOpen, onClose }) => {
   const { todayRate, setDailyRate, currentUser } = useAppFields('todayRate', 'setDailyRate', 'currentUser');
+  const isAdmin = currentUser?.role === 'ADMIN';
+
+  if (!isAdmin) return null;
+
+  const canSetRate = true;
   const hasRate = !!(todayRate && Number(todayRate.rate) > 0);
-  // Only ADMIN/PARTNER can actually set the rate (server-enforced) — a SELLER can't act
-  // on this, so blocking them behind a non-dismissable modal would be a dead end.
-  const canSetRate = currentUser?.role === 'ADMIN' || currentUser?.role === 'PARTNER';
-  const isMandatory = !hasCurrentDailyRate(todayRate) && canSetRate;
+  const isMandatory = !hasCurrentDailyRate(todayRate);
 
   const [rateInput, setRateInput] = useState<string>('');
   const [error, setError] = useState<string | null>(null);

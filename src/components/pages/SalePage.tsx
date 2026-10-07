@@ -21,6 +21,8 @@ import {
   UserCheck,
   User,
   Share2,
+  Phone,
+  X,
 } from 'lucide-react';
 import { apiClient } from '../../api/client';
 import { SearchBar } from '../ui/SearchBar';
@@ -42,6 +44,329 @@ interface CartItem {
   device: Device;
   salePriceTjs?: number;
 }
+
+interface CustomerPaymentControlsProps {
+  paymentMethod: PaymentMethod;
+  setPaymentMethod: (pm: PaymentMethod) => void;
+  totalTjs: number;
+  cashAmountInput: string;
+  setCashAmountInput: (val: string) => void;
+  cardAmountInput: string;
+  setCardAmountInput: (val: string) => void;
+  customerNameInput: string;
+  setCustomerNameInput: (val: string) => void;
+  customerPhoneInput: string;
+  setCustomerPhoneInput: (val: string) => void;
+  selectedCustomerId: string | null;
+  setSelectedCustomerId: (id: string | null) => void;
+  customerSuggestions: Array<{ id: string; name: string; phone?: string; totalDebtTjs: number }>;
+  setCustomerSuggestions: (items: Array<{ id: string; name: string; phone?: string; totalDebtTjs: number }>) => void;
+  downpaymentInput: string;
+  setDownpaymentInput: (val: string) => void;
+  downpaymentMethod: 'CASH' | 'CARD';
+  setDownpaymentMethod: (m: 'CASH' | 'CARD') => void;
+}
+
+const CustomerPaymentControls: React.FC<CustomerPaymentControlsProps> = ({
+  paymentMethod,
+  setPaymentMethod,
+  totalTjs,
+  cashAmountInput,
+  setCashAmountInput,
+  cardAmountInput,
+  setCardAmountInput,
+  customerNameInput,
+  setCustomerNameInput,
+  customerPhoneInput,
+  setCustomerPhoneInput,
+  selectedCustomerId,
+  setSelectedCustomerId,
+  customerSuggestions,
+  setCustomerSuggestions,
+  downpaymentInput,
+  setDownpaymentInput,
+  downpaymentMethod,
+  setDownpaymentMethod,
+}) => {
+  const isDebt = paymentMethod === 'DEBT';
+  const remainingDebt = Math.max(0, totalTjs - (parseFloat(downpaymentInput) || 0));
+
+  return (
+    <div className="space-y-2.5">
+      {/* Payment Method Selector */}
+      <div className="grid grid-cols-4 gap-1">
+        {([
+          { id: 'CASH' as const, label: 'Нал.', icon: Banknote },
+          { id: 'CARD' as const, label: 'Карта', icon: CreditCard },
+          { id: 'SPLIT' as const, label: 'Смеш.', icon: Split },
+          { id: 'DEBT' as const, label: 'В долг', icon: Clock },
+        ]).map(({ id, label, icon: Icon }) => (
+          <button
+            key={id}
+            type="button"
+            onClick={() => {
+              setPaymentMethod(id);
+              if (id === 'CASH') {
+                setCashAmountInput(totalTjs.toString());
+                setCardAmountInput('0');
+              } else if (id === 'CARD') {
+                setCardAmountInput(totalTjs.toString());
+                setCashAmountInput('0');
+              } else if (id === 'SPLIT') {
+                const half = Math.floor(totalTjs / 2);
+                setCashAmountInput(half.toString());
+                setCardAmountInput(moneyNumber(decimal(totalTjs).minus(half)).toString());
+              } else if (id === 'DEBT') {
+                setDownpaymentInput('0');
+              }
+            }}
+            className={`h-9 rounded-lg border text-xs font-semibold flex items-center justify-center gap-1 transition-colors cursor-pointer select-none ${
+              paymentMethod === id
+                ? id === 'DEBT'
+                  ? 'border-warning bg-warning/15 text-warning font-bold shadow-sm'
+                  : 'border-accent bg-accent/15 text-accent font-bold shadow-sm'
+                : 'border-border bg-surface text-fg-muted hover:text-fg hover:bg-surface-raised'
+            }`}
+          >
+            <Icon className="w-3.5 h-3.5 shrink-0" />
+            <span className="text-[11px] truncate">{label}</span>
+          </button>
+        ))}
+      </div>
+
+      {/* Customer details block */}
+      <div
+        className={`p-2.5 rounded-xl border space-y-2 relative transition-all ${
+          isDebt
+            ? 'bg-warning/10 border-warning/35'
+            : 'bg-surface-raised/70 border-border'
+        }`}
+      >
+        <div className="flex items-center justify-between text-[11px]">
+          {isDebt ? (
+            <span className="flex items-center gap-1 font-bold text-warning">
+              <Clock className="w-3.5 h-3.5 shrink-0" /> Продажа в долг
+            </span>
+          ) : (
+            <span className="flex items-center gap-1.5 font-medium text-fg">
+              <User className="w-3.5 h-3.5 text-accent shrink-0" />
+              <span>Покупатель</span>
+              <span className="text-[10px] text-fg-subtle font-normal">(не обязательно)</span>
+            </span>
+          )}
+
+          {selectedCustomerId ? (
+            <div className="flex items-center gap-1 bg-accent/15 border border-accent/30 text-accent px-1.5 py-0.5 rounded text-[10px] font-medium">
+              <UserCheck className="w-3 h-3 shrink-0" />
+              <span className="truncate max-w-[120px]">В базе</span>
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedCustomerId(null);
+                  setCustomerNameInput('');
+                  setCustomerPhoneInput('');
+                }}
+                className="text-fg-subtle hover:text-danger ml-0.5 p-0.5 cursor-pointer"
+                title="Очистить клиента"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            </div>
+          ) : null}
+        </div>
+
+        <div className="grid grid-cols-2 gap-1.5 relative">
+          {/* Phone Field */}
+          <div>
+            <label className="text-[10px] text-fg-subtle block mb-0.5">
+              Телефон {isDebt && <span className="text-warning font-bold">*</span>}
+            </label>
+            <div className="relative">
+              <Phone className="w-3 h-3 absolute left-2 top-2.5 text-fg-subtle pointer-events-none" />
+              <input
+                type="tel"
+                value={customerPhoneInput}
+                onChange={(e) => {
+                  setCustomerPhoneInput(e.target.value);
+                  setSelectedCustomerId(null);
+                }}
+                placeholder="+992..."
+                className={`w-full h-7 rounded-md bg-surface border pl-6 pr-2 text-xs font-mono text-fg focus:outline-none ${
+                  isDebt
+                    ? 'border-warning/50 focus:border-warning focus:ring-1 focus:ring-warning/30'
+                    : 'border-border focus:border-accent focus:ring-1 focus:ring-accent/30'
+                }`}
+              />
+            </div>
+          </div>
+
+          {/* Name Field */}
+          <div>
+            <label className="text-[10px] text-fg-subtle block mb-0.5">
+              Имя {isDebt && !customerPhoneInput.trim() && <span className="text-warning font-bold">*</span>}
+            </label>
+            <input
+              type="text"
+              value={customerNameInput}
+              onChange={(e) => {
+                setCustomerNameInput(e.target.value);
+                setSelectedCustomerId(null);
+              }}
+              placeholder="Имя Фамилия"
+              className={`w-full h-7 rounded-md bg-surface border px-2 text-xs text-fg focus:outline-none ${
+                isDebt
+                  ? 'border-warning/50 focus:border-warning focus:ring-1 focus:ring-warning/30'
+                  : 'border-border focus:border-accent focus:ring-1 focus:ring-accent/30'
+              }`}
+            />
+          </div>
+
+          {/* Autocomplete Dropdown */}
+          {customerSuggestions.length > 0 && (
+            <div className="absolute top-full left-0 right-0 z-40 mt-1 bg-surface border border-border rounded-lg shadow-xl overflow-hidden divide-y divide-border max-h-52 overflow-y-auto">
+              {customerSuggestions.map((c) => (
+                <button
+                  key={c.id}
+                  type="button"
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    setCustomerNameInput(c.name);
+                    setCustomerPhoneInput(c.phone || '');
+                    setSelectedCustomerId(c.id);
+                    setCustomerSuggestions([]);
+                  }}
+                  className="w-full text-left p-2 hover:bg-surface-raised flex items-center justify-between text-xs cursor-pointer transition-colors"
+                >
+                  <div className="min-w-0 pr-2">
+                    <span className="font-semibold text-fg block truncate">{c.name}</span>
+                    {c.phone && <span className="text-fg-subtle text-[10px] font-mono block truncate">{c.phone}</span>}
+                  </div>
+                  {c.totalDebtTjs > 0 && (
+                    <span className="text-[10px] font-bold text-danger shrink-0">
+                      Долг: {formatMoney(c.totalDebtTjs)} TJS
+                    </span>
+                  )}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Micro-caption when typing phone or name */}
+        {!selectedCustomerId && (customerPhoneInput.trim() || customerNameInput.trim()) ? (
+          <p className="text-[10px] text-accent/90 flex items-center gap-1">
+            <CheckCircle2 className="w-3 h-3 shrink-0" />
+            <span>Новый клиент сохранится в базу при продаже</span>
+          </p>
+        ) : null}
+
+        {/* Downpayment if DEBT */}
+        {isDebt && (
+          <div className="pt-2 border-t border-warning/25 space-y-2">
+            <div className="grid grid-cols-2 gap-1.5">
+              <div>
+                <span className="text-[10px] text-fg-subtle block mb-0.5">Первый взнос (TJS):</span>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  max={totalTjs}
+                  value={downpaymentInput}
+                  onChange={(e) => setDownpaymentInput(e.target.value)}
+                  className="w-full h-7 rounded-md bg-surface border border-warning/50 px-2 text-xs font-mono font-semibold text-fg focus:outline-none focus:border-warning"
+                />
+              </div>
+              <div>
+                <span className="text-[10px] text-fg-subtle block mb-0.5">Способ взноса:</span>
+                <div className="grid grid-cols-2 gap-1 h-7">
+                  <button
+                    type="button"
+                    onClick={() => setDownpaymentMethod('CASH')}
+                    className={`rounded-md text-[10px] font-semibold border flex items-center justify-center cursor-pointer transition-colors ${
+                      downpaymentMethod === 'CASH'
+                        ? 'bg-accent/15 border-accent text-accent font-bold'
+                        : 'bg-surface border-border text-fg-muted hover:text-fg'
+                    }`}
+                  >
+                    Нал
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setDownpaymentMethod('CARD')}
+                    className={`rounded-md text-[10px] font-semibold border flex items-center justify-center cursor-pointer transition-colors ${
+                      downpaymentMethod === 'CARD'
+                        ? 'bg-accent/15 border-accent text-accent font-bold'
+                        : 'bg-surface border-border text-fg-muted hover:text-fg'
+                    }`}
+                  >
+                    Карта
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between text-xs pt-1 border-t border-warning/20 font-bold">
+              <span className="text-fg-subtle text-[11px]">Останется в долг:</span>
+              <span className="text-warning text-sm font-mono">{formatMoney(remainingDebt)} TJS</span>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Split payment inputs */}
+      {paymentMethod === 'SPLIT' && (
+        <div className="grid grid-cols-2 gap-1.5 p-2 rounded-lg bg-surface-raised/40 border border-border">
+          <div>
+            <span className="text-[10px] text-fg-subtle block mb-0.5">Наличные:</span>
+            <input
+              type="number"
+              step="0.01"
+              min="0"
+              max={totalTjs}
+              value={cashAmountInput}
+              onChange={(e) => {
+                const valStr = e.target.value;
+                const raw = parseFloat(valStr);
+                if (!isNaN(raw)) {
+                  const clamped = Math.min(totalTjs, Math.max(0, raw));
+                  setCashAmountInput(raw > totalTjs ? totalTjs.toString() : valStr);
+                  setCardAmountInput(Number(Math.max(0, totalTjs - clamped).toFixed(2)).toString());
+                } else {
+                  setCashAmountInput(valStr);
+                  setCardAmountInput(totalTjs.toString());
+                }
+              }}
+              className="w-full h-7 rounded-md bg-surface border border-border px-2 text-xs font-mono font-semibold text-fg focus:outline-none focus:border-accent"
+            />
+          </div>
+          <div>
+            <span className="text-[10px] text-fg-subtle block mb-0.5">Карта:</span>
+            <input
+              type="number"
+              step="0.01"
+              min="0"
+              max={totalTjs}
+              value={cardAmountInput}
+              onChange={(e) => {
+                const valStr = e.target.value;
+                const raw = parseFloat(valStr);
+                if (!isNaN(raw)) {
+                  const clamped = Math.min(totalTjs, Math.max(0, raw));
+                  setCardAmountInput(raw > totalTjs ? totalTjs.toString() : valStr);
+                  setCashAmountInput(Number(Math.max(0, totalTjs - clamped).toFixed(2)).toString());
+                } else {
+                  setCardAmountInput(valStr);
+                  setCashAmountInput(totalTjs.toString());
+                }
+              }}
+              className="w-full h-7 rounded-md bg-surface border border-border px-2 text-xs font-mono font-semibold text-fg focus:outline-none focus:border-accent"
+            />
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
 
 export const SalePage: React.FC = () => {
   const { setStoreSwitchModalOpen, setDailyClosingModalOpen } = useUIStore();
@@ -85,11 +410,11 @@ export const SalePage: React.FC = () => {
   const [isSubmittingSale, setIsSubmittingSale] = useState(false);
 
   React.useEffect(() => {
-    if (paymentMethod !== 'DEBT') {
+    if (selectedCustomerId) {
       setCustomerSuggestions([]);
       return;
     }
-    const q = (customerNameInput.trim() || customerPhoneInput.trim());
+    const q = (customerPhoneInput.trim() || customerNameInput.trim());
     if (q.length < 2) {
       setCustomerSuggestions([]);
       return;
@@ -103,7 +428,7 @@ export const SalePage: React.FC = () => {
         if (!cancelled) setCustomerSuggestions([]);
       });
     return () => { cancelled = true; };
-  }, [customerNameInput, customerPhoneInput, paymentMethod]);
+  }, [customerNameInput, customerPhoneInput, selectedCustomerId]);
 
   const isRealAdmin = currentUser?.role === 'ADMIN';
   const isSeller = currentUser?.role === 'SELLER';
@@ -284,6 +609,9 @@ export const SalePage: React.FC = () => {
     setCashAmountInput(totalTjs > 0 ? totalTjs.toString() : '');
     setCardAmountInput('0');
     setCustomerNameInput('');
+    setCustomerPhoneInput('');
+    setSelectedCustomerId(null);
+    setCustomerSuggestions([]);
     setPaymentStatus(null);
     setIsCartOpen(true);
   };
@@ -718,226 +1046,27 @@ export const SalePage: React.FC = () => {
 
               {/* Bottom Checkout Controls */}
               <div className="p-3 border-t border-border bg-surface-raised/40 space-y-2.5 shrink-0">
-                {/* Payment Method Selector (4 methods) */}
-                <div className="grid grid-cols-4 gap-1">
-                  {([
-                    { id: 'CASH' as const, label: 'Нал.', icon: Banknote },
-                    { id: 'CARD' as const, label: 'Карта', icon: CreditCard },
-                    { id: 'SPLIT' as const, label: 'Смеш.', icon: Split },
-                    { id: 'DEBT' as const, label: 'В долг', icon: Clock },
-                  ]).map(({ id, label, icon: Icon }) => (
-                    <button
-                      key={id}
-                      type="button"
-                      onClick={() => {
-                        setPaymentMethod(id);
-                        if (id === 'CASH') { setCashAmountInput(totalTjs.toString()); setCardAmountInput('0'); }
-                        else if (id === 'CARD') { setCardAmountInput(totalTjs.toString()); setCashAmountInput('0'); }
-                        else if (id === 'SPLIT') { const half = Math.floor(totalTjs / 2); setCashAmountInput(half.toString()); setCardAmountInput(moneyNumber(decimal(totalTjs).minus(half)).toString()); }
-                        else if (id === 'DEBT') { setDownpaymentInput('0'); }
-                      }}
-                      className={`h-9 rounded-lg border text-xs font-semibold flex items-center justify-center gap-1 transition-colors cursor-pointer select-none ${
-                        paymentMethod === id
-                          ? id === 'DEBT'
-                            ? 'border-warning bg-warning/15 text-warning font-bold'
-                            : 'border-accent bg-accent/15 text-accent font-bold'
-                          : 'border-border bg-surface text-fg-muted hover:text-fg'
-                      }`}
-                    >
-                      <Icon className="w-3.5 h-3.5 shrink-0" />
-                      <span className="text-[11px] truncate">{label}</span>
-                    </button>
-                  ))}
-                </div>
-
-                {/* Normal customer input (when not DEBT) */}
-                {paymentMethod !== 'DEBT' && (
-                  <div>
-                    <input
-                      type="text"
-                      value={customerNameInput}
-                      onChange={(e) => setCustomerNameInput(e.target.value)}
-                      placeholder="Покупатель / номер телефона (опционально)"
-                      className="w-full h-8 rounded-lg bg-surface border border-border px-2.5 text-xs text-fg placeholder:text-fg-subtle focus:outline-none focus:border-accent"
-                    />
-                  </div>
-                )}
-
-                {/* Dedicated Customer & Debt fields (when DEBT) */}
-                {paymentMethod === 'DEBT' && (
-                  <div className="p-2.5 rounded-xl bg-warning/10 border border-warning/30 space-y-2 relative">
-                    <div className="flex items-center justify-between text-[11px] font-bold text-warning">
-                      <span className="flex items-center gap-1">
-                        <Clock className="w-3.5 h-3.5" /> Продажа в долг
-                      </span>
-                      {selectedCustomerId && (
-                        <span className="text-[10px] text-accent font-medium flex items-center gap-1">
-                          <UserCheck className="w-3 h-3" /> Клиент выбран
-                        </span>
-                      )}
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-1.5 relative">
-                      <div>
-                        <span className="text-[10px] text-fg-subtle block mb-0.5">Имя клиента *</span>
-                        <input
-                          type="text"
-                          value={customerNameInput}
-                          onChange={(e) => {
-                            setCustomerNameInput(e.target.value);
-                            setSelectedCustomerId(null);
-                          }}
-                          placeholder="Имя Фамилия"
-                          className="w-full h-7 rounded-md bg-surface border border-border px-2 text-xs text-fg focus:outline-none focus:border-warning"
-                        />
-                      </div>
-                      <div>
-                        <span className="text-[10px] text-fg-subtle block mb-0.5">Телефон *</span>
-                        <input
-                          type="text"
-                          value={customerPhoneInput}
-                          onChange={(e) => {
-                            setCustomerPhoneInput(e.target.value);
-                            setSelectedCustomerId(null);
-                          }}
-                          placeholder="+992..."
-                          className="w-full h-7 rounded-md bg-surface border border-border px-2 text-xs text-fg focus:outline-none focus:border-warning"
-                        />
-                      </div>
-
-                      {/* Autocomplete suggestions dropdown */}
-                      {customerSuggestions.length > 0 && (
-                        <div className="absolute top-full left-0 right-0 z-30 mt-1 bg-surface border border-border rounded-lg shadow-lg overflow-hidden divide-y divide-border">
-                          {customerSuggestions.map((c) => (
-                            <button
-                              key={c.id}
-                              type="button"
-                              onClick={() => {
-                                setCustomerNameInput(c.name);
-                                setCustomerPhoneInput(c.phone || '');
-                                setSelectedCustomerId(c.id);
-                                setCustomerSuggestions([]);
-                              }}
-                              className="w-full text-left p-2 hover:bg-surface-raised flex items-center justify-between text-xs cursor-pointer"
-                            >
-                              <div>
-                                <span className="font-semibold text-fg">{c.name}</span>
-                                {c.phone && <span className="text-fg-subtle text-[10px] block">{c.phone}</span>}
-                              </div>
-                              {c.totalDebtTjs > 0 && (
-                                <span className="text-[10px] font-bold text-danger">
-                                  Долг: {formatMoney(c.totalDebtTjs)} TJS
-                                </span>
-                              )}
-                            </button>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Downpayment (First installment) */}
-                    <div className="grid grid-cols-2 gap-1.5 pt-1 border-t border-warning/20">
-                      <div>
-                        <span className="text-[10px] text-fg-subtle block mb-0.5">Первый взнос (TJS):</span>
-                        <input
-                          type="number"
-                          step="0.01"
-                          min="0"
-                          max={totalTjs}
-                          value={downpaymentInput}
-                          onChange={(e) => setDownpaymentInput(e.target.value)}
-                          className="w-full h-7 rounded-md bg-surface border border-border px-2 text-xs font-mono font-semibold text-fg focus:outline-none focus:border-warning"
-                        />
-                      </div>
-                      <div>
-                        <span className="text-[10px] text-fg-subtle block mb-0.5">Способ взноса:</span>
-                        <div className="grid grid-cols-2 gap-1 h-7">
-                          <button
-                            type="button"
-                            onClick={() => setDownpaymentMethod('CASH')}
-                            className={`rounded-md text-[10px] font-semibold border flex items-center justify-center cursor-pointer ${
-                              downpaymentMethod === 'CASH'
-                                ? 'bg-accent/15 border-accent text-accent'
-                                : 'bg-surface border-border text-fg-muted'
-                            }`}
-                          >
-                            Нал
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setDownpaymentMethod('CARD')}
-                            className={`rounded-md text-[10px] font-semibold border flex items-center justify-center cursor-pointer ${
-                              downpaymentMethod === 'CARD'
-                                ? 'bg-accent/15 border-accent text-accent'
-                                : 'bg-surface border-border text-fg-muted'
-                            }`}
-                          >
-                            Карта
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center justify-between text-xs pt-1 border-t border-warning/20 font-bold">
-                      <span className="text-fg-subtle text-[11px]">Останется в долг:</span>
-                      <span className="text-warning text-sm font-mono">
-                        {formatMoney(Math.max(0, totalTjs - (parseFloat(downpaymentInput) || 0)))} TJS
-                      </span>
-                    </div>
-                  </div>
-                )}
-
-                {/* Split Details if active */}
-                {paymentMethod === 'SPLIT' && (
-                  <div className="grid grid-cols-2 gap-1.5">
-                    <div>
-                      <span className="text-[10px] text-fg-subtle block mb-0.5">Наличные:</span>
-                      <input
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        max={totalTjs}
-                        value={cashAmountInput}
-                        onChange={(e) => {
-                          const valStr = e.target.value;
-                          const raw = parseFloat(valStr);
-                          if (!isNaN(raw)) {
-                            const clamped = Math.min(totalTjs, Math.max(0, raw));
-                            setCashAmountInput(raw > totalTjs ? totalTjs.toString() : valStr);
-                            setCardAmountInput(Number(Math.max(0, totalTjs - clamped).toFixed(2)).toString());
-                          } else {
-                            setCashAmountInput(valStr);
-                            setCardAmountInput(totalTjs.toString());
-                          }
-                        }}
-                        className="w-full h-7 rounded-md bg-surface border border-border px-2 text-xs font-mono font-semibold text-fg focus:outline-none focus:border-accent"
-                      />
-                    </div>
-                    <div>
-                      <span className="text-[10px] text-fg-subtle block mb-0.5">Карта:</span>
-                      <input
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        max={totalTjs}
-                        value={cardAmountInput}
-                        onChange={(e) => {
-                          const valStr = e.target.value;
-                          const raw = parseFloat(valStr);
-                          if (!isNaN(raw)) {
-                            const clamped = Math.min(totalTjs, Math.max(0, raw));
-                            setCardAmountInput(raw > totalTjs ? totalTjs.toString() : valStr);
-                            setCashAmountInput(Number(Math.max(0, totalTjs - clamped).toFixed(2)).toString());
-                          } else {
-                            setCardAmountInput(valStr);
-                            setCashAmountInput(totalTjs.toString());
-                          }
-                        }}
-                        className="w-full h-7 rounded-md bg-surface border border-border px-2 text-xs font-mono font-semibold text-fg focus:outline-none focus:border-accent"
-                      />
-                    </div>
-                  </div>
-                )}
+                <CustomerPaymentControls
+                  paymentMethod={paymentMethod}
+                  setPaymentMethod={setPaymentMethod}
+                  totalTjs={totalTjs}
+                  cashAmountInput={cashAmountInput}
+                  setCashAmountInput={setCashAmountInput}
+                  cardAmountInput={cardAmountInput}
+                  setCardAmountInput={setCardAmountInput}
+                  customerNameInput={customerNameInput}
+                  setCustomerNameInput={setCustomerNameInput}
+                  customerPhoneInput={customerPhoneInput}
+                  setCustomerPhoneInput={setCustomerPhoneInput}
+                  selectedCustomerId={selectedCustomerId}
+                  setSelectedCustomerId={setSelectedCustomerId}
+                  customerSuggestions={customerSuggestions}
+                  setCustomerSuggestions={setCustomerSuggestions}
+                  downpaymentInput={downpaymentInput}
+                  setDownpaymentInput={setDownpaymentInput}
+                  downpaymentMethod={downpaymentMethod}
+                  setDownpaymentMethod={setDownpaymentMethod}
+                />
 
                 {/* Summary & Pay Action */}
                 <div className="pt-2 border-t border-border flex items-center justify-between">
@@ -1017,13 +1146,21 @@ export const SalePage: React.FC = () => {
             <Button
               size="lg"
               fullWidth
-              leftIcon={CheckCircle2}
+              leftIcon={paymentMethod === 'DEBT' ? Clock : CheckCircle2}
               loading={isSubmittingSale}
               disabled={hasEmptyPrice || totalTjs <= 0 || isSubmittingSale}
               onClick={handleFinishPayment}
-              className="h-12 text-sm font-bold flex items-center justify-center"
+              className={`h-12 text-sm font-bold flex items-center justify-center ${
+                paymentMethod === 'DEBT' ? '!bg-amber-600 hover:!bg-amber-700 text-white' : ''
+              }`}
             >
-              {isSubmittingSale ? 'Оформление…' : hasEmptyPrice ? 'Укажите цену' : 'Оплата'}
+              {isSubmittingSale
+                ? 'Оформление…'
+                : hasEmptyPrice
+                  ? 'Укажите цену'
+                  : paymentMethod === 'DEBT'
+                    ? `Оформить в долг (${formatMoney(Math.max(0, totalTjs - (parseFloat(downpaymentInput) || 0)))} TJS)`
+                    : `Оплатить ${formatMoney(totalTjs)} TJS`}
             </Button>
           </div>
         }
@@ -1090,91 +1227,28 @@ export const SalePage: React.FC = () => {
           })}
         </div>
 
-        <div className="space-y-3">
-          <div>
-            <label className="block text-xs font-medium text-fg-muted mb-1">Покупатель / телефон (опционально)</label>
-            <input
-              type="text"
-              value={customerNameInput}
-              onChange={(e) => setCustomerNameInput(e.target.value)}
-              placeholder="Имя или номер телефона"
-              className="w-full h-11 rounded-lg bg-bg border border-border px-3 text-sm text-fg-muted focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent"
-            />
-          </div>
-
-          <div className="grid grid-cols-3 gap-2">
-            {([
-              { id: 'CASH' as const, label: 'Наличные', icon: Banknote },
-              { id: 'CARD' as const, label: 'Карта', icon: CreditCard },
-              { id: 'SPLIT' as const, label: 'Разделить', icon: Split },
-            ]).map(({ id, label, icon: Icon }) => (
-              <button
-                key={id}
-                type="button"
-                onClick={() => {
-                  setPaymentMethod(id);
-                  if (id === 'CASH') { setCashAmountInput(totalTjs.toString()); setCardAmountInput('0'); }
-                  else if (id === 'CARD') { setCardAmountInput(totalTjs.toString()); setCashAmountInput('0'); }
-                  else { const half = Math.floor(totalTjs / 2); setCashAmountInput(half.toString()); setCardAmountInput(moneyNumber(decimal(totalTjs).minus(half)).toString()); }
-                }}
-                className={`h-16 rounded-lg border flex flex-col items-center justify-center gap-1 transition-colors ${
-                  paymentMethod === id ? 'border-accent bg-accent/10 text-accent' : 'border-border text-fg-muted'
-                }`}
-              >
-                <Icon className="w-4 h-4" />
-                <span className="text-xs font-semibold">{label}</span>
-              </button>
-            ))}
-          </div>
-
-          {paymentMethod === 'SPLIT' && (
-            <div className="grid grid-cols-2 gap-2">
-              <div>
-                <span className="text-xs text-fg-muted block mb-1">Наличные</span>
-                <input step="0.01"
-                  type="number"
-                  min="0"
-                  max={totalTjs}
-                  value={cashAmountInput}
-                  onChange={(e) => {
-                    const valStr = e.target.value;
-                    const raw = parseFloat(valStr);
-                    if (!isNaN(raw)) {
-                      const clamped = Math.min(totalTjs, Math.max(0, raw));
-                      setCashAmountInput(raw > totalTjs ? totalTjs.toString() : valStr);
-                      setCardAmountInput(Number(Math.max(0, totalTjs - clamped).toFixed(2)).toString());
-                    } else {
-                      setCashAmountInput(valStr);
-                      setCardAmountInput(totalTjs.toString());
-                    }
-                  }}
-                  className="w-full h-11 rounded-lg bg-bg border border-border px-3 text-sm font-semibold text-fg-muted focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent"
-                />
-              </div>
-              <div>
-                <span className="text-xs text-fg-muted block mb-1">Карта</span>
-                <input step="0.01"
-                  type="number"
-                  min="0"
-                  max={totalTjs}
-                  value={cardAmountInput}
-                  onChange={(e) => {
-                    const valStr = e.target.value;
-                    const raw = parseFloat(valStr);
-                    if (!isNaN(raw)) {
-                      const clamped = Math.min(totalTjs, Math.max(0, raw));
-                      setCardAmountInput(raw > totalTjs ? totalTjs.toString() : valStr);
-                      setCashAmountInput(Number(Math.max(0, totalTjs - clamped).toFixed(2)).toString());
-                    } else {
-                      setCardAmountInput(valStr);
-                      setCashAmountInput(totalTjs.toString());
-                    }
-                  }}
-                  className="w-full h-11 rounded-lg bg-bg border border-border px-3 text-sm font-semibold text-fg-muted focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent"
-                />
-              </div>
-            </div>
-          )}
+        <div className="pt-1">
+          <CustomerPaymentControls
+            paymentMethod={paymentMethod}
+            setPaymentMethod={setPaymentMethod}
+            totalTjs={totalTjs}
+            cashAmountInput={cashAmountInput}
+            setCashAmountInput={setCashAmountInput}
+            cardAmountInput={cardAmountInput}
+            setCardAmountInput={setCardAmountInput}
+            customerNameInput={customerNameInput}
+            setCustomerNameInput={setCustomerNameInput}
+            customerPhoneInput={customerPhoneInput}
+            setCustomerPhoneInput={setCustomerPhoneInput}
+            selectedCustomerId={selectedCustomerId}
+            setSelectedCustomerId={setSelectedCustomerId}
+            customerSuggestions={customerSuggestions}
+            setCustomerSuggestions={setCustomerSuggestions}
+            downpaymentInput={downpaymentInput}
+            setDownpaymentInput={setDownpaymentInput}
+            downpaymentMethod={downpaymentMethod}
+            setDownpaymentMethod={setDownpaymentMethod}
+          />
         </div>
       </Dialog>
 
@@ -1245,6 +1319,7 @@ export const SalePage: React.FC = () => {
               <div className="px-3 py-2 text-xs text-fg-subtle space-y-0.5">
                 <p>Оплата: <span className="text-fg-muted">{paymentSummary(completedSale)}</span></p>
                 {completedSale.customerName && <p>Покупатель: <span className="text-fg-muted">{completedSale.customerName}</span></p>}
+                {completedSale.customerPhone && <p>Телефон: <span className="text-fg-muted font-mono">{completedSale.customerPhone}</span></p>}
                 <p>Продавец: <span className="text-fg-muted">{completedSale.sellerName || currentUser?.name}</span></p>
               </div>
             </div>

@@ -85,11 +85,10 @@ export class BonusAccountService {
     });
   }
 
-  /** Pays money out of the Bonus Account for a stated purpose (who and what for). */
+  /** Pays money out of the Bonus Account. Description is optional. */
   public static async payout(input: { amountUsd: MoneyInput; comment?: string; userId: string }) {
     const amountUsd = requirePositiveMoney(input.amountUsd, 'Сумма выдачи');
     const purpose = input.comment?.trim();
-    if (!purpose) throw new Error('Укажите, кому и за что выдаются деньги');
     return prisma.$transaction(async (tx) => {
       const actor = await resolveActor(tx, input.userId);
       const { account, amountTjs } = await BonusAccountService.take(tx, amountUsd);
@@ -98,14 +97,15 @@ export class BonusAccountService {
         accountId: account.id, balanceCurrency: 'USD', amount: amountTjs, currency: 'TJS',
         exchangeRate: D(amountTjs).div(amountUsd).toDecimalPlaces(4),
         amountTjs, amountUsd, categoryName: 'Выдача с Бонусного счёта', sourceType: PAYOUT,
-        description: `Выдача с Бонусного счёта: ${purpose}`, comment: purpose,
+        description: purpose ? `Выдача с Бонусного счёта: ${purpose}` : 'Выдача с Бонусного счёта',
+        comment: purpose || undefined,
         createdByUserId: actor.id, guardBalance: true,
       });
       await tx.auditLog.create({
         data: {
           userId: actor.id, userName: actor.name, userRole: actor.role,
           action: 'BONUS_ACCOUNT_PAYOUT', targetId: posting.id,
-          details: `Выдача с Бонусного счёта: ${amountTjs} TJS ($${amountUsd}) — ${purpose}`,
+          details: `Выдача с Бонусного счёта: ${amountTjs} TJS ($${amountUsd})${purpose ? ` — ${purpose}` : ''}`,
           financialDetails: moneyJson({ amountUsd, amountTjs, transactionId: posting.id }),
         },
       });

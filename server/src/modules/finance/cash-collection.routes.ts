@@ -10,7 +10,9 @@ export function registerCashCollectionRoutes(app: Express) {
       const period = req.query.period as ReportPeriod | undefined;
       const month = typeof req.query.month === 'string' ? req.query.month : undefined;
       const storeId = typeof req.query.storeId === 'string' ? req.query.storeId : undefined;
-      const rows = await CashCollectionService.list({ period, month, storeId });
+      const startDate = typeof req.query.startDate === 'string' ? req.query.startDate : undefined;
+      const endDate = typeof req.query.endDate === 'string' ? req.query.endDate : undefined;
+      const rows = await CashCollectionService.list({ period, month, storeId, startDate, endDate });
       res.json(rows);
     } catch (error) {
       next(error);

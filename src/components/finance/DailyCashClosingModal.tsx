@@ -25,8 +25,10 @@ import {
   ChevronDown,
   Store as StoreIcon,
   Sparkles,
+  RotateCcw,
 } from 'lucide-react';
-import { formatStoreName } from '../../utils/storeContext';
+import { formatStoreName, useStoreContext } from '../../utils/storeContext';
+import { useUIStore } from '../../stores/useUIStore';
 
 interface DailyCashClosingModalProps {
   isOpen: boolean;
@@ -46,28 +48,66 @@ export const DailyCashClosingModal: React.FC<DailyCashClosingModalProps> = ({
   onClosed,
 }) => {
   const { currentUser, stores, selectedStoreId } = useAppFields('currentUser', 'stores', 'selectedStoreId');
+  const storeCtx = useStoreContext();
+
+  const retailStores = useMemo(
+    () => stores.filter((s) => !s.isMainWarehouse && s.active),
+    [stores]
+  );
+
+  // Auto-detect the target retail store
+  const detectedStoreId = useMemo(() => {
+    // 1. Explicit prop passed to modal
+    if (explicitStoreId && explicitStoreId !== 'all') {
+      const found = stores.find((s) => s.id === explicitStoreId && !s.isMainWarehouse);
+      if (found) return found.id;
+    }
+    // 2. Non-admin users (SELLER / PARTNER) are strictly tied to their store
+    if ((currentUser?.role === 'SELLER' || currentUser?.role === 'PARTNER') && currentUser.storeId) {
+      return currentUser.storeId;
+    }
+    // 3. Active store context (from topbar switch / context)
+    if (storeCtx.mode === 'STORE' && storeCtx.storeId) {
+      return storeCtx.storeId;
+    }
+    // 4. AppContext selectedStoreId
+    if (selectedStoreId && selectedStoreId !== 'all') {
+      const match = stores.find((s) => s.id === selectedStoreId && !s.isMainWarehouse);
+      if (match) return match.id;
+    }
+    // 5. UIStore selectedStoreId
+    const uiStoreId = useUIStore.getState().selectedStoreId;
+    if (uiStoreId && uiStoreId !== 'all') {
+      const match = stores.find((s) => s.id === uiStoreId && !s.isMainWarehouse);
+      if (match) return match.id;
+    }
+    // 6. UIStore dailyClosingStoreId
+    const uiClosingId = useUIStore.getState().dailyClosingStoreId;
+    if (uiClosingId && uiClosingId !== 'all') {
+      const match = stores.find((s) => s.id === uiClosingId && !s.isMainWarehouse);
+      if (match) return match.id;
+    }
+    // 7. Fallback for admin: default to first retail store if available
+    if (retailStores.length > 0) {
+      return retailStores[0].id;
+    }
+    return '';
+  }, [explicitStoreId, currentUser?.role, currentUser?.storeId, storeCtx, selectedStoreId, stores, retailStores]);
 
   const [selectedStoreIdState, setSelectedStoreIdState] = useState<string>('');
 
   useEffect(() => {
-    if (explicitStoreId) {
-      setSelectedStoreIdState(explicitStoreId);
-    } else if (currentUser?.role === 'SELLER' || currentUser?.role === 'PARTNER') {
-      setSelectedStoreIdState(currentUser.storeId || '');
-    } else if (selectedStoreId && selectedStoreId !== 'all') {
-      setSelectedStoreIdState(selectedStoreId);
-    } else {
-      setSelectedStoreIdState('');
+    if (isOpen) {
+      const target = (explicitStoreId && explicitStoreId !== 'all' ? explicitStoreId : '') || detectedStoreId;
+      setSelectedStoreIdState(target);
     }
-  }, [explicitStoreId, currentUser?.role, currentUser?.storeId, selectedStoreId, isOpen]);
+  }, [isOpen, explicitStoreId, detectedStoreId]);
 
   const effectiveStoreId = useMemo(() => {
-    if (explicitStoreId) return explicitStoreId;
-    if (selectedStoreIdState) return selectedStoreIdState;
-    if (currentUser?.role === 'SELLER' || currentUser?.role === 'PARTNER') return currentUser.storeId || '';
-    if (selectedStoreId && selectedStoreId !== 'all') return selectedStoreId;
-    return '';
-  }, [selectedStoreIdState, explicitStoreId, currentUser?.role, currentUser?.storeId, selectedStoreId]);
+    if (selectedStoreIdState && selectedStoreIdState !== 'all') return selectedStoreIdState;
+    if (explicitStoreId && explicitStoreId !== 'all') return explicitStoreId;
+    return detectedStoreId || '';
+  }, [selectedStoreIdState, explicitStoreId, detectedStoreId]);
 
   const activeStore = useMemo(
     () => stores.find((s) => s.id === effectiveStoreId),
@@ -80,8 +120,9 @@ export const DailyCashClosingModal: React.FC<DailyCashClosingModalProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [showDetails, setShowDetails] = useState(false);
   const [showUsdInput, setShowUsdInput] = useState(false);
+  const [reopening, setReopening] = useState(false);
 
-  const isCentralCashForbidden = (!effectiveStoreId || activeStore?.isMainWarehouse) && !summary?.alreadyClosed;
+  const isCentralCashForbidden = retailStores.length === 0;
 
   // Form input states
   const [actualCashTjs, setActualCashTjs] = useState<string>('');
@@ -174,9 +215,9 @@ export const DailyCashClosingModal: React.FC<DailyCashClosingModalProps> = ({
 
   // Submit closing
   const handleSubmitClosing = async () => {
-    const finalStoreId = summary?.storeId || effectiveStoreId || selectedStoreIdState || explicitStoreId;
-    if (!finalStoreId) {
-      setError('Пожалуйста, выберите магазин для закрытия смены.');
+    const finalStoreId = effectiveStoreId || summary?.storeId || selectedStoreIdState || explicitStoreId;
+    if (!finalStoreId || finalStoreId === 'all') {
+      setError('Пожалуйста, выберите розничный магазин для закрытия смены.');
       return;
     }
 
@@ -217,6 +258,26 @@ export const DailyCashClosingModal: React.FC<DailyCashClosingModalProps> = ({
     }
   };
 
+  const handleReopenClosing = async () => {
+    if (!summary?.closing?.id) return;
+    if (!window.confirm('Переоткрыть смену? Текущий Z-отчёт будет отменён, и вы сможете ввести фактическую сумму с расхождением заново.')) {
+      return;
+    }
+    setReopening(true);
+    setError(null);
+    try {
+      await apiClient(`/daily-closings/${summary.closing.id}`, {
+        method: 'DELETE',
+      });
+      soundEffects.playAddToCartSuccess();
+      await fetchSummary();
+    } catch (err: any) {
+      setError(err?.message || 'Не удалось переоткрыть смену');
+    } finally {
+      setReopening(false);
+    }
+  };
+
   const handlePrint = () => {
     window.print();
   };
@@ -238,15 +299,29 @@ export const DailyCashClosingModal: React.FC<DailyCashClosingModalProps> = ({
             </div>
           ) : summary?.alreadyClosed ? (
             <>
-              <Button
-                variant="secondary"
-                size="md"
-                leftIcon={Printer}
-                onClick={handlePrint}
-                className="hidden sm:inline-flex"
-              >
-                Печать Z-отчёта
-              </Button>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="secondary"
+                  size="md"
+                  leftIcon={Printer}
+                  onClick={handlePrint}
+                  className="hidden sm:inline-flex"
+                >
+                  Печать Z-отчёта
+                </Button>
+                {currentUser?.role === 'ADMIN' && summary.closing?.id && (
+                  <Button
+                    variant="ghost"
+                    size="md"
+                    leftIcon={RotateCcw}
+                    onClick={handleReopenClosing}
+                    loading={reopening}
+                    className="text-xs text-danger hover:text-danger hover:bg-danger/10"
+                  >
+                    Переоткрыть смену
+                  </Button>
+                )}
+              </div>
               <div className="flex-1 sm:flex-initial flex justify-end">
                 <Button variant="primary" size="md" onClick={onClose}>
                   Закрыть
@@ -285,9 +360,9 @@ export const DailyCashClosingModal: React.FC<DailyCashClosingModalProps> = ({
           <div className="w-12 h-12 rounded-full bg-amber-500/10 text-amber-500 flex items-center justify-center mx-auto">
             <StoreIcon className="w-6 h-6" />
           </div>
-          <h3 className="text-base font-bold text-fg">Смену закрывает кассир в магазине</h3>
+          <h3 className="text-base font-bold text-fg">Нет активных магазинов</h3>
           <p className="text-xs text-fg-subtle max-w-sm mx-auto leading-relaxed">
-            Из центральной кассы закрывать смену нельзя. Закрытие выполняется непосредственно в розничном магазине кассиром или партнёром.
+            В системе не найдены розничные магазины для закрытия смены.
           </p>
         </div>
       ) : loading ? (
@@ -313,6 +388,30 @@ export const DailyCashClosingModal: React.FC<DailyCashClosingModalProps> = ({
         </div>
       ) : summary ? (
         <div className="space-y-4">
+          {/* Admin Retail Store Switcher */}
+          {currentUser?.role === 'ADMIN' && retailStores.length > 1 && (
+            <div className="flex items-center justify-between gap-2 p-2.5 rounded-xl bg-surface-raised border border-border">
+              <span className="text-xs font-semibold text-fg-subtle flex items-center gap-1.5 pl-1">
+                <StoreIcon className="w-3.5 h-3.5 text-accent" />
+                <span>Магазин смены:</span>
+              </span>
+              <select
+                value={effectiveStoreId}
+                onChange={(e) => {
+                  setSelectedStoreIdState(e.target.value);
+                  setShowConfirmDiscrepancy(false);
+                }}
+                disabled={loading || submitting || reopening}
+                className="text-xs font-bold bg-surface border border-border rounded-lg px-2.5 py-1 text-fg focus:outline-none focus:border-accent cursor-pointer"
+              >
+                {retailStores.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {formatStoreName(s.name)}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
           {/* STATE 1: ALREADY CLOSED (Z-REPORT VIEW) */}
           {summary.alreadyClosed ? (
             <div className="space-y-3">

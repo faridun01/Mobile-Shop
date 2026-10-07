@@ -129,7 +129,7 @@ export function MainLayout() {
         <main className="flex-1 flex flex-col min-w-0 max-w-full min-h-0 overflow-y-auto overflow-x-hidden relative bg-bg">
           <Suspense fallback={<LoadingFallback />}>
             <Routes>
-              <Route path="/" element={<Navigate to={currentUser?.role === 'ADMIN' ? "/finance" : "/sale"} replace />} />
+              <Route path="/" element={<Navigate to={currentUser?.role === 'ADMIN' ? "/reports" : "/sale"} replace />} />
               <Route path="/sale" element={<SalePage />} />
               <Route path="/sales-history" element={<SalesHistoryPage />} />
               <Route path="/inventory" element={<InventoryPage />} />
@@ -139,20 +139,20 @@ export function MainLayout() {
               <Route path="/repair" element={<RepairPage />} />
               <Route path="/suppliers" element={currentUser?.role === 'ADMIN' ? <SuppliersPage /> : <Navigate to="/sale" replace />} />
               <Route path="/customers" element={<CustomersPage />} />
-              <Route path="/cash" element={<CashDeskPage />} />
+              <Route path="/cash" element={currentUser?.role === 'ADMIN' || currentUser?.role === 'PARTNER' ? <CashDeskPage /> : <Navigate to="/sale" replace />} />
               <Route path="/cash-collection" element={currentUser?.role === 'ADMIN' || currentUser?.role === 'PARTNER' ? <CashCollectionPage /> : <Navigate to="/sale" replace />} />
               <Route path="/bonuses" element={currentUser?.role === 'ADMIN' ? <BonusesPage /> : <Navigate to="/sale" replace />} />
               <Route path="/expenses" element={<ExpensesPage />} />
               <Route path="/owners" element={currentUser?.role === 'ADMIN' ? <OwnersPage /> : <Navigate to="/sale" replace />} />
               <Route path="/employees" element={currentUser?.role === 'ADMIN' ? <EmployeesPage /> : <Navigate to="/sale" replace />} />
-              {/* «Финансовые отчёты» merged into Финансы (opens on the «Отчёт» tab) */}
-              <Route path="/reports" element={<Navigate to={currentUser?.role === 'ADMIN' ? "/finance" : "/sale"} replace />} />
-              <Route path="/finance" element={currentUser?.role === 'ADMIN' || currentUser?.role === 'PARTNER' ? <FinancePage /> : <Navigate to="/sale" replace />} />
+              {/* Отдельная страница «Отчёты» */}
+              <Route path="/reports" element={currentUser?.role === 'ADMIN' || currentUser?.role === 'PARTNER' ? <FinancePage /> : <Navigate to="/sale" replace />} />
+              <Route path="/finance" element={<Navigate to="/reports" replace />} />
               <Route path="/audit-log" element={currentUser?.role === 'ADMIN' ? <AuditLogPage /> : <Navigate to="/sale" replace />} />
               <Route path="/settings" element={<SettingsPage />} />
               <Route path="/notifications" element={currentUser?.role === 'ADMIN' ? <NotificationsPage /> : <Navigate to="/sale" replace />} />
               <Route path="/receipts" element={<Navigate to="/inventory" replace />} />
-              <Route path="*" element={<Navigate to={currentUser?.role === 'ADMIN' ? "/finance" : "/sale"} replace />} />
+              <Route path="*" element={<Navigate to={currentUser?.role === 'ADMIN' ? "/reports" : "/sale"} replace />} />
             </Routes>
           </Suspense>
         </main>
@@ -184,13 +184,15 @@ export function MainLayout() {
         </footer>
       </div>
 
-      <DailyRateModal
-        isOpen={isDailyRateModalOpen || isRateModalOpen}
-        onClose={() => {
-          setDailyRateModalOpen(false);
-          closeDailyRateModal();
-        }}
-      />
+      {currentUser?.role === 'ADMIN' && (
+        <DailyRateModal
+          isOpen={isDailyRateModalOpen || isRateModalOpen}
+          onClose={() => {
+            setDailyRateModalOpen(false);
+            closeDailyRateModal();
+          }}
+        />
+      )}
       {currentUser?.role === 'ADMIN' && (
         <StoreSwitchModal
           isOpen={isStoreSwitchModalOpen}

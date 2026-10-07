@@ -58,6 +58,7 @@ export const StoreSwitchModal: React.FC<StoreSwitchModalProps> = ({ isOpen, onCl
     });
 
     setSelectedStoreId(store.id);
+    useUIStore.getState().setSelectedStoreId(store.id);
     setActivePage('SALE');
     navigate('/sale');
     onClose();
@@ -75,8 +76,9 @@ export const StoreSwitchModal: React.FC<StoreSwitchModalProps> = ({ isOpen, onCl
     });
 
     setSelectedStoreId('all');
-    setActivePage('FINANCE');
-    navigate('/finance');
+    useUIStore.getState().setSelectedStoreId('all');
+    setActivePage('REPORTS');
+    navigate('/reports');
     onClose();
   };
 

@@ -378,7 +378,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     // deliberately opened from Settings.
     if (manualRateEdit.current) return;
     const role = useAuthStore.getState().currentUser?.role;
-    const shouldOpen = (role === 'ADMIN' || role === 'PARTNER') && confirmedRateDay.current !== today;
+    const shouldOpen = role === 'ADMIN' && confirmedRateDay.current !== today;
     setIsRateModalOpen(shouldOpen);
     useUIStore.getState().setDailyRateModalOpen(shouldOpen);
   }, []);
@@ -1526,7 +1526,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const openDailyRateModal = () => {
     const role = useAuthStore.getState().currentUser?.role;
-    if (role !== 'ADMIN' && role !== 'PARTNER') return;
+    if (role !== 'ADMIN') return;
     manualRateEdit.current = true;
     setIsRateModalOpen(true);
     useUIStore.getState().setDailyRateModalOpen(true);

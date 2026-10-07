@@ -17,6 +17,9 @@ const db = vi.hoisted(() => {
     cashHandover: model(),
     financialTransaction: model(),
     auditLog: model(),
+    dailyCashClosing: model(),
+    sale: model(),
+    expense: model(),
     $queryRaw: vi.fn(),
   };
 });

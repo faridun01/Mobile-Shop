@@ -3,12 +3,70 @@ import { authenticateJwt, type AuthenticatedRequest, requireRoles } from '../../
 import { BonusesService } from './bonuses.service';
 import { RealtimeSyncGateway } from '../../websocket/websocket.gateway';
 import { BonusAccountService } from './bonus-account.service';
+import { prisma } from '../../prisma/prisma.service';
 
 export function registerBonusRoutes(app: Express) {
   app.get('/api/bonuses/pool', authenticateJwt, requireRoles('ADMIN'), async (_req: AuthenticatedRequest, res, next) => {
     try {
       const result = await BonusesService.getBonusPool();
       res.json(result);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Detailed list of all free bonus devices with stock and sale facts
+  app.get('/api/bonuses/devices', authenticateJwt, requireRoles('ADMIN'), async (_req: AuthenticatedRequest, res, next) => {
+    try {
+      const devices = await prisma.device.findMany({
+        where: { isBonus: true },
+        include: {
+          store: { select: { id: true, name: true, isMainWarehouse: true } },
+          saleItems: {
+            include: {
+              sale: {
+                select: {
+                  id: true,
+                  receiptNumber: true,
+                  createdAt: true,
+                  customer: { select: { name: true } },
+                  store: { select: { name: true } },
+                },
+              },
+            },
+          },
+        },
+        orderBy: { createdAt: 'desc' },
+      });
+
+      const formatted = devices.map((d) => {
+        const saleItem = d.saleItems?.[0];
+        const sale = saleItem?.sale;
+        return {
+          id: d.id,
+          brand: d.brand,
+          model: d.model,
+          ram: d.ram,
+          storage: d.storage,
+          color: d.color,
+          imei: d.imei,
+          status: d.status,
+          storeId: d.storeId,
+          storeName: d.store?.name || 'Склад',
+          isMainWarehouse: Boolean(d.store?.isMainWarehouse),
+          supplierName: d.supplierName || 'Поставщик',
+          costBasisUsd: Number(d.costBasisUsd || 0),
+          createdAt: d.createdAt.toISOString(),
+          isSold: d.status === 'SOLD',
+          soldPriceUsd: saleItem ? Number(saleItem.salePriceUsd || 0) : null,
+          soldPriceTjs: saleItem ? Number(saleItem.salePriceTjs || 0) : null,
+          saleReceiptNumber: sale ? sale.receiptNumber : null,
+          saleDate: sale ? sale.createdAt.toISOString() : null,
+          customerName: sale?.customer?.name || null,
+        };
+      });
+
+      res.json(formatted);
     } catch (error) {
       next(error);
     }

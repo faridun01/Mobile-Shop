@@ -99,6 +99,7 @@ export function mapSale(s: any, names: NameLookup): Sale {
     sellerId: s.userId,
     sellerName: s.user?.name ?? names.get(s.userId) ?? '',
     customerName: s.customerName ?? undefined,
+    customerPhone: s.customer?.phone ?? s.customerPhone ?? undefined,
     customerId: s.customerId ?? undefined,
     items: (s.saleItems || []).map(mapSaleItem),
     totalTjs: s.totalTjs,

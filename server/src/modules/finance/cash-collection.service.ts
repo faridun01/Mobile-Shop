@@ -6,7 +6,7 @@ import { cancelTransaction, postTransaction } from './financial-transaction.serv
 import { getBusinessDateKey } from '../../common/business-date';
 import { resolveActor } from '../../common/actor';
 import { requireNonNegativeMoney } from '../../common/money';
-import { dateRangeForPeriod, type ReportPeriod } from '../reports/reports.service';
+import { dateRangeForPeriod, dateRangeForCustomDates, type ReportPeriod } from '../reports/reports.service';
 import { cashBalanceFromLedger, loadCashLedger, registerLedgerBalance } from './cash-balance';
 import { notifyAdmins } from '../notifications/notification.service';
 
@@ -35,6 +35,8 @@ export interface RegisterBalance {
   cashOnlyTjs: string;
   /** Informational breakdown: card and digital transfer payments. */
   cardOnlyTjs: string;
+  lastCollectedAt?: string | null;
+  daysWithoutCollection?: number;
 }
 
 /**
@@ -229,6 +231,35 @@ export interface CashCollectionBreakdownExpense {
   createdAt: string;
 }
 
+export interface CashCollectionDailyItem {
+  date: string; // YYYY-MM-DD
+  dateLabel: string;
+  daysAgo: number;
+  isToday: boolean;
+  salesCount: number;
+  salesTotalTjs: number;
+  salesCashTjs: number;
+  salesCardTjs: number;
+  salesDebtTjs: number;
+  expensesCount: number;
+  expensesTotalTjs: number;
+  netCashTjs: number;
+  hasClosing: boolean;
+  closing?: {
+    id: string;
+    businessDate: string;
+    closedByName: string;
+    createdAt: string;
+    openingCashTjs: number;
+    expectedCashTjs: number;
+    actualCashTjs: number;
+    differenceTjs: number;
+    comment?: string | null;
+  } | null;
+  sales: CashCollectionBreakdownSale[];
+  expenses: CashCollectionBreakdownExpense[];
+}
+
 export interface CashCollectionBreakdown {
   store: {
     id: string;
@@ -270,6 +301,7 @@ export interface CashCollectionBreakdown {
     refundedCount: number;
     refundedTotalTjs: string;
   };
+  days: CashCollectionDailyItem[];
   sales: CashCollectionBreakdownSale[];
   expenses: CashCollectionBreakdownExpense[];
 }
@@ -375,6 +407,118 @@ export class CashCollectionService {
     const hoursDiff = Math.floor(msDiff / (1000 * 60 * 60));
     const daysDiff = Math.floor(hoursDiff / 24);
 
+    // Fetch DailyCashClosing records for this store since cutoff
+    const dailyClosings = await prisma.dailyCashClosing.findMany({
+      where: {
+        storeId,
+        ...(cutoff ? { createdAt: { gt: cutoff } } : {}),
+      },
+      orderBy: { businessDate: 'desc' },
+    });
+    const closingMap = new Map(dailyClosings.map((c) => [c.businessDate, c]));
+
+    const mappedSales: CashCollectionBreakdownSale[] = sales.map((s) => ({
+      id: s.id,
+      receiptNumber: s.receiptNumber,
+      createdAt: s.createdAt.toISOString(),
+      sellerName: s.user?.name || 'Сотрудник',
+      customerName: s.customerName || null,
+      paymentMethod: s.paymentMethod,
+      totalTjs: Number(s.totalTjs),
+      totalUsd: Number(s.totalUsd),
+      cashAmountTjs: Number(s.cashAmountTjs),
+      cardAmountTjs: Number(s.cardAmountTjs),
+      debtAmountTjs: Number(s.debtAmountTjs),
+      status: s.status,
+      itemsCount: s.saleItems.length,
+      items: s.saleItems.map((item) => ({
+        id: item.id,
+        brand: item.brand,
+        model: item.model,
+        storage: item.storage,
+        color: item.color,
+        salePriceTjs: Number(item.salePriceTjs),
+        salePriceUsd: Number(item.salePriceUsd),
+        isBonus: item.isBonus,
+      })),
+    }));
+
+    const mappedExpenses: CashCollectionBreakdownExpense[] = expenses.map((e) => ({
+      id: e.id,
+      category: e.category,
+      description: e.description || e.comment || 'Расход из кассы',
+      amountTjs: Number(e.amountTjs),
+      amountUsd: e.amountUsd ? Number(e.amountUsd) : null,
+      createdAt: e.createdAt.toISOString(),
+    }));
+
+    // Group sales and expenses by date (YYYY-MM-DD)
+    const datesSet = new Set<string>();
+    for (const s of mappedSales) {
+      datesSet.add(s.createdAt.slice(0, 10));
+    }
+    for (const e of mappedExpenses) {
+      datesSet.add(e.createdAt.slice(0, 10));
+    }
+    for (const c of dailyClosings) {
+      datesSet.add(c.businessDate);
+    }
+
+    const sortedDates = Array.from(datesSet).sort((a, b) => b.localeCompare(a));
+    const todayStr = getBusinessDateKey(now);
+
+    const days: CashCollectionDailyItem[] = sortedDates.map((dateStr) => {
+      const daySales = mappedSales.filter((s) => s.createdAt.slice(0, 10) === dateStr);
+      const dayExpenses = mappedExpenses.filter((e) => e.createdAt.slice(0, 10) === dateStr);
+      const closing = closingMap.get(dateStr);
+
+      const daySalesTotalTjs = daySales.reduce((acc, s) => (s.status !== 'REFUNDED' ? acc + s.totalTjs : acc), 0);
+      const daySalesCashTjs = daySales.reduce((acc, s) => (s.status !== 'REFUNDED' ? acc + s.cashAmountTjs : acc), 0);
+      const daySalesCardTjs = daySales.reduce((acc, s) => (s.status !== 'REFUNDED' ? acc + s.cardAmountTjs : acc), 0);
+      const daySalesDebtTjs = daySales.reduce((acc, s) => (s.status !== 'REFUNDED' ? acc + s.debtAmountTjs : acc), 0);
+      const dayExpensesTotalTjs = dayExpenses.reduce((acc, e) => acc + e.amountTjs, 0);
+      const netCashTjs = daySalesCashTjs - dayExpensesTotalTjs;
+
+      const dateObj = new Date(dateStr + 'T12:00:00Z');
+      const dateLabel = dateObj.toLocaleDateString('ru-RU', {
+        day: '2-digit',
+        month: 'short',
+        weekday: 'short',
+      });
+      const daysAgo = Math.max(0, Math.floor((now.getTime() - dateObj.getTime()) / (1000 * 60 * 60 * 24)));
+
+      return {
+        date: dateStr,
+        dateLabel,
+        daysAgo,
+        isToday: dateStr === todayStr,
+        salesCount: daySales.filter((s) => s.status !== 'REFUNDED').length,
+        salesTotalTjs: daySalesTotalTjs,
+        salesCashTjs: daySalesCashTjs,
+        salesCardTjs: daySalesCardTjs,
+        salesDebtTjs: daySalesDebtTjs,
+        expensesCount: dayExpenses.length,
+        expensesTotalTjs: dayExpensesTotalTjs,
+        netCashTjs,
+        hasClosing: !!closing,
+        closing: closing
+          ? {
+              id: closing.id,
+              businessDate: closing.businessDate,
+              closedByName: closing.closedByName,
+              createdAt: closing.createdAt.toISOString(),
+              openingCashTjs: Number(closing.openingCashTjs),
+              expectedCashTjs: Number(closing.expectedCashTjs),
+              actualCashTjs: Number(closing.actualCashTjs),
+              differenceTjs: Number(closing.differenceTjs),
+              comment: closing.comment,
+            }
+          : null,
+        sales: daySales,
+        expenses: dayExpenses,
+      };
+    });
+
     return {
       store: {
         id: store.id,
@@ -416,39 +560,9 @@ export class CashCollectionService {
         refundedCount,
         refundedTotalTjs: refundedTjs.toString(),
       },
-      sales: sales.map((s) => ({
-        id: s.id,
-        receiptNumber: s.receiptNumber,
-        createdAt: s.createdAt.toISOString(),
-        sellerName: s.user?.name || 'Сотрудник',
-        customerName: s.customerName || null,
-        paymentMethod: s.paymentMethod,
-        totalTjs: Number(s.totalTjs),
-        totalUsd: Number(s.totalUsd),
-        cashAmountTjs: Number(s.cashAmountTjs),
-        cardAmountTjs: Number(s.cardAmountTjs),
-        debtAmountTjs: Number(s.debtAmountTjs),
-        status: s.status,
-        itemsCount: s.saleItems.length,
-        items: s.saleItems.map((item) => ({
-          id: item.id,
-          brand: item.brand,
-          model: item.model,
-          storage: item.storage,
-          color: item.color,
-          salePriceTjs: Number(item.salePriceTjs),
-          salePriceUsd: Number(item.salePriceUsd),
-          isBonus: item.isBonus,
-        })),
-      })),
-      expenses: expenses.map((e) => ({
-        id: e.id,
-        category: e.category,
-        description: e.description || e.comment || 'Расход из кассы',
-        amountTjs: Number(e.amountTjs),
-        amountUsd: e.amountUsd ? Number(e.amountUsd) : null,
-        createdAt: e.createdAt.toISOString(),
-      })),
+      days,
+      sales: mappedSales,
+      expenses: mappedExpenses,
     };
   }
   /** Every active register in TJS and USD: retail stores to collect from, Central Cash, and the Bonus Account. Read-only. */
@@ -464,8 +578,38 @@ export class CashCollectionService {
     // TJS is rebuilt from the ledger rows' own historical amounts, like a store register.
     const bonusLedger = bonus ? cashBalanceFromLedger(bonus.id, await loadCashLedger(db, bonus.id)) : { tjs: '0', usd: '0' };
 
+    // Fetch the last uncancelled cash collection per store to compute days without collection
+    const lastHandovers = await prisma.cashHandover.findMany({
+      where: { cancelledAt: null },
+      orderBy: { createdAt: 'desc' },
+      distinct: ['storeId'],
+      select: { storeId: true, createdAt: true },
+    });
+    const lastHandoverMap = new Map(lastHandovers.map((h) => [h.storeId, h.createdAt]));
+    const now = new Date();
+
+    const enrichedStores = rows
+      .filter((r) => !r.isMainWarehouse)
+      .map((r) => {
+        const lastAt = lastHandoverMap.get(r.storeId) ?? null;
+        let days = 0;
+        if (lastAt) {
+          days = Math.max(0, Math.floor((now.getTime() - lastAt.getTime()) / (1000 * 60 * 60 * 24)));
+        } else {
+          const st = stores.find((s) => s.id === r.storeId);
+          if (st?.createdAt) {
+            days = Math.max(0, Math.floor((now.getTime() - new Date(st.createdAt).getTime()) / (1000 * 60 * 60 * 24)));
+          }
+        }
+        return {
+          ...r,
+          lastCollectedAt: lastAt ? lastAt.toISOString() : null,
+          daysWithoutCollection: days,
+        };
+      });
+
     return {
-      stores: rows.filter((r) => !r.isMainWarehouse),
+      stores: enrichedStores,
       central: rows.find((r) => r.isMainWarehouse) ?? null,
       bonusAccount: {
         id: bonus?.id ?? null,
@@ -476,9 +620,17 @@ export class CashCollectionService {
     };
   }
 
-  /** Cash collections (handovers) filtered by period, month and store. */
-  public static async list(params: { period?: ReportPeriod; month?: string; storeId?: string }): Promise<CashCollectionDto[]> {
-    const dateRange = dateRangeForPeriod(params.period || 'ALL', params.month);
+  /** Cash collections (handovers) filtered by period, month, custom dates and store. */
+  public static async list(params: {
+    period?: ReportPeriod;
+    month?: string;
+    storeId?: string;
+    startDate?: string;
+    endDate?: string;
+  }): Promise<CashCollectionDto[]> {
+    const dateRange = params.startDate
+      ? dateRangeForCustomDates(params.startDate, params.endDate)
+      : dateRangeForPeriod(params.period || 'ALL', params.month);
     const handovers = await prisma.cashHandover.findMany({
       where: {
         ...(params.storeId && params.storeId !== 'all' ? { storeId: params.storeId } : {}),

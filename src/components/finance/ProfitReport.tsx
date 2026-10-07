@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { allocateByShares, decimal, moneyNumber, sumMoney } from '../../utils/money';
+import { decimal, moneyNumber, sumMoney } from '../../utils/money';
 import { useNavigate } from 'react-router-dom';
 import { useAppFields } from '../../context/AppContext';
 import { apiClient } from '../../api/client';
@@ -7,7 +7,6 @@ import { mapExpense, mapSale, buildNameLookup } from '../../api/mappers';
 import { Expense, Sale } from '../../types';
 import {
   Smartphone,
-  ArrowDownRight,
   Download,
   Store as StoreIcon,
   Warehouse,
@@ -16,9 +15,7 @@ import {
   Wallet,
   PiggyBank,
   ChevronDown,
-  Users,
   Sparkles,
-  Briefcase,
   Package,
   Banknote
 } from 'lucide-react';
@@ -188,10 +185,7 @@ export const ProfitReport: React.FC<ProfitReportProps> = ({
     users,
     todayRate,
     selectedStoreId: globalSelectedStoreId,
-    owners,
-    storeProfitShares,
-    setActivePage,
-  } = useAppFields('currentUser', 'stores', 'users', 'todayRate', 'selectedStoreId', 'owners', 'storeProfitShares', 'setActivePage');
+  } = useAppFields('currentUser', 'stores', 'users', 'todayRate', 'selectedStoreId');
   // Admin inside a store sees only that store; Central Cash shows every store.
   const storeCtx = useStoreContext();
 
@@ -223,72 +217,6 @@ export const ProfitReport: React.FC<ProfitReportProps> = ({
   const periodLabel = useMemo(() => formatPeriodLabel(startDate, endDate, month), [startDate, endDate, month]);
   const retailStores = useMemo(() => stores.filter((s) => !s.isMainWarehouse), [stores]);
   const mainWarehouse = useMemo(() => stores.find((s) => s.isMainWarehouse), [stores]);
-
-  const sortedOwners = useMemo(() => {
-    return [...owners].sort((a, b) => {
-      const roleA = a.userId ? users.find((u) => u.id === a.userId)?.role : undefined;
-      const roleB = b.userId ? users.find((u) => u.id === b.userId)?.role : undefined;
-      const rank = (r?: string) => (r === 'ADMIN' ? 0 : r === 'PARTNER' ? 1 : 2);
-      return rank(roleA) - rank(roleB);
-    });
-  }, [owners, users]);
-
-
-  const adminOwner = useMemo(() => {
-    return owners.find(o => (!o.storeId && !users.find(u => u.id === o.userId)?.storeId) || users.find(u => u.id === o.userId)?.role === 'ADMIN') || owners[0];
-  }, [owners, users]);
-
-  const getOwnerStoreId = useCallback((owner: { storeId?: string | null; userId?: string | null }) => {
-    return owner.storeId || (owner.userId ? users.find((u) => u.id === owner.userId)?.storeId : null) || null;
-  }, [users]);
-
-  const getStorePartner = useCallback((storeId: string) => {
-    return owners.find((o) => {
-      const sId = getOwnerStoreId(o);
-      const role = o.userId ? users.find((u) => u.id === o.userId)?.role : undefined;
-      return sId === storeId && (role === 'PARTNER' || Boolean(sId));
-    });
-  }, [owners, users, getOwnerStoreId]);
-
-  // Partner shares are stored per store (set by the admin); the admin gets the rest of each
-  // store's profit — the same split the server books on every sale.
-  const getOwnerShareForStore = useCallback((owner: { id: string }, storeId: string) => {
-    const pairs = storeProfitShares.filter((sh) => sh.storeId === storeId);
-    if (owner.id === adminOwner?.id) {
-      return moneyNumber(decimal(100).minus(sumMoney(pairs.map((sh) => sh.sharePercent))));
-    }
-    return pairs.find((sh) => sh.ownerId === owner.id)?.sharePercent ?? 0;
-  }, [adminOwner, storeProfitShares]);
-
-  // A store's amount split between its owners cent-exact, the same way the server books profit:
-  // the parts always add up to the store figure (no cent shown twice).
-  const splitStoreAmount = useCallback((storeId: string, amount: number) =>
-    allocateByShares(amount, owners.map((o) => ({ id: o.id, percent: getOwnerShareForStore(o, storeId) }))),
-  [owners, getOwnerShareForStore]);
-
-  const getOwnerPeriodTotal = useCallback((owner: { id: string; storeId?: string | null; userId?: string | null; profitSharePercent?: number }, data: ReportsSummary) => {
-    const isOwnerAdmin = owner.id === adminOwner?.id || (!owner.storeId && users.find(u => u.id === owner.userId)?.role === 'ADMIN');
-    let periodUsd = decimal(0);
-    let periodTjs = decimal(0);
-
-    const breakdown = selectedStore === 'all' ? data.storeBreakdown : data.storeBreakdown.filter(s => s.storeId === selectedStore);
-
-    for (const store of breakdown) {
-      periodUsd = periodUsd.plus(splitStoreAmount(store.storeId, store.netProfitUsd)[owner.id] ?? 0);
-      periodTjs = periodTjs.plus(splitStoreAmount(store.storeId, store.netProfitTjs)[owner.id] ?? 0);
-    }
-
-    // Central office: only its general expenses. Supplier bonuses are not added to anyone.
-    if (selectedStore === 'all' && isOwnerAdmin && data.mainWarehouseExpenses.expensesUsd > 0) {
-      periodUsd = periodUsd.minus(data.mainWarehouseExpenses.expensesUsd);
-      periodTjs = periodTjs.minus(data.mainWarehouseExpenses.expensesTjs);
-    }
-
-    return {
-      periodAccruedUsd: moneyNumber(periodUsd),
-      periodAccruedTjs: moneyNumber(periodTjs),
-    };
-  }, [adminOwner, splitStoreAmount, selectedStore]);
 
   // Period/store filtering happens on the server (/api/reports/summary), so what crosses the
   // network scales with the selected month, not with the business's entire history.
@@ -378,8 +306,6 @@ export const ProfitReport: React.FC<ProfitReportProps> = ({
   }, [salesReportStoreId, month, startDate, endDate, namesLookup, revision]);
 
   const data: ReportsSummary = summary ?? EMPTY_SUMMARY;
-
-  const totalCapitalInvested = useMemo(() => owners.reduce((acc, o) => acc + (o.capitalBalanceUsd || 0), 0), [owners]);
 
   const totalStockCostUsd = useMemo(() => {
     if (selectedStore !== 'all') {
@@ -539,357 +465,64 @@ export const ProfitReport: React.FC<ProfitReportProps> = ({
               </div>
             </div>
 
-            {/* Desktop 2-column Grid: Net Profit Breakdown & Capital Assets */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-4 items-stretch">
-              {/* How net profit is built — clearly distinguishing core operations from separate bonus income */}
-              <div className="p-3.5 rounded-xl bg-surface border border-border space-y-2.5 text-sm flex flex-col justify-between shadow-xs">
-                <div className="space-y-2.5">
-                  <div className="flex items-center justify-between pb-1 border-b border-border">
-                    <h4 className="text-[10px] font-bold text-fg-subtle uppercase tracking-wider">Как считается чистая прибыль</h4>
-                    <span className="text-[10px] font-semibold text-accent bg-accent/10 px-2 py-0.5 rounded-md border border-accent/20">
-                      Операционная деятельность
-                    </span>
-                  </div>
-                  <div className="space-y-1.5">
-                    {[
-                      ...(data.refundsCount
-                        ? [
-                            { label: 'Продажи и обмены', value: usd(data.revenueUsd + data.refundsRevenueUsd) },
-                            { label: `Возвраты за период (${data.refundsCount})`, value: `−${usd(data.refundsRevenueUsd)}` },
-                          ]
-                        : [{ label: 'Выручка', value: usd(data.revenueUsd) }]),
-                      { label: 'Себестоимость проданного', value: `−${usd(data.cogsUsd)}` },
-                      ...(data.bonusDeviceProfitUsd ? [{ label: 'Прибыль бонусных телефонов (не доход)', value: `−${usd(data.bonusDeviceProfitUsd)}` }] : []),
-                      ...(data.periodRefundPenaltiesUsd ? [{ label: 'Удержано при возвратах', value: `+${usd(data.periodRefundPenaltiesUsd)}` }] : []),
-                      { label: 'Расходы (включая зарплату)', value: `−${usd(data.expensesUsd)}` },
-                    ].map((row) => (
-                      <div key={row.label} className="flex items-center justify-between text-fg-muted">
-                        <span>{row.label}</span>
-                        <span className="font-semibold font-mono">{row.value}</span>
-                      </div>
-                    ))}
-                  </div>
-
-                  <div className="flex items-center justify-between pt-1.5 border-t border-border font-bold">
-                    <span>Чистая прибыль</span>
-                    <span className={`font-mono ${data.netProfitUsd >= 0 ? 'text-accent' : 'text-danger'}`}>
-                      {signedUsd(data.netProfitUsd)}
-                    </span>
-                  </div>
+            {/* How net profit is built — clearly distinguishing core operations from separate bonus income */}
+            <div className="p-3.5 rounded-xl bg-surface border border-border space-y-2.5 text-sm shadow-xs">
+              <div className="space-y-2.5">
+                <div className="flex items-center justify-between pb-1 border-b border-border">
+                  <h4 className="text-[10px] font-bold text-fg-subtle uppercase tracking-wider">Как считается чистая прибыль</h4>
+                  <span className="text-[10px] font-semibold text-accent bg-accent/10 px-2 py-0.5 rounded-md border border-accent/20">
+                    Операционная деятельность
+                  </span>
+                </div>
+                <div className="space-y-1.5">
+                  {[
+                    ...(data.refundsCount
+                      ? [
+                          { label: 'Продажи и обмены', value: usd(data.revenueUsd + data.refundsRevenueUsd) },
+                          { label: `Возвраты за период (${data.refundsCount})`, value: `−${usd(data.refundsRevenueUsd)}` },
+                        ]
+                      : [{ label: 'Выручка', value: usd(data.revenueUsd) }]),
+                    { label: 'Себестоимость проданного', value: `−${usd(data.cogsUsd)}` },
+                    ...(data.bonusDeviceProfitUsd ? [{ label: 'Прибыль бонусных телефонов (не доход)', value: `−${usd(data.bonusDeviceProfitUsd)}` }] : []),
+                    ...(data.periodRefundPenaltiesUsd ? [{ label: 'Удержано при возвратах', value: `+${usd(data.periodRefundPenaltiesUsd)}` }] : []),
+                    { label: 'Расходы (включая зарплату)', value: `−${usd(data.expensesUsd)}` },
+                  ].map((row) => (
+                    <div key={row.label} className="flex items-center justify-between text-fg-muted">
+                      <span>{row.label}</span>
+                      <span className="font-semibold font-mono">{row.value}</span>
+                    </div>
+                  ))}
                 </div>
 
-                {/* Supplier bonuses: for reference only — not income, not in profit, not credited anywhere */}
-                <div className="pt-2 border-t border-dashed border-border/80 space-y-1.5 mt-2">
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="text-xs font-semibold text-info flex items-center gap-1.5">
-                      <Sparkles className="w-3.5 h-3.5" />
-                      <span>Бонусы поставщиков — справочно</span>
-                    </span>
-                    <span className="text-[10px] text-fg-subtle">не входят в прибыль</span>
-                  </div>
-                  <div className="flex items-center justify-between text-[11px] text-fg-subtle">
-                    <span>Денежные бонусы</span>
-                    <span className="font-medium text-fg-muted font-mono">{usd(data.periodCashBonusesUsd || 0)}</span>
-                  </div>
-                  <div className="flex items-center justify-between text-[11px] text-fg-subtle">
-                    <span>Прибыль бонусных телефонов</span>
-                    <span className="font-medium text-fg-muted font-mono">{usd(data.bonusDeviceProfitUsd || 0)}</span>
-                  </div>
+                <div className="flex items-center justify-between pt-1.5 border-t border-border font-bold">
+                  <span>Чистая прибыль</span>
+                  <span className={`font-mono ${data.netProfitUsd >= 0 ? 'text-accent' : 'text-danger'}`}>
+                    {signedUsd(data.netProfitUsd)}
+                  </span>
                 </div>
               </div>
 
-              {/* Capital & Active Assets Snapshot (Stock vs Cash) */}
-              <div className="p-3.5 rounded-xl bg-surface border border-border space-y-3 text-sm flex flex-col justify-between shadow-xs">
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between pb-1 border-b border-border">
-                    <h4 className="text-[10px] font-bold text-fg-subtle uppercase tracking-wider">Структура активов и капитал</h4>
-                    <span className="text-[10px] font-semibold text-info bg-info/10 px-2 py-0.5 rounded-md border border-info/20">
-                      Баланс
-                    </span>
-                  </div>
-
-                  <div className="space-y-2">
-                    <div className="p-2.5 rounded-xl bg-surface-raised border border-border flex items-center justify-between gap-2">
-                      <div className="flex items-center gap-2.5">
-                        <div className="w-8 h-8 rounded-lg bg-accent/10 border border-accent/20 flex items-center justify-center text-accent shrink-0">
-                          <Briefcase className="w-4 h-4" />
-                        </div>
-                        <div>
-                          <span className="text-[10px] text-fg-subtle uppercase font-semibold block">Капитал учредителей</span>
-                          <span className="text-xs text-fg-subtle">Вложено в оборот бизнеса</span>
-                        </div>
-                      </div>
-                      <span className="font-bold text-fg text-sm font-mono">{usd(totalCapitalInvested)}</span>
-                    </div>
-
-                    <div className="p-2.5 rounded-xl bg-surface-raised border border-border flex items-center justify-between gap-2">
-                      <div className="flex items-center gap-2.5">
-                        <div className="w-8 h-8 rounded-lg bg-info/10 border border-info/20 flex items-center justify-center text-info shrink-0">
-                          <Package className="w-4 h-4" />
-                        </div>
-                        <div>
-                          <span className="text-[10px] text-fg-subtle uppercase font-semibold block">В товаре на складах</span>
-                          <span className="text-xs text-fg-subtle">Остаток на балансе ({totalStockCount} шт)</span>
-                        </div>
-                      </div>
-                      <span className="font-bold text-info text-sm font-mono">{usd(totalStockCostUsd)}</span>
-                    </div>
-
-                    <div className="p-2.5 rounded-xl bg-surface-raised border border-border flex items-center justify-between gap-2">
-                      <div className="flex items-center gap-2.5">
-                        <div className="w-8 h-8 rounded-lg bg-accent/10 border border-accent/20 flex items-center justify-center text-accent shrink-0">
-                          <Banknote className="w-4 h-4" />
-                        </div>
-                        <div>
-                          <span className="text-[10px] text-fg-subtle uppercase font-semibold block">Наличными в кассах</span>
-                          <span className="text-xs text-fg-subtle">Суммарный кассовый остаток</span>
-                        </div>
-                      </div>
-                      <span className="font-bold text-accent text-sm font-mono">{usd(totalCashInRegistersUsd)}</span>
-                    </div>
-                  </div>
+              {/* Supplier bonuses: for reference only — not income, not in profit, not credited anywhere */}
+              <div className="pt-2 border-t border-dashed border-border/80 space-y-1.5 mt-2">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-xs font-semibold text-info flex items-center gap-1.5">
+                    <Sparkles className="w-3.5 h-3.5" />
+                    <span>Бонусы поставщиков — справочно</span>
+                  </span>
+                  <span className="text-[10px] text-fg-subtle">не входят в прибыль</span>
                 </div>
-
-                {(() => {
-                  const totalAssets = totalStockCostUsd + totalCashInRegistersUsd;
-                  const stockPct = totalAssets > 0 ? Math.round((totalStockCostUsd / totalAssets) * 100) : 50;
-                  const cashPct = 100 - stockPct;
-                  return (
-                    <div className="pt-2 border-t border-dashed border-border/80 space-y-2 mt-2">
-                      <div className="flex items-center justify-between text-[11px]">
-                        <span className="text-fg-subtle">
-                          Всего активов: <strong className="text-fg font-mono font-bold">{usd(totalAssets)}</strong>
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setActivePage('OWNERS');
-                            navigate('/owners');
-                          }}
-                          className="text-accent text-xs font-semibold hover:underline flex items-center gap-1 cursor-pointer"
-                        >
-                          Управление долями →
-                        </button>
-                      </div>
-
-                      <div className="space-y-1">
-                        <div className="flex items-center justify-between text-[10px] text-fg-subtle">
-                          <span className="flex items-center gap-1">
-                            <span className="w-2 h-2 rounded-full bg-info" />
-                            Товар: <strong className="text-fg-muted font-mono">{stockPct}%</strong>
-                          </span>
-                          <span className="flex items-center gap-1">
-                            <span className="w-2 h-2 rounded-full bg-accent" />
-                            Кассы: <strong className="text-fg-muted font-mono">{cashPct}%</strong>
-                          </span>
-                        </div>
-                        <div className="w-full h-1.5 rounded-full bg-surface-raised overflow-hidden flex border border-border">
-                          <div className="bg-info h-full transition-all duration-300" style={{ width: `${stockPct}%` }} />
-                          <div className="bg-accent h-full transition-all duration-300" style={{ width: `${cashPct}%` }} />
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })()}
+                <div className="flex items-center justify-between text-[11px] text-fg-subtle">
+                  <span>Денежные бонусы</span>
+                  <span className="font-medium text-fg-muted font-mono">{usd(data.periodCashBonusesUsd || 0)}</span>
+                </div>
+                <div className="flex items-center justify-between text-[11px] text-fg-subtle">
+                  <span>Прибыль бонусных телефонов</span>
+                  <span className="font-medium text-fg-muted font-mono">{usd(data.bonusDeviceProfitUsd || 0)}</span>
+                </div>
               </div>
             </div>
 
-            {/* Distribution to partners per store & balance */}
-            {owners.length > 0 && (
-              <div className="p-3.5 rounded-xl bg-surface border border-border space-y-3 text-sm">
-                <div className="flex items-center justify-between pb-1.5 border-b border-border">
-                  <h4 className="text-[10px] font-bold text-fg-subtle uppercase tracking-wider flex items-center gap-1.5">
-                    <Users className="w-3.5 h-3.5 text-accent" />
-                    <span>Партнёры: начисления по магазинам и остаток</span>
-                  </h4>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setActivePage('OWNERS');
-                      navigate('/owners');
-                    }}
-                    className="text-xs font-semibold text-accent hover:underline flex items-center gap-1 cursor-pointer"
-                  >
-                    Партнеры и капитал →
-                  </button>
-                </div>
 
-                {/* Overall summary cards for Admin and Partner */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                  {sortedOwners.map((owner) => {
-                    const isOwnerAdmin = owner.id === adminOwner?.id || (!owner.storeId && users.find(u => u.id === owner.userId)?.role === 'ADMIN');
-                    const ownerStoreId = getOwnerStoreId(owner);
-                    const attachedStore = ownerStoreId ? stores.find(s => s.id === ownerStoreId) : undefined;
-                    // Shares are per store: list each store this owner shares in.
-                    const ownerStoreShares = storeProfitShares
-                      .filter((sh) => sh.ownerId === owner.id)
-                      .map((sh) => `${formatStoreName(stores.find((st) => st.id === sh.storeId)?.name ?? 'Магазин')} ${sh.sharePercent}%`)
-                      .join(', ');
-                    const { periodAccruedUsd, periodAccruedTjs } = getOwnerPeriodTotal(owner, data);
-                    return (
-                      <div key={owner.id} className="p-3 rounded-xl bg-surface-raised border border-border flex flex-col justify-between gap-2.5 shadow-xs">
-                        <div className="flex items-start justify-between gap-2">
-                          <div>
-                            <div className="flex items-center gap-2">
-                              <div className="w-6 h-6 rounded-full bg-accent/10 border border-accent/20 flex items-center justify-center text-accent text-xs font-bold shrink-0">
-                                {owner.name.charAt(0).toUpperCase()}
-                              </div>
-                              <span className="text-xs sm:text-sm font-bold text-fg">{owner.name}</span>
-                              {attachedStore && (
-                                <span className="text-[10px] px-1.5 py-0.2 rounded bg-surface border border-border text-fg-subtle font-semibold shrink-0">
-                                  {formatStoreName(attachedStore.name)}
-                                </span>
-                              )}
-                            </div>
-                            <p className="text-[11px] text-fg-subtle mt-1">
-                              {isOwnerAdmin ? (
-                                <>Остаток прибыли каждого магазина после долей партнёров</>
-                              ) : ownerStoreShares ? (
-                                <>Доля: <strong className="text-fg-muted">{ownerStoreShares}</strong></>
-                              ) : (
-                                <span className="text-warning font-semibold">Доля в магазинах не задана (0%)</span>
-                              )}
-                            </p>
-                          </div>
-                          <div className="text-right shrink-0">
-                            <p className="text-[10px] text-fg-subtle uppercase">Остаток к выплате</p>
-                            <p className="text-sm font-bold text-warning">${(owner.availableProfitUsd || 0).toLocaleString()} USD</p>
-                          </div>
-                        </div>
-
-                        <div className="pt-2 border-t border-border flex items-center justify-between text-xs">
-                          <span className="text-fg-subtle">Начислено за {periodLabel}:</span>
-                          <span className={`font-bold ${periodAccruedUsd >= 0 ? 'text-accent' : 'text-danger'}`}>
-                            {signedUsd(periodAccruedUsd)} <span className="font-normal text-fg-subtle text-[11px]">({tjs(periodAccruedTjs)})</span>
-                          </span>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-
-                {/* Per-store breakdown table */}
-                <div className="space-y-1.5 pt-1">
-                  <p className="text-[10px] font-bold text-fg-subtle uppercase tracking-wider">
-                    Начисления по магазинам ({selectedStore === 'all' ? 'все магазины' : formatStoreName(retailStores.find(s => s.id === selectedStore)?.name || 'выбранный магазин')}):
-                  </p>
-                  <div className="overflow-x-auto rounded-lg border border-border">
-                    <table className="w-full text-left text-xs">
-                      <thead>
-                        <tr className="border-b border-border bg-surface-raised text-[10px] text-fg-subtle uppercase">
-                          <th className="py-2 px-3">Магазин / Точка</th>
-                          <th className="py-2 px-3 text-right">Чистая прибыль</th>
-                          {sortedOwners.map((owner) => {
-                            const isOwnerAdmin = owner.id === adminOwner?.id || (!owner.storeId && users.find(u => u.id === owner.userId)?.role === 'ADMIN');
-                            const ownerStoreId = getOwnerStoreId(owner);
-                            const attachedStore = ownerStoreId ? stores.find(s => s.id === ownerStoreId) : undefined;
-                            return (
-                              <th key={owner.id} className="py-2 px-3 text-right">
-                                {owner.name} {attachedStore ? `(${formatStoreName(attachedStore.name)})` : isOwnerAdmin ? '(Все магазины)' : ''}
-                              </th>
-                            );
-                          })}
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-border">
-                        {(selectedStore === 'all' ? data.storeBreakdown : data.storeBreakdown.filter(s => s.storeId === selectedStore)).map((store) => (
-                          <tr key={store.storeId} className="hover:bg-surface-raised/50">
-                            <td className="py-2.5 px-3 font-semibold text-fg-muted flex items-center gap-1.5">
-                              <StoreIcon className="w-3.5 h-3.5 text-accent shrink-0" />
-                              <span>{formatStoreName(store.storeName)}</span>
-                            </td>
-                            <td className={`py-2.5 px-3 text-right font-bold ${store.netProfitUsd >= 0 ? 'text-accent' : 'text-danger'}`}>
-                              {signedUsd(store.netProfitUsd)}
-                            </td>
-                            {sortedOwners.map((owner) => {
-                              const share = getOwnerShareForStore(owner, store.storeId);
-                              const ownerProfit = share > 0 ? splitStoreAmount(store.storeId, store.netProfitUsd)[owner.id] ?? 0 : 0;
-                              return (
-                                <td key={owner.id} className={`py-2.5 px-3 text-right font-bold ${share === 0 ? 'text-fg-subtle/40 font-normal' : ownerProfit >= 0 ? 'text-fg-muted' : 'text-danger'}`}>
-                                  {share > 0 ? signedUsd(ownerProfit) : '—'}
-                                </td>
-                              );
-                            })}
-                          </tr>
-                        ))}
-
-                        {/* Central office general expenses row if viewing all stores (bonuses are not anyone's) */}
-                        {selectedStore === 'all' && data.mainWarehouseExpenses.expensesUsd > 0 && (() => {
-                          const centralNetUsd = -data.mainWarehouseExpenses.expensesUsd;
-                          return (
-                            <tr className="hover:bg-surface-raised/50 bg-surface-raised/20">
-                              <td className="py-2.5 px-3 text-fg-subtle flex items-center gap-1.5">
-                                <Warehouse className="w-3.5 h-3.5 text-fg-subtle shrink-0" />
-                                <span>Центральный офис (общие расходы)</span>
-                              </td>
-                              <td className={`py-2.5 px-3 text-right font-semibold ${centralNetUsd >= 0 ? 'text-accent' : 'text-danger'}`}>
-                                {signedUsd(centralNetUsd)}
-                              </td>
-                              {sortedOwners.map((owner) => {
-                                const isOwnerAdmin = owner.id === adminOwner?.id || (!owner.storeId && users.find(u => u.id === owner.userId)?.role === 'ADMIN');
-                                const ownerCentral = isOwnerAdmin ? centralNetUsd : 0;
-                                return (
-                                  <td key={owner.id} className={`py-2.5 px-3 text-right font-semibold ${!isOwnerAdmin ? 'text-fg-subtle/40 font-normal' : ownerCentral >= 0 ? 'text-fg-muted' : 'text-danger'}`}>
-                                    {isOwnerAdmin ? signedUsd(ownerCentral) : '—'}
-                                  </td>
-                                );
-                              })}
-                            </tr>
-                          );
-                        })()}
-
-                        {/* Total Row */}
-                        <tr className="border-t-2 border-border bg-surface-raised font-bold text-fg-muted">
-                          <td className="py-2.5 px-3 uppercase text-[11px]">ИТОГО НАЧИСЛЕНО:</td>
-                          <td className={`py-2.5 px-3 text-right ${data.netProfitUsd >= 0 ? 'text-accent' : 'text-danger'}`}>
-                            {signedUsd(data.netProfitUsd)}
-                          </td>
-                          {sortedOwners.map((owner) => {
-                            const { periodAccruedUsd } = getOwnerPeriodTotal(owner, data);
-                            return (
-                              <td key={owner.id} className={`py-2.5 px-3 text-right ${periodAccruedUsd >= 0 ? 'text-accent' : 'text-danger'}`}>
-                                {signedUsd(periodAccruedUsd)}
-                              </td>
-                            );
-                          })}
-                        </tr>
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {data.topSuppliersByDebt.length > 0 && (
-              <div className="p-3.5 rounded-xl bg-surface border border-border space-y-2.5">
-                <h4 className="text-[10px] font-bold text-fg-subtle uppercase tracking-wider flex items-center gap-1.5">
-                  <ArrowDownRight className="w-3.5 h-3.5 text-danger" />
-                  <span>Долг поставщикам: {usd(data.totalSupplierDebtUsd)}</span>
-                </h4>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left text-xs">
-                    <thead>
-                      <tr className="border-b border-border text-[10px] text-fg-subtle uppercase">
-                        <th className="py-2 px-3">Поставщик</th>
-                        <th className="py-2 px-3 text-right">Закуплено</th>
-                        <th className="py-2 px-3 text-right">Оплачено</th>
-                        <th className="py-2 px-3 text-right">Долг</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-border">
-                      {data.topSuppliersByDebt.map((s) => (
-                        <tr key={s.id}>
-                          <td className="py-2 px-3 font-bold text-fg-muted">{s.name}</td>
-                          <td className="py-2 px-3 text-right text-fg-subtle">{usd(s.totalPurchasedUsd)}</td>
-                          <td className="py-2 px-3 text-right text-fg-muted">{usd(s.totalPaidUsd)}</td>
-                          <td className="py-2 px-3 text-right font-bold text-danger">{usd(s.totalDebtUsd)}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            )}
 
             {data.modelCounts.length > 0 && (
               <div className="p-3.5 rounded-xl bg-surface border border-border space-y-2.5">
@@ -927,10 +560,6 @@ export const ProfitReport: React.FC<ProfitReportProps> = ({
         ) : (
           <>
             <div className="p-3 sm:p-3.5 rounded-xl bg-surface border border-border shadow-xs flex flex-wrap items-center justify-between gap-3 text-xs">
-              <div className="flex items-center gap-2">
-                <Briefcase className="w-4 h-4 text-accent shrink-0" />
-                <span className="text-fg-subtle">Общий капитал: <strong className="text-fg font-bold">{usd(totalCapitalInvested)}</strong></span>
-              </div>
               <div className="flex items-center gap-2">
                 <Package className="w-4 h-4 text-info shrink-0" />
                 <span className="text-fg-subtle">В товаре на складах: <strong className="text-info font-bold">{usd(totalStockCostUsd)}</strong> ({totalStockCount} шт)</span>
@@ -1039,57 +668,6 @@ export const ProfitReport: React.FC<ProfitReportProps> = ({
                     </div>
                   </div>
 
-                  {/* Partner / Admin profit allocation for this store */}
-                  {(() => {
-                    const storePartner = getStorePartner(store.storeId);
-                    const storeOwners = storePartner && storePartner.id !== adminOwner?.id
-                      ? [adminOwner, storePartner].filter(Boolean)
-                      : [adminOwner].filter(Boolean);
-
-                    if (storeOwners.length === 0) return null;
-
-                    return (
-                      <div className="px-3.5 pb-3.5 pt-2.5 border-t border-border">
-                        <div className="flex items-center justify-between gap-2 mb-2">
-                          <span className="text-[10px] font-bold text-fg-subtle uppercase tracking-wider flex items-center gap-1.5">
-                            <Users className="w-3.5 h-3.5 text-accent" />
-                            <span>Распределение чистой прибыли:</span>
-                          </span>
-                          {!storePartner && (
-                            <span className="text-[10px] text-fg-subtle italic">
-                              100% администратору
-                            </span>
-                          )}
-                        </div>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
-                          {storeOwners.map((owner) => {
-                            const share = getOwnerShareForStore(owner, store.storeId);
-                            const ownerStoreNet = share > 0 ? splitStoreAmount(store.storeId, store.netProfitUsd)[owner.id] ?? 0 : 0;
-                            const ownerStoreNetTjs = share > 0 ? splitStoreAmount(store.storeId, store.netProfitTjs)[owner.id] ?? 0 : 0;
-                            return (
-                              <div key={owner.id} className="p-2.5 rounded-xl bg-surface-raised/60 border border-border flex items-center justify-between gap-2">
-                                <div className="flex items-center gap-2 min-w-0">
-                                  <div className="w-6 h-6 rounded-full bg-accent/10 border border-accent/20 flex items-center justify-center text-accent text-xs font-bold shrink-0">
-                                    {owner.name.charAt(0).toUpperCase()}
-                                  </div>
-                                  <span className="font-semibold text-xs text-fg truncate">{owner.name}</span>
-                                  <span className="text-[10px] px-1.5 py-0.2 rounded bg-surface border border-border text-fg-subtle font-semibold shrink-0">
-                                    {share}%
-                                  </span>
-                                </div>
-                                <div className="text-right shrink-0">
-                                  <span className={`font-bold text-xs block ${ownerStoreNet >= 0 ? 'text-accent' : 'text-danger'}`}>
-                                    {signedUsd(ownerStoreNet)}
-                                  </span>
-                                  <span className="text-[10px] text-fg-subtle block">{tjs(ownerStoreNetTjs)}</span>
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    );
-                  })()}
 
                   {expanded && (
                     <div className="animate-in fade-in-50 duration-200 px-3.5 pb-3.5 pt-3 border-t border-border grid sm:grid-cols-2 gap-4">

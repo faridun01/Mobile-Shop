@@ -1,13 +1,14 @@
 import type { Express } from 'express';
-import { authenticateJwt, type AuthenticatedRequest } from '../../auth/auth.middleware';
+import { authenticateJwt, requireRoles, type AuthenticatedRequest } from '../../auth/auth.middleware';
 import { DailyClosingService } from './daily-closing.service';
+import { prisma } from '../../prisma/prisma.service';
 
 export function registerDailyClosingRoutes(app: Express) {
   // Get summary of expected cash for today or a specific date
   app.get('/api/daily-closings/summary', authenticateJwt, async (req: AuthenticatedRequest, res, next) => {
     try {
       const user = req.user!;
-      let storeId = typeof req.query.storeId === 'string' && req.query.storeId.trim() !== ''
+      let storeId = typeof req.query.storeId === 'string' && req.query.storeId.trim() !== '' && req.query.storeId !== 'all'
         ? req.query.storeId.trim()
         : undefined;
 
@@ -17,6 +18,17 @@ export function registerDailyClosingRoutes(app: Express) {
         }
         storeId = user.storeId;
       } else if (!storeId) {
+        // Fallback for admin: if only 1 retail store exists, use it
+        const retailStores = await prisma.store.findMany({
+          where: { active: true, isMainWarehouse: false },
+          orderBy: { name: 'asc' },
+        });
+        if (retailStores.length === 1) {
+          storeId = retailStores[0].id;
+        }
+      }
+
+      if (!storeId) {
         return res.status(400).json({ message: 'Укажите storeId' });
       }
 
@@ -39,7 +51,7 @@ export function registerDailyClosingRoutes(app: Express) {
   app.post('/api/daily-closings', authenticateJwt, async (req: AuthenticatedRequest, res, next) => {
     try {
       const user = req.user!;
-      let storeId = typeof req.body?.storeId === 'string' && req.body.storeId.trim() !== ''
+      let storeId = typeof req.body?.storeId === 'string' && req.body.storeId.trim() !== '' && req.body.storeId !== 'all'
         ? req.body.storeId.trim()
         : undefined;
 
@@ -49,6 +61,16 @@ export function registerDailyClosingRoutes(app: Express) {
         }
         storeId = user.storeId;
       } else if (!storeId) {
+        const retailStores = await prisma.store.findMany({
+          where: { active: true, isMainWarehouse: false },
+          orderBy: { name: 'asc' },
+        });
+        if (retailStores.length === 1) {
+          storeId = retailStores[0].id;
+        }
+      }
+
+      if (!storeId) {
         return res.status(400).json({ message: 'Укажите storeId' });
       }
 
@@ -63,6 +85,16 @@ export function registerDailyClosingRoutes(app: Express) {
       });
 
       res.status(201).json(closing);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Re-open / delete a daily closing (ADMIN only)
+  app.delete('/api/daily-closings/:id', authenticateJwt, requireRoles('ADMIN'), async (req: AuthenticatedRequest, res, next) => {
+    try {
+      const result = await DailyClosingService.delete(req.params.id, req.user!.userId);
+      res.json(result);
     } catch (error) {
       next(error);
     }

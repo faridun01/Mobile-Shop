@@ -442,4 +442,42 @@ export class DailyClosingService {
       },
     });
   }
+
+  /**
+   * Deletes / re-opens a closing record (ADMIN only).
+   */
+  public static async delete(id: string, actorUserId: string) {
+    return prisma.$transaction(async (tx: TransactionClient) => {
+      const actor = await resolveActor(tx, actorUserId);
+      const closing = await tx.dailyCashClosing.findUnique({
+        where: { id },
+        include: { store: { select: { id: true, name: true } } },
+      });
+      if (!closing) {
+        throw Object.assign(new Error('Запись закрытия смены не найдена'), { statusCode: 404 });
+      }
+
+      await tx.dailyCashClosing.delete({ where: { id } });
+
+      await tx.auditLog.create({
+        data: {
+          userId: actor.id,
+          userName: actor.name,
+          userRole: actor.role,
+          storeName: closing.store?.name || 'Магазин',
+          action: 'DAILY_CASH_CLOSING_REOPENED',
+          targetId: closing.id,
+          details: `Переоткрыта смена за ${closing.businessDate} магазина «${closing.store?.name}», закрытая ранее (${closing.actualCashTjs} TJS). Запись удалена для повторного закрытия.`,
+        },
+      });
+
+      onCommit(() => {
+        RealtimeSyncGateway.broadcast('STORE_UPDATED', { storeId: closing.storeId });
+        RealtimeSyncGateway.broadcast('FINANCE_UPDATED', {});
+      });
+
+      return { success: true, message: 'Смена переоткрыта для редактирования' };
+    });
+  }
 }
+

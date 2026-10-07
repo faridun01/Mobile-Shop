@@ -415,37 +415,39 @@ export const SettingsPage: React.FC = () => {
                   </div>
                 </div>
 
-                {/* 2. Exchange Rate Card */}
-                <div className="p-3.5 rounded-2xl bg-surface border border-border shadow-2xs flex flex-col justify-between gap-2.5">
-                  <div className="flex items-center justify-between pb-1.5 border-b border-border/50">
-                    <div className="flex items-center gap-2">
-                      <DollarSign className="w-3.5 h-3.5 text-accent shrink-0" />
-                      <h4 className="text-xs font-bold text-fg uppercase tracking-wide">Курс валют</h4>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={openDailyRateModal}
-                      className="px-2.5 py-1 rounded-lg bg-accent hover:bg-accent-strong text-[10px] font-bold text-accent-fg uppercase transition-colors shadow-2xs cursor-pointer"
-                    >
-                      Изменить
-                    </button>
-                  </div>
-
-                  <div className="px-3 py-1.5 rounded-xl bg-surface-raised border border-border/70 flex items-center justify-between gap-2">
-                    <div className="flex items-baseline gap-1.5">
-                      <span className="text-base sm:text-lg font-bold font-mono text-accent">
-                        {(todayRate?.rate ?? 9.5).toFixed(2)} TJS
-                      </span>
-                      <span className="text-[11px] text-fg-subtle">за $1 USD</span>
+                {/* 2. Exchange Rate Card - ADMIN only */}
+                {currentUser?.role === 'ADMIN' && (
+                  <div className="p-3.5 rounded-2xl bg-surface border border-border shadow-2xs flex flex-col justify-between gap-2.5">
+                    <div className="flex items-center justify-between pb-1.5 border-b border-border/50">
+                      <div className="flex items-center gap-2">
+                        <DollarSign className="w-3.5 h-3.5 text-accent shrink-0" />
+                        <h4 className="text-xs font-bold text-fg uppercase tracking-wide">Курс валют</h4>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={openDailyRateModal}
+                        className="px-2.5 py-1 rounded-lg bg-accent hover:bg-accent-strong text-[10px] font-bold text-accent-fg uppercase transition-colors shadow-2xs cursor-pointer"
+                      >
+                        Изменить
+                      </button>
                     </div>
 
-                    <div className="text-right">
-                      <span className="text-fg font-mono font-medium text-[11px]">
-                        {todayRate?.date}
-                      </span>
+                    <div className="px-3 py-1.5 rounded-xl bg-surface-raised border border-border/70 flex items-center justify-between gap-2">
+                      <div className="flex items-baseline gap-1.5">
+                        <span className="text-base sm:text-lg font-bold font-mono text-accent">
+                          {(todayRate?.rate ?? 9.5).toFixed(2)} TJS
+                        </span>
+                        <span className="text-[11px] text-fg-subtle">за $1 USD</span>
+                      </div>
+
+                      <div className="text-right">
+                        <span className="text-fg font-mono font-medium text-[11px]">
+                          {todayRate?.date}
+                        </span>
+                      </div>
                     </div>
                   </div>
-                </div>
+                )}
               </div>
             </div>
 

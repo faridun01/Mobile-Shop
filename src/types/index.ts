@@ -175,6 +175,7 @@ export interface Sale {
   sellerId: string;
   sellerName: string;
   customerName?: string;
+  customerPhone?: string;
   customerId?: string;
   items: SaleItem[];
   totalTjs: number;

@@ -6,6 +6,8 @@ import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
 import { EmptyState } from '../ui/EmptyState';
 import { DailyCashClosingModal } from './DailyCashClosingModal';
+import { useAppFields } from '../../context/AppContext';
+import { useUIStore } from '../../stores/useUIStore';
 import {
   CheckCircle2,
   AlertTriangle,
@@ -26,6 +28,8 @@ export const DailyCashClosingListPanel: React.FC<DailyCashClosingListPanelProps>
   month,
   storeId,
 }) => {
+  const { currentUser } = useAppFields('currentUser');
+  const { setDailyClosingModalOpen } = useUIStore();
   const [closings, setClosings] = useState<DailyCashClosing[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -109,25 +113,37 @@ export const DailyCashClosingListPanel: React.FC<DailyCashClosingListPanelProps>
   }, [closings]);
 
   return (
-    <div className="p-3 sm:p-5 space-y-4 max-w-7xl mx-auto">
+    <div className="space-y-4">
       {/* Top Action Bar */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-surface p-3.5 rounded-2xl border border-border">
         <div>
           <h2 className="text-sm font-bold text-fg flex items-center gap-2">
             <FileCheck2 className="w-4 h-4 text-accent" />
-            <span>Закрытия смен и Z-отчёты</span>
+            <span>Журнал Z-отчётов и закрытий смен</span>
           </h2>
+          <p className="text-xs text-fg-subtle mt-0.5">
+            Сверка фактических денег в кассе и расчётных остатков за смену
+          </p>
         </div>
 
         <div className="flex items-center gap-2">
           <Button
             variant="secondary"
-            size="md"
+            size="sm"
             leftIcon={RefreshCw}
             onClick={refresh}
             loading={loading}
           >
-            Обновить 
+            Обновить
+          </Button>
+          <Button
+            variant="primary"
+            size="sm"
+            leftIcon={FileCheck2}
+            onClick={() => setDailyClosingModalOpen(true, storeId || currentUser?.storeId || undefined)}
+            className="cursor-pointer"
+          >
+            Снять Z-отчёт
           </Button>
         </div>
       </div>

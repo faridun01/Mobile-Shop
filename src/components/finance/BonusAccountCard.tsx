@@ -64,7 +64,6 @@ export const BonusAccountCard: React.FC = () => {
   const openForm = (kind: Kind) => { setForm(kind); setAmount(''); setComment(''); };
   const submit = async () => {
     if (!form || busy || !amountValid) return;
-    if (form === 'payout' && !comment.trim()) return;
     setBusy(true);
     try {
       await apiClient(`/bonus-account/${form}`, { method: 'POST', body: JSON.stringify({ amountUsd: amount, comment: comment.trim() || undefined }) });
@@ -170,7 +169,7 @@ export const BonusAccountCard: React.FC = () => {
         footer={
           <>
             <Button variant="secondary" fullWidth onClick={() => setForm(null)} disabled={busy}>Отмена</Button>
-            <Button variant="primary" fullWidth loading={busy} disabled={!amountValid || (form === 'payout' && !comment.trim())} onClick={submit}>
+            <Button variant="primary" fullWidth loading={busy} disabled={!amountValid} onClick={submit}>
               {form ? `${KIND_TEXT[form].action}${amountValid ? ` ${formatUsd(amountNumber)}` : ''}` : ''}
             </Button>
           </>
@@ -186,14 +185,16 @@ export const BonusAccountCard: React.FC = () => {
             />
             {amount && !amountValid && <span className="block text-xs text-danger mt-1">Сумма от $0.01 до {formatUsd(available)}</span>}
           </label>
-          <label className="block">
-            <span className="block text-xs text-fg-subtle mb-1 font-semibold">{form === 'payout' ? 'Кому и за что *' : 'Комментарий'}</span>
-            <input
-              type="text" value={comment} onChange={(e) => setComment(e.target.value)}
-              className="w-full min-h-11 rounded-xl bg-surface-raised border border-border px-3 text-sm text-fg focus:border-accent focus:outline-none"
-            />
-          </label>
-          <p className="text-xs text-fg-subtle">Сумма в сомони берётся по курсам, по которым деньги поступили на счёт. Прибылью владельцев это не становится.</p>
+          {form === 'transfer' && (
+            <label className="block">
+              <span className="block text-xs text-fg-subtle mb-1 font-semibold">Комментарий (необязательно)</span>
+              <input
+                type="text" value={comment} onChange={(e) => setComment(e.target.value)}
+                className="w-full min-h-11 rounded-xl bg-surface-raised border border-border px-3 text-sm text-fg focus:border-accent focus:outline-none"
+              />
+            </label>
+          )}
+          <p className="text-xs text-fg-subtle">Сумма в сомони берётся по курсам, по которым деньги поступили на счёт.</p>
         </div>
       </Dialog>
 

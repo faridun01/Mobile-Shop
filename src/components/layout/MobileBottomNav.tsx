@@ -56,7 +56,7 @@ export const MobileBottomNav: React.FC = () => {
   };
 
   if (isCentralCashMode) {
-    const isFinanceActive = location.pathname === '/finance' || location.pathname === '/';
+    const isFinanceActive = location.pathname === '/reports' || location.pathname === '/finance' || location.pathname === '/';
 
     return (
       <nav className="app-bottom-nav md:hidden shrink-0 w-full bg-surface border-t border-border flex items-stretch justify-around select-none">
@@ -83,8 +83,8 @@ export const MobileBottomNav: React.FC = () => {
         <div className="flex-1 flex justify-center items-center relative">
           <button
             onClick={() => {
-              setActivePage('FINANCE');
-              navigate('/finance');
+              setActivePage('REPORTS');
+              navigate('/reports');
             }}
             className={`w-13 h-13 -mt-4 rounded-full flex flex-col items-center justify-center active:scale-95 transition-transform shadow-md ${
               isFinanceActive ? 'bg-accent-strong text-accent-fg' : 'bg-accent text-accent-fg'
