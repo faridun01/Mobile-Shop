@@ -8,6 +8,8 @@ export const NAV_PAGE_ROUTES: Record<string, string> = {
   SALES_HISTORY: '/sales-history',
   INVENTORY: '/inventory',
   PURCHASE: '/purchase',
+  STORE_RECEIPT: '/receipts',
+  REVISION: '/revision',
   TRANSFER: '/transfer',
   EXCHANGE: '/exchange',
   REPAIR: '/repair',

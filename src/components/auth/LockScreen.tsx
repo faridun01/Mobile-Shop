@@ -121,20 +121,21 @@ export const LockScreen: React.FC = () => {
       aria-modal="true"
       aria-labelledby="lock-title"
       data-pwa-ignore="true"
-      className="app-safe-area safe-area-pt safe-area-pb fixed inset-0 z-[2147483000] bg-bg flex items-center justify-center p-4 overflow-y-auto"
+      data-lock-screen="true"
+      className="app-safe-area safe-area-pt safe-area-pb fixed inset-0 z-[2147483000] bg-bg flex flex-col items-center overflow-y-auto overscroll-contain p-3 sm:p-4"
     >
-      <div className="w-full max-w-sm">
-        <div className="text-center mb-5">
-          <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-surface border border-border text-accent mb-3">
-            <Lock className="w-7 h-7" />
+      <div className="w-full max-w-sm my-auto flex flex-col py-1 sm:py-2">
+        <div className="login-brand-header text-center mb-3 sm:mb-5">
+          <div className="login-brand-icon inline-flex items-center justify-center w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-surface border border-border text-accent mb-2 sm:mb-3">
+            <Lock className="w-6 h-6 sm:w-7 sm:h-7" />
           </div>
-          <h1 id="lock-title" className="text-lg font-bold text-fg">Сеанс заблокирован</h1>
-          <p className="text-sm text-fg-subtle mt-1">
+          <h1 id="lock-title" className="text-base sm:text-lg font-bold text-fg">Сеанс заблокирован</h1>
+          <p className="login-brand-subtitle text-xs sm:text-sm text-fg-subtle mt-1">
             Войдите, чтобы продолжить{unfinished ? ' — несохранённая работа сохранена на экране' : ''}.
           </p>
         </div>
 
-        <div className="bg-surface border border-border rounded-2xl p-5 space-y-4">
+        <div className="login-card bg-surface border border-border rounded-2xl p-4 sm:p-5 space-y-3 sm:space-y-4">
           {switchTo ? (
             <div className="space-y-3">
               <p className="text-sm text-fg-muted">

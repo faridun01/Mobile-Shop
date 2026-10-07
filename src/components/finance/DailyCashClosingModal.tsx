@@ -21,7 +21,6 @@ import {
   Clock,
   UserCheck,
   FileText,
-  Printer,
   ChevronDown,
   Store as StoreIcon,
   Sparkles,
@@ -278,10 +277,6 @@ export const DailyCashClosingModal: React.FC<DailyCashClosingModalProps> = ({
     }
   };
 
-  const handlePrint = () => {
-    window.print();
-  };
-
   return (
     <Dialog
       open={isOpen}
@@ -290,25 +285,16 @@ export const DailyCashClosingModal: React.FC<DailyCashClosingModalProps> = ({
       subtitle={isCentralCashForbidden ? 'Центральная касса · Только просмотр' : `${effectiveStoreName} · ${summary?.businessDate || explicitBusinessDate || 'Сегодня'}`}
       maxWidth="md"
       footer={
-        <div className="w-full flex items-center justify-between gap-3">
+        <div className="w-full flex flex-wrap items-center justify-between gap-2">
           {isCentralCashForbidden ? (
             <div className="w-full flex justify-end">
-              <Button variant="primary" size="md" onClick={onClose}>
+              <Button variant="primary" size="md" onClick={onClose} className="w-full sm:w-auto">
                 Понятно
               </Button>
             </div>
           ) : summary?.alreadyClosed ? (
             <>
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="secondary"
-                  size="md"
-                  leftIcon={Printer}
-                  onClick={handlePrint}
-                  className="hidden sm:inline-flex"
-                >
-                  Печать Z-отчёта
-                </Button>
+              <div className="flex items-center gap-2 flex-1 sm:flex-initial min-w-0">
                 {currentUser?.role === 'ADMIN' && summary.closing?.id && (
                   <Button
                     variant="ghost"
@@ -316,14 +302,14 @@ export const DailyCashClosingModal: React.FC<DailyCashClosingModalProps> = ({
                     leftIcon={RotateCcw}
                     onClick={handleReopenClosing}
                     loading={reopening}
-                    className="text-xs text-danger hover:text-danger hover:bg-danger/10"
+                    className="text-xs text-danger hover:text-danger hover:bg-danger/10 w-full sm:w-auto"
                   >
                     Переоткрыть смену
                   </Button>
                 )}
               </div>
-              <div className="flex-1 sm:flex-initial flex justify-end">
-                <Button variant="primary" size="md" onClick={onClose}>
+              <div className="flex-1 sm:flex-initial flex justify-end min-w-0">
+                <Button variant="primary" size="md" onClick={onClose} className="w-full sm:w-auto">
                   Закрыть
                 </Button>
               </div>
@@ -335,6 +321,7 @@ export const DailyCashClosingModal: React.FC<DailyCashClosingModalProps> = ({
                 size="md"
                 onClick={onClose}
                 disabled={submitting}
+                className="flex-1 sm:flex-initial"
               >
                 Отмена
               </Button>
@@ -346,9 +333,9 @@ export const DailyCashClosingModal: React.FC<DailyCashClosingModalProps> = ({
                 loading={submitting}
                 disabled={loading || parsedActualTjs === null}
                 leftIcon={CheckCircle2}
-                className="px-5 font-bold"
+                className="flex-1 sm:flex-initial px-4 font-bold"
               >
-                {showConfirmDiscrepancy ? 'Подтвердить закрытие' : 'Закрыть смену'}
+                {showConfirmDiscrepancy ? 'Подтвердить' : 'Закрыть смену'}
               </Button>
             </>
           )}
@@ -480,10 +467,10 @@ export const DailyCashClosingModal: React.FC<DailyCashClosingModalProps> = ({
                 <button
                   type="button"
                   onClick={handleAutofillExpected}
-                  className="w-full py-3 px-4 rounded-xl bg-accent text-accent-fg font-bold text-sm flex items-center justify-center gap-2 hover:opacity-90 active:scale-[0.99] transition-all cursor-pointer shadow-sm select-none"
+                  className="w-full py-3 px-3 sm:px-4 rounded-xl bg-accent text-accent-fg font-bold text-xs sm:text-sm flex items-center justify-center gap-2 hover:opacity-90 active:scale-[0.99] transition-all cursor-pointer shadow-sm select-none min-w-0"
                 >
                   <CheckCircle2 className="w-5 h-5 shrink-0" />
-                  <span>Всё сходится ({formatMoney(expectedTjs)} TJS)</span>
+                  <span className="truncate">Всё сходится ({formatMoney(expectedTjs)} TJS)</span>
                 </button>
               </div>
 

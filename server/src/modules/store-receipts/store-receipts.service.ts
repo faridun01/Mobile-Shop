@@ -28,10 +28,15 @@ function nextReceiptNumber(): string {
 /** Only these device fields ever reach store staff — never cost, supplier or warehouse data. */
 const SAFE_DEVICE = { id: true, imei: true, imei2: true, brand: true, model: true, ram: true, storage: true, color: true } as const;
 
-function requireStaffStore(user: StaffUser): string {
+function requireStaffStore(user: StaffUser, bodyStoreId?: string): string {
+  if (user.role === 'ADMIN') {
+    const storeId = user.storeId || bodyStoreId;
+    if (!storeId) throw fail('Укажите магазин для прихода', 400);
+    return storeId;
+  }
   if (user.role !== 'SELLER' && user.role !== 'PARTNER') throw fail('Приход товара оформляет сотрудник магазина', 403);
-  if (!user.storeId) throw fail('Пользователь не привязан ни к одному магазину', 403);
-  return user.storeId;
+  if (!user.storeId && !bodyStoreId) throw fail('Пользователь не привязан ни к одному магазину', 403);
+  return user.storeId || bodyStoreId!;
 }
 
 /** Why a device cannot be received into `storeId` (null when it can). */
@@ -46,8 +51,8 @@ function rejectionReason(device: { imei: string; storeId: string; status: string
 
 export class StoreReceiptsService {
   /** One scan: the phone must sit in the main warehouse. Returns only model details. */
-  public static async lookup(user: StaffUser, rawImei: unknown) {
-    const storeId = requireStaffStore(user);
+  public static async lookup(user: StaffUser, rawImei: unknown, bodyStoreId?: string) {
+    const storeId = requireStaffStore(user, bodyStoreId);
     const imei = normalizeImei(rawImei);
     if (!imei) throw fail('Введите или отсканируйте IMEI', 400);
     const warehouse = await prisma.store.findFirst({ where: { isMainWarehouse: true }, select: { id: true } });
@@ -65,8 +70,8 @@ export class StoreReceiptsService {
    * own store in one transaction and is on sale at once. Nothing is approved later — the
    * admin's acknowledgement is only a review mark. No money moves; purchase costs stay as they are.
    */
-  public static async create(user: StaffUser, rawImeis: unknown) {
-    const storeId = requireStaffStore(user);
+  public static async create(user: StaffUser, rawImeis: unknown, bodyStoreId?: string) {
+    const storeId = requireStaffStore(user, bodyStoreId);
     if (!Array.isArray(rawImeis) || rawImeis.length === 0) throw fail('Отсканируйте хотя бы один телефон', 400);
     if (rawImeis.length > MAX_ITEMS) throw fail(`В одном приходе не больше ${MAX_ITEMS} телефонов`, 400);
     const imeis = rawImeis.map(normalizeImei);

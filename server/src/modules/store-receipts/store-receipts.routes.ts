@@ -3,19 +3,19 @@ import { authenticateJwt, requireRoles, type AuthenticatedRequest } from '../../
 import { StoreReceiptsService } from './store-receipts.service';
 
 export function registerStoreReceiptRoutes(app: Express) {
-  // One scan of the receipt screen: is this phone in the main warehouse? (store staff only)
-  app.post('/api/store-receipts/lookup', authenticateJwt, requireRoles('SELLER', 'PARTNER'), async (req: AuthenticatedRequest, res, next) => {
+  // One scan of the receipt screen: is this phone in the main warehouse?
+  app.post('/api/store-receipts/lookup', authenticateJwt, requireRoles('SELLER', 'PARTNER', 'ADMIN'), async (req: AuthenticatedRequest, res, next) => {
     try {
-      res.json(await StoreReceiptsService.lookup(req.user!, req.body?.imei));
+      res.json(await StoreReceiptsService.lookup(req.user!, req.body?.imei, req.body?.storeId));
     } catch (error) {
       next(error);
     }
   });
 
-  // Completes the receipt into the employee's own store; any storeId in the body is ignored.
-  app.post('/api/store-receipts', authenticateJwt, requireRoles('SELLER', 'PARTNER'), async (req: AuthenticatedRequest, res, next) => {
+  // Completes the receipt into the store
+  app.post('/api/store-receipts', authenticateJwt, requireRoles('SELLER', 'PARTNER', 'ADMIN'), async (req: AuthenticatedRequest, res, next) => {
     try {
-      res.status(201).json(await StoreReceiptsService.create(req.user!, req.body?.imeis));
+      res.status(201).json(await StoreReceiptsService.create(req.user!, req.body?.imeis, req.body?.storeId));
     } catch (error) {
       next(error);
     }

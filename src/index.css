@@ -438,6 +438,65 @@ html[data-keyboard-open] .fixed.inset-0.items-center:not(.app-safe-area):not(.mo
 }
 
 /* =========================================================================
+   LOGIN & LOCK SCREEN KEYBOARD ADAPTATION
+   When software keyboard opens on mobile, preserve space so the login form,
+   inputs and submit button remain completely visible and comfortable.
+   ========================================================================= */
+html[data-keyboard-open] [data-login-page="true"],
+html[data-keyboard-open] [data-lock-screen="true"] {
+  justify-content: flex-start !important;
+  padding-top: max(0.25rem, var(--sa-top)) !important;
+  padding-bottom: 0.5rem !important;
+}
+
+html[data-keyboard-open] [data-login-page="true"] .login-brand-icon,
+html[data-keyboard-open] [data-lock-screen="true"] .login-brand-icon {
+  display: none !important;
+}
+
+html[data-keyboard-open] [data-login-page="true"] .login-brand-header,
+html[data-keyboard-open] [data-lock-screen="true"] .login-brand-header {
+  margin-bottom: 0.35rem !important;
+}
+
+html[data-keyboard-open] [data-login-page="true"] .login-brand-subtitle,
+html[data-keyboard-open] [data-lock-screen="true"] .login-brand-subtitle {
+  display: none !important;
+}
+
+html[data-keyboard-open] [data-login-page="true"] .login-card,
+html[data-keyboard-open] [data-lock-screen="true"] .login-card {
+  padding: 0.875rem 1rem !important;
+}
+
+html[data-keyboard-open] [data-login-page="true"] .login-footer {
+  display: none !important;
+}
+
+/* Landscape / short-height screens adaptation */
+@media (max-height: 580px) {
+  [data-login-page="true"] .login-brand-icon,
+  [data-lock-screen="true"] .login-brand-icon {
+    display: none !important;
+  }
+  [data-login-page="true"] .login-brand-header,
+  [data-lock-screen="true"] .login-brand-header {
+    margin-bottom: 0.35rem !important;
+  }
+  [data-login-page="true"] .login-brand-subtitle,
+  [data-lock-screen="true"] .login-brand-subtitle {
+    display: none !important;
+  }
+  [data-login-page="true"] .login-card,
+  [data-lock-screen="true"] .login-card {
+    padding: 0.875rem 1rem !important;
+  }
+  [data-login-page="true"] .login-footer {
+    display: none !important;
+  }
+}
+
+/* =========================================================================
    MODAL LAYER & DIALOG SHEETS (Consistent across all mobile screens & desktop)
    ========================================================================= */
 .modal-layer {
@@ -483,6 +542,42 @@ html[data-keyboard-open] .modal-layer .dialog-bottom-space {
 
 .dialog-bottom-space {
   padding-bottom: max(1rem, var(--sa-bottom));
+}
+
+/* Responsive dialog footer and button handling for all mobile phones */
+.dialog-footer {
+  box-sizing: border-box;
+}
+
+@media (max-width: 640px) {
+  .dialog-footer > button,
+  .dialog-footer > .btn {
+    flex: 1 1 calc(50% - 0.5rem);
+    min-width: 0;
+    max-width: 100%;
+  }
+  .dialog-footer > button:only-child,
+  .dialog-footer > .btn:only-child {
+    flex: 1 1 100%;
+  }
+}
+
+/* Ensure all modal dialog cards strictly respect screen boundaries on all mobile phones (320px - 430px) */
+.dialog-panel,
+.modal-layer [role="dialog"],
+.fixed.inset-0:not(.app-safe-area) > div:not(.modal-layer):not([data-modal-layer]),
+.fixed.inset-0:not(.app-safe-area) > form {
+  max-width: 100% !important;
+  box-sizing: border-box !important;
+}
+
+/* Ensure legacy modal overlays never exceed viewport height and allow comfortable touch scrolling */
+.fixed.inset-0:not(.app-safe-area) > div:not(.modal-layer):not([data-modal-layer]),
+.fixed.inset-0:not(.app-safe-area) > form {
+  max-height: calc(100dvh - max(1.5rem, calc(var(--sa-top) + var(--sa-bottom))));
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
 }
 
 /* Keep the navigation's space, but hide all of it (including the raised POS)

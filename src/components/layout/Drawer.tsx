@@ -10,6 +10,8 @@ import {
   ShoppingBag,
   History,
   Package,
+  PackagePlus,
+  ClipboardCheck,
   PlusCircle,
   ArrowLeftRight,
   RefreshCw,
@@ -50,6 +52,8 @@ const ITEM_STYLES: Record<string, { bg: string; text: string }> = {
   EXCHANGE: { bg: 'bg-violet-500/10 dark:bg-violet-500/20', text: 'text-violet-600 dark:text-violet-400' },
   REPAIR: { bg: 'bg-orange-500/10 dark:bg-orange-500/20', text: 'text-orange-600 dark:text-orange-400' },
   INVENTORY: { bg: 'bg-blue-500/10 dark:bg-blue-500/20', text: 'text-blue-600 dark:text-blue-400' },
+  STORE_RECEIPT: { bg: 'bg-indigo-500/10 dark:bg-indigo-500/20', text: 'text-indigo-600 dark:text-indigo-400' },
+  REVISION: { bg: 'bg-sky-500/10 dark:bg-sky-500/20', text: 'text-sky-600 dark:text-sky-400' },
   TRANSFER: { bg: 'bg-sky-500/10 dark:bg-sky-500/20', text: 'text-sky-600 dark:text-sky-400' },
   PURCHASE: { bg: 'bg-cyan-500/10 dark:bg-cyan-500/20', text: 'text-cyan-600 dark:text-cyan-400' },
   EXPENSES: { bg: 'bg-rose-500/10 dark:bg-rose-500/20', text: 'text-rose-600 dark:text-rose-400' },
@@ -130,6 +134,8 @@ export const Drawer: React.FC = () => {
           title: 'Склад и касса',
           items: [
             { id: 'INVENTORY', label: 'Склад товаров', icon: Package, roles: ['SELLER'] },
+            { id: 'STORE_RECEIPT', label: 'Приход товара', icon: PackagePlus, roles: ['SELLER'] },
+            { id: 'REVISION', label: 'Ревизия', icon: ClipboardCheck, roles: ['SELLER'] },
             { id: 'TRANSFER', label: 'Перемещение', icon: ArrowLeftRight, roles: ['SELLER'] },
             { id: 'EXPENSES', label: 'Расходы кассы', icon: Wallet, roles: ['SELLER'] },
           ],
@@ -151,6 +157,8 @@ export const Drawer: React.FC = () => {
           title: 'Склад',
           items: [
             { id: 'INVENTORY', label: 'Склад магазина', icon: Package, roles: ['PARTNER'] },
+            { id: 'STORE_RECEIPT', label: 'Приход товара', icon: PackagePlus, roles: ['PARTNER'] },
+            { id: 'REVISION', label: 'Ревизия', icon: ClipboardCheck, roles: ['PARTNER'] },
             { id: 'TRANSFER', label: 'Перемещение', icon: ArrowLeftRight, roles: ['PARTNER'] },
           ],
         },
@@ -185,6 +193,8 @@ export const Drawer: React.FC = () => {
           items: [
             { id: 'INVENTORY', label: 'Склад товаров', icon: Package, roles: ['ADMIN'] },
             { id: 'PURCHASE', label: 'Приходы (партии)', icon: PlusCircle, roles: ['ADMIN'] },
+            { id: 'STORE_RECEIPT', label: 'Приход в магазин', icon: PackagePlus, roles: ['ADMIN'] },
+            { id: 'REVISION', label: 'Ревизия', icon: ClipboardCheck, roles: ['ADMIN'] },
             { id: 'TRANSFER', label: 'Перемещение', icon: ArrowLeftRight, roles: ['ADMIN'] },
             { id: 'REPAIR', label: 'Сервис и ремонт', icon: Wrench, roles: ['ADMIN'] },
             { id: 'SUPPLIERS', label: 'Поставщики', icon: Truck, roles: ['ADMIN'] },
@@ -217,6 +227,8 @@ export const Drawer: React.FC = () => {
           title: 'Склад',
           items: [
             { id: 'INVENTORY', label: 'Склад магазина', icon: Package, roles: ['ADMIN'] },
+            { id: 'STORE_RECEIPT', label: 'Приход товара', icon: PackagePlus, roles: ['ADMIN'] },
+            { id: 'REVISION', label: 'Ревизия', icon: ClipboardCheck, roles: ['ADMIN'] },
             { id: 'TRANSFER', label: 'Перемещение', icon: ArrowLeftRight, roles: ['ADMIN'] },
           ],
         },

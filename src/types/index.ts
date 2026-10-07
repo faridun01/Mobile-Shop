@@ -49,6 +49,8 @@ export type PageId =
   | 'SALES_HISTORY'
   | 'INVENTORY'
   | 'PURCHASE'
+  | 'STORE_RECEIPT'
+  | 'REVISION'
   | 'TRANSFER'
   | 'EXCHANGE'
   | 'REPAIR'

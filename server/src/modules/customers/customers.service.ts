@@ -518,7 +518,7 @@ export class CustomersService {
       cash: {
         totalUsd: totalCashUsd,
         totalTjs: Number(totalCashTjs),
-        stores: storeCash,
+        stores: relevantStores,
       },
       inventory: {
         totalCount: totalStockCount,

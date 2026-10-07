@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAppFields } from '../../context/AppContext';
-import { useStoreContext, formatStoreName } from '../../utils/storeContext';
+import { formatStoreName } from '../../utils/storeContext';
 import { StatusBanner, StatusMessage } from '../ui/StatusBanner';
 import { RestrictedAccess } from '../ui/RestrictedAccess';
 import {
@@ -9,6 +9,7 @@ import {
   Plus,
   HandCoins,
   CheckCircle2,
+  Store as StoreIcon,
 } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { Dialog } from '../ui/Dialog';
@@ -18,14 +19,13 @@ import { CashDeskPanel } from '../finance/CashDeskPanel';
 
 export const CashDeskPage: React.FC = () => {
   const navigate = useNavigate();
-  const { currentUser, stores, createExpense } = useAppFields(
+  const { currentUser, stores, createExpense, selectedStoreId, setSelectedStoreId } = useAppFields(
     'currentUser',
     'stores',
-    'createExpense'
+    'createExpense',
+    'selectedStoreId',
+    'setSelectedStoreId'
   );
-  const storeCtx = useStoreContext();
-
-  const isSeller = currentUser?.role === 'SELLER';
 
   const [status, setStatus] = useState<StatusMessage | null>(null);
 
@@ -39,10 +39,27 @@ export const CashDeskPage: React.FC = () => {
 
   const retailStores = stores.filter((s) => !s.isMainWarehouse);
 
+  const isSeller = currentUser?.role === 'SELLER';
+  const isAdmin = currentUser?.role === 'ADMIN';
+  const isPartner = currentUser?.role === 'PARTNER';
+
+  const defaultStoreId = stores.find((s) => !s.isMainWarehouse)?.id || stores[0]?.id || '';
+  const effectiveStoreId =
+    isPartner && currentUser?.storeId
+      ? currentUser.storeId
+      : (selectedStoreId && selectedStoreId !== 'all' && stores.some((s) => s.id === selectedStoreId)
+          ? selectedStoreId
+          : defaultStoreId);
+
+  const currentStore = stores.find((s) => s.id === effectiveStoreId);
+  const pageTitle = currentStore?.isMainWarehouse
+    ? `Центральная касса (${currentStore.name})`
+    : `Касса: ${formatStoreName(currentStore?.name || 'Магазин')}`;
+
   const handleOpenExpenseModal = () => {
     setExpenseAmount('');
     setExpenseCategory('OTHER');
-    setExpenseStoreId(storeCtx.storeId || retailStores[0]?.id || stores[0]?.id || '');
+    setExpenseStoreId(effectiveStoreId || retailStores[0]?.id || stores[0]?.id || '');
     setExpenseNote('');
     setIsExpenseModalOpen(true);
   };
@@ -84,11 +101,6 @@ export const CashDeskPage: React.FC = () => {
     }
   };
 
-  const handleRefresh = () => {
-    window.dispatchEvent(new CustomEvent('business-data-changed'));
-    setStatus({ tone: 'success', text: 'Данные кассы обновлены' });
-  };
-
   if (isSeller) {
     return (
       <div className="flex-1 flex flex-col bg-bg">
@@ -96,12 +108,6 @@ export const CashDeskPage: React.FC = () => {
       </div>
     );
   }
-
-  const currentStore = stores.find((s) => s.id === storeCtx.storeId);
-  const pageTitle =
-    storeCtx.mode === 'STORE'
-      ? `Касса: ${formatStoreName(currentStore?.name || 'Магазин')}`
-      : 'Центральная касса';
 
   return (
     <div className="work-screen flex-1 flex flex-col h-full overflow-hidden bg-bg text-fg select-none">
@@ -118,25 +124,42 @@ export const CashDeskPage: React.FC = () => {
               {pageTitle}
             </h1>
             <p className="text-[11px] text-fg-subtle">
-              Наличные деньги в кассе, остаток, должники и поставщики
+              Наличные деньги в кассе, должники и поставщики
             </p>
           </div>
         </div>
 
         {/* Quick Actions Header */}
         <div className="flex items-center gap-2 flex-wrap">
-          {storeCtx.mode === 'STORE' && (
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={handleOpenExpenseModal}
-              leftIcon={Plus}
-              className="h-9 px-2.5 text-xs text-danger border-danger/30 hover:border-danger hover:bg-danger/10 cursor-pointer"
-              title="Быстро списать расход из кассы"
-            >
-              Расход
-            </Button>
+          {/* Store Selector (Admin) */}
+          {isAdmin && stores.length > 0 && (
+            <div className="flex items-center gap-1.5 bg-surface-raised border border-border rounded-xl px-2.5 h-9 shrink-0">
+              <StoreIcon className="w-3.5 h-3.5 text-accent shrink-0" />
+              <select
+                value={effectiveStoreId}
+                onChange={(e) => setSelectedStoreId(e.target.value)}
+                className="bg-transparent text-xs font-bold text-fg focus:outline-none cursor-pointer"
+                title="Выбрать магазин"
+              >
+                {stores.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.name}{s.isMainWarehouse ? ' (Центральная касса)' : ''}
+                  </option>
+                ))}
+              </select>
+            </div>
           )}
+
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={handleOpenExpenseModal}
+            leftIcon={Plus}
+            className="h-9 px-2.5 text-xs text-danger border-danger/30 hover:border-danger hover:bg-danger/10 cursor-pointer"
+            title="Быстро списать расход из кассы"
+          >
+            Расход
+          </Button>
 
           <Button
             variant="secondary"
@@ -154,7 +177,7 @@ export const CashDeskPage: React.FC = () => {
       {/* Main Cash & Z-Report Content */}
       <div className="flex-1 overflow-y-auto">
         <CashDeskPanel
-          storeId={storeCtx.storeId}
+          storeId={effectiveStoreId}
           onOpenExpenseModal={handleOpenExpenseModal}
         />
       </div>
@@ -200,25 +223,22 @@ export const CashDeskPage: React.FC = () => {
             </select>
           </div>
 
-          {storeCtx.mode !== 'STORE' && (
-            <div>
-              <label className="block text-xs font-semibold text-fg mb-1">
-                Точка / касса списания
-              </label>
-              <select
-                value={expenseStoreId}
-                onChange={(e) => setExpenseStoreId(e.target.value)}
-                className="w-full h-10 px-3 rounded-lg border border-border bg-surface text-fg text-sm focus:outline-none focus:border-accent"
-              >
-                <option value="">Центральная касса (Главная)</option>
-                {retailStores.map((st) => (
-                  <option key={st.id} value={st.id}>
-                    {formatStoreName(st.name)}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
+          <div>
+            <label className="block text-xs font-semibold text-fg mb-1">
+              Точка / касса списания
+            </label>
+            <select
+              value={expenseStoreId}
+              onChange={(e) => setExpenseStoreId(e.target.value)}
+              className="w-full h-10 px-3 rounded-lg border border-border bg-surface text-fg text-sm focus:outline-none focus:border-accent"
+            >
+              {stores.map((st) => (
+                <option key={st.id} value={st.id}>
+                  {st.name}{st.isMainWarehouse ? ' (Центральная касса)' : ''}
+                </option>
+              ))}
+            </select>
+          </div>
 
           <div>
             <label className="block text-xs font-semibold text-fg mb-1">

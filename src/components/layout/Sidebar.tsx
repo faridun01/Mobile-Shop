@@ -10,6 +10,8 @@ import {
   ShoppingBag,
   History,
   Package,
+  PackagePlus,
+  ClipboardCheck,
   PlusCircle,
   ArrowLeftRight,
   RefreshCw,
@@ -94,6 +96,8 @@ export const Sidebar: React.FC = () => {
           title: 'Склад',
           items: [
             { id: 'INVENTORY', label: 'Склад товаров', icon: Package, roles: ['SELLER'] },
+            { id: 'STORE_RECEIPT', label: 'Приход товара', icon: PackagePlus, roles: ['SELLER'] },
+            { id: 'REVISION', label: 'Ревизия', icon: ClipboardCheck, roles: ['SELLER'] },
             { id: 'TRANSFER', label: 'Перемещение', icon: ArrowLeftRight, roles: ['SELLER'] },
           ],
         },
@@ -117,6 +121,8 @@ export const Sidebar: React.FC = () => {
           title: 'Склад',
           items: [
             { id: 'INVENTORY', label: 'Склад магазина', icon: Package, roles: ['PARTNER'] },
+            { id: 'STORE_RECEIPT', label: 'Приход товара', icon: PackagePlus, roles: ['PARTNER'] },
+            { id: 'REVISION', label: 'Ревизия', icon: ClipboardCheck, roles: ['PARTNER'] },
             { id: 'TRANSFER', label: 'Перемещение', icon: ArrowLeftRight, roles: ['PARTNER'] },
           ],
         },
@@ -155,6 +161,8 @@ export const Sidebar: React.FC = () => {
           items: [
             { id: 'INVENTORY', label: 'Склад товаров', icon: Package, roles: ['ADMIN'] },
             { id: 'PURCHASE', label: 'Приходы (партии)', icon: PlusCircle, roles: ['ADMIN'] },
+            { id: 'STORE_RECEIPT', label: 'Приход в магазин', icon: PackagePlus, roles: ['ADMIN'] },
+            { id: 'REVISION', label: 'Ревизия', icon: ClipboardCheck, roles: ['ADMIN'] },
             { id: 'TRANSFER', label: 'Перемещение', icon: ArrowLeftRight, roles: ['ADMIN'] },
             { id: 'REPAIR', label: 'Сервис и ремонт', icon: Wrench, roles: ['ADMIN'] },
             { id: 'SUPPLIERS', label: 'Поставщики', icon: Truck, roles: ['ADMIN'] },
@@ -188,6 +196,8 @@ export const Sidebar: React.FC = () => {
         title: 'Склад',
         items: [
           { id: 'INVENTORY', label: 'Склад магазина', icon: Package, roles: ['ADMIN'] },
+          { id: 'STORE_RECEIPT', label: 'Приход товара', icon: PackagePlus, roles: ['ADMIN'] },
+          { id: 'REVISION', label: 'Ревизия', icon: ClipboardCheck, roles: ['ADMIN'] },
           { id: 'TRANSFER', label: 'Перемещение', icon: ArrowLeftRight, roles: ['ADMIN'] },
         ],
       },

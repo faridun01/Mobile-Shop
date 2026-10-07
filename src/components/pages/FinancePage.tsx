@@ -6,10 +6,8 @@ import { ProfitReport } from '../finance/ProfitReport';
 import { FALLBACK_EXCHANGE_RATE } from '../../utils/exchangeRate';
 import { getBusinessDateKey } from '../../utils/businessDate';
 import {
-  RefreshCw,
   TrendingUp,
 } from 'lucide-react';
-import { Button } from '../ui/Button';
 
 export const FinancePage: React.FC = () => {
   const { currentUser, todayRate } = useAppFields(
@@ -41,10 +39,7 @@ export const FinancePage: React.FC = () => {
     setEndDate('');
   };
 
-  const handleRefresh = () => {
-    window.dispatchEvent(new CustomEvent('business-data-changed'));
-    setStatus({ tone: 'success', text: 'Данные отчётов обновлены' });
-  };
+
 
   if (isSeller) {
     return (
@@ -81,19 +76,7 @@ export const FinancePage: React.FC = () => {
           </div>
         </div>
 
-        {/* Quick Actions Header */}
-        <div className="flex items-center gap-2 flex-wrap">
-          <Button
-            variant="secondary"
-            size="sm"
-            leftIcon={RefreshCw}
-            onClick={handleRefresh}
-            className="h-9 px-2.5 text-xs cursor-pointer"
-            title="Обновить данные"
-          >
-            <span className="hidden sm:inline">Обновить</span>
-          </Button>
-        </div>
+
       </div>
 
       {/* Main Report Content */}

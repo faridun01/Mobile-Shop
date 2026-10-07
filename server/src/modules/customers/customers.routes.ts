@@ -7,8 +7,10 @@ export function registerCustomerRoutes(app: Express) {
   // Summary for the "Касса" (Cash Register) overview dashboard page
   app.get('/api/cash-desk/summary', authenticateJwt, async (req: AuthenticatedRequest, res, next) => {
     try {
-      const isStoreScoped = req.user!.role === 'SELLER' || req.user!.role === 'PARTNER';
-      const storeId = isStoreScoped ? req.user!.storeId || undefined : (typeof req.query.storeId === 'string' ? req.query.storeId : undefined);
+      const isStoreScoped = (req.user!.role === 'SELLER' || req.user!.role === 'PARTNER') && Boolean(req.user!.storeId);
+      const storeId = isStoreScoped
+        ? req.user!.storeId!
+        : (typeof req.query.storeId === 'string' && req.query.storeId !== 'all' ? req.query.storeId : undefined);
       const summary = await CustomersService.getCashDeskSummary(storeId);
       res.json(summary);
     } catch (error) {

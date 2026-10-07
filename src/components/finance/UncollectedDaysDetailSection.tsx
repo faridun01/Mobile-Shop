@@ -14,7 +14,6 @@ import {
   FileCheck2,
   FileSpreadsheet,
   Receipt,
-  RefreshCw,
   ShoppingBag,
   TrendingDown,
   User,
@@ -120,15 +119,7 @@ export const UncollectedDaysDetailSection: React.FC<UncollectedDaysDetailSection
         </div>
 
         <div className="flex items-center gap-1.5">
-          <button
-            type="button"
-            onClick={fetchData}
-            disabled={loading}
-            className="h-7 w-7 rounded-lg border border-border bg-surface hover:bg-surface-raised text-fg-subtle hover:text-fg flex items-center justify-center transition-colors cursor-pointer disabled:opacity-50"
-            title="Обновить данные"
-          >
-            <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
-          </button>
+
           <button
             type="button"
             onClick={() => onOpenReconciliation(null)}

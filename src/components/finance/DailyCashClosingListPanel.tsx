@@ -16,7 +16,6 @@ import {
   Calendar,
   Store,
   UserCheck,
-  RefreshCw,
 } from 'lucide-react';
 
 interface DailyCashClosingListPanelProps {
@@ -127,15 +126,6 @@ export const DailyCashClosingListPanel: React.FC<DailyCashClosingListPanelProps>
         </div>
 
         <div className="flex items-center gap-2">
-          <Button
-            variant="secondary"
-            size="sm"
-            leftIcon={RefreshCw}
-            onClick={refresh}
-            loading={loading}
-          >
-            Обновить
-          </Button>
           <Button
             variant="primary"
             size="sm"

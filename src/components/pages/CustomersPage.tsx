@@ -14,7 +14,6 @@ import {
   Eye,
   FileText,
   AlertTriangle,
-  RefreshCw,
   ShoppingBag,
   CreditCard,
   UserCheck,
@@ -328,16 +327,7 @@ export const CustomersPage: React.FC = () => {
             </Button>
           )}
 
-          <Button
-            variant="secondary"
-            size="sm"
-            leftIcon={RefreshCw}
-            onClick={loadCustomers}
-            className="h-9 px-3"
-            title="Обновить"
-          >
-            <span className="hidden sm:inline">Обновить</span>
-          </Button>
+
 
           <Button
             variant="primary"

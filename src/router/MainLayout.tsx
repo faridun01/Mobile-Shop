@@ -49,12 +49,16 @@ const NotificationsPage = lazy(() => import('../components/pages/NotificationsPa
 const CashCollectionPage = lazy(() => import('../components/pages/CashCollectionPage').then(m => ({ default: m.CashCollectionPage })));
 const CashDeskPage = lazy(() => import('../components/pages/CashDeskPage').then(m => ({ default: m.CashDeskPage })));
 const CustomersPage = lazy(() => import('../components/pages/CustomersPage').then(m => ({ default: m.CustomersPage })));
+const StoreReceiptPage = lazy(() => import('../components/pages/StoreReceiptPage').then(m => ({ default: m.StoreReceiptPage })));
+const RevisionPage = lazy(() => import('../components/pages/RevisionPage').then(m => ({ default: m.RevisionPage })));
 
 const PAGE_ROUTES: Record<string, string> = {
   SALE: '/sale',
   SALES_HISTORY: '/sales-history',
   INVENTORY: '/inventory',
   PURCHASE: '/purchase',
+  STORE_RECEIPT: '/receipts',
+  REVISION: '/revision',
   TRANSFER: '/transfer',
   EXCHANGE: '/exchange',
   REPAIR: '/repair',
@@ -151,7 +155,8 @@ export function MainLayout() {
               <Route path="/audit-log" element={currentUser?.role === 'ADMIN' ? <AuditLogPage /> : <Navigate to="/sale" replace />} />
               <Route path="/settings" element={<SettingsPage />} />
               <Route path="/notifications" element={currentUser?.role === 'ADMIN' ? <NotificationsPage /> : <Navigate to="/sale" replace />} />
-              <Route path="/receipts" element={<Navigate to="/inventory" replace />} />
+              <Route path="/receipts" element={<StoreReceiptPage />} />
+              <Route path="/revision" element={<RevisionPage />} />
               <Route path="*" element={<Navigate to={currentUser?.role === 'ADMIN' ? "/reports" : "/sale"} replace />} />
             </Routes>
           </Suspense>

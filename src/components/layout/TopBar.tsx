@@ -54,6 +54,8 @@ export const TopBar: React.FC = () => {
       case 'SALES_HISTORY': return 'История продаж';
       case 'INVENTORY': return 'Склад товаров';
       case 'PURCHASE': return 'Приходы товара';
+      case 'STORE_RECEIPT': return 'Приход товара';
+      case 'REVISION': return 'Ревизия склада';
       case 'TRANSFER': return 'Перемещение';
       case 'EXCHANGE': return 'Обмен Trade-In';
       case 'REPAIR': return 'Сервис и ремонт';

@@ -2,7 +2,6 @@ import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Banknote,
-  Store as StoreIcon,
   Users,
   Truck,
   Search,
@@ -230,9 +229,6 @@ export const CashDeskPanel: React.FC<CashDeskPanelProps> = ({ storeId }) => {
         </div>
 
         <div className="flex items-center gap-3 self-end sm:self-center">
-          <span className="text-xs text-fg-subtle font-medium">
-            Кассовых точек: <strong className="text-fg font-semibold">{data?.cash.stores.length || 0}</strong>
-          </span>
           <button
             type="button"
             onClick={() => navigate('/cash-collection')}
@@ -240,53 +236,6 @@ export const CashDeskPanel: React.FC<CashDeskPanelProps> = ({ storeId }) => {
           >
             <HandCoins className="w-4 h-4" /> Инкассация →
           </button>
-        </div>
-      </div>
-
-      {/* 2. ОСТАТОК ПО КАССАМ (ПО ТОЧКАМ) */}
-      <div className="space-y-2.5">
-        <div className="flex items-center justify-between px-1">
-          <div className="flex items-center gap-2">
-            <StoreIcon className="w-4 h-4 text-accent" />
-            <h2 className="text-xs font-bold text-fg-subtle uppercase tracking-wider">
-              Остаток по кассам
-            </h2>
-            <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-surface-raised border border-border text-fg-subtle">
-              {data?.cash.stores.length || 0}
-            </span>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-          {data?.cash.stores.map((st) => (
-            <div
-              key={st.id}
-              className="p-3.5 rounded-2xl bg-surface border border-border hover:border-accent/40 shadow-xs transition-all flex items-center justify-between gap-3"
-            >
-              <div className="min-w-0">
-                <div className="flex items-center gap-1.5 flex-wrap">
-                  <p className="text-xs sm:text-sm font-bold text-fg truncate">{st.name}</p>
-                  {st.isMainWarehouse ? (
-                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-accent/10 text-accent font-semibold">
-                      Склад / Центр
-                    </span>
-                  ) : (
-                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-surface-raised text-fg-subtle font-medium">
-                      Точка
-                    </span>
-                  )}
-                </div>
-                <div className="flex items-baseline gap-2 mt-1">
-                  <span className="text-sm sm:text-base font-black font-mono text-fg tabular-nums">
-                    {formatMoney(st.cashTjs)} TJS
-                  </span>
-                  <span className="text-xs font-medium text-fg-subtle tabular-nums">
-                    ≈ ${formatMoney(st.cashUsd)}
-                  </span>
-                </div>
-              </div>
-            </div>
-          ))}
         </div>
       </div>
 

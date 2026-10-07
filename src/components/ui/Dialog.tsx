@@ -59,21 +59,21 @@ export const Dialog: React.FC<DialogProps> = ({
         aria-modal="true"
         aria-label={title}
         className={cn(
-          'dialog-panel relative w-full min-h-0 flex flex-col bg-surface border-t md:border border-border rounded-t-2xl md:rounded-2xl overflow-hidden overscroll-contain shadow-2xl outline-none z-10',
+          'dialog-panel relative w-full max-w-full min-h-0 flex flex-col bg-surface border-t md:border border-border rounded-t-2xl md:rounded-2xl overflow-hidden overscroll-contain shadow-2xl outline-none z-10',
           MAX_WIDTH_CLASSES[maxWidth]
         )}
       >
         <div className="md:hidden mx-auto mt-2 h-1 w-10 rounded-full bg-border shrink-0" />
 
         <div className={cn(
-          'flex items-center justify-between gap-3 border-b border-border shrink-0',
+          'flex items-center justify-between gap-2.5 border-b border-border shrink-0 min-w-0 w-full',
           compact ? 'px-3.5 py-2' : 'px-4 py-3'
         )}>
-          <div className="min-w-0">
-            <h2 className={cn('font-semibold text-fg leading-snug', compact ? 'text-sm' : 'text-base')}>{title}</h2>
-            {subtitle && <p className="text-xs text-fg-subtle mt-0.5">{subtitle}</p>}
+          <div className="min-w-0 flex-1">
+            <h2 className={cn('font-semibold text-fg leading-snug truncate', compact ? 'text-sm' : 'text-base')}>{title}</h2>
+            {subtitle && <p className="text-xs text-fg-subtle mt-0.5 truncate">{subtitle}</p>}
           </div>
-          {dismissable && <IconButton icon={X} aria-label="Закрыть" onClick={onClose} size="sm" />}
+          {dismissable && <IconButton icon={X} aria-label="Закрыть" onClick={onClose} size="sm" className="shrink-0 ml-1" />}
         </div>
 
         <div
@@ -88,7 +88,7 @@ export const Dialog: React.FC<DialogProps> = ({
 
         {footer && (
           <div className={cn(
-            'shrink-0 flex flex-wrap gap-2 border-t border-border',
+            'dialog-footer shrink-0 flex flex-wrap items-center justify-end gap-2 border-t border-border bg-surface w-full max-w-full min-w-0',
             compact ? 'px-3 py-2' : 'dialog-bottom-space px-4 py-3'
           )}>
             {footer}
