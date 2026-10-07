@@ -176,7 +176,7 @@ export const EmployeeFinancialHistoryModal: React.FC<EmployeeFinancialHistoryMod
                     <tr>
                       <th className="p-2">Дата</th>
                       <th className="p-2">Тип операции</th>
-                      <th className="p-2">Детали / Описание</th>
+                      <th className="p-2">Описание</th>
                       <th className="p-2 text-right">Сумма (TJS)</th>
                     </tr>
                   </thead>

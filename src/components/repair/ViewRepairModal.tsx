@@ -72,7 +72,7 @@ export const ViewRepairModal: React.FC<ViewRepairModalProps> = ({
               </div>
               {!isStoreScoped && (
                 <div>
-                  <span className="text-fg-subtle block text-[10px] uppercase font-semibold">Магазин / Точка</span>
+                  <span className="text-fg-subtle block text-[10px] uppercase font-semibold">Магазин</span>
                   <span className="text-fg-muted">{viewingTicket.storeName || 'Магазин'}</span>
                 </div>
               )}
@@ -123,7 +123,7 @@ export const ViewRepairModal: React.FC<ViewRepairModalProps> = ({
             <span className="text-fg-subtle block text-[10px] uppercase font-semibold">Расход на ремонт</span>
             <div className="grid grid-cols-2 gap-2 text-xs">
               <div>
-                <span className="text-fg-subtle block text-[10px]">Расход на запчасти / работу:</span>
+                <span className="text-fg-subtle block text-[10px]">Расход на ремонт:</span>
                 <span className="font-bold text-accent">
                   {viewingTicket.finalCostTjs ? `${formatMoney(viewingTicket.finalCostTjs)} TJS` : 'Задаётся при выдаче'}
                 </span>

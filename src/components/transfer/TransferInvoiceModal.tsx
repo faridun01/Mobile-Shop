@@ -334,8 +334,8 @@ export const TransferInvoiceModal: React.FC<TransferInvoiceModalProps> = ({
                 <thead>
                   <tr className="bg-surface-raised border-b border-border/80 text-[11px] font-bold text-fg-subtle uppercase tracking-wider print-border-black">
                     <th className="py-2.5 px-3 w-10 text-center">№</th>
-                    <th className="py-2.5 px-3">Наименование и спецификация</th>
-                    <th className="py-2.5 px-3">IMEI / Серийный номер</th>
+                    <th className="py-2.5 px-3">Наименование</th>
+                    <th className="py-2.5 px-3">IMEI</th>
                     <th className="py-2.5 px-3 w-16 text-center">Кол-во</th>
                     <th className="py-2.5 px-3 w-28 text-right">Оценка ($)</th>
                     <th className="py-2.5 px-3 w-28 text-right">Сумма ($)</th>

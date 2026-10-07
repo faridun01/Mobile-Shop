@@ -97,7 +97,7 @@ const CustomerPaymentControls: React.FC<CustomerPaymentControlsProps> = ({
       <div className="grid grid-cols-4 gap-1">
         {([
           { id: 'CASH' as const, label: 'Нал.', icon: Banknote },
-          { id: 'CARD' as const, label: 'Карта', icon: CreditCard },
+          { id: 'CARD' as const, label: 'Банк', icon: CreditCard },
           { id: 'SPLIT' as const, label: 'Смеш.', icon: Split },
           { id: 'DEBT' as const, label: 'В долг', icon: Clock },
         ]).map(({ id, label, icon: Icon }) => (
@@ -299,7 +299,7 @@ const CustomerPaymentControls: React.FC<CustomerPaymentControlsProps> = ({
                         : 'bg-surface border-border text-fg-muted hover:text-fg'
                     }`}
                   >
-                    Карта
+                    Банк
                   </button>
                 </div>
               </div>
@@ -340,7 +340,7 @@ const CustomerPaymentControls: React.FC<CustomerPaymentControlsProps> = ({
             />
           </div>
           <div>
-            <span className="text-[10px] text-fg-subtle block mb-0.5">Карта:</span>
+            <span className="text-[10px] text-fg-subtle block mb-0.5">Банк:</span>
             <input
               type="number"
               step="0.01"
@@ -638,7 +638,7 @@ export const SalePage: React.FC = () => {
       cashVal = parseFloat(cashAmountInput) || 0;
       cardVal = parseFloat(cardAmountInput) || 0;
       if (Math.abs(cashVal + cardVal - totalTjs) > 0.01) {
-        setPaymentStatus({ tone: 'error', text: `Сумма наличных (${formatMoney(cashVal)}) + карты (${formatMoney(cardVal)}) не равна итогу (${formatMoney(totalTjs)} TJS)` });
+        setPaymentStatus({ tone: 'error', text: `Сумма наличных (${formatMoney(cashVal)}) + банк (${formatMoney(cardVal)}) не равна итогу (${formatMoney(totalTjs)} TJS)` });
         return;
       }
     } else if (paymentMethod === 'DEBT') {
@@ -654,7 +654,7 @@ export const SalePage: React.FC = () => {
       }
       debtVal = Number(Math.max(0, totalTjs - downpayment).toFixed(2));
       if (debtVal <= 0) {
-        setPaymentStatus({ tone: 'error', text: 'При полной оплате выберите способ «Наличные» или «Карта»' });
+        setPaymentStatus({ tone: 'error', text: 'При полной оплате выберите способ «Наличные» или «Банк»' });
         return;
       }
     }
@@ -728,14 +728,14 @@ export const SalePage: React.FC = () => {
                     onChange={setSearchQuery}
                     onScan={handleTriggerScanner}
                     onSubmit={(value) => handleDeviceCode(value, 'enter')}
-                    placeholder="Поиск по IMEI / штрихкоду / модели..."
+                    placeholder="Поиск по IMEI или модели..."
                   />
                 </div>
                 <button
                   type="button"
                   onClick={() => setDailyClosingModalOpen(true, effectiveStoreId)}
                   className="h-11 px-3 rounded-xl bg-surface-raised hover:bg-surface border border-border text-xs font-semibold text-fg-muted hover:text-accent transition-colors flex items-center gap-1.5 shrink-0 cursor-pointer shadow-2xs"
-                  title="Закрытие кассовой смены (Z-отчёт)"
+                  title="Закрыть смену"
                 >
                   <FileCheck2 className="w-4 h-4 text-accent" />
                   <span className="hidden sm:inline">Z-Отчёт</span>
@@ -922,7 +922,7 @@ export const SalePage: React.FC = () => {
                 type="button"
                 onClick={() => setDailyClosingModalOpen(true, effectiveStoreId)}
                 className="p-1.5 rounded-lg text-fg-subtle hover:text-accent hover:bg-accent/10 transition-colors cursor-pointer"
-                title="Закрыть смену / Z-отчёт"
+                title="Закрыть смену"
               >
                 <FileCheck2 className="w-4 h-4" />
               </button>

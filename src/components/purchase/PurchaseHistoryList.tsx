@@ -67,7 +67,7 @@ export const PurchaseHistoryList: React.FC<PurchaseHistoryListProps> = ({
               type="text"
               value={searchQuery}
               onChange={(e) => onSearchChange(e.target.value)}
-              placeholder="Поиск: № накладной / IMEI..."
+              placeholder="Поиск накладной или IMEI..."
               className="w-full rounded-xl bg-surface-raised border border-border pl-8 pr-8 py-1.5 text-xs text-fg placeholder-fg-subtle focus:border-accent focus:outline-none transition-colors"
             />
             {searchQuery ? (

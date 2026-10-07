@@ -36,7 +36,7 @@ export interface ComprehensiveReportInput {
 const EXPENSE_CATEGORY_LABELS: Record<string, string> = {
   RENT: 'Аренда помещения',
   SALARY: 'Зарплата сотрудников',
-  EMPLOYEE_ADVANCE: 'Аванс / Подотчет сотрудника',
+  EMPLOYEE_ADVANCE: 'Аванс сотрудника',
   UTILITIES: 'Коммуналка и интернет',
   MARKETING: 'Реклама и маркетинг',
   REPAIR_PARTS: 'Запчасти для ремонта',
@@ -113,7 +113,7 @@ export function buildSalesReportTable(sales: Sale[], rate: number = 9.5, cashBon
     'Дата и время',
     'Магазин',
     'Кассир',
-    'Товар / Модель',
+    'Товар',
     'Количество (шт)',
     'Себестоимость ($)',
     'Цена продажи ($)',
@@ -165,7 +165,7 @@ export function buildSalesReportTable(sales: Sale[], rate: number = 9.5, cashBon
         priceTjs.toFixed(2),
         operationRate.toFixed(2),
         profitUsd.toFixed(2),
-        sale.paymentMethod === 'CASH' ? 'Наличные' : sale.paymentMethod === 'CARD' ? 'Карта' : 'Раздельная',
+        sale.paymentMethod === 'CASH' ? 'Наличные' : sale.paymentMethod === 'CARD' ? 'Банк' : 'Раздельная',
         isRefunded ? 'ВОЗВРАТ' : 'ЗАВЕРШЕНА'
       ]);
     });
@@ -202,7 +202,7 @@ export function buildSalesReportTable(sales: Sale[], rate: number = 9.5, cashBon
         // operationRate, which would silently misstate it whenever the two days' rates differ.
         penaltyUsd > 0 ? (penaltyTjs / penaltyUsd).toFixed(2) : '',
         penaltyUsd.toFixed(2),
-        sale.paymentMethod === 'CASH' ? 'Наличные' : sale.paymentMethod === 'CARD' ? 'Карта' : 'Раздельная',
+        sale.paymentMethod === 'CASH' ? 'Наличные' : sale.paymentMethod === 'CARD' ? 'Банк' : 'Раздельная',
         'ВОЗВРАТ (ШТРАФ)'
       ]);
     }
@@ -245,7 +245,7 @@ const XLSX_MONEY_FORMAT = '#,##0.00;[Red](#,##0.00);-';
 
 function paymentMethodLabel(method: Sale['paymentMethod']): string {
   if (method === 'CASH') return 'Наличные';
-  if (method === 'CARD') return 'Карта';
+  if (method === 'CARD') return 'Банк';
   if (method === 'DEBT') return 'В долг';
   return 'Раздельная оплата';
 }
@@ -547,7 +547,7 @@ export async function buildComprehensiveReportWorkbook({
   const expensesHeader = expensesSheet.getRow(4);
   expensesHeader.values = [
     'Дата и время', 'Категория', 'Тип', 'Магазин', 'Источник списания', 'Сотрудник',
-    'Создал', 'Комментарий / назначение', 'Сумма (TJS)', 'Курс', 'Сумма ($)',
+    'Создал', 'Назначение', 'Сумма (TJS)', 'Курс', 'Сумма ($)',
   ];
   styleHeader(expensesHeader);
 
@@ -680,7 +680,7 @@ export async function exportComprehensiveReport(input: ComprehensiveReportInput)
  * Exports security audit log report.
  */
 export function exportAuditLogsReport(logs: any[]) {
-  const headers = ['ID Записи', 'Дата и время', 'Действие / Событие', 'Сотрудник / Пользователь', 'Роль', 'Детали события'];
+  const headers = ['ID', 'Дата и время', 'Действие', 'Сотрудник', 'Роль', 'Детали'];
   const rows = logs.map(l => [
     escapeCsvField(l.id),
     escapeCsvField(l.timestamp ? new Date(l.timestamp).toLocaleString('ru-RU') : '-'),

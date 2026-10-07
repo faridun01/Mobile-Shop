@@ -21,12 +21,12 @@ describe('receipt text', () => {
     expect(text).toContain('IMEI: 351111111111111');
     expect(text).toContain(`Samsung A55 256GB — ${formatMoney(3200.5)} TJS`);
     expect(text).toContain(`Итого: ${formatMoney(12700.5)} TJS`);
-    expect(text).toContain(`Оплата: Наличные ${formatMoney(10000)} TJS + карта ${formatMoney(2700.5)} TJS`);
+    expect(text).toContain(`Оплата: Наличные ${formatMoney(10000)} TJS + Банк ${formatMoney(2700.5)} TJS`);
     expect(text).toContain('Покупатель: Бехруз');
   });
 
   it('can leave the store out and names single payment methods', () => {
     expect(formatReceiptText(sale, { showStore: false })).not.toContain('Магазин:');
-    expect(paymentSummary({ paymentMethod: 'CARD', cashAmountTjs: 0, cardAmountTjs: 10 })).toBe('Карта');
+    expect(paymentSummary({ paymentMethod: 'CARD', cashAmountTjs: 0, cardAmountTjs: 10 })).toBe('Банк');
   });
 });

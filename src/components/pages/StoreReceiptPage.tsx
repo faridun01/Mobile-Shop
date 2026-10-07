@@ -42,15 +42,15 @@ export const StoreReceiptPage: React.FC = () => {
 
   // Store resolution: Staff users are locked to their assigned store; Admins can choose
   const retailStores = useMemo(() => stores.filter((s) => !s.isMainWarehouse && s.active), [stores]);
-  const defaultStoreId = stores.find((s) => !s.isMainWarehouse)?.id || stores[0]?.id || '';
+  const defaultStoreId = retailStores[0]?.id || '';
   const effectiveStoreId =
     (currentUser?.role === 'SELLER' || isPartner) && currentUser?.storeId
       ? currentUser.storeId
-      : (selectedStoreId && selectedStoreId !== 'all' && stores.some((s) => s.id === selectedStoreId)
+      : (selectedStoreId && selectedStoreId !== 'all' && retailStores.some((s) => s.id === selectedStoreId)
           ? selectedStoreId
           : defaultStoreId);
 
-  const currentStore = stores.find((s) => s.id === effectiveStoreId);
+  const currentStore = retailStores.find((s) => s.id === effectiveStoreId);
 
   // Tab: 'NEW' (Scanning new intake) or 'HISTORY' (Past store receipts)
   const [activeTab, setActiveTab] = useState<'NEW' | 'HISTORY'>('NEW');

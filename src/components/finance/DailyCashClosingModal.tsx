@@ -14,8 +14,6 @@ import {
   AlertCircle,
   Banknote,
   DollarSign,
-  TrendingDown,
-  ArrowDownRight,
   CreditCard,
   Building2,
   Clock,
@@ -580,13 +578,13 @@ export const DailyCashClosingModal: React.FC<DailyCashClosingModalProps> = ({
             >
               <span className="font-semibold flex items-center gap-1.5">
                 <FileText className="w-3.5 h-3.5 text-accent" />
-                <span>Детали смены ({summary.salesCount} продаж, {summary.expensesCount} расходов)</span>
+                <span>Детали смены ({summary.salesCount} продаж)</span>
               </span>
               <ChevronDown className={`w-4 h-4 transition-transform ${showDetails ? 'rotate-180' : ''}`} />
             </button>
 
             {showDetails && (
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mt-2 text-xs animate-in fade-in duration-200">
+              <div className="grid grid-cols-3 gap-2 mt-2 text-xs animate-in fade-in duration-200">
                 {/* 1. Opening Cash */}
                 <div className="p-2.5 rounded-xl bg-surface border border-border space-y-0.5">
                   <div className="flex items-center gap-1 text-fg-subtle text-[11px]">
@@ -618,58 +616,10 @@ export const DailyCashClosingModal: React.FC<DailyCashClosingModalProps> = ({
                 <div className="p-2.5 rounded-xl bg-surface border border-border space-y-0.5">
                   <div className="flex items-center gap-1 text-info text-[11px]">
                     <CreditCard className="w-3 h-3" />
-                    <span>Безнал (карта)</span>
+                    <span>Банк</span>
                   </div>
                   <p className="text-xs font-bold font-mono text-fg">
                     {formatMoney(summary.salesCardTjs)} TJS
-                  </p>
-                </div>
-
-                {/* 4. Expenses */}
-                <div className="p-2.5 rounded-xl bg-surface border border-border space-y-0.5">
-                  <div className="flex items-center justify-between text-danger text-[11px]">
-                    <span className="flex items-center gap-1">
-                      <TrendingDown className="w-3 h-3" />
-                      <span>Расходы кассы</span>
-                    </span>
-                    <span className="font-mono text-[10px] text-fg-subtle">
-                      {summary.expensesCount}
-                    </span>
-                  </div>
-                  <p className="text-xs font-bold font-mono text-danger">
-                    -{formatMoney(summary.expensesCashTjs)} TJS
-                  </p>
-                </div>
-
-                {/* 5. Refunds */}
-                <div className="p-2.5 rounded-xl bg-surface border border-border space-y-0.5">
-                  <div className="flex items-center justify-between text-warning text-[11px]">
-                    <span className="flex items-center gap-1">
-                      <ArrowDownRight className="w-3 h-3" />
-                      <span>Возвраты</span>
-                    </span>
-                    <span className="font-mono text-[10px] text-fg-subtle">
-                      {summary.refundsCount}
-                    </span>
-                  </div>
-                  <p className="text-xs font-bold font-mono text-warning">
-                    -{formatMoney(summary.refundsCashTjs)} TJS
-                  </p>
-                </div>
-
-                {/* 6. Cash Collections */}
-                <div className="p-2.5 rounded-xl bg-surface border border-border space-y-0.5">
-                  <div className="flex items-center justify-between text-fg-subtle text-[11px]">
-                    <span className="flex items-center gap-1">
-                      <Building2 className="w-3 h-3 text-accent" />
-                      <span>Инкассация</span>
-                    </span>
-                    <span className="font-mono text-[10px]">
-                      {summary.collectionsCount}
-                    </span>
-                  </div>
-                  <p className="text-xs font-bold font-mono text-fg">
-                    -{formatMoney(summary.collectionsCashTjs)} TJS
                   </p>
                 </div>
               </div>

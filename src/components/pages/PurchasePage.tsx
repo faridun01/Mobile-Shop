@@ -500,9 +500,7 @@ export const PurchasePage: React.FC = () => {
           ram: ramStr,
           storage: storageStr,
           color: g.color.trim(),
-          purchasePriceUsd: g.isBonus ? 0 : g.purchasePriceUsd,
-          isBonus: Boolean(g.isBonus),
-          bonusCampaign: g.isBonus ? g.bonusCampaign?.trim() || 'Бонус от поставщика' : undefined,
+          purchasePriceUsd: g.purchasePriceUsd,
           items: validItems,
           imeis: validItems.map((i) => i.imei),
         };

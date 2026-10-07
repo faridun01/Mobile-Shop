@@ -373,13 +373,13 @@ export const CashReconciliationModal: React.FC<CashReconciliationModalProps> = (
                 <div className="p-3 rounded-xl border border-border bg-surface-raised/50 space-y-1">
                   <div className="flex items-center gap-1.5 text-xs font-semibold text-fg-subtle">
                     <CreditCard className="w-4 h-4 text-blue-500 shrink-0" />
-                    <span>Переводы / Карта</span>
+                    <span>Банк и переводы</span>
                   </div>
                   <p className="text-base sm:text-lg font-bold font-mono text-blue-600 dark:text-blue-400 tabular-nums">
                     {formatTjs(data.summary.salesCardTjs)}
                   </p>
                   <p className="text-[11px] text-fg-subtle">
-                    безналично на счёт магазина
+                    на банковский счёт магазина
                   </p>
                 </div>
               </div>
@@ -535,7 +535,7 @@ export const CashReconciliationModal: React.FC<CashReconciliationModalProps> = (
                         )}
                         {sale.cardAmountTjs > 0 && (
                           <span className="text-blue-600 dark:text-blue-400 font-mono">
-                            Карта: {formatTjs(sale.cardAmountTjs)}
+                            Банк: {formatTjs(sale.cardAmountTjs)}
                           </span>
                         )}
                       </div>

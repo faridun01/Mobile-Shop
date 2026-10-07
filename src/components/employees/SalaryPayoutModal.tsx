@@ -139,7 +139,7 @@ export const SalaryPayoutModal: React.FC<SalaryPayoutModalProps> = ({
         <div className="flex items-center justify-between pb-3 border-b border-border">
           <h4 className="text-xs font-bold text-accent uppercase tracking-wider flex items-center space-x-2">
             <DollarSign className="w-4 h-4 text-accent" />
-            <span>ВЫПЛАТА ЗАРПЛАТЫ СОТРУДНИКУ</span>
+            <span>ВЫПЛАТА ЗАРПЛАТЫ</span>
           </h4>
           <button type="button" onClick={onClose} className="text-fg-subtle hover:text-fg-muted">
             <X className="w-4 h-4" />
@@ -199,7 +199,7 @@ export const SalaryPayoutModal: React.FC<SalaryPayoutModalProps> = ({
           </div>
 
           <div>
-            <label className="block text-accent text-[10px] uppercase mb-1 font-bold">НАЧИСЛЕНО ЗАРПЛАТЫ / БОНУСОВ (TJS) *</label>
+            <label className="block text-accent text-[10px] uppercase mb-1 font-bold">НАЧИСЛЕНО (TJS) *</label>
             <div className="relative">
               <input
                 step="0.01"
@@ -223,7 +223,7 @@ export const SalaryPayoutModal: React.FC<SalaryPayoutModalProps> = ({
             </div>
             {paidSalary > 0 && (
               <div className="flex justify-between text-fg-subtle">
-                <span>Уже выплачено зарплаты за месяц:</span>
+                <span>Выплачено за месяц:</span>
                 <span>-{paidSalary.toLocaleString()} TJS</span>
               </div>
             )}
@@ -232,7 +232,7 @@ export const SalaryPayoutModal: React.FC<SalaryPayoutModalProps> = ({
               <span>-{totalAdvances.toLocaleString()} TJS</span>
             </div>
             <div className="flex justify-between pt-1 border-t border-border text-sm font-bold text-accent">
-              <span>К выгрузке / на руки:</span>
+              <span>К выплате:</span>
               <span>{netPayout.toLocaleString()} TJS</span>
             </div>
           </div>
@@ -253,10 +253,6 @@ export const SalaryPayoutModal: React.FC<SalaryPayoutModalProps> = ({
             <span className="text-accent font-bold">Центральная касса</span>
           </div>
 
-          <p className="text-[9px] text-fg-subtle italic">
-            ★ Выплата производится из Центральной кассы.
-          </p>
-
           <div className="flex space-x-2 pt-1">
             <button
               type="button"
@@ -272,7 +268,7 @@ export const SalaryPayoutModal: React.FC<SalaryPayoutModalProps> = ({
               className="flex-1 py-2.5 rounded-xl bg-accent hover:bg-accent-strong text-xs font-bold uppercase text-accent-fg shadow-xs disabled:opacity-60 flex items-center justify-center gap-1.5"
             >
               {isSubmitting && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-              {isSubmitting ? 'ВЫПЛАТА…' : 'ВЫПЛАТИТЬ ЗАРПЛАТУ'}
+              {isSubmitting ? 'ВЫПЛАТА…' : 'ВЫПЛАТИТЬ'}
             </button>
           </div>
         </div>

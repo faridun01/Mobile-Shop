@@ -207,7 +207,7 @@ export const EmployeeModal: React.FC<EmployeeModalProps> = ({
                 onChange={(e) => setStoreId(e.target.value)}
                 className="w-full rounded-lg bg-surface-raised border border-warning/40 px-3 py-2 text-fg font-bold focus:border-warning focus:outline-none cursor-pointer"
               >
-                <option value="">-- ВЫБЕРИТЕ ТОЧКУ ПРОДАЖ / МАГАЗИН * --</option>
+                <option value="">-- Выберите магазин * --</option>
                 {stores.filter((s) => !s.isMainWarehouse).map((s) => (
                   <option key={s.id} value={s.id}>{s.name}</option>
                 ))}

@@ -354,7 +354,7 @@ export const RevisionPage: React.FC = () => {
                   <div className="w-px h-8 bg-border hidden sm:block" />
                   <div>
                     <span className="text-[11px] font-bold text-danger uppercase tracking-wider block">
-                      Чужие / Лишние
+                      Чужие
                     </span>
                     <span className="text-xl sm:text-2xl font-black font-mono text-danger">
                       {foreignDevices.length} <span className="text-xs font-normal opacity-75">шт.</span>
@@ -678,12 +678,12 @@ export const RevisionPage: React.FC = () => {
               <span className="font-bold font-mono text-emerald-600 dark:text-emerald-400">{checkedCount} шт. ({progressPercent}%)</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-amber-600 dark:text-amber-400 font-semibold">Не найдено (недостача?):</span>
+              <span className="text-amber-600 dark:text-amber-400 font-semibold">Не найдено:</span>
               <span className="font-bold font-mono text-amber-600 dark:text-amber-400">{uncheckedCount} шт.</span>
             </div>
             {foreignDevices.length > 0 && (
               <div className="flex justify-between text-danger font-semibold">
-                <span>Лишние устройства (чужие):</span>
+                <span>Чужие устройства:</span>
                 <span className="font-bold font-mono">{foreignDevices.length} шт.</span>
               </div>
             )}
@@ -692,7 +692,7 @@ export const RevisionPage: React.FC = () => {
           {uncheckedCount > 0 && (
             <div>
               <h4 className="text-xs font-bold text-amber-600 dark:text-amber-400 mb-1.5">
-                Не проверенные телефоны ({uncheckedCount} шт.):
+                Непроверенные телефоны ({uncheckedCount} шт.):
               </h4>
               <div className="max-h-[160px] overflow-y-auto rounded-xl border border-border divide-y divide-border text-xs">
                 {storeDevices

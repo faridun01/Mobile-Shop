@@ -59,7 +59,7 @@ export const Dialog: React.FC<DialogProps> = ({
         aria-modal="true"
         aria-label={title}
         className={cn(
-          'dialog-panel relative w-full max-w-full min-h-0 flex flex-col bg-surface border-t md:border border-border rounded-t-2xl md:rounded-2xl overflow-hidden overscroll-contain shadow-2xl outline-none z-10',
+          'dialog-panel relative w-full min-h-0 flex flex-col bg-surface border-t md:border border-border rounded-t-2xl md:rounded-2xl overflow-hidden overscroll-contain shadow-2xl outline-none z-10',
           MAX_WIDTH_CLASSES[maxWidth]
         )}
       >

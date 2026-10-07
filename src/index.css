@@ -562,22 +562,24 @@ html[data-keyboard-open] .modal-layer .dialog-bottom-space {
   }
 }
 
-/* Ensure all modal dialog cards strictly respect screen boundaries on all mobile phones (320px - 430px) */
-.dialog-panel,
-.modal-layer [role="dialog"],
-.fixed.inset-0:not(.app-safe-area) > div:not(.modal-layer):not([data-modal-layer]),
-.fixed.inset-0:not(.app-safe-area) > form {
-  max-width: 100% !important;
-  box-sizing: border-box !important;
-}
+/* On mobile phones (320px - 767px), ensure modal dialog cards and legacy overlays strictly fit screen boundaries */
+@media (max-width: 767px) {
+  .dialog-panel,
+  .modal-layer [role="dialog"],
+  .fixed.inset-0:not(.app-safe-area) > div:not(.modal-layer):not([data-modal-layer]),
+  .fixed.inset-0:not(.app-safe-area) > form {
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+  }
 
-/* Ensure legacy modal overlays never exceed viewport height and allow comfortable touch scrolling */
-.fixed.inset-0:not(.app-safe-area) > div:not(.modal-layer):not([data-modal-layer]),
-.fixed.inset-0:not(.app-safe-area) > form {
-  max-height: calc(100dvh - max(1.5rem, calc(var(--sa-top) + var(--sa-bottom))));
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  -webkit-overflow-scrolling: touch;
+  /* Ensure legacy modal overlays never exceed viewport height and allow comfortable touch scrolling */
+  .fixed.inset-0:not(.app-safe-area) > div:not(.modal-layer):not([data-modal-layer]),
+  .fixed.inset-0:not(.app-safe-area) > form {
+    max-height: calc(100dvh - max(1.5rem, calc(var(--sa-top) + var(--sa-bottom))));
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+  }
 }
 
 /* Keep the navigation's space, but hide all of it (including the raised POS)

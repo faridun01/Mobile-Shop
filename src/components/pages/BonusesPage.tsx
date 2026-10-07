@@ -682,7 +682,7 @@ export const BonusesPage: React.FC = () => {
                 disabled={availableReserveUsd <= 0}
                 onClick={() => openReserveAction('payout')}
                 className="text-xs font-bold text-warning hover:underline flex items-center gap-1 cursor-pointer disabled:opacity-40"
-                title="Выдать как прибыль / дивиденды"
+                title="Выдать прибыль"
               >
                 <HandCoins className="w-3.5 h-3.5" /> Выдать
               </button>
@@ -856,7 +856,7 @@ export const BonusesPage: React.FC = () => {
                                   type="button"
                                   onClick={() => openReserveAction('payout', bonus.amountUsd)}
                                   className="text-[11px] font-semibold text-warning hover:underline flex items-center gap-1 cursor-pointer"
-                                  title="Выдать как прибыль / дивиденды"
+                                  title="Выдать прибыль"
                                 >
                                   <HandCoins className="w-3 h-3 text-warning" /> Выдать
                                 </button>
@@ -1018,7 +1018,7 @@ export const BonusesPage: React.FC = () => {
 
               {/* Название кампании */}
               <div>
-                <label className="block text-fg font-semibold mb-1">Название / Повод (опционально)</label>
+                <label className="block text-fg font-semibold mb-1">Повод (необязательно)</label>
                 <input
                   type="text"
                   value={campaignTitle}
@@ -1399,7 +1399,7 @@ export const BonusesPage: React.FC = () => {
             {reserveModalKind === 'transfer' && (
               <div>
                 <label className="block text-xs font-semibold text-fg mb-1">
-                  Примечание / Комментарий (необязательно)
+                  Примечание (необязательно)
                 </label>
                 <input
                   type="text"

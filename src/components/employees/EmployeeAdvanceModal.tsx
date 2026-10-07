@@ -57,7 +57,7 @@ export const EmployeeAdvanceModal: React.FC<EmployeeAdvanceModalProps> = ({
         <div className="flex items-center justify-between pb-3 border-b border-border">
           <h4 className="text-xs font-bold text-warning uppercase tracking-wider flex items-center space-x-2">
             <Plus className="w-4 h-4 text-warning" />
-            <span>ВЫДАЧА АВАНСА / РАСХОДА</span>
+            <span>ВЫДАЧА АВАНСА</span>
           </h4>
           <button type="button" onClick={onClose} className="text-fg-subtle hover:text-fg-muted">
             <X className="w-4 h-4" />
@@ -95,7 +95,7 @@ export const EmployeeAdvanceModal: React.FC<EmployeeAdvanceModalProps> = ({
           </div>
 
           <div>
-            <label className="block text-fg-subtle text-[10px] uppercase mb-1 font-bold">В СЧЁТ ЗАРПЛАТЫ ЗА МЕСЯЦ *</label>
+            <label className="block text-fg-subtle text-[10px] uppercase mb-1 font-bold">ЗА МЕСЯЦ *</label>
             <MonthPicker
               value={advancePayrollMonth}
               onChange={setAdvancePayrollMonth}
@@ -104,19 +104,15 @@ export const EmployeeAdvanceModal: React.FC<EmployeeAdvanceModalProps> = ({
           </div>
 
           <div>
-            <label className="block text-fg-subtle text-[10px] uppercase mb-1 font-bold">ПРИМЕЧАНИЕ / НА ЧТО ВЫДАНО</label>
+            <label className="block text-fg-subtle text-[10px] uppercase mb-1 font-bold">ПРИМЕЧАНИЕ</label>
             <input
               type="text"
               value={advanceNoteInput}
               onChange={(e) => setAdvanceNoteInput(e.target.value)}
-              placeholder="В счет зарплаты / На личные расходы"
+              placeholder="Примечание (необязательно)"
               className="w-full rounded-lg bg-bg border border-border px-3 py-2 text-fg-muted text-xs focus:border-warning focus:outline-none"
             />
           </div>
-
-          <p className="text-[9px] text-fg-subtle italic">
-            ★ Сумма будет списана из Центральной кассы и учтена как удержанный аванс при расчёте зарплаты.
-          </p>
         </div>
 
         <div className="flex space-x-2 pt-1">

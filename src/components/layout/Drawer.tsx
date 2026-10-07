@@ -193,7 +193,6 @@ export const Drawer: React.FC = () => {
           items: [
             { id: 'INVENTORY', label: 'Склад товаров', icon: Package, roles: ['ADMIN'] },
             { id: 'PURCHASE', label: 'Приходы (партии)', icon: PlusCircle, roles: ['ADMIN'] },
-            { id: 'STORE_RECEIPT', label: 'Приход в магазин', icon: PackagePlus, roles: ['ADMIN'] },
             { id: 'REVISION', label: 'Ревизия', icon: ClipboardCheck, roles: ['ADMIN'] },
             { id: 'TRANSFER', label: 'Перемещение', icon: ArrowLeftRight, roles: ['ADMIN'] },
             { id: 'REPAIR', label: 'Сервис и ремонт', icon: Wrench, roles: ['ADMIN'] },

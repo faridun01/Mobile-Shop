@@ -136,16 +136,11 @@ export const NewPurchaseForm: React.FC<NewPurchaseFormProps> = ({
           </div>
 
           {/* Destination location: All receipts go to Main Warehouse */}
-          <div className="pt-2 border-t border-border flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
-            <div className="flex items-center gap-2">
-              <span className="text-fg-subtle font-medium">Склад поступления:</span>
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-accent/10 border border-accent/25 text-accent font-semibold text-xs">
-                <span className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse" />
-                Главный склад (Центральный)
-              </span>
-            </div>
-            <span className="text-[11px] text-fg-subtle">
-              Все приходы оформляются через главный склад. В магазины товар распределяется через перемещение.
+          <div className="pt-2 border-t border-border flex items-center gap-2 text-xs">
+            <span className="text-fg-subtle font-medium">Склад поступления:</span>
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-accent/10 border border-accent/25 text-accent font-semibold text-xs">
+              <span className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse" />
+              Главный склад (Центральный)
             </span>
           </div>
         </div>
@@ -158,30 +153,9 @@ export const NewPurchaseForm: React.FC<NewPurchaseFormProps> = ({
               className="rounded-xl border border-border bg-surface shadow-xs p-3.5 sm:p-4 space-y-3 relative"
             >
               <div className="flex items-center justify-between border-b border-border pb-2">
-                <div className="flex items-center gap-3">
-                  <span className="text-xs font-bold text-fg-muted tracking-wider font-mono">
-                    Позиция #{groupIdx + 1}
-                  </span>
-                  <label className={`flex items-center gap-1.5 text-xs font-medium cursor-pointer select-none px-2.5 py-0.5 rounded-md border transition-all ${
-                    group.isBonus
-                      ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30'
-                      : 'bg-surface-raised text-fg-subtle border-border hover:text-fg-muted'
-                  }`}>
-                    <input
-                      type="checkbox"
-                      checked={Boolean(group.isBonus)}
-                      onChange={(e) => {
-                        const checked = e.target.checked;
-                        onUpdateGroup(groupIdx, 'isBonus', checked);
-                        if (checked) {
-                          onUpdateGroup(groupIdx, 'purchasePriceUsd', 0);
-                        }
-                      }}
-                      className="rounded border-border text-emerald-500 focus:ring-emerald-400 w-3.5 h-3.5"
-                    />
-                    <span>🎁 Бонусный товар (0$)</span>
-                  </label>
-                </div>
+                <span className="text-xs font-bold text-fg-muted tracking-wider font-mono">
+                  Позиция #{groupIdx + 1}
+                </span>
 
                 {groups.length > 1 && (
                   <button
@@ -194,19 +168,6 @@ export const NewPurchaseForm: React.FC<NewPurchaseFormProps> = ({
                   </button>
                 )}
               </div>
-
-              {group.isBonus && (
-                <div className="flex items-center gap-2 p-2 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-xs font-mono">
-                  <span className="text-emerald-400 font-medium shrink-0">Акция / примечание:</span>
-                  <input
-                    type="text"
-                    value={group.bonusCampaign || ''}
-                    onChange={(e) => onUpdateGroup(groupIdx, 'bonusCampaign', e.target.value)}
-                    placeholder="Бонус от поставщика / Акция 10+1..."
-                    className="flex-1 rounded-md bg-surface-raised border border-border px-2.5 py-1 text-xs text-fg-muted focus:border-emerald-500 focus:outline-none"
-                  />
-                </div>
-              )}
 
               {/* Group Specs Form */}
               <div className="grid grid-cols-2 sm:grid-cols-6 gap-2.5 text-xs font-mono">
@@ -272,25 +233,18 @@ export const NewPurchaseForm: React.FC<NewPurchaseFormProps> = ({
 
                 <div>
                   <label className="block text-fg-subtle mb-1">
-                    {group.isBonus ? 'Цена закупки (Бонус)' : 'Цена закупки ($)'}
+                    Цена закупки ($)
                   </label>
-                  {group.isBonus ? (
-                    <div className="w-full rounded-lg bg-emerald-500/10 border border-emerald-500/30 px-2.5 py-1.5 text-xs text-emerald-400 font-bold font-mono flex items-center justify-between">
-                      <span>$0.00</span>
-                      <span className="text-[10px] bg-emerald-500/20 px-1.5 py-0.5 rounded">Бонус</span>
-                    </div>
-                  ) : (
-                    <input
-                      type="number"
-                      required
-                      min="0.01"
-                      step="0.01"
-                      value={group.purchasePriceUsd || ''}
-                      onChange={(e) => onUpdateGroup(groupIdx, 'purchasePriceUsd', parseFloat(e.target.value) || 0)}
-                      className="w-full rounded-lg bg-surface-raised border border-border px-2.5 py-1.5 text-xs text-accent font-bold focus:border-accent focus:outline-none font-mono"
-                      placeholder="0"
-                    />
-                  )}
+                  <input
+                    type="number"
+                    required
+                    min="0.01"
+                    step="0.01"
+                    value={group.purchasePriceUsd || ''}
+                    onChange={(e) => onUpdateGroup(groupIdx, 'purchasePriceUsd', parseFloat(e.target.value) || 0)}
+                    className="w-full rounded-lg bg-surface-raised border border-border px-2.5 py-1.5 text-xs text-accent font-bold focus:border-accent focus:outline-none font-mono"
+                    placeholder="0"
+                  />
                 </div>
               </div>
 
@@ -322,7 +276,7 @@ export const NewPurchaseForm: React.FC<NewPurchaseFormProps> = ({
                 <div className="pt-1">
                   <input
                     type="text"
-                    placeholder="Быстрая вставка списка IMEI (через пробел, запятую или Dual SIM: IMEI 1 / IMEI 2)..."
+                    placeholder="Быстрая вставка списка IMEI..."
                     onKeyDown={(e) => {
                       if (e.key === 'Enter') {
                         e.preventDefault();

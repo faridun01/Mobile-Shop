@@ -114,7 +114,7 @@ export const EmployeeCard: React.FC<EmployeeCardProps> = ({
           </div>
 
           <div className="min-w-0">
-            <span className="text-[10px] text-fg-subtle block">Оклад / Комиссия</span>
+            <span className="text-[10px] text-fg-subtle block">Оклад и %</span>
             <span className="font-mono font-semibold text-accent truncate block">
               {baseSal > 0 ? `${baseSal.toLocaleString()} TJS` : 'Без оклада'} {commPct > 0 ? `(+${commPct}%)` : ''}
             </span>

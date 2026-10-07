@@ -512,7 +512,7 @@ export const ExchangePage: React.FC = () => {
                       type="text"
                       value={deviceSearchQuery ?? ''}
                       onChange={(e) => setDeviceSearchQuery(e.target.value)}
-                      placeholder="Поиск по наличию / IMEI..."
+                      placeholder="Поиск по IMEI или модели..."
                       className="w-full h-10 rounded-xl bg-surface border border-border pl-9 pr-3 text-xs text-fg placeholder:text-fg-subtle focus:border-accent focus:outline-none transition-colors"
                     />
                   </div>
@@ -612,7 +612,7 @@ export const ExchangePage: React.FC = () => {
                           exchangePaymentMethod === method ? 'bg-accent text-accent-fg' : 'text-fg-muted hover:text-fg'
                         }`}
                       >
-                        {method === 'CASH' ? 'Наличные' : 'Карта'}
+                        {method === 'CASH' ? 'Наличные' : 'Банк'}
                       </button>
                     ))}
                   </div>

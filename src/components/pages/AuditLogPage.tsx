@@ -25,7 +25,7 @@ const FILTER_CATEGORIES = [
   { id: 'SALE', label: 'Продажи' },
   { id: 'REFUND', label: 'Возвраты' },
   { id: 'EXCHANGE', label: 'Обмены' },
-  { id: 'PURCHASE', label: 'Приходы / Закупки' },
+  { id: 'PURCHASE', label: 'Приходы' },
   { id: 'TRANSFER', label: 'Перемещения' },
   { id: 'REPAIR', label: 'Ремонты' },
   { id: 'AUTH', label: 'Авторизация' },

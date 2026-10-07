@@ -426,7 +426,7 @@ export const BonusQuarterCard: React.FC = () => {
           {/* Month Name */}
           <div className="space-y-1">
             <label className="block text-[11px] font-bold text-fg-subtle uppercase tracking-wider">
-              Название периода / месяца
+              Название периода
             </label>
             <input
               type="text"
@@ -478,7 +478,7 @@ export const BonusQuarterCard: React.FC = () => {
                   <div className="flex items-center justify-between gap-2">
                     <span className="font-bold text-xs text-fg">Внести в бизнес (реинвест)</span>
                     <span className="text-[10px] px-1.5 py-0.2 rounded bg-accent/20 text-accent font-bold">
-                      В кассу / оборот
+                      В оборот
                     </span>
                   </div>
                   <p className="text-[11px] text-fg-subtle mt-0.5 leading-relaxed">
@@ -511,7 +511,7 @@ export const BonusQuarterCard: React.FC = () => {
                     </span>
                   </div>
                   <p className="text-[11px] text-fg-subtle mt-0.5 leading-relaxed">
-                    Бонусная прибыль выдаётся владельцам / делится между партнерами как дивиденды.
+                    Бонусная прибыль выдаётся владельцам или делится между партнёрами.
                   </p>
                 </div>
               </div>

@@ -3,15 +3,15 @@ import { formatMoney } from './money';
 
 export const PAYMENT_METHOD_LABELS: Record<PaymentMethod, string> = {
   CASH: 'Наличные',
-  CARD: 'Карта',
-  SPLIT: 'Наличные + карта',
+  CARD: 'Банк',
+  SPLIT: 'Наличные + Банк',
   DEBT: 'В долг',
 };
 
 /** How the customer paid, with the split amounts when both were used. */
 export function paymentSummary(sale: Pick<Sale, 'paymentMethod' | 'cashAmountTjs' | 'cardAmountTjs'>): string {
   if (sale.paymentMethod === 'SPLIT') {
-    return `Наличные ${formatMoney(sale.cashAmountTjs)} TJS + карта ${formatMoney(sale.cardAmountTjs)} TJS`;
+    return `Наличные ${formatMoney(sale.cashAmountTjs)} TJS + Банк ${formatMoney(sale.cardAmountTjs)} TJS`;
   }
   return PAYMENT_METHOD_LABELS[sale.paymentMethod] || sale.paymentMethod;
 }

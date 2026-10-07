@@ -477,7 +477,7 @@ export const SalesHistoryPage: React.FC = () => {
               Нал: <strong className="text-fg-muted font-medium">{formatMoney(periodSummary.cashTjs)}</strong>
             </span>
             <span className="px-2 py-0.5 rounded-md bg-surface-raised border border-border shrink-0">
-              Карта: <strong className="text-fg-muted font-medium">{formatMoney(periodSummary.cardTjs)}</strong>
+              Банк: <strong className="text-fg-muted font-medium">{formatMoney(periodSummary.cardTjs)}</strong>
             </span>
             {periodSummary.refunded > 0 && (
               <span className="px-2 py-0.5 rounded-md bg-danger/10 border border-danger/20 text-danger font-medium shrink-0">
@@ -604,7 +604,7 @@ export const SalesHistoryPage: React.FC = () => {
                         </td>
                         <td className="py-2.5 px-3 whitespace-nowrap text-[11px]">
                           <span className={sale.paymentMethod === 'DEBT' && (sale.debtAmountTjs ?? 0) > 0 ? 'text-danger font-semibold' : 'text-fg-subtle'}>
-                            {sale.paymentMethod === 'CASH' ? 'Наличные' : sale.paymentMethod === 'CARD' ? 'Карта' : sale.paymentMethod === 'DEBT' ? ((sale.debtAmountTjs ?? 0) > 0 ? `В долг (${formatMoney(sale.debtAmountTjs ?? 0)} TJS)` : 'В долг (погашено)') : 'Смешанная'}
+                            {sale.paymentMethod === 'CASH' ? 'Наличные' : sale.paymentMethod === 'CARD' ? 'Банк' : sale.paymentMethod === 'DEBT' ? ((sale.debtAmountTjs ?? 0) > 0 ? `В долг (${formatMoney(sale.debtAmountTjs ?? 0)} TJS)` : 'В долг (погашено)') : 'Смешанная'}
                           </span>
                         </td>
                         <td className="py-2.5 px-3 text-right whitespace-nowrap font-mono">
@@ -713,7 +713,7 @@ export const SalesHistoryPage: React.FC = () => {
                               );
                             })()}
                             <p className={`text-xs ${sale.paymentMethod === 'DEBT' && (sale.debtAmountTjs ?? 0) > 0 ? 'text-danger font-semibold' : 'text-fg-subtle'}`}>
-                              {sale.paymentMethod === 'CASH' ? 'Наличные' : sale.paymentMethod === 'CARD' ? 'Карта' : sale.paymentMethod === 'DEBT' ? ((sale.debtAmountTjs ?? 0) > 0 ? `В долг (${formatMoney(sale.debtAmountTjs ?? 0)} TJS)` : 'В долг (погашено)') : 'Смешанная'}
+                              {sale.paymentMethod === 'CASH' ? 'Наличные' : sale.paymentMethod === 'CARD' ? 'Банк' : sale.paymentMethod === 'DEBT' ? ((sale.debtAmountTjs ?? 0) > 0 ? `В долг (${formatMoney(sale.debtAmountTjs ?? 0)} TJS)` : 'В долг (погашено)') : 'Смешанная'}
                             </p>
                           </>
                         )}
@@ -902,7 +902,7 @@ export const SalesHistoryPage: React.FC = () => {
               <div className="flex justify-between items-center pb-1.5 border-b border-border/60">
                 <span className="text-fg-subtle text-xs font-semibold">Способ оплаты</span>
                 <span className="px-2 py-0.5 rounded-md bg-surface-raised border border-border text-xs font-bold text-fg">
-                  {selectedSale.paymentMethod === 'CASH' ? 'Наличные' : selectedSale.paymentMethod === 'CARD' ? 'Карта' : selectedSale.paymentMethod === 'DEBT' ? 'В долг' : 'Смешанная'}
+                  {selectedSale.paymentMethod === 'CASH' ? 'Наличные' : selectedSale.paymentMethod === 'CARD' ? 'Банк' : selectedSale.paymentMethod === 'DEBT' ? 'В долг' : 'Смешанная'}
                 </span>
               </div>
               {selectedSale.cashAmountTjs > 0 && (
@@ -913,7 +913,7 @@ export const SalesHistoryPage: React.FC = () => {
               )}
               {selectedSale.cardAmountTjs > 0 && (
                 <div className="flex justify-between text-xs">
-                  <span className="text-fg-subtle">Картой</span>
+                  <span className="text-fg-subtle">Банк</span>
                   <span className="text-fg font-mono font-bold">{formatMoney(selectedSale.cardAmountTjs)} TJS</span>
                 </div>
               )}
@@ -1009,7 +1009,7 @@ export const SalesHistoryPage: React.FC = () => {
                 type="text"
                 value={refundReason}
                 onChange={(e) => setRefundReason(e.target.value)}
-                placeholder="Брак / Отказ покупателя / Ошибка"
+                placeholder="Причина возврата..."
                 className="w-full h-11 rounded-lg bg-bg border border-border px-3 text-sm text-fg-muted focus:outline-none focus:border-danger focus:ring-1 focus:ring-danger"
               />
             </div>
@@ -1069,7 +1069,7 @@ export const SalesHistoryPage: React.FC = () => {
               <label className="block text-xs font-medium text-fg-muted mb-1">Способ возврата денег</label>
               <Select value={refundMethod} onChange={(e) => setRefundMethod(e.target.value as 'CASH' | 'CARD')} className="w-full">
                 <option value="CASH">Наличные из кассы</option>
-                <option value="CARD">Безналичный возврат</option>
+                <option value="CARD">Банк</option>
               </Select>
             </div>
           </div>

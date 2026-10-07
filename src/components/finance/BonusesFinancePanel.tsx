@@ -959,7 +959,7 @@ export const BonusesFinancePanel: React.FC<BonusesFinancePanelProps> = ({ month,
 
               <div className="space-y-2 border border-border rounded-xl p-3 bg-surface-raised/40">
                 <div className="flex justify-between py-1 border-b border-border/60">
-                  <span className="text-fg-subtle">Название акции / кампании:</span>
+                  <span className="text-fg-subtle">Название акции:</span>
                   <span className="font-semibold text-fg text-right">
                     {selectedBonus.campaignTitle || selectedBonus.campaignName || '—'}
                   </span>
@@ -1035,7 +1035,7 @@ export const BonusesFinancePanel: React.FC<BonusesFinancePanelProps> = ({ month,
 
               <div className="space-y-2 border border-border rounded-xl p-3 bg-surface-raised/40">
                 <div className="flex justify-between py-1 border-b border-border/60">
-                  <span className="text-fg-subtle">Память / Цвет:</span>
+                  <span className="text-fg-subtle">Память, цвет:</span>
                   <span className="font-semibold text-fg">
                     {selectedSoldDevice.storage} {selectedSoldDevice.color}
                   </span>
@@ -1119,7 +1119,7 @@ export const BonusesFinancePanel: React.FC<BonusesFinancePanelProps> = ({ month,
 
               <div className="space-y-2 border border-border rounded-xl p-3 bg-surface-raised/40">
                 <div className="flex justify-between py-1 border-b border-border/60">
-                  <span className="text-fg-subtle">Память / Цвет:</span>
+                  <span className="text-fg-subtle">Память, цвет:</span>
                   <span className="font-semibold text-fg">
                     {selectedStockDevice.storage} {selectedStockDevice.color}
                   </span>

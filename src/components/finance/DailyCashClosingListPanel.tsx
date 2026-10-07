@@ -267,8 +267,8 @@ export const DailyCashClosingListPanel: React.FC<DailyCashClosingListPanelProps>
               <table className="w-full text-left text-xs">
                 <thead className="bg-surface-raised/50 border-b border-border text-[11px] text-fg-subtle uppercase tracking-wider font-semibold select-none">
                   <tr>
-                    <th className="py-3 px-4">Дата / Время</th>
-                    <th className="py-3 px-4">Точка продаж</th>
+                    <th className="py-3 px-4">Дата и время</th>
+                    <th className="py-3 px-4">Магазин</th>
                     <th className="py-3 px-4">Кассир</th>
                     <th className="py-3 px-4 text-right">Ожидалось</th>
                     <th className="py-3 px-4 text-right">Фактически</th>

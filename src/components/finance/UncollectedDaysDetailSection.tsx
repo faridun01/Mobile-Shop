@@ -249,7 +249,7 @@ export const UncollectedDaysDetailSection: React.FC<UncollectedDaysDetailSection
                           </span>
                           {day.salesCardTjs > 0 && (
                             <span className="text-blue-600 dark:text-blue-400 font-mono">
-                              Карта: {formatTjs(day.salesCardTjs)}
+                              Банк: {formatTjs(day.salesCardTjs)}
                             </span>
                           )}
                           {hasExpenses && (
@@ -355,7 +355,7 @@ export const UncollectedDaysDetailSection: React.FC<UncollectedDaysDetailSection
                                   </p>
                                   <div className="flex items-center gap-1 justify-end text-[10px] text-fg-subtle">
                                     {sale.cashAmountTjs > 0 && <span>Нал: {formatTjs(sale.cashAmountTjs)}</span>}
-                                    {sale.cardAmountTjs > 0 && <span className="text-blue-500">Карта: {formatTjs(sale.cardAmountTjs)}</span>}
+                                    {sale.cardAmountTjs > 0 && <span className="text-blue-500">Банк: {formatTjs(sale.cardAmountTjs)}</span>}
                                   </div>
                                 </div>
                               </div>

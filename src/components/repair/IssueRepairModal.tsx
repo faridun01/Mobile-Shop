@@ -34,7 +34,7 @@ export const IssueRepairModal: React.FC<IssueRepairModalProps> = ({
             <p className="text-xs text-fg-subtle">Клиент: {selectedTicket.customerName} ({selectedTicket.customerPhone || 'телефон не указан'})</p>
           </div>
           <label className="block">
-            <span className="block text-fg-subtle mb-1 text-xs font-semibold">Расход на ремонт (запчасти / работа мастера), TJS</span>
+            <span className="block text-fg-subtle mb-1 text-xs font-semibold">Расход на ремонт, TJS</span>
             <input
               step="0.01"
               type="number"

@@ -225,7 +225,7 @@ export const CashDeskPage: React.FC = () => {
 
           <div>
             <label className="block text-xs font-semibold text-fg mb-1">
-              Точка / касса списания
+              Касса списания
             </label>
             <select
               value={expenseStoreId}

@@ -63,7 +63,7 @@ export const RepairTopBar: React.FC<RepairTopBarProps> = ({
                 type="text"
                 value={searchQuery ?? ''}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Квитанция / ФИО / IMEI..."
+                placeholder="Поиск ремонта..."
                 className="w-full h-9 rounded-xl bg-surface-raised border border-border pl-8 pr-8 text-xs text-fg placeholder:text-fg-subtle focus:border-accent focus:outline-none transition-colors"
               />
               {searchQuery ? (

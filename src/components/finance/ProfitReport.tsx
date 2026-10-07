@@ -664,7 +664,7 @@ export const ProfitReport: React.FC<ProfitReportProps> = ({
                       <p className="text-xs sm:text-sm font-bold text-fg mt-0.5">
                         {store.refundPenaltiesUsd > 0 ? `+${usd(store.refundPenaltiesUsd)}` : '$0.00'}
                       </p>
-                      <p className="text-[10px] text-fg-subtle">штрафы / комиссии</p>
+                      <p className="text-[10px] text-fg-subtle">штрафы и комиссии</p>
                     </div>
                   </div>
 

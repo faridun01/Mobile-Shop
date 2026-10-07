@@ -621,7 +621,7 @@ export const CustomersPage: React.FC = () => {
 
 
           <div>
-            <label className="text-xs font-semibold text-fg block mb-1">Заметка / Примечание</label>
+            <label className="text-xs font-semibold text-fg block mb-1">Примечание</label>
             <textarea
               value={formNote}
               onChange={(e) => setFormNote(e.target.value)}

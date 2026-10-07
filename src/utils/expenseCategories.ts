@@ -3,7 +3,7 @@
 export const STANDARD_EXPENSE_CATEGORIES = [
   { id: 'RENT', label: 'Аренда помещения' },
   { id: 'SALARY', label: 'Зарплата сотрудников' },
-  { id: 'EMPLOYEE_ADVANCE', label: 'Аванс / Подотчет сотрудника' },
+  { id: 'EMPLOYEE_ADVANCE', label: 'Аванс сотрудника' },
   { id: 'UTILITIES', label: 'Коммуналка и интернет' },
   { id: 'MARKETING', label: 'Реклама и маркетинг' },
   { id: 'REPAIR_PARTS', label: 'Запчасти для ремонта' },
@@ -15,7 +15,7 @@ export const STANDARD_EXPENSE_CATEGORIES = [
 export const LEGACY_EXPENSE_LABELS: Record<string, string> = {
   'Аренда': 'Аренда помещения',
   'Зарплата': 'Зарплата сотрудников',
-  'Аванс сотрудника': 'Аванс / Подотчет сотрудника',
+  'Аванс сотрудника': 'Аванс сотрудника',
   'Коммунальные': 'Коммуналка и интернет',
   'Ремонт': 'Ремонт и запчасти',
   'Транспорт': 'Транспорт и доставка',

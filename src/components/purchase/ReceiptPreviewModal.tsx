@@ -45,7 +45,7 @@ export const ReceiptPreviewModal: React.FC<ReceiptPreviewModalProps> = ({
   const totalInvoiceUsd = useMemo(() => {
     if (!previewInvoice) return 0;
     return previewInvoice.groups.reduce(
-      (sum, g) => sum + (g.isBonus ? 0 : g.items.length * g.purchasePriceUsd),
+      (sum, g) => sum + g.items.length * g.purchasePriceUsd,
       0
     );
   }, [previewInvoice]);
@@ -165,26 +165,18 @@ export const ReceiptPreviewModal: React.FC<ReceiptPreviewModalProps> = ({
             {previewInvoice.groups.map((g, idx) => (
               <div key={idx} className="p-2.5 sm:p-3 flex items-center justify-between gap-2">
                 <div className="min-w-0">
-                  <div className="flex items-center gap-1.5 flex-wrap">
-                    <p className="font-bold text-fg text-xs truncate">
-                      {g.brand} {g.model}
-                    </p>
-                    {g.isBonus && (
-                      <span className="text-[9px] bg-accent/20 text-accent border border-accent/35 px-1.5 py-0.2 rounded font-bold uppercase">
-                        Бонус ($0)
-                      </span>
-                    )}
-                  </div>
+                  <p className="font-bold text-fg text-xs truncate">
+                    {g.brand} {g.model}
+                  </p>
                   <p className="text-[11px] text-fg-muted mt-0.5 truncate">
                     {[g.ram, g.storage, g.color].filter(Boolean).join(' • ')}
                   </p>
                   <p className="text-[10px] text-fg-subtle mt-0.5">
-                    {g.items.length} шт. {g.isBonus ? '• Подарок от поставщика' : `× $${formatMoney(g.purchasePriceUsd)}`}
-                    {g.bonusCampaign ? ` • ${g.bonusCampaign}` : ''}
+                    {g.items.length} шт. × ${formatMoney(g.purchasePriceUsd)}
                   </p>
                 </div>
                 <span className="font-bold font-mono text-fg shrink-0 text-xs sm:text-sm">
-                  {g.isBonus ? '$0' : `$${formatMoney(g.items.length * g.purchasePriceUsd)}`}
+                  ${formatMoney(g.items.length * g.purchasePriceUsd)}
                 </span>
               </div>
             ))}

@@ -258,7 +258,7 @@ export const EmployeesPage: React.FC = () => {
         amountTjs: data.amount,
         storeId: advanceIssueUser.storeId || stores[0]?.id,
         sourceAccount: 'Центральная касса',
-        description: `Аванс сотруднику ${advanceIssueUser.name}: ${data.note || 'Выдан под отчет / в счет зарплаты'}`,
+        description: data.note ? `Аванс: ${advanceIssueUser.name} (${data.note})` : `Аванс: ${advanceIssueUser.name}`,
         paidFromCashRegister: true,
         employeeId: advanceIssueUser.id,
         employeeName: advanceIssueUser.name,

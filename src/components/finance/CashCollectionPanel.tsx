@@ -410,7 +410,7 @@ export const CashCollectionPanel: React.FC<CashCollectionPanelProps> = ({
                             {Number(store.cardOnlyTjs || 0) > 0 && (
                               <span className="inline-flex items-center gap-1 text-[11px] text-blue-600 dark:text-blue-400 bg-blue-500/10 border border-blue-500/20 px-2 py-0.5 rounded-md font-mono font-medium">
                                 <CreditCard className="w-3 h-3 shrink-0" />
-                                <span>Карта: {formatTjs(store.cardOnlyTjs)}</span>
+                                <span>Банк: {formatTjs(store.cardOnlyTjs)}</span>
                               </span>
                             )}
                           </div>
@@ -658,7 +658,7 @@ export const CashCollectionPanel: React.FC<CashCollectionPanelProps> = ({
                     <div className="flex justify-between items-center text-blue-600 dark:text-blue-400">
                       <span className="flex items-center gap-1.5 font-medium">
                         <CreditCard className="w-3.5 h-3.5 shrink-0" />
-                        На карте / переводами:
+                        Банк:
                       </span>
                       <span className="font-semibold tabular-nums font-mono">
                         {formatTjs(collecting.cardOnlyTjs)}
