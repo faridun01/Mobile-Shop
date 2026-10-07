@@ -28,6 +28,7 @@ export const DailyCashClosingListPanel: React.FC<DailyCashClosingListPanelProps>
   storeId,
 }) => {
   const { currentUser } = useAppFields('currentUser');
+  const isAdmin = currentUser?.role === 'ADMIN';
   const { setDailyClosingModalOpen } = useUIStore();
   const [closings, setClosings] = useState<DailyCashClosing[]>([]);
   const [loading, setLoading] = useState(false);
@@ -125,17 +126,19 @@ export const DailyCashClosingListPanel: React.FC<DailyCashClosingListPanelProps>
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
-          <Button
-            variant="primary"
-            size="sm"
-            leftIcon={FileCheck2}
-            onClick={() => setDailyClosingModalOpen(true, storeId || currentUser?.storeId || undefined)}
-            className="cursor-pointer"
-          >
-            Снять Z-отчёт
-          </Button>
-        </div>
+        {!isAdmin && (
+          <div className="flex items-center gap-2">
+            <Button
+              variant="primary"
+              size="sm"
+              leftIcon={FileCheck2}
+              onClick={() => setDailyClosingModalOpen(true, storeId || currentUser?.storeId || undefined)}
+              className="cursor-pointer"
+            >
+              Снять Z-отчёт
+            </Button>
+          </div>
+        )}
       </div>
 
       {/* KPI Cards */}

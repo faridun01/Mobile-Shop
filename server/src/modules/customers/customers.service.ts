@@ -457,6 +457,11 @@ export class CustomersService {
         select: {
           id: true,
           storeId: true,
+          brand: true,
+          model: true,
+          storage: true,
+          color: true,
+          imei: true,
           purchasePriceUsd: true,
           costBasisUsd: true,
           retailPriceTjs: true,
@@ -482,6 +487,7 @@ export class CustomersService {
     ]);
 
     const rate = rateVal ? Number(rateVal) : 10.9;
+    const storeMap = new Map<string, string>(stores.map((s: any) => [s.id, s.name]));
 
     // 1. Cash Balances
     const storeCash = stores.map((s: any) => {
@@ -500,10 +506,90 @@ export class CustomersService {
     const totalCashUsd = relevantStores.reduce((sum: number, s: any) => sum + s.cashUsd, 0);
     const totalCashTjs = roundMoney(D(totalCashUsd).mul(rate));
 
-    // 2. Stock Inventory
+    // 2. Stock Inventory by Cost Price
     const totalStockCount = inStockDevices.length;
     const totalStockCostUsd = inStockDevices.reduce((sum: number, d: any) => sum + Number(d.costBasisUsd || d.purchasePriceUsd || 0), 0);
     const totalStockCostTjs = roundMoney(D(totalStockCostUsd).mul(rate));
+
+    // Aggregate inventory by model
+    const modelMap = new Map<string, {
+      key: string;
+      brand: string;
+      model: string;
+      storage?: string | null;
+      color?: string | null;
+      count: number;
+      totalCostUsd: number;
+      storesMap: Map<string, { storeId: string; storeName: string; count: number }>;
+    }>();
+
+    for (const d of inStockDevices) {
+      const brand = d.brand || 'Не указан';
+      const model = d.model || 'Модель';
+      const storage = d.storage || null;
+      const color = d.color || null;
+      const key = `${brand}|${model}|${storage || ''}|${color || ''}`;
+      const itemCost = Number(d.costBasisUsd || d.purchasePriceUsd || 0);
+      const storeName = storeMap.get(d.storeId) || 'Склад';
+
+      let entry = modelMap.get(key);
+      if (!entry) {
+        entry = {
+          key,
+          brand,
+          model,
+          storage,
+          color,
+          count: 0,
+          totalCostUsd: 0,
+          storesMap: new Map(),
+        };
+        modelMap.set(key, entry);
+      }
+      entry.count += 1;
+      entry.totalCostUsd += itemCost;
+
+      const storeEntry = entry.storesMap.get(d.storeId) || { storeId: d.storeId, storeName, count: 0 };
+      storeEntry.count += 1;
+      entry.storesMap.set(d.storeId, storeEntry);
+    }
+
+    const models = Array.from(modelMap.values())
+      .map((m) => {
+        const roundedCostUsd = roundMoney(D(m.totalCostUsd));
+        const roundedCostTjs = roundMoney(D(roundedCostUsd).mul(rate));
+        const avgCostUsd = m.count > 0 ? roundMoney(D(roundedCostUsd).div(m.count)) : 0;
+        return {
+          key: m.key,
+          brand: m.brand,
+          model: m.model,
+          storage: m.storage,
+          color: m.color,
+          count: m.count,
+          avgCostUsd: Number(avgCostUsd),
+          totalCostUsd: Number(roundedCostUsd),
+          totalCostTjs: Number(roundedCostTjs),
+          stores: Array.from(m.storesMap.values()),
+        };
+      })
+      .sort((a, b) => b.totalCostUsd - a.totalCostUsd);
+
+    const items = inStockDevices.map((d: any) => {
+      const costUsd = Number(d.costBasisUsd || d.purchasePriceUsd || 0);
+      return {
+        id: d.id,
+        brand: d.brand,
+        model: d.model,
+        storage: d.storage,
+        color: d.color,
+        imei: d.imei,
+        costBasisUsd: costUsd,
+        costBasisTjs: Number(roundMoney(D(costUsd).mul(rate))),
+        retailPriceTjs: Number(d.retailPriceTjs || 0),
+        storeId: d.storeId,
+        storeName: storeMap.get(d.storeId) || 'Склад',
+      };
+    });
 
     // 3. Supplier Debt
     const totalSupplierDebtUsd = suppliersWithDebt.reduce((sum: number, s: any) => sum + Number(s.totalDebtUsd), 0);
@@ -522,8 +608,10 @@ export class CustomersService {
       },
       inventory: {
         totalCount: totalStockCount,
-        totalCostUsd: totalStockCostUsd,
+        totalCostUsd: Number(roundMoney(D(totalStockCostUsd))),
         totalCostTjs: Number(totalStockCostTjs),
+        models,
+        items,
       },
       suppliers: {
         totalDebtUsd: totalSupplierDebtUsd,

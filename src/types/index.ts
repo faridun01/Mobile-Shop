@@ -634,6 +634,31 @@ export interface CashDeskSummary {
     totalCount: number;
     totalCostUsd: number;
     totalCostTjs: number;
+    models?: {
+      key: string;
+      brand: string;
+      model: string;
+      storage?: string | null;
+      color?: string | null;
+      count: number;
+      avgCostUsd: number;
+      totalCostUsd: number;
+      totalCostTjs: number;
+      stores: { storeId: string; storeName: string; count: number }[];
+    }[];
+    items?: {
+      id: string;
+      brand: string;
+      model: string;
+      storage?: string | null;
+      color?: string | null;
+      imei: string;
+      costBasisUsd: number;
+      costBasisTjs: number;
+      retailPriceTjs: number;
+      storeId: string;
+      storeName: string;
+    }[];
   };
   suppliers: {
     totalDebtUsd: number;

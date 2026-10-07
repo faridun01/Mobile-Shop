@@ -731,15 +731,17 @@ export const SalePage: React.FC = () => {
                     placeholder="Поиск по IMEI или модели..."
                   />
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setDailyClosingModalOpen(true, effectiveStoreId)}
-                  className="h-11 px-3 rounded-xl bg-surface-raised hover:bg-surface border border-border text-xs font-semibold text-fg-muted hover:text-accent transition-colors flex items-center gap-1.5 shrink-0 cursor-pointer shadow-2xs"
-                  title="Закрыть смену"
-                >
-                  <FileCheck2 className="w-4 h-4 text-accent" />
-                  <span className="hidden sm:inline">Z-Отчёт</span>
-                </button>
+                {!isAdmin && (
+                  <button
+                    type="button"
+                    onClick={() => setDailyClosingModalOpen(true, effectiveStoreId)}
+                    className="h-11 px-3 rounded-xl bg-surface-raised hover:bg-surface border border-border text-xs font-semibold text-fg-muted hover:text-accent transition-colors flex items-center gap-1.5 shrink-0 cursor-pointer shadow-2xs"
+                    title="Закрыть смену"
+                  >
+                    <FileCheck2 className="w-4 h-4 text-accent" />
+                    <span className="hidden sm:inline">Z-Отчёт</span>
+                  </button>
+                )}
               </div>
 
               {brands.length > 2 && (
@@ -918,14 +920,16 @@ export const SalePage: React.FC = () => {
             </div>
 
             <div className="flex items-center gap-1.5 shrink-0">
-              <button
-                type="button"
-                onClick={() => setDailyClosingModalOpen(true, effectiveStoreId)}
-                className="p-1.5 rounded-lg text-fg-subtle hover:text-accent hover:bg-accent/10 transition-colors cursor-pointer"
-                title="Закрыть смену"
-              >
-                <FileCheck2 className="w-4 h-4" />
-              </button>
+              {!isAdmin && (
+                <button
+                  type="button"
+                  onClick={() => setDailyClosingModalOpen(true, effectiveStoreId)}
+                  className="p-1.5 rounded-lg text-fg-subtle hover:text-accent hover:bg-accent/10 transition-colors cursor-pointer"
+                  title="Закрыть смену"
+                >
+                  <FileCheck2 className="w-4 h-4" />
+                </button>
+              )}
               <span className="px-2 py-0.5 rounded-full bg-accent/15 border border-accent/30 text-accent font-bold font-mono text-xs">
                 {cart.length} шт
               </span>

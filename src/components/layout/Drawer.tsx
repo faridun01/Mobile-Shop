@@ -33,6 +33,7 @@ import {
   ArrowRight,
   FileCheck2,
   HandCoins,
+  LogOut,
 } from 'lucide-react';
 import { NAV_PAGE_ROUTES } from '../../router/navRoutes';
 
@@ -58,6 +59,7 @@ const ITEM_STYLES: Record<string, { bg: string; text: string }> = {
   PURCHASE: { bg: 'bg-cyan-500/10 dark:bg-cyan-500/20', text: 'text-cyan-600 dark:text-cyan-400' },
   EXPENSES: { bg: 'bg-rose-500/10 dark:bg-rose-500/20', text: 'text-rose-600 dark:text-rose-400' },
   FINANCE: { bg: 'bg-emerald-500/10 dark:bg-emerald-500/20', text: 'text-emerald-600 dark:text-emerald-400' },
+  REPORTS: { bg: 'bg-emerald-500/10 dark:bg-emerald-500/20', text: 'text-emerald-600 dark:text-emerald-400' },
   BONUSES: { bg: 'bg-fuchsia-500/10 dark:bg-fuchsia-500/20', text: 'text-fuchsia-600 dark:text-fuchsia-400' },
   OWNERS: { bg: 'bg-indigo-500/10 dark:bg-indigo-500/20', text: 'text-indigo-600 dark:text-indigo-400' },
   SUPPLIERS: { bg: 'bg-sky-500/10 dark:bg-sky-500/20', text: 'text-sky-600 dark:text-sky-400' },
@@ -81,6 +83,7 @@ export const Drawer: React.FC = () => {
     stores,
     selectedStoreId,
     setSelectedStoreId,
+    logout,
   } = useAppFields(
     'currentUser',
     'setActivePage',
@@ -88,7 +91,8 @@ export const Drawer: React.FC = () => {
     'setDrawerOpen',
     'stores',
     'selectedStoreId',
-    'setSelectedStoreId'
+    'setSelectedStoreId',
+    'logout'
   );
   const { notifications } = useNotifications();
   const { setStoreSwitchModalOpen, triggerStoreTransition, setDailyClosingModalOpen } = useUIStore();
@@ -107,14 +111,7 @@ export const Drawer: React.FC = () => {
 
   const unreadNotifs = Array.isArray(notifications) ? notifications.filter(n => !n.read).length : 0;
 
-  const bottomNavIds = useMemo<Set<PageId>>(() => {
-    if (isCentralCashMode) {
-      return new Set<PageId>(['INVENTORY', 'SUPPLIERS', 'FINANCE', 'TRANSFER']);
-    }
-    // Retail Store mode / Seller / Partner
-    return new Set<PageId>(['INVENTORY', 'SALES_HISTORY', 'SALE', 'TRANSFER']);
-  }, [isCentralCashMode]);
-
+  // Complete list of navigation groups for each role - all items are preserved so the entire menu is accessible
   const navGroups = useMemo<NavGroup[]>(() => {
     let rawGroups: NavGroup[] = [];
 
@@ -135,7 +132,7 @@ export const Drawer: React.FC = () => {
           items: [
             { id: 'INVENTORY', label: 'Склад товаров', icon: Package, roles: ['SELLER'] },
             { id: 'STORE_RECEIPT', label: 'Приход товара', icon: PackagePlus, roles: ['SELLER'] },
-            { id: 'REVISION', label: 'Ревизия', icon: ClipboardCheck, roles: ['SELLER'] },
+            { id: 'REVISION', label: 'Ревизия склада', icon: ClipboardCheck, roles: ['SELLER'] },
             { id: 'TRANSFER', label: 'Перемещение', icon: ArrowLeftRight, roles: ['SELLER'] },
             { id: 'EXPENSES', label: 'Расходы кассы', icon: Wallet, roles: ['SELLER'] },
           ],
@@ -144,7 +141,7 @@ export const Drawer: React.FC = () => {
     } else if (isPartner) {
       rawGroups = [
         {
-          title: 'Магазин',
+          title: 'Магазин и продажи',
           items: [
             { id: 'SALE', label: 'POS Терминал', icon: ShoppingBag, roles: ['PARTNER'] },
             { id: 'CUSTOMERS', label: 'База клиентов', icon: Users, roles: ['PARTNER'] },
@@ -158,7 +155,7 @@ export const Drawer: React.FC = () => {
           items: [
             { id: 'INVENTORY', label: 'Склад магазина', icon: Package, roles: ['PARTNER'] },
             { id: 'STORE_RECEIPT', label: 'Приход товара', icon: PackagePlus, roles: ['PARTNER'] },
-            { id: 'REVISION', label: 'Ревизия', icon: ClipboardCheck, roles: ['PARTNER'] },
+            { id: 'REVISION', label: 'Ревизия склада', icon: ClipboardCheck, roles: ['PARTNER'] },
             { id: 'TRANSFER', label: 'Перемещение', icon: ArrowLeftRight, roles: ['PARTNER'] },
           ],
         },
@@ -193,7 +190,7 @@ export const Drawer: React.FC = () => {
           items: [
             { id: 'INVENTORY', label: 'Склад товаров', icon: Package, roles: ['ADMIN'] },
             { id: 'PURCHASE', label: 'Приходы (партии)', icon: PlusCircle, roles: ['ADMIN'] },
-            { id: 'REVISION', label: 'Ревизия', icon: ClipboardCheck, roles: ['ADMIN'] },
+            { id: 'REVISION', label: 'Ревизия склада', icon: ClipboardCheck, roles: ['ADMIN'] },
             { id: 'TRANSFER', label: 'Перемещение', icon: ArrowLeftRight, roles: ['ADMIN'] },
             { id: 'REPAIR', label: 'Сервис и ремонт', icon: Wrench, roles: ['ADMIN'] },
             { id: 'SUPPLIERS', label: 'Поставщики', icon: Truck, roles: ['ADMIN'] },
@@ -210,10 +207,10 @@ export const Drawer: React.FC = () => {
         },
       ];
     } else {
-      // Retail Store mode for Admin — matches Partner menus for the store
+      // Retail Store mode for Admin
       rawGroups = [
         {
-          title: 'Магазин',
+          title: 'Магазин и продажи',
           items: [
             { id: 'SALE', label: 'POS Терминал', icon: ShoppingBag, roles: ['ADMIN'] },
             { id: 'CUSTOMERS', label: 'База клиентов', icon: Users, roles: ['ADMIN'] },
@@ -227,7 +224,7 @@ export const Drawer: React.FC = () => {
           items: [
             { id: 'INVENTORY', label: 'Склад магазина', icon: Package, roles: ['ADMIN'] },
             { id: 'STORE_RECEIPT', label: 'Приход товара', icon: PackagePlus, roles: ['ADMIN'] },
-            { id: 'REVISION', label: 'Ревизия', icon: ClipboardCheck, roles: ['ADMIN'] },
+            { id: 'REVISION', label: 'Ревизия склада', icon: ClipboardCheck, roles: ['ADMIN'] },
             { id: 'TRANSFER', label: 'Перемещение', icon: ArrowLeftRight, roles: ['ADMIN'] },
           ],
         },
@@ -241,17 +238,24 @@ export const Drawer: React.FC = () => {
             { id: 'SETTINGS', label: 'Настройки системы', icon: Settings, roles: ['ADMIN'] },
           ],
         },
+        {
+          title: 'Система и доступ',
+          items: [
+            { id: 'EMPLOYEES', label: 'Сотрудники', icon: UserCheck, roles: ['ADMIN'] },
+            { id: 'AUDIT_LOG', label: 'Журнал аудита', icon: FileText, roles: ['ADMIN'] },
+            { id: 'NOTIFICATIONS', label: 'Уведомления', icon: Bell, roles: ['ADMIN'] },
+          ],
+        },
       ];
     }
 
-    // Do not show in the drawer menu items that are already present in the mobile bottom bar
     return rawGroups
       .map((group) => ({
         ...group,
-        items: group.items.filter((item) => !bottomNavIds.has(item.id)),
+        items: group.items.filter((item) => item.roles.includes(userRole)),
       }))
       .filter((group) => group.items.length > 0);
-  }, [isSeller, isPartner, isCentralCashMode, activeRetailStore, bottomNavIds]);
+  }, [isSeller, isPartner, isCentralCashMode, userRole]);
 
   React.useEffect(() => {
     if (!drawerOpen) return;
@@ -273,184 +277,189 @@ export const Drawer: React.FC = () => {
 
   return (
     <>
-      {/* Backdrop overlay for outside click to collapse */}
+      {/* Backdrop overlay for outside click */}
       <div
-        className="fixed inset-0 bg-black/60 backdrop-blur-xs z-40 md:hidden transition-opacity touch-none"
+        className="fixed inset-0 bg-black/60 backdrop-blur-xs z-40 md:hidden transition-opacity"
         onClick={() => setDrawerOpen(false)}
         aria-hidden="true"
       />
 
-      <div className="app-safe-area fixed inset-0 z-50 flex md:hidden flex-col bg-bg text-fg-muted w-full h-[100dvh] max-h-[100dvh] overflow-hidden shadow-2xl overscroll-none animate-in slide-in-from-top-2 duration-200">
-        {/* Header */}
-        <div className="border-b border-border bg-surface shrink-0 shadow-2xs">
+      {/* Main Drawer Shell */}
+      <div className="app-safe-area fixed inset-0 z-50 flex md:hidden flex-col bg-bg text-fg-muted w-full h-[100dvh] max-h-[100dvh] overflow-hidden shadow-2xl animate-in slide-in-from-top-2 duration-200">
+        {/* Sticky Header with User Info & Close Button */}
+        <header className="sticky top-0 z-20 border-b border-border bg-surface/95 backdrop-blur-md shrink-0 shadow-2xs">
           <div className="w-full shrink-0" style={{ height: 'var(--sa-top)' }} />
-          <div className="p-3.5 flex items-center justify-between">
-            <div className="flex items-center gap-3 min-w-0">
-            <div className="relative shrink-0">
-              <div className="w-10 h-10 rounded-xl bg-accent/15 border border-accent/30 text-accent font-bold text-xs flex items-center justify-center shadow-xs">
-                {cleanDisplayName.substring(0, 2).toUpperCase()}
-              </div>
-              <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-500 border-2 border-surface" />
-            </div>
-            <div className="min-w-0">
-              <div className="flex items-center gap-1.5">
-                <h2 className="text-sm font-bold text-fg truncate leading-tight">
-                  {cleanDisplayName}
-                </h2>
-                <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-md bg-surface-raised border border-border text-fg-subtle shrink-0">
-                  {isAdmin ? 'Админ' : isPartner ? 'Партнер' : 'Продавец'}
-                </span>
-              </div>
-              {isStoreScoped ? (
-                userStoreName ? (
-                  <p className="text-[11px] font-medium text-fg-subtle truncate flex items-center gap-1 mt-0.5">
-                    <Store className="w-3 h-3 text-accent shrink-0" />
-                    <span>{userStoreName}</span>
-                  </p>
-                ) : null
-              ) : (
-                <p className="text-[11px] font-medium text-accent truncate flex items-center gap-1 mt-0.5">
-                  {isCentralCashMode ? (
-                    <>
-                      <Landmark className="w-3 h-3 shrink-0" />
-                      <span>Центральная касса</span>
-                    </>
-                  ) : (
-                    <>
-                      <Store className="w-3 h-3 shrink-0" />
-                      <span>{activeRetailStore?.name || 'Магазин'}</span>
-                    </>
-                  )}
-                </p>
-              )}
-            </div>
-          </div>
-
-          <button
-            type="button"
-            onClick={() => setDrawerOpen(false)}
-            aria-label="Закрыть меню"
-            className="w-8.5 h-8.5 rounded-full flex items-center justify-center bg-surface-raised hover:bg-surface border border-border text-fg-subtle hover:text-fg transition-all active:scale-90 cursor-pointer shadow-xs"
-          >
-            <X className="w-4 h-4" />
-          </button>
-          </div>
-        </div>
-
-        {/* Mode Switcher Banner for Admin only */}
-        {isAdmin && (
-          <div className="p-3 border-b border-border/80 bg-surface-raised/30 shrink-0">
-            {isCentralCashMode ? (
-              <div
-                onClick={() => {
-                  setDrawerOpen(false);
-                  triggerStoreTransition({
-                    storeName: 'Центральная касса (Главный офис)',
-                    storeId: 'all',
-                    isCentral: true,
-                  });
-                  setSelectedStoreId('all');
-                  setActivePage('CASH_DESK');
-                  navigate('/cash');
-                }}
-                className="p-3 rounded-xl bg-surface border border-accent/25 hover:border-accent/40 space-y-2 cursor-pointer transition-colors shadow-xs"
-                title="Перейти в Центральную кассу (Финансы)"
-              >
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <div className="w-7 h-7 rounded-lg bg-accent/15 text-accent flex items-center justify-center shrink-0">
-                      <Landmark className="w-3.5 h-3.5" />
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-[10px] font-bold uppercase tracking-wider text-accent">Центральная касса</span>
-                        <span className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse" />
-                      </div>
-                      <p className="text-[11px] text-fg-subtle">Главный офис и финансовый учёт</p>
-                    </div>
-                  </div>
+          <div className="px-3.5 py-2.5 flex items-center justify-between">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <div className="relative shrink-0">
+                <div className="w-9 h-9 rounded-xl bg-accent/15 border border-accent/30 text-accent font-bold text-xs flex items-center justify-center shadow-xs">
+                  {cleanDisplayName.substring(0, 2).toUpperCase()}
                 </div>
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setDrawerOpen(false);
-                    setStoreSwitchModalOpen(true);
-                  }}
-                  className="w-full h-8 px-2.5 rounded-lg bg-surface-raised hover:bg-accent hover:text-accent-fg border border-border text-xs font-semibold text-fg flex items-center justify-between transition-all shadow-xs active:scale-[0.98] cursor-pointer"
-                >
-                  <span className="flex items-center gap-1.5">
-                    <Store className="w-3.5 h-3.5 text-accent" />
-                    <span>Выбрать магазин для продаж</span>
+                <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-500 border-2 border-surface" />
+              </div>
+              <div className="min-w-0">
+                <div className="flex items-center gap-1.5">
+                  <h2 className="text-sm font-bold text-fg truncate leading-tight">
+                    {cleanDisplayName}
+                  </h2>
+                  <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-md bg-surface-raised border border-border text-fg-subtle shrink-0">
+                    {isAdmin ? 'Админ' : isPartner ? 'Партнер' : 'Продавец'}
                   </span>
-                  <ArrowRight className="w-3.5 h-3.5 opacity-60" />
-                </button>
+                </div>
+                {isStoreScoped ? (
+                  userStoreName ? (
+                    <p className="text-[11px] font-medium text-fg-subtle truncate flex items-center gap-1 mt-0.5">
+                      <Store className="w-3 h-3 text-accent shrink-0" />
+                      <span>{userStoreName}</span>
+                    </p>
+                  ) : null
+                ) : (
+                  <p className="text-[11px] font-medium text-accent truncate flex items-center gap-1 mt-0.5">
+                    {isCentralCashMode ? (
+                      <>
+                        <Landmark className="w-3 h-3 shrink-0" />
+                        <span>Центральная касса</span>
+                      </>
+                    ) : (
+                      <>
+                        <Store className="w-3 h-3 shrink-0" />
+                        <span>{activeRetailStore?.name || 'Магазин'}</span>
+                      </>
+                    )}
+                  </p>
+                )}
               </div>
-            ) : (
-              <div className="p-3 rounded-xl bg-surface border border-border shadow-xs space-y-2.5">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2.5 min-w-0">
-                    <div className="w-8 h-8 rounded-lg bg-amber-500/15 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0">
-                      <Store className="w-4 h-4" />
-                    </div>
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-[10px] font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400">Режим продаж</span>
-                        <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setDrawerOpen(false)}
+              aria-label="Закрыть меню"
+              className="w-8.5 h-8.5 rounded-full flex items-center justify-center bg-surface-raised hover:bg-surface border border-border text-fg-subtle hover:text-fg transition-all active:scale-90 cursor-pointer shadow-xs shrink-0"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        </header>
+
+        {/* Scrollable Body: Banner, Switchers, Quick Actions, and ALL Menu Items */}
+        <div
+          className="flex-1 min-h-0 overflow-y-auto overscroll-contain [-webkit-overflow-scrolling:touch] touch-pan-y px-3 py-3 space-y-3"
+          style={{ paddingBottom: 'calc(6.5rem + var(--sa-bottom, 20px))' }}
+        >
+          {/* Mode Switcher Banner for Admin (Now fully scrollable so it never blocks mobile screens) */}
+          {isAdmin && (
+            <div className="rounded-2xl bg-surface-raised/40 border border-border p-2.5 shadow-2xs space-y-2">
+              {isCentralCashMode ? (
+                <div
+                  onClick={() => {
+                    setDrawerOpen(false);
+                    triggerStoreTransition({
+                      storeName: 'Центральная касса (Главный офис)',
+                      storeId: 'all',
+                      isCentral: true,
+                    });
+                    setSelectedStoreId('all');
+                    setActivePage('CASH_DESK');
+                    navigate('/cash');
+                  }}
+                  className="p-2.5 rounded-xl bg-surface border border-accent/25 hover:border-accent/40 space-y-2 cursor-pointer transition-colors shadow-xs"
+                  title="Перейти в Центральную кассу"
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="w-7 h-7 rounded-lg bg-accent/15 text-accent flex items-center justify-center shrink-0">
+                        <Landmark className="w-3.5 h-3.5" />
                       </div>
-                      <p className="text-xs font-bold text-fg truncate leading-tight">
-                        {activeRetailStore?.name || 'Магазин'}
-                      </p>
+                      <div>
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-accent">Центральная касса</span>
+                          <span className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse" />
+                        </div>
+                        <p className="text-[11px] text-fg-subtle">Главный офис и финансовый учёт</p>
+                      </div>
                     </div>
                   </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-2">
                   <button
                     type="button"
-                    onClick={() => {
+                    onClick={(e) => {
+                      e.stopPropagation();
                       setDrawerOpen(false);
                       setStoreSwitchModalOpen(true);
                     }}
-                    className="h-8.5 px-2.5 rounded-lg bg-surface-raised hover:bg-surface border border-border text-xs font-medium text-fg flex items-center justify-center gap-1.5 transition-all active:scale-95 cursor-pointer shadow-2xs"
+                    className="w-full h-8 px-2.5 rounded-lg bg-surface-raised hover:bg-accent hover:text-accent-fg border border-border text-xs font-semibold text-fg flex items-center justify-between transition-all shadow-xs active:scale-[0.98] cursor-pointer"
                   >
-                    <Store className="w-3.5 h-3.5 text-fg-subtle" />
-                    <span>Сменить</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setDrawerOpen(false);
-                      triggerStoreTransition({
-                        storeName: 'Центральная касса (Главный офис)',
-                        storeId: 'all',
-                        isCentral: true,
-                      });
-                      setSelectedStoreId('all');
-                      setActivePage('CASH_DESK');
-                      navigate('/cash');
-                    }}
-                    className="h-8.5 px-2.5 rounded-lg bg-accent hover:bg-accent-strong text-accent-fg text-xs font-semibold flex items-center justify-center gap-1.5 transition-all shadow-xs active:scale-95 cursor-pointer"
-                  >
-                    <Landmark className="w-3.5 h-3.5" />
-                    <span>В Центр</span>
+                    <span className="flex items-center gap-1.5">
+                      <Store className="w-3.5 h-3.5 text-accent" />
+                      <span>Выбрать магазин для продаж</span>
+                    </span>
+                    <ArrowRight className="w-3.5 h-3.5 opacity-60" />
                   </button>
                 </div>
-              </div>
-            )}
-          </div>
-        )}
+              ) : (
+                <div className="p-2.5 rounded-xl bg-surface border border-border shadow-xs space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <div className="w-7 h-7 rounded-lg bg-amber-500/15 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0">
+                        <Store className="w-3.5 h-3.5" />
+                      </div>
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400">Режим продаж</span>
+                          <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+                        </div>
+                        <p className="text-xs font-bold text-fg truncate leading-tight">
+                          {activeRetailStore?.name || 'Магазин'}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
 
-        {/* Quick Shift Closing Button for Store Cashiers / Partners */}
-        {(!isAdmin || !isCentralCashMode) && (
-          <div className="px-3 pt-2.5 shrink-0">
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setDrawerOpen(false);
+                        setStoreSwitchModalOpen(true);
+                      }}
+                      className="h-8 px-2 rounded-lg bg-surface-raised hover:bg-surface border border-border text-xs font-medium text-fg flex items-center justify-center gap-1.5 transition-all active:scale-95 cursor-pointer shadow-2xs"
+                    >
+                      <Store className="w-3.5 h-3.5 text-fg-subtle" />
+                      <span>Сменить</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setDrawerOpen(false);
+                        triggerStoreTransition({
+                          storeName: 'Центральная касса (Главный офис)',
+                          storeId: 'all',
+                          isCentral: true,
+                        });
+                        setSelectedStoreId('all');
+                        setActivePage('CASH_DESK');
+                        navigate('/cash');
+                      }}
+                      className="h-8 px-2 rounded-lg bg-accent hover:bg-accent-strong text-accent-fg text-xs font-semibold flex items-center justify-center gap-1.5 transition-all shadow-xs active:scale-95 cursor-pointer"
+                    >
+                      <Landmark className="w-3.5 h-3.5" />
+                      <span>В Центр</span>
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Quick Shift Closing Button for Store Cashiers / Partners */}
+          {!isAdmin && (
             <button
               type="button"
               onClick={() => {
                 setDrawerOpen(false);
                 setDailyClosingModalOpen(true, currentUser?.storeId || (selectedStoreId !== 'all' ? selectedStoreId : undefined));
               }}
-              className="w-full py-2.5 px-3 rounded-xl bg-accent/10 hover:bg-accent/15 border border-accent/25 text-accent text-xs font-bold flex items-center justify-between transition-colors shadow-2xs cursor-pointer"
+              className="w-full py-2.5 px-3 rounded-xl bg-accent/10 hover:bg-accent/15 border border-accent/25 text-accent text-xs font-bold flex items-center justify-between transition-colors shadow-2xs cursor-pointer active:scale-[0.99]"
             >
               <span className="flex items-center gap-2">
                 <FileCheck2 className="w-4 h-4 text-accent shrink-0" />
@@ -460,11 +469,9 @@ export const Drawer: React.FC = () => {
                 Сверка кассы
               </span>
             </button>
-          </div>
-        )}
+          )}
 
-        {/* Vertical List of Menu Items with Collapsible/Expandable Sections */}
-        <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain [-webkit-overflow-scrolling:touch] touch-pan-y p-3 pb-[calc(1.5rem+var(--sa-bottom))] space-y-3">
+          {/* All Navigation Groups & Items */}
           {navGroups.map((group, gIdx) => {
             const visibleItems = group.items.filter(item => item.roles.includes(userRole));
             if (visibleItems.length === 0) return null;
@@ -478,7 +485,10 @@ export const Drawer: React.FC = () => {
                   aria-expanded={!isCollapsed}
                   className="w-full flex items-center justify-between px-1.5 py-1 text-[11px] font-bold text-fg-subtle uppercase tracking-wider hover:text-fg transition-colors select-none group"
                 >
-                  <span className="group-hover:text-fg transition-colors">{group.title}</span>
+                  <span className="flex items-center gap-1.5 group-hover:text-fg transition-colors">
+                    <span>{group.title}</span>
+                    <span className="text-[10px] text-fg-subtle/70 font-mono">({visibleItems.length})</span>
+                  </span>
                   <span className="flex items-center gap-1 text-[10px] lowercase font-normal opacity-70 group-hover:opacity-100 transition-opacity">
                     <span>{isCollapsed ? 'развернуть' : 'свернуть'}</span>
                     <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${isCollapsed ? '-rotate-90' : 'rotate-0'}`} />
@@ -535,6 +545,22 @@ export const Drawer: React.FC = () => {
               </div>
             );
           })}
+
+          {/* Quick Logout Button at the bottom of the scroll list */}
+          <div className="pt-2">
+            <button
+              type="button"
+              onClick={() => {
+                setDrawerOpen(false);
+                logout();
+                navigate('/login');
+              }}
+              className="w-full flex items-center justify-center gap-2 p-2.5 rounded-xl border border-danger/25 bg-danger/5 hover:bg-danger/10 text-danger text-xs font-semibold transition-all active:scale-[0.98] cursor-pointer"
+            >
+              <LogOut className="w-4 h-4" />
+              <span>Выйти из аккаунта</span>
+            </button>
+          </div>
         </div>
       </div>
     </>

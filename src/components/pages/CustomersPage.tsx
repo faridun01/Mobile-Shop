@@ -1,25 +1,24 @@
-import React, { useEffect, useState, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import {
   Users,
   Search,
   PlusCircle,
   Bell,
-  CheckCircle2,
-  Clock,
   Phone,
   Edit2,
   Trash2,
   Send,
   Eye,
-  FileText,
-  AlertTriangle,
-  ShoppingBag,
-  CreditCard,
-  UserCheck,
+  Check,
+  Copy,
+  ExternalLink,
+  MessageCircle,
+  Sparkles,
+  User,
+  Clock,
+  CheckCircle2,
 } from 'lucide-react';
 import { apiClient } from '../../api/client';
-import { formatMoney } from '../../utils/money';
 import { useAppFields } from '../../context/AppContext';
 import { Customer } from '../../types';
 import { Button } from '../ui/Button';
@@ -40,9 +39,26 @@ interface CustomerListResponse {
   };
 }
 
+const PROMO_TEMPLATES = [
+  {
+    label: 'Скидка на аксессуары',
+    title: '🔥 Скидка 15% на чехлы и стекла!',
+    message: 'При покупке чехла или стекла защитное покрытие в подарок. Ждём вас в нашем магазине!',
+  },
+  {
+    label: 'Новое поступление',
+    title: '📱 Новое поступление смартфонов!',
+    message: 'Большой выбор новых моделей с официальной гарантией и лучшими ценами в городе.',
+  },
+  {
+    label: 'Trade-In бонус',
+    title: '🔄 Выгодный обмен Trade-In!',
+    message: 'Сдайте старый телефон и получите специальную дополнительную скидку на новый смартфон.',
+  },
+];
+
 export const CustomersPage: React.FC = () => {
-  const navigate = useNavigate();
-  const { stores, currentUser } = useAppFields('stores', 'currentUser');
+  const { currentUser } = useAppFields('currentUser');
 
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [summary, setSummary] = useState<CustomerListResponse['summary']>({
@@ -57,7 +73,8 @@ export const CustomersPage: React.FC = () => {
   const [status, setStatus] = useState<StatusMessage | null>(null);
 
   const [search, setSearch] = useState('');
-  const [activeTab, setActiveTab] = useState<'ALL' | 'DEBTORS' | 'PUSH'>('ALL');
+  const [activeTab, setActiveTab] = useState<'ALL' | 'WITH_PHONE' | 'PUSH'>('ALL');
+  const [copiedId, setCopiedId] = useState<string | null>(null);
 
   // Add / Edit Modal
   const [isAddEditOpen, setIsAddEditOpen] = useState(false);
@@ -68,20 +85,12 @@ export const CustomersPage: React.FC = () => {
   const [formPushEnabled, setFormPushEnabled] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
 
-  // Detail Modal
-  const [detailCustomer, setDetailCustomer] = useState<any | null>(null);
-  const [isDetailLoading, setIsDetailLoading] = useState(false);
+  // Detail Modal (Contact Card)
+  const [detailCustomer, setDetailCustomer] = useState<Customer | null>(null);
 
-  // Payment Modal
-  const [paymentCustomer, setPaymentCustomer] = useState<Customer | null>(null);
-  const [paymentAmount, setPaymentAmount] = useState('');
-  const [paymentStoreId, setPaymentStoreId] = useState('');
-  const [paymentNote, setPaymentNote] = useState('');
-  const [isPaymentSubmitting, setIsPaymentSubmitting] = useState(false);
-
-  // Push Broadcast Modal
+  // Push / Promo Modal
   const [isPushModalOpen, setIsPushModalOpen] = useState(false);
-  const [pushTarget, setPushTarget] = useState<'ALL' | 'DEBTORS' | 'CUSTOMER'>('ALL');
+  const [pushTarget, setPushTarget] = useState<'ALL' | 'CUSTOMER'>('ALL');
   const [pushSelectedCustomerId, setPushSelectedCustomerId] = useState<string>('');
   const [pushTitle, setPushTitle] = useState('');
   const [pushMessage, setPushMessage] = useState('');
@@ -99,7 +108,6 @@ export const CustomersPage: React.FC = () => {
       setError(null);
       const params = new URLSearchParams();
       if (search.trim()) params.append('search', search.trim());
-      if (activeTab === 'DEBTORS') params.append('debtorsOnly', 'true');
       params.append('limit', '100');
 
       const res = await apiClient<CustomerListResponse>(`/customers?${params.toString()}`);
@@ -110,7 +118,7 @@ export const CustomersPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [search, activeTab]);
+  }, [search]);
 
   useEffect(() => {
     loadCustomers();
@@ -121,6 +129,14 @@ export const CustomersPage: React.FC = () => {
     window.addEventListener('business-data-changed', handleUpdate);
     return () => window.removeEventListener('business-data-changed', handleUpdate);
   }, [loadCustomers]);
+
+  // Copy phone number helper
+  const handleCopyPhone = (id: string, phone: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    navigator.clipboard.writeText(phone);
+    setCopiedId(id);
+    setTimeout(() => setCopiedId(null), 1500);
+  };
 
   // Open Add modal
   const handleOpenAdd = () => {
@@ -133,13 +149,32 @@ export const CustomersPage: React.FC = () => {
   };
 
   // Open Edit modal
-  const handleOpenEdit = (c: Customer) => {
+  const handleOpenEdit = (c: Customer, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
     setEditingCustomer(c);
     setFormName(c.name);
     setFormPhone(c.phone || '');
     setFormNote(c.note || '');
     setFormPushEnabled(c.pushEnabled !== false);
     setIsAddEditOpen(true);
+  };
+
+  // Open Promo Push Modal
+  const handleOpenPromoModal = (customerId?: string, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    if (customerId) {
+      setPushTarget('CUSTOMER');
+      setPushSelectedCustomerId(customerId);
+      const c = customers.find((item) => item.id === customerId);
+      setPushTitle(c ? `Спецпредложение для ${c.name}` : 'Спецпредложение');
+    } else {
+      setPushTarget('ALL');
+      setPushSelectedCustomerId('');
+      setPushTitle('');
+    }
+    setPushMessage('');
+    setPushLink('/sale');
+    setIsPushModalOpen(true);
   };
 
   // Save Customer
@@ -159,7 +194,7 @@ export const CustomersPage: React.FC = () => {
             pushEnabled: formPushEnabled,
           }),
         });
-        setStatus({ tone: 'success', text: `Данные клиента ${formName} успешно обновлены` });
+        setStatus({ tone: 'success', text: `Контакт клиента ${formName} успешно обновлен` });
       } else {
         await apiClient('/customers', {
           method: 'POST',
@@ -170,7 +205,7 @@ export const CustomersPage: React.FC = () => {
             pushEnabled: formPushEnabled,
           }),
         });
-        setStatus({ tone: 'success', text: `Клиент ${formName} успешно добавлен в базу` });
+        setStatus({ tone: 'success', text: `Клиент ${formName} сохранен в базу` });
       }
       setIsAddEditOpen(false);
       loadCustomers();
@@ -181,65 +216,7 @@ export const CustomersPage: React.FC = () => {
     }
   };
 
-  // View Customer Detail
-  const handleViewDetail = async (c: Customer) => {
-    setIsDetailLoading(true);
-    try {
-      const full = await apiClient(`/customers/${c.id}`);
-      setDetailCustomer(full);
-    } catch (err: any) {
-      setStatus({ tone: 'error', text: err?.message || 'Не удалось загрузить профиль клиента' });
-    } finally {
-      setIsDetailLoading(false);
-    }
-  };
-
-  // Open Payment modal
-  const handleOpenPayment = (c: Customer) => {
-    setPaymentCustomer(c);
-    setPaymentAmount(c.totalDebtTjs.toString());
-    const defaultStore = stores.find((s) => !s.isMainWarehouse);
-    setPaymentStoreId(currentUser?.storeId || defaultStore?.id || '');
-    setPaymentNote('');
-  };
-
-  // Submit Payment
-  const handleSubmitPayment = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!paymentCustomer || isPaymentSubmitting) return;
-
-    const amount = parseFloat(paymentAmount);
-    if (!amount || amount <= 0) {
-      setStatus({ tone: 'error', text: 'Укажите сумму оплаты' });
-      return;
-    }
-
-    setIsPaymentSubmitting(true);
-    try {
-      await apiClient(`/customers/${paymentCustomer.id}/payments`, {
-        method: 'POST',
-        body: JSON.stringify({
-          amountTjs: amount,
-          storeId: paymentStoreId || undefined,
-          note: paymentNote.trim() || undefined,
-        }),
-      });
-
-      setStatus({
-        tone: 'success',
-        text: `Оплата ${formatMoney(amount)} TJS от ${paymentCustomer.name} успешно зачислена в кассу`,
-      });
-      setPaymentCustomer(null);
-      window.dispatchEvent(new CustomEvent('business-data-changed'));
-      loadCustomers();
-    } catch (err: any) {
-      setStatus({ tone: 'error', text: err?.message || 'Ошибка проведения оплаты' });
-    } finally {
-      setIsPaymentSubmitting(false);
-    }
-  };
-
-  // Send Push
+  // Send Promo Push
   const handleSendPush = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!pushTitle.trim() || !pushMessage.trim() || isSendingPush) return;
@@ -259,7 +236,7 @@ export const CustomersPage: React.FC = () => {
 
       setStatus({
         tone: 'success',
-        text: `Push-уведомление отправлено (доставлено: ${res.sent} из ${res.totalFound})`,
+        text: `Уведомление об акции отправлено (доставлено: ${res.sent} из ${res.totalFound})`,
       });
       setIsPushModalOpen(false);
       setPushTitle('');
@@ -276,18 +253,54 @@ export const CustomersPage: React.FC = () => {
     if (!deletingCustomer) return;
     try {
       await apiClient(`/customers/${deletingCustomer.id}`, { method: 'DELETE' });
-      setStatus({ tone: 'success', text: `Клиент ${deletingCustomer.name} удален` });
+      setStatus({ tone: 'success', text: `Клиент ${deletingCustomer.name} удален из базы` });
       setDeletingCustomer(null);
+      if (detailCustomer?.id === deletingCustomer.id) {
+        setDetailCustomer(null);
+      }
       loadCustomers();
     } catch (err: any) {
       setStatus({ tone: 'error', text: err?.message || 'Не удалось удалить клиента' });
     }
   };
 
-  const displayedCustomers = customers.filter((c) => {
-    if (activeTab === 'PUSH') return c.hasPushSubscription;
-    return true;
-  });
+  // Clean phone string for wa.me link
+  const getWhatsAppLink = (phone?: string | null) => {
+    if (!phone) return null;
+    const digits = phone.replace(/[^\d]/g, '');
+    if (digits.length < 9) return null;
+    const full = digits.startsWith('992') ? digits : `992${digits}`;
+    return `https://wa.me/${full}`;
+  };
+
+  // Filters & Counts
+  const withPhoneCount = useMemo(() => customers.filter((c) => Boolean(c.phone?.trim())).length, [customers]);
+  const pushSubscribedCount = useMemo(
+    () => summary.pushSubscribedCount || customers.filter((c) => c.hasPushSubscription).length,
+    [customers, summary.pushSubscribedCount]
+  );
+
+  const displayedCustomers = useMemo(() => {
+    return customers.filter((c) => {
+      if (activeTab === 'WITH_PHONE' && !c.phone?.trim()) return false;
+      if (activeTab === 'PUSH' && !c.hasPushSubscription) return false;
+      if (!search.trim()) return true;
+      const q = search.toLowerCase().trim();
+      return (
+        c.name.toLowerCase().includes(q) ||
+        (c.phone && c.phone.toLowerCase().includes(q)) ||
+        (c.note && c.note.toLowerCase().includes(q))
+      );
+    });
+  }, [customers, activeTab, search]);
+
+  const getInitials = (name: string) => {
+    const parts = name.trim().split(/\s+/);
+    if (parts.length >= 2) {
+      return (parts[0][0] + parts[1][0]).toUpperCase();
+    }
+    return (name.slice(0, 2) || 'КЛ').toUpperCase();
+  };
 
   return (
     <div className="work-screen flex-1 flex flex-col h-full overflow-hidden bg-bg text-fg select-none">
@@ -296,7 +309,7 @@ export const CustomersPage: React.FC = () => {
       {/* Header */}
       <div className="p-3 sm:p-4 border-b border-border bg-surface shrink-0 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div className="flex items-center gap-2.5">
-          <div className="w-9 h-9 rounded-xl bg-accent/15 border border-accent/25 flex items-center justify-center text-accent shrink-0">
+          <div className="w-10 h-10 rounded-2xl bg-accent/15 border border-accent/25 flex items-center justify-center text-accent shrink-0 shadow-2xs">
             <Users className="w-5 h-5" />
           </div>
           <div>
@@ -306,35 +319,32 @@ export const CustomersPage: React.FC = () => {
                 {summary.totalCustomers} клиентов
               </span>
             </h1>
+            <p className="text-xs text-fg-subtle mt-0.5">
+              Контакты покупателей и рассылка акций
+            </p>
           </div>
         </div>
 
         {/* Action Buttons */}
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex items-center gap-2">
           {isAdmin && (
             <Button
               variant="secondary"
               size="sm"
               leftIcon={Bell}
-              onClick={() => {
-                setPushTarget('ALL');
-                setPushSelectedCustomerId('');
-                setIsPushModalOpen(true);
-              }}
-              className="h-9 px-3 text-xs font-semibold"
+              onClick={() => handleOpenPromoModal()}
+              className="h-9 px-3 text-xs font-semibold cursor-pointer"
             >
-              Отправить Push
+              Отправить акцию
             </Button>
           )}
-
-
 
           <Button
             variant="primary"
             size="sm"
             leftIcon={PlusCircle}
             onClick={handleOpenAdd}
-            className="h-9 px-3"
+            className="h-9 px-3 font-semibold cursor-pointer"
           >
             Новый клиент
           </Button>
@@ -343,246 +353,249 @@ export const CustomersPage: React.FC = () => {
 
       {/* Main Body */}
       <div className="flex-1 min-h-0 overflow-y-auto p-3 sm:p-5 space-y-4">
-        <div className="max-w-7xl mx-auto space-y-4">
+        <div className="max-w-6xl mx-auto space-y-4">
           {error && (
             <div className="p-3 bg-danger/15 border border-danger/30 text-danger text-xs font-medium rounded-xl">
               {error}
             </div>
           )}
 
-          {/* KPI CARDS */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            <div className="p-3.5 rounded-2xl bg-surface border border-border shadow-sm">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-fg-subtle block">Всего клиентов</span>
-              <div className="text-xl sm:text-2xl font-black font-mono text-fg mt-1">
-                {summary.totalCustomers}
+          {/* STATS: 3 CLEAN, RELEVANT CARDS */}
+          <div className="grid grid-cols-3 gap-2.5 sm:gap-3">
+            <div className="p-3 sm:p-4 rounded-2xl bg-surface border border-border shadow-2xs flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl bg-accent/10 border border-accent/20 flex items-center justify-center text-accent shrink-0">
+                <Users className="w-4 h-4" />
+              </div>
+              <div className="min-w-0">
+                <span className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-fg-subtle block truncate">
+                  Всего клиентов
+                </span>
+                <p className="text-lg sm:text-2xl font-black font-mono text-fg mt-0.5">
+                  {summary.totalCustomers || customers.length}
+                </p>
               </div>
             </div>
 
-            <div className="p-3.5 rounded-2xl bg-surface border border-border shadow-sm">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-warning block">Должников</span>
-              <div className="text-xl sm:text-2xl font-black font-mono text-warning mt-1">
-                {summary.debtorsCount}
+            <div className="p-3 sm:p-4 rounded-2xl bg-surface border border-border shadow-2xs flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl bg-info/10 border border-info/20 flex items-center justify-center text-info shrink-0">
+                <Phone className="w-4 h-4" />
+              </div>
+              <div className="min-w-0">
+                <span className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-fg-subtle block truncate">
+                  С телефоном
+                </span>
+                <p className="text-lg sm:text-2xl font-black font-mono text-fg mt-0.5">
+                  {withPhoneCount}
+                </p>
               </div>
             </div>
 
-            <div className="p-3.5 rounded-2xl bg-surface border border-border shadow-sm">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-danger block">Общий долг</span>
-              <div className="text-xl sm:text-2xl font-black font-mono text-danger mt-1">
-                {formatMoney(summary.totalDebtTjs)} <span className="text-xs">TJS</span>
+            <div className="p-3 sm:p-4 rounded-2xl bg-surface border border-border shadow-2xs flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl bg-highlight/10 border border-highlight/20 flex items-center justify-center text-highlight shrink-0">
+                <Bell className="w-4 h-4" />
               </div>
-            </div>
-
-            <div className="p-3.5 rounded-2xl bg-surface border border-border shadow-sm">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-success block">Всего оплачено</span>
-              <div className="text-xl sm:text-2xl font-black font-mono text-success mt-1">
-                {formatMoney(summary.totalPaidTjs)} <span className="text-xs">TJS</span>
+              <div className="min-w-0">
+                <span className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-fg-subtle block truncate">
+                  Push-акции
+                </span>
+                <p className="text-lg sm:text-2xl font-black font-mono text-fg mt-0.5">
+                  {pushSubscribedCount}
+                </p>
               </div>
             </div>
           </div>
 
           {/* SEARCH & FILTER TABS */}
-          <div className="bg-surface rounded-2xl border border-border shadow-sm p-3 flex flex-col sm:flex-row items-center justify-between gap-3">
-            <div className="flex items-center gap-1.5 w-full sm:w-auto">
+          <div className="bg-surface rounded-2xl border border-border shadow-2xs p-3 flex flex-col sm:flex-row items-center justify-between gap-3">
+            <div className="flex items-center gap-1.5 w-full sm:w-auto overflow-x-auto pb-1 sm:pb-0">
               <button
                 type="button"
                 onClick={() => setActiveTab('ALL')}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer transition-colors ${
+                className={`px-3 py-1.5 rounded-xl text-xs font-semibold cursor-pointer transition-colors whitespace-nowrap ${
                   activeTab === 'ALL'
-                    ? 'bg-accent/15 text-accent font-bold border border-accent/20'
+                    ? 'bg-accent/15 text-accent font-bold border border-accent/25'
                     : 'text-fg-subtle hover:text-fg'
                 }`}
               >
-                Все ({summary.totalCustomers})
+                Все ({customers.length})
               </button>
               <button
                 type="button"
-                onClick={() => setActiveTab('DEBTORS')}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer transition-colors ${
-                  activeTab === 'DEBTORS'
-                    ? 'bg-warning/15 text-warning font-bold border border-warning/20'
+                onClick={() => setActiveTab('WITH_PHONE')}
+                className={`px-3 py-1.5 rounded-xl text-xs font-semibold cursor-pointer transition-colors whitespace-nowrap ${
+                  activeTab === 'WITH_PHONE'
+                    ? 'bg-accent/15 text-accent font-bold border border-accent/25'
                     : 'text-fg-subtle hover:text-fg'
                 }`}
               >
-                С долгом ({summary.debtorsCount})
+                С телефоном ({withPhoneCount})
               </button>
               <button
                 type="button"
                 onClick={() => setActiveTab('PUSH')}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer transition-colors ${
+                className={`px-3 py-1.5 rounded-xl text-xs font-semibold cursor-pointer transition-colors whitespace-nowrap ${
                   activeTab === 'PUSH'
-                    ? 'bg-accent/15 text-accent font-bold border border-accent/20'
+                    ? 'bg-accent/15 text-accent font-bold border border-accent/25'
                     : 'text-fg-subtle hover:text-fg'
                 }`}
               >
-                С Push-подпиской ({summary.pushSubscribedCount})
+                С Push-подпиской ({pushSubscribedCount})
               </button>
             </div>
 
-            <div className="relative w-full sm:w-72">
-              <Search className="w-3.5 h-3.5 text-fg-subtle absolute left-2.5 top-1/2 -translate-y-1/2" />
+            <div className="relative w-full sm:w-80">
+              <Search className="w-4 h-4 text-fg-subtle absolute left-3 top-1/2 -translate-y-1/2" />
               <input
                 type="text"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                placeholder="Поиск по имени, телефону, заметке..."
-                className="w-full h-8 pl-8 pr-3 rounded-lg bg-surface-raised border border-border text-xs text-fg focus:outline-none focus:border-accent"
+                placeholder="Поиск по имени, номеру, заметке..."
+                className="w-full h-9 pl-9 pr-3 rounded-xl bg-surface-raised border border-border text-xs text-fg focus:outline-none focus:border-accent"
               />
             </div>
           </div>
 
-          {/* CUSTOMERS TABLE */}
-          <div className="bg-surface rounded-2xl border border-border shadow-sm overflow-hidden">
+          {/* CUSTOMERS LIST / TABLE */}
+          <div className="bg-surface rounded-2xl border border-border shadow-2xs overflow-hidden">
             {loading ? (
               <div className="p-8 text-center">
                 <LoadingState label="Загрузка списка клиентов…" />
               </div>
             ) : displayedCustomers.length === 0 ? (
               <div className="py-16 text-center text-xs text-fg-subtle space-y-3">
-                <Users className="w-8 h-8 text-fg-subtle/50 mx-auto" />
-                <p>Клиенты не найдены</p>
-                <Button size="sm" onClick={handleOpenAdd}>
-                  Добавить первого клиента
+                <Users className="w-9 h-9 text-fg-subtle/40 mx-auto" />
+                <p className="text-sm font-semibold text-fg-muted">Клиенты не найдены</p>
+                <p className="text-xs text-fg-subtle max-w-xs mx-auto">
+                  {search ? 'По вашему запросу ничего не найдено.' : 'Сохраняйте контакты покупателей для отправки акций и спецпредложений.'}
+                </p>
+                <Button size="sm" onClick={handleOpenAdd} className="mt-2">
+                  Добавить клиента
                 </Button>
               </div>
             ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs">
-                  <thead>
-                    <tr className="border-b border-border bg-surface-raised/40 text-fg-subtle font-semibold">
-                      <th className="py-3 px-4">Клиент</th>
-                      <th className="py-3 px-3">Контакты</th>
-                      <th className="py-3 px-3">Покупок</th>
-                      <th className="py-3 px-3 text-right">Текущий долг</th>
-                      <th className="py-3 px-3 text-right">Всего оплачено</th>
-                      <th className="py-3 px-3 text-center">Push-уведомления</th>
-                      <th className="py-3 px-4 text-right">Действия</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-border">
-                    {displayedCustomers.map((c) => (
-                      <tr key={c.id} className="hover:bg-surface-raised/40 transition-colors">
-                        <td className="py-3 px-4">
-                          <button
-                            type="button"
-                            onClick={() => handleViewDetail(c)}
-                            className="font-bold text-fg hover:text-accent text-left cursor-pointer"
-                          >
-                            {c.name}
-                          </button>
-                          {c.note && (
-                            <span className="text-[10px] text-fg-subtle block mt-0.5 line-clamp-1">{c.note}</span>
-                          )}
-                        </td>
+              <div className="divide-y divide-border">
+                {displayedCustomers.map((c) => {
+                  const waLink = getWhatsAppLink(c.phone);
+                  const isCopied = copiedId === c.id;
 
-                        <td className="py-3 px-3">
-                          {c.phone ? (
-                            <span className="font-mono text-fg-muted font-medium">{c.phone}</span>
-                          ) : (
-                            <span className="text-fg-subtle">—</span>
-                          )}
-                        </td>
+                  return (
+                    <div
+                      key={c.id}
+                      onClick={() => setDetailCustomer(c)}
+                      className="p-3 sm:px-4 sm:py-3.5 hover:bg-surface-raised/40 transition-colors flex flex-col sm:flex-row sm:items-center justify-between gap-3 cursor-pointer group"
+                    >
+                      {/* Left: Avatar + Name + Note */}
+                      <div className="flex items-center gap-3 min-w-0 flex-1">
+                        <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-accent/10 border border-accent/20 flex items-center justify-center text-accent font-bold text-xs shrink-0 select-none">
+                          {getInitials(c.name)}
+                        </div>
 
-                        <td className="py-3 px-3 text-fg-muted">
-                          <span className="font-bold text-fg">{c.salesCount || 0}</span> шт.
-                          {c.lastSale && (
-                            <span className="text-[10px] text-fg-subtle block">
-                              Чек #{c.lastSale.receiptNumber}
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-bold text-fg group-hover:text-accent transition-colors text-sm">
+                              {c.name}
                             </span>
-                          )}
-                        </td>
+                            {c.hasPushSubscription ? (
+                              <span className="inline-flex items-center gap-1 text-[10px] font-bold text-success bg-success/10 px-2 py-0.5 rounded-full border border-success/20">
+                                <Bell className="w-2.5 h-2.5" /> Push активен
+                              </span>
+                            ) : c.pushEnabled ? (
+                              <span className="text-[10px] text-fg-subtle bg-surface-raised px-1.5 py-0.5 rounded border border-border">
+                                Готов к рассылкам
+                              </span>
+                            ) : null}
+                          </div>
 
-                        <td className="py-3 px-3 text-right">
-                          {c.totalDebtTjs > 0 ? (
-                            <span className="font-black font-mono text-warning text-sm bg-warning/10 px-2 py-0.5 rounded-md border border-warning/20">
-                              {formatMoney(c.totalDebtTjs)} TJS
-                            </span>
+                          {c.note ? (
+                            <p className="text-xs text-fg-subtle mt-0.5 line-clamp-1">
+                              {c.note}
+                            </p>
                           ) : (
-                            <span className="text-fg-subtle font-mono">0 TJS</span>
+                            <p className="text-[10px] text-fg-subtle mt-0.5">
+                              Добавлен {new Date(c.createdAt).toLocaleDateString('ru-RU')}
+                            </p>
                           )}
-                        </td>
+                        </div>
+                      </div>
 
-                        <td className="py-3 px-3 text-right font-mono text-fg-muted font-semibold">
-                          {formatMoney(c.totalPaidTjs)} TJS
-                        </td>
-
-                        <td className="py-3 px-3 text-center">
-                          {c.hasPushSubscription ? (
-                            <span className="inline-flex items-center gap-1 text-[10px] font-bold text-success bg-success/10 px-2 py-0.5 rounded-full border border-success/20">
-                              <Bell className="w-2.5 h-2.5" /> Подписан
-                            </span>
-                          ) : c.pushEnabled ? (
-                            <span className="text-[10px] text-fg-subtle">Включено</span>
-                          ) : (
-                            <span className="text-[10px] text-fg-subtle/60">Откл.</span>
-                          )}
-                        </td>
-
-                        <td className="py-3 px-4 text-right">
-                          <div className="flex items-center justify-end gap-1.5">
-                            {c.totalDebtTjs > 0 && (
-                              <Button
-                                variant="secondary"
-                                size="sm"
-                                leftIcon={CheckCircle2}
-                                onClick={() => handleOpenPayment(c)}
-                                className="h-7 text-[11px] px-2"
-                                title="Принять оплату долга"
-                              >
-                                Оплата
-                              </Button>
-                            )}
-
-                            {isAdmin && (
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setPushTarget('CUSTOMER');
-                                  setPushSelectedCustomerId(c.id);
-                                  setPushTitle(`Уведомление для ${c.name}`);
-                                  setIsPushModalOpen(true);
-                                }}
-                                className="p-1.5 rounded-lg hover:bg-surface-raised text-fg-subtle hover:text-accent cursor-pointer"
-                                title="Отправить Push"
-                              >
-                                <Send className="w-3.5 h-3.5" />
-                              </button>
-                            )}
-
+                      {/* Middle: Phone + Quick actions */}
+                      <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+                        {c.phone ? (
+                          <div className="flex items-center gap-1 bg-surface-raised px-2.5 py-1 rounded-xl border border-border">
+                            <a
+                              href={`tel:${c.phone}`}
+                              onClick={(e) => e.stopPropagation()}
+                              className="font-mono text-xs font-semibold text-fg hover:text-accent transition-colors"
+                              title="Позвонить"
+                            >
+                              {c.phone}
+                            </a>
                             <button
                               type="button"
-                              onClick={() => handleViewDetail(c)}
-                              className="p-1.5 rounded-lg hover:bg-surface-raised text-fg-subtle hover:text-fg cursor-pointer"
-                              title="Профиль и история покупок"
+                              onClick={(e) => handleCopyPhone(c.id, c.phone!, e)}
+                              className="p-1 text-fg-subtle hover:text-fg transition-colors rounded cursor-pointer"
+                              title="Скопировать номер"
                             >
-                              <Eye className="w-3.5 h-3.5" />
+                              {isCopied ? <Check className="w-3 h-3 text-success" /> : <Copy className="w-3 h-3" />}
                             </button>
-
-                            <button
-                              type="button"
-                              onClick={() => handleOpenEdit(c)}
-                              className="p-1.5 rounded-lg hover:bg-surface-raised text-fg-subtle hover:text-fg cursor-pointer"
-                              title="Редактировать"
-                            >
-                              <Edit2 className="w-3.5 h-3.5" />
-                            </button>
-
-                            {isAdmin && (c.salesCount || 0) === 0 && (
-                              <button
-                                type="button"
-                                onClick={() => setDeletingCustomer(c)}
-                                className="p-1.5 rounded-lg hover:bg-danger/10 text-fg-subtle hover:text-danger cursor-pointer"
-                                title="Удалить"
+                            {waLink && (
+                              <a
+                                href={waLink}
+                                target="_blank"
+                                rel="noreferrer"
+                                onClick={(e) => e.stopPropagation()}
+                                className="p-1 text-fg-subtle hover:text-emerald-500 transition-colors rounded"
+                                title="Написать в WhatsApp"
                               >
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </button>
+                                <MessageCircle className="w-3.5 h-3.5" />
+                              </a>
                             )}
                           </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                        ) : (
+                          <span className="text-xs text-fg-subtle italic">Номер не указан</span>
+                        )}
+                      </div>
+
+                      {/* Right: Actions */}
+                      <div className="flex items-center justify-end gap-1 shrink-0 pt-1 sm:pt-0 border-t sm:border-t-0 border-border/40">
+                        {isAdmin && (
+                          <button
+                            type="button"
+                            onClick={(e) => handleOpenPromoModal(c.id, e)}
+                            className="h-8 px-2.5 rounded-lg bg-surface-raised hover:bg-accent/15 hover:text-accent text-fg-muted border border-border text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
+                            title="Отправить акцию этому клиенту"
+                          >
+                            <Send className="w-3.5 h-3.5 text-accent" />
+                            <span className="hidden md:inline">Акция</span>
+                          </button>
+                        )}
+
+                        <button
+                          type="button"
+                          onClick={(e) => handleOpenEdit(c, e)}
+                          className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-surface-raised text-fg-subtle hover:text-fg transition-colors cursor-pointer"
+                          title="Редактировать контакт"
+                        >
+                          <Edit2 className="w-3.5 h-3.5" />
+                        </button>
+
+                        {isAdmin && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setDeletingCustomer(c);
+                            }}
+                            className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-danger/10 text-fg-subtle hover:text-danger transition-colors cursor-pointer"
+                            title="Удалить"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             )}
           </div>
@@ -593,7 +606,8 @@ export const CustomersPage: React.FC = () => {
       <Dialog
         open={isAddEditOpen}
         onClose={() => setIsAddEditOpen(false)}
-        title={editingCustomer ? 'Редактирование клиента' : 'Добавление нового клиента'}
+        title={editingCustomer ? 'Редактировать клиента' : 'Новый клиент'}
+        subtitle={editingCustomer ? 'Изменение контактных данных' : 'Сохранение контакта в базу для акций и уведомлений'}
       >
         <form onSubmit={handleSaveCustomer} className="space-y-3.5">
           <div>
@@ -604,7 +618,7 @@ export const CustomersPage: React.FC = () => {
               onChange={(e) => setFormName(e.target.value)}
               placeholder="Например: Рустам Шарипов"
               required
-              className="w-full h-9 rounded-lg bg-surface border border-border px-3 text-xs text-fg focus:outline-none focus:border-accent"
+              className="w-full h-10 rounded-xl bg-surface border border-border px-3 text-xs text-fg focus:outline-none focus:border-accent"
             />
           </div>
 
@@ -615,26 +629,25 @@ export const CustomersPage: React.FC = () => {
               value={formPhone}
               onChange={(e) => setFormPhone(e.target.value)}
               placeholder="+992 900 00 00 00"
-              className="w-full h-9 rounded-lg bg-surface border border-border px-3 text-xs text-fg focus:outline-none focus:border-accent"
+              className="w-full h-10 rounded-xl bg-surface border border-border px-3 text-xs font-mono text-fg focus:outline-none focus:border-accent"
             />
           </div>
 
-
           <div>
-            <label className="text-xs font-semibold text-fg block mb-1">Примечание</label>
+            <label className="text-xs font-semibold text-fg block mb-1">Заметка / Предпочтения</label>
             <textarea
               value={formNote}
               onChange={(e) => setFormNote(e.target.value)}
               rows={2}
-              placeholder="Дополнительные сведения, паспортные данные или контакты поручителя"
-              className="w-full p-2.5 rounded-lg bg-surface border border-border text-xs text-fg focus:outline-none focus:border-accent resize-none"
+              placeholder="Интересуется новинками Apple, чехлы, защитные стекла..."
+              className="w-full p-2.5 rounded-xl bg-surface border border-border text-xs text-fg focus:outline-none focus:border-accent resize-none"
             />
           </div>
 
           <div className="flex items-center justify-between p-3 rounded-xl bg-surface-raised border border-border">
             <div>
-              <span className="text-xs font-semibold text-fg block">Получение Push-уведомлений</span>
-              <span className="text-[10px] text-fg-subtle block">Клиент согласен получать уведомления о новинках и задолженности</span>
+              <span className="text-xs font-semibold text-fg block">Согласие на получение акций</span>
+              <span className="text-[10px] text-fg-subtle block">Клиент согласен получать уведомления об акциях и скидках</span>
             </div>
             <input
               type="checkbox"
@@ -655,202 +668,140 @@ export const CustomersPage: React.FC = () => {
         </form>
       </Dialog>
 
-      {/* CUSTOMER DETAIL MODAL */}
+      {/* CUSTOMER CONTACT CARD MODAL */}
       <Dialog
         open={Boolean(detailCustomer)}
         onClose={() => setDetailCustomer(null)}
-        title={detailCustomer ? `Карточка клиента: ${detailCustomer.name}` : ''}
+        title={detailCustomer?.name || 'Карточка клиента'}
+        subtitle="Контактные данные покупателя"
       >
         {detailCustomer && (
-          <div className="space-y-4 max-h-[75vh] overflow-y-auto pr-1">
-            <div className="grid grid-cols-2 gap-2.5 p-3 rounded-xl bg-surface-raised border border-border text-xs">
-              <div>
-                <span className="text-[10px] text-fg-subtle block">Телефон:</span>
-                <span className="font-semibold text-fg">{detailCustomer.phone || 'Не указан'}</span>
+          <div className="space-y-4">
+            <div className="p-4 rounded-2xl bg-surface-raised border border-border space-y-3">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-2xl bg-accent/15 border border-accent/25 flex items-center justify-center text-accent font-bold text-base shrink-0">
+                  {getInitials(detailCustomer.name)}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <h3 className="text-base font-bold text-fg truncate">{detailCustomer.name}</h3>
+                  <p className="text-xs text-fg-subtle mt-0.5">
+                    В базе с {new Date(detailCustomer.createdAt).toLocaleDateString('ru-RU')}
+                  </p>
+                </div>
               </div>
-              <div>
-                <span className="text-[10px] text-fg-subtle block">Push-статус:</span>
-                <span className="font-semibold text-fg">
-                  {detailCustomer.hasPushSubscription ? 'Подписка активна' : 'Нет токена подписки'}
-                </span>
-              </div>
-              <div>
-                <span className="text-[10px] text-fg-subtle block">Текущий долг:</span>
-                <span className={`font-bold font-mono ${detailCustomer.totalDebtTjs > 0 ? 'text-warning' : 'text-fg'}`}>
-                  {formatMoney(detailCustomer.totalDebtTjs)} TJS
-                </span>
-              </div>
-              <div>
-                <span className="text-[10px] text-fg-subtle block">Всего оплачено:</span>
-                <span className="font-bold font-mono text-success">
-                  {formatMoney(detailCustomer.totalPaidTjs)} TJS
-                </span>
-              </div>
+
+              {detailCustomer.phone && (
+                <div className="pt-2 border-t border-border flex items-center justify-between gap-2">
+                  <div>
+                    <span className="text-[10px] uppercase font-bold text-fg-subtle block">Телефон:</span>
+                    <a
+                      href={`tel:${detailCustomer.phone}`}
+                      className="font-mono text-sm font-bold text-accent hover:underline"
+                    >
+                      {detailCustomer.phone}
+                    </a>
+                  </div>
+
+                  <div className="flex items-center gap-1.5">
+                    {getWhatsAppLink(detailCustomer.phone) && (
+                      <a
+                        href={getWhatsAppLink(detailCustomer.phone)!}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="px-2.5 py-1.5 rounded-lg bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20 text-xs font-semibold flex items-center gap-1 border border-emerald-500/20"
+                      >
+                        <MessageCircle className="w-3.5 h-3.5" />
+                        <span>WhatsApp</span>
+                      </a>
+                    )}
+                  </div>
+                </div>
+              )}
+
               {detailCustomer.note && (
-                <div className="col-span-2 pt-1 border-t border-border text-[11px] text-fg-muted">
-                  <strong>Заметка:</strong> {detailCustomer.note}
+                <div className="pt-2 border-t border-border">
+                  <span className="text-[10px] uppercase font-bold text-fg-subtle block">Заметка:</span>
+                  <p className="text-xs text-fg-muted mt-0.5">{detailCustomer.note}</p>
                 </div>
               )}
+
+              <div className="pt-2 border-t border-border flex items-center justify-between text-xs">
+                <span className="text-fg-subtle">Push-уведомления:</span>
+                {detailCustomer.hasPushSubscription ? (
+                  <span className="font-bold text-success flex items-center gap-1">
+                    <CheckCircle2 className="w-3.5 h-3.5" /> Подписка активна
+                  </span>
+                ) : detailCustomer.pushEnabled ? (
+                  <span className="text-fg-muted">Согласие дано</span>
+                ) : (
+                  <span className="text-fg-subtle">Отключено</span>
+                )}
+              </div>
             </div>
 
-            {/* Sales History */}
-            <div>
-              <h3 className="text-xs font-bold text-fg mb-2 flex items-center gap-1.5">
-                <ShoppingBag className="w-3.5 h-3.5 text-accent" /> История покупок ({detailCustomer.sales?.length || 0})
-              </h3>
-              {(detailCustomer.sales || []).length === 0 ? (
-                <p className="text-xs text-fg-subtle py-2">Покупок пока не было</p>
-              ) : (
-                <div className="space-y-2">
-                  {detailCustomer.sales.map((sale: any) => (
-                    <div key={sale.id} className="p-2.5 rounded-xl bg-surface border border-border text-xs space-y-1">
-                      <div className="flex items-center justify-between font-bold">
-                        <span>Чек #{sale.receiptNumber}</span>
-                        <span className="font-mono">{formatMoney(Number(sale.totalTjs))} TJS</span>
-                      </div>
-                      <div className="flex items-center justify-between text-[11px] text-fg-subtle">
-                        <span>{new Date(sale.createdAt).toLocaleDateString('ru-RU')}</span>
-                        {Number(sale.debtAmountTjs) > 0 && (
-                          <span className="text-warning font-semibold">Остаток долга: {formatMoney(Number(sale.debtAmountTjs))} TJS</span>
-                        )}
-                      </div>
-                      <div className="pt-1 text-[11px] text-fg-muted">
-                        {(sale.saleItems || []).map((item: any) => (
-                          <div key={item.id} className="flex items-center justify-between py-0.5">
-                            <span>{item.brand} {item.model} ({item.storage})</span>
-                            <span className="font-mono">{formatMoney(Number(item.salePriceTjs))} TJS</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  ))}
-                </div>
+            <div className="flex items-center justify-between gap-2 pt-2 border-t border-border">
+              {isAdmin && (
+                <Button
+                  variant="primary"
+                  size="sm"
+                  leftIcon={Send}
+                  onClick={() => {
+                    const c = detailCustomer;
+                    setDetailCustomer(null);
+                    handleOpenPromoModal(c.id);
+                  }}
+                  className="cursor-pointer"
+                >
+                  Отправить акцию
+                </Button>
               )}
-            </div>
 
-            {/* Payments History */}
-            <div>
-              <h3 className="text-xs font-bold text-fg mb-2 flex items-center gap-1.5">
-                <CreditCard className="w-3.5 h-3.5 text-success" /> История платежей ({detailCustomer.payments?.length || 0})
-              </h3>
-              {(detailCustomer.payments || []).length === 0 ? (
-                <p className="text-xs text-fg-subtle py-2">Платежей по долгам не зарегистрировано</p>
-              ) : (
-                <div className="space-y-2">
-                  {detailCustomer.payments.map((p: any) => (
-                    <div key={p.id} className="p-2.5 rounded-xl bg-surface border border-border text-xs flex items-center justify-between">
-                      <div>
-                        <span className="font-bold text-success block">+{formatMoney(Number(p.amountTjs))} TJS</span>
-                        <span className="text-[10px] text-fg-subtle">{new Date(p.createdAt).toLocaleDateString('ru-RU')}</span>
-                      </div>
-                      <span className="text-[11px] text-fg-muted">
-                        {p.sourceAccount === 'STORE_CASH' ? 'Касса магазина' : p.sourceAccount}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            <div className="flex justify-end pt-2 border-t border-border">
-              <Button variant="secondary" onClick={() => setDetailCustomer(null)}>
-                Закрыть
-              </Button>
+              <div className="flex items-center gap-2 ml-auto">
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  leftIcon={Edit2}
+                  onClick={() => {
+                    const c = detailCustomer;
+                    setDetailCustomer(null);
+                    handleOpenEdit(c);
+                  }}
+                >
+                  Редактировать
+                </Button>
+                <Button variant="secondary" size="sm" onClick={() => setDetailCustomer(null)}>
+                  Закрыть
+                </Button>
+              </div>
             </div>
           </div>
         )}
       </Dialog>
 
-      {/* PAYMENT REPAYMENT MODAL */}
-      <Dialog
-        open={Boolean(paymentCustomer)}
-        onClose={() => setPaymentCustomer(null)}
-        title="Приём оплаты долга"
-      >
-        <form onSubmit={handleSubmitPayment} className="space-y-3.5">
-          <div className="p-3 rounded-xl bg-surface-raised border border-border text-xs">
-            <span className="text-fg-subtle block">Клиент:</span>
-            <strong className="text-sm font-bold text-fg block mt-0.5">{paymentCustomer?.name}</strong>
-            <span className="text-warning font-bold mt-1 block">
-              Текущий долг: {formatMoney(paymentCustomer?.totalDebtTjs || 0)} TJS
-            </span>
-          </div>
-
-          <div>
-            <label className="text-xs font-semibold text-fg block mb-1">Сумма к оплате (TJS) *</label>
-            <input
-              type="number"
-              step="0.01"
-              min="0.01"
-              max={paymentCustomer?.totalDebtTjs}
-              value={paymentAmount}
-              onChange={(e) => setPaymentAmount(e.target.value)}
-              required
-              className="w-full h-9 rounded-lg bg-surface border border-border px-3 text-sm font-mono font-bold text-fg focus:outline-none focus:border-accent"
-            />
-          </div>
-
-          <div>
-            <label className="text-xs font-semibold text-fg block mb-1">В какую кассу внести *</label>
-            <select
-              value={paymentStoreId}
-              onChange={(e) => setPaymentStoreId(e.target.value)}
-              required
-              className="w-full h-9 rounded-lg bg-surface border border-border px-3 text-xs font-semibold text-fg focus:outline-none focus:border-accent"
-            >
-              {stores.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.name} {s.isMainWarehouse ? '(Центральный сейф)' : ''}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <label className="text-xs font-semibold text-fg block mb-1">Заметка</label>
-            <input
-              type="text"
-              value={paymentNote}
-              onChange={(e) => setPaymentNote(e.target.value)}
-              placeholder="Частичная оплата, наличные и т.д."
-              className="w-full h-8 rounded-lg bg-surface border border-border px-3 text-xs text-fg focus:outline-none focus:border-accent"
-            />
-          </div>
-
-          <div className="flex items-center justify-end gap-2 pt-2 border-t border-border">
-            <Button type="button" variant="secondary" onClick={() => setPaymentCustomer(null)}>
-              Отмена
-            </Button>
-            <Button type="submit" variant="primary" loading={isPaymentSubmitting} leftIcon={CheckCircle2}>
-              Провести оплату
-            </Button>
-          </div>
-        </form>
-      </Dialog>
-
-      {/* PUSH NOTIFICATION MODAL */}
+      {/* PUSH / PROMO NOTIFICATION MODAL */}
       <Dialog
         open={isPushModalOpen}
         onClose={() => setIsPushModalOpen(false)}
-        title="Отправка Push-уведомления клиентам"
+        title="Отправка акции клиентам"
+        subtitle="Push-уведомление со специальным предложением"
       >
         <form onSubmit={handleSendPush} className="space-y-3.5">
+          {/* Audience selection */}
           <div>
-            <label className="text-xs font-semibold text-fg block mb-1">Аудитория рассылки *</label>
-            <div className="grid grid-cols-3 gap-1.5">
+            <label className="text-xs font-semibold text-fg block mb-1">Кому отправить *</label>
+            <div className="grid grid-cols-2 gap-1.5">
               {[
-                { id: 'ALL' as const, label: 'Все клиенты' },
-                { id: 'DEBTORS' as const, label: 'Только должники' },
-                { id: 'CUSTOMER' as const, label: 'Один клиент' },
+                { id: 'ALL' as const, label: 'Всем клиентам в базе' },
+                { id: 'CUSTOMER' as const, label: 'Конкретному клиенту' },
               ].map((opt) => (
                 <button
                   key={opt.id}
                   type="button"
                   onClick={() => setPushTarget(opt.id)}
-                  className={`py-2 px-2 rounded-lg text-xs font-semibold border cursor-pointer ${
+                  className={`py-2 px-3 rounded-xl text-xs font-semibold border cursor-pointer transition-colors ${
                     pushTarget === opt.id
                       ? 'border-accent bg-accent/15 text-accent font-bold'
-                      : 'border-border bg-surface text-fg-muted'
+                      : 'border-border bg-surface text-fg-muted hover:text-fg'
                   }`}
                 >
                   {opt.label}
@@ -866,7 +817,7 @@ export const CustomersPage: React.FC = () => {
                 value={pushSelectedCustomerId}
                 onChange={(e) => setPushSelectedCustomerId(e.target.value)}
                 required
-                className="w-full h-9 rounded-lg bg-surface border border-border px-3 text-xs font-semibold text-fg focus:outline-none focus:border-accent"
+                className="w-full h-10 rounded-xl bg-surface border border-border px-3 text-xs font-semibold text-fg focus:outline-none focus:border-accent"
               >
                 <option value="">Выберите клиента...</option>
                 {customers.map((c) => (
@@ -878,15 +829,38 @@ export const CustomersPage: React.FC = () => {
             </div>
           )}
 
+          {/* Quick Promo Templates */}
           <div>
-            <label className="text-xs font-semibold text-fg block mb-1">Заголовок уведомления *</label>
+            <span className="text-[10px] font-bold uppercase tracking-wider text-fg-subtle block mb-1 flex items-center gap-1">
+              <Sparkles className="w-3 h-3 text-accent" />
+              Быстрые шаблоны акций:
+            </span>
+            <div className="flex flex-wrap gap-1.5">
+              {PROMO_TEMPLATES.map((tmpl, idx) => (
+                <button
+                  key={idx}
+                  type="button"
+                  onClick={() => {
+                    setPushTitle(tmpl.title);
+                    setPushMessage(tmpl.message);
+                  }}
+                  className="px-2.5 py-1 rounded-lg bg-surface-raised hover:bg-surface border border-border text-[11px] text-fg-muted hover:text-accent font-medium transition-colors cursor-pointer"
+                >
+                  {tmpl.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <label className="text-xs font-semibold text-fg block mb-1">Заголовок акции *</label>
             <input
               type="text"
               value={pushTitle}
               onChange={(e) => setPushTitle(e.target.value)}
-              placeholder="Заголовок..."
+              placeholder="Например: Скидка 15% на чехлы и стекла!"
               required
-              className="w-full h-9 rounded-lg bg-surface border border-border px-3 text-xs text-fg focus:outline-none focus:border-accent"
+              className="w-full h-10 rounded-xl bg-surface border border-border px-3 text-xs text-fg focus:outline-none focus:border-accent font-semibold"
             />
           </div>
 
@@ -896,20 +870,9 @@ export const CustomersPage: React.FC = () => {
               value={pushMessage}
               onChange={(e) => setPushMessage(e.target.value)}
               rows={3}
-              placeholder="Текст сообщения..."
+              placeholder="Опишите суть акции, условия или специальное предложение..."
               required
-              className="w-full p-2.5 rounded-lg bg-surface border border-border text-xs text-fg focus:outline-none focus:border-accent resize-none"
-            />
-          </div>
-
-          <div>
-            <label className="text-xs font-semibold text-fg block mb-1">Ссылка</label>
-            <input
-              type="text"
-              value={pushLink}
-              onChange={(e) => setPushLink(e.target.value)}
-              placeholder="/sale"
-              className="w-full h-8 rounded-lg bg-surface border border-border px-3 text-xs font-mono text-fg focus:outline-none focus:border-accent"
+              className="w-full p-2.5 rounded-xl bg-surface border border-border text-xs text-fg focus:outline-none focus:border-accent resize-none"
             />
           </div>
 
@@ -918,7 +881,7 @@ export const CustomersPage: React.FC = () => {
               Отмена
             </Button>
             <Button type="submit" variant="primary" loading={isSendingPush} leftIcon={Send}>
-              Отправить Push
+              Отправить акцию
             </Button>
           </div>
         </form>
@@ -928,7 +891,7 @@ export const CustomersPage: React.FC = () => {
       <ConfirmDialog
         open={Boolean(deletingCustomer)}
         title="Удалить клиента?"
-        message={`Вы действительно хотите удалить клиента «${deletingCustomer?.name}»? Это действие нельзя отменить.`}
+        message={`Вы действительно хотите удалить клиента «${deletingCustomer?.name}» из базы? Это действие нельзя отменить.`}
         confirmLabel="Удалить"
         tone="danger"
         onConfirm={handleDeleteCustomer}

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { resolveStoreContext, formatStoreName } from './storeContext';
+import { resolveStoreContext, formatStoreName, formatStoreDisplayTitle } from './storeContext';
 
 const stores = [
   { id: 'main', name: 'Главный склад', isMainWarehouse: true },
@@ -43,5 +43,23 @@ describe('formatStoreName', () => {
     expect(formatStoreName(null)).toBe('');
     expect(formatStoreName(undefined)).toBe('');
     expect(formatStoreName('')).toBe('');
+  });
+});
+
+describe('formatStoreDisplayTitle', () => {
+  it('formats retail stores cleanly without quotes', () => {
+    expect(formatStoreDisplayTitle({ name: 'Магазин «Сиёма»', isMainWarehouse: false })).toBe('Магазин Сиёма');
+    expect(formatStoreDisplayTitle({ name: 'Магазин «Садбарг»', isMainWarehouse: false })).toBe('Магазин Садбарг');
+    expect(formatStoreDisplayTitle({ name: 'Магазин "ЦУМ"', isMainWarehouse: false })).toBe('Магазин ЦУМ');
+    expect(formatStoreDisplayTitle({ name: 'Сиёма', isMainWarehouse: false })).toBe('Магазин Сиёма');
+  });
+
+  it('formats main warehouse correctly', () => {
+    expect(formatStoreDisplayTitle({ name: 'Главный склад', isMainWarehouse: true })).toBe('Главный склад');
+  });
+
+  it('handles null and undefined', () => {
+    expect(formatStoreDisplayTitle(null)).toBe('Магазин');
+    expect(formatStoreDisplayTitle(undefined)).toBe('Магазин');
   });
 });

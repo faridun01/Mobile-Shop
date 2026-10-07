@@ -119,11 +119,26 @@ export const OwnerTransactionModal: React.FC<OwnerTransactionModalProps> = ({
         className="modal-card w-full max-w-sm max-h-[min(90vh,var(--visual-viewport-height,90vh))] overflow-y-auto rounded-2xl bg-surface border border-border p-4 sm:p-5 text-fg shadow-2xl space-y-3.5 text-xs touch-pan-y"
       >
         <div className="flex items-center justify-between pb-2.5 border-b border-border">
-          <div className="flex items-center gap-2">
-            <CreditCard className="w-4 h-4 text-accent" />
-            <h4 id="owner-tx-title" className="text-sm font-bold text-fg uppercase">
-              Финансовая операция
-            </h4>
+          <div className="flex items-center gap-2.5">
+            {txType === 'WITHDRAWAL' ? (
+              <div className="w-8 h-8 rounded-xl bg-rose-500/15 border border-rose-500/25 flex items-center justify-center text-rose-600 dark:text-rose-400 shrink-0">
+                <ArrowUpRight className="w-4 h-4" />
+              </div>
+            ) : (
+              <div className="w-8 h-8 rounded-xl bg-emerald-500/15 border border-emerald-500/25 flex items-center justify-center text-emerald-600 dark:text-emerald-400 shrink-0">
+                <ArrowDownLeft className="w-4 h-4" />
+              </div>
+            )}
+            <div>
+              <h4 id="owner-tx-title" className="text-sm font-bold text-fg">
+                {txType === 'WITHDRAWAL' ? 'Вывод капитала' : 'Внесение капитала'}
+              </h4>
+              <p className="text-[11px] text-fg-subtle">
+                {txType === 'WITHDRAWAL'
+                  ? 'Выплата средств учредителю из кассы'
+                  : 'Пополнение капитала учредителя в кассу'}
+              </p>
+            </div>
           </div>
           <button
             type="button"
@@ -161,21 +176,6 @@ export const OwnerTransactionModal: React.FC<OwnerTransactionModalProps> = ({
                 </span>
               </div>
             )}
-          </div>
-
-          <div>
-            <label className="block text-fg-subtle text-[11px] uppercase mb-1 font-semibold">Тип операции *</label>
-            <CustomSelect
-              value={txType}
-              onChange={(v) => setTxType(v as 'INVESTMENT' | 'WITHDRAWAL')}
-              options={[
-                { value: 'INVESTMENT', label: 'Внесение капитала (Вложение)', icon: <ArrowDownLeft className="w-3.5 h-3.5 text-accent" /> },
-                { value: 'WITHDRAWAL', label: 'Изъятие / вывод капитала', icon: <ArrowUpRight className="w-3.5 h-3.5 text-danger" /> },
-              ]}
-              title="Тип операции"
-              className="w-full"
-              triggerClassName="w-full justify-between"
-            />
           </div>
 
           {/* Cash Register Selection */}
@@ -280,10 +280,18 @@ export const OwnerTransactionModal: React.FC<OwnerTransactionModalProps> = ({
           <button
             type="submit"
             disabled={isSubmitDisabled}
-            className="flex-1 py-2.5 rounded-xl bg-accent hover:bg-accent-strong text-xs font-bold text-accent-fg uppercase disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+            className={`flex-1 py-2.5 rounded-xl text-xs font-bold uppercase disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-xs active:scale-95 ${
+              txType === 'WITHDRAWAL'
+                ? 'bg-rose-600 hover:bg-rose-700 text-white'
+                : 'bg-accent hover:bg-accent-strong text-accent-fg'
+            }`}
           >
             {isSubmitting && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-            {isSubmitting ? 'Сохранение…' : 'Провести'}
+            {isSubmitting
+              ? 'Сохранение…'
+              : txType === 'WITHDRAWAL'
+              ? 'Вывести'
+              : 'Внести'}
           </button>
         </div>
       </form>

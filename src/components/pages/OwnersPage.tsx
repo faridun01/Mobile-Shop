@@ -10,7 +10,9 @@ import {
   Coins,
   Briefcase,
   Loader2,
-  FileText
+  FileText,
+  ArrowUpRight,
+  ArrowDownLeft
 } from 'lucide-react';
 import { StatusBanner, StatusMessage } from '../ui/StatusBanner';
 import { useStoreContext } from '../../utils/storeContext';
@@ -324,21 +326,40 @@ export const OwnersPage: React.FC = () => {
             )}
 
             {(currentUser?.role === 'ADMIN' || currentUser?.role === 'PARTNER') && (
-              <button
-                type="button"
-                onClick={() => {
-                  const myOwner = currentUser?.role === 'PARTNER'
-                    ? displayOwners.find(o => o.userId === currentUser.id) || displayOwners[0]
-                    : displayOwners[0];
-                  setTxModalOwnerId(myOwner?.id);
-                  setTxModalType('INVESTMENT');
-                  setIsTxModalOpen(true);
-                }}
-                className="px-2.5 py-1.5 rounded-xl bg-accent hover:bg-accent-strong text-accent-fg font-bold text-xs shadow-xs transition-all flex items-center gap-1.5 cursor-pointer"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                <span>Операция</span>
-              </button>
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const myOwner = currentUser?.role === 'PARTNER'
+                      ? displayOwners.find(o => o.userId === currentUser.id) || displayOwners[0]
+                      : displayOwners[0];
+                    setTxModalOwnerId(myOwner?.id);
+                    setTxModalType('INVESTMENT');
+                    setIsTxModalOpen(true);
+                  }}
+                  className="px-2.5 py-1.5 rounded-xl bg-accent hover:bg-accent-strong text-accent-fg font-bold text-xs shadow-xs transition-all flex items-center gap-1.5 cursor-pointer"
+                  title="Внести средства в капитал"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>Внести</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const myOwner = currentUser?.role === 'PARTNER'
+                      ? displayOwners.find(o => o.userId === currentUser.id) || displayOwners[0]
+                      : displayOwners[0];
+                    setTxModalOwnerId(myOwner?.id);
+                    setTxModalType('WITHDRAWAL');
+                    setIsTxModalOpen(true);
+                  }}
+                  className="px-2.5 py-1.5 rounded-xl bg-surface-raised hover:bg-surface text-danger border border-danger/30 hover:border-danger font-bold text-xs shadow-2xs transition-all flex items-center gap-1.5 cursor-pointer"
+                  title="Вывести средства из капитала"
+                >
+                  <ArrowUpRight className="w-3.5 h-3.5" />
+                  <span>Вывести</span>
+                </button>
+              </div>
             )}
           </div>
         </div>

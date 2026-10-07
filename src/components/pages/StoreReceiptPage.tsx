@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useAppFields } from '../../context/AppContext';
-import { formatStoreName } from '../../utils/storeContext';
+import { formatStoreName, formatStoreDisplayTitle } from '../../utils/storeContext';
 import { apiClient } from '../../api/client';
 import { StoreReceipt, StoreReceiptItem } from '../../types';
 import { soundEffects } from '../../utils/sound';
@@ -228,10 +228,16 @@ export const StoreReceiptPage: React.FC = () => {
             <PackagePlus className="w-5 h-5" />
           </div>
           <div>
-            <h1 className="text-base sm:text-lg font-bold text-fg leading-tight">
-              Приход в магазин: {formatStoreName(currentStore?.name || 'Магазин')}
-            </h1>
-            <p className="text-[11px] text-fg-subtle">
+            <div className="flex items-center gap-2 flex-wrap">
+              <h1 className="text-base sm:text-lg font-bold text-fg leading-tight">
+                Приход в магазин
+              </h1>
+              <span className="inline-flex items-center gap-1.5 text-xs font-bold px-2.5 py-0.5 rounded-full bg-accent/10 text-accent border border-accent/25 shadow-2xs">
+                <StoreIcon className="w-3.5 h-3.5 shrink-0" />
+                <span>{formatStoreDisplayTitle(currentStore)}</span>
+              </span>
+            </div>
+            <p className="text-[11px] text-fg-subtle mt-0.5">
               Приём устройств по IMEI с автоматическим созданием накладной
             </p>
           </div>
@@ -241,17 +247,17 @@ export const StoreReceiptPage: React.FC = () => {
         <div className="flex items-center gap-2 flex-wrap">
           {/* Admin Store Switcher */}
           {isAdmin && retailStores.length > 0 && (
-            <div className="flex items-center gap-1.5 bg-surface-raised border border-border rounded-xl px-2.5 h-9 shrink-0">
+            <div className="flex items-center gap-1.5 bg-surface-raised hover:bg-surface border border-border rounded-xl px-2.5 h-9 shrink-0 transition-colors shadow-2xs">
               <StoreIcon className="w-3.5 h-3.5 text-accent shrink-0" />
               <select
                 value={effectiveStoreId}
                 onChange={(e) => setSelectedStoreId(e.target.value)}
-                className="bg-transparent text-xs font-bold text-fg focus:outline-none cursor-pointer"
+                className="bg-transparent text-xs font-bold text-fg focus:outline-none cursor-pointer pr-1"
                 title="Выбрать магазин приёма"
               >
                 {retailStores.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.name}
+                  <option key={s.id} value={s.id} className="bg-surface text-fg font-medium">
+                    {formatStoreDisplayTitle(s)}
                   </option>
                 ))}
               </select>

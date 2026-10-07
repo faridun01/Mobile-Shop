@@ -23,6 +23,18 @@ export function formatStoreName(rawName?: string | null): string {
 }
 
 /**
+ * Formats a clean, readable title for a store or warehouse:
+ * e.g. «Магазин Сиёма», «Магазин ЦУМ» or «Главный склад»
+ * without ugly quotes « » and without duplicated prefixes.
+ */
+export function formatStoreDisplayTitle(store?: { name?: string | null; isMainWarehouse?: boolean } | null): string {
+  if (!store) return 'Магазин';
+  if (store.isMainWarehouse) return 'Главный склад';
+  const clean = formatStoreName(store.name);
+  return clean ? `Магазин ${clean}` : (store.name || 'Магазин');
+}
+
+/**
  * Whose data a page shows. The admin inside a store (picked in the top bar) sees only that
  * store; in Central Cash (no retail store picked) the overview of every store. Store staff are
  * always in their own store. This is a view filter — what a role may see is still enforced by

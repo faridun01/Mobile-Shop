@@ -1,6 +1,6 @@
-import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useAppFields } from '../../context/AppContext';
-import { formatStoreName } from '../../utils/storeContext';
+import { formatStoreName, formatStoreDisplayTitle } from '../../utils/storeContext';
 import { Device } from '../../types';
 import { soundEffects } from '../../utils/sound';
 import { StatusBanner, StatusMessage } from '../ui/StatusBanner';
@@ -9,29 +9,27 @@ import { Dialog } from '../ui/Dialog';
 import { formatUserName } from '../../utils/formatUser';
 import {
   ClipboardCheck,
-  Barcode,
   Search,
   CheckCircle2,
-  AlertTriangle,
   RotateCcw,
   Smartphone,
   Check,
-  X,
   Store as StoreIcon,
   Printer,
-  ChevronRight,
-  ShieldAlert,
-  Sparkles,
+  ChevronDown,
+  Layers,
+  List,
 } from 'lucide-react';
 
-interface ForeignDeviceItem {
-  id: string;
-  imei: string;
+interface ModelGroup {
+  key: string;
   brand: string;
   model: string;
   storage?: string;
   color?: string;
-  registeredStoreName: string;
+  items: Device[];
+  total: number;
+  checked: number;
 }
 
 export const RevisionPage: React.FC = () => {
@@ -39,14 +37,12 @@ export const RevisionPage: React.FC = () => {
     currentUser,
     stores,
     devices,
-    openScanner,
     selectedStoreId,
     setSelectedStoreId,
   } = useAppFields(
     'currentUser',
     'stores',
     'devices',
-    'openScanner',
     'selectedStoreId',
     'setSelectedStoreId'
   );
@@ -55,7 +51,6 @@ export const RevisionPage: React.FC = () => {
   const isPartner = currentUser?.role === 'PARTNER';
 
   // Store resolution: Staff users audit their assigned store; Admins can choose store
-  const retailStores = useMemo(() => stores.filter((s) => !s.isMainWarehouse && s.active), [stores]);
   const defaultStoreId = stores.find((s) => !s.isMainWarehouse)?.id || stores[0]?.id || '';
   const effectiveStoreId =
     (currentUser?.role === 'SELLER' || isPartner) && currentUser?.storeId
@@ -81,26 +76,23 @@ export const RevisionPage: React.FC = () => {
 
   // Checked IMEIs set for current revision session
   const [checkedImeis, setCheckedImeis] = useState<Set<string>>(() => new Set());
-  // Foreign devices found (belonging to another store or unregistered)
-  const [foreignDevices, setForeignDevices] = useState<ForeignDeviceItem[]>([]);
-
-  // Scan input & feedback
-  const [scanInput, setScanInput] = useState('');
   const [status, setStatus] = useState<StatusMessage | null>(null);
-  const scanInputRef = useRef<HTMLInputElement>(null);
 
-  // Filter tabs: 'ALL' | 'UNCHECKED' | 'CHECKED' | 'FOREIGN'
-  const [filterTab, setFilterTab] = useState<'ALL' | 'UNCHECKED' | 'CHECKED' | 'FOREIGN'>('ALL');
+  // Filter tabs: 'ALL' | 'UNCHECKED' | 'CHECKED'
+  const [filterTab, setFilterTab] = useState<'ALL' | 'UNCHECKED' | 'CHECKED'>('ALL');
+  // View mode: 'GROUPS' (grouped by model) | 'ITEMS' (itemized list)
+  const [viewMode, setViewMode] = useState<'GROUPS' | 'ITEMS'>('GROUPS');
   const [searchQuery, setSearchQuery] = useState('');
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(() => new Set());
 
   // Finish modal
   const [isSummaryModalOpen, setIsSummaryModalOpen] = useState(false);
 
-  // When store changes, reset revision session
-  useEffect(() => {
+  // Reset revision session when store changes
+  React.useEffect(() => {
     setCheckedImeis(new Set());
-    setForeignDevices([]);
     setStatus(null);
+    setExpandedGroups(new Set());
   }, [effectiveStoreId]);
 
   // Stats
@@ -108,96 +100,21 @@ export const RevisionPage: React.FC = () => {
   const checkedCount = storeDevices.filter((d) => checkedImeis.has(d.imei) || (d.imei2 && checkedImeis.has(d.imei2))).length;
   const uncheckedCount = totalCount - checkedCount;
   const progressPercent = totalCount > 0 ? Math.round((checkedCount / totalCount) * 100) : 0;
+  const isAllReconciled = totalCount > 0 && uncheckedCount === 0;
 
-  // Scan / Enter IMEI logic
-  const handleProcessScan = useCallback((rawCode: string) => {
-    const clean = rawCode.trim().replace(/\s+/g, '');
-    if (!clean) return;
-
-    // Check if matching device in this store (by exact IMEI, IMEI2, or suffix if 4+ digits)
-    const exactMatch = storeDevices.find(
-      (d) => d.imei === clean || (d.imei2 && d.imei2 === clean)
-    );
-
-    const suffixMatch = !exactMatch && clean.length >= 4
-      ? storeDevices.find((d) => d.imei.endsWith(clean) || (d.imei2 && d.imei2.endsWith(clean)))
-      : null;
-
-    const matchedDevice = exactMatch || suffixMatch;
-
-    if (matchedDevice) {
-      if (checkedImeis.has(matchedDevice.imei)) {
-        soundEffects.playAddToCartSuccess();
-        setStatus({
-          tone: 'info',
-          text: `${matchedDevice.brand} ${matchedDevice.model} [IMEI: ${matchedDevice.imei}] уже был проверен ранее`,
-        });
-      } else {
-        soundEffects.playAddToCartSuccess();
-        setCheckedImeis((prev) => {
-          const next = new Set(prev);
-          next.add(matchedDevice.imei);
-          if (matchedDevice.imei2) next.add(matchedDevice.imei2);
-          return next;
-        });
-        setStatus({
-          tone: 'success',
-          text: `✓ Найдено: ${matchedDevice.brand} ${matchedDevice.model} (${matchedDevice.storage || ''} ${matchedDevice.color || ''}) [IMEI: ${matchedDevice.imei}]`,
-        });
-      }
-      setScanInput('');
-      setTimeout(() => scanInputRef.current?.focus(), 50);
-      return;
-    }
-
-    // Not in this store: Check if device exists in company at all (another store / warehouse / sold)
-    const otherDevice = devices.find(
-      (d) => d.imei === clean || (d.imei2 && d.imei2 === clean)
-    );
-
-    if (otherDevice) {
-      soundEffects.playError();
-      const otherStoreName = stores.find((s) => s.id === otherDevice.locationId)?.name || otherDevice.locationName || 'другой точке';
-
-      // Add to foreign devices if not already there
-      setForeignDevices((prev) => {
-        if (prev.some((f) => f.imei === otherDevice.imei)) return prev;
-        return [
-          {
-            id: otherDevice.id,
-            imei: otherDevice.imei,
-            brand: otherDevice.brand,
-            model: otherDevice.model,
-            storage: otherDevice.storage,
-            color: otherDevice.color,
-            registeredStoreName: otherStoreName,
-          },
-          ...prev,
-        ];
-      });
-
-      setStatus({
-        tone: 'error',
-        text: `⚠️ Внимание! ${otherDevice.brand} ${otherDevice.model} числится в «${otherStoreName}», а не в этом магазине!`,
-      });
-      setScanInput('');
-      setTimeout(() => scanInputRef.current?.focus(), 50);
-      return;
-    }
-
-    // Unknown IMEI
-    soundEffects.playError();
-    setStatus({
-      tone: 'error',
-      text: `❌ Устройство с IMEI ${clean} не найдено в базе данных!`,
+  // 1-Click "Everything matches" reconciliation
+  const handleCheckAll = () => {
+    soundEffects.playAddToCartSuccess();
+    const next = new Set<string>();
+    storeDevices.forEach((d) => {
+      next.add(d.imei);
+      if (d.imei2) next.add(d.imei2);
     });
-  }, [storeDevices, devices, stores, checkedImeis]);
-
-  // Handle manual input submit
-  const handleInputSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!scanInput.trim()) return;
-    handleProcessScan(scanInput);
+    setCheckedImeis(next);
+    setStatus({
+      tone: 'success',
+      text: `✓ Все товары склада (${totalCount} шт.) подтверждены как сверенные`,
+    });
   };
 
   // Toggle single item manual check
@@ -216,16 +133,101 @@ export const RevisionPage: React.FC = () => {
     });
   };
 
+  // Toggle whole model group check
+  const handleToggleGroup = (group: ModelGroup, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    soundEffects.playAddToCartSuccess();
+    setCheckedImeis((prev) => {
+      const next = new Set(prev);
+      const isGroupComplete = group.items.every((d) => next.has(d.imei));
+      group.items.forEach((d) => {
+        if (isGroupComplete) {
+          next.delete(d.imei);
+          if (d.imei2) next.delete(d.imei2);
+        } else {
+          next.add(d.imei);
+          if (d.imei2) next.add(d.imei2);
+        }
+      });
+      return next;
+    });
+  };
+
+  // Toggle expand/collapse group
+  const handleToggleExpand = (groupKey: string) => {
+    setExpandedGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(groupKey)) {
+        next.delete(groupKey);
+      } else {
+        next.add(groupKey);
+      }
+      return next;
+    });
+  };
+
   // Reset revision session
   const handleResetRevision = () => {
-    if (window.confirm('Сбросить прогресс текущей ревизии и начать заново?')) {
+    if (window.confirm('Сбросить отметки сверки и начать заново?')) {
       setCheckedImeis(new Set());
-      setForeignDevices([]);
-      setStatus({ tone: 'info', text: 'Ревизия сброшена. Начните сканирование устройств.' });
+      setStatus({ tone: 'info', text: 'Сверка сброшена.' });
     }
   };
 
-  // Filtered devices list for display
+  // Grouped models list for display
+  const modelGroups = useMemo(() => {
+    const map = new Map<string, ModelGroup>();
+    storeDevices.forEach((d) => {
+      const key = `${d.brand}|||${d.model}|||${d.storage || ''}|||${d.color || ''}`.toLowerCase();
+      let group = map.get(key);
+      if (!group) {
+        group = {
+          key,
+          brand: d.brand,
+          model: d.model,
+          storage: d.storage,
+          color: d.color,
+          items: [],
+          total: 0,
+          checked: 0,
+        };
+        map.set(key, group);
+      }
+      group.items.push(d);
+      group.total += 1;
+      if (checkedImeis.has(d.imei) || (d.imei2 && checkedImeis.has(d.imei2))) {
+        group.checked += 1;
+      }
+    });
+
+    return Array.from(map.values()).sort((a, b) => {
+      const nameA = `${a.brand} ${a.model}`.toLowerCase();
+      const nameB = `${b.brand} ${b.model}`.toLowerCase();
+      return nameA.localeCompare(nameB);
+    });
+  }, [storeDevices, checkedImeis]);
+
+  // Filtered groups
+  const filteredGroups = useMemo(() => {
+    return modelGroups.filter((g) => {
+      const isComplete = g.checked === g.total;
+      if (filterTab === 'CHECKED' && !isComplete) return false;
+      if (filterTab === 'UNCHECKED' && isComplete) return false;
+
+      if (!searchQuery.trim()) return true;
+      const q = searchQuery.toLowerCase().trim();
+      const matchGroup =
+        g.brand.toLowerCase().includes(q) ||
+        g.model.toLowerCase().includes(q) ||
+        (g.color && g.color.toLowerCase().includes(q)) ||
+        (g.storage && g.storage.toLowerCase().includes(q));
+
+      if (matchGroup) return true;
+      return g.items.some((d) => d.imei.toLowerCase().includes(q) || (d.imei2 && d.imei2.toLowerCase().includes(q)));
+    });
+  }, [modelGroups, filterTab, searchQuery]);
+
+  // Filtered flat devices list for display
   const filteredList = useMemo(() => {
     return storeDevices.filter((d) => {
       const isChecked = checkedImeis.has(d.imei) || (d.imei2 ? checkedImeis.has(d.imei2) : false);
@@ -253,62 +255,72 @@ export const RevisionPage: React.FC = () => {
       {/* Top Header Bar */}
       <div className="p-3 sm:p-4 border-b border-border bg-surface shrink-0 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div className="flex items-center gap-2.5">
-          <div className="w-9 h-9 rounded-xl bg-accent/15 border border-accent/25 flex items-center justify-center text-accent shrink-0">
+          <div className="w-10 h-10 rounded-2xl bg-accent/15 border border-accent/25 flex items-center justify-center text-accent shrink-0 shadow-2xs">
             <ClipboardCheck className="w-5 h-5" />
           </div>
           <div>
-            <h1 className="text-base sm:text-lg font-bold text-fg leading-tight">
-              Ревизия склада: {formatStoreName(currentStore?.name || 'Магазин')}
-            </h1>
-            <p className="text-[11px] text-fg-subtle">
-              Сверка фактического наличия телефонов по IMEI
+            <div className="flex items-center gap-2 flex-wrap">
+              <h1 className="text-base sm:text-lg font-bold text-fg leading-tight">
+                {currentStore?.isMainWarehouse ? 'Сверка склада' : 'Сверка остатков'}
+              </h1>
+              {!isAdmin && (
+                <span className="inline-flex items-center gap-1.5 text-xs font-bold px-2.5 py-0.5 rounded-full bg-accent/10 text-accent border border-accent/25 shadow-2xs">
+                  <StoreIcon className="w-3.5 h-3.5 shrink-0" />
+                  <span>{formatStoreDisplayTitle(currentStore)}</span>
+                </span>
+              )}
+            </div>
+            <p className="text-[11px] text-fg-subtle mt-0.5">
+              Сверка фактического наличия товаров на складе
             </p>
           </div>
         </div>
 
         {/* Header Controls */}
-        <div className="flex items-center gap-2 flex-wrap">
+        <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap w-full sm:w-auto">
           {/* Admin Store Switcher */}
           {isAdmin && stores.length > 0 && (
-            <div className="flex items-center gap-1.5 bg-surface-raised border border-border rounded-xl px-2.5 h-9 shrink-0">
+            <div className="flex-1 sm:flex-initial flex items-center gap-1.5 bg-surface-raised hover:bg-surface border border-border rounded-xl px-2.5 h-9 min-w-0 transition-colors shadow-2xs">
               <StoreIcon className="w-3.5 h-3.5 text-accent shrink-0" />
               <select
                 value={effectiveStoreId}
                 onChange={(e) => setSelectedStoreId(e.target.value)}
-                className="bg-transparent text-xs font-bold text-fg focus:outline-none cursor-pointer"
-                title="Выбрать магазин для ревизии"
+                className="bg-transparent text-xs font-bold text-fg focus:outline-none cursor-pointer pr-1 truncate"
+                title="Выбрать точку для сверки"
               >
                 {stores.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.name}{s.isMainWarehouse ? ' (Центральный склад)' : ''}
+                  <option key={s.id} value={s.id} className="bg-surface text-fg font-medium">
+                    {formatStoreDisplayTitle(s)}
                   </option>
                 ))}
               </select>
             </div>
           )}
 
-          <Button
-            type="button"
-            variant="secondary"
-            size="sm"
-            onClick={handleResetRevision}
-            leftIcon={RotateCcw}
-            className="h-9 px-2.5 text-xs text-fg-subtle hover:text-fg cursor-pointer"
-            title="Сбросить текущую ревизию"
-          >
-            Сброс
-          </Button>
+          <div className="flex items-center gap-1.5 shrink-0">
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              onClick={handleResetRevision}
+              leftIcon={RotateCcw}
+              className="h-9 px-2.5 text-xs text-fg-subtle hover:text-fg cursor-pointer"
+              title="Сбросить отметки текущей сверки"
+            >
+              Сброс
+            </Button>
 
-          <Button
-            type="button"
-            variant="primary"
-            size="sm"
-            onClick={() => setIsSummaryModalOpen(true)}
-            leftIcon={CheckCircle2}
-            className="h-9 px-3.5 text-xs font-bold cursor-pointer"
-          >
-            Итоги ревизии
-          </Button>
+            <Button
+              type="button"
+              variant="primary"
+              size="sm"
+              onClick={() => setIsSummaryModalOpen(true)}
+              leftIcon={CheckCircle2}
+              className="h-9 px-3 text-xs font-bold cursor-pointer"
+            >
+              Итоги сверки
+            </Button>
+          </div>
         </div>
       </div>
 
@@ -331,7 +343,7 @@ export const RevisionPage: React.FC = () => {
 
               <div>
                 <span className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider block">
-                  Проверено
+                  Сверено
                 </span>
                 <span className="text-xl sm:text-2xl font-black font-mono text-emerald-600 dark:text-emerald-400">
                   {checkedCount} <span className="text-xs font-normal opacity-75">шт.</span>
@@ -342,30 +354,16 @@ export const RevisionPage: React.FC = () => {
 
               <div>
                 <span className="text-[11px] font-bold text-amber-600 dark:text-amber-400 uppercase tracking-wider block">
-                  Осталось найти
+                  Осталось проверить
                 </span>
                 <span className="text-xl sm:text-2xl font-black font-mono text-amber-600 dark:text-amber-400">
                   {uncheckedCount} <span className="text-xs font-normal opacity-75">шт.</span>
                 </span>
               </div>
-
-              {foreignDevices.length > 0 && (
-                <>
-                  <div className="w-px h-8 bg-border hidden sm:block" />
-                  <div>
-                    <span className="text-[11px] font-bold text-danger uppercase tracking-wider block">
-                      Чужие
-                    </span>
-                    <span className="text-xl sm:text-2xl font-black font-mono text-danger">
-                      {foreignDevices.length} <span className="text-xs font-normal opacity-75">шт.</span>
-                    </span>
-                  </div>
-                </>
-              )}
             </div>
 
             <div className="text-right sm:text-right">
-              <span className="text-xs font-bold text-fg-subtle">Прогресс проверки:</span>
+              <span className="text-xs font-bold text-fg-subtle">Прогресс сверки:</span>
               <span className="text-lg font-black font-mono text-accent ml-2">
                 {progressPercent}%
               </span>
@@ -376,71 +374,35 @@ export const RevisionPage: React.FC = () => {
           <div className="w-full h-2.5 rounded-full bg-surface-raised border border-border overflow-hidden">
             <div
               className={`h-full transition-all duration-300 ${
-                progressPercent === 100
+                isAllReconciled
                   ? 'bg-emerald-500'
                   : 'bg-accent'
               }`}
               style={{ width: `${progressPercent}%` }}
             />
           </div>
-        </div>
 
-        {/* Quick Scan Input & Search Panel */}
-        <div className="p-4 rounded-2xl bg-surface border border-border shadow-xs space-y-3">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <h2 className="text-sm font-bold text-fg flex items-center gap-2">
-              <Barcode className="w-4 h-4 text-accent" />
-              Сканирование устройства
-            </h2>
-
-            <Button
+          {/* 1-Click "Everything matches" instant action */}
+          {!isAllReconciled && totalCount > 0 ? (
+            <button
               type="button"
-              variant="secondary"
-              size="sm"
-              onClick={() => openScanner((code) => handleProcessScan(code))}
-              leftIcon={Barcode}
-              className="h-8 text-xs cursor-pointer text-accent border-accent/30 hover:border-accent self-start sm:self-auto"
+              onClick={handleCheckAll}
+              className="w-full py-2.5 px-4 rounded-xl bg-accent text-accent-fg font-bold text-xs sm:text-sm flex items-center justify-center gap-2 hover:opacity-90 active:scale-[0.99] transition-all cursor-pointer shadow-xs select-none"
             >
-              Камера-сканер
-            </Button>
-          </div>
-
-          <form onSubmit={handleInputSubmit} className="flex gap-2">
-            <div className="relative flex-1">
-              <input
-                ref={scanInputRef}
-                type="text"
-                value={scanInput}
-                onChange={(e) => setScanInput(e.target.value)}
-                placeholder="Отсканируйте сканером или введите IMEI (или последние 4-6 цифр)..."
-                className="w-full h-11 pl-4 pr-10 rounded-xl border border-border bg-bg text-fg font-mono text-sm focus:outline-none focus:border-accent"
-                autoFocus
-              />
-              {scanInput && (
-                <button
-                  type="button"
-                  onClick={() => setScanInput('')}
-                  className="absolute right-3 top-3 text-fg-subtle hover:text-fg cursor-pointer"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              )}
+              <CheckCircle2 className="w-4 h-4 shrink-0" />
+              <span>Всё сходится ({totalCount} шт.)</span>
+            </button>
+          ) : isAllReconciled ? (
+            <div className="p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-xs font-bold flex items-center justify-center gap-2">
+              <CheckCircle2 className="w-4 h-4 shrink-0" />
+              <span>Все товары склада сверены ({totalCount} шт.)</span>
             </div>
-
-            <Button
-              type="submit"
-              disabled={!scanInput.trim()}
-              leftIcon={Check}
-              className="h-11 px-5 cursor-pointer font-bold shrink-0"
-            >
-              Проверить
-            </Button>
-          </form>
+          ) : null}
         </div>
 
         {/* Devices Checklist & Tabs */}
         <div className="rounded-2xl bg-surface border border-border shadow-xs overflow-hidden">
-          {/* Controls Bar: Tabs & Search */}
+          {/* Controls Bar: Tabs, View Toggle & Search */}
           <div className="p-3 border-b border-border bg-surface-raised flex flex-col md:flex-row md:items-center justify-between gap-3">
             {/* Filter Tabs */}
             <div className="flex items-center gap-1 overflow-x-auto pb-1 md:pb-0">
@@ -464,7 +426,7 @@ export const RevisionPage: React.FC = () => {
                     : 'text-fg-subtle hover:text-fg'
                 }`}
               >
-                Осталось найти ({uncheckedCount})
+                Осталось проверить ({uncheckedCount})
               </button>
               <button
                 type="button"
@@ -475,76 +437,205 @@ export const RevisionPage: React.FC = () => {
                     : 'text-fg-subtle hover:text-fg'
                 }`}
               >
-                Проверено ({checkedCount})
+                Сверено ({checkedCount})
               </button>
-              {foreignDevices.length > 0 && (
-                <button
-                  type="button"
-                  onClick={() => setFilterTab('FOREIGN')}
-                  className={`px-3 py-1.5 text-xs font-bold rounded-xl transition-all cursor-pointer shrink-0 ${
-                    filterTab === 'FOREIGN'
-                      ? 'bg-danger text-white shadow-2xs'
-                      : 'text-danger hover:bg-danger/10'
-                  }`}
-                >
-                  Чужие ({foreignDevices.length})
-                </button>
-              )}
             </div>
 
-            {/* Search Input */}
-            <div className="relative w-full md:w-64 shrink-0">
-              <Search className="w-3.5 h-3.5 text-fg-subtle absolute left-3 top-3" />
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Поиск модели, цвета, IMEI..."
-                className="w-full h-9 pl-8.5 pr-3 rounded-xl border border-border bg-surface text-fg text-xs focus:outline-none focus:border-accent"
-              />
+            {/* Right side: View Mode Toggle & Search Input */}
+            <div className="flex items-center gap-2 flex-wrap">
+              {/* View mode toggle */}
+              <div className="inline-flex rounded-xl bg-surface border border-border p-0.5 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setViewMode('GROUPS')}
+                  className={`px-2.5 py-1 text-xs font-semibold rounded-lg flex items-center gap-1.5 transition-all cursor-pointer ${
+                    viewMode === 'GROUPS'
+                      ? 'bg-accent text-accent-fg shadow-2xs'
+                      : 'text-fg-subtle hover:text-fg'
+                  }`}
+                  title="Группировка по моделям"
+                >
+                  <Layers className="w-3.5 h-3.5" />
+                  <span>По моделям</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setViewMode('ITEMS')}
+                  className={`px-2.5 py-1 text-xs font-semibold rounded-lg flex items-center gap-1.5 transition-all cursor-pointer ${
+                    viewMode === 'ITEMS'
+                      ? 'bg-accent text-accent-fg shadow-2xs'
+                      : 'text-fg-subtle hover:text-fg'
+                  }`}
+                  title="Поштучный список"
+                >
+                  <List className="w-3.5 h-3.5" />
+                  <span>Поштучно</span>
+                </button>
+              </div>
+
+              {/* Search Input */}
+              <div className="relative w-full sm:w-60 shrink-0">
+                <Search className="w-3.5 h-3.5 text-fg-subtle absolute left-3 top-3" />
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Поиск модели, цвета, памяти..."
+                  className="w-full h-9 pl-8.5 pr-3 rounded-xl border border-border bg-surface text-fg text-xs focus:outline-none focus:border-accent"
+                />
+              </div>
             </div>
           </div>
 
-          {/* List Content */}
-          {filterTab === 'FOREIGN' ? (
-            /* Foreign devices found in this store */
-            <div className="p-3 space-y-2">
-              <div className="p-3 rounded-xl bg-danger/10 border border-danger/25 text-danger text-xs flex items-center gap-2">
-                <AlertTriangle className="w-4 h-4 shrink-0" />
-                <span>
-                  Эти телефоны были отсканированы в магазине, но в системе числятся на другом складе/точке!
-                </span>
-              </div>
-
-              {foreignDevices.map((f, idx) => (
-                <div
-                  key={f.imei}
-                  className="p-3 rounded-xl bg-surface-raised border border-danger/30 flex items-center justify-between gap-3"
-                >
-                  <div className="min-w-0">
-                    <p className="text-xs sm:text-sm font-bold text-fg truncate">
-                      {f.brand} {f.model}
-                    </p>
-                    <div className="flex items-center gap-2 text-[11px] text-fg-subtle flex-wrap mt-0.5">
-                      {f.storage && <span>{f.storage}</span>}
-                      {f.color && <span>• {f.color}</span>}
-                      <span className="font-mono text-accent font-semibold">• IMEI: {f.imei}</span>
-                      <span className="text-danger font-semibold">• Числятся в: «{f.registeredStoreName}»</span>
-                    </div>
-                  </div>
+          {/* List Content: Grouped by model or Flat List */}
+          {viewMode === 'GROUPS' ? (
+            /* GROUPED VIEW */
+            <div className="divide-y divide-border">
+              {filteredGroups.length === 0 ? (
+                <div className="py-12 text-center text-fg-subtle space-y-2">
+                  <Smartphone className="w-8 h-8 opacity-40 mx-auto" />
+                  <p className="text-sm font-medium">Товары не найдены</p>
                 </div>
-              ))}
+              ) : (
+                filteredGroups.map((group) => {
+                  const isComplete = group.checked === group.total;
+                  const isExpanded = expandedGroups.has(group.key);
+
+                  return (
+                    <div key={group.key} className="bg-surface transition-colors">
+                      {/* Main Group Header Row */}
+                      <div
+                        onClick={() => handleToggleExpand(group.key)}
+                        className={`p-3 sm:p-3.5 flex items-center justify-between gap-3 cursor-pointer ${
+                          isComplete ? 'bg-emerald-500/5 hover:bg-emerald-500/10' : 'hover:bg-surface-raised'
+                        }`}
+                      >
+                        {/* Check button & Model info */}
+                        <div className="flex items-center gap-3 min-w-0">
+                          <button
+                            type="button"
+                            onClick={(e) => handleToggleGroup(group, e)}
+                            className={`w-7 h-7 rounded-xl border flex items-center justify-center transition-all cursor-pointer shrink-0 ${
+                              isComplete
+                                ? 'bg-emerald-500 border-emerald-600 text-white shadow-2xs'
+                                : group.checked > 0
+                                ? 'bg-amber-500 border-amber-600 text-white'
+                                : 'bg-surface border-border text-transparent hover:border-accent'
+                            }`}
+                            title={isComplete ? 'Снять отметку' : 'Сверить всю группу'}
+                          >
+                            <Check className="w-4 h-4" strokeWidth={3} />
+                          </button>
+
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <p className={`text-xs sm:text-sm font-bold truncate ${
+                                isComplete ? 'text-emerald-700 dark:text-emerald-300' : 'text-fg'
+                              }`}>
+                                {group.brand} {group.model}
+                              </p>
+                              {isComplete ? (
+                                <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 font-bold flex items-center gap-1">
+                                  <Check className="w-3 h-3" /> Сходится
+                                </span>
+                              ) : (
+                                <span className="text-[10px] px-2 py-0.5 rounded-full bg-surface-raised text-fg-subtle font-medium border border-border">
+                                  Ожидает
+                                </span>
+                              )}
+                            </div>
+
+                            <div className="flex items-center gap-2 text-[11px] text-fg-subtle flex-wrap mt-0.5">
+                              {group.storage && <span>{group.storage}</span>}
+                              {group.color && <span>• {group.color}</span>}
+                              <span className="font-mono font-medium text-fg-subtle">
+                                • {group.checked} из {group.total} шт.
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Right side: Action button & Expand toggle */}
+                        <div className="flex items-center gap-2 shrink-0">
+                          <button
+                            type="button"
+                            onClick={(e) => handleToggleGroup(group, e)}
+                            className={`text-xs font-semibold px-2.5 py-1 rounded-lg border transition-all cursor-pointer ${
+                              isComplete
+                                ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20'
+                                : 'bg-surface-raised text-fg-subtle border-border hover:border-accent'
+                            }`}
+                          >
+                            {isComplete ? 'Сверено ✓' : `Сверить (${group.total} шт.)`}
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleToggleExpand(group.key);
+                            }}
+                            className="p-1 text-fg-subtle hover:text-fg rounded-lg transition-colors cursor-pointer"
+                            title={isExpanded ? 'Свернуть' : 'Развернуть список IMEI'}
+                          >
+                            <ChevronDown className={`w-4 h-4 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Sub-items (individual devices of this group if expanded) */}
+                      {isExpanded && (
+                        <div className="bg-surface-raised/40 border-t border-border/60 divide-y divide-border/40 pl-6 pr-3 py-1 animate-in fade-in duration-150">
+                          {group.items.map((device) => {
+                            const isChecked = checkedImeis.has(device.imei) || (device.imei2 && checkedImeis.has(device.imei2));
+                            return (
+                              <div
+                                key={device.id}
+                                onClick={() => handleToggleCheck(device)}
+                                className="py-2 px-2 flex items-center justify-between gap-2 text-xs cursor-pointer hover:bg-surface-raised/80 rounded-lg transition-colors"
+                              >
+                                <div className="flex items-center gap-2.5 min-w-0">
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleToggleCheck(device);
+                                    }}
+                                    className={`w-5 h-5 rounded-md border flex items-center justify-center transition-all cursor-pointer shrink-0 ${
+                                      isChecked
+                                        ? 'bg-emerald-500 border-emerald-600 text-white'
+                                        : 'bg-surface border-border text-transparent hover:border-accent'
+                                    }`}
+                                  >
+                                    <Check className="w-3 h-3" strokeWidth={3} />
+                                  </button>
+                                  <span className="font-mono text-fg-subtle text-[11px] truncate">
+                                    IMEI: <span className="font-semibold text-fg">{device.imei}</span>
+                                  </span>
+                                </div>
+                                <span className={`text-[10px] font-medium ${isChecked ? 'text-emerald-600 dark:text-emerald-400' : 'text-fg-subtle'}`}>
+                                  {isChecked ? 'В наличии ✓' : 'Не отмечен'}
+                                </span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })
+              )}
             </div>
           ) : (
-            /* Regular store devices checklist */
+            /* FLAT ITEMS LIST VIEW */
             <div className="divide-y divide-border">
               {filteredList.length === 0 ? (
                 <div className="py-12 text-center text-fg-subtle space-y-2">
                   <Smartphone className="w-8 h-8 opacity-40 mx-auto" />
-                  <p className="text-sm font-medium">Устройства не найдены</p>
+                  <p className="text-sm font-medium">Товары не найдены</p>
                 </div>
               ) : (
-                filteredList.map((device, idx) => {
+                filteredList.map((device) => {
                   const isChecked = checkedImeis.has(device.imei) || (device.imei2 ? checkedImeis.has(device.imei2) : false);
 
                   return (
@@ -583,7 +674,7 @@ export const RevisionPage: React.FC = () => {
                             </p>
                             {isChecked ? (
                               <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 font-bold flex items-center gap-1">
-                                <Check className="w-3 h-3" /> Проверен
+                                <Check className="w-3 h-3" /> Сверено
                               </span>
                             ) : (
                               <span className="text-[10px] px-2 py-0.5 rounded-full bg-surface-raised text-fg-subtle font-medium border border-border">
@@ -595,10 +686,7 @@ export const RevisionPage: React.FC = () => {
                           <div className="flex items-center gap-2 text-[11px] text-fg-subtle flex-wrap mt-0.5">
                             {device.storage && <span>{device.storage}</span>}
                             {device.color && <span>• {device.color}</span>}
-                            <span className="font-mono text-accent font-black">• IMEI: {device.imei}</span>
-                            {device.imei2 && (
-                              <span className="font-mono text-fg-subtle">• IMEI2: {device.imei2}</span>
-                            )}
+                            <span className="font-mono text-fg-subtle">• IMEI: {device.imei}</span>
                           </div>
                         </div>
                       </div>
@@ -616,7 +704,7 @@ export const RevisionPage: React.FC = () => {
                             : 'bg-surface-raised text-fg-subtle border-border hover:border-accent'
                         }`}
                       >
-                        {isChecked ? 'Отмечен ✓' : 'Отметить'}
+                        {isChecked ? 'Сверено ✓' : 'Сверить'}
                       </button>
                     </div>
                   );
@@ -631,7 +719,7 @@ export const RevisionPage: React.FC = () => {
       <Dialog
         open={isSummaryModalOpen}
         onClose={() => setIsSummaryModalOpen(false)}
-        title="Итоги ревизии склада"
+        title="Итоги сверки склада"
         footer={
           <div className="flex items-center justify-between w-full gap-2">
             <Button
@@ -657,55 +745,54 @@ export const RevisionPage: React.FC = () => {
         <div className="space-y-4 pt-1">
           <div className="p-4 rounded-xl bg-surface-raised border border-border text-xs space-y-2">
             <div className="flex justify-between">
-              <span className="text-fg-subtle">Магазин:</span>
-              <span className="font-bold text-fg">{currentStore?.name}</span>
+              <span className="text-fg-subtle">{currentStore?.isMainWarehouse ? 'Склад:' : 'Точка:'}</span>
+              <span className="font-bold text-fg">{formatStoreDisplayTitle(currentStore)}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-fg-subtle">Проверяющий:</span>
               <span className="font-medium text-fg">{formatUserName(currentUser?.name)}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-fg-subtle">Дата проверки:</span>
+              <span className="text-fg-subtle">Дата сверки:</span>
               <span className="font-medium text-fg">{new Date().toLocaleString('ru-RU')}</span>
             </div>
             <div className="w-full h-px bg-border my-1" />
             <div className="flex justify-between">
-              <span className="text-fg-subtle">Всего должно быть:</span>
+              <span className="text-fg-subtle">Всего числится:</span>
               <span className="font-bold font-mono text-fg">{totalCount} шт.</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-emerald-600 dark:text-emerald-400 font-semibold">Фактически найдено:</span>
+              <span className="text-emerald-600 dark:text-emerald-400 font-semibold">Фактически сверено:</span>
               <span className="font-bold font-mono text-emerald-600 dark:text-emerald-400">{checkedCount} шт. ({progressPercent}%)</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-amber-600 dark:text-amber-400 font-semibold">Не найдено:</span>
+              <span className="text-amber-600 dark:text-amber-400 font-semibold">Расхождение / не сверено:</span>
               <span className="font-bold font-mono text-amber-600 dark:text-amber-400">{uncheckedCount} шт.</span>
             </div>
-            {foreignDevices.length > 0 && (
-              <div className="flex justify-between text-danger font-semibold">
-                <span>Чужие устройства:</span>
-                <span className="font-bold font-mono">{foreignDevices.length} шт.</span>
-              </div>
-            )}
           </div>
 
-          {uncheckedCount > 0 && (
+          {isAllReconciled ? (
+            <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-xs font-bold flex items-center gap-2">
+              <CheckCircle2 className="w-4 h-4 shrink-0" />
+              <span>Остатки полностью сошлись (0 расхождений). Сверка прошла успешно!</span>
+            </div>
+          ) : uncheckedCount > 0 ? (
             <div>
               <h4 className="text-xs font-bold text-amber-600 dark:text-amber-400 mb-1.5">
-                Непроверенные телефоны ({uncheckedCount} шт.):
+                Не подтвержденные позиции ({uncheckedCount} шт.):
               </h4>
               <div className="max-h-[160px] overflow-y-auto rounded-xl border border-border divide-y divide-border text-xs">
                 {storeDevices
                   .filter((d) => !checkedImeis.has(d.imei) && (!d.imei2 || !checkedImeis.has(d.imei2)))
                   .map((d) => (
                     <div key={d.id} className="p-2 flex justify-between items-center bg-surface">
-                      <span className="font-semibold text-fg truncate">{d.brand} {d.model} ({d.storage || ''})</span>
+                      <span className="font-semibold text-fg truncate">{d.brand} {d.model} ({d.storage || ''} {d.color || ''})</span>
                       <span className="font-mono text-fg-subtle text-[11px] shrink-0 ml-2">{d.imei}</span>
                     </div>
                   ))}
               </div>
             </div>
-          )}
+          ) : null}
         </div>
       </Dialog>
     </div>

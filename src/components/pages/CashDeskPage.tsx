@@ -43,16 +43,16 @@ export const CashDeskPage: React.FC = () => {
   const isAdmin = currentUser?.role === 'ADMIN';
   const isPartner = currentUser?.role === 'PARTNER';
 
-  const defaultStoreId = stores.find((s) => !s.isMainWarehouse)?.id || stores[0]?.id || '';
   const effectiveStoreId =
     isPartner && currentUser?.storeId
       ? currentUser.storeId
-      : (selectedStoreId && selectedStoreId !== 'all' && stores.some((s) => s.id === selectedStoreId)
-          ? selectedStoreId
-          : defaultStoreId);
+      : (selectedStoreId || 'all');
 
+  const isCentral = effectiveStoreId === 'all';
   const currentStore = stores.find((s) => s.id === effectiveStoreId);
-  const pageTitle = currentStore?.isMainWarehouse
+  const pageTitle = isCentral
+    ? 'Центральная касса (Общий итог по всем магазинам)'
+    : currentStore?.isMainWarehouse
     ? `Центральная касса (${currentStore.name})`
     : `Касса: ${formatStoreName(currentStore?.name || 'Магазин')}`;
 
@@ -139,11 +139,19 @@ export const CashDeskPage: React.FC = () => {
                 value={effectiveStoreId}
                 onChange={(e) => setSelectedStoreId(e.target.value)}
                 className="bg-transparent text-xs font-bold text-fg focus:outline-none cursor-pointer"
-                title="Выбрать магазин"
+                title="Выбрать кассу / магазин"
               >
-                {stores.map((s) => (
+                <option value="all">
+                  Центральная касса (Общий итог)
+                </option>
+                {retailStores.map((s) => (
                   <option key={s.id} value={s.id}>
-                    {s.name}{s.isMainWarehouse ? ' (Центральная касса)' : ''}
+                    {s.name}
+                  </option>
+                ))}
+                {stores.filter((s) => s.isMainWarehouse).map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.name} (Главный склад)
                   </option>
                 ))}
               </select>

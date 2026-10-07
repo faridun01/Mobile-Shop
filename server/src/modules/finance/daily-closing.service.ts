@@ -234,21 +234,21 @@ export class DailyClosingService {
     }
 
     // 4. Expected Cash Calculation
-    const expectedCashTjs = roundMoney(
-      openingTjs
-        .plus(salesCashTjs)
-        .minus(refundsCashTjs)
-        .minus(expensesCashTjs)
-        .minus(collectionsCashTjs)
-    );
+    // Physical cash in drawer: cannot fall below 0 if collections emptied the register
+    // (including any card receipts that were tracked in the register balance).
+    const rawExpectedTjs = openingTjs
+      .plus(salesCashTjs)
+      .minus(refundsCashTjs)
+      .minus(expensesCashTjs)
+      .minus(collectionsCashTjs);
+    const expectedCashTjs = roundMoney(rawExpectedTjs.lt(0) ? D(0) : rawExpectedTjs);
 
-    const expectedCashUsd = roundMoney(
-      openingUsd
-        .plus(salesCashUsd)
-        .minus(refundsCashUsd)
-        .minus(expensesCashUsd)
-        .minus(collectionsCashUsd)
-    );
+    const rawExpectedUsd = openingUsd
+      .plus(salesCashUsd)
+      .minus(refundsCashUsd)
+      .minus(expensesCashUsd)
+      .minus(collectionsCashUsd);
+    const expectedCashUsd = roundMoney(rawExpectedUsd.lt(0) ? D(0) : rawExpectedUsd);
 
     return {
       storeId: store.id,

@@ -279,7 +279,7 @@ export const DailyCashClosingModal: React.FC<DailyCashClosingModalProps> = ({
     <Dialog
       open={isOpen}
       onClose={onClose}
-      title={isCentralCashForbidden ? 'Кассовая смена' : summary?.alreadyClosed ? 'Z-отчёт смены' : 'Закрытие смены (Z-отчёт)'}
+      title={isCentralCashForbidden ? 'Кассовая смена' : summary?.alreadyClosed ? 'Z-отчёт смены' : currentUser?.role === 'ADMIN' ? 'Кассовая смена' : 'Закрытие смены (Z-отчёт)'}
       subtitle={isCentralCashForbidden ? 'Центральная касса · Только просмотр' : `${effectiveStoreName} · ${summary?.businessDate || explicitBusinessDate || 'Сегодня'}`}
       maxWidth="md"
       footer={
@@ -321,20 +321,22 @@ export const DailyCashClosingModal: React.FC<DailyCashClosingModalProps> = ({
                 disabled={submitting}
                 className="flex-1 sm:flex-initial"
               >
-                Отмена
+                {currentUser?.role === 'ADMIN' ? 'Закрыть' : 'Отмена'}
               </Button>
 
-              <Button
-                variant="primary"
-                size="md"
-                onClick={handleSubmitClosing}
-                loading={submitting}
-                disabled={loading || parsedActualTjs === null}
-                leftIcon={CheckCircle2}
-                className="flex-1 sm:flex-initial px-4 font-bold"
-              >
-                {showConfirmDiscrepancy ? 'Подтвердить' : 'Закрыть смену'}
-              </Button>
+              {currentUser?.role !== 'ADMIN' && (
+                <Button
+                  variant="primary"
+                  size="md"
+                  onClick={handleSubmitClosing}
+                  loading={submitting}
+                  disabled={loading || parsedActualTjs === null}
+                  leftIcon={CheckCircle2}
+                  className="flex-1 sm:flex-initial px-4 font-bold"
+                >
+                  {showConfirmDiscrepancy ? 'Подтвердить' : 'Закрыть смену'}
+                </Button>
+              )}
             </>
           )}
         </div>
@@ -441,6 +443,27 @@ export const DailyCashClosingModal: React.FC<DailyCashClosingModalProps> = ({
                   <p className="mt-0.5 italic">{summary.closing.comment}</p>
                 </div>
               )}
+            </div>
+          ) : currentUser?.role === 'ADMIN' ? (
+            <div className="space-y-3.5">
+              <div className="p-4 rounded-2xl bg-surface-raised border border-border text-center space-y-2.5 shadow-xs">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-fg-subtle block">
+                  Расчётный остаток в кассе:
+                </span>
+                <div className="text-3xl font-black font-mono text-accent tracking-tight">
+                  {formatMoney(expectedTjs)} <span className="text-base font-bold text-fg-subtle">TJS</span>
+                </div>
+                {expectedUsd > 0 && (
+                  <div className="text-xs font-mono text-fg-subtle">
+                    + ${formatMoney(expectedUsd)} USD
+                  </div>
+                )}
+                <div className="pt-2.5 border-t border-border/80">
+                  <p className="text-xs text-fg-subtle">
+                    Смена в магазине ещё не закрыта. Закрывать смену и сдавать Z-отчёт должен продавец/кассир магазина.
+                  </p>
+                </div>
+              </div>
             </div>
           ) : (
             /* STATE 2: ACTIVE SHIFT CLOSING (MAXIMUM SIMPLE FLOW) */
