@@ -23,8 +23,18 @@ export interface TransferLocationSelectorProps {
   onDestinationChange: (id: string) => void;
 }
 
+export type TransferDeviceSortOption =
+  | 'SELECTED_FIRST'
+  | 'NAME_ASC'
+  | 'NAME_DESC'
+  | 'NEWEST'
+  | 'OLDEST'
+  | 'PRICE_DESC'
+  | 'PRICE_ASC';
+
 export interface TransferDeviceGridProps {
   availableDevices: Device[];
+  totalAvailableCount?: number;
   selectedDeviceIds: string[];
   searchQuery: string;
   setSearchQuery: (query: string) => void;
@@ -35,6 +45,13 @@ export interface TransferDeviceGridProps {
   onScanDevice: () => void;
   isInitialLoading: boolean;
   fromStoreName: string;
+  sortBy: TransferDeviceSortOption;
+  setSortBy: (sort: TransferDeviceSortOption) => void;
+  selectedBrand: string;
+  setSelectedBrand: (brand: string) => void;
+  availableBrands: { brand: string; count: number }[];
+  onlySelected: boolean;
+  setOnlySelected: (val: boolean) => void;
 }
 
 export interface TransferBottomBarProps {

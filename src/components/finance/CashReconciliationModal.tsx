@@ -5,6 +5,7 @@ import {
   Banknote,
   Calendar,
   CheckCircle2,
+  Clock,
   CreditCard,
   FileSpreadsheet,
   Gift,
@@ -138,6 +139,8 @@ export interface StoreBreakdown {
     salesDebtTjs: string;
     expensesCount?: number;
     expensesTotalTjs?: string;
+    customerPaymentsCount?: number;
+    customerPaymentsTotalTjs?: string;
     refundedCount: number;
     refundedTotalTjs: string;
   };
@@ -339,50 +342,90 @@ export const CashReconciliationModal: React.FC<CashReconciliationModalProps> = (
                 )}
               </div>
 
-              {/* 3 Summary Cards - purely sales & cash */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-                {/* 1. Cash In Register */}
-                <div className="p-3 rounded-xl border border-emerald-500/30 bg-emerald-500/5 space-y-1">
-                  <div className="flex items-center gap-1.5 text-xs font-semibold text-emerald-600 dark:text-emerald-400">
-                    <Banknote className="w-4 h-4 shrink-0" />
-                    <span>В кассе (к инкассации)</span>
-                  </div>
-                  <p className="text-base sm:text-lg font-bold font-mono text-fg tabular-nums">
-                    {formatTjs(data.summary.cashOnlyTjs ?? data.summary.currentCashTjs)}
-                  </p>
-                  <p className="text-[11px] text-fg-subtle">
-                    ≈ {formatUsd(data.summary.currentCashUsd)}
-                  </p>
-                </div>
+              {/* Summary Cards - with debt sales separation */}
+              {(() => {
+                const debtSum = Number(data.summary.salesDebtTjs || 0);
+                const customerPaymentsSum = Number(data.summary.customerPaymentsTotalTjs || 0);
+                const hasDebt = debtSum > 0;
+                const hasCustomerPayments = customerPaymentsSum > 0;
 
-                {/* 2. Sales Cash */}
-                <div className="p-3 rounded-xl border border-border bg-surface-raised/50 space-y-1">
-                  <div className="flex items-center gap-1.5 text-xs font-semibold text-fg-subtle">
-                    <Receipt className="w-4 h-4 text-accent shrink-0" />
-                    <span>Выручка наличными</span>
-                  </div>
-                  <p className="text-base sm:text-lg font-bold font-mono text-emerald-600 dark:text-emerald-400 tabular-nums">
-                    +{formatTjs(data.summary.salesCashTjs)}
-                  </p>
-                  <p className="text-[11px] text-fg-subtle">
-                    {data.summary.salesCount} чеков за период
-                  </p>
-                </div>
+                return (
+                  <div className={`grid gap-2.5 ${hasDebt || hasCustomerPayments ? 'grid-cols-2 sm:grid-cols-4' : 'grid-cols-1 sm:grid-cols-3'}`}>
+                    {/* 1. Cash In Register */}
+                    <div className="p-3 rounded-xl border border-emerald-500/30 bg-emerald-500/5 space-y-1">
+                      <div className="flex items-center gap-1.5 text-xs font-semibold text-emerald-600 dark:text-emerald-400">
+                        <Banknote className="w-4 h-4 shrink-0" />
+                        <span>В кассе (к инкассации)</span>
+                      </div>
+                      <p className="text-base sm:text-lg font-bold font-mono text-fg tabular-nums">
+                        {formatTjs(data.summary.cashOnlyTjs ?? data.summary.currentCashTjs)}
+                      </p>
+                      <p className="text-[11px] text-fg-subtle">
+                        ≈ {formatUsd(data.summary.currentCashUsd)}
+                      </p>
+                    </div>
 
-                {/* 3. Sales Card / Transfer */}
-                <div className="p-3 rounded-xl border border-border bg-surface-raised/50 space-y-1">
-                  <div className="flex items-center gap-1.5 text-xs font-semibold text-fg-subtle">
-                    <CreditCard className="w-4 h-4 text-blue-500 shrink-0" />
-                    <span>Банк и переводы</span>
+                    {/* 2. Sales Cash */}
+                    <div className="p-3 rounded-xl border border-border bg-surface-raised/50 space-y-1">
+                      <div className="flex items-center gap-1.5 text-xs font-semibold text-fg-subtle">
+                        <Receipt className="w-4 h-4 text-emerald-500 shrink-0" />
+                        <span>Выручка нал. (в кассу)</span>
+                      </div>
+                      <p className="text-base sm:text-lg font-bold font-mono text-emerald-600 dark:text-emerald-400 tabular-nums">
+                        +{formatTjs(data.summary.salesCashTjs)}
+                      </p>
+                      <p className="text-[11px] text-fg-subtle">
+                        {data.summary.salesCount} чеков за период
+                      </p>
+                    </div>
+
+                    {/* 3. Customer debt repayments in cash (if any) or Bank */}
+                    {hasCustomerPayments ? (
+                      <div className="p-3 rounded-xl border border-emerald-500/25 bg-surface-raised/50 space-y-1">
+                        <div className="flex items-center gap-1.5 text-xs font-semibold text-emerald-600 dark:text-emerald-400">
+                          <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
+                          <span>Оплата долгов (нал)</span>
+                        </div>
+                        <p className="text-base sm:text-lg font-bold font-mono text-emerald-600 dark:text-emerald-400 tabular-nums">
+                          +{formatTjs(customerPaymentsSum)}
+                        </p>
+                        <p className="text-[11px] text-fg-subtle">
+                          погашено клиентами в кассу
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="p-3 rounded-xl border border-border bg-surface-raised/50 space-y-1">
+                        <div className="flex items-center gap-1.5 text-xs font-semibold text-fg-subtle">
+                          <CreditCard className="w-4 h-4 text-blue-500 shrink-0" />
+                          <span>Банк и переводы</span>
+                        </div>
+                        <p className="text-base sm:text-lg font-bold font-mono text-blue-600 dark:text-blue-400 tabular-nums">
+                          {formatTjs(data.summary.salesCardTjs)}
+                        </p>
+                        <p className="text-[11px] text-fg-subtle">
+                          на банковский счёт
+                        </p>
+                      </div>
+                    )}
+
+                    {/* 4. Sales Debt (if any) */}
+                    {hasDebt && (
+                      <div className="p-3 rounded-xl border border-amber-500/30 bg-amber-500/5 space-y-1">
+                        <div className="flex items-center gap-1.5 text-xs font-semibold text-amber-600 dark:text-amber-400">
+                          <Clock className="w-4 h-4 shrink-0" />
+                          <span>Остаток в долг</span>
+                        </div>
+                        <p className="text-base sm:text-lg font-bold font-mono text-amber-600 dark:text-amber-400 tabular-nums">
+                          {formatTjs(data.summary.salesDebtTjs)}
+                        </p>
+                        <p className="text-[11px] text-fg-subtle">
+                          дебиторская задолженность
+                        </p>
+                      </div>
+                    )}
                   </div>
-                  <p className="text-base sm:text-lg font-bold font-mono text-blue-600 dark:text-blue-400 tabular-nums">
-                    {formatTjs(data.summary.salesCardTjs)}
-                  </p>
-                  <p className="text-[11px] text-fg-subtle">
-                    на банковский счёт магазина
-                  </p>
-                </div>
-              </div>
+                );
+              })()}
 
               {/* Bonus notification if any */}
               {data.summary.bonusCount > 0 && (
@@ -398,14 +441,62 @@ export const CashReconciliationModal: React.FC<CashReconciliationModalProps> = (
                 </div>
               )}
 
-              {/* Status check callout */}
-              <div className="p-2.5 rounded-xl bg-accent/5 border border-accent/20 flex items-center gap-2 text-xs text-fg-subtle">
-                <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
-                <span>
-                  Сверка сходится: Наличная выручка чеков ({formatTjs(data.summary.salesCashTjs)}) в точности равна
-                  сумме наличных в кассе ({formatTjs(data.summary.cashOnlyTjs)}).
-                </span>
-              </div>
+              {/* Accurate Status check callout */}
+              {(() => {
+                const salesCash = Number(data.summary.salesCashTjs || 0);
+                const customerPaymentsCash = Number(data.summary.customerPaymentsTotalTjs || 0);
+                const cashInReg = Number(data.summary.cashOnlyTjs ?? data.summary.currentCashTjs ?? 0);
+                const expensesCash = Number(data.summary.expensesTotalTjs || 0);
+                const netCashInflow = salesCash + customerPaymentsCash - expensesCash;
+                const diff = cashInReg - netCashInflow;
+
+                if (Math.abs(diff) < 0.01) {
+                  return (
+                    <div className="p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/25 flex items-center gap-2 text-xs text-emerald-800 dark:text-emerald-300">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
+                      <span>
+                        Сверка сходится: Поступления в кассу ({customerPaymentsCash > 0 ? `чеки +${formatTjs(salesCash)} и долги +${formatTjs(customerPaymentsCash)}` : `чеки ${formatTjs(salesCash)}`}) в точности равны сумме наличных в кассе ({formatTjs(cashInReg)}).
+                      </span>
+                    </div>
+                  );
+                }
+
+                if (diff > 0) {
+                  return (
+                    <div className="p-2.5 rounded-xl bg-blue-500/10 border border-blue-500/25 flex items-start gap-2 text-xs text-blue-900 dark:text-blue-200">
+                      <CheckCircle2 className="w-4 h-4 text-blue-500 shrink-0 mt-0.5" />
+                      <div className="space-y-0.5">
+                        <p className="font-semibold text-fg">
+                          В кассе: {formatTjs(cashInReg)} (на +{formatTjs(diff)} больше поступлений за период)
+                        </p>
+                        <p className="text-[11px] text-fg-subtle">
+                          Выручка продаж: +{formatTjs(salesCash)}
+                          {customerPaymentsCash > 0 ? ` • Оплата долгов: +${formatTjs(customerPaymentsCash)}` : ''}
+                          {expensesCash > 0 ? ` • Расходы: -${formatTjs(expensesCash)}` : ''}
+                          {` • Переходящий остаток / внесения с прошлых смен: +${formatTjs(diff)}`}
+                        </p>
+                      </div>
+                    </div>
+                  );
+                }
+
+                return (
+                  <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/25 flex items-start gap-2 text-xs text-amber-900 dark:text-amber-200">
+                    <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
+                    <div className="space-y-0.5">
+                      <p className="font-semibold text-fg">
+                        Расхождение: Поступления по чекам превышают фактическую сумму в кассе на {formatTjs(Math.abs(diff))}
+                      </p>
+                      <p className="text-[11px] text-fg-subtle">
+                        Выручка продаж: +{formatTjs(salesCash)}
+                        {customerPaymentsCash > 0 ? ` • Оплата долгов: +${formatTjs(customerPaymentsCash)}` : ''}
+                        {expensesCash > 0 ? ` • Расходы из кассы: -${formatTjs(expensesCash)}` : ''}
+                        {` • Фактически в кассе: ${formatTjs(cashInReg)}`}
+                      </p>
+                    </div>
+                  </div>
+                );
+              })()}
 
               {/* Day filter pills if multi-day */}
               {data.days && data.days.length > 1 && (
@@ -477,71 +568,159 @@ export const CashReconciliationModal: React.FC<CashReconciliationModalProps> = (
 
               {/* Sales Transactions List */}
               <div className="rounded-xl border border-border bg-surface divide-y divide-border/60 overflow-hidden text-xs">
-                {filteredSales.map((sale) => (
-                  <div
-                    key={sale.id}
-                    className="p-3 sm:p-3.5 hover:bg-surface-raised/40 transition-colors flex items-start justify-between gap-3"
-                  >
-                    <div className="min-w-0 space-y-1">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="font-bold text-fg">Чек #{sale.receiptNumber}</span>
-                        <span className="text-[10px] text-fg-subtle">
-                          {formatShortDate(sale.createdAt)}
-                        </span>
-                        <span className="text-[10px] px-1.5 py-0.2 rounded bg-surface-raised border border-border text-fg-subtle font-medium">
-                          {sale.sellerName}
-                        </span>
-                        {sale.status === 'REFUNDED' && (
-                          <span className="text-[10px] px-1.5 py-0.2 rounded bg-danger/10 text-danger border border-danger/20 font-semibold">
-                            Возврат
-                          </span>
-                        )}
-                      </div>
+                {filteredSales.map((sale) => {
+                  const cashPaid = sale.cashAmountTjs || 0;
+                  const cardPaid = sale.cardAmountTjs || 0;
+                  const paidAtSale = cashPaid + cardPaid;
+                  const currentDebt = sale.debtAmountTjs ?? 0;
+                  const initialDebt = Math.max(0, Math.round((sale.totalTjs - paidAtSale) * 100) / 100);
+                  const repaidLater = Math.max(0, Math.round((initialDebt - currentDebt) * 100) / 100);
+                  const hasDebtHistory = initialDebt > 0 || currentDebt > 0 || sale.paymentMethod === 'DEBT';
+                  const isPartial = currentDebt > 0 && paidAtSale > 0;
+                  const isFullDebt = currentDebt > 0 && paidAtSale === 0;
 
-                      {/* Sold Items */}
-                      <div className="flex items-center gap-1.5 flex-wrap pt-0.5">
-                        {sale.items.map((it) => (
-                          <span
-                            key={it.id}
-                            className={`text-[11px] px-1.5 py-0.5 rounded-md border flex items-center gap-1 ${
-                              it.isBonus
-                                ? 'bg-amber-500/10 border-amber-500/25 text-amber-600 dark:text-amber-400 font-medium'
-                                : 'bg-surface-raised border-border text-fg'
-                            }`}
-                          >
-                            {it.isBonus && <Gift className="w-3 h-3 shrink-0" />}
-                            <span>
-                              {it.brand} {it.model} {it.storage}
+                  return (
+                    <div
+                      key={sale.id}
+                      className="p-3 sm:p-3.5 hover:bg-surface-raised/40 transition-colors flex items-start justify-between gap-3"
+                    >
+                      <div className="min-w-0 space-y-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-bold text-fg">Чек #{sale.receiptNumber}</span>
+                          <span className="text-[10px] text-fg-subtle">
+                            {formatShortDate(sale.createdAt)}
+                          </span>
+                          <span className="text-[10px] px-1.5 py-0.2 rounded bg-surface-raised border border-border text-fg-subtle font-medium">
+                            {sale.sellerName}
+                          </span>
+                          {sale.status === 'REFUNDED' ? (
+                            <span className="text-[10px] px-1.5 py-0.2 rounded bg-danger/10 text-danger border border-danger/20 font-semibold">
+                              Возврат
                             </span>
-                          </span>
-                        ))}
+                          ) : isPartial ? (
+                            <span className="text-[10px] px-1.5 py-0.2 rounded bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/30 font-bold">
+                              Частично в долг
+                            </span>
+                          ) : isFullDebt ? (
+                            <span className="text-[10px] px-1.5 py-0.2 rounded bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/30 font-bold">
+                              В долг (100%)
+                            </span>
+                          ) : initialDebt > 0 && currentDebt === 0 ? (
+                            <span className="text-[10px] px-1.5 py-0.2 rounded bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30 font-bold">
+                              Долг погашен
+                            </span>
+                          ) : sale.paymentMethod === 'CARD' ? (
+                            <span className="text-[10px] px-1.5 py-0.2 rounded bg-blue-500/10 text-blue-700 dark:text-blue-300 border border-blue-500/20 font-medium">
+                              Банк
+                            </span>
+                          ) : sale.paymentMethod === 'MIXED' ? (
+                            <span className="text-[10px] px-1.5 py-0.2 rounded bg-purple-500/10 text-purple-700 dark:text-purple-300 border border-purple-500/20 font-medium">
+                              Смешанная
+                            </span>
+                          ) : (
+                            <span className="text-[10px] px-1.5 py-0.2 rounded bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20 font-medium">
+                              Наличные
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Sold Items */}
+                        <div className="flex items-center gap-1.5 flex-wrap pt-0.5">
+                          {sale.items.map((it) => (
+                            <span
+                              key={it.id}
+                              className={`text-[11px] px-1.5 py-0.5 rounded-md border flex items-center gap-1 ${
+                                it.isBonus
+                                  ? 'bg-amber-500/10 border-amber-500/25 text-amber-600 dark:text-amber-400 font-medium'
+                                  : 'bg-surface-raised border-border text-fg'
+                              }`}
+                            >
+                              {it.isBonus && <Gift className="w-3 h-3 shrink-0" />}
+                              <span>
+                                {it.brand} {it.model} {it.storage}
+                              </span>
+                            </span>
+                          ))}
+                        </div>
+
+                        {/* Customer */}
+                        {sale.customerName && (
+                          <p className="text-[11px] text-fg-subtle flex items-center gap-1">
+                            <span>Клиент:</span>
+                            <span className={`font-medium ${currentDebt > 0 ? 'text-fg font-semibold' : 'text-fg-subtle'}`}>
+                              {sale.customerName}
+                            </span>
+                            {currentDebt > 0 && (
+                              <span className="text-[10px] px-1 py-0.2 rounded bg-amber-500/10 text-amber-700 dark:text-amber-300 border border-amber-500/20 font-medium">
+                                должник
+                              </span>
+                            )}
+                          </p>
+                        )}
                       </div>
 
-                      {/* Customer */}
-                      {sale.customerName && (
-                        <p className="text-[10px] text-fg-subtle">Клиент: {sale.customerName}</p>
-                      )}
-                    </div>
+                      {/* Right: Total amount and explicit breakdown of actual money vs debt */}
+                      <div className="text-right shrink-0 space-y-1 tabular-nums">
+                        <div>
+                          <span className="text-[10px] text-fg-subtle uppercase tracking-wider mr-1">Чек:</span>
+                          <span className="font-bold font-mono text-sm sm:text-base text-fg">
+                            {formatTjs(sale.totalTjs)}
+                          </span>
+                        </div>
 
-                    <div className="text-right shrink-0 space-y-0.5 tabular-nums">
-                      <p className="font-bold font-mono text-sm text-fg">
-                        {formatTjs(sale.totalTjs)}
-                      </p>
-                      <div className="text-[10px] flex items-center justify-end gap-1.5 flex-wrap font-medium">
-                        {sale.cashAmountTjs > 0 && (
-                          <span className="text-emerald-600 dark:text-emerald-400 font-mono">
-                            Нал: {formatTjs(sale.cashAmountTjs)}
-                          </span>
-                        )}
-                        {sale.cardAmountTjs > 0 && (
-                          <span className="text-blue-600 dark:text-blue-400 font-mono">
-                            Банк: {formatTjs(sale.cardAmountTjs)}
-                          </span>
+                        {hasDebtHistory ? (
+                          <div className="flex flex-col items-end gap-1 text-[11px] font-mono">
+                            <div className="flex items-center gap-1.5 flex-wrap justify-end">
+                              {cashPaid > 0 && (
+                                <span className="text-emerald-800 dark:text-emerald-300 bg-emerald-500/15 border border-emerald-500/30 px-1.5 py-0.5 rounded font-semibold flex items-center gap-1">
+                                  <span className="text-[10px] font-sans text-emerald-900 dark:text-emerald-200">
+                                    {repaidLater > 0 ? 'При покупке нал:' : 'Факт. нал:'}
+                                  </span>
+                                  +{formatTjs(cashPaid)}
+                                </span>
+                              )}
+                              {cardPaid > 0 && (
+                                <span className="text-blue-800 dark:text-blue-300 bg-blue-500/15 border border-blue-500/30 px-1.5 py-0.5 rounded font-semibold flex items-center gap-1">
+                                  <span className="text-[10px] font-sans text-blue-900 dark:text-blue-200">Банк:</span>
+                                  +{formatTjs(cardPaid)}
+                                </span>
+                              )}
+                            </div>
+                            {repaidLater > 0 && (
+                              <span className="text-emerald-700 dark:text-emerald-300 bg-emerald-500/15 border border-emerald-500/30 px-1.5 py-0.5 rounded font-semibold flex items-center gap-1">
+                                <span className="text-[10px] font-sans text-emerald-900 dark:text-emerald-200">Погашено:</span>
+                                +{formatTjs(repaidLater)}
+                              </span>
+                            )}
+                            {currentDebt > 0 ? (
+                              <span className="text-amber-800 dark:text-amber-300 bg-amber-500/20 border border-amber-500/35 px-1.5 py-0.5 rounded font-bold flex items-center gap-1">
+                                <span className="text-[10px] font-sans text-amber-900 dark:text-amber-200">Остаток долга:</span>
+                                {formatTjs(currentDebt)}
+                              </span>
+                            ) : initialDebt > 0 ? (
+                              <span className="text-emerald-700 dark:text-emerald-300 bg-emerald-500/10 border border-emerald-500/25 px-1.5 py-0.5 rounded font-medium text-[10px]">
+                                Долг закрыт
+                              </span>
+                            ) : null}
+                          </div>
+                        ) : (
+                          <div className="text-[10px] flex items-center justify-end gap-1.5 flex-wrap font-medium">
+                            {sale.cashAmountTjs > 0 && (
+                              <span className="text-emerald-600 dark:text-emerald-400 font-mono">
+                                Нал: {formatTjs(sale.cashAmountTjs)}
+                              </span>
+                            )}
+                            {sale.cardAmountTjs > 0 && (
+                              <span className="text-blue-600 dark:text-blue-400 font-mono">
+                                Банк: {formatTjs(sale.cardAmountTjs)}
+                              </span>
+                            )}
+                          </div>
                         )}
                       </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
 
                 {filteredSales.length === 0 && (
                   <div className="p-8 text-center text-fg-subtle space-y-1">

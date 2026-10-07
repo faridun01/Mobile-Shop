@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   Search,
   X,
@@ -9,6 +9,7 @@ import {
   CheckCircle2,
   XCircle,
   ArrowLeftRight,
+  ArrowUpDown,
   Copy,
   Check,
   Warehouse,
@@ -52,13 +53,37 @@ export const TransferHistoryList: React.FC<TransferHistoryListProps> = ({
   onNavigateToCreate,
   onOpenInvoice,
 }) => {
+  const [historySort, setHistorySort] = useState<'NEWEST' | 'OLDEST' | 'ITEMS_DESC' | 'ITEMS_ASC'>('NEWEST');
+
+  const sortedTransfers = useMemo(() => {
+    return [...filteredTransfers].sort((a, b) => {
+      if (historySort === 'NEWEST') {
+        return new Date(b.requestedAt || 0).getTime() - new Date(a.requestedAt || 0).getTime();
+      }
+      if (historySort === 'OLDEST') {
+        return new Date(a.requestedAt || 0).getTime() - new Date(b.requestedAt || 0).getTime();
+      }
+      if (historySort === 'ITEMS_DESC') {
+        const countA = (a.deviceIds || []).length;
+        const countB = (b.deviceIds || []).length;
+        return countB - countA;
+      }
+      if (historySort === 'ITEMS_ASC') {
+        const countA = (a.deviceIds || []).length;
+        const countB = (b.deviceIds || []).length;
+        return countA - countB;
+      }
+      return 0;
+    });
+  }, [filteredTransfers, historySort]);
+
   return (
     <div className="flex-1 overflow-y-auto p-2.5 sm:p-4 lg:p-6 space-y-4 bg-bg flex flex-col max-w-4xl xl:max-w-5xl mx-auto w-full">
       {/* Header Toolbar: Search + Location Filter + Quick Status Tabs */}
       <div className="space-y-3 pb-2 border-b border-border/70 shrink-0">
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 flex-wrap">
           {/* Search Input */}
-          <div className="relative flex-1">
+          <div className="relative flex-1 min-w-[220px]">
             <Search className="w-4 h-4 text-fg-subtle absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
             <input
               type="text"
@@ -78,9 +103,9 @@ export const TransferHistoryList: React.FC<TransferHistoryListProps> = ({
             )}
           </div>
 
-          {/* Location Filter Dropdown (if central / multi-store) */}
-          {!isStoreScoped && isCentralMode && (
-            <div className="flex items-center gap-2 shrink-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            {/* Location Filter Dropdown (if central / multi-store) */}
+            {!isStoreScoped && isCentralMode && (
               <div className="relative flex items-center w-full sm:w-auto">
                 <Building2 className="w-3.5 h-3.5 text-accent absolute left-2.5 pointer-events-none" />
                 <select
@@ -97,8 +122,23 @@ export const TransferHistoryList: React.FC<TransferHistoryListProps> = ({
                 </select>
                 <ChevronDown className="w-3.5 h-3.5 text-fg-subtle absolute right-2 pointer-events-none" />
               </div>
+            )}
+
+            {/* Sorting Selector */}
+            <div className="flex items-center gap-1.5 bg-surface border border-border rounded-xl px-2.5 py-1.5 shrink-0">
+              <ArrowUpDown className="w-3.5 h-3.5 text-accent shrink-0" />
+              <select
+                value={historySort}
+                onChange={(e) => setHistorySort(e.target.value as any)}
+                className="bg-transparent text-xs font-semibold text-fg focus:outline-none cursor-pointer pr-1"
+              >
+                <option value="NEWEST">Сначала новые</option>
+                <option value="OLDEST">Сначала старые</option>
+                <option value="ITEMS_DESC">Количество (больше)</option>
+                <option value="ITEMS_ASC">Количество (меньше)</option>
+              </select>
             </div>
-          )}
+          </div>
         </div>
 
         {/* Status Filter Chips */}
@@ -216,7 +256,7 @@ export const TransferHistoryList: React.FC<TransferHistoryListProps> = ({
       ) : (
         /* Transfers List */
         <div className="space-y-3.5">
-          {filteredTransfers.map((tr: TransferRequest) => {
+          {sortedTransfers.map((tr: TransferRequest) => {
             const isExpanded = expandedTransferIds.has(tr.id);
             const deviceCount = (tr.deviceIds || []).length;
             const rawModels = tr.deviceModels || [];

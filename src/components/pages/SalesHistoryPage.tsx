@@ -899,30 +899,91 @@ export const SalesHistoryPage: React.FC = () => {
             )}
 
             <div className="bg-surface p-3.5 rounded-xl border border-border space-y-2 text-sm shadow-2xs">
-              <div className="flex justify-between items-center pb-1.5 border-b border-border/60">
-                <span className="text-fg-subtle text-xs font-semibold">Способ оплаты</span>
-                <span className="px-2 py-0.5 rounded-md bg-surface-raised border border-border text-xs font-bold text-fg">
-                  {selectedSale.paymentMethod === 'CASH' ? 'Наличные' : selectedSale.paymentMethod === 'CARD' ? 'Банк' : selectedSale.paymentMethod === 'DEBT' ? 'В долг' : 'Смешанная'}
-                </span>
-              </div>
-              {selectedSale.cashAmountTjs > 0 && (
-                <div className="flex justify-between text-xs">
-                  <span className="text-fg-subtle">Наличными</span>
-                  <span className="text-fg font-mono font-bold">{formatMoney(selectedSale.cashAmountTjs)} TJS</span>
-                </div>
-              )}
-              {selectedSale.cardAmountTjs > 0 && (
-                <div className="flex justify-between text-xs">
-                  <span className="text-fg-subtle">Банк</span>
-                  <span className="text-fg font-mono font-bold">{formatMoney(selectedSale.cardAmountTjs)} TJS</span>
-                </div>
-              )}
-              {(selectedSale.debtAmountTjs ?? 0) > 0 && (
-                <div className="flex justify-between text-xs pt-1 border-t border-border/60">
-                  <span className="text-danger font-semibold">Остаток долга</span>
-                  <span className="text-danger font-mono font-bold">{formatMoney(selectedSale.debtAmountTjs ?? 0)} TJS</span>
-                </div>
-              )}
+              {(() => {
+                const cashPaid = selectedSale.cashAmountTjs || 0;
+                const cardPaid = selectedSale.cardAmountTjs || 0;
+                const tradeInPaid = selectedSale.exchangeTradeInCreditTjs || 0;
+                const initialPaidAtSale = cashPaid + cardPaid + tradeInPaid;
+                const currentDebt = selectedSale.debtAmountTjs ?? 0;
+                const initialDebt = Math.max(0, Math.round((selectedSale.totalTjs - initialPaidAtSale) * 100) / 100);
+                const repaidLater = Math.max(0, Math.round((initialDebt - currentDebt) * 100) / 100);
+                const totalPaidSoFar = initialPaidAtSale + repaidLater;
+                const hasDebtHistory = initialDebt > 0 || currentDebt > 0 || selectedSale.paymentMethod === 'DEBT';
+
+                return (
+                  <>
+                    <div className="flex justify-between items-center pb-1.5 border-b border-border/60">
+                      <span className="text-fg-subtle text-xs font-semibold">Способ оплаты</span>
+                      <span className="px-2 py-0.5 rounded-md bg-surface-raised border border-border text-xs font-bold text-fg">
+                        {selectedSale.paymentMethod === 'CASH'
+                          ? 'Наличные'
+                          : selectedSale.paymentMethod === 'CARD'
+                          ? 'Банк'
+                          : selectedSale.paymentMethod === 'DEBT'
+                          ? initialPaidAtSale > 0
+                            ? 'Частично в долг'
+                            : 'В долг'
+                          : 'Смешанная'}
+                      </span>
+                    </div>
+
+                    {cashPaid > 0 && (
+                      <div className="flex justify-between text-xs">
+                        <span className="text-fg-subtle">
+                          {hasDebtHistory ? 'Наличными при покупке' : 'Наличными'}
+                        </span>
+                        <span className="text-fg font-mono font-bold">{formatMoney(cashPaid)} TJS</span>
+                      </div>
+                    )}
+
+                    {cardPaid > 0 && (
+                      <div className="flex justify-between text-xs">
+                        <span className="text-fg-subtle">
+                          {hasDebtHistory ? 'Банк при покупке' : 'Банк'}
+                        </span>
+                        <span className="text-fg font-mono font-bold">{formatMoney(cardPaid)} TJS</span>
+                      </div>
+                    )}
+
+                    {tradeInPaid > 0 && (
+                      <div className="flex justify-between text-xs">
+                        <span className="text-fg-subtle">Зачёт Trade-In</span>
+                        <span className="text-fg font-mono font-bold">{formatMoney(tradeInPaid)} TJS</span>
+                      </div>
+                    )}
+
+                    {repaidLater > 0 && (
+                      <div className="flex justify-between text-xs pt-1 border-t border-border/60">
+                        <span className="text-emerald-600 dark:text-emerald-400 font-semibold">
+                          Погашено по долгу позже
+                        </span>
+                        <span className="text-emerald-600 dark:text-emerald-400 font-mono font-bold">
+                          +{formatMoney(repaidLater)} TJS
+                        </span>
+                      </div>
+                    )}
+
+                    {hasDebtHistory && (initialPaidAtSale > 0 || repaidLater > 0) && (
+                      <div className="flex justify-between text-xs text-fg-subtle">
+                        <span>Всего фактически оплачено</span>
+                        <span className="font-mono font-semibold text-fg">{formatMoney(totalPaidSoFar)} TJS</span>
+                      </div>
+                    )}
+
+                    {currentDebt > 0 ? (
+                      <div className="flex justify-between text-xs pt-1 border-t border-border/60">
+                        <span className="text-danger font-semibold">Остаток долга</span>
+                        <span className="text-danger font-mono font-bold">{formatMoney(currentDebt)} TJS</span>
+                      </div>
+                    ) : hasDebtHistory && initialDebt > 0 ? (
+                      <div className="flex justify-between text-xs pt-1 border-t border-border/60">
+                        <span className="text-emerald-600 dark:text-emerald-400 font-semibold">Долг полностью погашен</span>
+                        <span className="text-emerald-600 dark:text-emerald-400 font-mono font-bold">0.00 TJS</span>
+                      </div>
+                    ) : null}
+                  </>
+                );
+              })()}
               <div className="flex justify-between items-center pt-2 border-t border-border">
                 <span className="text-xs font-bold uppercase tracking-wider text-fg-subtle">Итого</span>
                 <span className="text-base sm:text-lg font-black font-mono text-accent">

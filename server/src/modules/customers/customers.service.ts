@@ -5,6 +5,7 @@ import { requirePositiveMoney, roundMoney } from '../../common/money';
 import { getStoreCashAccount } from '../finance/account.service';
 import { postTransaction } from '../finance/financial-transaction.service';
 import { PushNotificationService } from '../notifications/push.service';
+import { Prisma } from '@prisma/client';
 
 export interface CustomerFilter {
   search?: string;
@@ -73,7 +74,7 @@ export class CustomersService {
 
     const [debtorsCount, pushSubscribedCount] = await Promise.all([
       prisma.customer.count({ where: { totalDebtTjs: { gt: 0 } } }),
-      prisma.customer.count({ where: { pushSubscription: { not: null as any } } }),
+      prisma.customer.count({ where: { pushSubscription: { not: Prisma.DbNull } } }),
     ]);
 
     return {
@@ -390,7 +391,7 @@ export class CustomersService {
 
     const where: any = {
       pushEnabled: true,
-      pushSubscription: { not: null as any },
+      pushSubscription: { not: Prisma.DbNull },
     };
 
     if (target === 'CUSTOMER') {

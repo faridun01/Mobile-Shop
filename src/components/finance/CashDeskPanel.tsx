@@ -40,8 +40,6 @@ export const CashDeskPanel: React.FC<CashDeskPanelProps> = ({ storeId }) => {
   // Search filters
   const [customerSearch, setCustomerSearch] = useState('');
   const [supplierSearch, setSupplierSearch] = useState('');
-  const [inventorySearch, setInventorySearch] = useState('');
-  const [inventoryViewMode, setInventoryViewMode] = useState<'models' | 'items'>('models');
 
   // Customer debt repayment modal state
   const [paymentCustomer, setPaymentCustomer] = useState<{ id: string; name: string; totalDebtTjs: number } | null>(null);
@@ -110,36 +108,6 @@ export const CashDeskPanel: React.FC<CashDeskPanelProps> = ({ storeId }) => {
     );
   }, [data?.suppliers?.suppliers, supplierSearch]);
 
-  // Filter inventory models by search
-  const filteredModels = useMemo(() => {
-    const list = data?.inventory?.models || [];
-    if (!inventorySearch.trim()) return list;
-    const q = inventorySearch.toLowerCase().trim();
-    return list.filter(
-      (m) =>
-        m.brand.toLowerCase().includes(q) ||
-        m.model.toLowerCase().includes(q) ||
-        (m.color && m.color.toLowerCase().includes(q)) ||
-        (m.storage && m.storage.toLowerCase().includes(q)) ||
-        m.stores.some((st) => st.storeName.toLowerCase().includes(q))
-    );
-  }, [data?.inventory?.models, inventorySearch]);
-
-  // Filter inventory items by search
-  const filteredItems = useMemo(() => {
-    const list = data?.inventory?.items || [];
-    if (!inventorySearch.trim()) return list;
-    const q = inventorySearch.toLowerCase().trim();
-    return list.filter(
-      (item) =>
-        item.brand.toLowerCase().includes(q) ||
-        item.model.toLowerCase().includes(q) ||
-        (item.color && item.color.toLowerCase().includes(q)) ||
-        (item.storage && item.storage.toLowerCase().includes(q)) ||
-        item.imei.toLowerCase().includes(q) ||
-        item.storeName.toLowerCase().includes(q)
-    );
-  }, [data?.inventory?.items, inventorySearch]);
 
   // Open customer payment modal
   const handleOpenPaymentModal = (c: any) => {
@@ -251,304 +219,166 @@ export const CashDeskPanel: React.FC<CashDeskPanelProps> = ({ storeId }) => {
         </div>
       )}
 
-      {/* 1. TOP METRICS GRID: КАССА (НАЛИЧНЫЕ) И ТОВАРЫ ПО СЕБЕСТОИМОСТИ */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      {/* 1. TOP METRICS GRID: КАССА, ТОВАРЫ ПО СЕБЕСТОИМОСТИ, ДОЛЖНИКИ, ПОСТАВЩИКИ */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
         {/* КАРТОЧКА 1: ДЕНЬГИ В КАССЕ */}
-        <div className="p-4 sm:p-5 rounded-2xl bg-surface border border-border shadow-xs flex flex-col justify-between gap-4">
-          <div className="flex items-start justify-between gap-3">
-            <div className="flex items-center gap-3.5">
-              <div className="w-12 h-12 rounded-2xl bg-emerald-500/15 border border-emerald-500/25 flex items-center justify-center text-emerald-600 dark:text-emerald-400 shrink-0">
-                <Banknote className="w-6 h-6" />
+        <div className="p-4 rounded-2xl bg-surface border border-border shadow-2xs flex flex-col justify-between gap-3">
+          <div className="flex items-start justify-between gap-2">
+            <div className="flex items-center gap-2.5">
+              <div className="w-10 h-10 rounded-xl bg-emerald-500/15 border border-emerald-500/25 flex items-center justify-center text-emerald-600 dark:text-emerald-400 shrink-0">
+                <Banknote className="w-5 h-5" />
               </div>
-              <div>
-                <span className="text-[11px] font-bold uppercase tracking-wider text-fg-subtle block">
+              <div className="min-w-0">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-fg-subtle block truncate">
                   Деньги в кассе
                 </span>
-                <div className="text-2xl sm:text-3xl font-black font-mono text-emerald-600 dark:text-emerald-400 mt-0.5">
+                <div className="text-xl sm:text-2xl font-black font-mono text-emerald-600 dark:text-emerald-400 mt-0.5 truncate">
                   {formatMoney(data?.cash.totalTjs || 0)} TJS
                 </div>
-                <span className="text-xs font-semibold text-fg-subtle font-mono mt-0.5 block">
+                <span className="text-[11px] font-semibold text-fg-subtle font-mono block truncate">
                   ≈ ${formatMoney(data?.cash.totalUsd || 0)} USD
                 </span>
               </div>
             </div>
-
             <button
               type="button"
               onClick={() => navigate('/cash-collection')}
-              className="px-3 py-1.5 rounded-xl bg-accent/10 border border-accent/20 text-accent hover:bg-accent/20 text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer shrink-0"
+              className="p-1.5 rounded-lg bg-accent/10 border border-accent/20 text-accent hover:bg-accent/20 transition-colors cursor-pointer shrink-0"
               title="Перейти к инкассации"
             >
               <HandCoins className="w-4 h-4" />
-              <span>Инкассация →</span>
             </button>
           </div>
-          <div className="text-[11px] text-fg-subtle flex items-center gap-1.5">
-            <StoreIcon className="w-3.5 h-3.5 text-accent shrink-0" />
-            <span>
-              {isCentral
-                ? 'Наличные в кассах (общий баланс сети)'
-                : `Наличные в кассе «${currentStoreName}»`}
+          <div className="text-[10px] text-fg-subtle flex items-center gap-1.5 pt-1.5 border-t border-border/50 truncate">
+            <StoreIcon className="w-3 h-3 text-accent shrink-0" />
+            <span className="truncate">
+              {isCentral ? 'Общий баланс касс сети' : `Касса «${currentStoreName}»`}
             </span>
           </div>
         </div>
 
         {/* КАРТОЧКА 2: ТОВАРЫ ПО СЕБЕСТОИМОСТИ */}
-        <div className="p-4 sm:p-5 rounded-2xl bg-surface border border-border shadow-xs flex flex-col justify-between gap-4">
-          <div className="flex items-start justify-between gap-3">
-            <div className="flex items-center gap-3.5">
-              <div className="w-12 h-12 rounded-2xl bg-indigo-500/15 border border-indigo-500/25 flex items-center justify-center text-indigo-600 dark:text-indigo-400 shrink-0">
-                <Package className="w-6 h-6" />
+        <div className="p-4 rounded-2xl bg-surface border border-border shadow-2xs flex flex-col justify-between gap-3">
+          <div className="flex items-start justify-between gap-2">
+            <div className="flex items-center gap-2.5">
+              <div className="w-10 h-10 rounded-xl bg-indigo-500/15 border border-indigo-500/25 flex items-center justify-center text-indigo-600 dark:text-indigo-400 shrink-0">
+                <Package className="w-5 h-5" />
               </div>
-              <div>
-                <div className="flex items-center gap-2">
-                  <span className="text-[11px] font-bold uppercase tracking-wider text-fg-subtle block">
+              <div className="min-w-0">
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-fg-subtle block truncate">
                     Товары по себестоимости
                   </span>
-                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20">
+                  <span className="text-[9px] font-bold px-1.5 py-0.2 rounded-full bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20 font-mono">
                     {data?.inventory.totalCount || 0} шт.
                   </span>
                 </div>
-                <div className="text-2xl sm:text-3xl font-black font-mono text-indigo-600 dark:text-indigo-400 mt-0.5">
+                <div className="text-xl sm:text-2xl font-black font-mono text-indigo-600 dark:text-indigo-400 mt-0.5 truncate">
                   ${formatMoney(data?.inventory.totalCostUsd || 0)} USD
                 </div>
-                <span className="text-xs font-semibold text-fg-subtle font-mono mt-0.5 block">
+                <span className="text-[11px] font-semibold text-fg-subtle font-mono block truncate">
                   ≈ {formatMoney(data?.inventory.totalCostTjs || 0)} TJS
                 </span>
               </div>
             </div>
-
             <button
               type="button"
               onClick={() => navigate('/inventory')}
-              className="px-3 py-1.5 rounded-xl bg-surface-raised border border-border hover:bg-surface text-fg text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer shrink-0"
+              className="p-1.5 rounded-lg bg-surface-raised border border-border hover:bg-surface text-fg transition-colors cursor-pointer shrink-0"
               title="Перейти на склад"
             >
               <ArrowUpRight className="w-4 h-4 text-accent" />
-              <span>Склад →</span>
             </button>
           </div>
-          <div className="text-[11px] text-fg-subtle flex items-center gap-1.5">
-            <Boxes className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
-            <span>
-              {isCentral
-                ? 'Общий остаток всех товаров (все магазины и склад)'
-                : `Товары в наличии магазина «${currentStoreName}»`}
+          <div className="text-[10px] text-fg-subtle flex items-center gap-1.5 pt-1.5 border-t border-border/50 truncate">
+            <Boxes className="w-3 h-3 text-indigo-500 shrink-0" />
+            <span className="truncate">
+              {isCentral ? 'Общий остаток склада и магазинов' : `Остаток «${currentStoreName}»`}
             </span>
           </div>
         </div>
-      </div>
 
-      {/* 2. СЕКЦИЯ: ДЕТАЛИЗАЦИЯ ТОВАРОВ ПО СЕБЕСТОИМОСТИ */}
-      <div className="p-4 sm:p-5 rounded-2xl bg-surface border border-border shadow-xs flex flex-col space-y-3">
-        {/* Header & Controls */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-border">
-          <div>
-            <div className="flex items-center gap-2">
-              <Package className="w-4 h-4 text-indigo-500" />
-              <h2 className="text-sm font-bold text-fg">
-                {isCentral
-                  ? 'Все товары по себестоимости (общий остаток сети)'
-                  : `Товары в наличии: ${currentStoreName} (по себестоимости)`}
-              </h2>
-              <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20">
-                {data?.inventory.totalCount || 0} шт.
-              </span>
+        {/* КАРТОЧКА 3: ДОЛГИ КЛИЕНТОВ */}
+        <div className="p-4 rounded-2xl bg-surface border border-border shadow-2xs flex flex-col justify-between gap-3">
+          <div className="flex items-start justify-between gap-2">
+            <div className="flex items-center gap-2.5">
+              <div className="w-10 h-10 rounded-xl bg-amber-500/15 border border-amber-500/25 flex items-center justify-center text-amber-600 dark:text-amber-400 shrink-0">
+                <Users className="w-5 h-5" />
+              </div>
+              <div className="min-w-0">
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-fg-subtle block truncate">
+                    Долги клиентов
+                  </span>
+                  <span className="text-[9px] font-bold px-1.5 py-0.2 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 font-mono">
+                    {data?.customers.debtorsCount || 0}
+                  </span>
+                </div>
+                <div className="text-xl sm:text-2xl font-black font-mono text-amber-600 dark:text-amber-400 mt-0.5 truncate">
+                  {formatMoney(data?.customers.totalDebtTjs || 0)} TJS
+                </div>
+                <span className="text-[11px] font-semibold text-fg-subtle font-mono block truncate">
+                  ≈ ${formatMoney(data?.customers.totalDebtUsd || 0)} USD
+                </span>
+              </div>
             </div>
-            <div className="flex items-baseline gap-2 mt-0.5">
-              <span className="text-xs font-semibold text-fg-subtle">Общая себестоимость:</span>
-              <span className="text-sm font-black font-mono text-indigo-600 dark:text-indigo-400">
-                ${formatMoney(data?.inventory.totalCostUsd || 0)} USD
-              </span>
-              <span className="text-xs text-fg-subtle font-mono">
-                (≈ {formatMoney(data?.inventory.totalCostTjs || 0)} TJS)
-              </span>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2 flex-wrap">
-            {/* View Mode Toggle: Models vs Individual Items */}
-            <div className="flex items-center bg-surface-raised border border-border rounded-xl p-0.5 text-xs font-semibold">
-              <button
-                type="button"
-                onClick={() => setInventoryViewMode('models')}
-                className={`px-2.5 py-1 rounded-lg transition-colors cursor-pointer ${
-                  inventoryViewMode === 'models'
-                    ? 'bg-accent text-accent-fg shadow-2xs font-bold'
-                    : 'text-fg-subtle hover:text-fg'
-                }`}
-              >
-                По моделям ({data?.inventory.models?.length || 0})
-              </button>
-              <button
-                type="button"
-                onClick={() => setInventoryViewMode('items')}
-                className={`px-2.5 py-1 rounded-lg transition-colors cursor-pointer ${
-                  inventoryViewMode === 'items'
-                    ? 'bg-accent text-accent-fg shadow-2xs font-bold'
-                    : 'text-fg-subtle hover:text-fg'
-                }`}
-              >
-                Поштучно ({data?.inventory.totalCount || 0})
-              </button>
-            </div>
-
-            {/* Search */}
-            <div className="relative w-full sm:w-48">
-              <Search className="w-3.5 h-3.5 text-fg-subtle absolute left-2.5 top-2.5" />
-              <input
-                type="text"
-                placeholder="Поиск товара..."
-                value={inventorySearch}
-                onChange={(e) => setInventorySearch(e.target.value)}
-                className="w-full h-8 bg-surface-raised border border-border rounded-xl pl-8 pr-3 text-xs text-fg focus:outline-none focus:border-accent"
-              />
-            </div>
-
             <button
               type="button"
-              onClick={() => navigate('/inventory')}
-              className="text-xs font-bold text-accent hover:underline flex items-center gap-0.5 shrink-0 cursor-pointer"
-              title="Перейти к полному управлению складом"
+              onClick={() => navigate('/customers')}
+              className="p-1.5 rounded-lg bg-surface-raised border border-border hover:bg-surface text-fg transition-colors cursor-pointer shrink-0"
+              title="Перейти к клиентам"
             >
-              <span>Склад</span>
-              <ArrowUpRight className="w-3.5 h-3.5" />
+              <ArrowUpRight className="w-4 h-4 text-accent" />
             </button>
+          </div>
+          <div className="text-[10px] text-fg-subtle flex items-center gap-1.5 pt-1.5 border-t border-border/50 truncate">
+            <Users className="w-3 h-3 text-amber-500 shrink-0" />
+            <span className="truncate">
+              {data?.customers.debtorsCount || 0} клиентов с долгом
+            </span>
           </div>
         </div>
 
-        {/* Inventory Content */}
-        {inventoryViewMode === 'models' ? (
-          <div className="overflow-x-auto max-h-96 overflow-y-auto">
-            {filteredModels.length === 0 ? (
-              <div className="py-8 text-center text-xs text-fg-subtle">
-                {inventorySearch ? 'Товары по запросу не найдены' : 'Товаров в наличии нет'}
+        {/* КАРТОЧКА 4: ДОЛГИ ПОСТАВЩИКАМ */}
+        <div className="p-4 rounded-2xl bg-surface border border-border shadow-2xs flex flex-col justify-between gap-3">
+          <div className="flex items-start justify-between gap-2">
+            <div className="flex items-center gap-2.5">
+              <div className="w-10 h-10 rounded-xl bg-danger/15 border border-danger/25 flex items-center justify-center text-danger shrink-0">
+                <Truck className="w-5 h-5" />
               </div>
-            ) : (
-              <table className="w-full text-left border-collapse text-xs">
-                <thead>
-                  <tr className="border-b border-border bg-surface-raised/40 text-fg-subtle text-[11px] uppercase tracking-wider font-semibold">
-                    <th className="py-2.5 px-3">Модель / Бренд</th>
-                    {isCentral && <th className="py-2.5 px-3">Магазины / Склад</th>}
-                    <th className="py-2.5 px-3 text-center">Кол-во</th>
-                    <th className="py-2.5 px-3 text-right">Себестоимость / шт.</th>
-                    <th className="py-2.5 px-3 text-right">Итого себестоимость</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border/60">
-                  {filteredModels.map((m) => (
-                    <tr
-                      key={m.key}
-                      className="hover:bg-surface-raised/30 transition-colors"
-                    >
-                      <td className="py-2.5 px-3">
-                        <div className="font-bold text-fg">
-                          {m.brand} {m.model}
-                        </div>
-                        <div className="flex items-center gap-1.5 text-[11px] text-fg-subtle mt-0.5">
-                          {m.storage && <span className="px-1.5 py-0.2 rounded bg-surface-raised border border-border">{m.storage}</span>}
-                          {m.color && <span className="px-1.5 py-0.2 rounded bg-surface-raised border border-border">{m.color}</span>}
-                        </div>
-                      </td>
-                      {isCentral && (
-                        <td className="py-2.5 px-3">
-                          <div className="flex flex-wrap gap-1">
-                            {m.stores.map((st) => (
-                              <span
-                                key={st.storeId}
-                                className="text-[10px] px-1.5 py-0.5 rounded bg-surface-raised border border-border text-fg-subtle font-medium"
-                              >
-                                {st.storeName}: <strong className="text-fg">{st.count}</strong>
-                              </span>
-                            ))}
-                          </div>
-                        </td>
-                      )}
-                      <td className="py-2.5 px-3 text-center font-bold text-fg">
-                        <span className="inline-block px-2 py-0.5 rounded-full bg-surface-raised border border-border text-xs">
-                          {m.count} шт.
-                        </span>
-                      </td>
-                      <td className="py-2.5 px-3 text-right font-mono">
-                        <div className="font-bold text-fg">${formatMoney(m.avgCostUsd)}</div>
-                        <div className="text-[10px] text-fg-subtle">
-                          ≈ {formatMoney(m.count > 0 ? m.totalCostTjs / m.count : 0)} TJS
-                        </div>
-                      </td>
-                      <td className="py-2.5 px-3 text-right font-mono">
-                        <div className="font-black text-indigo-600 dark:text-indigo-400 text-sm">
-                          ${formatMoney(m.totalCostUsd)}
-                        </div>
-                        <div className="text-[10px] text-fg-subtle">
-                          ≈ {formatMoney(m.totalCostTjs)} TJS
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-          </div>
-        ) : (
-          <div className="overflow-x-auto max-h-96 overflow-y-auto">
-            {filteredItems.length === 0 ? (
-              <div className="py-8 text-center text-xs text-fg-subtle">
-                {inventorySearch ? 'Товары по запросу не найдены' : 'Товаров в наличии нет'}
+              <div className="min-w-0">
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-fg-subtle block truncate">
+                    Долг поставщикам
+                  </span>
+                  <span className="text-[9px] font-bold px-1.5 py-0.2 rounded-full bg-danger/10 text-danger border border-danger/20 font-mono">
+                    {data?.suppliers.debtorsCount || 0}
+                  </span>
+                </div>
+                <div className="text-xl sm:text-2xl font-black font-mono text-danger mt-0.5 truncate">
+                  ${formatMoney(data?.suppliers.totalDebtUsd || 0)} USD
+                </div>
+                <span className="text-[11px] font-semibold text-fg-subtle font-mono block truncate">
+                  ≈ {formatMoney(data?.suppliers.totalDebtTjs || 0)} TJS
+                </span>
               </div>
-            ) : (
-              <table className="w-full text-left border-collapse text-xs">
-                <thead>
-                  <tr className="border-b border-border bg-surface-raised/40 text-fg-subtle text-[11px] uppercase tracking-wider font-semibold">
-                    <th className="py-2.5 px-3">Товар</th>
-                    <th className="py-2.5 px-3">IMEI</th>
-                    {isCentral && <th className="py-2.5 px-3">Магазин / Точка</th>}
-                    <th className="py-2.5 px-3 text-right">Себестоимость</th>
-                    <th className="py-2.5 px-3 text-right">Розница (TJS)</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border/60">
-                  {filteredItems.map((item) => (
-                    <tr
-                      key={item.id}
-                      className="hover:bg-surface-raised/30 transition-colors"
-                    >
-                      <td className="py-2.5 px-3">
-                        <div className="font-bold text-fg">
-                          {item.brand} {item.model}
-                        </div>
-                        <div className="text-[11px] text-fg-subtle">
-                          {[item.storage, item.color].filter(Boolean).join(' · ')}
-                        </div>
-                      </td>
-                      <td className="py-2.5 px-3 font-mono text-[11px] text-fg-subtle">
-                        {item.imei}
-                      </td>
-                      {isCentral && (
-                        <td className="py-2.5 px-3">
-                          <span className="text-[11px] font-medium text-fg-subtle flex items-center gap-1">
-                            <StoreIcon className="w-3 h-3 text-accent shrink-0" />
-                            <span>{item.storeName}</span>
-                          </span>
-                        </td>
-                      )}
-                      <td className="py-2.5 px-3 text-right font-mono">
-                        <div className="font-bold text-indigo-600 dark:text-indigo-400">
-                          ${formatMoney(item.costBasisUsd)}
-                        </div>
-                        <div className="text-[10px] text-fg-subtle">
-                          ≈ {formatMoney(item.costBasisTjs)} TJS
-                        </div>
-                      </td>
-                      <td className="py-2.5 px-3 text-right font-mono font-medium text-fg">
-                        {formatMoney(item.retailPriceTjs)} TJS
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
+            </div>
+            <button
+              type="button"
+              onClick={() => navigate('/suppliers')}
+              className="p-1.5 rounded-lg bg-surface-raised border border-border hover:bg-surface text-fg transition-colors cursor-pointer shrink-0"
+              title="Перейти к поставщикам"
+            >
+              <ArrowUpRight className="w-4 h-4 text-accent" />
+            </button>
           </div>
-        )}
+          <div className="text-[10px] text-fg-subtle flex items-center gap-1.5 pt-1.5 border-t border-border/50 truncate">
+            <Truck className="w-3 h-3 text-danger shrink-0" />
+            <span className="truncate">
+              {data?.suppliers.debtorsCount || 0} поставщиков с долгом
+            </span>
+          </div>
+        </div>
       </div>
 
       {/* 3. ДОЛЖНИКИ И ПОСТАВЩИКИ (В ДВЕ КОЛОНКИ НА БОЛЬШИХ ЭКРАНАХ) */}

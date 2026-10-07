@@ -18,6 +18,7 @@ import { TransferHistoryList } from '../transfer/TransferHistoryList';
 import { ConfirmTransferModal } from '../transfer/ConfirmTransferModal';
 import { RejectTransferModal } from '../transfer/RejectTransferModal';
 import { TransferInvoiceModal } from '../transfer/TransferInvoiceModal';
+import { TransferDeviceSortOption } from '../transfer/types';
 
 export const TransferPage: React.FC = () => {
   const {
@@ -61,6 +62,9 @@ export const TransferPage: React.FC = () => {
   const [toLocationId, setToLocationId] = useState<string>(defaultToId);
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [selectedDeviceIds, setSelectedDeviceIds] = useState<string[]>([]);
+  const [deviceSortBy, setDeviceSortBy] = useState<TransferDeviceSortOption>('SELECTED_FIRST');
+  const [selectedBrand, setSelectedBrand] = useState<string>('ALL');
+  const [onlySelected, setOnlySelected] = useState<boolean>(false);
 
   // Automatically sync fromLocationId when stores or currentUser load
   useEffect(() => {
@@ -161,25 +165,98 @@ export const TransferPage: React.FC = () => {
     ? (toStore.isMainWarehouse ? `Центральный склад (${formatStoreName(toStore.name)})` : formatStoreName(toStore.name))
     : 'Не выбран';
 
-  const availableDevicesAtFromLocation = useMemo(() => {
+  const rawAvailableAtLocation = useMemo(() => {
     return devices.filter(d => {
       if (d.locationId !== fromLocationId) return false;
-      const isAvailable = d.status === 'STORE_STOCK' || d.status === 'MAIN_WAREHOUSE' || d.status === 'IN_STOCK_AFTER_EXCHANGE';
-      if (!isAvailable) return false;
-
-      if (searchQuery.trim()) {
-        const q = searchQuery.toLowerCase().trim();
-        const matches =
-          d.imei.toLowerCase().includes(q) ||
-          (d.imei2 && d.imei2.toLowerCase().includes(q)) ||
-          d.brand.toLowerCase().includes(q) ||
-          d.model.toLowerCase().includes(q) ||
-          d.color.toLowerCase().includes(q);
-        if (!matches) return false;
-      }
-      return true;
+      return d.status === 'STORE_STOCK' || d.status === 'MAIN_WAREHOUSE' || d.status === 'IN_STOCK_AFTER_EXCHANGE';
     });
-  }, [devices, fromLocationId, searchQuery]);
+  }, [devices, fromLocationId]);
+
+  const availableBrands = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const d of rawAvailableAtLocation) {
+      if (d.brand) {
+        counts.set(d.brand, (counts.get(d.brand) || 0) + 1);
+      }
+    }
+    return Array.from(counts.entries())
+      .map(([brand, count]) => ({ brand, count }))
+      .sort((a, b) => b.count - a.count || a.brand.localeCompare(b.brand));
+  }, [rawAvailableAtLocation]);
+
+  const availableDevicesAtFromLocation = useMemo(() => {
+    let list = rawAvailableAtLocation;
+
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase().trim();
+      list = list.filter(d =>
+        d.imei.toLowerCase().includes(q) ||
+        (d.imei2 && d.imei2.toLowerCase().includes(q)) ||
+        d.brand.toLowerCase().includes(q) ||
+        d.model.toLowerCase().includes(q) ||
+        d.color.toLowerCase().includes(q)
+      );
+    }
+
+    if (selectedBrand !== 'ALL') {
+      list = list.filter(d => d.brand === selectedBrand);
+    }
+
+    if (onlySelected) {
+      list = list.filter(d => selectedDeviceIds.includes(d.id));
+    }
+
+    return [...list].sort((a, b) => {
+      const aSelected = selectedDeviceIds.includes(a.id);
+      const bSelected = selectedDeviceIds.includes(b.id);
+
+      if (deviceSortBy === 'SELECTED_FIRST') {
+        if (aSelected && !bSelected) return -1;
+        if (!aSelected && bSelected) return 1;
+        const nameA = `${a.brand} ${a.model}`.toLowerCase();
+        const nameB = `${b.brand} ${b.model}`.toLowerCase();
+        return nameA.localeCompare(nameB);
+      }
+
+      if (deviceSortBy === 'NAME_ASC') {
+        const nameA = `${a.brand} ${a.model}`.toLowerCase();
+        const nameB = `${b.brand} ${b.model}`.toLowerCase();
+        return nameA.localeCompare(nameB);
+      }
+
+      if (deviceSortBy === 'NAME_DESC') {
+        const nameA = `${a.brand} ${a.model}`.toLowerCase();
+        const nameB = `${b.brand} ${b.model}`.toLowerCase();
+        return nameB.localeCompare(nameA);
+      }
+
+      if (deviceSortBy === 'NEWEST') {
+        const timeA = new Date(a.createdAt || a.receivedDate || 0).getTime();
+        const timeB = new Date(b.createdAt || b.receivedDate || 0).getTime();
+        return timeB - timeA;
+      }
+
+      if (deviceSortBy === 'OLDEST') {
+        const timeA = new Date(a.createdAt || a.receivedDate || 0).getTime();
+        const timeB = new Date(b.createdAt || b.receivedDate || 0).getTime();
+        return timeA - timeB;
+      }
+
+      if (deviceSortBy === 'PRICE_DESC') {
+        const priceA = a.retailPriceTjs ?? 0;
+        const priceB = b.retailPriceTjs ?? 0;
+        return priceB - priceA;
+      }
+
+      if (deviceSortBy === 'PRICE_ASC') {
+        const priceA = a.retailPriceTjs ?? 0;
+        const priceB = b.retailPriceTjs ?? 0;
+        return priceA - priceB;
+      }
+
+      return 0;
+    });
+  }, [rawAvailableAtLocation, searchQuery, selectedBrand, onlySelected, deviceSortBy, selectedDeviceIds]);
 
   const selectedDevices = useMemo(() => {
     return devices.filter(d => selectedDeviceIds.includes(d.id));
@@ -193,11 +270,12 @@ export const TransferPage: React.FC = () => {
 
   const handleSelectAllFiltered = () => {
     const allFilteredIds = availableDevicesAtFromLocation.map(d => d.id);
-    setSelectedDeviceIds(allFilteredIds);
+    setSelectedDeviceIds(prev => Array.from(new Set([...prev, ...allFilteredIds])));
   };
 
   const handleClearSelection = () => {
     setSelectedDeviceIds([]);
+    setOnlySelected(false);
   };
 
   /** Camera scan or Enter from a USB/Bluetooth scanner: select the phone or say why not. */
@@ -435,12 +513,15 @@ export const TransferPage: React.FC = () => {
                 setFromLocationId(id);
                 setSelectedDeviceIds([]);
                 setToLocationId('');
+                setSelectedBrand('ALL');
+                setOnlySelected(false);
               }}
               onDestinationChange={(id) => setToLocationId(id)}
             />
 
             <TransferDeviceGrid
               availableDevices={availableDevicesAtFromLocation}
+              totalAvailableCount={rawAvailableAtLocation.length}
               selectedDeviceIds={selectedDeviceIds}
               searchQuery={searchQuery}
               setSearchQuery={setSearchQuery}
@@ -451,6 +532,13 @@ export const TransferPage: React.FC = () => {
               onScanDevice={handleScanDevice}
               isInitialLoading={isInitialLoading}
               fromStoreName={fromStoreName}
+              sortBy={deviceSortBy}
+              setSortBy={setDeviceSortBy}
+              selectedBrand={selectedBrand}
+              setSelectedBrand={setSelectedBrand}
+              availableBrands={availableBrands}
+              onlySelected={onlySelected}
+              setOnlySelected={setOnlySelected}
             />
 
             <TransferBottomBar

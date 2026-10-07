@@ -298,6 +298,8 @@ export interface CashCollectionBreakdown {
     salesDebtTjs: string;
     expensesCount: number;
     expensesTotalTjs: string;
+    customerPaymentsCount: number;
+    customerPaymentsTotalTjs: string;
     refundedCount: number;
     refundedTotalTjs: string;
   };
@@ -399,6 +401,21 @@ export class CashCollectionService {
     let expensesTotalTjs = D(0);
     for (const e of expenses) {
       expensesTotalTjs = expensesTotalTjs.plus(e.amountTjs);
+    }
+
+    // Fetch customer debt repayments made in cash at this store since cutoff
+    const customerPayments = await prisma.customerPayment.findMany({
+      where: {
+        storeId,
+        sourceAccount: 'STORE_CASH',
+        ...(cutoff ? { createdAt: { gt: cutoff } } : {}),
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    let customerPaymentsTotalTjs = D(0);
+    for (const cp of customerPayments) {
+      customerPaymentsTotalTjs = customerPaymentsTotalTjs.plus(cp.amountTjs);
     }
 
     const now = new Date();
@@ -557,6 +574,8 @@ export class CashCollectionService {
         salesDebtTjs: salesDebtTjs.toString(),
         expensesCount: expenses.length,
         expensesTotalTjs: expensesTotalTjs.toString(),
+        customerPaymentsCount: customerPayments.length,
+        customerPaymentsTotalTjs: customerPaymentsTotalTjs.toString(),
         refundedCount,
         refundedTotalTjs: refundedTjs.toString(),
       },
