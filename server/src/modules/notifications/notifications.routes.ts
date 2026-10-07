@@ -2,6 +2,7 @@ import type { Express } from 'express';
 import { authenticateJwt, type AuthenticatedRequest } from '../../auth/auth.middleware';
 import { prisma } from '../../prisma/prisma.service';
 import { RealtimeSyncGateway } from '../../websocket/websocket.gateway';
+import { PushNotificationService } from './push.service';
 
 const notificationScope = (user: NonNullable<AuthenticatedRequest['user']>) => ({
   AND: [
@@ -97,6 +98,56 @@ export function registerNotificationRoutes(app: Express) {
       const notification = await prisma.notification.findUniqueOrThrow({ where: { id: req.params.id } });
       RealtimeSyncGateway.broadcast('NOTIFICATION_CREATED', { id: notification.id }, notification.targetRole ? { roles: [notification.targetRole] } : {});
       res.json(notification);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Get VAPID public key for frontend push subscription
+  app.get('/api/push/public-key', authenticateJwt, (_req, res) => {
+    res.json({ publicKey: PushNotificationService.getPublicKey() });
+  });
+
+  // Save push subscription for the logged-in user
+  app.post('/api/push/subscribe', authenticateJwt, async (req: AuthenticatedRequest, res, next) => {
+    try {
+      const user = req.user!;
+      const { subscription, userAgent } = req.body || {};
+      if (!subscription?.endpoint) {
+        res.status(400).json({ message: 'Push subscription payload is required' });
+        return;
+      }
+      await PushNotificationService.saveSubscription(user.userId, subscription, userAgent);
+      res.json({ success: true, message: 'Push-уведомления успешно подключены' });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Unsubscribe from push
+  app.post('/api/push/unsubscribe', authenticateJwt, async (req: AuthenticatedRequest, res, next) => {
+    try {
+      const { endpoint } = req.body || {};
+      if (endpoint) {
+        await PushNotificationService.removeSubscription(endpoint);
+      }
+      res.json({ success: true });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Test push notification delivery to current user
+  app.post('/api/push/test', authenticateJwt, async (req: AuthenticatedRequest, res, next) => {
+    try {
+      const user = req.user!;
+      await PushNotificationService.sendPushToUser(user.userId, {
+        title: 'Mobile Shop 📲',
+        message: 'Проверка связи: Push-уведомления на телефон работают отлично!',
+        targetRoute: '/notifications',
+        dedupeKey: `TEST_PUSH:${user.userId}:${Date.now()}`,
+      });
+      res.json({ success: true, message: 'Тестовое уведомление отправлено на телефон' });
     } catch (error) {
       next(error);
     }

@@ -401,7 +401,7 @@ export const BonusesFinancePanel: React.FC<BonusesFinancePanelProps> = ({ month,
               </div>
               <div className="min-w-0">
                 <div className="flex items-center gap-1.5 flex-wrap">
-                  <h4 className="text-xs sm:text-sm font-bold text-fg truncate">Квартальный пул бонусов</h4>
+                  <h4 className="text-xs sm:text-sm font-bold text-fg truncate">Пул бонусов за период</h4>
                   {poolPendingUsd > 0 ? (
                     <Badge tone="success" className="text-[10px] py-0 px-1.5">Ждёт закрытия</Badge>
                   ) : (
@@ -535,19 +535,21 @@ export const BonusesFinancePanel: React.FC<BonusesFinancePanelProps> = ({ month,
                 ) : (
                   !bonusPool?.history || bonusPool.history.length === 0 ? (
                     <div className="text-center py-6 text-xs text-fg-subtle">
-                      Кварталы бонусов ещё не закрывались.
+                      Периоды бонусов ещё не фиксировались.
                     </div>
                   ) : (
                     <div className="space-y-2">
                       {bonusPool.history.map((log) => {
                         const isDist = log.type === 'DISTRIBUTION';
+                        const isBusiness = log.type === 'BUSINESS_REINVEST';
+                        const isPayout = log.type === 'PROFIT_PAYOUT';
                         const allocs = Array.isArray(log.allocations) ? log.allocations : [];
                         return (
                           <div key={log.id} className="p-2.5 sm:p-3 rounded-xl border border-border bg-surface text-xs space-y-1.5">
                             <div className="flex items-center justify-between gap-2">
                               <div className="flex items-center gap-2">
-                                <Badge tone={isDist ? 'success' : 'neutral'} className="text-[10px] py-0 px-1.5">
-                                  {isDist ? 'Распределение (до правила)' : 'Закрытие квартала'}
+                                <Badge tone={isBusiness ? 'success' : isPayout ? 'info' : isDist ? 'success' : 'neutral'} className="text-[10px] py-0 px-1.5">
+                                  {isBusiness ? 'Внесено в бизнес' : isPayout ? 'Выдано как прибыль' : isDist ? 'Распределение' : 'Фиксация за месяц'}
                                 </Badge>
                                 <span className="font-bold text-fg">{log.periodName}</span>
                                 <span className="text-[11px] text-fg-subtle">
@@ -607,7 +609,7 @@ export const BonusesFinancePanel: React.FC<BonusesFinancePanelProps> = ({ month,
           </div>
           {isExplainerOpen && (
             <p className="text-fg-subtle text-[11px] leading-relaxed pt-1.5 border-t border-border/50">
-              Бонусы не являются операционным доходом магазина: <strong>денежные бонусы</strong> и прибыль от <strong>бонусных телефонов</strong> ($0 себестоимость) не входят в прибыль и учитываются на отдельном Бонусном счёте компании. Денежный бонус зачисляется при регистрации, прибыль с телефонов — при инкассации. Счётчики обнуляются при закрытии квартала на странице «Бонусы».
+              Бонусы не являются операционным доходом магазина: <strong>денежные бонусы</strong> и прибыль от <strong>бонусных телефонов</strong> ($0 себестоимость) не входят в прибыль и учитываются на отдельном Бонусном счёте компании. Денежный бонус зачисляется при регистрации, прибыль с телефонов — при инкассации. Счётчики обнуляются при закрытии периода на странице «Бонусы».
             </p>
           )}
         </div>

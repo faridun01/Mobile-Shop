@@ -99,7 +99,7 @@ export const LegacyBonusAccrualsCard: React.FC = () => {
               ))}
             </ul>
             {data.perOwner.some((o) => Number(o.availableAfterUsd) < 0) && (
-              <p className="text-xs text-danger">Отрицательный остаток означает, что эти бонусы уже были переведены в капитал при закрытии квартала.</p>
+              <p className="text-xs text-danger">Отрицательный остаток означает, что эти бонусы уже были переведены в капитал при закрытии периода.</p>
             )}
           </div>
         }

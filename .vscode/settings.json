@@ -3,5 +3,11 @@
   "tailwindCSS.experimental.configFile": null,
   // The database is PostgreSQL; the MSSQL extension flags valid Postgres syntax
   // (e.g. ALTER COLUMN ... TYPE ... USING) in prisma/migrations as T-SQL errors.
-  "mssql.intelliSense.enableErrorChecking": false
+  "mssql.intelliSense.enableErrorChecking": false,
+  // Treat GitHub Actions workflows as standard YAML to prevent false-positive
+  // "Unable to resolve action" errors when not authenticated with GitHub in the editor
+  "files.associations": {
+    "**/.github/workflows/*.yml": "yaml",
+    "**/.github/workflows/*.yaml": "yaml"
+  }
 }

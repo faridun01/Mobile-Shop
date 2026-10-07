@@ -105,10 +105,13 @@ interface AppContextType {
   // Business logic operations
   createSale: (params: {
     items: { device: Device; salePriceTjs: number }[];
-    paymentMethod: Exclude<PaymentMethod, 'DEBT'>;
+    paymentMethod: PaymentMethod;
     cashAmountTjs: number;
     cardAmountTjs: number;
     customerName?: string;
+    customerPhone?: string;
+    customerId?: string;
+    debtAmountTjs?: number;
   }) => Promise<{ success: boolean; receiptNumber?: number; message?: string }>;
 
   processExchange: (params: {
@@ -191,7 +194,7 @@ interface AppContextType {
   }) => Promise<{ success: boolean; message?: string }>;
   deleteSupplierBonus: (id: string) => Promise<{ success: boolean; message?: string }>;
 
-  createTransferRequest: (toLocationIdOrParams: string | { fromLocationId?: string; toLocationId: string; deviceIds: string[] }, deviceIds?: string[]) => Promise<{ success: boolean; message?: string }>;
+  createTransferRequest: (toLocationIdOrParams: string | { fromLocationId?: string; toLocationId: string; deviceIds: string[] }, deviceIds?: string[]) => Promise<{ success: boolean; message?: string; transfer?: TransferRequest }>;
   approveTransfer: (transferId: string) => Promise<{ success: boolean; message?: string }>;
   rejectTransfer: (transferId: string, reason: string) => Promise<{ success: boolean; message?: string }>;
 
@@ -940,7 +943,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // ---- Business operations: call the API, then resync from it ----
 
-  const createSale: AppContextType['createSale'] = async ({ items, paymentMethod, cashAmountTjs, cardAmountTjs, customerName }) => {
+  const createSale: AppContextType['createSale'] = async ({
+    items,
+    paymentMethod,
+    cashAmountTjs,
+    cardAmountTjs,
+    customerName,
+    customerPhone,
+    customerId,
+    debtAmountTjs,
+  }) => {
     // Trust the actual location of the devices in the cart over the (possibly stale,
     // shared-across-pages) selectedStoreId — e.g. an admin who last picked the main
     // warehouse on the Inventory page must not have that leak into a POS sale here.
@@ -958,7 +970,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           paymentMethod,
           cashAmountTjs,
           cardAmountTjs,
+          debtAmountTjs,
           customerName: customerName?.trim() || undefined,
+          customerPhone: customerPhone?.trim() || undefined,
+          customerId: customerId || undefined,
         }),
       });
       markLocalMutation(['sales', 'devices', 'stores', 'owners']);
@@ -1185,13 +1200,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
 
     try {
-      await apiClient('/transfers', {
+      const raw = await apiClient<any>('/transfers', {
         method: 'POST',
         body: JSON.stringify({ fromStoreId: fromLocId, toStoreId: toLocationId, deviceIds }),
       });
       markLocalMutation(['transfers', 'devices']);
       await refreshAfterMutation([fetchTransfers(), fetchDevices()]);
-      return { success: true };
+      const mapped = raw ? mapTransfer(raw, namesRef.current) : undefined;
+      return { success: true, transfer: mapped };
     } catch (err) {
       return { success: false, message: errorMessage(err, 'Не удалось создать перемещение') };
     }
@@ -1376,7 +1392,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       void refreshAfterMutation([fetchOwners(), fetchOwnerTransactions(), fetchStores()]);
       return { success: true };
     } catch (err) {
-      return { success: false, message: errorMessage(err, 'Нет прав') };
+      return { success: false, message: errorMessage(err, 'Не удалось провести внесение капитала') };
     }
   };
 
@@ -1388,7 +1404,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       void refreshAfterMutation([fetchOwners(), fetchOwnerTransactions(), fetchStores()]);
       return { success: true };
     } catch (err) {
-      return { success: false, message: errorMessage(err, 'Сумма изъятия превышает текущий капитал') };
+      return { success: false, message: errorMessage(err, 'Не удалось провести изъятие капитала') };
     }
   };
 

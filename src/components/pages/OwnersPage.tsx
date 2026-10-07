@@ -1,22 +1,15 @@
 import React, { useState, useMemo } from 'react';
-import { decimal, formatMoney, moneyNumber, formatUsd, formatTjs } from '../../utils/money';
 import { formatUserName } from '../../utils/formatUser';
 import { capitalByLocation } from '../../utils/ownerCapital';
 import { useAppFields } from '../../context/AppContext';
 import { FALLBACK_EXCHANGE_RATE } from '../../utils/exchangeRate';
 import {
   Plus,
-  PieChart,
   Percent,
-  Briefcase,
   Users,
   Coins,
-  Package,
-  Banknote,
-  Wallet,
+  Briefcase,
   Loader2,
-  Store,
-  Warehouse,
   FileText
 } from 'lucide-react';
 import { StatusBanner, StatusMessage } from '../ui/StatusBanner';
@@ -147,40 +140,12 @@ export const OwnersPage: React.FC = () => {
     return result;
   }, [owners, stores, ownerTransactions]);
 
-  const totalCapitalInvested = useMemo(() => owners.reduce((acc, o) => acc + (o.capitalBalanceUsd ?? 0), 0), [owners]);
-  const totalAvailableProfit = useMemo(() => owners.reduce((acc, o) => acc + (o.availableProfitUsd ?? 0), 0), [owners]);
-
   // Devices currently in stock across warehouses and stores
   const inStockDevices = useMemo(() => {
     return (devices || []).filter(d =>
       d.status === 'MAIN_WAREHOUSE' || d.status === 'STORE_STOCK' || d.status === 'IN_STOCK_AFTER_EXCHANGE'
     );
   }, [devices]);
-
-  // Total cost value of stock on hand (сколько на товар)
-  const totalStockCostUsd = useMemo(() => {
-    return inStockDevices.reduce((sum, d) => sum + (d.costBasisUsd ?? d.purchaseCostUsd ?? 0), 0);
-  }, [inStockDevices]);
-
-  // Total cash in all store registers and main warehouse (сколько налами лежит)
-  const totalCashInRegistersUsd = useMemo(() => {
-    return (stores || []).reduce((sum, s) => sum + (s.cashBalanceUsd || 0), 0);
-  }, [stores]);
-
-  // Total active assets (goods in stock + cash on hand)
-  const totalAssetsSumUsd = useMemo(() => {
-    return totalStockCostUsd + totalCashInRegistersUsd;
-  }, [totalStockCostUsd, totalCashInRegistersUsd]);
-
-  const stockRatioPercent = useMemo(() => {
-    if (totalAssetsSumUsd <= 0) return 0;
-    return Math.round((totalStockCostUsd / totalAssetsSumUsd) * 1000) / 10;
-  }, [totalStockCostUsd, totalAssetsSumUsd]);
-
-  const cashRatioPercent = useMemo(() => {
-    if (totalAssetsSumUsd <= 0) return 0;
-    return Math.round((totalCashInRegistersUsd / totalAssetsSumUsd) * 1000) / 10;
-  }, [totalCashInRegistersUsd, totalAssetsSumUsd]);
 
   // Breakdown of stock and cash per store / warehouse
   const storeAssetsBreakdown = useMemo(() => {
@@ -233,9 +198,9 @@ export const OwnersPage: React.FC = () => {
     if (isSubmitting) return;
     setStatusBanner(null);
 
-    const targetStore = mainWarehouse || stores.find(s => s.id === data.storeId || s.isMainWarehouse) || stores[0];
+    const targetStore = stores.find(s => s.id === data.storeId) || mainWarehouse || stores.find(s => s.isMainWarehouse) || stores[0];
     if (!targetStore) {
-      setStatusBanner({ tone: 'error', text: 'Центральная касса не найдена' });
+      setStatusBanner({ tone: 'error', text: 'Касса не найдена' });
       return;
     }
 
@@ -304,7 +269,7 @@ export const OwnersPage: React.FC = () => {
           text: `Финансовый период «${data.quarterName}» успешно закрыт`
         });
       } else {
-        setStatusBanner({ tone: 'error', text: res.message || 'Ошибка закрытия квартала' });
+        setStatusBanner({ tone: 'error', text: res.message || 'Ошибка закрытия периода' });
       }
     } finally {
       setIsSubmitting(false);
@@ -327,7 +292,7 @@ export const OwnersPage: React.FC = () => {
                 Капитал и Учредители
               </h1>
               <p className="text-[10px] text-fg-subtle truncate">
-                Учёт капитала, долей и истории финансовых операций
+                Учёт капитала и истории финансовых операций
               </p>
             </div>
           </div>
@@ -341,47 +306,39 @@ export const OwnersPage: React.FC = () => {
                 className="px-2.5 py-1.5 rounded-xl bg-accent hover:bg-accent-strong text-accent-fg font-bold text-xs shadow-xs disabled:opacity-50 transition-all flex items-center gap-1.5 cursor-pointer"
               >
                 {isInitializing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Coins className="w-3.5 h-3.5" />}
-                <span>Инициализировать (50% / 50%)</span>
+                <span>Инициализировать</span>
               </button>
             )}
 
             {currentUser?.role === 'ADMIN' && (
-              <>
-                <button
-                  type="button"
-                  onClick={() => openSharesModal()}
-                  className="px-2.5 py-1.5 rounded-xl bg-surface-raised hover:bg-surface border border-border text-fg-muted hover:text-fg font-bold text-xs shadow-2xs transition-all flex items-center gap-1.5 cursor-pointer"
-                  title="Настройка долей партнеров по магазинам"
-                >
-                  <Percent className="w-3.5 h-3.5 text-accent" />
-                  <span className="hidden sm:inline">Доли партнеров</span>
-                  <span className="sm:hidden">Доли</span>
-                </button>
+              <button
+                type="button"
+                onClick={() => setIsQuarterModalOpen(true)}
+                className="px-2.5 py-1.5 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/30 text-amber-500 font-bold text-xs shadow-2xs transition-all flex items-center gap-1.5 cursor-pointer"
+                title="Сводная ведомость, закрытие периода и архив отчётов"
+              >
+                <FileText className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Отчёт за период</span>
+                <span className="sm:hidden">Период</span>
+              </button>
+            )}
 
-                <button
-                  type="button"
-                  onClick={() => setIsQuarterModalOpen(true)}
-                  className="px-2.5 py-1.5 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/30 text-amber-500 font-bold text-xs shadow-2xs transition-all flex items-center gap-1.5 cursor-pointer"
-                  title="Сводная ведомость, закрытие квартала и архив периодов"
-                >
-                  <FileText className="w-3.5 h-3.5" />
-                  <span className="hidden sm:inline">Квартальные отчеты</span>
-                  <span className="sm:hidden">Квартал</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    setTxModalOwnerId(displayOwners[0]?.id);
-                    setTxModalType('INVESTMENT');
-                    setIsTxModalOpen(true);
-                  }}
-                  className="px-2.5 py-1.5 rounded-xl bg-accent hover:bg-accent-strong text-accent-fg font-bold text-xs shadow-xs transition-all flex items-center gap-1.5 cursor-pointer"
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                  <span>Операция</span>
-                </button>
-              </>
+            {(currentUser?.role === 'ADMIN' || currentUser?.role === 'PARTNER') && (
+              <button
+                type="button"
+                onClick={() => {
+                  const myOwner = currentUser?.role === 'PARTNER'
+                    ? displayOwners.find(o => o.userId === currentUser.id) || displayOwners[0]
+                    : displayOwners[0];
+                  setTxModalOwnerId(myOwner?.id);
+                  setTxModalType('INVESTMENT');
+                  setIsTxModalOpen(true);
+                }}
+                className="px-2.5 py-1.5 rounded-xl bg-accent hover:bg-accent-strong text-accent-fg font-bold text-xs shadow-xs transition-all flex items-center gap-1.5 cursor-pointer"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>Операция</span>
+              </button>
             )}
           </div>
         </div>
@@ -390,257 +347,24 @@ export const OwnersPage: React.FC = () => {
       {/* Scrollable Content */}
       <div className="flex-1 overflow-y-auto p-2.5 sm:p-4 lg:p-6 bg-bg">
         <div className="max-w-6xl xl:max-w-7xl mx-auto w-full space-y-3 sm:space-y-4">
-          {/* Top 4 Stat Cards */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3">
-            {/* Total Capital */}
-            <div className="p-2 sm:p-2.5 rounded-xl bg-surface border border-border flex flex-col justify-between space-y-1 shadow-2xs">
-              <div className="flex items-center justify-between gap-1">
-                <span className="text-[10px] font-semibold text-fg-subtle uppercase truncate">Общий капитал</span>
-                <div className="w-5 h-5 rounded-md bg-accent/10 border border-accent/20 flex items-center justify-center text-accent shrink-0">
-                  <Briefcase className="w-2.5 h-2.5" />
-                </div>
-              </div>
-              <div>
-                <div className="flex items-baseline gap-1">
-                  <span className="text-sm sm:text-base lg:text-lg font-black font-mono text-fg truncate">
-                    ${formatMoney(totalCapitalInvested)}
-                  </span>
-                  <span className="text-[9px] font-bold text-fg-subtle">USD</span>
-                </div>
-                <span className="text-[9px] sm:text-[10px] text-fg-subtle block font-mono truncate">
-                  ≈ {formatMoney(moneyNumber(decimal(totalCapitalInvested).mul(rate)))} TJS
-                </span>
-              </div>
-              <div className="pt-1 border-t border-border/60 flex items-center justify-between text-[9px] sm:text-[10px] text-fg-subtle">
-                <span>Товар: <strong className="text-info font-bold">${formatMoney(totalStockCostUsd)}</strong></span>
-                <span>Нал: <strong className="text-accent font-bold">${formatMoney(totalCashInRegistersUsd)}</strong></span>
-              </div>
-            </div>
-
-            {/* Stock on Hand */}
-            <div className="p-2 sm:p-2.5 rounded-xl bg-surface border border-border flex flex-col justify-between space-y-1 shadow-2xs">
-              <div className="flex items-center justify-between gap-1">
-                <span className="text-[10px] font-semibold text-fg-subtle uppercase truncate">В товаре</span>
-                <div className="w-5 h-5 rounded-md bg-info/10 border border-info/20 flex items-center justify-center text-info shrink-0">
-                  <Package className="w-2.5 h-2.5" />
-                </div>
-              </div>
-              <div>
-                <div className="flex items-baseline gap-1">
-                  <span className="text-sm sm:text-base lg:text-lg font-black font-mono text-info truncate">
-                    ${formatMoney(totalStockCostUsd)}
-                  </span>
-                  <span className="text-[9px] font-bold text-fg-subtle">USD</span>
-                </div>
-                <span className="text-[9px] sm:text-[10px] text-fg-subtle block font-mono truncate">
-                  ≈ {formatMoney(totalStockCostUsd * rate)} TJS · {inStockDevices.length} шт
-                </span>
-              </div>
-              <div className="pt-1 border-t border-border/60 text-[9px] sm:text-[10px] text-fg-subtle truncate">
-                Себестоимость ({stockRatioPercent}% активов)
-              </div>
-            </div>
-
-            {/* Cash in Registers */}
-            <div className="p-2 sm:p-2.5 rounded-xl bg-surface border border-border flex flex-col justify-between space-y-1 shadow-2xs">
-              <div className="flex items-center justify-between gap-1">
-                <span className="text-[10px] font-semibold text-fg-subtle uppercase truncate">В кассах</span>
-                <div className="w-5 h-5 rounded-md bg-accent/10 border border-accent/20 flex items-center justify-center text-accent shrink-0">
-                  <Banknote className="w-2.5 h-2.5" />
-                </div>
-              </div>
-              <div>
-                <div className="flex items-baseline gap-1">
-                  <span className="text-sm sm:text-base lg:text-lg font-black font-mono text-accent truncate">
-                    ${formatMoney(totalCashInRegistersUsd)}
-                  </span>
-                  <span className="text-[9px] font-bold text-fg-subtle">USD</span>
-                </div>
-                <span className="text-[9px] sm:text-[10px] text-fg-subtle block font-mono truncate">
-                  ≈ {formatMoney(totalCashInRegistersUsd * rate)} TJS · {stores.length} касс
-                </span>
-              </div>
-              <div className="pt-1 border-t border-border/60 text-[9px] sm:text-[10px] text-fg-subtle truncate">
-                Кассовый остаток ({cashRatioPercent}% активов)
-              </div>
-            </div>
-
-            {/* Available Profit */}
-            <div className="p-2 sm:p-2.5 rounded-xl bg-surface border border-border flex flex-col justify-between space-y-1 shadow-2xs">
-              <div className="flex items-center justify-between gap-1">
-                <span className={`text-[10px] font-semibold uppercase truncate ${
-                  totalAvailableProfit < 0 ? 'text-danger' : totalAvailableProfit > 0 ? 'text-accent' : 'text-fg-subtle'
-                }`}>
-                  {totalAvailableProfit < 0 ? 'Убыток' : 'Прибыль'}
-                </span>
-                <div className={`w-5 h-5 rounded-md border flex items-center justify-center shrink-0 ${
-                  totalAvailableProfit < 0
-                    ? 'bg-danger/10 border-danger/20 text-danger'
-                    : totalAvailableProfit > 0
-                    ? 'bg-accent/10 border-accent/20 text-accent'
-                    : 'bg-surface-raised border-border text-fg-subtle'
-                }`}>
-                  <Wallet className="w-2.5 h-2.5" />
-                </div>
-              </div>
-              <div>
-                <div className="flex items-baseline gap-1">
-                  <span className={`text-sm sm:text-base lg:text-lg font-black font-mono truncate ${
-                    totalAvailableProfit < 0 ? 'text-danger' : totalAvailableProfit > 0 ? 'text-accent' : 'text-fg-muted'
-                  }`}>
-                    {formatUsd(totalAvailableProfit)}
-                  </span>
-                  <span className="text-[9px] font-bold text-fg-subtle">USD</span>
-                </div>
-                <span className={`text-[9px] sm:text-[10px] block font-mono truncate ${
-                  totalAvailableProfit < 0 ? 'text-danger/80' : totalAvailableProfit > 0 ? 'text-accent/80' : 'text-fg-subtle'
-                }`}>
-                  ≈ {formatTjs(moneyNumber(decimal(totalAvailableProfit).mul(rate)))}
-                </span>
-              </div>
-              <div className="pt-1 border-t border-border/60 text-[9px] sm:text-[10px] text-fg-subtle truncate">
-                До закрытия квартала
-              </div>
-            </div>
-          </div>
-
-          {/* Section: Capital Allocation Breakdown (Goods vs Cash) */}
-          <div className="p-2.5 sm:p-3.5 rounded-xl bg-surface border border-border shadow-xs space-y-2.5">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 pb-1.5 border-b border-border">
-              <div className="flex items-center gap-1.5">
-                <PieChart className="w-3.5 h-3.5 text-accent" />
-                <h2 className="text-xs font-bold text-fg uppercase tracking-wide">
-                  Структура активов: товар и кассы
-                </h2>
-              </div>
-              <div className="text-[10px] sm:text-[11px] text-fg-subtle flex items-center gap-2 flex-wrap">
-                <span>Всего активов: <strong className="text-fg font-bold font-mono">${formatMoney(totalAssetsSumUsd)}</strong></span>
-                <span>·</span>
-                <span>Курс: <strong className="text-accent font-semibold">{rate} TJS</strong></span>
-              </div>
-            </div>
-
-            {/* Visual Split Ratio Progress Bar */}
-            <div className="space-y-1">
-              <div className="flex flex-wrap items-center justify-between gap-1.5 text-[10px] sm:text-xs">
-                <div className="flex items-center gap-1.5">
-                  <span className="w-2 h-2 rounded-full bg-info" />
-                  <span className="text-fg-muted font-medium">В товаре:</span>
-                  <span className="font-bold text-fg font-mono">${formatMoney(totalStockCostUsd)}</span>
-                  <span className="text-fg-subtle">({stockRatioPercent}% · {inStockDevices.length} шт)</span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <span className="w-2 h-2 rounded-full bg-accent" />
-                  <span className="text-fg-muted font-medium">Наличными:</span>
-                  <span className="font-bold text-fg font-mono">${formatMoney(totalCashInRegistersUsd)}</span>
-                  <span className="text-fg-subtle">({cashRatioPercent}% · {stores.length} касс)</span>
-                </div>
-              </div>
-
-              <div className="w-full h-1.5 sm:h-2 bg-surface-raised rounded-full overflow-hidden flex border border-border">
-                <div
-                  className="bg-info h-full transition-all duration-300"
-                  style={{ width: `${Math.min(100, Math.max(0, stockRatioPercent))}%` }}
-                  title={`В товаре: $${formatMoney(totalStockCostUsd)} (${stockRatioPercent}%)`}
-                />
-                <div
-                  className="bg-accent h-full transition-all duration-300"
-                  style={{ width: `${Math.min(100, Math.max(0, cashRatioPercent))}%` }}
-                  title={`Наличными: $${formatMoney(totalCashInRegistersUsd)} (${cashRatioPercent}%)`}
-                />
-              </div>
-            </div>
-
-            {/* Per-Store / Warehouse Breakdown Grid */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-1.5 sm:gap-2 pt-0.5">
-              {storeAssetsBreakdown.map(item => (
-                <div
-                  key={item.id}
-                  className="p-2 sm:p-2.5 rounded-xl bg-surface-raised border border-border flex flex-col justify-between space-y-1.5 shadow-2xs"
-                >
-                  <div className="flex items-center justify-between gap-1">
-                    <div className="flex items-center gap-1.5 min-w-0">
-                      {item.isMainWarehouse ? (
-                        <Warehouse className="w-3.5 h-3.5 text-warning shrink-0" />
-                      ) : (
-                        <Store className="w-3.5 h-3.5 text-accent shrink-0" />
-                      )}
-                      <span className="font-bold text-xs text-fg truncate">{item.name}</span>
-                    </div>
-                    {item.isMainWarehouse && (
-                      <span className="text-[9px] font-bold px-1 py-0.2 rounded bg-warning/10 text-warning border border-warning/20 shrink-0">
-                        Склад
-                      </span>
-                    )}
-                  </div>
-
-                  <div className="space-y-0.5 text-xs">
-                    <div className="flex items-center justify-between text-fg-muted">
-                      <span className="text-[10px] sm:text-[11px] text-fg-subtle flex items-center gap-1">
-                        <Package className="w-3 h-3 text-info shrink-0" />
-                        Товар ({item.stockCount}):
-                      </span>
-                      <span className="font-bold text-fg font-mono text-[11px] sm:text-xs">${formatMoney(item.stockCostUsd)}</span>
-                    </div>
-                    <div className="flex items-center justify-between text-fg-muted">
-                      <span className="text-[10px] sm:text-[11px] text-fg-subtle flex items-center gap-1">
-                        <Banknote className="w-3 h-3 text-accent shrink-0" />
-                        Касса:
-                      </span>
-                      <span className="font-bold text-accent font-mono text-[11px] sm:text-xs">${formatMoney(item.cashUsd)}</span>
-                    </div>
-                  </div>
-
-                  <div className="pt-1 border-t border-border flex items-center justify-between text-[10px] sm:text-[11px]">
-                    <span className="text-fg-subtle font-medium">Итого:</span>
-                    <span className="font-bold text-fg font-mono">${formatMoney(item.totalUsd)}</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
           {/* Section: Partner Cards */}
           <div className="space-y-2 sm:space-y-2.5">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-1.5 sm:gap-2">
-                <Users className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-accent" />
-                <h2 className="text-xs sm:text-sm font-bold text-fg uppercase tracking-wide">
-                  Соучредители бизнеса
-                </h2>
-              </div>
-              <button
-                type="button"
-                onClick={() => openSharesModal()}
-                className="text-xs font-semibold text-accent hover:underline flex items-center gap-1 cursor-pointer"
-              >
-                <span>Изменить доли</span>
-              </button>
+            <div className="flex items-center gap-1.5 sm:gap-2">
+              <Users className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-accent" />
+              <h2 className="text-xs sm:text-sm font-bold text-fg uppercase tracking-wide">
+                Соучредители бизнеса
+              </h2>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5 sm:gap-3">
               {displayOwners.map((owner) => {
                 const info = getOwnerDetails(owner);
-                const ownerPairs = storeProfitShares.filter(sh => sh.ownerId === owner.id);
-                const share = owner.id === adminOwner?.id ? null : ownerPairs.reduce((max, sh) => Math.max(max, sh.sharePercent), 0);
-                const ownerStoreId = owner.storeId;
-                const ownerStore = ownerStoreId ? stores.find(s => s.id === ownerStoreId) : null;
-                const partnerStoreAssets = ownerStoreId ? storeAssetsBreakdown.find(s => s.id === ownerStoreId) : null;
-                const activeStores = stores.filter(s => (storeInvestmentsByOwner[owner.id]?.[s.id] || 0) > 0);
-
                 return (
                   <OwnerCard
                     key={owner.id}
                     owner={owner}
                     info={info}
-                    share={share}
-                    ownerStore={ownerStore}
-                    ownerShareLabel={ownerShareLabel(owner.id)}
                     rate={rate}
-                    partnerStoreAssets={partnerStoreAssets}
-                    activeStores={activeStores}
-                    storeInvestments={storeInvestmentsByOwner[owner.id] || {}}
-                    onOpenSharesModal={() => openSharesModal(owner.id)}
                     onOpenTxModal={(type) => openTxModalForOwner(owner.id, type)}
                   />
                 );

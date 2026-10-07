@@ -17,6 +17,7 @@ import {
   Truck,
   Gift,
   Wallet,
+  HandCoins,
   Users,
   UserCheck,
   FileText,
@@ -28,7 +29,6 @@ import {
   ChevronDown,
   PanelLeftClose,
   PanelLeftOpen,
-  PackagePlus,
 } from 'lucide-react';
 import { NAV_PAGE_ROUTES } from '../../router/navRoutes';
 
@@ -83,6 +83,7 @@ export const Sidebar: React.FC = () => {
           title: 'Основное',
           items: [
             { id: 'SALE', label: 'POS Терминал', icon: ShoppingBag, roles: ['SELLER'] },
+            { id: 'CUSTOMERS', label: 'База клиентов', icon: Users, roles: ['SELLER'] },
             { id: 'SALES_HISTORY', label: 'История продаж', icon: History, roles: ['SELLER'] },
             { id: 'EXCHANGE', label: 'Обмен Trade-In', icon: RefreshCw, roles: ['SELLER'] },
             { id: 'REPAIR', label: 'Сервис и ремонт', icon: Wrench, roles: ['SELLER'] },
@@ -92,7 +93,6 @@ export const Sidebar: React.FC = () => {
           title: 'Склад',
           items: [
             { id: 'INVENTORY', label: 'Склад товаров', icon: Package, roles: ['SELLER'] },
-            { id: 'RECEIPTS', label: 'Приходы', icon: PackagePlus, roles: ['SELLER'] },
             { id: 'TRANSFER', label: 'Перемещение', icon: ArrowLeftRight, roles: ['SELLER'] },
           ],
         },
@@ -100,13 +100,13 @@ export const Sidebar: React.FC = () => {
     }
 
     // 2. Partner: works on site in their own store, has more privileges than seller
-    // Strictly hidden: Finance, Bonuses, Owners/Capital, Employees, Audit Log, Notifications
     if (isPartner) {
       return [
         {
           title: 'Магазин',
           items: [
             { id: 'SALE', label: 'POS Терминал', icon: ShoppingBag, roles: ['PARTNER'] },
+            { id: 'CUSTOMERS', label: 'База клиентов', icon: Users, roles: ['PARTNER'] },
             { id: 'SALES_HISTORY', label: 'История продаж', icon: History, roles: ['PARTNER'] },
             { id: 'EXCHANGE', label: 'Обмен Trade-In', icon: RefreshCw, roles: ['PARTNER'] },
             { id: 'REPAIR', label: 'Сервис и ремонт', icon: Wrench, roles: ['PARTNER'] },
@@ -116,13 +116,14 @@ export const Sidebar: React.FC = () => {
           title: 'Склад',
           items: [
             { id: 'INVENTORY', label: 'Склад магазина', icon: Package, roles: ['PARTNER'] },
-            { id: 'RECEIPTS', label: 'Приходы', icon: PackagePlus, roles: ['PARTNER'] },
             { id: 'TRANSFER', label: 'Перемещение', icon: ArrowLeftRight, roles: ['PARTNER'] },
           ],
         },
         {
           title: 'Управление точкой',
           items: [
+            { id: 'FINANCE', label: 'Касса магазина', icon: Wallet, roles: ['PARTNER'] },
+            { id: 'CASH_COLLECTION', label: 'Инкассация', icon: HandCoins, roles: ['PARTNER'] },
             { id: 'EXPENSES', label: 'Расходы кассы', icon: Wallet, roles: ['PARTNER'] },
             { id: 'SETTINGS', label: 'Настройки', icon: Settings, roles: ['PARTNER'] },
           ],
@@ -137,7 +138,9 @@ export const Sidebar: React.FC = () => {
         {
           title: 'Центральная касса и финансы',
           items: [
-            { id: 'FINANCE', label: 'Финансы и отчёты', icon: Landmark, roles: ['ADMIN'] },
+            { id: 'FINANCE', label: 'Финансы и касса', icon: Landmark, roles: ['ADMIN'] },
+            { id: 'CASH_COLLECTION', label: 'Инкассация', icon: HandCoins, roles: ['ADMIN'] },
+            { id: 'CUSTOMERS', label: 'База клиентов', icon: Users, roles: ['ADMIN'] },
             { id: 'SALES_HISTORY', label: 'История продаж', icon: History, roles: ['ADMIN'] },
             { id: 'EXPENSES', label: 'Расходы кассы', icon: Wallet, roles: ['ADMIN'] },
             { id: 'BONUSES', label: 'Бонусы поставщиков', icon: Gift, roles: ['ADMIN'] },
@@ -149,7 +152,6 @@ export const Sidebar: React.FC = () => {
           items: [
             { id: 'INVENTORY', label: 'Склад товаров', icon: Package, roles: ['ADMIN'] },
             { id: 'PURCHASE', label: 'Приходы (партии)', icon: PlusCircle, roles: ['ADMIN'] },
-            { id: 'RECEIPTS', label: 'Приходы в магазины', icon: PackagePlus, roles: ['ADMIN'] },
             { id: 'TRANSFER', label: 'Перемещение', icon: ArrowLeftRight, roles: ['ADMIN'] },
             { id: 'REPAIR', label: 'Сервис и ремонт', icon: Wrench, roles: ['ADMIN'] },
             { id: 'SUPPLIERS', label: 'Поставщики', icon: Truck, roles: ['ADMIN'] },
@@ -167,37 +169,32 @@ export const Sidebar: React.FC = () => {
       ];
     }
 
-    // 4. Admin in Retail Store Mode (selling at chosen store)
+    // 4. Admin in Retail Store Mode (selling at chosen store) — sees exact same store menus as Partner
     return [
       {
-        title: `Продажи: ${activeRetailStore?.name || 'Магазин'}`,
+        title: 'Магазин',
         items: [
           { id: 'SALE', label: 'POS Терминал', icon: ShoppingBag, roles: ['ADMIN'] },
+          { id: 'CUSTOMERS', label: 'База клиентов', icon: Users, roles: ['ADMIN'] },
           { id: 'SALES_HISTORY', label: 'История продаж', icon: History, roles: ['ADMIN'] },
-          { id: 'PURCHASE', label: 'Приход товара', icon: PlusCircle, roles: ['ADMIN'] },
-          { id: 'RECEIPTS', label: 'Приходы в магазины', icon: PackagePlus, roles: ['ADMIN'] },
           { id: 'EXCHANGE', label: 'Обмен Trade-In', icon: RefreshCw, roles: ['ADMIN'] },
           { id: 'REPAIR', label: 'Сервис и ремонт', icon: Wrench, roles: ['ADMIN'] },
+        ],
+      },
+      {
+        title: 'Склад',
+        items: [
           { id: 'INVENTORY', label: 'Склад магазина', icon: Package, roles: ['ADMIN'] },
           { id: 'TRANSFER', label: 'Перемещение', icon: ArrowLeftRight, roles: ['ADMIN'] },
         ],
       },
       {
-        title: 'Финансы (Центральный офис)',
+        title: 'Управление точкой',
         items: [
-          { id: 'FINANCE', label: 'Финансы', icon: Landmark, roles: ['ADMIN'] },
-          { id: 'EXPENSES', label: 'Расходы', icon: Wallet, roles: ['ADMIN'] },
-          { id: 'BONUSES', label: 'Бонусы', icon: Gift, roles: ['ADMIN'] },
-          { id: 'OWNERS', label: 'Партнеры и капитал', icon: Users, roles: ['ADMIN'] },
-        ],
-      },
-      {
-        title: 'Система и доступ',
-        items: [
-          { id: 'EMPLOYEES', label: 'Сотрудники', icon: UserCheck, roles: ['ADMIN'] },
-          { id: 'AUDIT_LOG', label: 'Журнал аудита', icon: FileText, roles: ['ADMIN'] },
-          { id: 'NOTIFICATIONS', label: 'Уведомления', icon: Bell, roles: ['ADMIN'] },
-          { id: 'SETTINGS', label: 'Настройки системы', icon: Settings, roles: ['ADMIN'] },
+          { id: 'FINANCE', label: 'Касса магазина', icon: Wallet, roles: ['ADMIN'] },
+          { id: 'CASH_COLLECTION', label: 'Инкассация', icon: HandCoins, roles: ['ADMIN'] },
+          { id: 'EXPENSES', label: 'Расходы кассы', icon: Wallet, roles: ['ADMIN'] },
+          { id: 'SETTINGS', label: 'Настройки', icon: Settings, roles: ['ADMIN'] },
         ],
       },
     ];

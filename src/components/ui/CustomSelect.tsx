@@ -143,7 +143,7 @@ export function CustomSelect<T extends string = string>({
 
       {/* Mobile Bottom Sheet Modal */}
       {isOpen && (
-        <div className="sm:hidden fixed inset-0 z-50 flex flex-col justify-end">
+        <div className="sm:hidden fixed inset-0 z-[70] flex flex-col justify-end">
           {/* Backdrop */}
           <div
             className="fixed inset-0 bg-black/70 backdrop-blur-xs transition-opacity animate-in fade-in duration-200"

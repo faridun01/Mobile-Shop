@@ -14,7 +14,6 @@ import {
   Calendar,
   Store,
   UserCheck,
-  Plus,
   RefreshCw,
 } from 'lucide-react';
 
@@ -34,7 +33,6 @@ export const DailyCashClosingListPanel: React.FC<DailyCashClosingListPanelProps>
 
   // Selected closing to inspect in modal
   const [inspectClosing, setInspectClosing] = useState<DailyCashClosing | null>(null);
-  const [isNewClosingOpen, setIsNewClosingOpen] = useState(false);
 
   const refresh = useCallback(() => setRevision((v) => v + 1), []);
 
@@ -119,9 +117,6 @@ export const DailyCashClosingListPanel: React.FC<DailyCashClosingListPanelProps>
             <FileCheck2 className="w-4 h-4 text-accent" />
             <span>Закрытия смен и Z-отчёты</span>
           </h2>
-          <p className="text-xs text-fg-subtle mt-0.5">
-            Сверка ожидаемой выручки и физических наличных в кассах магазинов
-          </p>
         </div>
 
         <div className="flex items-center gap-2">
@@ -132,15 +127,7 @@ export const DailyCashClosingListPanel: React.FC<DailyCashClosingListPanelProps>
             onClick={refresh}
             loading={loading}
           >
-            Обновить
-          </Button>
-          <Button
-            variant="primary"
-            size="md"
-            leftIcon={Plus}
-            onClick={() => setIsNewClosingOpen(true)}
-          >
-            Закрыть смену
+            Обновить 
           </Button>
         </div>
       </div>
@@ -205,149 +192,201 @@ export const DailyCashClosingListPanel: React.FC<DailyCashClosingListPanelProps>
         <EmptyState
           icon={FileCheck2}
           title="Нет закрытых смен за выбранный месяц"
-          description="Когда кассиры или администраторы проводят ежедневную сверку кассы (Z-отчёт), результаты сохраняются здесь."
-          action={
-            <Button
-              variant="primary"
-              size="md"
-              leftIcon={Plus}
-              onClick={() => setIsNewClosingOpen(true)}
-            >
-              Закрыть смену сейчас
-            </Button>
-          }
+          description="Смены за выбранный период не найдены"
         />
       ) : (
-        <div className="bg-surface rounded-2xl border border-border overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
-              <thead className="bg-surface-raised/50 border-b border-border text-[11px] text-fg-subtle uppercase tracking-wider font-semibold select-none">
-                <tr>
-                  <th className="py-3 px-4">Дата / Время</th>
-                  <th className="py-3 px-4">Точка продаж</th>
-                  <th className="py-3 px-4">Кассир</th>
-                  <th className="py-3 px-4 text-right">Ожидалось</th>
-                  <th className="py-3 px-4 text-right">Фактически</th>
-                  <th className="py-3 px-4 text-center">Расхождение TJS</th>
-                  <th className="py-3 px-4 text-center">Расхождение USD</th>
-                  <th className="py-3 px-4">Комментарий</th>
-                  <th className="py-3 px-4 text-right">Действие</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border/60">
-                {closings.map((c) => {
-                  const diffTjs = Number(c.differenceTjs) || 0;
-                  const diffUsd = Number(c.differenceUsd) || 0;
+        <div className="space-y-2.5">
+          {/* Mobile Card View (< md) */}
+          <div className="md:hidden space-y-2">
+            {closings.map((c) => {
+              const diffTjs = Number(c.differenceTjs) || 0;
+              const isMatch = Math.abs(diffTjs) < 0.001;
 
-                  return (
-                    <tr
-                      key={c.id}
-                      className="hover:bg-surface-raised/30 transition-colors cursor-pointer"
-                      onClick={() => setInspectClosing(c)}
-                    >
-                      {/* Date / Time */}
-                      <td className="py-3 px-4 whitespace-nowrap">
-                        <div className="flex items-center gap-1.5 font-bold font-mono text-fg">
-                          <Calendar className="w-3.5 h-3.5 text-accent" />
-                          <span>{c.businessDate}</span>
-                        </div>
-                        <span className="text-[10px] text-fg-subtle block font-mono mt-0.5">
-                          {new Date(c.createdAt).toLocaleString('ru-RU')}
-                        </span>
-                      </td>
+              return (
+                <div
+                  key={c.id}
+                  onClick={() => setInspectClosing(c)}
+                  className="p-3.5 rounded-2xl bg-surface border border-border shadow-xs space-y-2.5 active:bg-surface-raised cursor-pointer transition-colors"
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-1.5 font-bold font-mono text-xs text-fg">
+                      <Calendar className="w-3.5 h-3.5 text-accent" />
+                      <span>{c.businessDate}</span>
+                      <span className="text-[10px] text-fg-subtle font-normal">
+                        ({new Date(c.createdAt).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })})
+                      </span>
+                    </div>
 
-                      {/* Store */}
-                      <td className="py-3 px-4 whitespace-nowrap">
-                        <div className="flex items-center gap-1 text-fg font-medium">
-                          <Store className="w-3.5 h-3.5 text-fg-subtle" />
-                          <span>{c.store?.name || 'Магазин'}</span>
-                        </div>
-                      </td>
+                    {isMatch ? (
+                      <Badge tone="success" className="text-[10px] py-0.5 px-2">
+                        <CheckCircle2 className="w-3 h-3" />
+                        <span>0.00 TJS</span>
+                      </Badge>
+                    ) : diffTjs < 0 ? (
+                      <Badge tone="danger" className="text-[10px] py-0.5 px-2">
+                        <AlertTriangle className="w-3 h-3" />
+                        <span>-{formatMoney(Math.abs(diffTjs))} TJS</span>
+                      </Badge>
+                    ) : (
+                      <Badge tone="info" className="text-[10px] py-0.5 px-2">
+                        <AlertCircle className="w-3 h-3" />
+                        <span>+{formatMoney(diffTjs)} TJS</span>
+                      </Badge>
+                    )}
+                  </div>
 
-                      {/* Cashier */}
-                      <td className="py-3 px-4 whitespace-nowrap">
-                        <div className="flex items-center gap-1 text-fg-subtle">
-                          <UserCheck className="w-3.5 h-3.5" />
-                          <span>{c.closedByName}</span>
-                        </div>
-                      </td>
+                  <div className="flex items-center justify-between text-xs pt-1 border-t border-border/50">
+                    <div>
+                      <span className="text-[10px] text-fg-subtle block">Сдано в кассу</span>
+                      <span className="font-bold font-mono text-sm text-fg">{formatTjs(c.actualCashTjs)}</span>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-[10px] text-fg-subtle block">Ожидалось</span>
+                      <span className="font-mono text-xs text-fg-muted">{formatTjs(c.expectedCashTjs)}</span>
+                    </div>
+                  </div>
 
-                      {/* Expected */}
-                      <td className="py-3 px-4 text-right whitespace-nowrap font-mono">
-                        <div className="text-fg">{formatTjs(c.expectedCashTjs)}</div>
-                        <div className="text-[10px] text-fg-subtle">{formatUsd(c.expectedCashUsd)}</div>
-                      </td>
+                  <div className="flex items-center justify-between text-[11px] text-fg-subtle pt-1">
+                    <span className="truncate">{c.store?.name || 'Магазин'} · {c.closedByName}</span>
+                    <span className="text-accent font-semibold shrink-0">Z-Отчёт →</span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
 
-                      {/* Actual */}
-                      <td className="py-3 px-4 text-right whitespace-nowrap font-mono font-bold">
-                        <div className="text-fg">{formatTjs(c.actualCashTjs)}</div>
-                        <div className="text-[10px] text-fg-subtle">{formatUsd(c.actualCashUsd)}</div>
-                      </td>
+          {/* Desktop Table View (>= md) */}
+          <div className="hidden md:block bg-surface rounded-2xl border border-border overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-surface-raised/50 border-b border-border text-[11px] text-fg-subtle uppercase tracking-wider font-semibold select-none">
+                  <tr>
+                    <th className="py-3 px-4">Дата / Время</th>
+                    <th className="py-3 px-4">Точка продаж</th>
+                    <th className="py-3 px-4">Кассир</th>
+                    <th className="py-3 px-4 text-right">Ожидалось</th>
+                    <th className="py-3 px-4 text-right">Фактически</th>
+                    <th className="py-3 px-4 text-center">Расхождение TJS</th>
+                    <th className="py-3 px-4 text-center">Расхождение USD</th>
+                    <th className="py-3 px-4">Комментарий</th>
+                    <th className="py-3 px-4 text-right">Действие</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border/60">
+                  {closings.map((c) => {
+                    const diffTjs = Number(c.differenceTjs) || 0;
+                    const diffUsd = Number(c.differenceUsd) || 0;
 
-                      {/* Diff TJS */}
-                      <td className="py-3 px-4 text-center whitespace-nowrap font-mono">
-                        {Math.abs(diffTjs) < 0.001 ? (
-                          <Badge tone="success" className="gap-1">
-                            <CheckCircle2 className="w-3 h-3" />
-                            <span>0.00 TJS</span>
-                          </Badge>
-                        ) : diffTjs < 0 ? (
-                          <Badge tone="danger" className="gap-1">
-                            <AlertTriangle className="w-3 h-3" />
-                            <span>-{formatMoney(Math.abs(diffTjs))} TJS</span>
-                          </Badge>
-                        ) : (
-                          <Badge tone="info" className="gap-1">
-                            <AlertCircle className="w-3 h-3" />
-                            <span>+{formatMoney(diffTjs)} TJS</span>
-                          </Badge>
-                        )}
-                      </td>
+                    return (
+                      <tr
+                        key={c.id}
+                        className="hover:bg-surface-raised/30 transition-colors cursor-pointer"
+                        onClick={() => setInspectClosing(c)}
+                      >
+                        {/* Date / Time */}
+                        <td className="py-3 px-4 whitespace-nowrap">
+                          <div className="flex items-center gap-1.5 font-bold font-mono text-fg">
+                            <Calendar className="w-3.5 h-3.5 text-accent" />
+                            <span>{c.businessDate}</span>
+                          </div>
+                          <span className="text-[10px] text-fg-subtle block font-mono mt-0.5">
+                            {new Date(c.createdAt).toLocaleString('ru-RU')}
+                          </span>
+                        </td>
 
-                      {/* Diff USD */}
-                      <td className="py-3 px-4 text-center whitespace-nowrap font-mono">
-                        {Math.abs(diffUsd) < 0.001 ? (
-                          <Badge tone="success" className="gap-1">
-                            <CheckCircle2 className="w-3 h-3" />
-                            <span>$0.00</span>
-                          </Badge>
-                        ) : diffUsd < 0 ? (
-                          <Badge tone="danger" className="gap-1">
-                            <AlertTriangle className="w-3 h-3" />
-                            <span>-${formatMoney(Math.abs(diffUsd))}</span>
-                          </Badge>
-                        ) : (
-                          <Badge tone="info" className="gap-1">
-                            <AlertCircle className="w-3 h-3" />
-                            <span>+${formatMoney(diffUsd)}</span>
-                          </Badge>
-                        )}
-                      </td>
+                        {/* Store */}
+                        <td className="py-3 px-4 whitespace-nowrap">
+                          <div className="flex items-center gap-1 text-fg font-medium">
+                            <Store className="w-3.5 h-3.5 text-fg-subtle" />
+                            <span>{c.store?.name || 'Магазин'}</span>
+                          </div>
+                        </td>
 
-                      {/* Comment */}
-                      <td className="py-3 px-4 max-w-xs truncate text-fg-subtle">
-                        {c.comment || <span className="text-fg-subtle/40">—</span>}
-                      </td>
+                        {/* Cashier */}
+                        <td className="py-3 px-4 whitespace-nowrap">
+                          <div className="flex items-center gap-1 text-fg-subtle">
+                            <UserCheck className="w-3.5 h-3.5" />
+                            <span>{c.closedByName}</span>
+                          </div>
+                        </td>
 
-                      {/* Action */}
-                      <td className="py-3 px-4 text-right whitespace-nowrap">
-                        <Button
-                          variant="ghost"
-                          size="md"
-                          className="h-8 px-2.5 text-xs text-accent"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setInspectClosing(c);
-                          }}
-                        >
-                          Z-Отчёт
-                        </Button>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+                        {/* Expected */}
+                        <td className="py-3 px-4 text-right whitespace-nowrap font-mono">
+                          <div className="text-fg">{formatTjs(c.expectedCashTjs)}</div>
+                          <div className="text-[10px] text-fg-subtle">{formatUsd(c.expectedCashUsd)}</div>
+                        </td>
+
+                        {/* Actual */}
+                        <td className="py-3 px-4 text-right whitespace-nowrap font-mono font-bold">
+                          <div className="text-fg">{formatTjs(c.actualCashTjs)}</div>
+                          <div className="text-[10px] text-fg-subtle">{formatUsd(c.actualCashUsd)}</div>
+                        </td>
+
+                        {/* Diff TJS */}
+                        <td className="py-3 px-4 text-center whitespace-nowrap font-mono">
+                          {Math.abs(diffTjs) < 0.001 ? (
+                            <Badge tone="success" className="gap-1">
+                              <CheckCircle2 className="w-3 h-3" />
+                              <span>0.00 TJS</span>
+                            </Badge>
+                          ) : diffTjs < 0 ? (
+                            <Badge tone="danger" className="gap-1">
+                              <AlertTriangle className="w-3 h-3" />
+                              <span>-{formatMoney(Math.abs(diffTjs))} TJS</span>
+                            </Badge>
+                          ) : (
+                            <Badge tone="info" className="gap-1">
+                              <AlertCircle className="w-3 h-3" />
+                              <span>+{formatMoney(diffTjs)} TJS</span>
+                            </Badge>
+                          )}
+                        </td>
+
+                        {/* Diff USD */}
+                        <td className="py-3 px-4 text-center whitespace-nowrap font-mono">
+                          {Math.abs(diffUsd) < 0.001 ? (
+                            <Badge tone="success" className="gap-1">
+                              <CheckCircle2 className="w-3 h-3" />
+                              <span>$0.00</span>
+                            </Badge>
+                          ) : diffUsd < 0 ? (
+                            <Badge tone="danger" className="gap-1">
+                              <AlertTriangle className="w-3 h-3" />
+                              <span>-${formatMoney(Math.abs(diffUsd))}</span>
+                            </Badge>
+                          ) : (
+                            <Badge tone="info" className="gap-1">
+                              <AlertCircle className="w-3 h-3" />
+                              <span>+${formatMoney(diffUsd)}</span>
+                            </Badge>
+                          )}
+                        </td>
+
+                        {/* Comment */}
+                        <td className="py-3 px-4 max-w-xs truncate text-fg-subtle">
+                          {c.comment || <span className="text-fg-subtle/40">—</span>}
+                        </td>
+
+                        {/* Action */}
+                        <td className="py-3 px-4 text-right whitespace-nowrap">
+                          <Button
+                            variant="ghost"
+                            size="md"
+                            className="h-8 px-2.5 text-xs text-accent"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setInspectClosing(c);
+                            }}
+                          >
+                            Z-Отчёт
+                          </Button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       )}
@@ -360,19 +399,6 @@ export const DailyCashClosingListPanel: React.FC<DailyCashClosingListPanelProps>
           storeId={inspectClosing.storeId}
           storeName={inspectClosing.store?.name}
           businessDate={inspectClosing.businessDate}
-        />
-      )}
-
-      {/* New Closing Modal */}
-      {isNewClosingOpen && (
-        <DailyCashClosingModal
-          isOpen={true}
-          onClose={() => setIsNewClosingOpen(false)}
-          storeId={storeId && storeId !== 'all' ? storeId : undefined}
-          onClosed={() => {
-            setIsNewClosingOpen(false);
-            refresh();
-          }}
         />
       )}
     </div>

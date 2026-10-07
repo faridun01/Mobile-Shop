@@ -30,6 +30,7 @@ import { EmptyState } from '../ui/EmptyState';
 import { FilterPillGroup } from '../ui/FilterPillGroup';
 import { LoadingState } from '../ui/Skeleton';
 import { useStoreContext } from '../../utils/storeContext';
+import { PushNotificationBanner } from '../notifications/PushNotificationBanner';
 
 /** Names of the business events, for the action filter and the item label. */
 export const ACTION_LABELS: Record<string, string> = {
@@ -61,7 +62,7 @@ export const ACTION_LABELS: Record<string, string> = {
   OWNER_WITHDRAWAL: 'Изъятие капитала',
   PROFIT_PAYOUT: 'Выплата прибыли',
   REINVEST: 'Капитализация прибыли',
-  QUARTER_CLOSE: 'Закрытие квартала',
+  QUARTER_CLOSE: 'Закрытие периода',
 };
 
 function formatNotificationDate(rawDate?: string | number | Date): string {
@@ -319,6 +320,9 @@ export const NotificationsPage: React.FC = () => {
         </div>
       </div>
 
+      {/* Push Notification Setup Banner */}
+      <PushNotificationBanner />
+
       {/* Notifications List */}
       <div className="flex-1 overflow-y-auto">
         {error && <p className="m-3 text-xs text-danger bg-danger/10 border border-danger/30 rounded-xl p-2.5">{error}</p>}
@@ -442,7 +446,7 @@ export const NotificationsPage: React.FC = () => {
 
                     {path && (
                       <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-accent group-hover:underline ml-auto">
-                        {n.actionType === 'STORE_RECEIPT' ? 'Открыть приход' : 'Перейти'}
+                        Перейти
                         <ChevronRight className="w-3 h-3 transition-transform group-hover:translate-x-0.5" />
                       </span>
                     )}

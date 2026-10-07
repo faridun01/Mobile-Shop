@@ -102,6 +102,7 @@ async function distributedDeltas(db: TransactionClient, entries: { id: string; d
 
 export interface AnnulBonusInput {
   periodName?: string;
+  action?: 'BUSINESS' | 'PAYOUT' | 'RECORD';
   note?: string;
   userId: string;
 }
@@ -212,39 +213,69 @@ export class BonusesService {
   }
 
   /**
-   * The current bonus quarter, shown on the Bonuses page: everything since the last quarterly
-   * close. Bonuses are nobody's income — this is a report, not a balance anyone can draw from.
+   * Monthly bonus summary: everything since the last close or for a specific month.
    */
-  public static async quarterSummary(db: Pick<TransactionClient, 'bonusDistributionLog' | 'supplierBonus' | 'bonusPoolEntry'> = prisma) {
-    const lastClose = await db.bonusDistributionLog.findFirst({ where: { type: 'ANNULMENT' }, orderBy: { createdAt: 'desc' } });
-    const since = lastClose?.createdAt ?? null;
-    const sinceFilter = since ? { createdAt: { gt: since } } : {};
+  public static async quarterSummary(
+    db: Pick<TransactionClient, 'bonusDistributionLog' | 'supplierBonus' | 'bonusPoolEntry'> = prisma,
+    monthStr?: string
+  ) {
+    let sinceFilter: any = {};
+    let pendingFilter: any = { status: 'PENDING' };
+    let since: Date | null = null;
+
+    if (monthStr && /^\d{4}-\d{2}$/.test(monthStr)) {
+      const [year, month] = monthStr.split('-').map(Number);
+      const start = new Date(Date.UTC(year, month - 1, 1, 0, 0, 0));
+      const end = new Date(Date.UTC(year, month, 1, 0, 0, 0));
+      sinceFilter = { createdAt: { gte: start, lt: end } };
+      pendingFilter = { createdAt: { gte: start, lt: end } };
+    } else {
+      const lastClose = await db.bonusDistributionLog.findFirst({
+        where: { type: { in: ['ANNULMENT', 'BUSINESS_REINVEST', 'PROFIT_PAYOUT'] } },
+        orderBy: { createdAt: 'desc' },
+      });
+      since = lastClose?.createdAt ?? null;
+      sinceFilter = since ? { createdAt: { gt: since } } : {};
+    }
+
     const [cashBonuses, deviceBonuses, pending] = await Promise.all([
       db.supplierBonus.findMany({ where: { bonusType: 'CASH_DISCOUNT', ...sinceFilter }, select: { amountUsd: true, exchangeRate: true } }),
       db.supplierBonus.findMany({ where: { bonusType: 'FREE_DEVICES', ...sinceFilter }, select: { id: true } }),
-      db.bonusPoolEntry.findMany({ where: { status: 'PENDING' }, select: { profitUsd: true, profitTjs: true } }),
+      db.bonusPoolEntry.findMany({ where: pendingFilter, select: { profitUsd: true, profitTjs: true } }),
     ]);
+
+    const cashBonusesUsd = roundMoney(cashBonuses.reduce((sum, b) => D(sum).plus(b.amountUsd ?? 0), D(0)));
+    const cashBonusesTjs = roundMoney(cashBonuses.reduce((sum, b) => D(sum).plus(D(b.amountUsd ?? 0).mul(b.exchangeRate)), D(0)));
+    const bonusDeviceProfitUsd = roundMoney(pending.reduce((sum, e) => D(sum).plus(e.profitUsd), D(0)));
+    const bonusDeviceProfitTjs = roundMoney(pending.reduce((sum, e) => D(sum).plus(e.profitTjs), D(0)));
+    const totalBonusUsd = roundMoney(D(cashBonusesUsd).plus(bonusDeviceProfitUsd));
+
     return {
       since: since?.toISOString() ?? null,
+      month: monthStr || null,
       cashBonusesCount: cashBonuses.length,
-      cashBonusesUsd: roundMoney(cashBonuses.reduce((sum, b) => D(sum).plus(b.amountUsd ?? 0), D(0))),
-      cashBonusesTjs: roundMoney(cashBonuses.reduce((sum, b) => D(sum).plus(D(b.amountUsd ?? 0).mul(b.exchangeRate)), D(0))),
+      cashBonusesUsd,
+      cashBonusesTjs,
       bonusDevicesReceived: deviceBonuses.length,
       bonusDevicesSold: pending.length,
-      bonusDeviceProfitUsd: roundMoney(pending.reduce((sum, e) => D(sum).plus(e.profitUsd), D(0))),
-      bonusDeviceProfitTjs: roundMoney(pending.reduce((sum, e) => D(sum).plus(e.profitTjs), D(0))),
+      bonusDeviceProfitUsd,
+      bonusDeviceProfitTjs,
+      totalBonusUsd,
     };
   }
 
-  /** Past quarterly closes, newest first. */
+  /** Past monthly closes, newest first. */
   public static async quarterHistory() {
-    return prisma.bonusDistributionLog.findMany({ where: { type: 'ANNULMENT' }, orderBy: { createdAt: 'desc' }, take: 20 });
+    return prisma.bonusDistributionLog.findMany({
+      orderBy: { createdAt: 'desc' },
+      take: 50,
+    });
   }
 
   /**
-   * Quarterly close of bonuses (confirmed on the Bonuses page): the quarter's cash bonuses and
-   * bonus-phone profit are recorded in the close log and the counters start from zero. Nothing
-   * is credited to anyone and no money moves — the sold phones' cash simply stays in the registers.
+   * Monthly bonus close / fixation (confirmed on the Bonuses page):
+   * Records the month's sold bonus phones and cash bonuses, saves the admin's decision
+   * (reinvest into business vs distribute/payout as profit vs record only), and starts counters from zero.
    */
   public static async annulBonusPool(input: AnnulBonusInput) {
     return prisma.$transaction(async (tx) => {
@@ -256,20 +287,42 @@ export class BonusesService {
       });
 
       if (pendingEntries.length === 0 && quarter.cashBonusesCount === 0 && quarter.bonusDevicesReceived === 0) {
-        throw new Error('За этот квартал бонусов нет — обнулять нечего');
+        throw new Error('За этот период бонусов нет — фиксировать нечего');
       }
 
       const totalAnnulledUsd = roundMoney(
         pendingEntries.reduce((sum, e) => D(sum).plus(e.profitUsd), D(0))
       );
 
+      const totalMonthBonusUsd = roundMoney(
+        D(quarter.cashBonusesUsd).plus(totalAnnulledUsd)
+      );
+
+      const logType =
+        input.action === 'BUSINESS' ? 'BUSINESS_REINVEST' :
+        input.action === 'PAYOUT' ? 'PROFIT_PAYOUT' : 'ANNULMENT';
+
+      const actionTitle =
+        input.action === 'BUSINESS' ? 'Внесено в бизнес (реинвест)' :
+        input.action === 'PAYOUT' ? 'Выдано как прибыль (поделено)' :
+        'Зафиксировано за месяц';
+
+      const defaultNote = `${actionTitle}: продано ${quarter.bonusDevicesSold} бонусных устройств ($${quarter.bonusDeviceProfitUsd}), денежные бонусы $${quarter.cashBonusesUsd} (${quarter.cashBonusesCount} шт.)`;
+
       const log = await tx.bonusDistributionLog.create({
         data: {
-          periodName: input.periodName?.trim() || 'Обнуление после квартального отчёта',
-          totalAmountUsd: totalAnnulledUsd,
-          type: 'ANNULMENT',
-          allocations: [],
-          note: input.note?.trim() || `Квартал бонусов закрыт: денежные бонусы $${quarter.cashBonusesUsd} (${quarter.cashBonusesCount}), бонусные телефоны продано ${quarter.bonusDevicesSold} на $${quarter.bonusDeviceProfitUsd}, получено ${quarter.bonusDevicesReceived}`,
+          periodName: input.periodName?.trim() || 'Фиксация бонусов за месяц',
+          totalAmountUsd: totalMonthBonusUsd.gt(0) ? totalMonthBonusUsd : totalAnnulledUsd,
+          type: logType,
+          allocations: {
+            action: input.action || 'RECORD',
+            devicesSold: quarter.bonusDevicesSold,
+            devicesProfitUsd: quarter.bonusDeviceProfitUsd,
+            cashBonusesCount: quarter.cashBonusesCount,
+            cashBonusesUsd: quarter.cashBonusesUsd,
+            bonusDevicesReceived: quarter.bonusDevicesReceived,
+          },
+          note: input.note?.trim() || defaultNote,
           performedByUserId: actor.id,
           performedByName: actor.name,
         },
@@ -281,7 +334,7 @@ export class BonusesService {
           status: 'ANNULLED',
           annulledAt: new Date(),
           annulledBy: actor.name,
-          annulledNote: input.note?.trim() || 'Обнуление бонусного пула администратором',
+          annulledNote: input.note?.trim() || actionTitle,
         },
       });
 
@@ -291,9 +344,11 @@ export class BonusesService {
           userName: actor.name,
           userRole: actor.role,
           action: 'BONUS_POOL_ANNULLED',
-          details: `Закрыт квартал бонусов «${input.periodName?.trim() || 'без названия'}»: денежные бонусы $${quarter.cashBonusesUsd}, прибыль бонусных телефонов $${totalAnnulledUsd} (${pendingEntries.length} шт.) — счётчики обнулены, деньги на Бонусном счёте не изменились`,
+          details: `Зафиксированы бонусы за «${input.periodName?.trim() || 'месяц'}» (${actionTitle}): итого $${totalMonthBonusUsd}, продано ${pendingEntries.length} устройств на $${totalAnnulledUsd}, денежные бонусы $${quarter.cashBonusesUsd}`,
           financialDetails: moneyJson({
+            totalMonthBonusUsd,
             totalAnnulledUsd,
+            action: input.action,
             entriesCount: pendingEntries.length,
             cashBonusesUsd: quarter.cashBonusesUsd,
             cashBonusesCount: quarter.cashBonusesCount,

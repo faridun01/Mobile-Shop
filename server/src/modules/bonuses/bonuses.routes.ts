@@ -14,11 +14,20 @@ export function registerBonusRoutes(app: Express) {
     }
   });
 
-  // Bonuses are never distributed to anyone (no payout, no reinvestment): the Bonuses page
-  // shows the quarter and closes it.
-  app.get('/api/bonuses/quarter', authenticateJwt, requireRoles('ADMIN'), async (_req: AuthenticatedRequest, res, next) => {
+  // Monthly bonus summary and period history
+  app.get('/api/bonuses/quarter', authenticateJwt, requireRoles('ADMIN'), async (req: AuthenticatedRequest, res, next) => {
     try {
-      res.json(await BonusesService.quarterSummary());
+      const month = typeof req.query.month === 'string' ? req.query.month : undefined;
+      res.json(await BonusesService.quarterSummary(undefined, month));
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.get('/api/bonuses/month-summary', authenticateJwt, requireRoles('ADMIN'), async (req: AuthenticatedRequest, res, next) => {
+    try {
+      const month = typeof req.query.month === 'string' ? req.query.month : undefined;
+      res.json(await BonusesService.quarterSummary(undefined, month));
     } catch (error) {
       next(error);
     }
@@ -36,11 +45,13 @@ export function registerBonusRoutes(app: Express) {
     try {
       const result = await BonusesService.annulBonusPool({
         periodName: req.body?.periodName,
+        action: req.body?.action,
         note: req.body?.note,
         userId: req.user!.userId,
       });
-      // Other open admin screens refetch the zeroed quarter.
+      // Other open admin screens refetch the updated counters and balances.
       RealtimeSyncGateway.broadcast('INVENTORY_UPDATE', {}, { roles: ['ADMIN'] });
+      RealtimeSyncGateway.broadcast('STORE_UPDATED', {}, { roles: ['ADMIN'] });
       res.status(200).json(result);
     } catch (error) {
       next(error);

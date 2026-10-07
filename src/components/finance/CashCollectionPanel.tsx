@@ -54,7 +54,17 @@ const isZero = (value: string) => Number(value) === 0;
  * - Regular revenue goes to Central Cash.
  * - Bonus device proceeds automatically route to the dedicated Bonus Account.
  */
-export const CashCollectionPanel: React.FC<{ month: string; storeId?: string | null }> = ({ month, storeId }) => {
+export interface CashCollectionPanelProps {
+  month: string;
+  storeId?: string | null;
+  onSelectStoreId?: (storeId: string | null) => void;
+}
+
+export const CashCollectionPanel: React.FC<CashCollectionPanelProps> = ({
+  month,
+  storeId,
+  onSelectStoreId,
+}) => {
   const [balances, setBalances] = useState<{
     stores: RegisterBalance[];
     central: RegisterBalance | null;
@@ -69,6 +79,19 @@ export const CashCollectionPanel: React.FC<{ month: string; storeId?: string | n
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState<StatusMessage | null>(null);
 
+  // Local selection support if parent doesn't manage it directly
+  const [localSelectedStoreId, setLocalSelectedStoreId] = useState<string | null>(null);
+  const effectiveStoreId = storeId !== undefined ? storeId : localSelectedStoreId;
+
+  const handleStoreClick = (clickedStoreId: string) => {
+    const next = effectiveStoreId === clickedStoreId ? null : clickedStoreId;
+    if (onSelectStoreId) {
+      onSelectStoreId(next);
+    } else {
+      setLocalSelectedStoreId(next);
+    }
+  };
+
   const refresh = useCallback(() => setRevision((v) => v + 1), []);
 
   useEffect(() => {
@@ -79,9 +102,14 @@ export const CashCollectionPanel: React.FC<{ month: string; storeId?: string | n
   useEffect(() => {
     let cancelled = false;
     setLoadError(null);
+    let historyUrl = `/cash-collections?period=SPECIFIC_MONTH&month=${encodeURIComponent(month)}`;
+    if (effectiveStoreId) {
+      historyUrl += `&storeId=${encodeURIComponent(effectiveStoreId)}`;
+    }
+
     Promise.all([
       apiClient<{ stores: RegisterBalance[]; central: RegisterBalance | null; bonusAccount: BonusAccountBalance | null }>('/cash-collections/balances'),
-      apiClient<CashCollection[]>(`/cash-collections?period=SPECIFIC_MONTH&month=${encodeURIComponent(month)}${storeId ? `&storeId=${encodeURIComponent(storeId)}` : ''}`),
+      apiClient<CashCollection[]>(historyUrl),
     ])
       .then(([b, h]) => {
         if (cancelled) return;
@@ -92,7 +120,7 @@ export const CashCollectionPanel: React.FC<{ month: string; storeId?: string | n
         if (!cancelled) setLoadError(e instanceof Error ? e.message : 'Не удалось загрузить кассы');
       });
     return () => { cancelled = true; };
-  }, [month, revision, storeId]);
+  }, [month, revision, effectiveStoreId]);
 
   const confirmCollect = async () => {
     if (!collecting || busy) return;
@@ -192,32 +220,73 @@ export const CashCollectionPanel: React.FC<{ month: string; storeId?: string | n
       {/* Store registers list */}
       <section className="space-y-1.5" aria-label="Кассы магазинов">
         <div className="flex items-center justify-between px-0.5">
-          <h2 className="text-xs font-bold text-fg-subtle uppercase tracking-wide">Наличные в магазинах</h2>
-          <span className="text-[11px] text-fg-subtle font-medium">{balances.stores.length} точек</span>
+          {effectiveStoreId && balances?.stores.find((s) => s.storeId === effectiveStoreId) ? (
+            <div className="flex items-center gap-2">
+              <h2 className="text-xs font-bold text-fg-subtle uppercase tracking-wide">
+                Магазин: <strong className="text-accent">{balances.stores.find((s) => s.storeId === effectiveStoreId)?.storeName}</strong>
+              </h2>
+            </div>
+          ) : (
+            <h2 className="text-xs font-bold text-fg-subtle uppercase tracking-wide">Наличные в магазинах</h2>
+          )}
+
+          {effectiveStoreId ? (
+            <button
+              type="button"
+              onClick={() => {
+                if (onSelectStoreId) onSelectStoreId(null);
+                setLocalSelectedStoreId(null);
+              }}
+              className="text-xs font-bold text-accent hover:underline cursor-pointer flex items-center gap-1"
+            >
+              <span>← Все магазины ({balances.stores.length})</span>
+            </button>
+          ) : (
+            <span className="text-[11px] text-fg-subtle font-medium">
+              {balances.stores.length} точек (нажмите для выбора)
+            </span>
+          )}
         </div>
 
         {balances.stores.length === 0 ? (
           <p className="text-xs text-fg-subtle p-4 bg-surface rounded-xl border border-border text-center">Магазинов нет</p>
         ) : (
           <div className="rounded-2xl border border-border bg-surface divide-y divide-border/60 overflow-hidden shadow-xs">
-            {balances.stores.filter((s) => !storeId || s.storeId === storeId).map((store) => {
+            {balances.stores.filter((s) => !effectiveStoreId || s.storeId === effectiveStoreId).map((store) => {
               const empty = isZero(store.cashUsd);
               const unreconciled = !isZero(store.unreconciledUsd);
               const hasBonus = Number(store.bonusCashUsd || 0) > 0;
+              const isSelected = effectiveStoreId === store.storeId;
 
               return (
-                <div key={store.storeId} className="p-3 sm:p-3.5 flex items-center justify-between gap-2.5 hover:bg-surface-raised/40 transition-colors">
+                <div
+                  key={store.storeId}
+                  onClick={() => handleStoreClick(store.storeId)}
+                  className={`p-3 sm:p-3.5 flex items-center justify-between gap-2.5 transition-all cursor-pointer ${
+                    isSelected
+                      ? 'bg-accent/10 border-l-4 border-l-accent'
+                      : 'hover:bg-surface-raised/50 active:bg-surface-raised'
+                  }`}
+                  title={isSelected ? 'Нажмите, чтобы показать все магазины' : 'Нажмите, чтобы показать только этот магазин'}
+                >
                   <div className="flex items-center gap-2.5 min-w-0">
                     <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${
                       empty
                         ? 'bg-surface-raised text-fg-subtle'
-                        : 'bg-emerald-500/10 text-emerald-500 dark:text-emerald-400'
+                        : isSelected
+                          ? 'bg-accent text-accent-fg'
+                          : 'bg-emerald-500/10 text-emerald-500 dark:text-emerald-400'
                     }`}>
                       <StoreIcon className="w-4 h-4" />
                     </div>
                     <div className="min-w-0">
                       <div className="flex items-center gap-1.5 flex-wrap">
                         <p className="text-xs sm:text-sm font-semibold text-fg truncate">{store.storeName}</p>
+                        {isSelected && (
+                          <span className="text-[10px] px-1.5 py-0.2 rounded bg-accent/20 text-accent font-bold">
+                            Выбран
+                          </span>
+                        )}
                         {hasBonus && (
                           <span className="text-[10px] px-1.5 py-0.2 rounded bg-amber-500/10 border border-amber-500/20 text-amber-500 dark:text-amber-400 font-semibold shrink-0">
                             Бонусы: {formatUsd(store.bonusCashUsd || 0)} ({store.bonusCount} шт.)
@@ -251,7 +320,10 @@ export const CashCollectionPanel: React.FC<{ month: string; storeId?: string | n
                   <div className="shrink-0 flex items-center gap-1.5 sm:gap-2">
                     <button
                       type="button"
-                      onClick={() => setInspectingStore(store)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setInspectingStore(store);
+                      }}
                       className="h-8 px-2.5 rounded-lg border border-border bg-surface hover:bg-surface-raised text-fg text-xs font-semibold flex items-center gap-1.5 transition-all shadow-2xs active:scale-95 cursor-pointer"
                       title="Сверить чеки продаж за период перед инкассацией"
                     >
@@ -268,7 +340,10 @@ export const CashCollectionPanel: React.FC<{ month: string; storeId?: string | n
                       <button
                         type="button"
                         disabled={unreconciled || busy}
-                        onClick={() => setCollecting(store)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setCollecting(store);
+                        }}
                         className="h-8 px-3 rounded-lg bg-accent hover:bg-accent-strong text-accent-fg text-xs font-semibold flex items-center gap-1.5 transition-all shadow-xs active:scale-95 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         <ArrowDownToLine className="w-3.5 h-3.5" />
@@ -281,17 +356,26 @@ export const CashCollectionPanel: React.FC<{ month: string; storeId?: string | n
             })}
           </div>
         )}
-        <p className="text-[11px] text-fg-subtle px-0.5 flex items-center gap-1.5">
-          <span className="text-accent">ℹ</span>
-          <span>Касса полностью обнуляется: бонусные средства зачисляются на Бонусный счёт, основные — в Центр. кассу.</span>
-        </p>
       </section>
 
       {/* History */}
       <section className="space-y-1.5" aria-label="История инкассаций">
-        <h2 className="text-xs font-bold text-fg-subtle uppercase tracking-wide px-0.5">История за месяц</h2>
+        <div className="flex items-center justify-between px-0.5">
+          <h2 className="text-xs font-bold text-fg-subtle uppercase tracking-wide">
+            {effectiveStoreId && balances?.stores.find((s) => s.storeId === effectiveStoreId)
+              ? `История инкассаций: ${balances.stores.find((s) => s.storeId === effectiveStoreId)?.storeName}`
+              : 'История за месяц'}
+          </h2>
+          {effectiveStoreId && history.length > 0 && (
+            <span className="text-[11px] text-fg-subtle font-medium">{history.length} операций</span>
+          )}
+        </div>
         {history.length === 0 ? (
-          <p className="text-xs text-fg-subtle p-3 bg-surface rounded-xl border border-border text-center">Инкассаций в этом месяце не было</p>
+          <p className="text-xs text-fg-subtle p-3 bg-surface rounded-xl border border-border text-center">
+            {effectiveStoreId && balances?.stores.find((s) => s.storeId === effectiveStoreId)
+              ? `Инкассаций магазина «${balances.stores.find((s) => s.storeId === effectiveStoreId)?.storeName}» в этом месяце не было`
+              : 'Инкассаций в этом месяце не было'}
+          </p>
         ) : (
           <div className="rounded-2xl border border-border bg-surface divide-y divide-border/60 overflow-hidden shadow-xs">
             {history.map((item) => {
@@ -395,9 +479,6 @@ export const CashCollectionPanel: React.FC<{ month: string; storeId?: string | n
                 </p>
               )}
             </div>
-            <p className="text-[11px] text-fg-subtle">
-              Кассир сдает всю сумму целиком — система автоматически распределит средства по счетам.
-            </p>
             <div className="pt-1.5 border-t border-border/60">
               <button
                 type="button"

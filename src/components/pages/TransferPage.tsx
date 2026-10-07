@@ -17,6 +17,7 @@ import { TransferBottomBar } from '../transfer/TransferBottomBar';
 import { TransferHistoryList } from '../transfer/TransferHistoryList';
 import { ConfirmTransferModal } from '../transfer/ConfirmTransferModal';
 import { RejectTransferModal } from '../transfer/RejectTransferModal';
+import { TransferInvoiceModal } from '../transfer/TransferInvoiceModal';
 
 export const TransferPage: React.FC = () => {
   const {
@@ -148,6 +149,7 @@ export const TransferPage: React.FC = () => {
   const [confirmTransferModal, setConfirmTransferModal] = useState<boolean>(false);
   const [isSubmittingTransfer, setIsSubmittingTransfer] = useState(false);
   const [processingTransferId, setProcessingTransferId] = useState<string | null>(null);
+  const [selectedInvoiceTransfer, setSelectedInvoiceTransfer] = useState<TransferRequest | null>(null);
 
   const fromStore = stores.find(s => s.id === fromLocationId);
   const fromStoreName = fromStore
@@ -282,12 +284,15 @@ export const TransferPage: React.FC = () => {
         setStatusBanner({
           tone: 'success',
           text: isStoreScoped
-            ? `Заявка на перемещение (${selectedDeviceIds.length} шт.) отправлена и ожидает подтверждения администратора.`
-            : `Перемещение (${selectedDeviceIds.length} шт.) выполнено.`
+            ? `Накладная на перемещение (${selectedDeviceIds.length} шт.) создана и ожидает подтверждения администратора.`
+            : `Накладная на перемещение (${selectedDeviceIds.length} шт.) успешно проведена.`
         });
         setSelectedDeviceIds([]);
         setToLocationId(isStoreScoped ? (mainWarehouse?.id || '') : '');
         setActiveTab('list');
+        if (res.transfer) {
+          setSelectedInvoiceTransfer(res.transfer);
+        }
       } else {
         setStatusMessage({ type: 'error', text: res.message || 'Ошибка создания перемещения' });
       }
@@ -486,6 +491,7 @@ export const TransferPage: React.FC = () => {
               setRejectTarget(tr);
             }}
             onNavigateToCreate={() => setActiveTab('create')}
+            onOpenInvoice={(tr) => setSelectedInvoiceTransfer(tr)}
           />
         )}
       </div>
@@ -510,6 +516,27 @@ export const TransferPage: React.FC = () => {
         setRejectReason={setRejectReason}
         processingTransferId={processingTransferId}
         onReject={handleReject}
+      />
+
+      <TransferInvoiceModal
+        open={Boolean(selectedInvoiceTransfer)}
+        onClose={() => setSelectedInvoiceTransfer(null)}
+        transfer={
+          selectedInvoiceTransfer
+            ? (transfers || []).find((t: TransferRequest) => t.id === selectedInvoiceTransfer.id) || selectedInvoiceTransfer
+            : null
+        }
+        stores={stores}
+        mainWarehouse={mainWarehouse}
+        devicesById={devicesById}
+        devicesByImei={devicesByImei}
+        currentUser={currentUser}
+        processingTransferId={processingTransferId}
+        onApprove={handleApprove}
+        onRequestReject={(tr) => {
+          setRejectReason('');
+          setRejectTarget(tr);
+        }}
       />
     </div>
   );

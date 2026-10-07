@@ -28,8 +28,8 @@ export const ConfirmTransferModal: React.FC<ConfirmTransferModalProps> = ({
     <Dialog
       open={open}
       onClose={() => { if (!isSubmittingTransfer) onClose(); }}
-      title={isStoreScoped ? 'Отправка на главный склад' : 'Подтверждение перемещения'}
-      subtitle={`Проверьте маршрут передачи и список устройств (${selectedDevices.length} шт.)`}
+      title={isStoreScoped ? 'Накладная на отправку' : 'Накладная на перемещение'}
+      subtitle={`Формирование накладной на передачу (${selectedDevices.length} шт.)`}
       maxWidth="md"
       footer={
         <div className="flex items-center justify-end gap-2.5 w-full">
@@ -50,12 +50,12 @@ export const ConfirmTransferModal: React.FC<ConfirmTransferModalProps> = ({
             {isSubmittingTransfer ? (
               <>
                 <Loader2 className="w-4 h-4 animate-spin" />
-                <span>Перемещение...</span>
+                <span>Создание накладной...</span>
               </>
             ) : (
               <>
                 <Send className="w-3.5 h-3.5" />
-                <span>{isStoreScoped ? 'Отправить на склад' : 'Подтвердить перемещение'}</span>
+                <span>{isStoreScoped ? 'Создать накладную и отправить' : 'Сформировать накладную'}</span>
               </>
             )}
           </button>

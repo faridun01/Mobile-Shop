@@ -8,7 +8,7 @@ const actions: Record<string, string> = {
   REPAIR_INTAKE: 'Устройство принято в ремонт', REPAIR_STATUS_CHANGE: 'Изменён статус ремонта',
   EXPENSE: 'Добавлен расход', EXPENSE_EDIT: 'Изменён расход', EXPENSE_DELETE: 'Удалён расход', EXPENSE_PAID: 'Оплачен расход', PAYROLL_PAYOUT: 'Выплачена зарплата',
   OWNER_INVESTMENT: 'Внесение капитала', OWNER_WITHDRAWAL: 'Изъятие капитала', OWNER_LINK_USER: 'Привязка партнёра к сотруднику', INITIALIZE_OWNERS: 'Созданы партнёры',
-  PROFIT_PAYOUT: 'Выплата прибыли', PROFIT_SHARE_CHANGE: 'Изменены доли прибыли', QUARTER_CLOSE: 'Закрыт квартал', REINVEST: 'Реинвестирование прибыли',
+  PROFIT_PAYOUT: 'Выплата прибыли', PROFIT_SHARE_CHANGE: 'Изменены доли прибыли', QUARTER_CLOSE: 'Закрыт период', REINVEST: 'Реинвестирование прибыли',
   STORE_CREATE: 'Создан магазин', STORE_UPDATE: 'Изменён магазин', STORE_DELETE: 'Удалён магазин', STORE_MERGE: 'Объединены магазины', STORE_CASH_ADJUSTMENT: 'Корректировка кассы',
   SUPPLIER_PAYMENT: 'Оплата поставщику', SUPPLIER_BONUS: 'Получен бонус поставщика', BONUS_EDIT: 'Изменён бонус', BONUS_DELETE: 'Удалён бонус', CASH_LEDGER_RECONCILIATION: 'Сверка кассы и финансового счёта',
 };

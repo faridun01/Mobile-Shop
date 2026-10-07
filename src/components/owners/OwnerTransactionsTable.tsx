@@ -10,6 +10,7 @@ import {
   Wallet,
   Landmark,
   Store,
+  ChevronDown,
 } from 'lucide-react';
 import { CustomSelect, CustomSelectOption } from '../ui/CustomSelect';
 import { MonthPicker } from '../ui/MonthPicker';
@@ -59,6 +60,25 @@ export const OwnerTransactionsTable: React.FC<OwnerTransactionsTableProps> = ({
   const [periodFilter, setPeriodFilter] = useState<'ALL' | 'SPECIFIC_MONTH'>('ALL');
   const [selectedMonth, setSelectedMonth] = useState<string>(getBusinessDateKey().substring(0, 7));
   const [transactionsPage, setTransactionsPage] = useState(1);
+  const [isCollapsed, setIsCollapsed] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('owner_tx_collapsed') === 'true';
+    } catch {
+      return false;
+    }
+  });
+
+  const toggleCollapse = () => {
+    setIsCollapsed(prev => {
+      const next = !prev;
+      try {
+        localStorage.setItem('owner_tx_collapsed', String(next));
+      } catch {
+        // ignore
+      }
+      return next;
+    });
+  };
 
   const ownerFilterOptions = useMemo<CustomSelectOption[]>(() => [
     { value: 'ALL', label: 'Все учредители', icon: <Users className="w-3.5 h-3.5" /> },
@@ -111,18 +131,47 @@ export const OwnerTransactionsTable: React.FC<OwnerTransactionsTableProps> = ({
   }, [filteredTransactions, transactionsPage]);
 
   return (
-    <div className="p-2.5 sm:p-3.5 rounded-xl bg-surface border border-border space-y-2.5 shadow-xs">
-      <div className="flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-border">
-        <div className="flex items-center gap-1.5 sm:gap-2">
-          <CreditCard className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-accent" />
-          <h2 className="text-xs sm:text-sm font-bold text-fg uppercase tracking-wide">
-            История операций
-          </h2>
-          <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-surface-raised border border-border text-fg-muted font-bold font-mono">
-            {filteredTransactions.length}
-          </span>
+    <div className="rounded-xl sm:rounded-2xl bg-surface border border-border shadow-xs overflow-hidden transition-all">
+      {/* Collapsible Header Bar */}
+      <button
+        type="button"
+        onClick={toggleCollapse}
+        className="w-full flex items-center justify-between gap-2 p-2.5 sm:p-3.5 hover:bg-surface-raised/40 transition-colors cursor-pointer text-left select-none"
+        aria-expanded={!isCollapsed}
+      >
+        <div className="flex items-center gap-2 min-w-0">
+          <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-accent/10 border border-accent/20 flex items-center justify-center text-accent shrink-0">
+            <CreditCard className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+          </div>
+          <div className="min-w-0">
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <h2 className="text-xs sm:text-sm font-bold text-fg uppercase tracking-wide">
+                История операций
+              </h2>
+              <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-surface-raised border border-border text-fg-muted font-bold font-mono">
+                {filteredTransactions.length}
+              </span>
+            </div>
+            <p className="text-[10px] text-fg-subtle truncate">
+              {isCollapsed ? 'Нажмите, чтобы развернуть список операций' : 'Внесения, изъятия и движение капитала учредителей'}
+            </p>
+          </div>
         </div>
-      </div>
+
+        <div className="flex items-center gap-1.5 text-xs text-fg-subtle font-medium shrink-0">
+          <span className="hidden sm:inline text-[11px] font-semibold">
+            {isCollapsed ? 'Развернуть' : 'Свернуть'}
+          </span>
+          <div className={`p-1 rounded-lg bg-surface-raised border border-border transition-transform duration-200 ${
+            isCollapsed ? '' : 'rotate-180'
+          }`}>
+            <ChevronDown className="w-4 h-4 text-fg-subtle" />
+          </div>
+        </div>
+      </button>
+
+      {!isCollapsed && (
+        <div className="p-2.5 sm:p-3.5 border-t border-border space-y-2.5">
 
       {/* Filters Bar */}
       <div className="space-y-1.5">
@@ -503,6 +552,8 @@ export const OwnerTransactionsTable: React.FC<OwnerTransactionsTableProps> = ({
               Вперед →
             </button>
           </div>
+        </div>
+      )}
         </div>
       )}
     </div>

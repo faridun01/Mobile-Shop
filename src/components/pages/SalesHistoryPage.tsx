@@ -68,10 +68,16 @@ export const SalesHistoryPage: React.FC = () => {
 
   const todayStr = getBusinessDateKey();
   const thisMonthStr = currentBusinessMonth();
-  const [periodFilter, setPeriodFilter] = useState<'TODAY' | 'CUSTOM' | 'MONTH'>('MONTH');
-  const [selectedMonth, setSelectedMonth] = useState<string>(thisMonthStr);
-  const [selectedStartDate, setSelectedStartDate] = useState<string>(() => monthBounds(thisMonthStr).start);
-  const [selectedEndDate, setSelectedEndDate] = useState<string>(() => monthBounds(thisMonthStr).end);
+  const [periodFilter, setPeriodFilter] = useState<'TODAY' | 'CUSTOM' | 'MONTH'>('TODAY');
+  const [selectedMonth, setSelectedMonth] = useState<string>('');
+  const [selectedStartDate, setSelectedStartDate] = useState<string>(todayStr);
+  const [selectedEndDate, setSelectedEndDate] = useState<string>(todayStr);
+  const resetToToday = () => {
+    setSelectedMonth('');
+    setSelectedStartDate(todayStr);
+    setSelectedEndDate(todayStr);
+    setPeriodFilter('TODAY');
+  };
   const resetToCurrentMonth = () => {
     const { start, end } = monthBounds(thisMonthStr);
     setSelectedMonth(thisMonthStr);
@@ -391,12 +397,12 @@ export const SalesHistoryPage: React.FC = () => {
               className="shrink-0"
             />
 
-            {(searchQuery || periodFilter !== 'MONTH' || selectedMonth !== thisMonthStr || (selectedStoreFilter !== 'ALL' && !isStoreScoped && storeCtx.mode === 'CENTRAL')) && (
+            {(searchQuery || periodFilter !== 'TODAY' || (selectedStoreFilter !== 'ALL' && !isStoreScoped && storeCtx.mode === 'CENTRAL')) && (
               <button
                 type="button"
                 onClick={() => {
                   setSearchQuery('');
-                  resetToCurrentMonth();
+                  resetToToday();
                   if (!isStoreScoped) setSelectedStoreFilter('ALL');
                 }}
                 className="h-8 px-2.5 text-fg-subtle hover:text-danger hover:bg-danger/10 border border-border/70 hover:border-danger/25 rounded-xl text-xs font-medium transition-colors cursor-pointer flex items-center gap-1 shadow-2xs"

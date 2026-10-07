@@ -119,12 +119,12 @@ describe('BonusesService', () => {
       expect(db.owner.updateMany).not.toHaveBeenCalled();
     });
 
-    it('refuses to close an empty quarter', async () => {
+    it('refuses to close an empty period', async () => {
       db.bonusPoolEntry.findMany.mockResolvedValue([]);
       db.supplierBonus.findMany.mockResolvedValue([]);
 
       await expect(BonusesService.annulBonusPool({ periodName: 'Пусто', userId: 'admin-1' }))
-        .rejects.toThrow('За этот квартал бонусов нет');
+        .rejects.toThrow('За этот период бонусов нет');
       expect(db.bonusDistributionLog.create).not.toHaveBeenCalled();
     });
   });

@@ -25,6 +25,7 @@ import { registerBonusRoutes } from './modules/bonuses/bonuses.routes';
 import { registerCashCollectionRoutes } from './modules/finance/cash-collection.routes';
 import { registerDailyClosingRoutes } from './modules/finance/daily-closing.routes';
 import { registerStoreReceiptRoutes } from './modules/store-receipts/store-receipts.routes';
+import { registerCustomerRoutes } from './modules/customers/customers.routes';
 import { decorateTransactions } from './prisma/prisma.service';
 import { withAuditNotifications } from './modules/notifications/audit-notifications';
 import { requireNonNegativeMoney, requirePositiveMoney, roundMoney } from './common/money';
@@ -586,6 +587,7 @@ registerBonusRoutes(app);
 registerCashCollectionRoutes(app);
 registerDailyClosingRoutes(app);
 registerStoreReceiptRoutes(app);
+registerCustomerRoutes(app);
 // Every audited business event inside a transaction also notifies the admin (same transaction).
 decorateTransactions(withAuditNotifications);
 

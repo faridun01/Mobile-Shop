@@ -362,7 +362,7 @@ export const BonusesPage: React.FC = () => {
 
       {/* List of Bonuses */}
       <div className="flex-1 overflow-y-auto p-2.5 sm:p-3 space-y-2 max-w-4xl mx-auto w-full">
-        {/* Bonuses are managed only here: the quarterly close zeroes them (admin) */}
+        {/* Bonuses are managed here: monthly bonus tracking and fixation with admin decision (business/payout) */}
         {currentUser?.role === 'ADMIN' && (
           <div className="space-y-2">
             <LegacyBonusAccrualsCard />

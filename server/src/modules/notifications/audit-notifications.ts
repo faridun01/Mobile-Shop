@@ -55,7 +55,7 @@ export const AUDIT_NOTIFICATION_RULES: Record<string, Rule> = {
   OWNER_WITHDRAWAL: { title: 'Изъятие капитала партнёра', route: '/owners', amounts: fromFd },
   PROFIT_PAYOUT: { title: 'Выплата прибыли партнёру', route: '/owners', amounts: fromFd },
   REINVEST: { title: 'Капитализация прибыли партнёра', route: '/owners', amounts: fromFd },
-  QUARTER_CLOSE: { title: 'Закрытие квартала', route: '/owners' },
+  QUARTER_CLOSE: { title: 'Закрытие периода', route: '/owners' },
   REPAIR_STATUS_CHANGE: {
     title: 'Выдача ремонта с расходом',
     route: '/repair',

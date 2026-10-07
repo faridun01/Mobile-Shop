@@ -3,6 +3,7 @@ import { moneyJson, type MoneyInput } from '../../common/decimal';
 import type { TransactionClient } from '../../prisma/prisma.service';
 import { onCommit } from '../../common/after-commit';
 import { RealtimeSyncGateway } from '../../websocket/websocket.gateway';
+import { PushNotificationService } from './push.service';
 
 export interface AdminNotificationInput {
   /** Stable machine name of the business event, e.g. 'STORE_RECEIPT', 'CASH_COLLECTION'. */
@@ -52,6 +53,14 @@ export async function notifyAdmins(tx: TransactionClient, input: AdminNotificati
       dedupeKey: input.dedupeKey,
     },
   });
-  onCommit(() => RealtimeSyncGateway.broadcast('NOTIFICATION_CREATED', { id: notification.id }, { roles: ['ADMIN'] }));
+  onCommit(() => {
+    RealtimeSyncGateway.broadcast('NOTIFICATION_CREATED', { id: notification.id }, { roles: ['ADMIN'] });
+    PushNotificationService.sendPushToRole('ADMIN', {
+      title: input.title,
+      message: input.message,
+      targetRoute: input.targetRoute || '/notifications',
+      dedupeKey: input.dedupeKey,
+    }).catch((err) => console.error('[Push] Failed to send push to admins:', err));
+  });
   return notification;
 }

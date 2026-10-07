@@ -46,7 +46,9 @@ const FinancePage = lazy(() => import('../components/pages/FinancePage').then(m 
 const AuditLogPage = lazy(() => import('../components/pages/AuditLogPage').then(m => ({ default: m.AuditLogPage })));
 const SettingsPage = lazy(() => import('../components/pages/SettingsPage').then(m => ({ default: m.SettingsPage })));
 const NotificationsPage = lazy(() => import('../components/pages/NotificationsPage').then(m => ({ default: m.NotificationsPage })));
-const ReceiptsPage = lazy(() => import('../components/pages/ReceiptsPage').then(m => ({ default: m.ReceiptsPage })));
+const CashCollectionPage = lazy(() => import('../components/pages/CashCollectionPage').then(m => ({ default: m.CashCollectionPage })));
+const CashDeskPage = lazy(() => import('../components/pages/CashDeskPage').then(m => ({ default: m.CashDeskPage })));
+const CustomersPage = lazy(() => import('../components/pages/CustomersPage').then(m => ({ default: m.CustomersPage })));
 
 const PAGE_ROUTES: Record<string, string> = {
   SALE: '/sale',
@@ -66,7 +68,9 @@ const PAGE_ROUTES: Record<string, string> = {
   AUDIT_LOG: '/audit-log',
   SETTINGS: '/settings',
   NOTIFICATIONS: '/notifications',
-  RECEIPTS: '/receipts',
+  CASH_COLLECTION: '/cash-collection',
+  CASH_DESK: '/cash',
+  CUSTOMERS: '/customers',
 };
 
 function LoadingFallback() {
@@ -134,18 +138,20 @@ export function MainLayout() {
               <Route path="/exchange" element={<ExchangePage />} />
               <Route path="/repair" element={<RepairPage />} />
               <Route path="/suppliers" element={currentUser?.role === 'ADMIN' ? <SuppliersPage /> : <Navigate to="/sale" replace />} />
-              <Route path="/customers" element={<Navigate to="/sale" replace />} />
+              <Route path="/customers" element={<CustomersPage />} />
+              <Route path="/cash" element={<CashDeskPage />} />
+              <Route path="/cash-collection" element={currentUser?.role === 'ADMIN' || currentUser?.role === 'PARTNER' ? <CashCollectionPage /> : <Navigate to="/sale" replace />} />
               <Route path="/bonuses" element={currentUser?.role === 'ADMIN' ? <BonusesPage /> : <Navigate to="/sale" replace />} />
               <Route path="/expenses" element={<ExpensesPage />} />
               <Route path="/owners" element={currentUser?.role === 'ADMIN' ? <OwnersPage /> : <Navigate to="/sale" replace />} />
               <Route path="/employees" element={currentUser?.role === 'ADMIN' ? <EmployeesPage /> : <Navigate to="/sale" replace />} />
               {/* «Финансовые отчёты» merged into Финансы (opens on the «Отчёт» tab) */}
               <Route path="/reports" element={<Navigate to={currentUser?.role === 'ADMIN' ? "/finance" : "/sale"} replace />} />
-              <Route path="/finance" element={currentUser?.role === 'ADMIN' ? <FinancePage /> : <Navigate to="/sale" replace />} />
+              <Route path="/finance" element={currentUser?.role === 'ADMIN' || currentUser?.role === 'PARTNER' ? <FinancePage /> : <Navigate to="/sale" replace />} />
               <Route path="/audit-log" element={currentUser?.role === 'ADMIN' ? <AuditLogPage /> : <Navigate to="/sale" replace />} />
               <Route path="/settings" element={<SettingsPage />} />
               <Route path="/notifications" element={currentUser?.role === 'ADMIN' ? <NotificationsPage /> : <Navigate to="/sale" replace />} />
-              <Route path="/receipts" element={<ReceiptsPage />} />
+              <Route path="/receipts" element={<Navigate to="/inventory" replace />} />
               <Route path="*" element={<Navigate to={currentUser?.role === 'ADMIN' ? "/finance" : "/sale"} replace />} />
             </Routes>
           </Suspense>

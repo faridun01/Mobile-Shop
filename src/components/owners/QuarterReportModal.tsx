@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { FileText, X, Check, CheckCircle2, Loader2, History, Archive, AlertCircle, Calendar } from 'lucide-react';
-import { CustomSelect } from '../ui/CustomSelect';
 import { formatUsd } from '../../utils/money';
 import { Owner, QuarterClosure } from '../../types';
 import { apiClient } from '../../api/client';
@@ -40,6 +39,29 @@ function formatClosureDate(dateStr?: string): string {
   }
 }
 
+const MONTH_NAMES_RU = [
+  'Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь',
+  'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь',
+];
+
+function getInitialPeriodName(): string {
+  const now = new Date();
+  const monthName = MONTH_NAMES_RU[now.getMonth()];
+  return `${monthName} ${now.getFullYear()}`;
+}
+
+function getTodayPeriodName(): string {
+  const now = new Date();
+  const day = String(now.getDate()).padStart(2, '0');
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  return `Отчёт на ${day}.${month}.${now.getFullYear()}`;
+}
+
+function getYearPeriodName(): string {
+  const now = new Date();
+  return `${now.getFullYear()} год`;
+}
+
 export const QuarterReportModal: React.FC<QuarterReportModalProps> = ({
   open,
   onClose,
@@ -50,8 +72,7 @@ export const QuarterReportModal: React.FC<QuarterReportModalProps> = ({
   isSubmitting,
 }) => {
   const [activeTab, setActiveTab] = useState<'CLOSE' | 'HISTORY'>('CLOSE');
-  const [selectedQuarter, setSelectedQuarter] = useState<'Q1' | 'Q2' | 'Q3' | 'Q4'>('Q3');
-  const [selectedQuarterYear, setSelectedQuarterYear] = useState<number>(2026);
+  const [periodName, setPeriodName] = useState<string>(getInitialPeriodName);
   const [transferRemainingToCapital, setTransferRemainingToCapital] = useState(true);
 
   const [closures, setClosures] = useState<QuarterClosure[]>([]);
@@ -78,13 +99,15 @@ export const QuarterReportModal: React.FC<QuarterReportModalProps> = ({
   useEffect(() => {
     if (open) {
       void fetchClosures();
+      setPeriodName((prev) => (prev.trim() ? prev : getInitialPeriodName()));
     }
   }, [open, fetchClosures]);
 
-  const quarterNameCandidate = `${selectedQuarter} ${selectedQuarterYear}`;
+  const periodNameTrimmed = periodName.trim();
   const alreadyClosedCurrent = useMemo(() => {
-    return closures.find((c) => c.quarterName === quarterNameCandidate);
-  }, [closures, quarterNameCandidate]);
+    if (!periodNameTrimmed) return null;
+    return closures.find((c) => c.quarterName.trim().toLowerCase() === periodNameTrimmed.toLowerCase());
+  }, [closures, periodNameTrimmed]);
 
   const selectedClosure = useMemo(() => {
     if (!closures.length) return null;
@@ -94,9 +117,9 @@ export const QuarterReportModal: React.FC<QuarterReportModalProps> = ({
   if (!open) return null;
 
   const handleConfirm = async () => {
-    if (alreadyClosedCurrent) return;
+    if (alreadyClosedCurrent || !periodNameTrimmed) return;
     await onConfirmClose({
-      quarterName: quarterNameCandidate,
+      quarterName: periodNameTrimmed,
       transferRemainingToCapital,
     });
     await fetchClosures();
@@ -120,10 +143,10 @@ export const QuarterReportModal: React.FC<QuarterReportModalProps> = ({
             </div>
             <div>
               <h4 id="quarter-report-title" className="text-xs sm:text-sm font-bold text-fg leading-tight">
-                Квартальные отчеты учредителей
+                Финансовый отчёт и закрытие периода
               </h4>
               <p className="text-[10px] text-fg-subtle">
-                Закрытие периодов, обнуление счетчиков и архив ведомостей
+                Сводная ведомость учредителей, фиксация прибыли и архив отчётов
               </p>
             </div>
           </div>
@@ -173,39 +196,50 @@ export const QuarterReportModal: React.FC<QuarterReportModalProps> = ({
 
         {activeTab === 'CLOSE' ? (
           <>
-            {/* Quarter / Year Selector Toolbar */}
-            <div className="flex items-center justify-between gap-2 p-1 rounded-xl bg-surface-raised border border-border">
-              <div className="flex items-center gap-1 flex-1">
-                {(['Q1', 'Q2', 'Q3', 'Q4'] as const).map((q) => {
-                  const isSel = selectedQuarter === q;
-                  return (
-                    <button
-                      key={q}
-                      type="button"
-                      onClick={() => setSelectedQuarter(q)}
-                      className={`flex-1 py-1 px-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                        isSel
-                          ? 'bg-amber-500 text-black shadow-xs font-black'
-                          : 'text-fg-subtle hover:text-fg hover:bg-surface'
-                      }`}
-                    >
-                      {q}
-                    </button>
-                  );
-                })}
+            {/* Flexible Period Selector */}
+            <div className="p-2.5 sm:p-3 rounded-xl bg-surface-raised border border-border space-y-2">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5">
+                <label htmlFor="period-name-input" className="text-xs font-bold text-fg flex items-center gap-1.5">
+                  <Calendar className="w-3.5 h-3.5 text-amber-500" />
+                  <span>Период отчёта:</span>
+                </label>
+                <div className="flex flex-wrap items-center gap-1 text-[11px]">
+                  <span className="text-fg-subtle text-[10px] mr-0.5">Быстро:</span>
+                  {[
+                    { label: 'Текущий месяц', value: getInitialPeriodName() },
+                    { label: 'На сегодня', value: getTodayPeriodName() },
+                    { label: 'С начала года', value: getYearPeriodName() },
+                  ].map((p) => {
+                    const isSel = periodName.trim() === p.value;
+                    return (
+                      <button
+                        key={p.label}
+                        type="button"
+                        onClick={() => setPeriodName(p.value)}
+                        className={`px-2 py-0.5 rounded-lg font-semibold transition-all cursor-pointer ${
+                          isSel
+                            ? 'bg-amber-500 text-black font-bold shadow-xs'
+                            : 'bg-surface border border-border text-fg-subtle hover:text-fg hover:border-amber-500/40'
+                        }`}
+                      >
+                        {p.label}
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
 
-              <CustomSelect
-                value={String(selectedQuarterYear)}
-                onChange={(val) => setSelectedQuarterYear(parseInt(val))}
-                options={[
-                  { value: '2026', label: '2026 г.' },
-                  { value: '2025', label: '2025 г.' },
-                  { value: '2024', label: '2024 г.' },
-                ]}
-                title="Выберите год"
-                className="shrink-0"
+              <input
+                id="period-name-input"
+                type="text"
+                value={periodName}
+                onChange={(e) => setPeriodName(e.target.value)}
+                placeholder="Например: Октябрь 2026, Отчёт на 07.10.2026 или любое название..."
+                className="w-full rounded-xl bg-surface border border-border px-3 py-2 text-xs sm:text-sm font-semibold text-fg placeholder:text-fg-subtle/50 focus:border-amber-500 focus:outline-hidden"
               />
+              <p className="text-[10px] text-fg-subtle">
+                Формируйте отчёт в любой момент, когда нужно — за месяц, произвольные даты или с начала года.
+              </p>
             </div>
 
             {/* Already closed banner if selected quarter is in history */}
@@ -239,7 +273,7 @@ export const QuarterReportModal: React.FC<QuarterReportModalProps> = ({
             <div className="space-y-1">
               <div className="flex items-center justify-between text-[11px] text-fg-subtle px-0.5">
                 <span className="font-semibold uppercase tracking-wider">
-                  Текущие счетчики периода ({quarterNameCandidate})
+                  Текущие счетчики периода {periodNameTrimmed ? `(«${periodNameTrimmed}»)` : ''}
                 </span>
                 <span className="font-mono">{displayOwners.length} {ownerCountLabel(displayOwners.length)}</span>
               </div>
@@ -248,7 +282,7 @@ export const QuarterReportModal: React.FC<QuarterReportModalProps> = ({
                 <table className="w-full text-left text-xs min-w-[500px]">
                   <thead className="bg-surface text-[10px] text-fg-subtle uppercase border-b border-border">
                     <tr>
-                      <th className="py-2 px-2.5 font-semibold">Партнер / Доля</th>
+                      <th className="py-2 px-2.5 font-semibold">Партнер</th>
                       <th className="py-2 px-2 text-right font-semibold">Начислено</th>
                       <th className="py-2 px-2 text-right font-semibold">Выплачено</th>
                       <th className="py-2 px-2 text-right font-semibold">Реинвест</th>
@@ -262,11 +296,8 @@ export const QuarterReportModal: React.FC<QuarterReportModalProps> = ({
                       return (
                         <tr key={o.id} className="hover:bg-surface/50 font-mono transition-colors">
                           <td className="py-1.5 px-2.5 font-sans">
-                            <span className="font-bold text-fg block text-xs truncate max-w-[130px] sm:max-w-none">
+                            <span className="font-bold text-fg block text-xs truncate max-w-[150px] sm:max-w-none">
                               {getOwnerDetails(o).name}
-                            </span>
-                            <span className="text-[10px] text-fg-subtle block truncate max-w-[150px] sm:max-w-none leading-tight">
-                              {ownerShareLabel(o.id)}
                             </span>
                           </td>
                           <td className="py-1.5 px-2 text-right font-semibold text-fg">
@@ -347,7 +378,7 @@ export const QuarterReportModal: React.FC<QuarterReportModalProps> = ({
                 <span className="text-[11px] text-fg-subtle block leading-tight mt-0.5">
                   {transferRemainingToCapital
                     ? 'Остаток прибыли пополнит капитал партнеров. Счетчики «Начислено», «Выплачено» и «Реинвест» обнулятся для нового периода и зафиксируются в архиве.'
-                    : 'Прибыль останется доступной для выплаты. Счетчики квартала обнулятся для нового периода.'}
+                    : 'Прибыль останется доступной для выплаты. Счетчики периода обнулятся для нового периода.'}
                 </span>
               </div>
             </div>
@@ -360,14 +391,14 @@ export const QuarterReportModal: React.FC<QuarterReportModalProps> = ({
                 onClick={onClose}
                 className="px-3.5 py-2 rounded-xl text-xs font-semibold text-fg-subtle hover:text-fg hover:bg-surface-raised transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
               >
-                Закрыть
+                Отмена
               </button>
               <button
                 type="button"
-                disabled={isSubmitting || Boolean(alreadyClosedCurrent)}
+                disabled={isSubmitting || Boolean(alreadyClosedCurrent) || !periodNameTrimmed}
                 onClick={handleConfirm}
                 className={`px-4 py-2 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 shadow-xs transition-all ${
-                  alreadyClosedCurrent
+                  alreadyClosedCurrent || !periodNameTrimmed
                     ? 'bg-surface-raised border border-border text-fg-subtle cursor-not-allowed opacity-70'
                     : 'bg-amber-500 hover:bg-amber-600 text-black cursor-pointer'
                 }`}
@@ -382,10 +413,12 @@ export const QuarterReportModal: React.FC<QuarterReportModalProps> = ({
                     <CheckCircle2 className="w-3.5 h-3.5 text-amber-500" />
                     <span>Период уже закрыт</span>
                   </>
+                ) : !periodNameTrimmed ? (
+                  <span>Укажите название периода</span>
                 ) : (
                   <>
                     <CheckCircle2 className="w-3.5 h-3.5" />
-                    <span>Закрыть {selectedQuarter} {selectedQuarterYear}</span>
+                    <span>Закрыть период «{periodNameTrimmed}»</span>
                   </>
                 )}
               </button>
@@ -403,7 +436,7 @@ export const QuarterReportModal: React.FC<QuarterReportModalProps> = ({
               <div className="p-8 text-center text-fg-subtle rounded-xl border border-dashed border-border bg-surface-raised/20 space-y-1">
                 <Archive className="w-8 h-8 text-fg-subtle/50 mx-auto" />
                 <p className="font-semibold text-xs text-fg">Архив закрытых периодов пуст</p>
-                <p className="text-[11px]">После закрытия квартала здесь будет храниться вся финансовая история.</p>
+                <p className="text-[11px]">После закрытия периода здесь будет храниться вся финансовая история.</p>
               </div>
             ) : (
               <>

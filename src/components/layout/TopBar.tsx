@@ -55,7 +55,6 @@ export const TopBar: React.FC = () => {
       case 'INVENTORY': return 'Склад товаров';
       case 'PURCHASE': return 'Приходы товара';
       case 'TRANSFER': return 'Перемещение';
-      case 'RECEIPTS': return isStoreScoped ? 'Приходы' : 'Приходы в магазины';
       case 'EXCHANGE': return 'Обмен Trade-In';
       case 'REPAIR': return 'Сервис и ремонт';
       case 'SUPPLIERS': return 'Поставщики';
@@ -65,6 +64,9 @@ export const TopBar: React.FC = () => {
       case 'EMPLOYEES': return 'Сотрудники';
       case 'REPORTS': return 'Финансовые отчёты';
       case 'FINANCE': return 'Финансы';
+      case 'CASH_COLLECTION': return 'Инкассация';
+      case 'CASH_DESK': return 'Касса';
+      case 'CUSTOMERS': return 'База клиентов';
       case 'AUDIT_LOG': return 'Журнал аудита';
       case 'SETTINGS': return 'Настройки';
       case 'NOTIFICATIONS': return 'Уведомления';

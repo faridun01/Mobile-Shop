@@ -71,6 +71,7 @@ export interface TransferHistoryListProps {
   onApprove: (transferId: string) => void;
   onRequestReject: (transfer: TransferRequest) => void;
   onNavigateToCreate: () => void;
+  onOpenInvoice: (transfer: TransferRequest) => void;
 }
 
 export interface ConfirmTransferModalProps {

@@ -17,6 +17,7 @@ import {
   Smartphone,
   AlertCircle,
   Loader2,
+  FileText,
 } from 'lucide-react';
 import { formatStoreName } from '../../utils/storeContext';
 import { getPhoneColorHex, formatRam } from '../../utils/phoneSpecs';
@@ -49,6 +50,7 @@ export const TransferHistoryList: React.FC<TransferHistoryListProps> = ({
   onApprove,
   onRequestReject,
   onNavigateToCreate,
+  onOpenInvoice,
 }) => {
   return (
     <div className="flex-1 overflow-y-auto p-2.5 sm:p-4 lg:p-6 space-y-4 bg-bg flex flex-col max-w-4xl xl:max-w-5xl mx-auto w-full">
@@ -240,9 +242,14 @@ export const TransferHistoryList: React.FC<TransferHistoryListProps> = ({
                     </div>
 
                     <div className="flex items-center gap-1.5">
-                      <span className="font-bold font-mono text-fg text-xs sm:text-sm">
+                      <button
+                        type="button"
+                        onClick={() => onOpenInvoice(tr)}
+                        title="Открыть накладную на перемещение"
+                        className="font-bold font-mono text-fg text-xs sm:text-sm hover:text-accent hover:underline cursor-pointer transition-colors text-left"
+                      >
                         Перемещение #{tr.transferNumber || tr.id.slice(-6)}
-                      </span>
+                      </button>
                       <button
                         type="button"
                         onClick={() => onCopyText(tr.transferNumber || tr.id.slice(-6))}
@@ -270,6 +277,17 @@ export const TransferHistoryList: React.FC<TransferHistoryListProps> = ({
                         {tr.status === 'APPROVED' ? 'Выполнено' : tr.status === 'PENDING_APPROVAL' ? 'Ожидает подтверждения' : 'Отклонено'}
                       </span>
                     </span>
+
+                    {/* Waybill Button */}
+                    <button
+                      type="button"
+                      onClick={() => onOpenInvoice(tr)}
+                      title="Посмотреть официальную накладную"
+                      className="px-2.5 py-1 rounded-lg bg-surface border border-accent/40 hover:border-accent text-accent hover:bg-accent hover:text-accent-fg font-bold text-xs transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                    >
+                      <FileText className="w-3.5 h-3.5" />
+                      <span>Накладная</span>
+                    </button>
                   </div>
 
                   <div className="flex items-center gap-2.5 text-fg-subtle text-[11px] font-medium ml-auto sm:ml-0">
@@ -351,16 +369,28 @@ export const TransferHistoryList: React.FC<TransferHistoryListProps> = ({
                       </span>
                     </div>
 
-                    {rawModels.length > 3 && (
+                    <div className="flex items-center gap-3">
                       <button
                         type="button"
-                        onClick={() => onToggleExpandTransfer(tr.id)}
-                        className="text-[11px] font-semibold text-accent hover:underline flex items-center gap-1 cursor-pointer"
+                        onClick={() => onOpenInvoice(tr)}
+                        className="text-[11px] font-bold text-accent hover:underline flex items-center gap-1 cursor-pointer"
+                        title="Посмотреть полную накладную"
                       >
-                        <span>{isExpanded ? 'Свернуть' : `Показать все (${rawModels.length})`}</span>
-                        {isExpanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                        <FileText className="w-3 h-3" />
+                        <span>Накладная</span>
                       </button>
-                    )}
+
+                      {rawModels.length > 3 && (
+                        <button
+                          type="button"
+                          onClick={() => onToggleExpandTransfer(tr.id)}
+                          className="text-[11px] font-semibold text-fg-muted hover:text-fg hover:underline flex items-center gap-1 cursor-pointer"
+                        >
+                          <span>{isExpanded ? 'Свернуть' : `Все (${rawModels.length})`}</span>
+                          {isExpanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                        </button>
+                      )}
+                    </div>
                   </div>
 
                   <div className="divide-y divide-border/60">

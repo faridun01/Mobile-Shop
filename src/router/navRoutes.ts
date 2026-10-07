@@ -21,5 +21,7 @@ export const NAV_PAGE_ROUTES: Record<string, string> = {
   AUDIT_LOG: '/audit-log',
   SETTINGS: '/settings',
   NOTIFICATIONS: '/notifications',
-  RECEIPTS: '/receipts',
+  CASH_COLLECTION: '/cash-collection',
+  CASH_DESK: '/finance?tab=CASH',
+  CUSTOMERS: '/customers',
 };

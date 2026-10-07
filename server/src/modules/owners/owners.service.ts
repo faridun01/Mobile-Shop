@@ -3,7 +3,7 @@ import { prisma } from '../../prisma/prisma.service';
 import type { TransactionClient } from '../../prisma/prisma.service';
 import { resolveActor } from '../../common/actor';
 import { requireFiniteNumber, requirePositiveMoney, roundMoney } from '../../common/money';
-import { requireTodayRate } from '../exchange-rate/exchange-rate.service';
+import { requireTodayRate, getRateForDate } from '../exchange-rate/exchange-rate.service';
 import { getStoreCashAccount } from '../finance/account.service';
 import { postTransaction } from '../finance/financial-transaction.service';
 import { allocateOwnerProfit } from '../sales/profit';
@@ -36,11 +36,17 @@ export class OwnersService {
     amountUsd = requirePositiveMoney(amountUsd, 'Сумма инвестиции');
     return prisma.$transaction(async (tx) => {
       const actor = await resolveActor(tx, userId);
-      const exchangeRate = await requireTodayRate(tx);
+      let exchangeRate: any;
+      try {
+        exchangeRate = await requireTodayRate(tx);
+      } catch {
+        const fallback = await getRateForDate(new Date());
+        exchangeRate = fallback ? D(fallback) : D(10);
+      }
       const owner = await tx.owner.findUnique({ where: { id: ownerId } });
       if (!owner) throw new Error('Владелец не найден');
 
-      const targetStore = await OwnersService.getMainWarehouse(tx);
+      const targetStore = await OwnersService.resolveTargetStore(tx, destination);
       const cashAmountTjs = roundMoney(D(amountUsd).mul(exchangeRate));
       // The register is kept in USD, so owner money moves dollar for dollar — capital and cash never drift with the rate.
       await tx.store.update({ where: { id: targetStore.id }, data: { cashBalanceUsd: { increment: amountUsd } } });
@@ -83,16 +89,22 @@ export class OwnersService {
     amountUsd = requirePositiveMoney(amountUsd, 'Сумма изъятия');
     return prisma.$transaction(async (tx) => {
       const actor = await resolveActor(tx, userId);
-      const exchangeRate = await requireTodayRate(tx);
+      let exchangeRate: any;
+      try {
+        exchangeRate = await requireTodayRate(tx);
+      } catch {
+        const fallback = await getRateForDate(new Date());
+        exchangeRate = fallback ? D(fallback) : D(10);
+      }
       const owner = await tx.owner.findUnique({ where: { id: ownerId } });
       if (!owner) throw new Error('Владелец не найден');
       const guard = await tx.owner.updateMany({ where: { id: ownerId, capitalBalanceUsd: { gte: amountUsd } }, data: { capitalBalanceUsd: { decrement: amountUsd } } });
       if (guard.count !== 1) throw new Error('Сумма изъятия превышает текущий капитал');
 
-      const targetStore = await OwnersService.getMainWarehouse(tx);
+      const targetStore = await OwnersService.resolveTargetStore(tx, source);
       const cashAmountTjs = roundMoney(D(amountUsd).mul(exchangeRate));
       const cashGuard = await tx.store.updateMany({ where: { id: targetStore.id, cashBalanceUsd: { gte: amountUsd } }, data: { cashBalanceUsd: { decrement: amountUsd } } });
-      if (!D(cashGuard.count).eq(1)) throw new Error(`В центральной кассе («${targetStore.name}») недостаточно наличных для изъятия`);
+      if (!D(cashGuard.count).eq(1)) throw new Error(`В кассе («${targetStore.name}») недостаточно наличных для изъятия (в кассе $${targetStore.cashBalanceUsd}, требуется $${amountUsd})`);
 
       const updated = await tx.owner.findUniqueOrThrow({ where: { id: ownerId } });
       const ownerTx = await tx.ownerTransaction.create({
@@ -292,14 +304,14 @@ export class OwnersService {
 
   public static async closeQuarter(quarterName: string, transferRemainingToCapital: boolean, userId: string) {
     const cleanQuarterName = String(quarterName || '').trim();
-    if (!cleanQuarterName) throw new Error('Укажите название закрываемого квартала');
+    if (!cleanQuarterName) throw new Error('Укажите название закрываемого периода');
 
     return prisma.$transaction(async (tx) => {
       const actor = await resolveActor(tx, userId);
 
       const existingClosure = await tx.quarterClosure.findFirst({ where: { quarterName: cleanQuarterName } });
       if (existingClosure) {
-        throw new Error(`Квартал «${cleanQuarterName}» уже закрыт`);
+        throw new Error(`Период «${cleanQuarterName}» уже закрыт`);
       }
 
       const owners = await tx.owner.findMany();
@@ -320,9 +332,9 @@ export class OwnersService {
                 availableProfitUsd: { decrement: remaining },
               },
             });
-            if (guard.count !== 1) throw new Error('Прибыль изменилась во время закрытия квартала. Обновите данные и повторите');
+            if (guard.count !== 1) throw new Error('Прибыль изменилась во время закрытия периода. Обновите данные и повторите');
             // Same records a manual REINVEST produces: owner history, journal and audit amounts.
-            const note = `Автоматическое реинвестирование остатка при закрытии квартала ${cleanQuarterName}`;
+            const note = `Автоматическое реинвестирование остатка при закрытии периода ${cleanQuarterName}`;
             await tx.ownerTransaction.create({
               data: {
                 ownerId: owner.id,
@@ -378,7 +390,7 @@ export class OwnersService {
           userName: actor.name,
           userRole: actor.role,
           action: 'QUARTER_CLOSE',
-          details: `Закрыт квартальный период (${cleanQuarterName})${transferRemainingToCapital ? ', остаток прибыли зачислен в оборотный капитал' : ', остаток прибыли перенесён на следующий период'}. Счетчики периода обнулены и сохранены в истории.`,
+          details: `Закрыт финансовый период (${cleanQuarterName})${transferRemainingToCapital ? ', остаток прибыли зачислен в оборотный капитал' : ', остаток прибыли перенесён на следующий период'}. Счетчики периода обнулены и сохранены в истории.`,
           financialDetails: moneyJson({ quarterName: cleanQuarterName, transferRemainingToCapital, sweptToCapital: swept }),
         },
       });

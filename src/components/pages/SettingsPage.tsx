@@ -211,7 +211,6 @@ export const SettingsPage: React.FC = () => {
           </div>
           <div className="min-w-0">
             <h1 className="text-xs sm:text-sm font-bold text-fg leading-tight">Настройки системы</h1>
-            <p className="text-[10px] text-fg-subtle truncate">Оформление, курс валют, филиалы и параметры приложения</p>
           </div>
         </div>
       </div>

@@ -62,7 +62,9 @@ export type PageId =
   | 'AUDIT_LOG'
   | 'SETTINGS'
   | 'NOTIFICATIONS'
-  | 'RECEIPTS';
+  | 'CASH_COLLECTION'
+  | 'CASH_DESK'
+  | 'CUSTOMERS';
 
 export interface User {
   id: string;
@@ -528,8 +530,8 @@ export interface BonusDistributionLog {
   periodName: string;
   totalAmountUsd: number;
   totalAmountTjs?: number;
-  type: 'DISTRIBUTION' | 'ANNULMENT';
-  allocations: { ownerId: string; ownerName?: string; amountUsd: number }[];
+  type: 'DISTRIBUTION' | 'ANNULMENT' | 'BUSINESS_REINVEST' | 'PROFIT_PAYOUT' | string;
+  allocations: any;
   note?: string;
   performedByUserId?: string;
   performedByName?: string;
@@ -592,3 +594,70 @@ export interface DailyClosingSummary {
   expectedCashTjs: string;
   expectedCashUsd: string;
 }
+
+export interface Customer {
+  id: string;
+  name: string;
+  phone?: string | null;
+  note?: string | null;
+  pushEnabled?: boolean;
+  hasPushSubscription?: boolean;
+  totalDebtTjs: number;
+  totalPaidTjs: number;
+  salesCount?: number;
+  paymentsCount?: number;
+  lastSale?: {
+    createdAt: string;
+    receiptNumber: number;
+    totalTjs: number;
+  } | null;
+  createdAt: string;
+}
+
+export interface CashDeskSummary {
+  exchangeRate: number;
+  cash: {
+    totalUsd: number;
+    totalTjs: number;
+    stores: {
+      id: string;
+      name: string;
+      isMainWarehouse: boolean;
+      cashUsd: number;
+      cashTjs: number;
+    }[];
+  };
+  inventory: {
+    totalCount: number;
+    totalCostUsd: number;
+    totalCostTjs: number;
+  };
+  suppliers: {
+    totalDebtUsd: number;
+    totalDebtTjs: number;
+    debtorsCount: number;
+    suppliers: {
+      id: string;
+      name: string;
+      phone?: string;
+      totalDebtUsd: number;
+      totalDebtTjs: number;
+    }[];
+  };
+  customers: {
+    totalDebtTjs: number;
+    totalDebtUsd: number;
+    debtorsCount: number;
+    debtors: {
+      id: string;
+      name: string;
+      phone?: string;
+      note?: string;
+      totalDebtTjs: number;
+      totalPaidTjs: number;
+      lastSaleDate?: string | null;
+      lastReceiptNumber?: number | null;
+    }[];
+  };
+}
+

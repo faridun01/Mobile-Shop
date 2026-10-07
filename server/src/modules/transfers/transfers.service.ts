@@ -63,7 +63,7 @@ export class TransfersService {
           requestedByUserId: input.requestedByUserId,
           items: { create: devices.map((d) => ({ deviceId: d.id, imei: d.imei, brand: d.brand, model: d.model })) },
         },
-        include: { items: true },
+        include: { items: true, fromStore: { select: { name: true } }, toStore: { select: { name: true } } },
       });
 
       const holdResult = await tx.device.updateMany({
@@ -158,6 +158,7 @@ export class TransfersService {
           approvedAt: new Date(),
           items: { create: devices.map((d) => ({ deviceId: d.id, imei: d.imei, brand: d.brand, model: d.model })) },
         },
+        include: { items: true, fromStore: { select: { name: true } }, toStore: { select: { name: true } } },
       });
 
       const moveResult = await tx.device.updateMany({

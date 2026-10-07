@@ -14,10 +14,13 @@ interface CreateSaleInput {
   storeId: string;
   userId: string;
   items: { deviceId: string; salePriceTjs: MoneyInput }[];
-  paymentMethod: 'CASH' | 'CARD' | 'SPLIT';
+  paymentMethod: 'CASH' | 'CARD' | 'SPLIT' | 'DEBT';
   cashAmountTjs?: MoneyInput;
   cardAmountTjs?: MoneyInput;
+  debtAmountTjs?: MoneyInput;
   customerName?: string;
+  customerPhone?: string;
+  customerId?: string;
 }
 
 export class SalesService {
@@ -36,7 +39,7 @@ export class SalesService {
     }
 
     if (!input.storeId) throw new Error('Не удалось определить магазин продажи');
-    if (!['CASH', 'CARD', 'SPLIT'].includes(input.paymentMethod)) throw new Error('Некорректный способ оплаты');
+    if (!['CASH', 'CARD', 'SPLIT', 'DEBT'].includes(input.paymentMethod)) throw new Error('Некорректный способ оплаты');
     const deviceIds = input.items.map((item) => item.deviceId);
     if (new Set(deviceIds).size !== deviceIds.length) throw new Error('Одно устройство нельзя добавить в чек дважды');
 
@@ -45,13 +48,32 @@ export class SalesService {
       salePriceTjs: requirePositiveMoney(item.salePriceTjs, 'Цена продажи'),
     }));
     const totalTjs = normalizedItems.reduce((sum, item) => D(sum).plus(item.salePriceTjs), D(0));
-    const cashAmountTjs = requireNonNegativeMoney(input.paymentMethod === 'CASH' ? totalTjs : input.paymentMethod === 'SPLIT' ? input.cashAmountTjs ?? 0 : 0, 'Сумма наличными');
-    const cardAmountTjs = requireNonNegativeMoney(input.paymentMethod === 'CARD' ? totalTjs : input.paymentMethod === 'SPLIT' ? input.cardAmountTjs ?? 0 : 0, 'Сумма по карте');
 
-    requireNonNegativeMoney(cashAmountTjs, 'Сумма наличными');
-    requireNonNegativeMoney(cardAmountTjs, 'Сумма по карте');
-    if (input.paymentMethod === 'SPLIT' && !moneyEquals(D(cashAmountTjs).plus(cardAmountTjs), totalTjs)) {
-      throw new Error('Сумма наличных и по карте должна совпадать с итоговой суммой чека');
+    let cashAmountTjs = D(0);
+    let cardAmountTjs = D(0);
+    let debtAmountTjs = D(0);
+
+    if (input.paymentMethod === 'CASH') {
+      cashAmountTjs = totalTjs;
+    } else if (input.paymentMethod === 'CARD') {
+      cardAmountTjs = totalTjs;
+    } else if (input.paymentMethod === 'SPLIT') {
+      cashAmountTjs = requireNonNegativeMoney(input.cashAmountTjs ?? 0, 'Сумма наличными');
+      cardAmountTjs = requireNonNegativeMoney(input.cardAmountTjs ?? 0, 'Сумма по карте');
+      if (!moneyEquals(cashAmountTjs.plus(cardAmountTjs), totalTjs)) {
+        throw new Error('Сумма наличных и по карте должна совпадать с итоговой суммой чека');
+      }
+    } else if (input.paymentMethod === 'DEBT') {
+      cashAmountTjs = requireNonNegativeMoney(input.cashAmountTjs ?? 0, 'Сумма наличными');
+      cardAmountTjs = requireNonNegativeMoney(input.cardAmountTjs ?? 0, 'Сумма по карте');
+      const upfrontPaidTjs = cashAmountTjs.plus(cardAmountTjs);
+      if (upfrontPaidTjs.gt(totalTjs)) {
+        throw new Error('Сумма первого взноса не может превышать общую стоимость чека');
+      }
+      debtAmountTjs = totalTjs.minus(upfrontPaidTjs);
+      if (debtAmountTjs.lte(0)) {
+        throw new Error('При продаже в долг сумма долга должна быть больше 0');
+      }
     }
 
     return prisma.$transaction(async (tx: TransactionClient) => {
@@ -122,6 +144,52 @@ export class SalesService {
         };
       });
 
+      let finalCustomerId: string | null = null;
+      let finalCustomerName = input.customerName?.trim() || null;
+      const cleanPhone = input.customerPhone?.trim() || null;
+
+      if (input.paymentMethod === 'DEBT') {
+        if (input.customerId) {
+          const cust = await tx.customer.findUnique({ where: { id: input.customerId } });
+          if (!cust) throw new Error('Выбранный клиент не найден');
+          finalCustomerId = cust.id;
+          finalCustomerName = cust.name;
+        } else if (cleanPhone || finalCustomerName) {
+          if (cleanPhone) {
+            let cust = await tx.customer.findUnique({ where: { phone: cleanPhone } });
+            if (!cust) {
+              cust = await tx.customer.create({
+                data: {
+                  name: finalCustomerName || `Клиент ${cleanPhone}`,
+                  phone: cleanPhone,
+                },
+              });
+            } else if (finalCustomerName && cust.name !== finalCustomerName) {
+              cust = await tx.customer.update({
+                where: { id: cust.id },
+                data: { name: finalCustomerName },
+              });
+            }
+            finalCustomerId = cust.id;
+            finalCustomerName = cust.name;
+          } else if (finalCustomerName) {
+            const cust = await tx.customer.create({
+              data: {
+                name: finalCustomerName,
+              },
+            });
+            finalCustomerId = cust.id;
+          }
+        } else {
+          throw new Error('Для продажи в долг обязательно укажите клиента (имя или номер телефона)');
+        }
+
+        await tx.customer.update({
+          where: { id: finalCustomerId! },
+          data: { totalDebtTjs: { increment: debtAmountTjs } },
+        });
+      }
+
       const sale = await tx.sale.create({
         data: {
           storeId: input.storeId,
@@ -131,8 +199,10 @@ export class SalesService {
           exchangeRate: rate,
           cashAmountTjs,
           cardAmountTjs,
+          debtAmountTjs,
           paymentMethod: input.paymentMethod,
-          customerName: input.customerName,
+          customerId: finalCustomerId,
+          customerName: finalCustomerName,
           hasBelowCostItem,
           saleItems: { create: saleItemsData },
         },
@@ -140,6 +210,7 @@ export class SalesService {
           saleItems: { include: { device: { select: { ram: true } } } },
           store: true,
           user: { select: { id: true, name: true, role: true } },
+          customer: true,
         },
       });
 
@@ -173,32 +244,37 @@ export class SalesService {
         data: saleItemsData.map((item) => ({
           deviceId: item.deviceId,
           type: 'SALE',
-          description: `Продано за ${item.salePriceTjs} TJS (чек #${sale.receiptNumber})${item.isBonus ? ' (Бонусный товар)' : ''}`,
+          description: `Продано за ${item.salePriceTjs} TJS (чек #${sale.receiptNumber})${input.paymentMethod === 'DEBT' ? ` [В долг: ${debtAmountTjs} TJS]` : ''}${item.isBonus ? ' (Бонусный товар)' : ''}`,
           userName: input.userId,
           priceTjs: item.salePriceTjs,
           priceUsd: item.salePriceUsd,
         })),
       });
 
-      if (!D(totalTjs).eq(0)) {
-        await tx.store.update({ where: { id: input.storeId }, data: { cashBalanceUsd: { increment: totalUsd } } });
+      const upfrontPaidTjs = D(cashAmountTjs).plus(cardAmountTjs);
+      const upfrontPaidUsd = roundMoney(upfrontPaidTjs.div(rate));
+
+      if (!upfrontPaidTjs.isZero()) {
+        await tx.store.update({ where: { id: input.storeId }, data: { cashBalanceUsd: { increment: upfrontPaidUsd } } });
         const cashAccount = await getStoreCashAccount(tx, input.storeId, store.name);
-        const paymentDescription = input.paymentMethod === 'CASH'
-          ? 'продажа наличными'
-          : input.paymentMethod === 'CARD'
-            ? 'продажа (перевод / карта)'
-            : `смешанная оплата (наличные ${cashAmountTjs} TJS, перевод/карта ${cardAmountTjs} TJS)`;
+        const paymentDescription = input.paymentMethod === 'DEBT'
+          ? `продажа в долг (первый взнос: нал. ${cashAmountTjs} TJS, карта ${cardAmountTjs} TJS; долг: ${debtAmountTjs} TJS, клиент: ${finalCustomerName})`
+          : input.paymentMethod === 'CASH'
+            ? 'продажа наличными'
+            : input.paymentMethod === 'CARD'
+              ? 'продажа (перевод / карта)'
+              : `смешанная оплата (наличные ${cashAmountTjs} TJS, перевод/карта ${cardAmountTjs} TJS)`;
         await postTransaction(tx, {
           type: 'INCOME',
           direction: 'IN',
           numberPrefix: 'CR',
           accountId: cashAccount.id,
           balanceCurrency: 'USD',
-          amount: totalTjs,
+          amount: upfrontPaidTjs,
           currency: 'TJS',
           exchangeRate: rate,
-          amountTjs: totalTjs,
-          amountUsd: totalUsd,
+          amountTjs: upfrontPaidTjs,
+          amountUsd: upfrontPaidUsd,
           categoryName: 'Продажа',
           shopId: input.storeId,
           sourceType: 'SALE',
@@ -224,7 +300,7 @@ export class SalesService {
       await tx.ledgerEntry.create({
         data: {
           type: input.paymentMethod === 'CASH' ? 'CASH_SALE' : input.paymentMethod === 'CARD' ? 'CARD_SALE' : 'SALE',
-          description: `Чек #${sale.receiptNumber}: продажа ${saleItemsData.length} устройств`,
+          description: `Чек #${sale.receiptNumber}: продажа ${saleItemsData.length} устройств${input.paymentMethod === 'DEBT' ? ` в долг (${finalCustomerName || 'Клиент'}, долг ${debtAmountTjs} TJS)` : ''}`,
           amountTjs: totalTjs,
           amountUsd: totalUsd,
           exchangeRate: rate,
@@ -238,11 +314,12 @@ export class SalesService {
         data: {
           userId: input.userId,
           action: hasBelowCostItem ? 'SALE_BELOW_COST' : 'SALE',
-          details: `Чек #${sale.receiptNumber}: продажа ${saleItemsData.length} устройств на сумму ${totalTjs} TJS ($${totalUsd})${bonusItems.length > 0 ? ` (включая ${bonusItems.length} бонусных устройств, $${roundMoney(bonusProfitUsd)} в бонусный пул)` : ''}`,
+          details: `Чек #${sale.receiptNumber}: продажа ${saleItemsData.length} устройств на сумму ${totalTjs} TJS ($${totalUsd})${input.paymentMethod === 'DEBT' ? ` в долг (${finalCustomerName}, долг ${debtAmountTjs} TJS)` : ''}${bonusItems.length > 0 ? ` (включая ${bonusItems.length} бонусных устройств, $${roundMoney(bonusProfitUsd)} в бонусный пул)` : ''}`,
           financialDetails: moneyJson({
             amountTjs: totalTjs,
             amountUsd: totalUsd,
             exchangeRate: rate,
+            debtAmountTjs,
             recognizedProfitUsd: regularProfitUsd,
             bonusProfitUsd: roundMoney(bonusProfitUsd),
             ownerProfitAllocations: moneyJson(ownerProfitAllocations),

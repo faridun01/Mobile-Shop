@@ -38,7 +38,7 @@ export function registerOwnerRoutes(app: Express) {
     }
   });
 
-  app.get('/api/owner-transactions', authenticateJwt, requireRoles('ADMIN'), async (req: AuthenticatedRequest, res, next) => {
+  app.get('/api/owner-transactions', authenticateJwt, requireRoles('ADMIN', 'PARTNER'), async (req: AuthenticatedRequest, res, next) => {
     try {
       // Owner-level capital moves (investment/withdrawal/payout/reinvest) are nowhere near
       // per-sale volume, so a generous opt-in cap is enough — existing callers that don't
@@ -51,7 +51,7 @@ export function registerOwnerRoutes(app: Express) {
     }
   });
 
-  app.post('/api/owners/:id/investment', authenticateJwt, requireRoles('ADMIN'), async (req: AuthenticatedRequest, res, next) => {
+  app.post('/api/owners/:id/investment', authenticateJwt, requireRoles('ADMIN', 'PARTNER'), async (req: AuthenticatedRequest, res, next) => {
     try {
       const { amountUsd, destination, note } = req.body ?? {};
       const owner = await OwnersService.investment(req.params.id, amountUsd, destination ?? 'Главный счет', note, req.user!.userId);
@@ -62,7 +62,7 @@ export function registerOwnerRoutes(app: Express) {
     }
   });
 
-  app.post('/api/owners/:id/withdrawal', authenticateJwt, requireRoles('ADMIN'), async (req: AuthenticatedRequest, res, next) => {
+  app.post('/api/owners/:id/withdrawal', authenticateJwt, requireRoles('ADMIN', 'PARTNER'), async (req: AuthenticatedRequest, res, next) => {
     try {
       const { amountUsd, source, note } = req.body ?? {};
       const owner = await OwnersService.withdrawal(req.params.id, amountUsd, source ?? 'Главный счет', note, req.user!.userId);

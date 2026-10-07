@@ -10,7 +10,6 @@ import {
   Landmark,
   Truck,
   ArrowLeftRight,
-  PackagePlus,
 } from 'lucide-react';
 
 export const MobileBottomNav: React.FC = () => {
@@ -163,29 +162,16 @@ export const MobileBottomNav: React.FC = () => {
         </button>
       </div>
 
-      {isAdmin ? (
-        <NavItem
-          routePath="/purchase"
-          label="Приход"
-          title="Приход товара"
-          icon={PlusCircle}
-          onSelect={() => {
-            setActivePage('PURCHASE');
-            navigate('/purchase');
-          }}
-        />
-      ) : (
-        <NavItem
-          routePath="/receipts"
-          label="Приходы"
-          title="Приходы"
-          icon={PackagePlus}
-          onSelect={() => {
-            setActivePage('RECEIPTS');
-            navigate('/receipts');
-          }}
-        />
-      )}
+      <NavItem
+        routePath="/transfer"
+        label="Перемещение"
+        title="Перемещение"
+        icon={ArrowLeftRight}
+        onSelect={() => {
+          setActivePage('TRANSFER');
+          navigate('/transfer');
+        }}
+      />
 
       <button
         onClick={() => setDrawerOpen(!drawerOpen)}
