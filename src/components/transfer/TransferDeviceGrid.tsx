@@ -472,9 +472,9 @@ export const TransferDeviceGrid: React.FC<TransferDeviceGridProps> = ({
                   )}
                 >
                   {/* Model Header Row */}
-                  <div className="p-2.5 sm:p-3 flex items-center justify-between gap-3">
+                  <div className="p-2 sm:p-2.5 flex items-center justify-between gap-2.5">
                     <div
-                      className="flex items-center gap-2.5 min-w-0 flex-1 cursor-pointer select-none"
+                      className="flex items-center gap-2 min-w-0 flex-1 cursor-pointer select-none"
                       onClick={() => toggleExpandGroup(group.key)}
                     >
                       {/* Checkbox for whole group */}
@@ -485,9 +485,9 @@ export const TransferDeviceGrid: React.FC<TransferDeviceGridProps> = ({
                           handleToggleGroupSelect(group);
                         }}
                         className={cn(
-                          'w-5 h-5 rounded-md border flex items-center justify-center transition-colors shrink-0 cursor-pointer',
+                          'w-4.5 h-4.5 rounded-md border flex items-center justify-center transition-all shrink-0 cursor-pointer',
                           allSelected
-                            ? 'bg-accent border-accent text-accent-fg'
+                            ? 'bg-accent border-accent text-accent-fg shadow-2xs scale-105'
                             : someSelected
                             ? 'bg-accent/25 border-accent text-accent'
                             : 'border-border bg-surface-raised hover:border-accent'
@@ -495,28 +495,28 @@ export const TransferDeviceGrid: React.FC<TransferDeviceGridProps> = ({
                         title={allSelected ? 'Снять выделение со всех' : 'Выбрать все устройства этой модели'}
                       >
                         {allSelected ? (
-                          <Check className="w-3.5 h-3.5 stroke-3" />
+                          <Check className="w-3 h-3 stroke-3" />
                         ) : someSelected ? (
-                          <Minus className="w-3 h-3 stroke-3" />
+                          <Minus className="w-2.5 h-2.5 stroke-3" />
                         ) : null}
                       </button>
 
-                      <div className="w-8 h-8 rounded-lg bg-surface-raised border border-border flex items-center justify-center shrink-0 text-accent">
-                        <Smartphone className="w-4 h-4" />
+                      <div className="w-7 h-7 rounded-lg bg-surface-raised border border-border flex items-center justify-center shrink-0 text-accent">
+                        <Smartphone className="w-3.5 h-3.5" />
                       </div>
 
                       <div className="min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap">
+                        <div className="flex items-center gap-1.5 flex-wrap">
                           <span className="font-bold text-xs sm:text-sm text-fg truncate">
                             {group.brand} {group.model}
                           </span>
                           {allSelected ? (
-                            <span className="text-[10px] px-1.5 py-0.2 rounded-md bg-accent text-accent-fg font-bold">
-                              Выбраны все ({group.totalCount})
+                            <span className="text-[9px] px-1.5 py-0.2 rounded-md bg-accent text-accent-fg font-bold uppercase tracking-wide">
+                              Все ({group.totalCount})
                             </span>
                           ) : someSelected ? (
-                            <span className="text-[10px] px-1.5 py-0.2 rounded-md bg-accent/15 border border-accent/30 text-accent font-bold">
-                              Выбрано: {group.selectedCount} из {group.totalCount}
+                            <span className="text-[9px] px-1.5 py-0.2 rounded-md bg-accent/15 border border-accent/30 text-accent font-bold">
+                              {group.selectedCount} из {group.totalCount}
                             </span>
                           ) : (
                             <span className="text-[10px] px-1.5 py-0.2 rounded-md bg-surface-raised border border-border text-fg-subtle font-mono">
@@ -526,7 +526,7 @@ export const TransferDeviceGrid: React.FC<TransferDeviceGridProps> = ({
                         </div>
 
                         {/* Storage and color chips */}
-                        <div className="flex items-center gap-1.5 flex-wrap pt-0.5 text-[11px] text-fg-subtle">
+                        <div className="flex items-center gap-1 flex-wrap pt-0.5 text-[10px] text-fg-subtle">
                           {group.storageList.map((st) => (
                             <span
                               key={st.storage}
@@ -537,12 +537,12 @@ export const TransferDeviceGrid: React.FC<TransferDeviceGridProps> = ({
                                   : 'bg-surface-raised border-border/70 text-fg-muted'
                               )}
                             >
-                              {st.storage} ({st.count} шт.)
+                              {st.storage} ({st.count})
                             </span>
                           ))}
                           {group.colorList.length > 0 && (
-                            <span className="text-[10px] text-fg-subtle truncate">
-                              Цвета: {group.colorList.map(c => c.color).join(', ')}
+                            <span className="text-[10px] text-fg-subtle truncate max-w-[200px]">
+                              {group.colorList.map(c => c.color).join(', ')}
                             </span>
                           )}
                         </div>
@@ -550,7 +550,7 @@ export const TransferDeviceGrid: React.FC<TransferDeviceGridProps> = ({
                     </div>
 
                     {/* Right side: Price, Select all button & Chevron */}
-                    <div className="flex items-center gap-2 shrink-0">
+                    <div className="flex items-center gap-1.5 shrink-0">
                       <div className="text-right hidden sm:block">
                         <span className="text-xs font-bold font-mono text-fg block">
                           {group.minPrice > 0 ? (
@@ -565,7 +565,7 @@ export const TransferDeviceGrid: React.FC<TransferDeviceGridProps> = ({
                         type="button"
                         onClick={() => handleToggleGroupSelect(group)}
                         className={cn(
-                          'h-7 px-2.5 rounded-lg text-xs font-semibold border transition-all cursor-pointer shrink-0',
+                          'h-6.5 px-2 rounded-lg text-xs font-semibold border transition-all cursor-pointer shrink-0',
                           allSelected
                             ? 'bg-surface-raised border-border text-fg-subtle hover:text-danger hover:border-danger/30'
                             : 'bg-accent/15 border-accent/30 text-accent hover:bg-accent hover:text-accent-fg font-bold'
@@ -577,17 +577,17 @@ export const TransferDeviceGrid: React.FC<TransferDeviceGridProps> = ({
                       <button
                         type="button"
                         onClick={() => toggleExpandGroup(group.key)}
-                        className="w-7 h-7 rounded-lg hover:bg-surface-raised text-fg-subtle hover:text-fg flex items-center justify-center transition-colors cursor-pointer"
+                        className="w-6.5 h-6.5 rounded-lg hover:bg-surface-raised text-fg-subtle hover:text-fg flex items-center justify-center transition-colors cursor-pointer"
                         title={isExpanded ? 'Свернуть' : 'Развернуть список устройств'}
                       >
-                        <ChevronDown className={cn('w-4 h-4 transition-transform duration-200', isExpanded && 'rotate-180 text-accent')} />
+                        <ChevronDown className={cn('w-3.5 h-3.5 transition-transform duration-200', isExpanded && 'rotate-180 text-accent')} />
                       </button>
                     </div>
                   </div>
 
                   {/* Expanded Devices List */}
                   {isExpanded && (
-                    <div className="border-t border-border/70 bg-surface-raised/30 p-2 sm:p-2.5 divide-y divide-border/50">
+                    <div className="border-t border-border/70 bg-surface-raised/30 p-1.5 sm:p-2 divide-y divide-border/50">
                       {group.devices.map((dev) => {
                         const isChecked = selectedDeviceIds.includes(dev.id);
                         const colorHex = getPhoneColorHex(dev.color);
@@ -598,56 +598,63 @@ export const TransferDeviceGrid: React.FC<TransferDeviceGridProps> = ({
                             key={dev.id}
                             onClick={() => onToggleSelectDevice(dev.id)}
                             className={cn(
-                              'p-2 rounded-lg flex items-center justify-between gap-2.5 text-xs transition-colors cursor-pointer select-none',
+                              'px-2.5 py-1.5 rounded-lg flex items-center justify-between gap-2 text-xs transition-colors cursor-pointer select-none',
                               isChecked
-                                ? 'bg-accent/10 border border-accent/30 shadow-2xs'
+                                ? 'bg-accent/10 border border-accent/40 shadow-2xs ring-1 ring-accent/20'
                                 : 'hover:bg-surface-raised'
                             )}
                           >
-                            <div className="flex items-center gap-2 min-w-0">
+                            <div className="flex items-center gap-2 min-w-0 flex-1">
                               <div
                                 className={cn(
-                                  'w-4 h-4 rounded border flex items-center justify-center transition-colors shrink-0',
+                                  'w-4 h-4 rounded-md border flex items-center justify-center transition-all shrink-0',
                                   isChecked
-                                    ? 'bg-accent border-accent text-accent-fg'
+                                    ? 'bg-accent border-accent text-accent-fg shadow-2xs scale-105'
                                     : 'border-border bg-surface'
                                 )}
                               >
-                                {isChecked && <Check className="w-3 h-3 stroke-3" />}
+                                {isChecked && <Check className="w-2.5 h-2.5 stroke-3" />}
                               </div>
 
                               <div className="min-w-0 flex items-center gap-1.5 flex-wrap">
                                 {dev.storage && (
-                                  <span className="font-mono font-bold text-fg text-xs">
+                                  <span className="px-1.5 py-0.2 rounded bg-surface border border-border font-mono font-bold text-fg text-[10px]">
                                     {dev.storage}
                                   </span>
                                 )}
                                 {formattedRam && !dev.storage.toLowerCase().includes(formattedRam.toLowerCase()) && (
                                   <span className="text-[10px] text-accent font-mono font-semibold">
-                                    {formattedRam}
+                                    RAM {formattedRam}
                                   </span>
                                 )}
                                 {dev.color && (
                                   <span className="inline-flex items-center gap-1 text-[11px] text-fg-muted">
                                     {colorHex && (
                                       <span
-                                        className="w-2.5 h-2.5 rounded-full border border-black/20 shrink-0"
+                                        className="w-2 h-2 rounded-full border border-black/20 shrink-0"
                                         style={{ backgroundColor: colorHex }}
                                       />
                                     )}
                                     <span>{dev.color}</span>
                                   </span>
                                 )}
-                                <span className="font-mono text-[10px] text-fg-subtle ml-1">
-                                  IMEI: {dev.imei}
+                                <span className="font-mono text-[10px] text-fg-subtle bg-surface px-1.5 py-0.2 rounded border border-border/50">
+                                  IMEI: <strong className="text-fg font-medium">{dev.imei}</strong>
                                 </span>
                               </div>
                             </div>
 
-                            <div className="text-right shrink-0">
-                              <span className="font-mono font-bold text-xs text-accent">
-                                {(dev.retailPriceTjs ?? 0) > 0 ? `${formatMoney(dev.retailPriceTjs)} TJS` : '—'}
-                              </span>
+                            <div className="flex items-center gap-1.5 shrink-0 text-right">
+                              {(dev.retailPriceTjs ?? 0) > 0 && (
+                                <span className="font-mono font-bold text-xs text-accent">
+                                  {formatMoney(dev.retailPriceTjs)} TJS
+                                </span>
+                              )}
+                              {isChecked && (
+                                <span className="px-1.5 py-0.5 rounded bg-accent text-accent-fg font-bold text-[9px] uppercase tracking-wider shadow-2xs">
+                                  Выбран
+                                </span>
+                              )}
                             </div>
                           </div>
                         );
@@ -659,10 +666,12 @@ export const TransferDeviceGrid: React.FC<TransferDeviceGridProps> = ({
             })}
           </div>
         ) : (
-          /* FLAT CARDS GRID VIEW */
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-2.5">
+          /* FLAT CARDS GRID VIEW - ULTRA-COMPACT & BEAUTIFUL */
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-1.5 sm:gap-2">
             {availableDevices.map((dev) => {
               const isChecked = selectedDeviceIds.includes(dev.id);
+              const colorHex = getPhoneColorHex(dev.color);
+              const formattedRam = formatRam(dev.ram);
 
               return (
                 <button
@@ -671,44 +680,87 @@ export const TransferDeviceGrid: React.FC<TransferDeviceGridProps> = ({
                   onClick={() => onToggleSelectDevice(dev.id)}
                   aria-pressed={isChecked}
                   className={cn(
-                    'w-full text-left p-2.5 sm:p-3 rounded-xl border flex items-center justify-between gap-2.5 cursor-pointer transition-all shadow-2xs relative overflow-hidden',
+                    'w-full text-left px-2.5 py-1.5 sm:py-2 rounded-xl border flex items-center justify-between gap-2 cursor-pointer transition-all duration-150 select-none shadow-2xs relative group',
                     isChecked
-                      ? 'bg-accent/10 border-accent/50 shadow-xs ring-1 ring-accent/30'
-                      : 'bg-surface hover:bg-surface-raised/70 border-border/80'
+                      ? 'bg-accent/10 border-accent text-fg ring-1 ring-accent/30 shadow-xs'
+                      : 'bg-surface hover:bg-surface-raised border-border/80 text-fg hover:border-accent/40'
                   )}
                 >
-                  <div className="flex items-center gap-2.5 min-w-0">
+                  <div className="flex items-center gap-2 min-w-0 flex-1">
+                    {/* Checkbox */}
                     <div
                       aria-hidden="true"
                       className={cn(
-                        'w-5 h-5 shrink-0 rounded-md border flex items-center justify-center transition-colors',
+                        'w-4.5 h-4.5 shrink-0 rounded-md border flex items-center justify-center transition-all',
                         isChecked
-                          ? 'bg-accent border-accent text-accent-fg'
-                          : 'border-border bg-surface-raised'
+                          ? 'bg-accent border-accent text-accent-fg shadow-2xs scale-105'
+                          : 'border-border bg-surface-raised group-hover:border-accent/60'
                       )}
                     >
-                      {isChecked && <Check className="w-3.5 h-3.5 stroke-3" />}
+                      {isChecked && <Check className="w-3 h-3 stroke-3" />}
                     </div>
 
-                    <div className="min-w-0">
-                      <span className="block text-xs font-bold text-fg truncate">
-                        {dev.brand} {dev.model}
-                      </span>
-                      <span className="block text-[11px] text-fg-muted truncate">
-                        {dev.ram ? `${dev.ram} • ` : ''}{dev.storage} • {dev.color}
-                      </span>
-                      <span className="block text-[10px] text-fg-subtle font-mono truncate">
-                        IMEI: {dev.imei}
-                      </span>
+                    {/* Device Details */}
+                    <div className="min-w-0 flex-1">
+                      {/* Top line: Brand & Model + Badges */}
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        <span className="font-bold text-xs text-fg truncate">
+                          {dev.brand} {dev.model}
+                        </span>
+
+                        {dev.storage && (
+                          <span className="px-1.5 py-0.2 rounded bg-surface-raised border border-border text-[10px] font-mono font-bold text-fg shrink-0">
+                            {dev.storage}
+                          </span>
+                        )}
+
+                        {dev.color && (
+                          <span className="hidden xs:inline-flex sm:inline-flex items-center gap-1 px-1.5 py-0.2 rounded bg-surface-raised border border-border text-[10px] text-fg-muted shrink-0">
+                            {colorHex && (
+                              <span
+                                className="w-2 h-2 rounded-full border border-black/20 shrink-0"
+                                style={{ backgroundColor: colorHex }}
+                              />
+                            )}
+                            <span className="truncate max-w-[80px]">{dev.color}</span>
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Bottom line: IMEI tag + RAM + color fallback on mobile */}
+                      <div className="flex items-center gap-1.5 text-[10px] text-fg-subtle pt-0.5 min-w-0">
+                        <span className="font-mono truncate bg-surface-raised/80 px-1 py-0.2 rounded border border-border/60">
+                          IMEI: <strong className="text-fg font-semibold">{dev.imei}</strong>
+                        </span>
+                        {formattedRam && !dev.storage.toLowerCase().includes(formattedRam.toLowerCase()) && (
+                          <span className="hidden sm:inline font-mono font-semibold text-accent">
+                            RAM {formattedRam}
+                          </span>
+                        )}
+                        {dev.color && (
+                          <span className="xs:hidden inline-flex items-center gap-1 text-fg-muted">
+                            {colorHex && (
+                              <span
+                                className="w-2 h-2 rounded-full border border-black/20 shrink-0"
+                                style={{ backgroundColor: colorHex }}
+                              />
+                            )}
+                            <span className="truncate max-w-[70px]">{dev.color}</span>
+                          </span>
+                        )}
+                      </div>
                     </div>
                   </div>
 
-                  <div className="text-right shrink-0">
-                    <span className="text-xs font-bold text-accent font-mono block">
-                      {(dev.retailPriceTjs ?? 0) > 0 ? `${formatMoney(dev.retailPriceTjs)} TJS` : '—'}
-                    </span>
+                  {/* Right side: Price & Selected Badge */}
+                  <div className="flex items-center gap-1.5 shrink-0 text-right">
+                    {(dev.retailPriceTjs ?? 0) > 0 && (
+                      <span className="text-xs font-bold text-accent font-mono block">
+                        {formatMoney(dev.retailPriceTjs)} TJS
+                      </span>
+                    )}
                     {isChecked && (
-                      <span className="text-[10px] font-bold text-accent">
+                      <span className="px-1.5 py-0.5 rounded bg-accent text-accent-fg font-bold text-[9px] uppercase tracking-wider shadow-2xs shrink-0">
                         Выбран
                       </span>
                     )}

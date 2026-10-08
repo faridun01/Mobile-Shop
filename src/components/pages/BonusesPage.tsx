@@ -557,158 +557,182 @@ export const BonusesPage: React.FC = () => {
     <div className="work-screen flex-1 flex flex-col h-full overflow-hidden bg-bg text-fg select-none">
       <StatusBanner message={status} onDismiss={() => setStatus(null)} />
 
-      {/* Top Header Bar */}
-      <div className="p-3 sm:p-4 border-b border-border bg-surface shrink-0 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div className="flex items-center gap-2.5">
-          <div className="w-9 h-9 rounded-xl bg-accent/15 border border-accent/25 flex items-center justify-center text-accent shrink-0">
-            <Gift className="w-5 h-5" />
-          </div>
-          <div>
-            <h1 className="text-base sm:text-lg font-bold text-fg leading-tight flex items-center gap-2">
-              <span>Бонусы поставщиков</span>
-              {isAdmin && (
-                <span className="text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full bg-accent/10 text-accent border border-accent/20">
-                  1 USD = {rate.toFixed(2)} TJS
-                </span>
+      {/* Compact Top Navigation & Action Bar */}
+      <div className="px-2.5 sm:px-4 py-1.5 sm:py-2 border-b border-border bg-surface shrink-0 flex items-center justify-between gap-2 shadow-2xs">
+        {/* Navigation Tabs */}
+        <div className="flex items-center gap-1 overflow-x-auto scrollbar-none text-xs">
+          <button
+            type="button"
+            onClick={() => setActiveTab('HISTORY')}
+            className={cn(
+              'h-7 px-2.5 rounded-lg text-xs font-semibold cursor-pointer transition-all whitespace-nowrap flex items-center gap-1.5',
+              activeTab === 'HISTORY'
+                ? 'bg-accent text-accent-fg shadow-2xs font-bold'
+                : 'bg-surface-raised border border-border text-fg-subtle hover:text-fg'
+            )}
+          >
+            <span>Журнал бонусов</span>
+            <span
+              className={cn(
+                'text-[10px] px-1.5 py-0.2 rounded-full font-mono font-bold',
+                activeTab === 'HISTORY' ? 'bg-black/20 text-white' : 'bg-surface border border-border text-fg-muted'
               )}
-            </h1>
-            <p className="text-xs text-fg-subtle">
-              Учёт подарочных телефонов ($0 себестоимость) и денежных бонусов с распределением
-            </p>
-          </div>
+            >
+              {supplierBonuses.length}
+            </span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab('DEVICES')}
+            className={cn(
+              'h-7 px-2.5 rounded-lg text-xs font-semibold cursor-pointer transition-all whitespace-nowrap flex items-center gap-1.5',
+              activeTab === 'DEVICES'
+                ? 'bg-accent text-accent-fg shadow-2xs font-bold'
+                : 'bg-surface-raised border border-border text-fg-subtle hover:text-fg'
+            )}
+          >
+            <span>Подарочные телефоны</span>
+            <span
+              className={cn(
+                'text-[10px] px-1.5 py-0.2 rounded-full font-mono font-bold',
+                activeTab === 'DEVICES' ? 'bg-black/20 text-white' : 'bg-surface border border-border text-fg-muted'
+              )}
+            >
+              {bonusDevices.length}
+            </span>
+          </button>
         </div>
 
-        <div className="flex items-center gap-2">
-          <Button
-            variant="primary"
-            size="sm"
-            leftIcon={Plus}
-            onClick={() => setIsCreateModalOpen(true)}
-            className="cursor-pointer"
-          >
-            Зафиксировать бонус
-          </Button>
-        </div>
+        {/* Action Button */}
+        <Button
+          variant="primary"
+          size="sm"
+          leftIcon={Plus}
+          onClick={() => setIsCreateModalOpen(true)}
+          className="h-7.5 px-2.5 text-xs font-bold cursor-pointer shadow-xs shrink-0 whitespace-nowrap"
+        >
+          <span>+ Бонус</span>
+        </Button>
       </div>
 
       {/* Main Scrollable Content */}
-      <div className="flex-1 overflow-y-auto p-3 sm:p-5 space-y-4">
+      <div className="flex-1 overflow-y-auto p-2 sm:p-3 space-y-2.5">
         {/* 3 PRIMARY METRIC CARDS */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-2.5">
           {/* CARD 1: Денежные бонусы */}
-          <div className="p-4 rounded-2xl bg-surface border border-border shadow-xs flex flex-col justify-between relative overflow-hidden group hover:border-accent/40 transition-colors">
-            <div className="flex items-start justify-between">
-              <div>
-                <span className="text-[11px] font-bold uppercase tracking-wider text-fg-subtle block">
-                  Денежные бонусы (за месяц)
+          <div className="p-2.5 sm:p-3 rounded-xl bg-surface border border-border shadow-2xs flex flex-col justify-between">
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-fg-subtle block truncate">
+                  Денежные бонусы (месяц)
                 </span>
-                <div className="text-xl sm:text-2xl font-black font-mono text-accent mt-1">
-                  ${formatMoney(monthStats?.cashBonusesUsd || 0)} <span className="text-xs font-semibold">USD</span>
+                <div className="text-base sm:text-lg font-black font-mono text-accent leading-tight mt-0.5">
+                  ${formatMoney(monthStats?.cashBonusesUsd || 0)}{' '}
+                  <span className="text-[11px] font-semibold text-fg-subtle font-mono">
+                    ≈ {formatMoney(monthStats?.cashBonusesTjs || 0)} TJS
+                  </span>
                 </div>
-                <span className="text-xs font-semibold text-fg-subtle font-mono mt-0.5 block">
-                  ≈ {formatMoney(monthStats?.cashBonusesTjs || 0)} TJS
-                </span>
               </div>
-              <div className="w-10 h-10 rounded-xl bg-accent/15 border border-accent/25 flex items-center justify-center text-accent shrink-0">
-                <Banknote className="w-5 h-5" />
+              <div className="w-7 h-7 rounded-lg bg-accent/10 border border-accent/20 flex items-center justify-center text-accent shrink-0">
+                <Banknote className="w-3.5 h-3.5" />
               </div>
             </div>
-            <div className="pt-3 mt-3 border-t border-border flex items-center justify-between text-[11px] text-fg-subtle">
-              <span>Кампаний: <strong className="text-fg font-semibold">{monthStats?.cashBonusesCount || 0}</strong></span>
+            <div className="pt-1.5 mt-1.5 border-t border-border/60 flex items-center justify-between text-[10px] text-fg-subtle">
+              <span>Кампаний: <strong className="text-fg font-semibold font-mono">{monthStats?.cashBonusesCount || 0}</strong></span>
               <span className="text-accent font-medium">От поставщиков</span>
             </div>
           </div>
 
           {/* CARD 2: Подарочные телефоны */}
-          <div className="p-4 rounded-2xl bg-surface border border-border shadow-xs flex flex-col justify-between relative overflow-hidden group hover:border-accent/40 transition-colors">
-            <div className="flex items-start justify-between">
-              <div>
-                <span className="text-[11px] font-bold uppercase tracking-wider text-fg-subtle block">
+          <div className="p-2.5 sm:p-3 rounded-xl bg-surface border border-border shadow-2xs flex flex-col justify-between">
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-fg-subtle block truncate">
                   Подарочные телефоны ($0)
                 </span>
-                <div className="text-xl sm:text-2xl font-black font-mono text-warning mt-1">
-                  {totalBonusDevicesInStock} <span className="text-sm font-semibold">на складе</span>
+                <div className="text-base sm:text-lg font-black font-mono text-warning leading-tight mt-0.5">
+                  {totalBonusDevicesInStock}{' '}
+                  <span className="text-[11px] font-semibold text-fg-subtle">на складе</span>
+                  <span className="text-[10px] text-success font-mono font-semibold ml-1.5">
+                    (продано: {totalBonusDevicesSold})
+                  </span>
                 </div>
-                <span className="text-xs font-semibold text-success font-mono mt-0.5 block">
-                  Продано: {totalBonusDevicesSold} шт. (+${formatMoney(totalBonusDevicesSoldRevenueUsd)})
-                </span>
               </div>
-              <div className="w-10 h-10 rounded-xl bg-warning/15 border border-warning/25 flex items-center justify-center text-warning shrink-0">
-                <Smartphone className="w-5 h-5" />
+              <div className="w-7 h-7 rounded-lg bg-warning/15 border border-warning/25 flex items-center justify-center text-warning shrink-0">
+                <Smartphone className="w-3.5 h-3.5" />
               </div>
             </div>
-            <div className="pt-3 mt-3 border-t border-border flex items-center justify-between text-[11px]">
+            <div className="pt-1.5 mt-1.5 border-t border-border/60 flex items-center justify-between text-[10px]">
               <span className="text-fg-subtle">Себестоимость: $0</span>
               <button
                 type="button"
                 onClick={() => { setActiveTab('DEVICES'); setDeviceFilter('IN_STOCK'); }}
-                className="text-xs font-bold text-accent hover:underline flex items-center gap-1 cursor-pointer"
+                className="text-[11px] font-bold text-accent hover:underline flex items-center gap-0.5 cursor-pointer"
               >
-                Посмотреть устройства →
+                Устройства →
               </button>
             </div>
           </div>
 
           {/* CARD 3: Бонусный резерв */}
-          <div className="p-4 rounded-2xl bg-surface border border-border shadow-xs flex flex-col justify-between relative overflow-hidden group hover:border-accent/40 transition-colors">
-            <div className="flex items-start justify-between">
-              <div>
-                <span className="text-[11px] font-bold uppercase tracking-wider text-fg-subtle block">
+          <div className="p-2.5 sm:p-3 rounded-xl bg-surface border border-border shadow-2xs flex flex-col justify-between">
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-fg-subtle block truncate">
                   Бонусный резерв
                 </span>
-                <div className="text-xl sm:text-2xl font-black font-mono text-success mt-1">
-                  ${formatMoney(availableReserveUsd)} <span className="text-xs font-semibold">USD</span>
+                <div className="text-base sm:text-lg font-black font-mono text-success leading-tight mt-0.5">
+                  ${formatMoney(availableReserveUsd)}{' '}
+                  <span className="text-[11px] font-semibold text-fg-subtle font-mono">
+                    ≈ {formatMoney(availableReserveTjs)} TJS
+                  </span>
                 </div>
-                <span className="text-xs font-semibold text-fg-subtle font-mono mt-0.5 block">
-                  ≈ {formatMoney(availableReserveTjs)} TJS (не распределено)
-                </span>
               </div>
-              <div className="w-10 h-10 rounded-xl bg-success/15 border border-success/25 flex items-center justify-center text-success shrink-0">
-                <Wallet className="w-5 h-5" />
+              <div className="w-7 h-7 rounded-lg bg-success/15 border border-success/25 flex items-center justify-center text-success shrink-0">
+                <Wallet className="w-3.5 h-3.5" />
               </div>
             </div>
-            <div className="pt-3 mt-3 border-t border-border flex items-center justify-between gap-2">
-              <button
-                type="button"
-                disabled={availableReserveUsd <= 0}
-                onClick={() => openReserveAction('transfer')}
-                className="text-xs font-bold text-accent hover:underline flex items-center gap-1 cursor-pointer disabled:opacity-40"
-                title="Перевести в Центральную кассу"
-              >
-                <Landmark className="w-3.5 h-3.5" /> В кассу
-              </button>
-              <button
-                type="button"
-                disabled={availableReserveUsd <= 0}
-                onClick={() => openReserveAction('payout')}
-                className="text-xs font-bold text-warning hover:underline flex items-center gap-1 cursor-pointer disabled:opacity-40"
-                title="Выдать прибыль"
-              >
-                <HandCoins className="w-3.5 h-3.5" /> Выдать
-              </button>
+            <div className="pt-1.5 mt-1.5 border-t border-border/60 flex items-center justify-between gap-2 text-[10px]">
+              <span className="text-fg-subtle truncate">Действия:</span>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  disabled={availableReserveUsd <= 0}
+                  onClick={() => openReserveAction('transfer')}
+                  className="font-bold text-accent hover:underline flex items-center gap-0.5 cursor-pointer disabled:opacity-40"
+                  title="Перевести в Центральную кассу"
+                >
+                  <Landmark className="w-3 h-3" /> В кассу
+                </button>
+                <span className="text-border">•</span>
+                <button
+                  type="button"
+                  disabled={availableReserveUsd <= 0}
+                  onClick={() => openReserveAction('payout')}
+                  className="font-bold text-warning hover:underline flex items-center gap-0.5 cursor-pointer disabled:opacity-40"
+                  title="Выдать прибыль"
+                >
+                  <HandCoins className="w-3 h-3" /> Выдать
+                </button>
+              </div>
             </div>
           </div>
         </div>
 
-        {/* NAVIGATION TAB PILL BAR */}
-        <div className="flex items-center justify-between gap-3 border-b border-border pb-2 pt-1 flex-wrap">
-          <FilterPillGroup
-            options={[
-              { value: 'HISTORY', label: 'Журнал бонусов и решений' },
-              { value: 'DEVICES', label: `Подарочные телефоны (${bonusDevices.length})` },
-            ]}
-            value={activeTab}
-            onChange={(val) => setActiveTab(val as MainTab)}
-          />
-
-          {activeTab === 'DEVICES' && (
-            <div className="flex items-center gap-1.5 text-xs">
+        {/* DEVICES sub-filter bar (only shown when activeTab === 'DEVICES') */}
+        {activeTab === 'DEVICES' && (
+          <div className="flex items-center justify-between gap-2 border-b border-border pb-1.5 pt-0.5 flex-wrap">
+            <span className="text-xs font-bold text-fg-subtle">Фильтр телефонов:</span>
+            <div className="flex items-center gap-1 text-xs">
               <button
                 type="button"
                 onClick={() => setDeviceFilter('ALL')}
                 className={cn(
-                  'px-2.5 py-1 rounded-lg font-semibold transition-colors cursor-pointer',
-                  deviceFilter === 'ALL' ? 'bg-accent text-accent-fg' : 'bg-surface border border-border text-fg-subtle hover:text-fg'
+                  'h-6.5 px-2 rounded-md font-semibold text-[11px] transition-colors cursor-pointer',
+                  deviceFilter === 'ALL'
+                    ? 'bg-accent text-accent-fg font-bold'
+                    : 'bg-surface-raised border border-border text-fg-subtle hover:text-fg'
                 )}
               >
                 Все ({bonusDevices.length})
@@ -717,8 +741,10 @@ export const BonusesPage: React.FC = () => {
                 type="button"
                 onClick={() => setDeviceFilter('IN_STOCK')}
                 className={cn(
-                  'px-2.5 py-1 rounded-lg font-semibold transition-colors cursor-pointer',
-                  deviceFilter === 'IN_STOCK' ? 'bg-warning/20 text-warning border border-warning/30 font-bold' : 'bg-surface border border-border text-fg-subtle hover:text-fg'
+                  'h-6.5 px-2 rounded-md font-semibold text-[11px] transition-colors cursor-pointer',
+                  deviceFilter === 'IN_STOCK'
+                    ? 'bg-warning/20 text-warning border border-warning/40 font-bold'
+                    : 'bg-surface-raised border border-border text-fg-subtle hover:text-fg'
                 )}
               >
                 На складе ({totalBonusDevicesInStock})
@@ -727,19 +753,21 @@ export const BonusesPage: React.FC = () => {
                 type="button"
                 onClick={() => setDeviceFilter('SOLD')}
                 className={cn(
-                  'px-2.5 py-1 rounded-lg font-semibold transition-colors cursor-pointer',
-                  deviceFilter === 'SOLD' ? 'bg-success/20 text-success border border-success/30 font-bold' : 'bg-surface border border-border text-fg-subtle hover:text-fg'
+                  'h-6.5 px-2 rounded-md font-semibold text-[11px] transition-colors cursor-pointer',
+                  deviceFilter === 'SOLD'
+                    ? 'bg-success/20 text-success border border-success/40 font-bold'
+                    : 'bg-surface-raised border border-border text-fg-subtle hover:text-fg'
                 )}
               >
                 Проданы ({totalBonusDevicesSold})
               </button>
             </div>
-          )}
-        </div>
+          </div>
+        )}
 
         {/* TAB 1: ЖУРНАЛ БОНУСОВ И РЕШЕНИЙ */}
         {activeTab === 'HISTORY' ? (
-          <div className="space-y-3">
+          <div className="space-y-2">
             {supplierBonuses.length === 0 ? (
               <EmptyState
                 icon={Gift}
@@ -757,7 +785,7 @@ export const BonusesPage: React.FC = () => {
                 }
               />
             ) : (
-              <div className="space-y-2">
+              <div className="space-y-1.5">
                 {[...supplierBonuses]
                   .sort((a, b) => new Date(b.dateReceived || b.date || 0).getTime() - new Date(a.dateReceived || a.date || 0).getTime())
                   .map((bonus) => {
@@ -768,49 +796,46 @@ export const BonusesPage: React.FC = () => {
                     return (
                       <div
                         key={bonus.id}
-                        className="p-3 sm:p-4 rounded-2xl bg-surface border border-border hover:border-accent/40 transition-colors shadow-2xs space-y-2.5"
+                        className="px-3 py-2 sm:py-2.5 rounded-xl bg-surface border border-border hover:border-accent/40 transition-colors shadow-2xs space-y-1.5 text-xs"
                       >
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="space-y-1 min-w-0">
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <span className="text-sm font-bold text-fg truncate">
-                                {bonus.campaignTitle || bonus.campaignName || `Бонус от ${bonus.supplierName}`}
-                              </span>
-                              <span
-                                className={cn(
-                                  'text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider',
-                                  isCash
-                                    ? 'bg-accent/15 text-accent border border-accent/25'
-                                    : 'bg-warning/15 text-warning border border-warning/30'
-                                )}
-                              >
-                                {isCash ? 'Денежный бонус' : 'Подарочный телефон ($0)'}
-                              </span>
-                            </div>
-
-                            <p className="text-xs text-fg-subtle">
-                              Поставщик: <strong className="text-fg font-semibold">{bonus.supplierName}</strong>
-                              {bonusDate && <span> • Дата: {bonusDate}</span>}
-                            </p>
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="min-w-0 flex items-center gap-1.5 flex-wrap">
+                            <span className="font-bold text-fg text-xs sm:text-sm truncate">
+                              {bonus.campaignTitle || bonus.campaignName || `Бонус от ${bonus.supplierName}`}
+                            </span>
+                            <span
+                              className={cn(
+                                'text-[9px] sm:text-[10px] px-1.5 py-0.5 rounded font-bold uppercase tracking-wider',
+                                isCash
+                                  ? 'bg-accent/15 text-accent border border-accent/25'
+                                  : 'bg-warning/15 text-warning border border-warning/30'
+                              )}
+                            >
+                              {isCash ? 'Денежный' : 'Телефон ($0)'}
+                            </span>
+                            <span className="text-[11px] text-fg-subtle truncate">
+                              • Поставщик: <strong className="text-fg font-medium">{bonus.supplierName}</strong>
+                              {bonusDate && <span> • {bonusDate}</span>}
+                            </span>
                           </div>
 
                           <div className="text-right shrink-0">
                             {isCash ? (
-                              <div>
-                                <span className="text-base sm:text-lg font-black font-mono text-accent block">
-                                  +${formatMoney(bonus.amountUsd || 0)} USD
+                              <div className="flex items-baseline justify-end gap-1.5">
+                                <span className="text-sm sm:text-base font-black font-mono text-accent leading-none">
+                                  +${formatMoney(bonus.amountUsd || 0)}
                                 </span>
-                                <span className="text-[11px] text-fg-subtle font-mono block">
-                                  ≈ {formatMoney((bonus.amountUsd || 0) * (bonus.exchangeRate || rate))} TJS
+                                <span className="text-[10px] text-fg-subtle font-mono hidden xs:inline">
+                                  (≈ {formatMoney((bonus.amountUsd || 0) * (bonus.exchangeRate || rate))} TJS)
                                 </span>
                               </div>
                             ) : (
-                              <div>
-                                <span className="text-sm font-bold font-mono text-warning block">
-                                  +{bonus.freeDevices?.length || 1} шт. бесплатно
+                              <div className="flex items-baseline justify-end gap-1.5">
+                                <span className="text-xs sm:text-sm font-bold font-mono text-warning leading-none">
+                                  +{bonus.freeDevices?.length || 1} шт.
                                 </span>
-                                <span className="text-[10px] text-success font-semibold block">
-                                  Себестоимость $0
+                                <span className="text-[10px] text-success font-semibold">
+                                  ($0)
                                 </span>
                               </div>
                             )}
@@ -819,34 +844,31 @@ export const BonusesPage: React.FC = () => {
 
                         {/* Details for Free Devices */}
                         {hasFreeDevices && (
-                          <div className="p-2.5 rounded-xl bg-surface-raised border border-border text-xs space-y-1">
-                            <div className="flex items-center gap-1.5 text-warning font-semibold">
-                              <Smartphone className="w-3.5 h-3.5" />
-                              <span>Подарочные телефоны на складе:</span>
-                            </div>
-                            <div className="flex flex-wrap gap-2 pt-1">
-                              {bonus.freeDevices!.map((fd) => (
-                                <span
-                                  key={fd.imei}
-                                  className="px-2 py-1 rounded-lg bg-surface border border-border font-mono text-[11px] text-fg"
-                                >
-                                  {fd.brand} {fd.model} {fd.storage} • IMEI: <strong>{fd.imei}</strong>
-                                </span>
-                              ))}
-                            </div>
+                          <div className="px-2 py-1 rounded-lg bg-surface-raised border border-border text-[11px] flex items-center gap-2 flex-wrap">
+                            <span className="text-warning font-semibold flex items-center gap-1 shrink-0">
+                              <Smartphone className="w-3 h-3" /> Подарочные:
+                            </span>
+                            {bonus.freeDevices!.map((fd) => (
+                              <span
+                                key={fd.imei}
+                                className="px-1.5 py-0.5 rounded bg-surface border border-border font-mono text-[10px] text-fg"
+                              >
+                                {fd.brand} {fd.model} {fd.storage} • {fd.imei}
+                              </span>
+                            ))}
                           </div>
                         )}
 
                         {/* Action buttons */}
-                        <div className="pt-2 border-t border-border flex items-center justify-between gap-2 text-xs">
+                        <div className="pt-1 border-t border-border/70 flex items-center justify-between gap-2 text-xs">
                           <div className="flex items-center gap-2">
                             {isCash && (
                               <div className="flex items-center gap-1.5">
-                                <span className="text-[11px] text-fg-subtle">Действие:</span>
+                                <span className="text-[10px] text-fg-subtle">Действие:</span>
                                 <button
                                   type="button"
                                   onClick={() => openReserveAction('transfer', bonus.amountUsd)}
-                                  className="text-[11px] font-semibold text-accent hover:underline flex items-center gap-1 cursor-pointer"
+                                  className="text-[11px] font-semibold text-accent hover:underline flex items-center gap-0.5 cursor-pointer"
                                   title="Перевести сумму в Центральную кассу"
                                 >
                                   <Landmark className="w-3 h-3 text-accent" /> В кассу
@@ -855,7 +877,7 @@ export const BonusesPage: React.FC = () => {
                                 <button
                                   type="button"
                                   onClick={() => openReserveAction('payout', bonus.amountUsd)}
-                                  className="text-[11px] font-semibold text-warning hover:underline flex items-center gap-1 cursor-pointer"
+                                  className="text-[11px] font-semibold text-warning hover:underline flex items-center gap-0.5 cursor-pointer"
                                   title="Выдать прибыль"
                                 >
                                   <HandCoins className="w-3 h-3 text-warning" /> Выдать
@@ -864,11 +886,11 @@ export const BonusesPage: React.FC = () => {
                             )}
                           </div>
 
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-1">
                             <button
                               type="button"
                               onClick={() => handleStartEditBonus(bonus)}
-                              className="text-fg-subtle hover:text-accent p-1 cursor-pointer transition-colors"
+                              className="text-fg-subtle hover:text-accent p-1 rounded hover:bg-surface-raised cursor-pointer transition-colors"
                               title="Редактировать бонус"
                             >
                               <Edit className="w-3.5 h-3.5" />
@@ -876,7 +898,7 @@ export const BonusesPage: React.FC = () => {
                             <button
                               type="button"
                               onClick={() => setDeletingBonus(bonus)}
-                              className="text-fg-subtle hover:text-danger p-1 cursor-pointer transition-colors"
+                              className="text-fg-subtle hover:text-danger p-1 rounded hover:bg-surface-raised cursor-pointer transition-colors"
                               title="Удалить бонус"
                             >
                               <Trash2 className="w-3.5 h-3.5" />
@@ -891,7 +913,7 @@ export const BonusesPage: React.FC = () => {
           </div>
         ) : (
           /* TAB 2: ПОДАРОЧНЫЕ ТЕЛЕФОНЫ */
-          <div className="space-y-3">
+          <div className="space-y-2">
             {filteredBonusDevices.length === 0 ? (
               <EmptyState
                 icon={Smartphone}
@@ -905,25 +927,25 @@ export const BonusesPage: React.FC = () => {
                 }
               />
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
                 {filteredBonusDevices.map((d) => (
                   <div
                     key={d.id}
-                    className="p-3.5 rounded-2xl bg-surface border border-border shadow-xs space-y-2 hover:border-accent/40 transition-colors"
+                    className="p-2 sm:p-2.5 rounded-xl bg-surface border border-border shadow-2xs space-y-1.5 hover:border-accent/40 transition-colors text-xs"
                   >
-                    <div className="flex items-start justify-between gap-2">
-                      <div>
-                        <h3 className="text-sm font-bold text-fg">
+                    <div className="flex items-start justify-between gap-1.5">
+                      <div className="min-w-0">
+                        <h3 className="text-xs sm:text-sm font-bold text-fg truncate">
                           {d.brand} {d.model}
                         </h3>
-                        <p className="text-xs text-fg-subtle">
+                        <p className="text-[11px] text-fg-subtle truncate">
                           {d.storage} • {d.color} {d.ram && `• RAM ${d.ram}`}
                         </p>
                       </div>
 
                       <span
                         className={cn(
-                          'text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider',
+                          'text-[9px] px-1.5 py-0.5 rounded font-bold uppercase tracking-wider shrink-0',
                           d.isSold
                             ? 'bg-success/15 text-success border border-success/30'
                             : 'bg-warning/15 text-warning border border-warning/30'
@@ -933,40 +955,38 @@ export const BonusesPage: React.FC = () => {
                       </span>
                     </div>
 
-                    <div className="p-2.5 rounded-xl bg-surface-raised border border-border text-xs space-y-1">
+                    <div className="px-2 py-1.5 rounded-lg bg-surface-raised border border-border text-[11px] space-y-0.5">
                       <div className="flex items-center justify-between text-fg-subtle">
                         <span>IMEI:</span>
                         <strong className="text-fg font-mono font-bold">{d.imei}</strong>
                       </div>
                       <div className="flex items-center justify-between text-fg-subtle">
-                        <span>Поставщик:</span>
-                        <strong className="text-fg">{d.supplierName}</strong>
+                        <span>Поставщик / Точка:</span>
+                        <span className="text-fg font-medium truncate max-w-[170px] text-right">
+                          {d.supplierName} • {d.storeName}
+                        </span>
                       </div>
                       <div className="flex items-center justify-between text-fg-subtle">
                         <span>Себестоимость:</span>
                         <strong className="text-success font-mono font-bold">$0 (подарок)</strong>
                       </div>
-                      <div className="flex items-center justify-between text-fg-subtle">
-                        <span>Локация:</span>
-                        <strong className="text-fg">{d.storeName}</strong>
-                      </div>
                     </div>
 
                     {d.isSold ? (
-                      <div className="pt-2 border-t border-border flex items-center justify-between text-xs">
-                        <span className="text-fg-subtle">
-                          Чек: <strong className="text-fg font-mono font-bold">#{d.saleReceiptNumber}</strong>
+                      <div className="pt-1 border-t border-border flex items-center justify-between text-[11px]">
+                        <span className="text-fg-subtle truncate">
+                          Чек <strong className="text-fg font-mono font-bold">#{d.saleReceiptNumber}</strong>
                           {d.saleDate && ` (${new Date(d.saleDate).toLocaleDateString('ru-RU')})`}
                         </span>
-                        <span className="text-success font-bold font-mono">
-                          +{formatMoney(d.soldPriceUsd || 0)} USD в кассу
+                        <span className="text-success font-bold font-mono shrink-0 ml-1">
+                          +${formatMoney(d.soldPriceUsd || 0)}
                         </span>
                       </div>
                     ) : (
-                      <div className="pt-2 border-t border-border flex items-center justify-between text-xs text-warning">
-                        <span>Готов к продаже</span>
-                        <span className="text-fg-subtle font-mono">
-                          Поступил: {new Date(d.createdAt).toLocaleDateString('ru-RU')}
+                      <div className="pt-1 border-t border-border flex items-center justify-between text-[11px] text-warning">
+                        <span className="font-semibold">Готов к продаже</span>
+                        <span className="text-fg-subtle font-mono text-[10px]">
+                          {new Date(d.createdAt).toLocaleDateString('ru-RU')}
                         </span>
                       </div>
                     )}

@@ -12,7 +12,6 @@ import { StoreSelector } from '../common/StoreSelector';
 import { SearchBar } from '../ui/SearchBar';
 import { DEVICE_STATUS_LABELS, findDeviceByCode, normalizeScanCode } from '../../utils/scanLookup';
 import {
-  ClipboardCheck,
   Search,
   CheckCircle2,
   RotateCcw,
@@ -308,172 +307,139 @@ export const RevisionPage: React.FC = () => {
   }, [storeDevices, checkedImeis, filterTab, searchQuery]);
 
   return (
-    <div className="work-screen flex-1 flex flex-col h-full overflow-hidden bg-bg text-fg select-none">
+    <div className="work-screen flex-1 flex flex-col h-full overflow-y-auto min-h-0 bg-bg text-fg select-none">
       <StatusBanner message={status} onDismiss={() => setStatus(null)} />
 
       {/* Top Header Bar */}
-      <div className="p-3 sm:p-4 border-b border-border bg-surface shrink-0 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div className="flex items-center gap-2.5">
-          <div className="w-10 h-10 rounded-2xl bg-accent/15 border border-accent/25 flex items-center justify-center text-accent shrink-0 shadow-2xs">
-            <ClipboardCheck className="w-5 h-5" />
-          </div>
-          <div>
-            <div className="flex items-center gap-2 flex-wrap">
-              <h1 className="text-base sm:text-lg font-bold text-fg leading-tight">
-                {currentStore?.isMainWarehouse ? 'Сверка склада' : 'Сверка остатков'}
-              </h1>
-              {!isAdmin && (
-                <span className="inline-flex items-center gap-1.5 text-xs font-bold px-2.5 py-0.5 rounded-full bg-accent/10 text-accent border border-accent/25 shadow-2xs">
-                  <StoreIcon className="w-3.5 h-3.5 shrink-0" />
-                  <span>{formatStoreDisplayTitle(currentStore)}</span>
-                </span>
-              )}
-            </div>
-            <p className="text-[11px] text-fg-subtle mt-0.5">
-              Сверка фактического наличия товаров на складе
-            </p>
-          </div>
-        </div>
+      <div className="px-2.5 sm:px-4 py-1.5 sm:py-2 border-b border-border bg-surface shrink-0 flex items-center justify-between gap-2 shadow-2xs sticky top-0 z-20">
+        <div className="flex items-center gap-2 min-w-0">
+          {!isAdmin && (
+            <span className="inline-flex items-center gap-1.5 text-xs font-bold px-2 py-0.5 rounded-lg bg-accent/10 text-accent border border-accent/25 truncate">
+              <StoreIcon className="w-3.5 h-3.5 shrink-0" />
+              <span className="truncate">{formatStoreDisplayTitle(currentStore)}</span>
+            </span>
+          )}
 
-        {/* Header Controls */}
-        <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap w-full sm:w-auto">
           {/* Admin Store Switcher */}
           {isAdmin && stores.length > 0 && (
             <StoreSelector
               value={effectiveStoreId}
               onChange={setSelectedStoreId}
               stores={stores}
-              className="flex-1 sm:flex-initial max-w-full sm:max-w-56"
+              className="max-w-full sm:max-w-56"
               title="Выбрать точку для сверки"
             />
           )}
+        </div>
 
-          <div className="flex items-center gap-1.5 shrink-0">
-            <Button
-              type="button"
-              variant="secondary"
-              size="sm"
-              onClick={handleOpenResetRevision}
-              leftIcon={RotateCcw}
-              className="h-9 px-2.5 text-xs text-fg-subtle hover:text-fg cursor-pointer"
-              title="Сбросить отметки текущей сверки"
-            >
-              Сброс
-            </Button>
+        <div className="flex items-center gap-1.5 shrink-0">
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            onClick={handleOpenResetRevision}
+            leftIcon={RotateCcw}
+            className="h-7.5 px-2.5 text-xs text-fg-subtle hover:text-fg cursor-pointer"
+            title="Сбросить отметки текущей сверки"
+          >
+            Сброс
+          </Button>
 
-            <Button
-              type="button"
-              variant="primary"
-              size="sm"
-              onClick={() => setIsSummaryModalOpen(true)}
-              leftIcon={CheckCircle2}
-              className="h-9 px-3 text-xs font-bold cursor-pointer"
-            >
-              Итоги сверки
-            </Button>
-          </div>
+          <Button
+            type="button"
+            variant="primary"
+            size="sm"
+            onClick={() => setIsSummaryModalOpen(true)}
+            leftIcon={CheckCircle2}
+            className="h-7.5 px-3 text-xs font-bold cursor-pointer shadow-xs"
+          >
+            Итоги сверки
+          </Button>
         </div>
       </div>
 
       {/* Main Content Area */}
-      <div className="flex-1 overflow-y-auto p-3 sm:p-5 space-y-4">
+      <div className="p-2 sm:p-3 space-y-2.5">
         {/* Progress & Live Counters Bar */}
-        <div className="p-4 sm:p-5 rounded-2xl bg-surface border border-border shadow-xs space-y-3">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div className="flex items-center gap-4 flex-wrap">
-              <div>
-                <span className="text-[11px] font-bold text-fg-subtle uppercase tracking-wider block">
-                  Всего на складе
-                </span>
-                <span className="text-xl sm:text-2xl font-black font-mono text-fg">
-                  {totalCount} <span className="text-xs font-normal text-fg-subtle">шт.</span>
-                </span>
-              </div>
-
-              <div className="w-px h-8 bg-border hidden sm:block" />
-
-              <div>
-                <span className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider block">
-                  Сверено
-                </span>
-                <span className="text-xl sm:text-2xl font-black font-mono text-emerald-600 dark:text-emerald-400">
-                  {checkedCount} <span className="text-xs font-normal opacity-75">шт.</span>
-                </span>
-              </div>
-
-              <div className="w-px h-8 bg-border hidden sm:block" />
-
-              <div>
-                <span className="text-[11px] font-bold text-amber-600 dark:text-amber-400 uppercase tracking-wider block">
-                  Осталось проверить
-                </span>
-                <span className="text-xl sm:text-2xl font-black font-mono text-amber-600 dark:text-amber-400">
-                  {uncheckedCount} <span className="text-xs font-normal opacity-75">шт.</span>
-                </span>
-              </div>
+        <div className="p-2.5 sm:p-3 rounded-xl bg-surface border border-border shadow-2xs space-y-2">
+          <div className="flex items-center justify-between gap-2 flex-wrap">
+            <div className="flex items-center gap-2 sm:gap-3 flex-wrap text-xs">
+              <span className="text-fg-subtle">
+                Всего: <strong className="font-mono text-fg font-black text-sm">{totalCount}</strong> шт.
+              </span>
+              <span className="text-border">•</span>
+              <span className="text-emerald-600 dark:text-emerald-400">
+                Сверено: <strong className="font-mono font-black text-sm">{checkedCount}</strong> шт.
+              </span>
+              <span className="text-border">•</span>
+              <span className="text-amber-600 dark:text-amber-400">
+                Осталось: <strong className="font-mono font-black text-sm">{uncheckedCount}</strong> шт.
+              </span>
             </div>
 
-            <div className="text-right sm:text-right">
-              <span className="text-xs font-bold text-fg-subtle">Прогресс сверки:</span>
-              <span className="text-lg font-black font-mono text-accent ml-2">
+            <div className="flex items-center gap-1.5 text-xs font-bold shrink-0">
+              <span className="text-fg-subtle">Прогресс:</span>
+              <span className="font-black font-mono text-accent text-sm sm:text-base">
                 {progressPercent}%
               </span>
             </div>
           </div>
 
           {/* Progress Bar */}
-          <div className="w-full h-2.5 rounded-full bg-surface-raised border border-border overflow-hidden">
+          <div className="w-full h-1.5 rounded-full bg-surface-raised border border-border overflow-hidden">
             <div
               className={`h-full transition-all duration-300 ${
-                isAllReconciled
-                  ? 'bg-emerald-500'
-                  : 'bg-accent'
+                isAllReconciled ? 'bg-emerald-500' : 'bg-accent'
               }`}
               style={{ width: `${progressPercent}%` }}
             />
           </div>
 
-          {/* 1-Click instant match action */}
-          {!isAllReconciled && totalCount > 0 && (
-            <button
-              type="button"
-              onClick={handleCheckAll}
-              className="w-full py-2.5 px-4 rounded-xl bg-accent text-accent-fg font-bold text-xs sm:text-sm flex items-center justify-center gap-2 hover:opacity-90 active:scale-[0.99] transition-all cursor-pointer shadow-xs select-none"
-            >
-              <CheckCircle2 className="w-4 h-4 shrink-0" />
-              <span>Подтвердить все ({totalCount} шт.)</span>
-            </button>
-          )}
+          {/* Actions & Scanner row */}
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 pt-0.5">
+            {!isAllReconciled && totalCount > 0 && (
+              <button
+                type="button"
+                onClick={handleCheckAll}
+                className="h-8.5 px-3 rounded-lg bg-accent text-accent-fg font-bold text-xs flex items-center justify-center gap-1.5 hover:opacity-90 active:scale-[0.99] transition-all cursor-pointer shadow-xs shrink-0 whitespace-nowrap"
+              >
+                <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+                <span>Подтвердить все ({totalCount} шт.)</span>
+              </button>
+            )}
 
-          <SearchBar
-            value={scanInput}
-            onChange={setScanInput}
-            onScan={handleScanCamera}
-            onSubmit={handleScanCode}
-            placeholder="Сканируйте IMEI"
-          />
+            <div className="flex-1 min-w-0">
+              <SearchBar
+                value={scanInput}
+                onChange={setScanInput}
+                onScan={handleScanCamera}
+                onSubmit={handleScanCode}
+                placeholder="Сканируйте IMEI или штрихкод..."
+              />
+            </div>
+          </div>
         </div>
 
         {surplus.length > 0 && (
-          <div className="p-3.5 rounded-2xl bg-danger/10 border border-danger/30 space-y-2" role="region" aria-label="Излишки">
+          <div className="p-2 sm:p-2.5 rounded-xl bg-danger/10 border border-danger/30 space-y-1.5" role="region" aria-label="Излишки">
             <h3 className="text-xs font-bold text-danger flex items-center gap-1.5">
-              <AlertTriangle className="w-4 h-4" />
+              <AlertTriangle className="w-3.5 h-3.5" />
               Излишки ({surplus.length} шт.)
             </h3>
-            <div className="divide-y divide-danger/20">
+            <div className="divide-y divide-danger/20 text-xs">
               {surplus.map((item) => (
-                <div key={item.code} className="py-1.5 flex items-center justify-between gap-2 text-xs">
-                  <div className="min-w-0">
-                    <p className="font-mono font-bold text-fg">{item.code}</p>
-                    <p className="text-fg-subtle truncate">{item.note}</p>
+                <div key={item.code} className="py-1 flex items-center justify-between gap-2">
+                  <div className="min-w-0 flex items-center gap-2">
+                    <span className="font-mono font-bold text-fg">{item.code}</span>
+                    <span className="text-fg-subtle truncate text-[11px]">{item.note}</span>
                   </div>
                   <button
                     type="button"
                     aria-label={`Убрать ${item.code} из излишков`}
                     onClick={() => setSurplus((prev) => prev.filter((x) => x.code !== item.code))}
-                    className="w-9 h-9 shrink-0 rounded-lg flex items-center justify-center text-fg-subtle hover:text-danger hover:bg-danger/10"
+                    className="w-7 h-7 shrink-0 rounded-lg flex items-center justify-center text-fg-subtle hover:text-danger hover:bg-danger/10 cursor-pointer"
                   >
-                    <X className="w-4 h-4" />
+                    <X className="w-3.5 h-3.5" />
                   </button>
                 </div>
               ))}
@@ -482,17 +448,17 @@ export const RevisionPage: React.FC = () => {
         )}
 
         {/* Devices Checklist & Tabs */}
-        <div className="rounded-2xl bg-surface border border-border shadow-xs overflow-hidden">
+        <div className="rounded-xl bg-surface border border-border shadow-2xs overflow-hidden">
           {/* Controls Bar: Tabs, View Toggle & Search */}
-          <div className="p-3 border-b border-border bg-surface-raised flex flex-col md:flex-row md:items-center justify-between gap-3">
+          <div className="px-2.5 py-1.5 border-b border-border bg-surface-raised flex flex-wrap items-center justify-between gap-2">
             {/* Filter Tabs */}
-            <div className="flex items-center gap-1 overflow-x-auto pb-1 md:pb-0">
+            <div className="flex items-center gap-1 overflow-x-auto scrollbar-none text-xs">
               <button
                 type="button"
                 onClick={() => setFilterTab('ALL')}
-                className={`px-3 py-1.5 text-xs font-bold rounded-xl transition-all cursor-pointer shrink-0 ${
+                className={`h-6.5 px-2 text-[11px] font-semibold rounded-md transition-all cursor-pointer shrink-0 ${
                   filterTab === 'ALL'
-                    ? 'bg-accent text-accent-fg shadow-2xs'
+                    ? 'bg-accent text-accent-fg shadow-2xs font-bold'
                     : 'text-fg-subtle hover:text-fg'
                 }`}
               >
@@ -501,20 +467,20 @@ export const RevisionPage: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setFilterTab('UNCHECKED')}
-                className={`px-3 py-1.5 text-xs font-bold rounded-xl transition-all cursor-pointer shrink-0 ${
+                className={`h-6.5 px-2 text-[11px] font-semibold rounded-md transition-all cursor-pointer shrink-0 ${
                   filterTab === 'UNCHECKED'
-                    ? 'bg-amber-500 text-white shadow-2xs'
+                    ? 'bg-amber-500 text-white shadow-2xs font-bold'
                     : 'text-fg-subtle hover:text-fg'
                 }`}
               >
-                Осталось проверить ({uncheckedCount})
+                Осталось ({uncheckedCount})
               </button>
               <button
                 type="button"
                 onClick={() => setFilterTab('CHECKED')}
-                className={`px-3 py-1.5 text-xs font-bold rounded-xl transition-all cursor-pointer shrink-0 ${
+                className={`h-6.5 px-2 text-[11px] font-semibold rounded-md transition-all cursor-pointer shrink-0 ${
                   filterTab === 'CHECKED'
-                    ? 'bg-emerald-600 text-white shadow-2xs'
+                    ? 'bg-emerald-600 text-white shadow-2xs font-bold'
                     : 'text-fg-subtle hover:text-fg'
                 }`}
               >
@@ -523,47 +489,56 @@ export const RevisionPage: React.FC = () => {
             </div>
 
             {/* Right side: View Mode Toggle & Search Input */}
-            <div className="flex items-center gap-2 flex-wrap">
+            <div className="flex items-center gap-1.5 shrink-0 flex-wrap sm:flex-nowrap">
               {/* View mode toggle */}
-              <div className="inline-flex rounded-xl bg-surface border border-border p-0.5 shrink-0">
+              <div className="inline-flex rounded-lg bg-surface border border-border p-0.5 shrink-0">
                 <button
                   type="button"
                   onClick={() => setViewMode('GROUPS')}
-                  className={`px-2.5 py-1 text-xs font-semibold rounded-lg flex items-center gap-1.5 transition-all cursor-pointer ${
+                  className={`h-6 px-2 text-[11px] font-semibold rounded-md flex items-center gap-1 transition-all cursor-pointer ${
                     viewMode === 'GROUPS'
-                      ? 'bg-accent text-accent-fg shadow-2xs'
+                      ? 'bg-accent text-accent-fg shadow-2xs font-bold'
                       : 'text-fg-subtle hover:text-fg'
                   }`}
                   title="Группировка по моделям"
                 >
-                  <Layers className="w-3.5 h-3.5" />
-                  <span>По моделям</span>
+                  <Layers className="w-3 h-3" />
+                  <span>Модели</span>
                 </button>
                 <button
                   type="button"
                   onClick={() => setViewMode('ITEMS')}
-                  className={`px-2.5 py-1 text-xs font-semibold rounded-lg flex items-center gap-1.5 transition-all cursor-pointer ${
+                  className={`h-6 px-2 text-[11px] font-semibold rounded-md flex items-center gap-1 transition-all cursor-pointer ${
                     viewMode === 'ITEMS'
-                      ? 'bg-accent text-accent-fg shadow-2xs'
+                      ? 'bg-accent text-accent-fg shadow-2xs font-bold'
                       : 'text-fg-subtle hover:text-fg'
                   }`}
                   title="Поштучный список"
                 >
-                  <List className="w-3.5 h-3.5" />
-                  <span>Поштучно</span>
+                  <List className="w-3 h-3" />
+                  <span>Штучно</span>
                 </button>
               </div>
 
               {/* Search Input */}
-              <div className="relative w-full sm:w-60 shrink-0">
-                <Search className="w-3.5 h-3.5 text-fg-subtle absolute left-3 top-3" />
+              <div className="relative w-44 sm:w-56 shrink-0">
+                <Search className="w-3.5 h-3.5 text-fg-subtle absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                 <input
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Поиск модели, цвета, памяти..."
-                  className="w-full h-9 pl-8.5 pr-3 rounded-xl border border-border bg-surface text-fg text-xs focus:outline-none focus:border-accent"
+                  placeholder="Поиск..."
+                  className="w-full h-7 pl-7 pr-6 rounded-lg border border-border bg-surface text-fg text-xs focus:outline-none focus:border-accent"
                 />
+                {searchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => setSearchQuery('')}
+                    className="absolute right-1.5 top-1/2 -translate-y-1/2 text-fg-subtle hover:text-fg p-0.5 cursor-pointer"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                )}
               </div>
             </div>
           </div>
@@ -573,9 +548,9 @@ export const RevisionPage: React.FC = () => {
             /* GROUPED VIEW */
             <div className="divide-y divide-border">
               {filteredGroups.length === 0 ? (
-                <div className="py-12 text-center text-fg-subtle space-y-2">
-                  <Smartphone className="w-8 h-8 opacity-40 mx-auto" />
-                  <p className="text-sm font-medium">Товары не найдены</p>
+                <div className="py-8 text-center text-fg-subtle space-y-1.5">
+                  <Smartphone className="w-6 h-6 opacity-40 mx-auto" />
+                  <p className="text-xs font-medium">Товары не найдены</p>
                 </div>
               ) : (
                 filteredGroups.map((group) => {
@@ -587,16 +562,16 @@ export const RevisionPage: React.FC = () => {
                       {/* Main Group Header Row */}
                       <div
                         onClick={() => handleToggleExpand(group.key)}
-                        className={`p-3 sm:p-3.5 flex items-center justify-between gap-3 cursor-pointer ${
+                        className={`px-2.5 py-1.5 sm:py-2 flex items-center justify-between gap-2 cursor-pointer text-xs ${
                           isComplete ? 'bg-emerald-500/5 hover:bg-emerald-500/10' : 'hover:bg-surface-raised'
                         }`}
                       >
                         {/* Check button & Model info */}
-                        <div className="flex items-center gap-3 min-w-0">
+                        <div className="flex items-center gap-2 min-w-0 flex-1">
                           <button
                             type="button"
                             onClick={(e) => handleToggleGroup(group, e)}
-                            className={`w-7 h-7 rounded-xl border flex items-center justify-center transition-all cursor-pointer shrink-0 ${
+                            className={`w-5 h-5 rounded-md border flex items-center justify-center transition-all cursor-pointer shrink-0 ${
                               isComplete
                                 ? 'bg-emerald-500 border-emerald-600 text-white shadow-2xs'
                                 : group.checked > 0
@@ -605,49 +580,54 @@ export const RevisionPage: React.FC = () => {
                             }`}
                             title={isComplete ? 'Снять отметку' : 'Сверить всю группу'}
                           >
-                            <Check className="w-4 h-4" strokeWidth={3} />
+                            <Check className="w-3 h-3 stroke-3" />
                           </button>
 
-                          <div className="min-w-0">
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <p className={`text-xs sm:text-sm font-bold truncate ${
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span className={`font-bold text-xs truncate ${
                                 isComplete ? 'text-emerald-700 dark:text-emerald-300' : 'text-fg'
                               }`}>
                                 {group.brand} {group.model}
-                              </p>
-                              {isComplete ? (
-                                <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 font-bold flex items-center gap-1">
-                                  <Check className="w-3 h-3" /> Сходится
-                                </span>
-                              ) : (
-                                <span className="text-[10px] px-2 py-0.5 rounded-full bg-surface-raised text-fg-subtle font-medium border border-border">
-                                  Ожидает
+                              </span>
+
+                              {group.storage && (
+                                <span className="px-1.5 py-0.2 rounded bg-surface-raised border border-border text-[10px] font-mono font-bold text-fg shrink-0">
+                                  {group.storage}
                                 </span>
                               )}
-                            </div>
 
-                            <div className="flex items-center gap-2 text-[11px] text-fg-subtle flex-wrap mt-0.5">
-                              {group.storage && <span>{group.storage}</span>}
-                              {group.color && <span>• {group.color}</span>}
-                              <span className="font-mono font-medium text-fg-subtle">
-                                • {group.checked} из {group.total} шт.
-                              </span>
+                              {group.color && (
+                                <span className="text-[10px] text-fg-muted shrink-0">
+                                  • {group.color}
+                                </span>
+                              )}
+
+                              {isComplete ? (
+                                <span className="text-[9px] px-1.5 py-0.2 rounded bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 font-bold flex items-center gap-0.5 shrink-0">
+                                  <Check className="w-2.5 h-2.5 stroke-3" /> Сходится
+                                </span>
+                              ) : (
+                                <span className="text-[9px] px-1.5 py-0.2 rounded bg-surface-raised text-fg-subtle font-medium border border-border shrink-0">
+                                  {group.checked} из {group.total}
+                                </span>
+                              )}
                             </div>
                           </div>
                         </div>
 
                         {/* Right side: Action button & Expand toggle */}
-                        <div className="flex items-center gap-2 shrink-0">
+                        <div className="flex items-center gap-1.5 shrink-0">
                           <button
                             type="button"
                             onClick={(e) => handleToggleGroup(group, e)}
-                            className={`text-xs font-semibold px-2.5 py-1 rounded-lg border transition-all cursor-pointer ${
+                            className={`text-[11px] font-semibold px-2 py-0.5 rounded-md border transition-all cursor-pointer ${
                               isComplete
                                 ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20'
                                 : 'bg-surface-raised text-fg-subtle border-border hover:border-accent'
                             }`}
                           >
-                            {isComplete ? 'Сверено ✓' : `Сверить (${group.total} шт.)`}
+                            {isComplete ? 'Сверено ✓' : `Сверить (${group.total})`}
                           </button>
 
                           <button
@@ -656,42 +636,42 @@ export const RevisionPage: React.FC = () => {
                               e.stopPropagation();
                               handleToggleExpand(group.key);
                             }}
-                            className="p-1 text-fg-subtle hover:text-fg rounded-lg transition-colors cursor-pointer"
+                            className="p-1 text-fg-subtle hover:text-fg rounded transition-colors cursor-pointer"
                             title={isExpanded ? 'Свернуть' : 'Развернуть список IMEI'}
                           >
-                            <ChevronDown className={`w-4 h-4 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+                            <ChevronDown className={`w-3.5 h-3.5 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
                           </button>
                         </div>
                       </div>
 
                       {/* Sub-items (individual devices of this group if expanded) */}
                       {isExpanded && (
-                        <div className="bg-surface-raised/40 border-t border-border/60 divide-y divide-border/40 pl-6 pr-3 py-1 animate-in fade-in duration-150">
+                        <div className="bg-surface-raised/40 border-t border-border/60 divide-y divide-border/40 pl-7 pr-2.5 py-0.5 animate-in fade-in duration-150 text-xs">
                           {group.items.map((device) => {
                             const isChecked = checkedImeis.has(device.imei) || (device.imei2 && checkedImeis.has(device.imei2));
                             return (
                               <div
                                 key={device.id}
                                 onClick={() => handleToggleCheck(device)}
-                                className="py-2 px-2 flex items-center justify-between gap-2 text-xs cursor-pointer hover:bg-surface-raised/80 rounded-lg transition-colors"
+                                className="py-1 px-1.5 flex items-center justify-between gap-2 cursor-pointer hover:bg-surface-raised/80 rounded transition-colors"
                               >
-                                <div className="flex items-center gap-2.5 min-w-0">
+                                <div className="flex items-center gap-2 min-w-0">
                                   <button
                                     type="button"
                                     onClick={(e) => {
                                       e.stopPropagation();
                                       handleToggleCheck(device);
                                     }}
-                                    className={`w-5 h-5 rounded-md border flex items-center justify-center transition-all cursor-pointer shrink-0 ${
+                                    className={`w-4 h-4 rounded border flex items-center justify-center transition-all cursor-pointer shrink-0 ${
                                       isChecked
                                         ? 'bg-emerald-500 border-emerald-600 text-white'
                                         : 'bg-surface border-border text-transparent hover:border-accent'
                                     }`}
                                   >
-                                    <Check className="w-3 h-3" strokeWidth={3} />
+                                    <Check className="w-2.5 h-2.5 stroke-3" />
                                   </button>
                                   <span className="font-mono text-fg-subtle text-[11px] truncate">
-                                    IMEI: <span className="font-semibold text-fg">{device.imei}</span>
+                                    IMEI: <strong className="text-fg font-semibold">{device.imei}</strong>
                                   </span>
                                 </div>
                                 <span className={`text-[10px] font-medium ${isChecked ? 'text-emerald-600 dark:text-emerald-400' : 'text-fg-subtle'}`}>
@@ -711,9 +691,9 @@ export const RevisionPage: React.FC = () => {
             /* FLAT ITEMS LIST VIEW */
             <div className="divide-y divide-border">
               {filteredList.length === 0 ? (
-                <div className="py-12 text-center text-fg-subtle space-y-2">
-                  <Smartphone className="w-8 h-8 opacity-40 mx-auto" />
-                  <p className="text-sm font-medium">Товары не найдены</p>
+                <div className="py-8 text-center text-fg-subtle space-y-1.5">
+                  <Smartphone className="w-6 h-6 opacity-40 mx-auto" />
+                  <p className="text-xs font-medium">Товары не найдены</p>
                 </div>
               ) : (
                 filteredList.map((device) => {
@@ -723,51 +703,52 @@ export const RevisionPage: React.FC = () => {
                     <div
                       key={device.id}
                       onClick={() => handleToggleCheck(device)}
-                      className={`p-3 sm:p-3.5 flex items-center justify-between gap-3 transition-colors cursor-pointer ${
+                      className={`px-2.5 py-1.5 sm:py-2 flex items-center justify-between gap-2 transition-colors cursor-pointer text-xs ${
                         isChecked
                           ? 'bg-emerald-500/5 hover:bg-emerald-500/10'
                           : 'hover:bg-surface-raised'
                       }`}
                     >
                       {/* Check indicator & Model details */}
-                      <div className="flex items-center gap-3 min-w-0">
+                      <div className="flex items-center gap-2 min-w-0 flex-1">
                         <button
                           type="button"
                           onClick={(e) => {
                             e.stopPropagation();
                             handleToggleCheck(device);
                           }}
-                          className={`w-7 h-7 rounded-xl border flex items-center justify-center transition-all cursor-pointer shrink-0 ${
+                          className={`w-5 h-5 rounded-md border flex items-center justify-center transition-all cursor-pointer shrink-0 ${
                             isChecked
                               ? 'bg-emerald-500 border-emerald-600 text-white shadow-2xs'
                               : 'bg-surface border-border text-transparent hover:border-accent'
                           }`}
                         >
-                          <Check className="w-4 h-4" strokeWidth={3} />
+                          <Check className="w-3 h-3 stroke-3" />
                         </button>
 
-                        <div className="min-w-0">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <p className={`text-xs sm:text-sm font-bold truncate ${
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className={`font-bold text-xs truncate ${
                               isChecked ? 'text-emerald-700 dark:text-emerald-300' : 'text-fg'
                             }`}>
                               {device.brand} {device.model}
-                            </p>
-                            {isChecked ? (
-                              <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 font-bold flex items-center gap-1">
-                                <Check className="w-3 h-3" /> Сверено
-                              </span>
-                            ) : (
-                              <span className="text-[10px] px-2 py-0.5 rounded-full bg-surface-raised text-fg-subtle font-medium border border-border">
-                                Ожидает
+                            </span>
+
+                            {device.storage && (
+                              <span className="px-1.5 py-0.2 rounded bg-surface-raised border border-border text-[10px] font-mono font-bold text-fg shrink-0">
+                                {device.storage}
                               </span>
                             )}
-                          </div>
 
-                          <div className="flex items-center gap-2 text-[11px] text-fg-subtle flex-wrap mt-0.5">
-                            {device.storage && <span>{device.storage}</span>}
-                            {device.color && <span>• {device.color}</span>}
-                            <span className="font-mono text-fg-subtle">• IMEI: {device.imei}</span>
+                            {device.color && (
+                              <span className="text-[10px] text-fg-muted shrink-0">
+                                • {device.color}
+                              </span>
+                            )}
+
+                            <span className="font-mono text-fg-subtle text-[10px] bg-surface-raised/80 px-1 py-0.2 rounded border border-border/50 shrink-0">
+                              IMEI: <strong className="text-fg font-medium">{device.imei}</strong>
+                            </span>
                           </div>
                         </div>
                       </div>
@@ -779,7 +760,7 @@ export const RevisionPage: React.FC = () => {
                           e.stopPropagation();
                           handleToggleCheck(device);
                         }}
-                        className={`text-xs font-semibold px-2.5 py-1 rounded-lg border transition-all cursor-pointer shrink-0 ${
+                        className={`text-[11px] font-semibold px-2 py-0.5 rounded-md border transition-all cursor-pointer shrink-0 ${
                           isChecked
                             ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20'
                             : 'bg-surface-raised text-fg-subtle border-border hover:border-accent'

@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import { HandCoins } from 'lucide-react';
 import { useAppFields } from '../../context/AppContext';
 import { CashCollectionPanel } from '../finance/CashCollectionPanel';
 import { DateRangePicker } from '../ui/DateRangePicker';
@@ -33,24 +32,10 @@ export const CashCollectionPage: React.FC = () => {
 
   return (
     <div className="work-screen flex-1 flex flex-col h-full overflow-hidden bg-bg text-fg select-none">
-      {/* Header */}
-      <div className="p-3 sm:p-4 border-b border-border bg-surface shrink-0 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div className="flex items-center gap-2.5">
-          <div className="w-9 h-9 rounded-xl bg-accent/15 border border-accent/25 flex items-center justify-center text-accent shrink-0">
-            <HandCoins className="w-5 h-5" />
-          </div>
-          <div>
-            <h1 className="text-base sm:text-lg font-bold text-fg leading-tight">
-              Инкассация
-            </h1>
-            <p className="text-[11px] text-fg-subtle">
-              Сдача наличных касс магазинов в центральную кассу и на бонусный счёт
-            </p>
-          </div>
-        </div>
-
+      {/* Controls Bar */}
+      <div className="px-3 sm:px-4 py-2 border-b border-border bg-surface shrink-0 flex items-center justify-end gap-2 shadow-2xs">
         {/* Filter controls */}
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto justify-between sm:justify-end">
           {/* Store Filter */}
           <StoreSelector
             value={selectedStoreId}
@@ -59,7 +44,7 @@ export const CashCollectionPage: React.FC = () => {
             showAllOption
             allOptionLabel="Все магазины"
             allOptionValue="all"
-            className="max-w-44 sm:max-w-56"
+            className="flex-1 sm:flex-initial max-w-44 sm:max-w-56"
           />
 
           {/* Date Range Picker (Range, Month, Day) */}
