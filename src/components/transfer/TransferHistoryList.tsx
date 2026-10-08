@@ -23,7 +23,7 @@ import {
 import { formatStoreName } from '../../utils/storeContext';
 import { getPhoneColorHex, formatRam } from '../../utils/phoneSpecs';
 import { cn } from '../../utils/cn';
-import { TransferHistoryListProps, isLocationWarehouse } from './types';
+import { TransferHistoryListProps } from './types';
 import { TransferRequest } from '../../types';
 import { CustomSelect, CustomSelectOption } from '../ui/CustomSelect';
 

@@ -5,7 +5,7 @@ import { resolveActor } from '../../common/actor';
 import { requireNonNegativeMoney, requirePositiveMoney, roundMoney } from '../../common/money';
 import { requireTodayRate } from '../exchange-rate/exchange-rate.service';
 import { lockBonusAccount, lockCashRegister } from '../finance/account.service';
-import { currentOwnerAllocations, readOwnerAllocations, replaceOwnerAllocations } from '../finance/owner-allocations';
+import { readOwnerAllocations, replaceOwnerAllocations } from '../finance/owner-allocations';
 import type { OwnerProfitAllocation } from '../sales/profit';
 import { cancelTransaction, postTransaction } from '../finance/financial-transaction.service';
 import { allocateMoney } from '../../common/allocation';
@@ -154,8 +154,6 @@ export class SuppliersService {
         throw new Error('Оплата поставщикам производится только из Центральной кассы. Розничные кассы не используются для расчетов с поставщиками.');
       }
       // Supplier payments are funded strictly from the central cash register (Main Warehouse account).
-      // amountUsd was collected in USD terms but store registers hold TJS; convert via today's rate if available.
-      const cashAmountTjs = roundMoney(D(amountUsd).mul(exchangeRate));
       const cashGuard = await tx.store.updateMany({ where: { id: input.storeId, cashBalanceUsd: { gte: amountUsd } }, data: { cashBalanceUsd: { decrement: amountUsd } } });
       if (!D(cashGuard.count).eq(1)) throw new Error('В центральной кассе недостаточно наличных для оплаты поставщику');
 
@@ -265,7 +263,6 @@ export class SuppliersService {
       if (store.isMainWarehouse === false) {
         throw new Error('Оплата поставщикам производится только из Центральной кассы. Розничные кассы не используются для расчетов с поставщиками.');
       }
-      const cashAmountTjs = roundMoney(D(amountUsd).mul(exchangeRate));
       const cashGuard = await tx.store.updateMany({ where: { id: input.storeId, cashBalanceUsd: { gte: amountUsd } }, data: { cashBalanceUsd: { decrement: amountUsd } } });
       if (!D(cashGuard.count).eq(1)) throw new Error('В центральной кассе недостаточно наличных для оплаты накладной');
 

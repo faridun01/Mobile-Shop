@@ -9,7 +9,6 @@ import {
 } from 'lucide-react';
 import { MonthPicker } from '../ui/MonthPicker';
 import { StoreSelector } from '../common/StoreSelector';
-import { formatMoney } from '../../utils/money';
 import { cn } from '../../utils/cn';
 import { RepairTopBarProps } from './types';
 import { RepairStatus } from '../../types';
@@ -136,13 +135,6 @@ export const RepairTopBar: React.FC<RepairTopBarProps> = ({
                 <span className="text-[11px]">Сброс</span>
               </button>
             )}
-          </div>
-
-          {/* Quick Metrics Strip */}
-          <div className="flex items-center gap-1.5 text-[11px] text-fg-subtle shrink-0">
-            <span className="px-2 py-0.5 rounded-lg bg-surface-raised border border-border/80 text-fg-muted font-medium">{totalRepairsCount} рем.</span>
-            <span className="px-2 py-0.5 rounded-lg bg-accent/10 border border-accent/20 text-accent font-semibold">{readyRepairsCount} готово</span>
-            <span className="px-2 py-0.5 rounded-lg bg-surface-raised border border-border/80 font-bold text-fg">{formatMoney(totalExpensesTjs)} TJS</span>
           </div>
         </div>
       )}

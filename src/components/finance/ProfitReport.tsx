@@ -1,6 +1,5 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { decimal, moneyNumber, sumMoney } from '../../utils/money';
-import { useNavigate } from 'react-router-dom';
 import { useAppFields } from '../../context/AppContext';
 import { apiClient } from '../../api/client';
 import { mapExpense, mapSale, buildNameLookup } from '../../api/mappers';
@@ -181,7 +180,6 @@ export const ProfitReport: React.FC<ProfitReportProps> = ({
   onDateChange,
   onResetToCurrentMonth,
 }) => {
-  const navigate = useNavigate();
   const {
     currentUser,
     stores,
@@ -191,8 +189,6 @@ export const ProfitReport: React.FC<ProfitReportProps> = ({
   } = useAppFields('currentUser', 'stores', 'users', 'todayRate', 'selectedStoreId');
   // Admin inside a store sees only that store; Central Cash shows every store.
   const storeCtx = useStoreContext();
-
-  const period = 'SPECIFIC_MONTH';
   // Summary view defaults to whichever store is active on the POS Terminal page (same
   // fallback SalePage uses); the per-store view always needs every store.
   const [selectedStore, setSelectedStore] = useState<string>(() => {

@@ -5,7 +5,6 @@ import {
   ShoppingBag,
   History,
   Package,
-  PlusCircle,
   Menu,
   Landmark,
   Truck,

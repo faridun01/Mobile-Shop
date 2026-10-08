@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { useAppFields } from '../../context/AppContext';
-import { formatStoreName, formatStoreDisplayTitle } from '../../utils/storeContext';
+import { formatStoreDisplayTitle } from '../../utils/storeContext';
 import { Device } from '../../types';
 import { soundEffects } from '../../utils/sound';
 import { StatusBanner, StatusMessage } from '../ui/StatusBanner';
@@ -12,7 +12,6 @@ import { StoreSelector } from '../common/StoreSelector';
 import { SearchBar } from '../ui/SearchBar';
 import { DEVICE_STATUS_LABELS, findDeviceByCode, normalizeScanCode } from '../../utils/scanLookup';
 import {
-  Search,
   CheckCircle2,
   RotateCcw,
   Smartphone,
@@ -92,7 +91,6 @@ export const RevisionPage: React.FC = () => {
   const [filterTab, setFilterTab] = useState<'ALL' | 'UNCHECKED' | 'CHECKED'>('ALL');
   // View mode: 'GROUPS' (grouped by model) | 'ITEMS' (itemized list)
   const [viewMode, setViewMode] = useState<'GROUPS' | 'ITEMS'>('GROUPS');
-  const [searchQuery, setSearchQuery] = useState('');
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(() => new Set());
 
   // Finish modal
@@ -271,40 +269,19 @@ export const RevisionPage: React.FC = () => {
       const isComplete = g.checked === g.total;
       if (filterTab === 'CHECKED' && !isComplete) return false;
       if (filterTab === 'UNCHECKED' && isComplete) return false;
-
-      if (!searchQuery.trim()) return true;
-      const q = searchQuery.toLowerCase().trim();
-      const matchGroup =
-        g.brand.toLowerCase().includes(q) ||
-        g.model.toLowerCase().includes(q) ||
-        (g.color && g.color.toLowerCase().includes(q)) ||
-        (g.storage && g.storage.toLowerCase().includes(q));
-
-      if (matchGroup) return true;
-      return g.items.some((d) => d.imei.toLowerCase().includes(q) || (d.imei2 && d.imei2.toLowerCase().includes(q)));
+      return true;
     });
-  }, [modelGroups, filterTab, searchQuery]);
+  }, [modelGroups, filterTab]);
 
   // Filtered flat devices list for display
   const filteredList = useMemo(() => {
     return storeDevices.filter((d) => {
       const isChecked = checkedImeis.has(d.imei) || (d.imei2 ? checkedImeis.has(d.imei2) : false);
-
       if (filterTab === 'CHECKED' && !isChecked) return false;
       if (filterTab === 'UNCHECKED' && isChecked) return false;
-
-      if (!searchQuery.trim()) return true;
-      const q = searchQuery.toLowerCase().trim();
-      return (
-        d.brand.toLowerCase().includes(q) ||
-        d.model.toLowerCase().includes(q) ||
-        d.imei.toLowerCase().includes(q) ||
-        (d.imei2 && d.imei2.toLowerCase().includes(q)) ||
-        (d.color && d.color.toLowerCase().includes(q)) ||
-        (d.storage && d.storage.toLowerCase().includes(q))
-      );
+      return true;
     });
-  }, [storeDevices, checkedImeis, filterTab, searchQuery]);
+  }, [storeDevices, checkedImeis, filterTab]);
 
   return (
     <div className="work-screen flex-1 flex flex-col h-full overflow-y-auto min-h-0 bg-bg text-fg select-none">
@@ -339,7 +316,8 @@ export const RevisionPage: React.FC = () => {
             size="sm"
             onClick={handleOpenResetRevision}
             leftIcon={RotateCcw}
-            className="h-7.5 px-2.5 text-xs text-fg-subtle hover:text-fg cursor-pointer"
+            data-compact="true"
+            className="min-h-0 h-7.5 px-2.5 text-xs text-fg-subtle hover:text-fg cursor-pointer"
             title="Сбросить отметки текущей сверки"
           >
             Сброс
@@ -351,7 +329,8 @@ export const RevisionPage: React.FC = () => {
             size="sm"
             onClick={() => setIsSummaryModalOpen(true)}
             leftIcon={CheckCircle2}
-            className="h-7.5 px-3 text-xs font-bold cursor-pointer shadow-xs"
+            data-compact="true"
+            className="min-h-0 h-7.5 px-3 text-xs font-bold cursor-pointer shadow-xs"
           >
             Итоги сверки
           </Button>
@@ -359,34 +338,34 @@ export const RevisionPage: React.FC = () => {
       </div>
 
       {/* Main Content Area */}
-      <div className="p-2 sm:p-3 space-y-2.5">
+      <div className="p-2 sm:p-2.5 space-y-2">
         {/* Progress & Live Counters Bar */}
-        <div className="p-2.5 sm:p-3 rounded-xl bg-surface border border-border shadow-2xs space-y-2">
-          <div className="flex items-center justify-between gap-2 flex-wrap">
-            <div className="flex items-center gap-2 sm:gap-3 flex-wrap text-xs">
+        <div className="p-2 sm:p-2.5 rounded-xl bg-surface border border-border shadow-2xs space-y-1.5">
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-1.5 sm:gap-2.5 flex-wrap text-xs">
               <span className="text-fg-subtle">
-                Всего: <strong className="font-mono text-fg font-black text-sm">{totalCount}</strong> шт.
+                Всего: <strong className="font-mono text-fg font-black">{totalCount}</strong> шт.
               </span>
               <span className="text-border">•</span>
               <span className="text-emerald-600 dark:text-emerald-400">
-                Сверено: <strong className="font-mono font-black text-sm">{checkedCount}</strong> шт.
+                Сверено: <strong className="font-mono font-black">{checkedCount}</strong> шт.
               </span>
               <span className="text-border">•</span>
               <span className="text-amber-600 dark:text-amber-400">
-                Осталось: <strong className="font-mono font-black text-sm">{uncheckedCount}</strong> шт.
+                Осталось: <strong className="font-mono font-black">{uncheckedCount}</strong> шт.
               </span>
             </div>
 
-            <div className="flex items-center gap-1.5 text-xs font-bold shrink-0">
+            <div className="flex items-center gap-1 text-xs font-bold shrink-0">
               <span className="text-fg-subtle">Прогресс:</span>
-              <span className="font-black font-mono text-accent text-sm sm:text-base">
+              <span className={`font-mono font-black text-xs sm:text-sm ${isAllReconciled ? 'text-emerald-500' : 'text-accent'}`}>
                 {progressPercent}%
               </span>
             </div>
           </div>
 
           {/* Progress Bar */}
-          <div className="w-full h-1.5 rounded-full bg-surface-raised border border-border overflow-hidden">
+          <div className="w-full h-1 sm:h-1.5 rounded-full bg-surface-raised border border-border overflow-hidden">
             <div
               className={`h-full transition-all duration-300 ${
                 isAllReconciled ? 'bg-emerald-500' : 'bg-accent'
@@ -396,18 +375,7 @@ export const RevisionPage: React.FC = () => {
           </div>
 
           {/* Actions & Scanner row */}
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 pt-0.5">
-            {!isAllReconciled && totalCount > 0 && (
-              <button
-                type="button"
-                onClick={handleCheckAll}
-                className="h-8.5 px-3 rounded-lg bg-accent text-accent-fg font-bold text-xs flex items-center justify-center gap-1.5 hover:opacity-90 active:scale-[0.99] transition-all cursor-pointer shadow-xs shrink-0 whitespace-nowrap"
-              >
-                <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
-                <span>Подтвердить все ({totalCount} шт.)</span>
-              </button>
-            )}
-
+          <div className="flex items-center gap-2 pt-0.5">
             <div className="flex-1 min-w-0">
               <SearchBar
                 value={scanInput}
@@ -417,27 +385,42 @@ export const RevisionPage: React.FC = () => {
                 placeholder="Сканируйте IMEI или штрихкод..."
               />
             </div>
+
+            {!isAllReconciled && totalCount > 0 && (
+              <button
+                type="button"
+                data-compact="true"
+                onClick={handleCheckAll}
+                className="min-h-0 h-11 px-2.5 sm:px-3 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-xs shrink-0 whitespace-nowrap active:scale-[0.98]"
+                title="Подтвердить все товары как сверенные"
+              >
+                <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+                <span className="hidden sm:inline">Подтвердить все ({totalCount} шт.)</span>
+                <span className="sm:hidden">Все ({totalCount} шт.)</span>
+              </button>
+            )}
           </div>
         </div>
 
         {surplus.length > 0 && (
-          <div className="p-2 sm:p-2.5 rounded-xl bg-danger/10 border border-danger/30 space-y-1.5" role="region" aria-label="Излишки">
+          <div className="p-2 rounded-xl bg-danger/10 border border-danger/30 space-y-1" role="region" aria-label="Излишки">
             <h3 className="text-xs font-bold text-danger flex items-center gap-1.5">
               <AlertTriangle className="w-3.5 h-3.5" />
               Излишки ({surplus.length} шт.)
             </h3>
             <div className="divide-y divide-danger/20 text-xs">
               {surplus.map((item) => (
-                <div key={item.code} className="py-1 flex items-center justify-between gap-2">
+                <div key={item.code} className="py-0.5 flex items-center justify-between gap-2">
                   <div className="min-w-0 flex items-center gap-2">
-                    <span className="font-mono font-bold text-fg">{item.code}</span>
+                    <span className="font-mono font-bold text-fg text-xs">{item.code}</span>
                     <span className="text-fg-subtle truncate text-[11px]">{item.note}</span>
                   </div>
                   <button
                     type="button"
+                    data-compact="true"
                     aria-label={`Убрать ${item.code} из излишков`}
                     onClick={() => setSurplus((prev) => prev.filter((x) => x.code !== item.code))}
-                    className="w-7 h-7 shrink-0 rounded-lg flex items-center justify-center text-fg-subtle hover:text-danger hover:bg-danger/10 cursor-pointer"
+                    className="min-h-0 w-6 h-6 shrink-0 rounded flex items-center justify-center text-fg-subtle hover:text-danger hover:bg-danger/10 cursor-pointer"
                   >
                     <X className="w-3.5 h-3.5" />
                   </button>
@@ -449,14 +432,15 @@ export const RevisionPage: React.FC = () => {
 
         {/* Devices Checklist & Tabs */}
         <div className="rounded-xl bg-surface border border-border shadow-2xs overflow-hidden">
-          {/* Controls Bar: Tabs, View Toggle & Search */}
-          <div className="px-2.5 py-1.5 border-b border-border bg-surface-raised flex flex-wrap items-center justify-between gap-2">
+          {/* Controls Bar: Tabs & View Toggle (Search removed, single compact row) */}
+          <div className="px-2 py-1.5 border-b border-border bg-surface-raised flex items-center justify-between gap-1.5">
             {/* Filter Tabs */}
             <div className="flex items-center gap-1 overflow-x-auto scrollbar-none text-xs">
               <button
                 type="button"
+                data-compact="true"
                 onClick={() => setFilterTab('ALL')}
-                className={`h-6.5 px-2 text-[11px] font-semibold rounded-md transition-all cursor-pointer shrink-0 ${
+                className={`min-h-0 h-6 px-2 text-[11px] font-semibold rounded-md transition-all cursor-pointer shrink-0 ${
                   filterTab === 'ALL'
                     ? 'bg-accent text-accent-fg shadow-2xs font-bold'
                     : 'text-fg-subtle hover:text-fg'
@@ -466,8 +450,9 @@ export const RevisionPage: React.FC = () => {
               </button>
               <button
                 type="button"
+                data-compact="true"
                 onClick={() => setFilterTab('UNCHECKED')}
-                className={`h-6.5 px-2 text-[11px] font-semibold rounded-md transition-all cursor-pointer shrink-0 ${
+                className={`min-h-0 h-6 px-2 text-[11px] font-semibold rounded-md transition-all cursor-pointer shrink-0 ${
                   filterTab === 'UNCHECKED'
                     ? 'bg-amber-500 text-white shadow-2xs font-bold'
                     : 'text-fg-subtle hover:text-fg'
@@ -477,8 +462,9 @@ export const RevisionPage: React.FC = () => {
               </button>
               <button
                 type="button"
+                data-compact="true"
                 onClick={() => setFilterTab('CHECKED')}
-                className={`h-6.5 px-2 text-[11px] font-semibold rounded-md transition-all cursor-pointer shrink-0 ${
+                className={`min-h-0 h-6 px-2 text-[11px] font-semibold rounded-md transition-all cursor-pointer shrink-0 ${
                   filterTab === 'CHECKED'
                     ? 'bg-emerald-600 text-white shadow-2xs font-bold'
                     : 'text-fg-subtle hover:text-fg'
@@ -488,58 +474,36 @@ export const RevisionPage: React.FC = () => {
               </button>
             </div>
 
-            {/* Right side: View Mode Toggle & Search Input */}
-            <div className="flex items-center gap-1.5 shrink-0 flex-wrap sm:flex-nowrap">
-              {/* View mode toggle */}
-              <div className="inline-flex rounded-lg bg-surface border border-border p-0.5 shrink-0">
-                <button
-                  type="button"
-                  onClick={() => setViewMode('GROUPS')}
-                  className={`h-6 px-2 text-[11px] font-semibold rounded-md flex items-center gap-1 transition-all cursor-pointer ${
-                    viewMode === 'GROUPS'
-                      ? 'bg-accent text-accent-fg shadow-2xs font-bold'
-                      : 'text-fg-subtle hover:text-fg'
-                  }`}
-                  title="Группировка по моделям"
-                >
-                  <Layers className="w-3 h-3" />
-                  <span>Модели</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setViewMode('ITEMS')}
-                  className={`h-6 px-2 text-[11px] font-semibold rounded-md flex items-center gap-1 transition-all cursor-pointer ${
-                    viewMode === 'ITEMS'
-                      ? 'bg-accent text-accent-fg shadow-2xs font-bold'
-                      : 'text-fg-subtle hover:text-fg'
-                  }`}
-                  title="Поштучный список"
-                >
-                  <List className="w-3 h-3" />
-                  <span>Штучно</span>
-                </button>
-              </div>
-
-              {/* Search Input */}
-              <div className="relative w-44 sm:w-56 shrink-0">
-                <Search className="w-3.5 h-3.5 text-fg-subtle absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-                <input
-                  type="text"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Поиск..."
-                  className="w-full h-7 pl-7 pr-6 rounded-lg border border-border bg-surface text-fg text-xs focus:outline-none focus:border-accent"
-                />
-                {searchQuery && (
-                  <button
-                    type="button"
-                    onClick={() => setSearchQuery('')}
-                    className="absolute right-1.5 top-1/2 -translate-y-1/2 text-fg-subtle hover:text-fg p-0.5 cursor-pointer"
-                  >
-                    <X className="w-3 h-3" />
-                  </button>
-                )}
-              </div>
+            {/* View mode toggle */}
+            <div className="inline-flex rounded-lg bg-surface border border-border p-0.5 shrink-0">
+              <button
+                type="button"
+                data-compact="true"
+                onClick={() => setViewMode('GROUPS')}
+                className={`min-h-0 h-5.5 px-2 text-[11px] font-semibold rounded-md flex items-center gap-1 transition-all cursor-pointer ${
+                  viewMode === 'GROUPS'
+                    ? 'bg-accent text-accent-fg shadow-2xs font-bold'
+                    : 'text-fg-subtle hover:text-fg'
+                }`}
+                title="Группировка по моделям"
+              >
+                <Layers className="w-3 h-3" />
+                <span>Модели</span>
+              </button>
+              <button
+                type="button"
+                data-compact="true"
+                onClick={() => setViewMode('ITEMS')}
+                className={`min-h-0 h-5.5 px-2 text-[11px] font-semibold rounded-md flex items-center gap-1 transition-all cursor-pointer ${
+                  viewMode === 'ITEMS'
+                    ? 'bg-accent text-accent-fg shadow-2xs font-bold'
+                    : 'text-fg-subtle hover:text-fg'
+                }`}
+                title="Поштучный список"
+              >
+                <List className="w-3 h-3" />
+                <span>Штучно</span>
+              </button>
             </div>
           </div>
 
@@ -548,8 +512,8 @@ export const RevisionPage: React.FC = () => {
             /* GROUPED VIEW */
             <div className="divide-y divide-border">
               {filteredGroups.length === 0 ? (
-                <div className="py-8 text-center text-fg-subtle space-y-1.5">
-                  <Smartphone className="w-6 h-6 opacity-40 mx-auto" />
+                <div className="py-6 text-center text-fg-subtle space-y-1">
+                  <Smartphone className="w-5 h-5 opacity-40 mx-auto" />
                   <p className="text-xs font-medium">Товары не найдены</p>
                 </div>
               ) : (
@@ -562,7 +526,7 @@ export const RevisionPage: React.FC = () => {
                       {/* Main Group Header Row */}
                       <div
                         onClick={() => handleToggleExpand(group.key)}
-                        className={`px-2.5 py-1.5 sm:py-2 flex items-center justify-between gap-2 cursor-pointer text-xs ${
+                        className={`px-2.5 py-1.5 flex items-center justify-between gap-2 cursor-pointer text-xs ${
                           isComplete ? 'bg-emerald-500/5 hover:bg-emerald-500/10' : 'hover:bg-surface-raised'
                         }`}
                       >
@@ -570,8 +534,9 @@ export const RevisionPage: React.FC = () => {
                         <div className="flex items-center gap-2 min-w-0 flex-1">
                           <button
                             type="button"
+                            data-compact="true"
                             onClick={(e) => handleToggleGroup(group, e)}
-                            className={`w-5 h-5 rounded-md border flex items-center justify-center transition-all cursor-pointer shrink-0 ${
+                            className={`min-h-0 w-4.5 h-4.5 rounded-md border flex items-center justify-center transition-all cursor-pointer shrink-0 ${
                               isComplete
                                 ? 'bg-emerald-500 border-emerald-600 text-white shadow-2xs'
                                 : group.checked > 0
@@ -617,11 +582,12 @@ export const RevisionPage: React.FC = () => {
                         </div>
 
                         {/* Right side: Action button & Expand toggle */}
-                        <div className="flex items-center gap-1.5 shrink-0">
+                        <div className="flex items-center gap-1 shrink-0">
                           <button
                             type="button"
+                            data-compact="true"
                             onClick={(e) => handleToggleGroup(group, e)}
-                            className={`text-[11px] font-semibold px-2 py-0.5 rounded-md border transition-all cursor-pointer ${
+                            className={`min-h-0 text-[11px] font-semibold px-2 py-0.5 rounded-md border transition-all cursor-pointer ${
                               isComplete
                                 ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20'
                                 : 'bg-surface-raised text-fg-subtle border-border hover:border-accent'
@@ -632,11 +598,12 @@ export const RevisionPage: React.FC = () => {
 
                           <button
                             type="button"
+                            data-compact="true"
                             onClick={(e) => {
                               e.stopPropagation();
                               handleToggleExpand(group.key);
                             }}
-                            className="p-1 text-fg-subtle hover:text-fg rounded transition-colors cursor-pointer"
+                            className="min-h-0 p-1 text-fg-subtle hover:text-fg rounded transition-colors cursor-pointer"
                             title={isExpanded ? 'Свернуть' : 'Развернуть список IMEI'}
                           >
                             <ChevronDown className={`w-3.5 h-3.5 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
@@ -658,11 +625,12 @@ export const RevisionPage: React.FC = () => {
                                 <div className="flex items-center gap-2 min-w-0">
                                   <button
                                     type="button"
+                                    data-compact="true"
                                     onClick={(e) => {
                                       e.stopPropagation();
                                       handleToggleCheck(device);
                                     }}
-                                    className={`w-4 h-4 rounded border flex items-center justify-center transition-all cursor-pointer shrink-0 ${
+                                    className={`min-h-0 w-4 h-4 rounded border flex items-center justify-center transition-all cursor-pointer shrink-0 ${
                                       isChecked
                                         ? 'bg-emerald-500 border-emerald-600 text-white'
                                         : 'bg-surface border-border text-transparent hover:border-accent'
@@ -691,8 +659,8 @@ export const RevisionPage: React.FC = () => {
             /* FLAT ITEMS LIST VIEW */
             <div className="divide-y divide-border">
               {filteredList.length === 0 ? (
-                <div className="py-8 text-center text-fg-subtle space-y-1.5">
-                  <Smartphone className="w-6 h-6 opacity-40 mx-auto" />
+                <div className="py-6 text-center text-fg-subtle space-y-1">
+                  <Smartphone className="w-5 h-5 opacity-40 mx-auto" />
                   <p className="text-xs font-medium">Товары не найдены</p>
                 </div>
               ) : (
@@ -703,7 +671,7 @@ export const RevisionPage: React.FC = () => {
                     <div
                       key={device.id}
                       onClick={() => handleToggleCheck(device)}
-                      className={`px-2.5 py-1.5 sm:py-2 flex items-center justify-between gap-2 transition-colors cursor-pointer text-xs ${
+                      className={`px-2.5 py-1.5 flex items-center justify-between gap-2 transition-colors cursor-pointer text-xs ${
                         isChecked
                           ? 'bg-emerald-500/5 hover:bg-emerald-500/10'
                           : 'hover:bg-surface-raised'
@@ -713,11 +681,12 @@ export const RevisionPage: React.FC = () => {
                       <div className="flex items-center gap-2 min-w-0 flex-1">
                         <button
                           type="button"
+                          data-compact="true"
                           onClick={(e) => {
                             e.stopPropagation();
                             handleToggleCheck(device);
                           }}
-                          className={`w-5 h-5 rounded-md border flex items-center justify-center transition-all cursor-pointer shrink-0 ${
+                          className={`min-h-0 w-4.5 h-4.5 rounded-md border flex items-center justify-center transition-all cursor-pointer shrink-0 ${
                             isChecked
                               ? 'bg-emerald-500 border-emerald-600 text-white shadow-2xs'
                               : 'bg-surface border-border text-transparent hover:border-accent'
@@ -756,11 +725,12 @@ export const RevisionPage: React.FC = () => {
                       {/* Right action button */}
                       <button
                         type="button"
+                        data-compact="true"
                         onClick={(e) => {
                           e.stopPropagation();
                           handleToggleCheck(device);
                         }}
-                        className={`text-[11px] font-semibold px-2 py-0.5 rounded-md border transition-all cursor-pointer shrink-0 ${
+                        className={`min-h-0 text-[11px] font-semibold px-2 py-0.5 rounded-md border transition-all cursor-pointer shrink-0 ${
                           isChecked
                             ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20'
                             : 'bg-surface-raised text-fg-subtle border-border hover:border-accent'

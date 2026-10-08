@@ -54,7 +54,7 @@ async function main() {
       console.log('   Setting daily exchange rate...');
       await rateModal.click({ count: 3 } as any);
       await rateModal.type('10.95');
-      const submitBtn = await page.evaluate(() => {
+      await page.evaluate(() => {
         const btns = Array.from(document.querySelectorAll('button'));
         const save = btns.find((b) => b.innerText.includes('Подтвердить') || b.innerText.includes('Сохранить'));
         if (save) {

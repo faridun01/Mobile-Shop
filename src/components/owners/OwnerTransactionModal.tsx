@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { CreditCard, X, Users, ArrowDownLeft, ArrowUpRight, Store, Loader2, AlertTriangle, Landmark } from 'lucide-react';
+import { X, Users, ArrowDownLeft, ArrowUpRight, Store, Loader2, AlertTriangle, Landmark } from 'lucide-react';
 import { CustomSelect } from '../ui/CustomSelect';
 import { formatMoney } from '../../utils/money';
 import { formatStoreName } from '../../utils/storeContext';

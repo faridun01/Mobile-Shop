@@ -4,7 +4,6 @@ import {
   recordNavVisit,
   sortNavItemsByUsage,
   sortNavGroupsByUsage,
-  DEFAULT_PAGE_WEIGHTS,
 } from './navUsage';
 
 function memoryStorage(initial: Record<string, string> = {}) {

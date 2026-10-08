@@ -39,7 +39,7 @@ export const FlatDevicesTable: React.FC<FlatDevicesTableProps> = ({
           const index = flatRows.from + i;
           const store = stores.find(s => s.id === dev.locationId);
           const isWh = store?.isMainWarehouse || dev.status === 'MAIN_WAREHOUSE';
-          const storeName = isWh ? 'Центральный склад' : dev.locationName || store?.name || 'Магазин';
+          const storeName = isWh ? 'Главный склад' : dev.locationName || store?.name || 'Магазин';
           return (
             <DeviceRow
               key={dev.id}
@@ -148,7 +148,7 @@ export const FlatDevicesTable: React.FC<FlatDevicesTableProps> = ({
                     ) : (
                       <Store className="w-3 h-3 text-accent shrink-0" />
                     )}
-                    <span>{isWh ? 'Центральный склад' : dev.locationName || store?.name || 'Магазин'}</span>
+                    <span>{isWh ? 'Главный склад' : dev.locationName || store?.name || 'Магазин'}</span>
                   </span>
                 </td>
                 {isAdmin && (

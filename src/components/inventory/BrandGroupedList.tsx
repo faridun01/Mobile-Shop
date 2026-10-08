@@ -223,7 +223,7 @@ export const BrandGroupedList: React.FC<BrandGroupedListProps> = ({
                           {mGroup.devices.map((dev) => {
                             const store = stores.find(s => s.id === dev.locationId);
                             const isWh = store?.isMainWarehouse || dev.status === 'MAIN_WAREHOUSE';
-                            const storeName = isWh ? 'Центральный склад' : dev.locationName || store?.name || 'Магазин';
+                            const storeName = isWh ? 'Главный склад' : dev.locationName || store?.name || 'Магазин';
                             return (
                               <DeviceRow
                                 key={dev.id}

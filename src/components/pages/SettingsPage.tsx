@@ -13,7 +13,6 @@ import {
   AlertCircle,
   Sun,
   Moon,
-  Check,
   MapPin,
   Sparkles,
   Pencil,
@@ -27,7 +26,7 @@ import {
   RefreshCw,
   Download,
   Smartphone,
-  ShieldCheck
+  ShieldCheck,
 } from 'lucide-react';
 import { usePWAUpdate } from '../../hooks/usePWAUpdate';
 import { cn } from '../../utils/cn';
@@ -738,7 +737,7 @@ export const SettingsPage: React.FC = () => {
               </p>
               <p className="text-[11px] text-accent flex items-start space-x-1.5 pt-1">
                 <CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5" />
-                <span>Все остатки товаров из этого магазина будут <strong>автоматически перенесены на Центральный склад</strong>.</span>
+                <span>Все остатки товаров из этого магазина будут <strong>автоматически перенесены на Главный склад</strong>.</span>
               </p>
             </div>
 

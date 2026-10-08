@@ -2,7 +2,7 @@ import { D, moneyJson, type MoneyInput } from '../../common/decimal';
 import { prisma } from '../../prisma/prisma.service';
 import type { TransactionClient } from '../../prisma/prisma.service';
 import { resolveActor } from '../../common/actor';
-import { requireNonNegativeMoney, roundMoney } from '../../common/money';
+import { roundMoney } from '../../common/money';
 import { allocateMoney } from '../../common/allocation';
 import type { OwnerProfitAllocation } from '../sales/profit';
 import { readOwnerAllocations, replaceOwnerAllocations } from '../finance/owner-allocations';

@@ -7,8 +7,6 @@ import { useAppFields } from '../../context/AppContext';
 import { RepairTicket, RepairStatus, SaleItem } from '../../types';
 import { StatusBanner, StatusMessage } from '../ui/StatusBanner';
 import { useStoreContext } from '../../utils/storeContext';
-
-import { getStatusBadge } from '../repair/types';
 import { RepairTopBar } from '../repair/RepairTopBar';
 import { RepairTicketsList } from '../repair/RepairTicketsList';
 import { NewRepairForm } from '../repair/NewRepairForm';

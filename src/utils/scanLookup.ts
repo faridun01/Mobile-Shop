@@ -1,7 +1,7 @@
 import type { Device, DeviceStatus } from '../types';
 
 export const DEVICE_STATUS_LABELS: Record<DeviceStatus, string> = {
-  MAIN_WAREHOUSE: 'Центральный склад',
+  MAIN_WAREHOUSE: 'Главный склад',
   STORE_STOCK: 'В магазине',
   SOLD: 'Продан',
   IN_STOCK_AFTER_EXCHANGE: 'После обмена',

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useAppFields } from '../../context/AppContext';
-import { formatStoreName, formatStoreDisplayTitle } from '../../utils/storeContext';
+import { formatStoreDisplayTitle } from '../../utils/storeContext';
 import { apiClient } from '../../api/client';
 import { StoreReceipt, StoreReceiptItem } from '../../types';
 import { soundEffects } from '../../utils/sound';
@@ -16,7 +16,6 @@ import {
   Plus,
   Trash2,
   CheckCircle2,
-  AlertCircle,
   FileText,
   ChevronRight,
   Store as StoreIcon,
@@ -25,7 +24,6 @@ import {
   User,
   History,
   Check,
-  Printer,
   X,
 } from 'lucide-react';
 

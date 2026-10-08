@@ -131,8 +131,6 @@ export const PurchasePage: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [supplierInvoices?.length]);
 
-  const [purchaseDate] = useState<string>(getBusinessDateKey());
-
   // All purchases go exclusively to Main Warehouse
   const mainWarehouseId = stores.find((s) => s.isMainWarehouse)?.id || 'main-warehouse';
 

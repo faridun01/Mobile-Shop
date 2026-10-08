@@ -1,4 +1,4 @@
-import { isSafeToUpdate, getUpdateSafetyAssessment } from '../utils/pwaUpdateSafety';
+import { getUpdateSafetyAssessment } from '../utils/pwaUpdateSafety';
 
 export interface PWAUpdateState {
   hasUpdate: boolean;
@@ -31,7 +31,6 @@ class PWAUpdateService {
 
   private listeners = new Set<PWAUpdateListener>();
   private registration: ServiceWorkerRegistration | null = null;
-  private checkIntervalId: ReturnType<typeof setInterval> | null = null;
   private initialized = false;
   private networkNoticeTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -208,7 +207,7 @@ class PWAUpdateService {
     // E. Periodic Heartbeat (~30 seconds) while active in production/test
     const isDev = typeof import.meta !== 'undefined' && Boolean(import.meta.env?.DEV) && import.meta.env?.MODE !== 'test';
     if (!isDev) {
-      this.checkIntervalId = setInterval(() => {
+      setInterval(() => {
         if (typeof document !== 'undefined' && document.visibilityState === 'visible' && navigator.onLine) {
           if (this.state.hasUpdate && !this.state.isUpdating) {
             this.trySafeAutoUpdate();

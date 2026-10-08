@@ -1,9 +1,6 @@
-import { useEffect } from 'react';
-import { Capacitor } from '@capacitor/core';
-import { App } from '@capacitor/app';
-import { useAuthStore, takeLegacyPersistedToken } from '../stores/useAuthStore';
-import { hasActiveMutations, revokeAbandonedSession } from '../api/client';
-import { InactivityMonitor } from './inactivityLock';
+
+import { useAuthStore } from '../stores/useAuthStore';
+import { revokeAbandonedSession } from '../api/client';
 
 /** Hides the app synchronously (before the next paint) via CSS while the session is locked. */
 export function markLockedDom(locked: boolean) {
@@ -25,10 +22,6 @@ export function lockSession() {
 /** Revokes a server session left by an earlier launch. Disabled: sessions persist across launches. */
 export function revokeLeftoverSession() {
   // Disabled: persistent sessions must not be revoked on startup
-}
-
-function safeSessionStorage(): Storage | null {
-  try { return sessionStorage; } catch { return null; }
 }
 
 /**

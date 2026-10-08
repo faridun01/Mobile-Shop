@@ -2,12 +2,11 @@ import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { useAppFields } from '../../context/AppContext';
 import { SupplierBonus } from '../../types';
 import { apiClient } from '../../api/client';
-import { formatMoney, formatTjs, formatUsd } from '../../utils/money';
+import { formatMoney } from '../../utils/money';
 import { StatusBanner, StatusMessage } from '../ui/StatusBanner';
 import { Button } from '../ui/Button';
 import { Dialog } from '../ui/Dialog';
 import { ConfirmDialog } from '../ui/ConfirmDialog';
-import { FilterPillGroup } from '../ui/FilterPillGroup';
 import { EmptyState } from '../ui/EmptyState';
 import { cn } from '../../utils/cn';
 import {
@@ -15,26 +14,22 @@ import {
   Plus,
   Smartphone,
   CheckCircle2,
-  AlertCircle,
   Building2,
   Users,
-  History,
-  TrendingUp,
   Wallet,
   Banknote,
-  ChevronRight,
   X,
   Scan,
   Edit,
   Trash2,
-  Loader2,
   Landmark,
   HandCoins,
-  Package,
-  ArrowUpRight,
-  Clock,
   Sparkles,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react';
+import { MonthPicker } from '../ui/MonthPicker';
+import { currentBusinessMonth } from '../../utils/businessDate';
 
 interface BonusAccountBalance {
   balanceUsd: string;
@@ -96,7 +91,6 @@ const formatBonusDate = (d?: string | null) => {
 
 export const BonusesPage: React.FC = () => {
   const {
-    currentUser,
     supplierBonuses,
     suppliers,
     stores,
@@ -120,18 +114,19 @@ export const BonusesPage: React.FC = () => {
   );
 
   const rate = Number(todayRate?.rate) || 0;
-  const isAdmin = currentUser?.role === 'ADMIN';
 
-  // Active view tab
+  // Active view tab & filters
   const [activeTab, setActiveTab] = useState<MainTab>('HISTORY');
   const [deviceFilter, setDeviceFilter] = useState<'ALL' | 'IN_STOCK' | 'SOLD'>('ALL');
+  const [selectedMonth, setSelectedMonth] = useState<string>(() => currentBusinessMonth());
+  const [isHistoryCollapsed, setIsHistoryCollapsed] = useState(false);
 
   // Async server data: bonus account, operations, devices, summary
   const [balance, setBalance] = useState<BonusAccountBalance | null>(null);
-  const [operations, setOperations] = useState<BonusOperation[]>([]);
+  const [, setOperations] = useState<BonusOperation[]>([]);
   const [bonusDevices, setBonusDevices] = useState<BonusDeviceItem[]>([]);
   const [monthStats, setMonthStats] = useState<MonthBonusStats | null>(null);
-  const [loadingData, setLoadingData] = useState(false);
+  const [, setLoadingData] = useState(false);
   const [revision, setRevision] = useState(0);
 
   // Status banners
@@ -164,7 +159,7 @@ export const BonusesPage: React.FC = () => {
   const [isSubmittingReserveAction, setIsSubmittingReserveAction] = useState(false);
 
   // Inspection, Editing, and Deleting
-  const [selectedBonus, setSelectedBonus] = useState<SupplierBonus | null>(null);
+  const [, setSelectedBonus] = useState<SupplierBonus | null>(null);
   const [editingBonus, setEditingBonus] = useState<SupplierBonus | null>(null);
   const [editCampaignTitle, setEditCampaignTitle] = useState('');
   const [editAmountUsd, setEditAmountUsd] = useState('');
@@ -187,11 +182,12 @@ export const BonusesPage: React.FC = () => {
   const loadDashboardData = useCallback(async () => {
     try {
       setLoadingData(true);
+      const statsUrl = selectedMonth ? `/bonuses/quarter?month=${selectedMonth}` : '/bonuses/quarter';
       const [balancesRes, opsRes, devicesRes, statsRes] = await Promise.allSettled([
         apiClient<{ bonusAccount: BonusAccountBalance }>('/cash-collections/balances'),
         apiClient<BonusOperation[]>('/bonus-account/operations'),
         apiClient<BonusDeviceItem[]>('/bonuses/devices'),
-        apiClient<MonthBonusStats>('/bonuses/quarter'),
+        apiClient<MonthBonusStats>(statsUrl),
       ]);
 
       if (balancesRes.status === 'fulfilled' && balancesRes.value?.bonusAccount) {
@@ -209,7 +205,7 @@ export const BonusesPage: React.FC = () => {
     } finally {
       setLoadingData(false);
     }
-  }, []);
+  }, [selectedMonth]);
 
   useEffect(() => {
     loadDashboardData();
@@ -284,9 +280,29 @@ export const BonusesPage: React.FC = () => {
     return bonusDevices.filter((d) => d.isSold).length;
   }, [bonusDevices]);
 
-  const totalBonusDevicesSoldRevenueUsd = useMemo(() => {
-    return bonusDevices.filter((d) => d.isSold).reduce((acc, d) => acc + (d.soldPriceUsd || 0), 0);
-  }, [bonusDevices]);
+  // Filtered bonuses for the selected month
+  const filteredBonuses = useMemo(() => {
+    const list = [...supplierBonuses].sort(
+      (a, b) => new Date(b.dateReceived || b.date || 0).getTime() - new Date(a.dateReceived || a.date || 0).getTime()
+    );
+    if (!selectedMonth) return list;
+    return list.filter((b) => {
+      const d = b.dateReceived || b.date || (b as any).createdAt || '';
+      return d.startsWith(selectedMonth);
+    });
+  }, [supplierBonuses, selectedMonth]);
+
+  const monthLabel = useMemo(() => {
+    if (!selectedMonth) return 'все периоды';
+    try {
+      const [y, m] = selectedMonth.split('-').map(Number);
+      if (!y || !m) return selectedMonth;
+      const d = new Date(Date.UTC(y, m - 1, 1));
+      return d.toLocaleDateString('ru-RU', { month: 'long', year: 'numeric' });
+    } catch {
+      return selectedMonth;
+    }
+  }, [selectedMonth]);
 
   // Handle registration of new bonus with immediate admin decision
   const handleCreateBonus = async (e: React.FormEvent) => {
@@ -557,7 +573,7 @@ export const BonusesPage: React.FC = () => {
       <StatusBanner message={status} onDismiss={() => setStatus(null)} />
 
       {/* Compact Top Navigation & Action Bar */}
-      <div className="px-2.5 sm:px-4 py-1.5 sm:py-2 border-b border-border bg-surface shrink-0 flex items-center justify-between gap-2 shadow-2xs">
+      <div className="px-2.5 sm:px-4 py-1.5 sm:py-2 border-b border-border bg-surface shrink-0 flex items-center justify-between gap-2 shadow-2xs flex-wrap">
         {/* Navigation Tabs */}
         <div className="flex items-center gap-1 overflow-x-auto scrollbar-none text-xs">
           <button
@@ -577,7 +593,7 @@ export const BonusesPage: React.FC = () => {
                 activeTab === 'HISTORY' ? 'bg-black/20 text-white' : 'bg-surface border border-border text-fg-muted'
               )}
             >
-              {supplierBonuses.length}
+              {filteredBonuses.length}
             </span>
           </button>
 
@@ -603,28 +619,88 @@ export const BonusesPage: React.FC = () => {
           </button>
         </div>
 
-        {/* Action Button */}
-        <Button
-          variant="primary"
-          size="sm"
-          leftIcon={Plus}
-          onClick={() => setIsCreateModalOpen(true)}
-          className="h-7.5 px-2.5 text-xs font-bold cursor-pointer shadow-xs shrink-0 whitespace-nowrap"
-        >
-          <span>+ Бонус</span>
-        </Button>
+        {/* Action Buttons: MonthPicker & + Бонус */}
+        <div className="flex items-center gap-1.5 shrink-0">
+          <MonthPicker
+            value={selectedMonth}
+            onChange={setSelectedMonth}
+            onReset={() => setSelectedMonth('')}
+            placeholder="Все месяцы"
+            className="h-7.5 px-2.5 rounded-lg border border-border hover:border-accent/40 bg-surface-raised text-xs font-semibold text-fg focus:outline-none cursor-pointer"
+          />
+
+          <Button
+            variant="primary"
+            size="sm"
+            leftIcon={Plus}
+            onClick={() => setIsCreateModalOpen(true)}
+            className="h-7.5 px-2.5 text-xs font-bold cursor-pointer shadow-xs shrink-0 whitespace-nowrap"
+          >
+            <span>+ Бонус</span>
+          </Button>
+        </div>
       </div>
 
       {/* Main Scrollable Content */}
       <div className="flex-1 overflow-y-auto p-2 sm:p-3 space-y-2.5">
-        {/* 3 PRIMARY METRIC CARDS */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-2.5">
+        {/* 1. БОНУСНЫЙ РЕЗЕРВ (НАВЕРХУ) */}
+        <div className="p-3 sm:p-3.5 rounded-xl bg-gradient-to-r from-success/15 via-surface to-surface border border-success/30 shadow-2xs flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2.5 sm:gap-4">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-10 h-10 rounded-xl bg-success/20 border border-success/30 flex items-center justify-center text-success shrink-0 shadow-xs">
+              <Wallet className="w-5 h-5" />
+            </div>
+            <div className="min-w-0">
+              <div className="flex items-center gap-2">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-fg-subtle">
+                  Бонусный резерв
+                </span>
+                <span className="text-[10px] px-1.5 py-0.2 rounded-md bg-success/20 text-success font-semibold border border-success/30">
+                  Доступно к распределению
+                </span>
+              </div>
+              <div className="text-xl sm:text-2xl font-black font-mono text-success leading-tight mt-0.5 flex items-baseline gap-2 flex-wrap">
+                <span>${formatMoney(availableReserveUsd)}</span>
+                <span className="text-xs sm:text-sm font-semibold text-fg-subtle font-mono">
+                  ≈ {formatMoney(availableReserveTjs)} TJS
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-border/50">
+            <Button
+              variant="secondary"
+              size="sm"
+              leftIcon={Landmark}
+              disabled={availableReserveUsd <= 0}
+              onClick={() => openReserveAction('transfer')}
+              className="h-8 px-3 text-xs font-semibold text-accent border-accent/40 hover:bg-accent/10 cursor-pointer disabled:opacity-40"
+              title="Перевести в Центральную кассу"
+            >
+              В кассу
+            </Button>
+            <Button
+              variant="secondary"
+              size="sm"
+              leftIcon={HandCoins}
+              disabled={availableReserveUsd <= 0}
+              onClick={() => openReserveAction('payout')}
+              className="h-8 px-3 text-xs font-semibold text-warning border-warning/40 hover:bg-warning/10 cursor-pointer disabled:opacity-40"
+              title="Выдать прибыль"
+            >
+              Выдать
+            </Button>
+          </div>
+        </div>
+
+        {/* 2. СТАТИСТИКА ЗА МЕСЯЦ */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-2.5">
           {/* CARD 1: Денежные бонусы */}
           <div className="p-2.5 sm:p-3 rounded-xl bg-surface border border-border shadow-2xs flex flex-col justify-between">
             <div className="flex items-start justify-between gap-2">
               <div className="min-w-0">
                 <span className="text-[10px] font-bold uppercase tracking-wider text-fg-subtle block truncate">
-                  Денежные бонусы (месяц)
+                  Денежные бонусы {selectedMonth ? `(${monthLabel})` : '(все периоды)'}
                 </span>
                 <div className="text-base sm:text-lg font-black font-mono text-accent leading-tight mt-0.5">
                   ${formatMoney(monthStats?.cashBonusesUsd || 0)}{' '}
@@ -671,50 +747,6 @@ export const BonusesPage: React.FC = () => {
               >
                 Устройства →
               </button>
-            </div>
-          </div>
-
-          {/* CARD 3: Бонусный резерв */}
-          <div className="p-2.5 sm:p-3 rounded-xl bg-surface border border-border shadow-2xs flex flex-col justify-between">
-            <div className="flex items-start justify-between gap-2">
-              <div className="min-w-0">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-fg-subtle block truncate">
-                  Бонусный резерв
-                </span>
-                <div className="text-base sm:text-lg font-black font-mono text-success leading-tight mt-0.5">
-                  ${formatMoney(availableReserveUsd)}{' '}
-                  <span className="text-[11px] font-semibold text-fg-subtle font-mono">
-                    ≈ {formatMoney(availableReserveTjs)} TJS
-                  </span>
-                </div>
-              </div>
-              <div className="w-7 h-7 rounded-lg bg-success/15 border border-success/25 flex items-center justify-center text-success shrink-0">
-                <Wallet className="w-3.5 h-3.5" />
-              </div>
-            </div>
-            <div className="pt-1.5 mt-1.5 border-t border-border/60 flex items-center justify-between gap-2 text-[10px]">
-              <span className="text-fg-subtle truncate">Действия:</span>
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  disabled={availableReserveUsd <= 0}
-                  onClick={() => openReserveAction('transfer')}
-                  className="font-bold text-accent hover:underline flex items-center gap-0.5 cursor-pointer disabled:opacity-40"
-                  title="Перевести в Центральную кассу"
-                >
-                  <Landmark className="w-3 h-3" /> В кассу
-                </button>
-                <span className="text-border">•</span>
-                <button
-                  type="button"
-                  disabled={availableReserveUsd <= 0}
-                  onClick={() => openReserveAction('payout')}
-                  className="font-bold text-warning hover:underline flex items-center gap-0.5 cursor-pointer disabled:opacity-40"
-                  title="Выдать прибыль"
-                >
-                  <HandCoins className="w-3 h-3" /> Выдать
-                </button>
-              </div>
             </div>
           </div>
         </div>
@@ -767,11 +799,51 @@ export const BonusesPage: React.FC = () => {
         {/* TAB 1: ЖУРНАЛ БОНУСОВ И РЕШЕНИЙ */}
         {activeTab === 'HISTORY' ? (
           <div className="space-y-2">
-            {supplierBonuses.length === 0 ? (
+            {/* Collapsible header */}
+            <div className="flex items-center justify-between gap-2 px-1 py-0.5">
+              <div className="flex items-center gap-2">
+                <h3 className="text-xs font-bold text-fg uppercase tracking-wider">
+                  Журнал бонусов
+                </h3>
+                <span className="text-[10px] px-1.5 py-0.2 rounded-full font-mono font-bold bg-surface-raised border border-border text-fg-muted">
+                  {filteredBonuses.length}
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsHistoryCollapsed((c) => !c)}
+                className="h-6.5 px-2.5 rounded-lg text-xs font-semibold text-fg-subtle hover:text-fg bg-surface-raised border border-border hover:border-accent/40 flex items-center gap-1.5 cursor-pointer transition-colors"
+                title={isHistoryCollapsed ? 'Развернуть историю' : 'Свернуть историю'}
+              >
+                <span>{isHistoryCollapsed ? 'Развернуть' : 'Свернуть'}</span>
+                {isHistoryCollapsed ? (
+                  <ChevronDown className="w-3.5 h-3.5 text-accent" />
+                ) : (
+                  <ChevronUp className="w-3.5 h-3.5 text-fg-subtle" />
+                )}
+              </button>
+            </div>
+
+            {/* Collapsed state placeholder or full list */}
+            {isHistoryCollapsed ? (
+              <div
+                onClick={() => setIsHistoryCollapsed(false)}
+                className="p-3.5 rounded-xl bg-surface border border-border border-dashed text-center text-xs text-fg-subtle hover:text-fg hover:border-accent/40 cursor-pointer transition-colors flex items-center justify-center gap-2 shadow-2xs"
+              >
+                <span>История бонусов свернута ({filteredBonuses.length} записей)</span>
+                <span className="text-accent font-semibold flex items-center gap-0.5">
+                  Развернуть <ChevronDown className="w-3.5 h-3.5" />
+                </span>
+              </div>
+            ) : filteredBonuses.length === 0 ? (
               <EmptyState
                 icon={Gift}
-                title="Бонусов пока нет"
-                description="Зафиксируйте первый денежный бонус или подарочное устройство от поставщика"
+                title={selectedMonth ? `За ${monthLabel} бонусов нет` : 'Бонусов пока нет'}
+                description={
+                  selectedMonth
+                    ? 'За выбранный месяц бонусы ещё не регистрировались. Выберите другой месяц или добавьте новый бонус.'
+                    : 'Зафиксируйте первый денежный бонус или подарочное устройство от поставщика'
+                }
                 action={
                   <Button
                     variant="primary"
@@ -785,9 +857,7 @@ export const BonusesPage: React.FC = () => {
               />
             ) : (
               <div className="space-y-1.5">
-                {[...supplierBonuses]
-                  .sort((a, b) => new Date(b.dateReceived || b.date || 0).getTime() - new Date(a.dateReceived || a.date || 0).getTime())
-                  .map((bonus) => {
+                {filteredBonuses.map((bonus) => {
                     const isCash = bonus.bonusType === 'CASH_DISCOUNT';
                     const hasFreeDevices = Boolean(bonus.freeDevices && bonus.freeDevices.length > 0);
                     const bonusDate = formatBonusDate(bonus.date || bonus.dateReceived);

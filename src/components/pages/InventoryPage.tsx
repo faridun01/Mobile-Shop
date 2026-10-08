@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { decimal, moneyNumber, sumMoney } from '../../utils/money';
 import { useAppFields } from '../../context/AppContext';
-import { Device, DeviceStatus } from '../../types';
+import { Device } from '../../types';
 import {
   List,
   Building2,

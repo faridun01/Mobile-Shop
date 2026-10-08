@@ -8,9 +8,6 @@ import { Dialog } from '../ui/Dialog';
 import { soundEffects } from '../../utils/sound';
 import { extractImeis, SCAN_HINTS } from '../../services/scanner/imei';
 import { cn } from '../../utils/cn';
-
-const CONFIRMATION_WINDOW_MS = 800;
-const REQUIRED_MATCHING_FRAMES = 2;
 const DECODE_INTERVAL_MS = 60;
 // The aiming band is cropped at camera resolution, capped here to bound decode time.
 const MAX_DECODE_WIDTH = 1280;
@@ -26,10 +23,6 @@ type BarcodeCameraCapabilities = MediaTrackCapabilities & {
 type BarcodeCameraConstraint = MediaTrackConstraintSet & {
   focusMode?: string;
   torch?: boolean;
-  zoom?: number;
-};
-
-type BarcodeCameraSettings = MediaTrackSettings & {
   zoom?: number;
 };
 

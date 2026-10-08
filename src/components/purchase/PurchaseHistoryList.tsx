@@ -2,7 +2,7 @@ import React from 'react';
 import { SupplierInvoice, Supplier, Store, User } from '../../types';
 import { formatInvoiceDate } from './types';
 import { MonthPicker } from '../ui/MonthPicker';
-import { CustomSelect, CustomSelectOption } from '../ui/CustomSelect';
+import { CustomSelect } from '../ui/CustomSelect';
 import {
   Search,
   Scan,

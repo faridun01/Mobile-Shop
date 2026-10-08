@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { SupplierInvoice, Device, Store, User } from '../../types';
+import { SupplierInvoice, Device, User } from '../../types';
 import { formatInvoiceDate } from './types';
 import { formatMoney } from '../../utils/money';
 import { getPhoneColorHex, formatRam, formatStorage } from '../../utils/phoneSpecs';

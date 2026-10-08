@@ -138,7 +138,7 @@ export const InventoryFiltersBar: React.FC<InventoryFiltersBarProps> = ({
               <option value="ALL">Все {activeStore ? `(«${activeStore.name}»)` : 'в наличии'}</option>
               {selectedLocationId === 'ALL' && (
                 <>
-                  <option value="MAIN_WAREHOUSE">Центральный склад</option>
+                  <option value="MAIN_WAREHOUSE">Главный склад</option>
                   <option value="STORE_STOCK">В магазинах</option>
                 </>
               )}
@@ -451,7 +451,7 @@ export const InventoryFiltersBar: React.FC<InventoryFiltersBarProps> = ({
               <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-accent/15 text-accent border border-accent/30">
                 <span>
                   {selectedStatusFilter === 'MAIN_WAREHOUSE'
-                    ? 'Центральный склад'
+                    ? 'Главный склад'
                     : selectedStatusFilter === 'STORE_STOCK'
                     ? 'В магазинах'
                     : selectedStatusFilter === 'BONUS_ONLY'

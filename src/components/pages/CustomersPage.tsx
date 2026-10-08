@@ -3,20 +3,13 @@ import {
   Users,
   Search,
   PlusCircle,
-  Bell,
-  Phone,
   Edit2,
   Trash2,
-  Send,
   Check,
   Copy,
   MessageCircle,
-  Sparkles,
-  CheckCircle2,
   HandCoins,
   ArrowUpDown,
-  Receipt,
-  CreditCard,
   X,
 } from 'lucide-react';
 import { apiClient } from '../../api/client';
@@ -24,31 +17,13 @@ import { useAppFields } from '../../context/AppContext';
 import { Customer } from '../../types';
 import { formatMoney } from '../../utils/money';
 import { Button } from '../ui/Button';
-import { Dialog } from '../ui/Dialog';
 import { ConfirmDialog } from '../ui/ConfirmDialog';
 import { StatusBanner, StatusMessage } from '../ui/StatusBanner';
 import { LoadingState } from '../ui/Skeleton';
-
-/** GET /customers/:id — money columns arrive as numbers or decimal strings. */
-interface CustomerDetailResponse {
-  totalDebtTjs: number;
-  totalPaidTjs: number;
-  payments: Array<{
-    id: string;
-    amountTjs: number | string;
-    createdAt: string;
-    sourceAccount: string;
-    allocations?: Array<{ sale?: { receiptNumber: number } | null }>;
-  }>;
-  sales: Array<{
-    id: string;
-    receiptNumber: number;
-    totalTjs: number | string;
-    debtAmountTjs: number | string;
-    createdAt: string;
-    store?: { name: string } | null;
-  }>;
-}
+import { CustomerDetailDialog } from '../customers/CustomerDetailDialog';
+import { CustomerPaymentDialog } from '../customers/CustomerPaymentDialog';
+import { CustomerFormDialog } from '../customers/CustomerFormDialog';
+import { CustomerDetailResponse, CustomerFormValues, PaymentTarget, getInitials, getWhatsAppLink } from '../customers/types';
 
 interface CustomerListResponse {
   items: Customer[];
@@ -74,24 +49,6 @@ export type CustomerSortOption =
 
 export type CustomerTab = 'ALL' | 'DEBTORS' | 'WITH_PHONE' | 'PUSH';
 
-const PROMO_TEMPLATES = [
-  {
-    label: 'Скидка на аксессуары',
-    title: '🔥 Скидка 15% на чехлы и стекла!',
-    message: 'При покупке чехла или стекла защитное покрытие в подарок. Ждём вас в нашем магазине!',
-  },
-  {
-    label: 'Новое поступление',
-    title: '📱 Новое поступление смартфонов!',
-    message: 'Большой выбор новых моделей с официальной гарантией и лучшими ценами в городе.',
-  },
-  {
-    label: 'Trade-In бонус',
-    title: '🔄 Выгодный обмен Trade-In!',
-    message: 'Сдайте старый телефон и получите специальную дополнительную скидку на новый смартфон.',
-  },
-];
-
 export const CustomersPage: React.FC = () => {
   const { currentUser, stores } = useAppFields('currentUser', 'stores');
 
@@ -112,36 +69,17 @@ export const CustomersPage: React.FC = () => {
   const [sortBy, setSortBy] = useState<CustomerSortOption>('DEBT_DESC');
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
-  // Customer debt payment modal state
-  const [paymentCustomer, setPaymentCustomer] = useState<{ id: string; name: string; totalDebtTjs: number } | null>(null);
-  const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
-  const [paymentAmountInput, setPaymentAmountInput] = useState('');
-  const [paymentStoreId, setPaymentStoreId] = useState('');
-  const [paymentNote, setPaymentNote] = useState('');
-  const [isSubmittingPayment, setIsSubmittingPayment] = useState(false);
+  // Customer debt payment dialog
+  const [paymentTarget, setPaymentTarget] = useState<PaymentTarget | null>(null);
 
-  // Add / Edit Modal
+  // Add / Edit dialog
   const [isAddEditOpen, setIsAddEditOpen] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
-  const [formName, setFormName] = useState('');
-  const [formPhone, setFormPhone] = useState('');
-  const [formNote, setFormNote] = useState('');
-  const [formPushEnabled, setFormPushEnabled] = useState(true);
-  const [isSaving, setIsSaving] = useState(false);
 
   // Detail Modal (Contact Card & DB History)
   const [detailCustomer, setDetailCustomer] = useState<Customer | null>(null);
   const [detailCustomerFull, setDetailCustomerFull] = useState<CustomerDetailResponse | null>(null);
   const [loadingCustomerFull, setLoadingCustomerFull] = useState(false);
-
-  // Push / Promo Modal
-  const [isPushModalOpen, setIsPushModalOpen] = useState(false);
-  const [pushTarget, setPushTarget] = useState<'ALL' | 'CUSTOMER'>('ALL');
-  const [pushSelectedCustomerId, setPushSelectedCustomerId] = useState<string>('');
-  const [pushTitle, setPushTitle] = useState('');
-  const [pushMessage, setPushMessage] = useState('');
-  const [pushLink, setPushLink] = useState('/sale');
-  const [isSendingPush, setIsSendingPush] = useState(false);
 
   // Delete Confirm
   const [deletingCustomer, setDeletingCustomer] = useState<Customer | null>(null);
@@ -208,171 +146,74 @@ export const CustomersPage: React.FC = () => {
     setTimeout(() => setCopiedId(null), 1500);
   };
 
-  // Open Payment Modal
-  const handleOpenPaymentModal = (
-    c: { id: string; name: string; totalDebtTjs: number },
-    e?: React.MouseEvent
-  ) => {
+  // Open the debt payment dialog
+  const handleOpenPaymentModal = (c: PaymentTarget, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
-    setPaymentCustomer(c);
-    setPaymentAmountInput(c.totalDebtTjs > 0 ? c.totalDebtTjs.toString() : '');
-    const defaultStore = stores.find((s) => !s.isMainWarehouse)?.id || stores[0]?.id || '';
-    setPaymentStoreId(defaultStore);
-    setPaymentNote(`Оплата долга: ${c.name}`);
-    setIsPaymentModalOpen(true);
+    setPaymentTarget(c);
   };
 
-  // Submit debt payment to database
-  const handleRecordPayment = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!paymentCustomer) return;
-    const amount = parseFloat(paymentAmountInput.replace(',', '.'));
-    if (!amount || amount <= 0) {
-      setStatus({ tone: 'error', text: 'Укажите корректную сумму оплаты' });
-      return;
-    }
-
-    setIsSubmittingPayment(true);
+  // Record a debt payment; true when it went through
+  const handleRecordPayment = async (amount: number, storeId: string, note: string): Promise<boolean> => {
+    if (!paymentTarget) return false;
     try {
-      await apiClient(`/customers/${paymentCustomer.id}/payments`, {
+      await apiClient(`/customers/${paymentTarget.id}/payments`, {
         method: 'POST',
-        body: JSON.stringify({
-          amountTjs: amount,
-          storeId: paymentStoreId || undefined,
-          note: paymentNote.trim() || undefined,
-        }),
+        body: JSON.stringify({ amountTjs: amount, storeId: storeId || undefined, note: note || undefined }),
       });
-
       setStatus({
         tone: 'success',
-        text: `Оплата ${formatMoney(amount)} TJS от клиента ${paymentCustomer.name} успешно принята в кассу`,
+        text: `Оплата ${formatMoney(amount)} TJS от клиента ${paymentTarget.name} успешно принята в кассу`,
       });
-      setIsPaymentModalOpen(false);
       loadCustomers();
 
-      // If customer detail modal is currently open, refresh full customer state
-      if (detailCustomer?.id === paymentCustomer.id) {
-        apiClient<CustomerDetailResponse>(`/customers/${paymentCustomer.id}`).then((res) => {
+      // If the customer card is open, refresh it
+      if (detailCustomer?.id === paymentTarget.id) {
+        apiClient<CustomerDetailResponse>(`/customers/${paymentTarget.id}`).then((res) => {
           setDetailCustomerFull(res);
           setDetailCustomer((prev) => (prev ? { ...prev, totalDebtTjs: res.totalDebtTjs, totalPaidTjs: res.totalPaidTjs } : null));
         });
       }
 
       window.dispatchEvent(new CustomEvent('business-data-changed'));
+      return true;
     } catch (err: any) {
       setStatus({ tone: 'error', text: err?.message || 'Ошибка проведения оплаты' });
-    } finally {
-      setIsSubmittingPayment(false);
+      return false;
     }
   };
 
-  // Open Add modal
   const handleOpenAdd = () => {
     setEditingCustomer(null);
-    setFormName('');
-    setFormPhone('');
-    setFormNote('');
-    setFormPushEnabled(true);
     setIsAddEditOpen(true);
   };
 
-  // Open Edit modal
   const handleOpenEdit = (c: Customer, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
     setEditingCustomer(c);
-    setFormName(c.name);
-    setFormPhone(c.phone || '');
-    setFormNote(c.note || '');
-    setFormPushEnabled(c.pushEnabled !== false);
     setIsAddEditOpen(true);
   };
 
-  // Open Promo Push Modal
-  const handleOpenPromoModal = (customerId?: string, e?: React.MouseEvent) => {
-    if (e) e.stopPropagation();
-    if (customerId) {
-      setPushTarget('CUSTOMER');
-      setPushSelectedCustomerId(customerId);
-      const c = customers.find((item) => item.id === customerId);
-      setPushTitle(c ? `Спецпредложение для ${c.name}` : 'Спецпредложение');
-    } else {
-      setPushTarget('ALL');
-      setPushSelectedCustomerId('');
-      setPushTitle('');
-    }
-    setPushMessage('');
-    setPushLink('/sale');
-    setIsPushModalOpen(true);
-  };
-
-  // Save Customer
-  const handleSaveCustomer = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!formName.trim() || isSaving) return;
-
-    setIsSaving(true);
+  // Save a customer; true when saved
+  const handleSaveCustomer = async (values: CustomerFormValues): Promise<boolean> => {
+    const body = JSON.stringify({
+      name: values.name.trim(),
+      phone: values.phone.trim() || null,
+      note: values.note.trim() || null,
+      pushEnabled: values.pushEnabled,
+    });
     try {
       if (editingCustomer) {
-        await apiClient(`/customers/${editingCustomer.id}`, {
-          method: 'PATCH',
-          body: JSON.stringify({
-            name: formName.trim(),
-            phone: formPhone.trim() || null,
-            note: formNote.trim() || null,
-            pushEnabled: formPushEnabled,
-          }),
-        });
-        setStatus({ tone: 'success', text: `Контакт клиента ${formName} успешно обновлен` });
+        await apiClient(`/customers/${editingCustomer.id}`, { method: 'PATCH', body });
+        setStatus({ tone: 'success', text: `Контакт клиента ${values.name} успешно обновлен` });
       } else {
-        await apiClient('/customers', {
-          method: 'POST',
-          body: JSON.stringify({
-            name: formName.trim(),
-            phone: formPhone.trim() || null,
-            note: formNote.trim() || null,
-            pushEnabled: formPushEnabled,
-          }),
-        });
-        setStatus({ tone: 'success', text: `Клиент ${formName} сохранен в базу` });
+        await apiClient('/customers', { method: 'POST', body });
+        setStatus({ tone: 'success', text: `Клиент ${values.name} сохранен в базу` });
       }
-      setIsAddEditOpen(false);
       loadCustomers();
+      return true;
     } catch (err: any) {
       setStatus({ tone: 'error', text: err?.message || 'Ошибка сохранения клиента' });
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-  // Send Promo Push
-  const handleSendPush = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!pushTitle.trim() || !pushMessage.trim() || isSendingPush) return;
-
-    setIsSendingPush(true);
-    try {
-      const res = await apiClient<{ sent: number; totalFound: number; failed: number }>('/customers/send-push', {
-        method: 'POST',
-        body: JSON.stringify({
-          target: pushTarget,
-          customerId: pushTarget === 'CUSTOMER' ? pushSelectedCustomerId : undefined,
-          title: pushTitle.trim(),
-          message: pushMessage.trim(),
-          targetRoute: pushLink.trim() || '/sale',
-        }),
-      });
-
-      setStatus({
-        tone: 'success',
-        text: `Уведомление об акции отправлено (доставлено: ${res.sent} из ${res.totalFound})`,
-      });
-      setIsPushModalOpen(false);
-      setPushTitle('');
-      setPushMessage('');
-    } catch (err: any) {
-      setStatus({ tone: 'error', text: err?.message || 'Ошибка отправки push-уведомления' });
-    } finally {
-      setIsSendingPush(false);
+      return false;
     }
   };
 
@@ -392,25 +233,12 @@ export const CustomersPage: React.FC = () => {
     }
   };
 
-  // Clean phone string for wa.me link
-  const getWhatsAppLink = (phone?: string | null) => {
-    if (!phone) return null;
-    const digits = phone.replace(/[^\d]/g, '');
-    if (digits.length < 9) return null;
-    const full = digits.startsWith('992') ? digits : `992${digits}`;
-    return `https://wa.me/${full}`;
-  };
-
   // Filters & Counts
   const debtorsCount = useMemo(
     () => summary.debtorsCount || customers.filter((c) => (c.totalDebtTjs || 0) > 0).length,
     [customers, summary.debtorsCount]
   );
   const withPhoneCount = useMemo(() => customers.filter((c) => Boolean(c.phone?.trim())).length, [customers]);
-  const pushSubscribedCount = useMemo(
-    () => summary.pushSubscribedCount || customers.filter((c) => c.hasPushSubscription).length,
-    [customers, summary.pushSubscribedCount]
-  );
 
   // Filter and sort customers
   const displayedCustomers = useMemo(() => {
@@ -450,14 +278,6 @@ export const CustomersPage: React.FC = () => {
       }
     });
   }, [customers, activeTab, search, sortBy]);
-
-  const getInitials = (name: string) => {
-    const parts = name.trim().split(/\s+/);
-    if (parts.length >= 2) {
-      return (parts[0][0] + parts[1][0]).toUpperCase();
-    }
-    return (name.slice(0, 2) || 'КЛ').toUpperCase();
-  };
 
   return (
     <div className="work-screen flex-1 flex flex-col h-full overflow-hidden bg-bg text-fg select-none">
@@ -766,362 +586,32 @@ export const CustomersPage: React.FC = () => {
         </div>
       </div>
 
-      {/* CUSTOMER CONTACT CARD & DB HISTORY MODAL */}
-      <Dialog
-        open={Boolean(detailCustomer)}
+      <CustomerDetailDialog
+        customer={detailCustomer}
+        detail={detailCustomerFull}
+        loading={loadingCustomerFull}
         onClose={() => setDetailCustomer(null)}
-        title={detailCustomer?.name || 'Карточка клиента'}
-        subtitle="Контактные данные, задолженность и история оплат из базы данных"
-      >
-        {detailCustomer && (
-          <div className="space-y-4 max-h-[75vh] overflow-y-auto pr-1">
-            {/* Contact Header */}
-            <div className="p-4 rounded-2xl bg-surface-raised border border-border space-y-3">
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-2xl bg-accent/15 border border-accent/25 flex items-center justify-center text-accent font-bold text-base shrink-0">
-                  {getInitials(detailCustomer.name)}
-                </div>
-                <div className="min-w-0 flex-1">
-                  <h3 className="text-base font-bold text-fg truncate">{detailCustomer.name}</h3>
-                  <p className="text-xs text-fg-subtle mt-0.5">
-                    В базе с {new Date(detailCustomer.createdAt).toLocaleDateString('ru-RU')}
-                  </p>
-                </div>
-              </div>
+        onAcceptPayment={(target) => handleOpenPaymentModal(target)}
+        onEdit={(c) => {
+          setDetailCustomer(null);
+          handleOpenEdit(c);
+        }}
+      />
 
-              {detailCustomer.phone && (
-                <div className="pt-2 border-t border-border flex items-center justify-between gap-2">
-                  <div>
-                    <span className="text-[10px] uppercase font-bold text-fg-subtle block">Телефон:</span>
-                    <a
-                      href={`tel:${detailCustomer.phone}`}
-                      className="font-mono text-sm font-bold text-accent hover:underline"
-                    >
-                      {detailCustomer.phone}
-                    </a>
-                  </div>
+      <CustomerPaymentDialog
+        target={paymentTarget}
+        stores={stores}
+        onClose={() => setPaymentTarget(null)}
+        onSubmit={handleRecordPayment}
+        onInvalidAmount={() => setStatus({ tone: 'error', text: 'Укажите корректную сумму оплаты' })}
+      />
 
-                  <div className="flex items-center gap-1.5">
-                    {getWhatsAppLink(detailCustomer.phone) && (
-                      <a
-                        href={getWhatsAppLink(detailCustomer.phone)!}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="px-2.5 py-1.5 rounded-lg bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20 text-xs font-semibold flex items-center gap-1 border border-emerald-500/20"
-                      >
-                        <MessageCircle className="w-3.5 h-3.5" />
-                        <span>WhatsApp</span>
-                      </a>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {detailCustomer.note && (
-                <div className="pt-2 border-t border-border">
-                  <span className="text-[10px] uppercase font-bold text-fg-subtle block">Заметка:</span>
-                  <p className="text-xs text-fg-muted mt-0.5">{detailCustomer.note}</p>
-                </div>
-              )}
-            </div>
-
-            {/* FINANCIAL OVERVIEW CARD */}
-            <div className="p-3.5 rounded-2xl bg-surface border border-border space-y-3">
-              <span className="text-[11px] font-bold uppercase tracking-wider text-fg-subtle block">
-                Финансовый баланс клиента
-              </span>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div className="p-2.5 rounded-xl bg-surface-raised border border-border">
-                  <span className="text-[10px] text-fg-subtle uppercase font-semibold block">Текущий долг</span>
-                  <p className="text-base sm:text-lg font-black font-mono text-warning mt-0.5">
-                    {formatMoney(detailCustomerFull?.totalDebtTjs ?? detailCustomer.totalDebtTjs)} TJS
-                  </p>
-                </div>
-
-                <div className="p-2.5 rounded-xl bg-surface-raised border border-border">
-                  <span className="text-[10px] text-fg-subtle uppercase font-semibold block">Всего оплачено</span>
-                  <p className="text-base sm:text-lg font-black font-mono text-success mt-0.5">
-                    {formatMoney(detailCustomerFull?.totalPaidTjs ?? detailCustomer.totalPaidTjs)} TJS
-                  </p>
-                </div>
-              </div>
-
-              {/* ACTION: ACCEPT PAYMENT IF DEBT > 0 */}
-              {(detailCustomerFull?.totalDebtTjs ?? detailCustomer.totalDebtTjs) > 0 && (
-                <Button
-                  variant="primary"
-                  size="sm"
-                  leftIcon={HandCoins}
-                  onClick={() =>
-                    handleOpenPaymentModal({
-                      id: detailCustomer.id,
-                      name: detailCustomer.name,
-                      totalDebtTjs: detailCustomerFull?.totalDebtTjs ?? detailCustomer.totalDebtTjs,
-                    })
-                  }
-                  className="w-full h-10 bg-emerald-600 hover:bg-emerald-500 text-white font-bold cursor-pointer"
-                >
-                  Принять оплату долга в кассу
-                </Button>
-              )}
-            </div>
-
-            {/* DB PAYMENT HISTORY */}
-            <div className="p-3.5 rounded-2xl bg-surface border border-border space-y-2.5">
-              <div className="flex items-center justify-between">
-                <span className="text-[11px] font-bold uppercase tracking-wider text-fg-subtle flex items-center gap-1.5">
-                  <CreditCard className="w-3.5 h-3.5 text-accent" />
-                  История оплат из базы данных
-                </span>
-                {detailCustomerFull?.payments?.length ? (
-                  <span className="text-[10px] font-mono font-bold px-1.5 py-0.2 rounded bg-surface-raised border border-border">
-                    {detailCustomerFull.payments.length} оплат
-                  </span>
-                ) : null}
-              </div>
-
-              {loadingCustomerFull ? (
-                <div className="py-4 text-center">
-                  <LoadingState label="Загрузка платежей…" />
-                </div>
-              ) : !detailCustomerFull?.payments || detailCustomerFull.payments.length === 0 ? (
-                <p className="text-xs text-fg-subtle py-2 text-center">Платежей по долгам пока не зарегистрировано</p>
-              ) : (
-                <div className="divide-y divide-border/60 max-h-48 overflow-y-auto">
-                  {detailCustomerFull.payments.map((p) => (
-                    <div key={p.id} className="py-2 flex items-center justify-between text-xs">
-                      <div>
-                        <p className="font-bold text-success font-mono">
-                          +{formatMoney(Number(p.amountTjs))} TJS
-                        </p>
-                        <p className="text-[10px] text-fg-subtle">
-                          {new Date(p.createdAt).toLocaleDateString('ru-RU')}{' '}
-                          {new Date(p.createdAt).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}
-                          {p.allocations?.length ? ` • Погашен чек №${p.allocations[0]?.sale?.receiptNumber}` : ''}
-                        </p>
-                      </div>
-                      <span className="text-[10px] text-fg-subtle bg-surface-raised px-1.5 py-0.5 rounded border border-border">
-                        {p.sourceAccount === 'STORE_CASH' ? 'Касса' : p.sourceAccount}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* DB SALES HISTORY */}
-            <div className="p-3.5 rounded-2xl bg-surface border border-border space-y-2.5">
-              <div className="flex items-center justify-between">
-                <span className="text-[11px] font-bold uppercase tracking-wider text-fg-subtle flex items-center gap-1.5">
-                  <Receipt className="w-3.5 h-3.5 text-accent" />
-                  История покупок
-                </span>
-                {detailCustomerFull?.sales?.length ? (
-                  <span className="text-[10px] font-mono font-bold px-1.5 py-0.2 rounded bg-surface-raised border border-border">
-                    {detailCustomerFull.sales.length} покупок
-                  </span>
-                ) : null}
-              </div>
-
-              {loadingCustomerFull ? (
-                <div className="py-4 text-center">
-                  <LoadingState label="Загрузка покупок…" />
-                </div>
-              ) : !detailCustomerFull?.sales || detailCustomerFull.sales.length === 0 ? (
-                <p className="text-xs text-fg-subtle py-2 text-center">Покупок пока нет</p>
-              ) : (
-                <div className="divide-y divide-border/60 max-h-48 overflow-y-auto">
-                  {detailCustomerFull.sales.map((s) => (
-                    <div key={s.id} className="py-2 flex items-center justify-between text-xs">
-                      <div>
-                        <p className="font-bold text-fg">
-                          Чек №{s.receiptNumber}{' '}
-                          <span className="font-mono text-fg-subtle font-normal">
-                            ({formatMoney(Number(s.totalTjs))} TJS)
-                          </span>
-                        </p>
-                        <p className="text-[10px] text-fg-subtle">
-                          {new Date(s.createdAt).toLocaleDateString('ru-RU')}{' '}
-                          {s.store?.name ? `• ${s.store.name}` : ''}
-                          {Number(s.debtAmountTjs) > 0 && (
-                            <span className="text-amber-500 font-semibold ml-1">
-                              • Долг: {formatMoney(Number(s.debtAmountTjs))} TJS
-                            </span>
-                          )}
-                        </p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* Modal Bottom Actions */}
-            <div className="flex items-center justify-end gap-2 pt-2 border-t border-border">
-              <div className="flex items-center gap-2 ml-auto">
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  leftIcon={Edit2}
-                  onClick={() => {
-                    const c = detailCustomer;
-                    setDetailCustomer(null);
-                    handleOpenEdit(c);
-                  }}
-                >
-                  Редактировать
-                </Button>
-                <Button variant="secondary" size="sm" onClick={() => setDetailCustomer(null)}>
-                  Закрыть
-                </Button>
-              </div>
-            </div>
-          </div>
-        )}
-      </Dialog>
-
-      {/* CUSTOMER DEBT PAYMENT MODAL */}
-      <Dialog
-        open={isPaymentModalOpen}
-        onClose={() => setIsPaymentModalOpen(false)}
-        title="Приём оплаты долга в кассу"
-      >
-        <form onSubmit={handleRecordPayment} className="space-y-4 pt-1">
-          <div className="p-3 bg-surface-raised rounded-xl border border-border text-xs space-y-1">
-            <div className="flex items-center justify-between">
-              <span className="text-fg-subtle">Клиент:</span>
-              <strong className="text-fg">{paymentCustomer?.name}</strong>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-fg-subtle">Общий долг:</span>
-              <strong className="text-warning font-mono">
-                {formatMoney(paymentCustomer?.totalDebtTjs || 0)} TJS
-              </strong>
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-xs font-semibold text-fg mb-1">
-              Сумма оплаты (TJS) <span className="text-danger">*</span>
-            </label>
-            <input
-              type="text"
-              inputMode="decimal"
-              required
-              value={paymentAmountInput}
-              onChange={(e) => {
-                const val = e.target.value.replace(',', '.').replace(/[^0-9.]/g, '');
-                setPaymentAmountInput(val);
-              }}
-              placeholder="0.00"
-              className="w-full h-10 px-3 bg-surface-raised border border-border rounded-xl text-base font-bold font-mono text-fg focus:outline-none focus:border-accent"
-              autoFocus
-            />
-          </div>
-
-          <div>
-            <label className="block text-xs font-semibold text-fg mb-1">
-              Касса магазина (куда поступают деньги) <span className="text-danger">*</span>
-            </label>
-            <select
-              value={paymentStoreId}
-              onChange={(e) => setPaymentStoreId(e.target.value)}
-              className="w-full h-10 px-3 bg-surface-raised border border-border rounded-xl text-xs font-semibold text-fg focus:outline-none focus:border-accent cursor-pointer"
-            >
-              {stores.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.isMainWarehouse ? `Центральная касса (${s.name})` : s.name}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <label className="block text-xs font-semibold text-fg mb-1">Примечание</label>
-            <input
-              type="text"
-              value={paymentNote}
-              onChange={(e) => setPaymentNote(e.target.value)}
-              placeholder="Наличные, частичная оплата долга..."
-              className="w-full h-9 px-3 bg-surface-raised border border-border rounded-xl text-xs text-fg focus:outline-none focus:border-accent"
-            />
-          </div>
-
-          <div className="flex items-center justify-end gap-2 pt-2 border-t border-border">
-            <Button
-              type="button"
-              variant="secondary"
-              onClick={() => setIsPaymentModalOpen(false)}
-              disabled={isSubmittingPayment}
-            >
-              Отмена
-            </Button>
-            <Button
-              type="submit"
-              variant="primary"
-              loading={isSubmittingPayment}
-              leftIcon={CheckCircle2}
-              className="bg-emerald-600 hover:bg-emerald-500 text-white border-0"
-            >
-              Провести оплату
-            </Button>
-          </div>
-        </form>
-      </Dialog>
-
-      {/* ADD / EDIT CUSTOMER MODAL */}
-      <Dialog
+      <CustomerFormDialog
         open={isAddEditOpen}
+        customer={editingCustomer}
         onClose={() => setIsAddEditOpen(false)}
-        title={editingCustomer ? 'Редактировать клиента' : 'Новый клиент'}
-        subtitle={editingCustomer ? 'Изменение контактных данных' : 'Сохранение контакта в базу'}
-      >
-        <form onSubmit={handleSaveCustomer} className="space-y-3.5">
-          <div>
-            <label className="text-xs font-semibold text-fg block mb-1">Имя и фамилия *</label>
-            <input
-              type="text"
-              value={formName}
-              onChange={(e) => setFormName(e.target.value)}
-              placeholder="Например: Рустам Шарипов"
-              required
-              className="w-full h-10 rounded-xl bg-surface border border-border px-3 text-xs text-fg focus:outline-none focus:border-accent"
-            />
-          </div>
-
-          <div>
-            <label className="text-xs font-semibold text-fg block mb-1">Номер телефона</label>
-            <input
-              type="text"
-              value={formPhone}
-              onChange={(e) => setFormPhone(e.target.value)}
-              placeholder="+992 900 00 00 00"
-              className="w-full h-10 rounded-xl bg-surface border border-border px-3 text-xs font-mono text-fg focus:outline-none focus:border-accent"
-            />
-          </div>
-
-          <div>
-            <label className="text-xs font-semibold text-fg block mb-1">Заметка / Предпочтения</label>
-            <textarea
-              value={formNote}
-              onChange={(e) => setFormNote(e.target.value)}
-              rows={2}
-              placeholder="Интересуется новинками Apple, чехлы, защитные стекла..."
-              className="w-full p-2.5 rounded-xl bg-surface border border-border text-xs text-fg focus:outline-none focus:border-accent resize-none"
-            />
-          </div>
-
-          <div className="flex items-center justify-end gap-2 pt-2 border-t border-border">
-            <Button type="button" variant="secondary" onClick={() => setIsAddEditOpen(false)}>
-              Отмена
-            </Button>
-            <Button type="submit" variant="primary" loading={isSaving}>
-              Сохранить
-            </Button>
-          </div>
-        </form>
-      </Dialog>
+        onSave={handleSaveCustomer}
+      />
 
       {/* DELETE CONFIRM */}
       <ConfirmDialog

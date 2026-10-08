@@ -6,7 +6,6 @@ import { useAppFields } from '../../context/AppContext';
 import { SaleItem } from '../../types';
 import {
   ChevronRight,
-  ChevronDown,
   RefreshCw,
   Wrench,
   RotateCcw,
@@ -16,7 +15,7 @@ import {
   Building2,
   Smartphone,
   User,
-  X
+  X,
 } from 'lucide-react';
 import { CustomSelect, CustomSelectOption } from '../ui/CustomSelect';
 import { formatRam, formatStorage, getPhoneColorHex } from '../../utils/phoneSpecs';

@@ -1,17 +1,14 @@
 import React, { useState, useMemo } from 'react';
 import { formatUserName } from '../../utils/formatUser';
-import { capitalByLocation } from '../../utils/ownerCapital';
 import { useAppFields } from '../../context/AppContext';
 import {
   Plus,
-  Percent,
   Users,
   Coins,
   Briefcase,
   Loader2,
   FileText,
   ArrowUpRight,
-  ArrowDownLeft
 } from 'lucide-react';
 import { StatusBanner, StatusMessage } from '../ui/StatusBanner';
 import { useStoreContext } from '../../utils/storeContext';
@@ -28,7 +25,6 @@ export const OwnersPage: React.FC = () => {
     storeProfitShares,
     users,
     stores,
-    devices,
     ownerTransactions,
     todayRate,
     createOwnerTransaction,
@@ -60,7 +56,6 @@ export const OwnersPage: React.FC = () => {
   const [txModalType, setTxModalType] = useState<'INVESTMENT' | 'WITHDRAWAL'>('INVESTMENT');
 
   const [isSharesModalOpen, setIsSharesModalOpen] = useState(false);
-  const [selectedSharesStoreId, setSelectedSharesStoreId] = useState<string>('');
 
   const [isQuarterModalOpen, setIsQuarterModalOpen] = useState(false);
 
@@ -126,61 +121,6 @@ export const OwnersPage: React.FC = () => {
     const pairs = storeProfitShares.filter(sh => sh.ownerId === ownerId);
     if (!pairs.length) return 'доля не задана';
     return pairs.map(sh => `${stores.find(st => st.id === sh.storeId)?.name || 'Магазин'} ${sh.sharePercent}%`).join(', ');
-  };
-
-  // Track invested capital separately for each store and owner (used in owner cards)
-  const storeInvestmentsByOwner = useMemo(() => {
-    const result: Record<string, Record<string, number>> = {};
-    owners.forEach(owner => {
-      result[owner.id] = capitalByLocation({
-        capitalUsd: owner.capitalBalanceUsd || 0,
-        transactions: ownerTransactions.filter(tx => tx.ownerId === owner.id),
-        stores,
-      });
-    });
-    return result;
-  }, [owners, stores, ownerTransactions]);
-
-  // Devices currently in stock across warehouses and stores
-  const inStockDevices = useMemo(() => {
-    return (devices || []).filter(d =>
-      d.status === 'MAIN_WAREHOUSE' || d.status === 'STORE_STOCK' || d.status === 'IN_STOCK_AFTER_EXCHANGE'
-    );
-  }, [devices]);
-
-  // Breakdown of stock and cash per store / warehouse
-  const storeAssetsBreakdown = useMemo(() => {
-    return stores.map(store => {
-      const storeDevs = inStockDevices.filter(d =>
-        d.locationId === store.id ||
-        (d as any).storeId === store.id ||
-        (store.isMainWarehouse && (d.status === 'MAIN_WAREHOUSE' || d.locationId === 'main_warehouse'))
-      );
-      const stockCost = storeDevs.reduce((sum, d) => sum + (d.costBasisUsd ?? d.purchaseCostUsd ?? 0), 0);
-      const cash = store.cashBalanceUsd || 0;
-      return {
-        id: store.id,
-        name: store.name,
-        isMainWarehouse: Boolean(store.isMainWarehouse),
-        stockCount: storeDevs.length,
-        stockCostUsd: stockCost,
-        cashUsd: cash,
-        totalUsd: stockCost + cash
-      };
-    });
-  }, [stores, inStockDevices]);
-
-  const openSharesModal = (ownerId?: string) => {
-    if (ownerId) {
-      const partnerStore = stores.find(s => {
-        const pair = sharePairOf(s.id);
-        return (pair && pair.ownerId === ownerId) || (owners.find(o => o.id === ownerId)?.storeId === s.id);
-      });
-      if (partnerStore) {
-        setSelectedSharesStoreId(partnerStore.id);
-      }
-    }
-    setIsSharesModalOpen(true);
   };
 
   const openTxModalForOwner = (ownerId: string, type: 'INVESTMENT' | 'WITHDRAWAL') => {
@@ -417,7 +357,7 @@ export const OwnersPage: React.FC = () => {
         adminOwner={adminOwner}
         partnerForStore={partnerForStore}
         storeProfitShares={storeProfitShares}
-        initialStoreId={selectedSharesStoreId}
+        initialStoreId=""
         isSubmitting={isSubmitting}
       />
 

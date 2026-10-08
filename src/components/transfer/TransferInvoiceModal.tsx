@@ -1,10 +1,8 @@
 import React, { useState } from 'react';
 import {
-  X,
   Printer,
   Copy,
   Check,
-  Building2,
   Warehouse,
   Store as StoreIcon,
   CheckCircle2,
@@ -19,7 +17,6 @@ import { Dialog } from '../ui/Dialog';
 import { formatMoney } from '../../utils/money';
 import { getTransferInvoiceItems, formatTransferInvoiceText } from '../../utils/transferInvoice';
 import { isLocationWarehouse } from './types';
-import { cn } from '../../utils/cn';
 
 export interface TransferInvoiceModalProps {
   open: boolean;
