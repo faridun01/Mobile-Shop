@@ -3,26 +3,16 @@ import React, { useState, useMemo, useRef } from 'react';
 import { useAppFields } from '../../context/AppContext';
 import { Device, PaymentMethod } from '../../types';
 import { looksLikeDeviceCode, normalizeScanCode, resolveSaleScan, saleScanMessage } from '../../utils/scanLookup';
-import { formatReceiptText, paymentSummary } from '../../utils/receipt';
 import {
   Smartphone,
   Trash2,
   AlertTriangle,
-  CreditCard,
-  Banknote,
-  Split,
   CheckCircle2,
-  ChevronDown,
   ShoppingCart,
   Store as StoreIcon,
   Plus,
   FileCheck2,
   Clock,
-  UserCheck,
-  User,
-  Share2,
-  Phone,
-  X,
 } from 'lucide-react';
 import { apiClient } from '../../api/client';
 import { SearchBar } from '../ui/SearchBar';
@@ -30,7 +20,6 @@ import { formatRam, formatStorage, getPhoneColorHex } from '../../utils/phoneSpe
 import { FilterPillGroup } from '../ui/FilterPillGroup';
 import { Button } from '../ui/Button';
 import { IconButton } from '../ui/IconButton';
-import { Badge } from '../ui/Badge';
 import { EmptyState } from '../ui/EmptyState';
 import { LoadingState } from '../ui/Skeleton';
 import { StatusBanner, StatusMessage } from '../ui/StatusBanner';
@@ -41,6 +30,8 @@ import { useUIStore } from '../../stores/useUIStore';
 import { useUnfinishedWork } from '../../utils/pwaUpdateSafety';
 import { hasCurrentDailyRate } from '../../utils/dailyRatePrompt';
 import { CustomerPaymentControls } from '../sale/CustomerPaymentControls';
+import { SaleReceiptDialog } from '../sale/SaleReceiptDialog';
+import { SaleVariantRow, retailPriceOf, type SaleVariant } from '../sale/SaleVariantRow';
 
 interface CartItem {
   device: Device;
@@ -86,7 +77,6 @@ export const SalePage: React.FC = () => {
     () => (completedReceiptNumber === null ? undefined : sales.find(s => s.receiptNumber === completedReceiptNumber)),
     [sales, completedReceiptNumber]
   );
-  const [receiptShareState, setReceiptShareState] = useState<'idle' | 'copied' | 'failed'>('idle');
   const [isSubmittingSale, setIsSubmittingSale] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
 
@@ -170,8 +160,7 @@ export const SalePage: React.FC = () => {
     return [{ value: 'ALL', label: 'Все бренды' }, ...Array.from(set).sort().map(b => ({ value: b, label: b }))];
   }, [devices, effectiveStoreId]);
 
-  const defaultPriceFor = (device: Device): number | undefined =>
-    device.retailPriceTjs && device.retailPriceTjs > 0 ? device.retailPriceTjs : undefined;
+  const defaultPriceFor = retailPriceOf;
 
   const addDeviceToCart = (device: Device) => {
     soundEffects.playAddToCartSuccess();
@@ -202,7 +191,7 @@ export const SalePage: React.FC = () => {
     return Object.values(groups);
   }, [availableDevices]);
 
-  const handleSelectVariant = (variant: typeof groupedVariants[0]) => {
+  const handleSelectVariant = (variant: SaleVariant) => {
     if (variant.devices.length === 1) {
       addDeviceToCart(variant.devices[0]);
     } else {
@@ -512,83 +501,16 @@ export const SalePage: React.FC = () => {
                       </span>
                     )}
                   </div>
-                  {groupedVariants.map((variant) => {
-                  const costs = variant.devices.map(d => d.purchaseCostUsd ?? d.costBasisUsd ?? 0);
-                  const maxCost = costs.length ? Math.max(...costs) : 0;
-                  const hasCostVariance = costs.length > 1 && maxCost > Math.min(...costs);
-                  const isExpanded = expandedVariantKey === variant.variantKey;
-                  const sortedDevices = [...variant.devices].sort((a, b) => (b.purchaseCostUsd ?? b.costBasisUsd ?? 0) - (a.purchaseCostUsd ?? a.costBasisUsd ?? 0));
-                  const retailPrices = variant.devices.map(defaultPriceFor).filter((p): p is number => p !== undefined);
-                  const minRetail = retailPrices.length ? Math.min(...retailPrices) : undefined;
-                  const maxRetail = retailPrices.length ? Math.max(...retailPrices) : undefined;
-
-                  return (
-                    <div key={variant.variantKey}>
-                      <button
-                        onClick={() => handleSelectVariant(variant)}
-                        className="w-full text-left px-4 py-3 active:bg-surface-raised flex items-center justify-between gap-3 transition-colors hover:bg-surface-raised/40 cursor-pointer"
-                      >
-                        <div className="min-w-0">
-                          <p className="text-sm font-semibold text-fg-muted truncate">{variant.brand} {variant.model}</p>
-                          <p className="text-xs text-fg-subtle mt-0.5">
-                            {variant.ram ? `${variant.ram} · ` : ''}{variant.storage} · {variant.color}
-                          </p>
-                        </div>
-
-                        <div className="text-right shrink-0 flex items-center gap-2">
-                          <div className="flex flex-col items-end gap-0.5">
-                            {minRetail !== undefined ? (
-                              <span className="text-sm font-bold tabular-nums text-accent whitespace-nowrap">
-                                {formatMoney(minRetail)}{maxRetail !== undefined && maxRetail > minRetail ? `–${formatMoney(maxRetail)}` : ''} TJS
-                              </span>
-                            ) : (
-                              <span className="text-xs text-fg-subtle whitespace-nowrap">Цена не задана</span>
-                            )}
-                            <span className="text-xs text-fg-subtle tabular-nums">{variant.devices.length} шт.</span>
-                          </div>
-                          {variant.devices.length > 1 && (
-                            <ChevronDown className={`w-4 h-4 text-fg-subtle transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
-                          )}
-                        </div>
-                      </button>
-
-                      {isExpanded && (
-                        <div className="bg-surface/60 border-t border-border px-4 py-2 space-y-2">
-                          {sortedDevices.map((dev) => {
-                            const devCost = dev.purchaseCostUsd ?? dev.costBasisUsd ?? 0;
-                            const isHighestCost = isRealAdmin && hasCostVariance && devCost === maxCost;
-                            return (
-                              <button
-                                key={dev.id}
-                                onClick={() => addDeviceToCart(dev)}
-                                className={`w-full p-3 text-left rounded-lg flex items-center justify-between gap-2 border transition-colors cursor-pointer ${
-                                  isHighestCost ? 'border-warning bg-warning/10' : 'border-border bg-surface hover:bg-surface-raised'
-                                }`}
-                              >
-                                <div className="min-w-0">
-                                  <p className="text-xs font-semibold text-fg-muted font-mono">
-                                    IMEI: {dev.imei}{dev.imei2 ? ` / ${dev.imei2}` : ''}
-                                  </p>
-                                  {isRealAdmin && devCost > 0 && (
-                                    <p className="text-xs text-fg-subtle mt-0.5">
-                                      Закупка: ${devCost}
-                                    </p>
-                                  )}
-                                </div>
-                                <div className="flex items-center gap-2 shrink-0">
-                                  {defaultPriceFor(dev) !== undefined && (
-                                    <span className="text-xs font-semibold tabular-nums text-fg-muted">{formatMoney(defaultPriceFor(dev))} TJS</span>
-                                  )}
-                                  <Badge tone={isHighestCost ? 'warning' : 'accent'}>Выбрать</Badge>
-                                </div>
-                              </button>
-                            );
-                          })}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
+                  {groupedVariants.map((variant) => (
+                    <SaleVariantRow
+                      key={variant.variantKey}
+                      variant={variant}
+                      expanded={expandedVariantKey === variant.variantKey}
+                      showCosts={isRealAdmin}
+                      onSelect={handleSelectVariant}
+                      onAddDevice={addDeviceToCart}
+                    />
+                  ))}
               </>
             )}
           </div>
@@ -976,86 +898,15 @@ export const SalePage: React.FC = () => {
         </div>
       </Dialog>
 
-      {/* Receipt */}
-      <Dialog
-        open={completedReceiptNumber !== null}
-        onClose={() => { setCompletedReceiptNumber(null); setReceiptShareState('idle'); focusSearchForScanner(); }}
-        title="Продажа завершена"
-        maxWidth="sm"
-        footer={
-          <div className="w-full grid grid-cols-2 gap-2">
-            <Button
-              variant="secondary"
-              fullWidth
-              leftIcon={Share2}
-              disabled={!completedSale}
-              onClick={async () => {
-                if (!completedSale) return;
-                const text = formatReceiptText(completedSale, { showStore: true, storeAddress: stores.find((s) => s.id === completedSale.storeId)?.address });
-                try {
-                  if (navigator.share) {
-                    await navigator.share({ title: `Чек №${completedSale.receiptNumber}`, text });
-                    return;
-                  }
-                  await navigator.clipboard.writeText(text);
-                  setReceiptShareState('copied');
-                } catch (err) {
-                  // Closing the share sheet is not an error.
-                  if ((err as Error)?.name !== 'AbortError') setReceiptShareState('failed');
-                }
-              }}
-            >
-              {receiptShareState === 'copied' ? 'Скопировано' : 'Отправить чек'}
-            </Button>
-            <Button fullWidth onClick={() => { setCompletedReceiptNumber(null); setReceiptShareState('idle'); focusSearchForScanner(); }}>Новый чек</Button>
-          </div>
-        }
-      >
-        <div>
-          <div className="flex items-center gap-3 mb-3">
-            <div className="w-10 h-10 rounded-full bg-success/15 text-success flex items-center justify-center shrink-0">
-              <CheckCircle2 className="w-5 h-5" />
-            </div>
-            <div className="min-w-0">
-              <p className="text-sm font-semibold text-fg">Чек №{completedReceiptNumber}</p>
-              <p className="text-xs text-fg-subtle">
-                {new Date(completedSale?.date || Date.now()).toLocaleString('ru-RU')}
-                {!isStoreScoped && ` · ${completedSale?.storeName || activeStoreName}`}
-              </p>
-            </div>
-          </div>
-
-          {completedSale ? (
-            <div className="rounded-lg border border-border bg-bg divide-y divide-border text-sm">
-              {completedSale.items.map((item) => (
-                <div key={item.deviceId} className="flex items-start justify-between gap-3 px-3 py-2">
-                  <div className="min-w-0">
-                    <p className="font-medium text-fg-muted">{item.brand} {item.model}</p>
-                    <p className="text-xs text-fg-subtle">IMEI: {item.imei}</p>
-                  </div>
-                  <span className="tabular-nums font-semibold text-fg-muted whitespace-nowrap">{formatMoney(item.salePriceTjs)} TJS</span>
-                </div>
-              ))}
-              <div className="flex items-center justify-between px-3 py-2.5">
-                <span className="text-fg-muted">Итого</span>
-                <strong className="text-base tabular-nums text-accent">{formatMoney(completedSale.totalTjs)} TJS</strong>
-              </div>
-              <div className="px-3 py-2 text-xs text-fg-subtle space-y-0.5">
-                <p>Оплата: <span className="text-fg-muted">{paymentSummary(completedSale)}</span></p>
-                {completedSale.customerName && <p>Покупатель: <span className="text-fg-muted">{completedSale.customerName}</span></p>}
-                {completedSale.customerPhone && <p>Телефон: <span className="text-fg-muted font-mono">{completedSale.customerPhone}</span></p>}
-                <p>Продавец: <span className="text-fg-muted">{completedSale.sellerName || currentUser?.name}</span></p>
-              </div>
-            </div>
-          ) : (
-            <p className="text-xs text-fg-subtle">Продажа сохранена. Состав чека появится после обновления данных — его можно открыть в «Истории продаж».</p>
-          )}
-
-          {receiptShareState === 'failed' && (
-            <p className="mt-2 text-xs text-danger">Не удалось отправить чек. Откройте его в «Истории продаж».</p>
-          )}
-        </div>
-      </Dialog>
+      <SaleReceiptDialog
+        receiptNumber={completedReceiptNumber}
+        sale={completedSale}
+        storeAddress={completedSale ? stores.find((st) => st.id === completedSale.storeId)?.address : undefined}
+        showStoreName={!isStoreScoped}
+        storeNameFallback={activeStoreName}
+        sellerNameFallback={currentUser?.name}
+        onClose={() => { setCompletedReceiptNumber(null); focusSearchForScanner(); }}
+      />
     </div>
   );
 };

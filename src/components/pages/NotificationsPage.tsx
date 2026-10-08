@@ -158,7 +158,6 @@ export const NotificationsPage: React.FC = () => {
   // Admin inside a store sees that store's events; Central Cash shows every store.
   const storeCtx = useStoreContext();
   const storeId = storeCtx.mode === 'STORE' ? storeCtx.storeId : storeChoice;
-  const [actionType, setActionType] = useState('');
   const [items, setItems] = useState<NotificationItem[] | null>(null);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -168,10 +167,9 @@ export const NotificationsPage: React.FC = () => {
     const params = new URLSearchParams({ view: 'history', limit: '50' });
     if (view === 'UNREAD') params.set('unread', '1');
     if (storeId) params.set('storeId', storeId);
-    if (actionType) params.set('actionType', actionType);
     if (cursor) params.set('cursor', cursor);
     return apiClient<{ items: any[]; nextCursor: string | null }>(`/notifications?${params.toString()}`);
-  }, [view, storeId, actionType]);
+  }, [view, storeId]);
 
   const bellKey = useMemo(() => bellList.map((n) => `${n.id}:${n.read ? 1 : 0}`).join(','), [bellList]);
   useEffect(() => {
@@ -301,20 +299,6 @@ export const NotificationsPage: React.FC = () => {
             </div>
           )}
 
-          <div className="relative shrink-0">
-            <select
-              value={actionType}
-              onChange={(e) => setActionType(e.target.value)}
-              aria-label="Действие"
-              className="h-7 pl-2 pr-6 rounded-lg bg-surface-raised border border-border text-fg-muted hover:border-accent/40 text-[11px] font-medium appearance-none max-w-[125px] sm:max-w-[160px] truncate cursor-pointer focus:outline-hidden focus:border-accent transition-colors"
-            >
-              <option value="">Все действия</option>
-              {Object.entries(ACTION_LABELS).map(([value, label]) => (
-                <option key={value} value={value}>{label}</option>
-              ))}
-            </select>
-            <ChevronDown className="w-3 h-3 text-fg-subtle absolute right-1.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-          </div>
 
           {hasUnread && (
             <button

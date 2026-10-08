@@ -9,8 +9,8 @@ const STORE_SEEDS = [
 
 const USER_SEEDS = [
   { id: 'user-admin', name: 'Далер', login: 'admin', password: 'admin123', role: 'ADMIN' as const, storeId: null },
-  // A partner is always store-bound (see the partner store model): never seed one without a store.
-  { id: 'user-partner', name: 'Рустам', login: 'partner', password: 'partner123', role: 'PARTNER' as const, storeId: 'store-siyoma' },
+  // No store on purpose: the admin assigns the partner's store manually (Сотрудники).
+  { id: 'user-partner', name: 'Рустам', login: 'partner', password: 'partner123', role: 'PARTNER' as const, storeId: null },
   { id: 'user-ahmad', name: 'Ahmad', login: 'ahmad', password: 'seller123', role: 'SELLER' as const, storeId: 'store-siyoma' },
   { id: 'user-farhod', name: 'Фарход', login: 'farhod', password: 'seller123', role: 'SELLER' as const, storeId: 'store-siyoma' },
 ];

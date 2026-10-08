@@ -34,7 +34,7 @@ import {
   PanelLeftOpen,
 } from 'lucide-react';
 import { NAV_PAGE_ROUTES } from '../../router/navRoutes';
-import { useNavUsage, sortNavGroupsByUsage, recordNavVisit } from '../../utils/navUsage';
+import { recordNavVisit } from '../../utils/navUsage';
 
 interface NavGroup {
   title: string;
@@ -84,21 +84,22 @@ export const Sidebar: React.FC = () => {
     if (isSeller) {
       return [
         {
-          title: 'Основное',
+          title: 'Основные операции',
           items: [
             { id: 'SALE', label: 'POS Терминал', icon: ShoppingBag, roles: ['SELLER'] },
+            { id: 'INVENTORY', label: 'Склад магазина', icon: Package, roles: ['SELLER'] },
             { id: 'SALES_HISTORY', label: 'История продаж', icon: History, roles: ['SELLER'] },
-            { id: 'EXCHANGE', label: 'Обмен Trade-In', icon: RefreshCw, roles: ['SELLER'] },
+            { id: 'EXCHANGE', label: 'Обмен (Trade-In)', icon: RefreshCw, roles: ['SELLER'] },
             { id: 'REPAIR', label: 'Сервис и ремонт', icon: Wrench, roles: ['SELLER'] },
           ],
         },
         {
-          title: 'Склад',
+          title: 'Склад и касса',
           items: [
-            { id: 'INVENTORY', label: 'Склад магазина', icon: Package, roles: ['SELLER'] },
             { id: 'STORE_RECEIPT', label: 'Приход товара', icon: PackagePlus, roles: ['SELLER'] },
-            { id: 'REVISION', label: 'Ревизия', icon: ClipboardCheck, roles: ['SELLER'] },
             { id: 'TRANSFER', label: 'Перемещение', icon: ArrowLeftRight, roles: ['SELLER'] },
+            { id: 'REVISION', label: 'Ревизия склада', icon: ClipboardCheck, roles: ['SELLER'] },
+            { id: 'EXPENSES', label: 'Расходы кассы', icon: Wallet, roles: ['SELLER'] },
           ],
         },
       ];
@@ -108,11 +109,12 @@ export const Sidebar: React.FC = () => {
     if (isPartner) {
       return [
         {
-          title: 'Магазин',
+          title: 'Магазин и продажи',
           items: [
             { id: 'SALE', label: 'POS Терминал', icon: ShoppingBag, roles: ['PARTNER'] },
+            { id: 'CASH_DESK', label: 'Касса', icon: Wallet, roles: ['PARTNER'] },
             { id: 'SALES_HISTORY', label: 'История продаж', icon: History, roles: ['PARTNER'] },
-            { id: 'EXCHANGE', label: 'Обмен Trade-In', icon: RefreshCw, roles: ['PARTNER'] },
+            { id: 'EXCHANGE', label: 'Обмен (Trade-In)', icon: RefreshCw, roles: ['PARTNER'] },
             { id: 'REPAIR', label: 'Сервис и ремонт', icon: Wrench, roles: ['PARTNER'] },
           ],
         },
@@ -121,16 +123,15 @@ export const Sidebar: React.FC = () => {
           items: [
             { id: 'INVENTORY', label: 'Склад магазина', icon: Package, roles: ['PARTNER'] },
             { id: 'STORE_RECEIPT', label: 'Приход товара', icon: PackagePlus, roles: ['PARTNER'] },
-            { id: 'REVISION', label: 'Ревизия', icon: ClipboardCheck, roles: ['PARTNER'] },
             { id: 'TRANSFER', label: 'Перемещение', icon: ArrowLeftRight, roles: ['PARTNER'] },
+            { id: 'REVISION', label: 'Ревизия склада', icon: ClipboardCheck, roles: ['PARTNER'] },
           ],
         },
         {
           title: 'Управление точкой',
           items: [
-            { id: 'CASH_DESK', label: 'Касса', icon: Wallet, roles: ['PARTNER'] },
             { id: 'EXPENSES', label: 'Расходы кассы', icon: Wallet, roles: ['PARTNER'] },
-            { id: 'SETTINGS', label: 'Настройки', icon: Settings, roles: ['PARTNER'] },
+            { id: 'SETTINGS', label: 'Настройки системы', icon: Settings, roles: ['PARTNER'] },
           ],
         },
       ];
@@ -143,14 +144,14 @@ export const Sidebar: React.FC = () => {
         {
           title: 'Центральная касса и финансы',
           items: [
-            { id: 'CASH_DESK', label: 'Касса', icon: Wallet, roles: ['ADMIN'] },
             { id: 'REPORTS', label: 'Отчёты', icon: TrendingUp, roles: ['ADMIN'] },
+            { id: 'CASH_DESK', label: 'Касса', icon: Wallet, roles: ['ADMIN'] },
             { id: 'CASH_COLLECTION', label: 'Инкассация', icon: HandCoins, roles: ['ADMIN'] },
-            { id: 'CUSTOMERS', label: 'База клиентов', icon: Users, roles: ['ADMIN'] },
             { id: 'SALES_HISTORY', label: 'История продаж', icon: History, roles: ['ADMIN'] },
             { id: 'EXPENSES', label: 'Расходы кассы', icon: Wallet, roles: ['ADMIN'] },
             { id: 'BONUSES', label: 'Бонусы поставщиков', icon: Gift, roles: ['ADMIN'] },
             { id: 'OWNERS', label: 'Партнеры и капитал', icon: Users, roles: ['ADMIN'] },
+            { id: 'CUSTOMERS', label: 'База клиентов', icon: Users, roles: ['ADMIN'] },
           ],
         },
         {
@@ -158,19 +159,19 @@ export const Sidebar: React.FC = () => {
           items: [
             { id: 'INVENTORY', label: 'Склад товаров', icon: Package, roles: ['ADMIN'] },
             { id: 'PURCHASE', label: 'Приходы (партии)', icon: PlusCircle, roles: ['ADMIN'] },
-            { id: 'REVISION', label: 'Ревизия', icon: ClipboardCheck, roles: ['ADMIN'] },
             { id: 'TRANSFER', label: 'Перемещение', icon: ArrowLeftRight, roles: ['ADMIN'] },
-            { id: 'REPAIR', label: 'Сервис и ремонт', icon: Wrench, roles: ['ADMIN'] },
+            { id: 'REVISION', label: 'Ревизия склада', icon: ClipboardCheck, roles: ['ADMIN'] },
             { id: 'SUPPLIERS', label: 'Поставщики', icon: Truck, roles: ['ADMIN'] },
+            { id: 'REPAIR', label: 'Сервис и ремонт', icon: Wrench, roles: ['ADMIN'] },
           ],
         },
         {
-          title: 'Управление',
+          title: 'Система и доступ',
           items: [
             { id: 'EMPLOYEES', label: 'Сотрудники', icon: UserCheck, roles: ['ADMIN'] },
-            { id: 'AUDIT_LOG', label: 'Журнал аудита', icon: FileText, roles: ['ADMIN'] },
             { id: 'NOTIFICATIONS', label: 'Уведомления', icon: Bell, roles: ['ADMIN'] },
-            { id: 'SETTINGS', label: 'Настройки', icon: Settings, roles: ['ADMIN'] },
+            { id: 'AUDIT_LOG', label: 'Журнал аудита', icon: FileText, roles: ['ADMIN'] },
+            { id: 'SETTINGS', label: 'Настройки системы', icon: Settings, roles: ['ADMIN'] },
           ],
         },
       ];
@@ -179,11 +180,12 @@ export const Sidebar: React.FC = () => {
     // 4. Admin in Retail Store Mode (selling at chosen store) — sees exact same store menus as Partner
     return [
       {
-        title: 'Магазин',
+        title: 'Магазин и продажи',
         items: [
           { id: 'SALE', label: 'POS Терминал', icon: ShoppingBag, roles: ['ADMIN'] },
+          { id: 'CASH_DESK', label: 'Касса', icon: Wallet, roles: ['ADMIN'] },
           { id: 'SALES_HISTORY', label: 'История продаж', icon: History, roles: ['ADMIN'] },
-          { id: 'EXCHANGE', label: 'Обмен Trade-In', icon: RefreshCw, roles: ['ADMIN'] },
+          { id: 'EXCHANGE', label: 'Обмен (Trade-In)', icon: RefreshCw, roles: ['ADMIN'] },
           { id: 'REPAIR', label: 'Сервис и ремонт', icon: Wrench, roles: ['ADMIN'] },
         ],
       },
@@ -192,27 +194,32 @@ export const Sidebar: React.FC = () => {
         items: [
           { id: 'INVENTORY', label: 'Склад магазина', icon: Package, roles: ['ADMIN'] },
           { id: 'STORE_RECEIPT', label: 'Приход товара', icon: PackagePlus, roles: ['ADMIN'] },
-          { id: 'REVISION', label: 'Ревизия', icon: ClipboardCheck, roles: ['ADMIN'] },
           { id: 'TRANSFER', label: 'Перемещение', icon: ArrowLeftRight, roles: ['ADMIN'] },
+          { id: 'REVISION', label: 'Ревизия склада', icon: ClipboardCheck, roles: ['ADMIN'] },
         ],
       },
       {
         title: 'Управление точкой',
         items: [
-          { id: 'CASH_DESK', label: 'Касса', icon: Wallet, roles: ['ADMIN'] },
           { id: 'REPORTS', label: 'Отчёты', icon: TrendingUp, roles: ['ADMIN'] },
           { id: 'CASH_COLLECTION', label: 'Инкассация', icon: HandCoins, roles: ['ADMIN'] },
           { id: 'EXPENSES', label: 'Расходы кассы', icon: Wallet, roles: ['ADMIN'] },
-          { id: 'SETTINGS', label: 'Настройки', icon: Settings, roles: ['ADMIN'] },
+          { id: 'SETTINGS', label: 'Настройки системы', icon: Settings, roles: ['ADMIN'] },
+        ],
+      },
+      {
+        title: 'Система и доступ',
+        items: [
+          { id: 'EMPLOYEES', label: 'Сотрудники', icon: UserCheck, roles: ['ADMIN'] },
+          { id: 'NOTIFICATIONS', label: 'Уведомления', icon: Bell, roles: ['ADMIN'] },
+          { id: 'AUDIT_LOG', label: 'Журнал аудита', icon: FileText, roles: ['ADMIN'] },
         ],
       },
     ];
-  }, [isSeller, isPartner, isCentralCashMode, activeRetailStore, sellerStoreName]);
+  }, [isSeller, isPartner, isCentralCashMode]);
 
-  const navUsage = useNavUsage();
-  const sortedNavGroups = useMemo(() => {
-    return sortNavGroupsByUsage(navGroups, navUsage);
-  }, [navGroups, navUsage]);
+  // Business-prioritized groups rendered stably and predictably
+  const sortedNavGroups = navGroups;
 
   return (
     <aside className={`hidden lg:flex flex-col border-r border-border bg-surface text-fg-muted select-none shrink-0 h-full sticky top-0 transition-all duration-200 ${

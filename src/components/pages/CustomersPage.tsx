@@ -9,7 +9,6 @@ import {
   Copy,
   MessageCircle,
   HandCoins,
-  ArrowUpDown,
   X,
 } from 'lucide-react';
 import { apiClient } from '../../api/client';
@@ -37,16 +36,6 @@ interface CustomerListResponse {
   };
 }
 
-export type CustomerSortOption =
-  | 'DEBT_DESC'
-  | 'DEBT_ASC'
-  | 'NAME_ASC'
-  | 'NAME_DESC'
-  | 'NEWEST'
-  | 'OLDEST'
-  | 'PAID_DESC'
-  | 'SALES_DESC';
-
 export type CustomerTab = 'ALL' | 'DEBTORS' | 'WITH_PHONE' | 'PUSH';
 
 export const CustomersPage: React.FC = () => {
@@ -66,7 +55,6 @@ export const CustomersPage: React.FC = () => {
 
   const [search, setSearch] = useState('');
   const [activeTab, setActiveTab] = useState<CustomerTab>('ALL');
-  const [sortBy, setSortBy] = useState<CustomerSortOption>('DEBT_DESC');
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
   // Customer debt payment dialog
@@ -256,28 +244,9 @@ export const CustomersPage: React.FC = () => {
     });
 
     return [...list].sort((a, b) => {
-      switch (sortBy) {
-        case 'DEBT_DESC':
-          return (b.totalDebtTjs || 0) - (a.totalDebtTjs || 0) || a.name.localeCompare(b.name, 'ru');
-        case 'DEBT_ASC':
-          return (a.totalDebtTjs || 0) - (b.totalDebtTjs || 0) || a.name.localeCompare(b.name, 'ru');
-        case 'NAME_ASC':
-          return a.name.localeCompare(b.name, 'ru');
-        case 'NAME_DESC':
-          return b.name.localeCompare(a.name, 'ru');
-        case 'NEWEST':
-          return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
-        case 'OLDEST':
-          return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
-        case 'PAID_DESC':
-          return (b.totalPaidTjs || 0) - (a.totalPaidTjs || 0);
-        case 'SALES_DESC':
-          return (b.salesCount || 0) - (a.salesCount || 0);
-        default:
-          return 0;
-      }
+      return (b.totalDebtTjs || 0) - (a.totalDebtTjs || 0) || a.name.localeCompare(b.name, 'ru');
     });
-  }, [customers, activeTab, search, sortBy]);
+  }, [customers, activeTab, search]);
 
   return (
     <div className="work-screen flex-1 flex flex-col h-full overflow-hidden bg-bg text-fg select-none">
@@ -380,26 +349,6 @@ export const CustomersPage: React.FC = () => {
                 <X className="w-3 h-3" />
               </button>
             )}
-          </div>
-
-          {/* Sorting selector */}
-          <div className="flex items-center gap-1 bg-surface-raised border border-border rounded-lg px-2 h-7.5 shrink-0">
-            <ArrowUpDown className="w-3 h-3 text-accent shrink-0" />
-            <select
-              value={sortBy}
-              onChange={(e) => setSortBy(e.target.value as CustomerSortOption)}
-              className="bg-transparent text-xs font-medium text-fg focus:outline-none cursor-pointer max-w-[100px] sm:max-w-none truncate"
-              title="Сортировка клиентов"
-            >
-              <option value="DEBT_DESC">Долг ↓</option>
-              <option value="DEBT_ASC">Долг ↑</option>
-              <option value="NAME_ASC">Имя (А-Я)</option>
-              <option value="NAME_DESC">Имя (Я-А)</option>
-              <option value="NEWEST">Новые</option>
-              <option value="OLDEST">Старые</option>
-              <option value="PAID_DESC">Оплаты ↓</option>
-              <option value="SALES_DESC">Покупки ↓</option>
-            </select>
           </div>
 
           <Button

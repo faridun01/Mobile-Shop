@@ -84,9 +84,10 @@ try {
   const admin = await login('admin', 'admin123');
   const seller = await login('ahmad', 'seller123');
 
-  // A second retail store; the seeded partner is bound to Сиёма.
+  // A second retail store. The seeded partner has no store until the admin assigns one by hand.
   const storeB = ok(await call(admin, 'POST', '/stores', { name: 'Тестовая точка', address: 'ул. Проверки, 1' }));
-  assert.equal((await db.user.findUniqueOrThrow({ where: { id: 'user-partner' } })).storeId, 'store-siyoma', 'seed must bind the partner to a store');
+  assert.equal((await db.user.findUniqueOrThrow({ where: { id: 'user-partner' } })).storeId, null, 'seed must not pick a store for the partner');
+  ok(await call(admin, 'PATCH', '/users/user-partner', { storeId: 'store-siyoma' }));
   const partner = await login('partner', 'partner123');
   ok(await call(admin, 'POST', '/users', { login: 'sellerb', password: 'seller-b-pass-1', name: 'Продавец Б', role: 'SELLER', storeId: storeB.id }));
   const sellerB = await login('sellerb', 'seller-b-pass-1');
@@ -249,6 +250,7 @@ try {
     const desk = ok(await call(partner, 'GET', '/cash-desk/summary'));
     assert.deepEqual(desk.cash.stores.map((s: any) => s.id), ['store-siyoma']);
     assert.equal(desk.suppliers.totalDebtUsd, 0, 'supplier debt is ADMIN-only');
+    assert.equal(desk.cash.central, undefined, 'Central Cash balance is ADMIN-only');
     ok(await call(partner, 'GET', '/expenses'));
     for (const [m, p] of [['GET', '/cash-collections'], ['GET', '/owners'], ['GET', '/reports/summary?period=TODAY'], ['POST', '/stores/store-siyoma/adjust-cash']] as const) {
       assert.equal((await call(partner, m, p, m === 'POST' ? { newBalanceUsd: 0 } : undefined)).status, 403, `${m} ${p}`);
@@ -261,7 +263,8 @@ try {
       ok(await call(admin, 'GET', p));
     }
     const desk = ok(await call(admin, 'GET', '/cash-desk/summary'));
-    assert(desk.cash.stores.length >= 3, 'admin sees every register');
+    assert(desk.cash.central, 'admin sees Central Cash');
+    assert.deepEqual(desk.cash.stores.map((s: any) => s.id).sort(), ['store-siyoma', storeB.id].sort(), 'admin sees every retail register');
     const local = ok(await call(admin, 'GET', '/cash-desk/summary?storeId=store-siyoma'));
     assert.deepEqual(local.cash.stores.map((s: any) => s.id), ['store-siyoma'], 'store mode scopes the admin to the chosen store');
   });

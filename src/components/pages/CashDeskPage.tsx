@@ -1,9 +1,8 @@
 import React, { useState } from 'react';
 import { useAppFields } from '../../context/AppContext';
-import { formatStoreName } from '../../utils/storeContext';
 import { StatusBanner, StatusMessage } from '../ui/StatusBanner';
 import { RestrictedAccess } from '../ui/RestrictedAccess';
-import { Wallet, FileCheck2 } from 'lucide-react';
+import { FileCheck2 } from 'lucide-react';
 import { CashDeskPanel } from '../finance/CashDeskPanel';
 import { StoreSelector } from '../common/StoreSelector';
 import { useUIStore } from '../../stores/useUIStore';
@@ -31,10 +30,6 @@ export const CashDeskPage: React.FC = () => {
       : (selectedStoreId || 'all');
 
   const isCentral = effectiveStoreId === 'all';
-  const currentStore = retailStores.find((s) => s.id === effectiveStoreId);
-  const pageTitle = isCentral
-    ? 'Центральная касса (Общий итог)'
-    : `Касса: ${formatStoreName(currentStore?.name || 'Магазин')}`;
 
   if (isSeller) {
     return (
@@ -48,23 +43,9 @@ export const CashDeskPage: React.FC = () => {
     <div className="work-screen flex-1 h-full overflow-y-auto min-h-0 bg-bg text-fg select-none">
       <StatusBanner message={status} onDismiss={() => setStatus(null)} />
 
-      {/* Compact Sticky Header */}
-      <header className="sticky top-0 z-20 px-3 sm:px-4 py-2 border-b border-border bg-surface/95 backdrop-blur-sm flex flex-col sm:flex-row sm:items-center justify-between gap-2 shadow-2xs">
-        <div className="flex items-center gap-2 min-w-0 w-full sm:w-auto">
-          <div className="w-8 h-8 rounded-lg bg-accent/15 border border-accent/25 flex items-center justify-center text-accent shrink-0">
-            <Wallet className="w-4 h-4" />
-          </div>
-          <div className="min-w-0 flex-1">
-            <h1 className="text-sm sm:text-base font-bold text-fg leading-tight truncate">
-              {pageTitle}
-            </h1>
-            <p className="text-[10px] text-fg-subtle truncate">
-              Наличные средства и баланс кассы
-            </p>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-1.5 w-full sm:w-auto justify-between sm:justify-end min-w-0">
+      {/* Compact Sticky Controls Bar */}
+      {((isAdmin && retailStores.length > 0) || !isCentral) && (
+        <div className="sticky top-0 z-20 px-3 sm:px-4 py-1.5 border-b border-border bg-surface/95 backdrop-blur-sm flex items-center justify-end gap-2 shadow-2xs">
           {/* Store Selector (Admin) - retail stores only; main warehouse has no cash register */}
           {isAdmin && retailStores.length > 0 && (
             <StoreSelector
@@ -89,11 +70,11 @@ export const CashDeskPage: React.FC = () => {
               title="Закрыть смену / Z-отчёт"
             >
               <FileCheck2 className="w-3.5 h-3.5 shrink-0" />
-              <span className="hidden sm:inline">Z-отчёт</span>
+              <span>Z-отчёт</span>
             </button>
           )}
         </div>
-      </header>
+      )}
 
       {/* Main Cash & Shift Closing Content */}
       <div className="p-3 sm:p-4 max-w-7xl mx-auto">

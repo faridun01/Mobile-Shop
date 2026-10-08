@@ -89,10 +89,7 @@ export const NewPurchaseForm: React.FC<NewPurchaseFormProps> = ({
                 <ArrowLeft className="w-3.5 h-3.5" />
                 <span>Список приходов</span>
               </button>
-              <span className="text-fg-subtle">/</span>
-              <h3 className="text-xs font-bold text-fg-muted tracking-wider">
-                Новый приход товаров
-              </h3>
+
             </div>
           </div>
 
@@ -126,12 +123,7 @@ export const NewPurchaseForm: React.FC<NewPurchaseFormProps> = ({
                   <Plus className="w-4 h-4" />
                 </button>
               </div>
-              {!selectedSupplierId && (
-                <p className="text-[11px] text-amber-500 mt-1 flex items-center gap-1 font-medium">
-                  <AlertCircle className="w-3.5 h-3.5 shrink-0" />
-                  <span>Поставщик не выбран. Обязательно выберите поставщика из списка перед продолжением.</span>
-                </p>
-              )}
+
             </div>
           </div>
 

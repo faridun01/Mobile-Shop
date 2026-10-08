@@ -36,7 +36,10 @@ import {
   LogOut,
 } from 'lucide-react';
 import { NAV_PAGE_ROUTES } from '../../router/navRoutes';
-import { useNavUsage, sortNavGroupsByUsage, recordNavVisit } from '../../utils/navUsage';
+import { recordNavVisit } from '../../utils/navUsage';
+
+// Remember scroll position across drawer opens so user stays in the same place
+let savedDrawerScrollTop = 0;
 
 interface NavGroup {
   title: string;
@@ -122,6 +125,7 @@ export const Drawer: React.FC = () => {
           title: 'Основные операции',
           items: [
             { id: 'SALE', label: 'POS Терминал', icon: ShoppingBag, roles: ['SELLER'] },
+            { id: 'INVENTORY', label: 'Склад магазина', icon: Package, roles: ['SELLER'] },
             { id: 'SALES_HISTORY', label: 'История продаж', icon: History, roles: ['SELLER'] },
             { id: 'EXCHANGE', label: 'Обмен (Trade-In)', icon: RefreshCw, roles: ['SELLER'] },
             { id: 'REPAIR', label: 'Сервис и ремонт', icon: Wrench, roles: ['SELLER'] },
@@ -130,10 +134,9 @@ export const Drawer: React.FC = () => {
         {
           title: 'Склад и касса',
           items: [
-            { id: 'INVENTORY', label: 'Склад магазина', icon: Package, roles: ['SELLER'] },
             { id: 'STORE_RECEIPT', label: 'Приход товара', icon: PackagePlus, roles: ['SELLER'] },
-            { id: 'REVISION', label: 'Ревизия склада', icon: ClipboardCheck, roles: ['SELLER'] },
             { id: 'TRANSFER', label: 'Перемещение', icon: ArrowLeftRight, roles: ['SELLER'] },
+            { id: 'REVISION', label: 'Ревизия склада', icon: ClipboardCheck, roles: ['SELLER'] },
             { id: 'EXPENSES', label: 'Расходы кассы', icon: Wallet, roles: ['SELLER'] },
           ],
         },
@@ -144,6 +147,7 @@ export const Drawer: React.FC = () => {
           title: 'Магазин и продажи',
           items: [
             { id: 'SALE', label: 'POS Терминал', icon: ShoppingBag, roles: ['PARTNER'] },
+            { id: 'CASH_DESK', label: 'Касса', icon: Wallet, roles: ['PARTNER'] },
             { id: 'SALES_HISTORY', label: 'История продаж', icon: History, roles: ['PARTNER'] },
             { id: 'EXCHANGE', label: 'Обмен (Trade-In)', icon: RefreshCw, roles: ['PARTNER'] },
             { id: 'REPAIR', label: 'Сервис и ремонт', icon: Wrench, roles: ['PARTNER'] },
@@ -154,14 +158,13 @@ export const Drawer: React.FC = () => {
           items: [
             { id: 'INVENTORY', label: 'Склад магазина', icon: Package, roles: ['PARTNER'] },
             { id: 'STORE_RECEIPT', label: 'Приход товара', icon: PackagePlus, roles: ['PARTNER'] },
-            { id: 'REVISION', label: 'Ревизия склада', icon: ClipboardCheck, roles: ['PARTNER'] },
             { id: 'TRANSFER', label: 'Перемещение', icon: ArrowLeftRight, roles: ['PARTNER'] },
+            { id: 'REVISION', label: 'Ревизия склада', icon: ClipboardCheck, roles: ['PARTNER'] },
           ],
         },
         {
           title: 'Управление точкой',
           items: [
-            { id: 'CASH_DESK', label: 'Касса', icon: Wallet, roles: ['PARTNER'] },
             { id: 'EXPENSES', label: 'Расходы кассы', icon: Wallet, roles: ['PARTNER'] },
             { id: 'SETTINGS', label: 'Настройки системы', icon: Settings, roles: ['PARTNER'] },
           ],
@@ -172,14 +175,14 @@ export const Drawer: React.FC = () => {
         {
           title: 'Центральная касса и финансы',
           items: [
-            { id: 'CASH_DESK', label: 'Касса', icon: Wallet, roles: ['ADMIN'] },
             { id: 'REPORTS', label: 'Отчёты', icon: TrendingUp, roles: ['ADMIN'] },
+            { id: 'CASH_DESK', label: 'Касса', icon: Wallet, roles: ['ADMIN'] },
             { id: 'CASH_COLLECTION', label: 'Инкассация', icon: HandCoins, roles: ['ADMIN'] },
-            { id: 'CUSTOMERS', label: 'База клиентов', icon: Users, roles: ['ADMIN'] },
             { id: 'SALES_HISTORY', label: 'История продаж', icon: History, roles: ['ADMIN'] },
             { id: 'EXPENSES', label: 'Расходы кассы', icon: Wallet, roles: ['ADMIN'] },
             { id: 'BONUSES', label: 'Бонусы поставщиков', icon: Gift, roles: ['ADMIN'] },
             { id: 'OWNERS', label: 'Партнеры и капитал', icon: Users, roles: ['ADMIN'] },
+            { id: 'CUSTOMERS', label: 'База клиентов', icon: Users, roles: ['ADMIN'] },
           ],
         },
         {
@@ -187,18 +190,18 @@ export const Drawer: React.FC = () => {
           items: [
             { id: 'INVENTORY', label: 'Склад товаров', icon: Package, roles: ['ADMIN'] },
             { id: 'PURCHASE', label: 'Приходы (партии)', icon: PlusCircle, roles: ['ADMIN'] },
-            { id: 'REVISION', label: 'Ревизия склада', icon: ClipboardCheck, roles: ['ADMIN'] },
             { id: 'TRANSFER', label: 'Перемещение', icon: ArrowLeftRight, roles: ['ADMIN'] },
-            { id: 'REPAIR', label: 'Сервис и ремонт', icon: Wrench, roles: ['ADMIN'] },
+            { id: 'REVISION', label: 'Ревизия склада', icon: ClipboardCheck, roles: ['ADMIN'] },
             { id: 'SUPPLIERS', label: 'Поставщики', icon: Truck, roles: ['ADMIN'] },
+            { id: 'REPAIR', label: 'Сервис и ремонт', icon: Wrench, roles: ['ADMIN'] },
           ],
         },
         {
           title: 'Система и доступ',
           items: [
             { id: 'EMPLOYEES', label: 'Сотрудники', icon: UserCheck, roles: ['ADMIN'] },
-            { id: 'AUDIT_LOG', label: 'Журнал аудита', icon: FileText, roles: ['ADMIN'] },
             { id: 'NOTIFICATIONS', label: 'Уведомления', icon: Bell, roles: ['ADMIN'] },
+            { id: 'AUDIT_LOG', label: 'Журнал аудита', icon: FileText, roles: ['ADMIN'] },
             { id: 'SETTINGS', label: 'Настройки системы', icon: Settings, roles: ['ADMIN'] },
           ],
         },
@@ -210,6 +213,7 @@ export const Drawer: React.FC = () => {
           title: 'Магазин и продажи',
           items: [
             { id: 'SALE', label: 'POS Терминал', icon: ShoppingBag, roles: ['ADMIN'] },
+            { id: 'CASH_DESK', label: 'Касса', icon: Wallet, roles: ['ADMIN'] },
             { id: 'SALES_HISTORY', label: 'История продаж', icon: History, roles: ['ADMIN'] },
             { id: 'EXCHANGE', label: 'Обмен (Trade-In)', icon: RefreshCw, roles: ['ADMIN'] },
             { id: 'REPAIR', label: 'Сервис и ремонт', icon: Wrench, roles: ['ADMIN'] },
@@ -220,14 +224,13 @@ export const Drawer: React.FC = () => {
           items: [
             { id: 'INVENTORY', label: 'Склад магазина', icon: Package, roles: ['ADMIN'] },
             { id: 'STORE_RECEIPT', label: 'Приход товара', icon: PackagePlus, roles: ['ADMIN'] },
-            { id: 'REVISION', label: 'Ревизия склада', icon: ClipboardCheck, roles: ['ADMIN'] },
             { id: 'TRANSFER', label: 'Перемещение', icon: ArrowLeftRight, roles: ['ADMIN'] },
+            { id: 'REVISION', label: 'Ревизия склада', icon: ClipboardCheck, roles: ['ADMIN'] },
           ],
         },
         {
           title: 'Управление точкой',
           items: [
-            { id: 'CASH_DESK', label: 'Касса', icon: Wallet, roles: ['ADMIN'] },
             { id: 'REPORTS', label: 'Отчёты', icon: TrendingUp, roles: ['ADMIN'] },
             { id: 'CASH_COLLECTION', label: 'Инкассация', icon: HandCoins, roles: ['ADMIN'] },
             { id: 'EXPENSES', label: 'Расходы кассы', icon: Wallet, roles: ['ADMIN'] },
@@ -238,8 +241,8 @@ export const Drawer: React.FC = () => {
           title: 'Система и доступ',
           items: [
             { id: 'EMPLOYEES', label: 'Сотрудники', icon: UserCheck, roles: ['ADMIN'] },
-            { id: 'AUDIT_LOG', label: 'Журнал аудита', icon: FileText, roles: ['ADMIN'] },
             { id: 'NOTIFICATIONS', label: 'Уведомления', icon: Bell, roles: ['ADMIN'] },
+            { id: 'AUDIT_LOG', label: 'Журнал аудита', icon: FileText, roles: ['ADMIN'] },
           ],
         },
       ];
@@ -253,15 +256,33 @@ export const Drawer: React.FC = () => {
       .filter((group) => group.items.length > 0);
   }, [isSeller, isPartner, isCentralCashMode, userRole]);
 
-  const navUsage = useNavUsage();
-  const sortedNavGroups = useMemo(() => {
-    return sortNavGroupsByUsage(navGroups, navUsage);
-  }, [navGroups, navUsage]);
+  // Business-prioritized groups rendered stably and predictably
+  const sortedNavGroups = navGroups;
+
+  const scrollContainerRef = React.useRef<HTMLDivElement>(null);
+  const lastActiveRouteRef = React.useRef(location.pathname);
+
+  const saveScroll = React.useCallback(() => {
+    if (scrollContainerRef.current) {
+      const top = scrollContainerRef.current.scrollTop;
+      savedDrawerScrollTop = top;
+      try {
+        sessionStorage.setItem('mobile_shop_drawer_scroll', String(top));
+      } catch {
+        // ignore
+      }
+    }
+  }, []);
+
+  const closeDrawer = React.useCallback(() => {
+    saveScroll();
+    setDrawerOpen(false);
+  }, [saveScroll, setDrawerOpen]);
 
   React.useEffect(() => {
     if (!drawerOpen) return;
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setDrawerOpen(false);
+      if (e.key === 'Escape') closeDrawer();
     };
     window.addEventListener('keydown', handleKeyDown);
     const prevOverflow = document.body.style.overflow;
@@ -272,7 +293,49 @@ export const Drawer: React.FC = () => {
       document.body.style.overflow = prevOverflow;
       document.documentElement.removeAttribute('data-drawer-open');
     };
-  }, [drawerOpen, setDrawerOpen]);
+  }, [drawerOpen, closeDrawer]);
+
+  // Restore scroll position when drawer opens: opens from the exact same place!
+  React.useLayoutEffect(() => {
+    if (!drawerOpen) return;
+    const container = scrollContainerRef.current;
+    if (!container) return;
+
+    let targetScroll = savedDrawerScrollTop;
+    if (!targetScroll) {
+      try {
+        const stored = sessionStorage.getItem('mobile_shop_drawer_scroll');
+        if (stored) targetScroll = Number(stored) || 0;
+      } catch {
+        // ignore
+      }
+    }
+
+    const isSameRoute = lastActiveRouteRef.current === location.pathname;
+
+    const restorePosition = () => {
+      if (!container) return;
+      if (isSameRoute && targetScroll > 0) {
+        container.scrollTop = targetScroll;
+      } else {
+        const activeEl = container.querySelector<HTMLElement>('[data-active-nav="true"]');
+        if (activeEl) {
+          activeEl.scrollIntoView({ block: 'center' });
+        } else if (targetScroll > 0) {
+          container.scrollTop = targetScroll;
+        }
+      }
+    };
+
+    restorePosition();
+    const rafId = requestAnimationFrame(restorePosition);
+    const timerId = setTimeout(restorePosition, 40);
+
+    return () => {
+      cancelAnimationFrame(rafId);
+      clearTimeout(timerId);
+    };
+  }, [drawerOpen, location.pathname]);
 
   if (!drawerOpen) return null;
 
@@ -281,7 +344,7 @@ export const Drawer: React.FC = () => {
       {/* Backdrop overlay for outside click */}
       <div
         className="fixed inset-0 bg-black/60 backdrop-blur-xs z-40 md:hidden transition-opacity"
-        onClick={() => setDrawerOpen(false)}
+        onClick={closeDrawer}
         aria-hidden="true"
       />
 
@@ -334,7 +397,7 @@ export const Drawer: React.FC = () => {
 
             <button
               type="button"
-              onClick={() => setDrawerOpen(false)}
+              onClick={closeDrawer}
               aria-label="Закрыть меню"
               className="w-8.5 h-8.5 rounded-full flex items-center justify-center bg-surface-raised hover:bg-surface border border-border text-fg-subtle hover:text-fg transition-all active:scale-90 cursor-pointer shadow-xs shrink-0"
             >
@@ -345,6 +408,15 @@ export const Drawer: React.FC = () => {
 
         {/* Scrollable Body: Banner, Switchers, Quick Actions, and ALL Menu Items */}
         <div
+          ref={scrollContainerRef}
+          onScroll={(e) => {
+            savedDrawerScrollTop = e.currentTarget.scrollTop;
+            try {
+              sessionStorage.setItem('mobile_shop_drawer_scroll', String(e.currentTarget.scrollTop));
+            } catch {
+              // ignore
+            }
+          }}
           className="flex-1 min-h-0 overflow-y-auto overscroll-contain [-webkit-overflow-scrolling:touch] touch-pan-y px-3 py-3 space-y-3"
           style={{ paddingBottom: 'calc(6.5rem + var(--sa-bottom, 20px))' }}
         >
@@ -354,7 +426,7 @@ export const Drawer: React.FC = () => {
               {isCentralCashMode ? (
                 <div
                   onClick={() => {
-                    setDrawerOpen(false);
+                    closeDrawer();
                     triggerStoreTransition({
                       storeName: 'Центральная касса (Главный офис)',
                       storeId: 'all',
@@ -385,7 +457,7 @@ export const Drawer: React.FC = () => {
                     type="button"
                     onClick={(e) => {
                       e.stopPropagation();
-                      setDrawerOpen(false);
+                      closeDrawer();
                       setStoreSwitchModalOpen(true);
                     }}
                     className="w-full h-8 px-2.5 rounded-lg bg-surface-raised hover:bg-accent hover:text-accent-fg border border-border text-xs font-semibold text-fg flex items-center justify-between transition-all shadow-xs active:scale-[0.98] cursor-pointer"
@@ -420,7 +492,7 @@ export const Drawer: React.FC = () => {
                     <button
                       type="button"
                       onClick={() => {
-                        setDrawerOpen(false);
+                        closeDrawer();
                         setStoreSwitchModalOpen(true);
                       }}
                       className="h-8 px-2 rounded-lg bg-surface-raised hover:bg-surface border border-border text-xs font-medium text-fg flex items-center justify-center gap-1.5 transition-all active:scale-95 cursor-pointer shadow-2xs"
@@ -431,7 +503,7 @@ export const Drawer: React.FC = () => {
                     <button
                       type="button"
                       onClick={() => {
-                        setDrawerOpen(false);
+                        closeDrawer();
                         triggerStoreTransition({
                           storeName: 'Центральная касса (Главный офис)',
                           storeId: 'all',
@@ -457,7 +529,7 @@ export const Drawer: React.FC = () => {
             <button
               type="button"
               onClick={() => {
-                setDrawerOpen(false);
+                closeDrawer();
                 setDailyClosingModalOpen(true, currentUser?.storeId || (selectedStoreId !== 'all' ? selectedStoreId : undefined));
               }}
               className="w-full py-2.5 px-3 rounded-xl bg-accent/10 hover:bg-accent/15 border border-accent/25 text-accent text-xs font-bold flex items-center justify-between transition-colors shadow-2xs cursor-pointer active:scale-[0.99]"
@@ -508,7 +580,10 @@ export const Drawer: React.FC = () => {
                       return (
                         <button
                           key={item.id}
+                          data-active-nav={isActive ? 'true' : undefined}
                           onClick={() => {
+                            saveScroll();
+                            lastActiveRouteRef.current = routePath;
                             recordNavVisit(item.id);
                             setActivePage(item.id);
                             navigate(routePath);
@@ -553,7 +628,7 @@ export const Drawer: React.FC = () => {
             <button
               type="button"
               onClick={() => {
-                setDrawerOpen(false);
+                closeDrawer();
                 logout();
                 navigate('/login');
               }}
