@@ -104,7 +104,21 @@ export function registerSupplierRoutes(app: Express) {
         where: { isMainWarehouse: true, active: true },
         orderBy: { cashBalanceUsd: 'desc' },
       }) ?? await prisma.store.findFirst({ where: { active: true } });
-      const resolvedStoreId = storeId || sourceAccountId || centralStore?.id;
+
+      const rawStoreId = (typeof storeId === 'string' && storeId.trim())
+        ? storeId.trim()
+        : ((typeof sourceAccountId === 'string' && sourceAccountId.trim()) ? sourceAccountId.trim() : undefined);
+
+      let resolvedStoreId = rawStoreId;
+      if (!resolvedStoreId || resolvedStoreId === 'STORE_CASH' || resolvedStoreId === 'central') {
+        resolvedStoreId = centralStore?.id || 'main-warehouse';
+      }
+
+      const storeCheck = await prisma.store.findUnique({ where: { id: resolvedStoreId } });
+      if (!storeCheck) {
+        resolvedStoreId = centralStore?.id || 'main-warehouse';
+      }
+
       if (!resolvedStoreId) {
         res.status(400).json({ message: 'Центральная касса не найдена' });
         return;
@@ -136,7 +150,21 @@ export function registerSupplierRoutes(app: Express) {
         where: { isMainWarehouse: true, active: true },
         orderBy: { cashBalanceUsd: 'desc' },
       }) ?? await prisma.store.findFirst({ where: { active: true } });
-      const resolvedStoreId = storeId || sourceAccountId || centralStore?.id;
+
+      const rawStoreId = (typeof storeId === 'string' && storeId.trim())
+        ? storeId.trim()
+        : ((typeof sourceAccountId === 'string' && sourceAccountId.trim()) ? sourceAccountId.trim() : undefined);
+
+      let resolvedStoreId = rawStoreId;
+      if (!resolvedStoreId || resolvedStoreId === 'STORE_CASH' || resolvedStoreId === 'central') {
+        resolvedStoreId = centralStore?.id || 'main-warehouse';
+      }
+
+      const storeCheck = await prisma.store.findUnique({ where: { id: resolvedStoreId } });
+      if (!storeCheck) {
+        resolvedStoreId = centralStore?.id || 'main-warehouse';
+      }
+
       if (!resolvedStoreId) {
         res.status(400).json({ message: 'Центральная касса не найдена' });
         return;

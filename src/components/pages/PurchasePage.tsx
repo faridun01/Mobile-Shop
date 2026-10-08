@@ -20,6 +20,7 @@ import { ReceiptPreviewModal } from '../purchase/ReceiptPreviewModal';
 import { InvoiceDetailsModal } from '../purchase/InvoiceDetailsModal';
 import { PurchaseHistoryList } from '../purchase/PurchaseHistoryList';
 import { NewPurchaseForm } from '../purchase/NewPurchaseForm';
+import { ConfirmDialog } from '../ui/ConfirmDialog';
 
 export const PurchasePage: React.FC = () => {
   const dataRefreshRevision = useDataRefreshRevision();
@@ -321,14 +322,20 @@ export const PurchasePage: React.FC = () => {
     return res;
   };
 
-  const handleDeleteInvoiceModal = async (id: string) => {
-    if (isSubmitting) return;
-    if (!window.confirm('Вы действительно хотите удалить эту накладную и все её незапроданные устройства?')) return;
+  const [deletingInvoiceId, setDeletingInvoiceId] = useState<string | null>(null);
+
+  const handleDeleteInvoiceModal = (id: string) => {
+    setDeletingInvoiceId(id);
+  };
+
+  const handleConfirmDeleteInvoice = async () => {
+    if (!deletingInvoiceId || isSubmitting) return;
     setIsSubmitting(true);
     try {
-      const res = await deleteSupplierInvoice(id);
+      const res = await deleteSupplierInvoice(deletingInvoiceId);
       if (res.success) {
         setSelectedInvoiceId(null);
+        setDeletingInvoiceId(null);
         setStatusMessage({ type: 'success', text: 'Накладная успешно удалена!' });
       } else {
         setStatusMessage({ type: 'error', text: res.message || 'Ошибка удаления накладной' });
@@ -695,6 +702,19 @@ export const PurchasePage: React.FC = () => {
         onError={(msg) => {
           setStatusMessage({ type: 'error', text: msg });
         }}
+      />
+
+      {/* Красивый диалог подтверждения удаления накладной */}
+      <ConfirmDialog
+        open={Boolean(deletingInvoiceId)}
+        title="Удалить накладную прихода?"
+        message="Вы действительно хотите удалить эту накладную и все её незапроданные устройства? Это действие необратимо."
+        confirmLabel="Удалить накладную"
+        cancelLabel="Отмена"
+        tone="danger"
+        loading={isSubmitting}
+        onConfirm={handleConfirmDeleteInvoice}
+        onCancel={() => setDeletingInvoiceId(null)}
       />
     </>
   );

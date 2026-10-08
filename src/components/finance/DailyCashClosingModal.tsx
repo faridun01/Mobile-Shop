@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Dialog } from '../ui/Dialog';
+import { ConfirmDialog } from '../ui/ConfirmDialog';
 import { Button } from '../ui/Button';
 import { Badge } from '../ui/Badge';
 import { FormField } from '../ui/FormField';
@@ -255,11 +256,15 @@ export const DailyCashClosingModal: React.FC<DailyCashClosingModalProps> = ({
     }
   };
 
-  const handleReopenClosing = async () => {
+  const [isReopenConfirmOpen, setIsReopenConfirmOpen] = useState(false);
+
+  const handleReopenClosing = () => {
     if (!summary?.closing?.id) return;
-    if (!window.confirm('Переоткрыть смену? Текущий Z-отчёт будет отменён, и вы сможете ввести фактическую сумму с расхождением заново.')) {
-      return;
-    }
+    setIsReopenConfirmOpen(true);
+  };
+
+  const handleConfirmReopen = async () => {
+    if (!summary?.closing?.id) return;
     setReopening(true);
     setError(null);
     try {
@@ -267,6 +272,7 @@ export const DailyCashClosingModal: React.FC<DailyCashClosingModalProps> = ({
         method: 'DELETE',
       });
       soundEffects.playAddToCartSuccess();
+      setIsReopenConfirmOpen(false);
       await fetchSummary();
     } catch (err: any) {
       setError(err?.message || 'Не удалось переоткрыть смену');
@@ -276,7 +282,8 @@ export const DailyCashClosingModal: React.FC<DailyCashClosingModalProps> = ({
   };
 
   return (
-    <Dialog
+    <>
+      <Dialog
       open={isOpen}
       onClose={onClose}
       title={isCentralCashForbidden ? 'Кассовая смена' : summary?.alreadyClosed ? 'Z-отчёт смены' : currentUser?.role === 'ADMIN' ? 'Кассовая смена' : 'Закрытие смены (Z-отчёт)'}
@@ -672,5 +679,28 @@ export const DailyCashClosingModal: React.FC<DailyCashClosingModalProps> = ({
         </div>
       ) : null}
     </Dialog>
+
+    {/* Красивый диалог подтверждения переоткрытия смены */}
+    <ConfirmDialog
+      open={isReopenConfirmOpen}
+      title="Переоткрыть смену?"
+      message={
+        <div className="space-y-1.5">
+          <p className="font-semibold text-fg">
+            Текущий Z-отчёт будет отменён.
+          </p>
+          <p className="text-xs text-fg-subtle">
+            Вы сможете повторно ввести фактическую сумму наличных в кассе и зафиксировать расхождение заново.
+          </p>
+        </div>
+      }
+      confirmLabel="Да, переоткрыть смену"
+      cancelLabel="Отмена"
+      tone="danger"
+      loading={reopening}
+      onConfirm={handleConfirmReopen}
+      onCancel={() => setIsReopenConfirmOpen(false)}
+    />
+    </>
   );
 };

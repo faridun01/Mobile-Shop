@@ -699,11 +699,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const loadedModules = useRef(new Set<() => Promise<unknown>>());
   const pendingModules = useRef(new Map<() => Promise<unknown>, Promise<unknown>>());
   const pageFetchers = useMemo(() => ({
+    stores: fetchStores, users: fetchUsers,
     sales: fetchSales, transfers: fetchTransfers, repairs: fetchRepairs,
     suppliers: fetchSuppliers, invoices: fetchInvoices, supplierInvoices: fetchInvoices,
     bonuses: fetchBonuses, supplierBonuses: fetchBonuses, expenses: fetchExpenses,
     owners: fetchOwners, ownerTransactions: fetchOwnerTransactions, auditLogs: fetchAuditLogs,
-  }), [fetchSales, fetchTransfers, fetchRepairs, fetchSuppliers, fetchInvoices, fetchBonuses, fetchExpenses, fetchOwners, fetchOwnerTransactions, fetchAuditLogs]);
+  }), [fetchStores, fetchUsers, fetchSales, fetchTransfers, fetchRepairs, fetchSuppliers, fetchInvoices, fetchBonuses, fetchExpenses, fetchOwners, fetchOwnerTransactions, fetchAuditLogs]);
 
   useLayoutEffect(() => {
     loadedModules.current.clear();
@@ -1267,9 +1268,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const paySupplier: AppContextType['paySupplier'] = async ({ supplierId, amountUsd, storeId, sourceAccountId, note }) => {
-    const centralStore = stores.find((s) => s.isMainWarehouse) || stores[0];
-    const resolvedStoreId = storeId || sourceAccountId || centralStore?.id;
-    if (!resolvedStoreId) return { success: false, message: 'Центральная касса не найдена' };
+    let resolvedStoreId = (typeof storeId === 'string' && storeId.trim())
+      || (typeof sourceAccountId === 'string' && sourceAccountId.trim())
+      || undefined;
+    if (!resolvedStoreId || resolvedStoreId === 'STORE_CASH' || resolvedStoreId === 'central') {
+      const centralStore = stores.find((s) => s.isMainWarehouse) || stores.find((s) => s.id === 'main-warehouse') || stores[0];
+      resolvedStoreId = centralStore?.id || 'main-warehouse';
+    }
     try {
       await apiClient(`/suppliers/${supplierId}/payments`, {
         method: 'POST',
@@ -1289,9 +1294,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const paySupplierInvoice: AppContextType['paySupplierInvoice'] = async ({ invoiceId, amountUsd, storeId, sourceAccountId }) => {
-    const centralStore = stores.find((s) => s.isMainWarehouse) || stores[0];
-    const resolvedStoreId = storeId || sourceAccountId || centralStore?.id;
-    if (!resolvedStoreId) return { success: false, message: 'Центральная касса не найдена' };
+    let resolvedStoreId = (typeof storeId === 'string' && storeId.trim())
+      || (typeof sourceAccountId === 'string' && sourceAccountId.trim())
+      || undefined;
+    if (!resolvedStoreId || resolvedStoreId === 'STORE_CASH' || resolvedStoreId === 'central') {
+      const centralStore = stores.find((s) => s.isMainWarehouse) || stores.find((s) => s.id === 'main-warehouse') || stores[0];
+      resolvedStoreId = centralStore?.id || 'main-warehouse';
+    }
     try {
       await apiClient(`/supplier-invoices/${invoiceId}/payments`, {
         method: 'POST',

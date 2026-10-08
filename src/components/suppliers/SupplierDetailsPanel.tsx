@@ -68,7 +68,7 @@ export const SupplierDetailsPanel: React.FC<SupplierDetailsPanelProps> = ({
                   className="px-4 py-2 rounded-xl bg-accent hover:bg-accent-strong disabled:opacity-40 disabled:cursor-not-allowed text-xs font-semibold text-accent-fg shadow-xs transition-colors flex items-center space-x-1.5 cursor-pointer"
                 >
                   <DollarSign className="w-4 h-4" />
-                  <span>Погасить долг (FIFO)</span>
+                  <span>Погасить долг</span>
                 </button>
                 <button
                   type="button"
@@ -240,7 +240,7 @@ export const SupplierDetailsPanel: React.FC<SupplierDetailsPanelProps> = ({
               className="w-full py-2.5 rounded-xl bg-accent hover:bg-accent-strong disabled:opacity-40 disabled:cursor-not-allowed text-xs font-semibold text-accent-fg shadow-xs flex items-center justify-center space-x-1.5 transition-colors cursor-pointer"
             >
               <DollarSign className="w-4 h-4" />
-              <span>Погасить долг поставщику (FIFO)</span>
+              <span>Погасить долг</span>
             </button>
           </div>
 

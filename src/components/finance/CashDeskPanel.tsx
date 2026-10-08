@@ -13,6 +13,7 @@ import {
   Store as StoreIcon,
   Smartphone,
   Layers,
+  ArrowUpDown,
 } from 'lucide-react';
 import { apiClient } from '../../api/client';
 import { formatMoney } from '../../utils/money';
@@ -83,6 +84,10 @@ export const CashDeskPanel: React.FC<CashDeskPanelProps> = ({ storeId }) => {
     return () => window.removeEventListener('business-data-changed', handleUpdate);
   }, [loadSummary]);
 
+  // Sorting states
+  const [debtorSort, setDebtorSort] = useState<'DEBT_DESC' | 'DEBT_ASC' | 'NAME_ASC' | 'NAME_DESC'>('DEBT_DESC');
+  const [supplierSort, setSupplierSort] = useState<'DEBT_DESC' | 'DEBT_ASC' | 'NAME_ASC' | 'NAME_DESC'>('DEBT_DESC');
+
   // Filter debtors by search
   const filteredDebtors = useMemo(() => {
     if (!data?.customers?.debtors) return [];
@@ -96,6 +101,24 @@ export const CashDeskPanel: React.FC<CashDeskPanelProps> = ({ storeId }) => {
     );
   }, [data?.customers?.debtors, customerSearch]);
 
+  // Sort debtors
+  const sortedDebtors = useMemo(() => {
+    return [...filteredDebtors].sort((a, b) => {
+      switch (debtorSort) {
+        case 'DEBT_DESC':
+          return (b.totalDebtTjs || 0) - (a.totalDebtTjs || 0);
+        case 'DEBT_ASC':
+          return (a.totalDebtTjs || 0) - (b.totalDebtTjs || 0);
+        case 'NAME_ASC':
+          return a.name.localeCompare(b.name, 'ru');
+        case 'NAME_DESC':
+          return b.name.localeCompare(a.name, 'ru');
+        default:
+          return 0;
+      }
+    });
+  }, [filteredDebtors, debtorSort]);
+
   // Filter suppliers by search
   const filteredSuppliers = useMemo(() => {
     if (!data?.suppliers?.suppliers) return [];
@@ -107,6 +130,24 @@ export const CashDeskPanel: React.FC<CashDeskPanelProps> = ({ storeId }) => {
         (s.phone && s.phone.toLowerCase().includes(q))
     );
   }, [data?.suppliers?.suppliers, supplierSearch]);
+
+  // Sort suppliers
+  const sortedSuppliers = useMemo(() => {
+    return [...filteredSuppliers].sort((a, b) => {
+      switch (supplierSort) {
+        case 'DEBT_DESC':
+          return (b.totalDebtUsd || 0) - (a.totalDebtUsd || 0);
+        case 'DEBT_ASC':
+          return (a.totalDebtUsd || 0) - (b.totalDebtUsd || 0);
+        case 'NAME_ASC':
+          return a.name.localeCompare(b.name, 'ru');
+        case 'NAME_DESC':
+          return b.name.localeCompare(a.name, 'ru');
+        default:
+          return 0;
+      }
+    });
+  }, [filteredSuppliers, supplierSort]);
 
 
   // Open customer payment modal
@@ -156,8 +197,8 @@ export const CashDeskPanel: React.FC<CashDeskPanelProps> = ({ storeId }) => {
   const handleOpenSupplierPaymentModal = (s: any) => {
     setPaymentSupplier(s);
     setSupplierPaymentAmountUsd(s.totalDebtUsd.toString());
-    const centralStore = stores.find((st) => st.isMainWarehouse)?.id || stores[0]?.id || '';
-    setSupplierPaymentStoreId(selectedStoreId !== 'all' ? selectedStoreId : centralStore);
+    const centralStore = stores.find((st) => st.isMainWarehouse)?.id || stores.find((st) => st.id === 'main-warehouse')?.id || 'main-warehouse';
+    setSupplierPaymentStoreId(centralStore);
     setSupplierPaymentNote(`Оплата поставщику ${s.name}`);
     setIsSupplierPaymentModalOpen(true);
   };
@@ -405,8 +446,8 @@ export const CashDeskPanel: React.FC<CashDeskPanelProps> = ({ storeId }) => {
               </div>
             </div>
 
-            <div className="flex items-center gap-2">
-              <div className="relative w-full sm:w-48">
+            <div className="flex items-center gap-2 flex-wrap">
+              <div className="relative w-full sm:w-44">
                 <Search className="w-3.5 h-3.5 text-fg-subtle absolute left-2.5 top-2.5" />
                 <input
                   type="text"
@@ -416,6 +457,23 @@ export const CashDeskPanel: React.FC<CashDeskPanelProps> = ({ storeId }) => {
                   className="w-full h-8 bg-surface-raised border border-border rounded-xl pl-8 pr-3 text-xs text-fg focus:outline-none focus:border-accent"
                 />
               </div>
+
+              {/* Sorting selector */}
+              <div className="flex items-center gap-1 bg-surface-raised border border-border rounded-xl px-2 h-8 shrink-0">
+                <ArrowUpDown className="w-3 h-3 text-accent shrink-0" />
+                <select
+                  value={debtorSort}
+                  onChange={(e) => setDebtorSort(e.target.value as any)}
+                  className="bg-transparent text-[11px] font-semibold text-fg focus:outline-none cursor-pointer"
+                  title="Сортировка должников"
+                >
+                  <option value="DEBT_DESC">Долг ↓</option>
+                  <option value="DEBT_ASC">Долг ↑</option>
+                  <option value="NAME_ASC">Имя (А-Я)</option>
+                  <option value="NAME_DESC">Имя (Я-А)</option>
+                </select>
+              </div>
+
               <button
                 type="button"
                 onClick={() => navigate('/customers')}
@@ -429,12 +487,12 @@ export const CashDeskPanel: React.FC<CashDeskPanelProps> = ({ storeId }) => {
           </div>
 
           <div className="divide-y divide-border/60 overflow-y-auto max-h-96 mt-2 flex-1">
-            {filteredDebtors.length === 0 ? (
+            {sortedDebtors.length === 0 ? (
               <div className="py-8 text-center text-xs text-fg-subtle">
                 {customerSearch ? 'Должники по запросу не найдены' : 'Клиентов с активными долгами нет'}
               </div>
             ) : (
-              filteredDebtors.map((c) => (
+              sortedDebtors.map((c) => (
                 <div
                   key={c.id}
                   className="py-2.5 sm:py-3 flex items-center justify-between gap-3 text-xs hover:bg-surface-raised/30 transition-colors px-1"
@@ -494,8 +552,8 @@ export const CashDeskPanel: React.FC<CashDeskPanelProps> = ({ storeId }) => {
               </div>
             </div>
 
-            <div className="flex items-center gap-2">
-              <div className="relative w-full sm:w-48">
+            <div className="flex items-center gap-2 flex-wrap">
+              <div className="relative w-full sm:w-44">
                 <Search className="w-3.5 h-3.5 text-fg-subtle absolute left-2.5 top-2.5" />
                 <input
                   type="text"
@@ -505,6 +563,23 @@ export const CashDeskPanel: React.FC<CashDeskPanelProps> = ({ storeId }) => {
                   className="w-full h-8 bg-surface-raised border border-border rounded-xl pl-8 pr-3 text-xs text-fg focus:outline-none focus:border-accent"
                 />
               </div>
+
+              {/* Sorting selector */}
+              <div className="flex items-center gap-1 bg-surface-raised border border-border rounded-xl px-2 h-8 shrink-0">
+                <ArrowUpDown className="w-3 h-3 text-accent shrink-0" />
+                <select
+                  value={supplierSort}
+                  onChange={(e) => setSupplierSort(e.target.value as any)}
+                  className="bg-transparent text-[11px] font-semibold text-fg focus:outline-none cursor-pointer"
+                  title="Сортировка поставщиков"
+                >
+                  <option value="DEBT_DESC">Долг ↓</option>
+                  <option value="DEBT_ASC">Долг ↑</option>
+                  <option value="NAME_ASC">Имя (А-Я)</option>
+                  <option value="NAME_DESC">Имя (Я-А)</option>
+                </select>
+              </div>
+
               <button
                 type="button"
                 onClick={() => navigate('/suppliers')}
@@ -518,12 +593,12 @@ export const CashDeskPanel: React.FC<CashDeskPanelProps> = ({ storeId }) => {
           </div>
 
           <div className="divide-y divide-border/60 overflow-y-auto max-h-96 mt-2 flex-1">
-            {filteredSuppliers.length === 0 ? (
+            {sortedSuppliers.length === 0 ? (
               <div className="py-8 text-center text-xs text-fg-subtle">
                 {supplierSearch ? 'Поставщики по запросу не найдены' : 'Задолженностей перед поставщиками нет'}
               </div>
             ) : (
-              filteredSuppliers.map((s) => (
+              sortedSuppliers.map((s) => (
                 <div
                   key={s.id}
                   className="py-2.5 sm:py-3 flex items-center justify-between gap-3 text-xs hover:bg-surface-raised/30 transition-colors px-1"
@@ -688,7 +763,7 @@ export const CashDeskPanel: React.FC<CashDeskPanelProps> = ({ storeId }) => {
 
           <div>
             <label className="block text-xs font-semibold text-fg mb-1">
-              Касса списания (откуда списываются деньги) <span className="text-danger">*</span>
+              Касса списания <span className="text-danger">*</span>
             </label>
             <select
               value={supplierPaymentStoreId}

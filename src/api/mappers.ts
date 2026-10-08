@@ -342,7 +342,7 @@ export function mapStore(s: any): Store {
     name: s.name,
     address: s.address ?? undefined,
     isMainWarehouse: s.isMainWarehouse,
-    cashBalanceUsd: s.cashBalanceUsd,
+    cashBalanceUsd: Number(s.cashBalanceUsd) || 0,
     active: s.active,
   };
 }

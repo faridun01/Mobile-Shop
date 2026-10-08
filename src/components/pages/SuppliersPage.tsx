@@ -120,11 +120,15 @@ export const SuppliersPage: React.FC = () => {
   // Central Cash: all supplier payments strictly draw from the central cash register
   const centralCashStore = useMemo(() => {
     const warehouses = stores.filter(s => s.isMainWarehouse);
-    if (warehouses.length === 0) return stores[0] || null;
-    return warehouses.reduce(
-      (best, cur) => (cur.cashBalanceUsd || 0) > (best.cashBalanceUsd || 0) ? cur : best,
-      warehouses[0]
-    );
+    if (warehouses.length > 0) {
+      return warehouses.reduce(
+        (best, cur) => (Number(cur.cashBalanceUsd) || 0) > (Number(best.cashBalanceUsd) || 0) ? cur : best,
+        warehouses[0]
+      );
+    }
+    const mainWh = stores.find(s => s.id === 'main-warehouse');
+    if (mainWh) return mainWh;
+    return stores[0] || null;
   }, [stores]);
 
   const rateNumber = todayRate?.rate || 0;

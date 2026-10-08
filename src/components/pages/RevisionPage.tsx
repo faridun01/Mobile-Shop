@@ -6,6 +6,7 @@ import { soundEffects } from '../../utils/sound';
 import { StatusBanner, StatusMessage } from '../ui/StatusBanner';
 import { Button } from '../ui/Button';
 import { Dialog } from '../ui/Dialog';
+import { ConfirmDialog } from '../ui/ConfirmDialog';
 import { formatUserName } from '../../utils/formatUser';
 import {
   ClipboardCheck,
@@ -87,6 +88,8 @@ export const RevisionPage: React.FC = () => {
 
   // Finish modal
   const [isSummaryModalOpen, setIsSummaryModalOpen] = useState(false);
+  // Reset confirmation dialog modal
+  const [isResetConfirmOpen, setIsResetConfirmOpen] = useState(false);
 
   // Reset revision session when store changes
   React.useEffect(() => {
@@ -166,12 +169,20 @@ export const RevisionPage: React.FC = () => {
     });
   };
 
-  // Reset revision session
-  const handleResetRevision = () => {
-    if (window.confirm('Сбросить отметки сверки и начать заново?')) {
-      setCheckedImeis(new Set());
-      setStatus({ tone: 'info', text: 'Сверка сброшена.' });
+  // Open reset confirm dialog
+  const handleOpenResetRevision = () => {
+    if (checkedImeis.size === 0) {
+      setStatus({ tone: 'info', text: 'Сверка ещё не начата (нет отметок для сброса).' });
+      return;
     }
+    setIsResetConfirmOpen(true);
+  };
+
+  // Perform reset
+  const handleConfirmReset = () => {
+    setCheckedImeis(new Set());
+    setIsResetConfirmOpen(false);
+    setStatus({ tone: 'info', text: 'Сверка сброшена.' });
   };
 
   // Grouped models list for display
@@ -302,7 +313,7 @@ export const RevisionPage: React.FC = () => {
               type="button"
               variant="secondary"
               size="sm"
-              onClick={handleResetRevision}
+              onClick={handleOpenResetRevision}
               leftIcon={RotateCcw}
               className="h-9 px-2.5 text-xs text-fg-subtle hover:text-fg cursor-pointer"
               title="Сбросить отметки текущей сверки"
@@ -795,6 +806,28 @@ export const RevisionPage: React.FC = () => {
           ) : null}
         </div>
       </Dialog>
+
+      {/* Красивый диалог подтверждения сброса сверки вместо системного alert */}
+      <ConfirmDialog
+        open={isResetConfirmOpen}
+        title="Сбросить отметки сверки?"
+        message={
+          <div className="space-y-1.5">
+            <p className="font-semibold text-fg">
+              Вы уверены, что хотите сбросить текущую сверку для магазина{' '}
+              <span className="text-accent underline font-bold">«{currentStore?.name || 'магазина'}»</span>?
+            </p>
+            <p className="text-xs text-fg-subtle">
+              Все отмеченные позиции ({checkedCount} из {totalCount} шт.) будут очищены, и сверка начнётся заново.
+            </p>
+          </div>
+        }
+        confirmLabel="Сбросить и начать заново"
+        cancelLabel="Отмена"
+        tone="danger"
+        onConfirm={handleConfirmReset}
+        onCancel={() => setIsResetConfirmOpen(false)}
+      />
     </div>
   );
 };
