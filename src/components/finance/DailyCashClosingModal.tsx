@@ -439,7 +439,7 @@ export const DailyCashClosingModal: React.FC<DailyCashClosingModalProps> = ({
                 <div className="p-3 rounded-xl bg-surface-raised border border-border">
                   <span className="text-[10px] uppercase font-bold text-fg-subtle block">Расхождение</span>
                   <p className={`text-lg font-bold font-mono mt-1 ${Number(summary.closing?.differenceTjs) < 0 ? 'text-danger' : Number(summary.closing?.differenceTjs) > 0 ? 'text-info' : 'text-success'}`}>
-                    {Number(summary.closing?.differenceTjs) === 0 ? '0.00 (Идеально)' : `${Number(summary.closing?.differenceTjs) > 0 ? '+' : ''}${formatTjs(summary.closing?.differenceTjs)}`}
+                    {Number(summary.closing?.differenceTjs) === 0 ? '0.00 TJS' : `${Number(summary.closing?.differenceTjs) > 0 ? '+' : ''}${formatTjs(summary.closing?.differenceTjs)}`}
                   </p>
                 </div>
               </div>
@@ -467,7 +467,7 @@ export const DailyCashClosingModal: React.FC<DailyCashClosingModalProps> = ({
                 )}
                 <div className="pt-2.5 border-t border-border/80">
                   <p className="text-xs text-fg-subtle">
-                    Смена в магазине ещё не закрыта. Закрывать смену и сдавать Z-отчёт должен продавец/кассир магазина.
+                    Смена в магазине ещё не закрыта продавцом.
                   </p>
                 </div>
               </div>
@@ -498,7 +498,7 @@ export const DailyCashClosingModal: React.FC<DailyCashClosingModalProps> = ({
                   className="w-full py-3 px-3 sm:px-4 rounded-xl bg-accent text-accent-fg font-bold text-xs sm:text-sm flex items-center justify-center gap-2 hover:opacity-90 active:scale-[0.99] transition-all cursor-pointer shadow-sm select-none min-w-0"
                 >
                   <CheckCircle2 className="w-5 h-5 shrink-0" />
-                  <span className="truncate">Всё сходится ({formatMoney(expectedTjs)} TJS)</span>
+                  <span className="truncate">Подтвердить сумму ({formatMoney(expectedTjs)} TJS)</span>
                 </button>
               </div>
 
@@ -524,7 +524,7 @@ export const DailyCashClosingModal: React.FC<DailyCashClosingModalProps> = ({
                     inputMode="decimal"
                     value={actualCashTjs}
                     onChange={(e) => setActualCashTjs(e.target.value)}
-                    placeholder={`Введите сумму, если не ${expectedTjs.toFixed(2)}`}
+                    placeholder="0.00"
                     className="w-full h-11 px-3 pr-12 rounded-xl bg-surface-raised border border-border font-mono text-base font-bold text-fg placeholder:text-fg-subtle/50 placeholder:font-normal placeholder:text-xs focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent"
                   />
                   <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold font-mono text-fg-subtle">
@@ -540,7 +540,7 @@ export const DailyCashClosingModal: React.FC<DailyCashClosingModalProps> = ({
                       inputMode="decimal"
                       value={actualCashUsd}
                       onChange={(e) => setActualCashUsd(e.target.value)}
-                      placeholder={`USD (ожидалось: ${expectedUsd.toFixed(2)})`}
+                      placeholder="0.00"
                       className="w-full h-10 px-3 pr-12 rounded-xl bg-surface-raised border border-border font-mono text-sm text-fg placeholder:text-fg-subtle/50 focus:outline-none focus:border-accent"
                     />
                     <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold font-mono text-fg-subtle">
@@ -560,20 +560,21 @@ export const DailyCashClosingModal: React.FC<DailyCashClosingModalProps> = ({
                 {/* LIVE DISCREPANCY STATUS */}
                 {parsedActualTjs !== null && (
                   <div className="pt-1">
-                    {diffTjs === 0 && (diffUsd === null || diffUsd === 0) ? (
-                      <div className="p-2.5 rounded-lg bg-success/15 border border-success/30 flex items-center gap-2 text-success text-xs font-bold">
-                        <CheckCircle2 className="w-4 h-4 shrink-0" />
-                        <span>Касса сошлась идеально (0.00 TJS)</span>
-                      </div>
-                    ) : diffTjs !== null && diffTjs < 0 ? (
-                      <div className="p-2.5 rounded-lg bg-danger/15 border border-danger/30 flex items-center gap-2 text-danger text-xs font-bold">
-                        <AlertTriangle className="w-4 h-4 shrink-0" />
-                        <span>Недостача в кассе: -{formatMoney(Math.abs(diffTjs))} TJS</span>
+                    {diffTjs === 0 && (diffUsd === null || diffUsd === 0) ? null : diffTjs !== null && diffTjs < 0 ? (
+                      <div className="p-2.5 rounded-lg bg-danger/15 border border-danger/30 flex items-center justify-between text-danger text-xs font-bold">
+                        <div className="flex items-center gap-2">
+                          <AlertTriangle className="w-4 h-4 shrink-0" />
+                          <span>Недостача</span>
+                        </div>
+                        <span className="font-mono">-{formatMoney(Math.abs(diffTjs))} TJS</span>
                       </div>
                     ) : diffTjs !== null && diffTjs > 0 ? (
-                      <div className="p-2.5 rounded-lg bg-info/15 border border-info/30 flex items-center gap-2 text-info text-xs font-bold">
-                        <AlertCircle className="w-4 h-4 shrink-0" />
-                        <span>Излишек в кассе: +{formatMoney(diffTjs)} TJS</span>
+                      <div className="p-2.5 rounded-lg bg-info/15 border border-info/30 flex items-center justify-between text-info text-xs font-bold">
+                        <div className="flex items-center gap-2">
+                          <AlertCircle className="w-4 h-4 shrink-0" />
+                          <span>Излишек</span>
+                        </div>
+                        <span className="font-mono">+{formatMoney(diffTjs)} TJS</span>
                       </div>
                     ) : null}
                   </div>

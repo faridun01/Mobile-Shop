@@ -52,6 +52,7 @@ export interface TransferDeviceGridProps {
   availableBrands: { brand: string; count: number }[];
   onlySelected: boolean;
   setOnlySelected: (val: boolean) => void;
+  onToggleBatchDevices?: (ids: string[], select: boolean) => void;
 }
 
 export interface TransferBottomBarProps {

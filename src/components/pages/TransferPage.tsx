@@ -268,6 +268,17 @@ export const TransferPage: React.FC = () => {
     );
   };
 
+  const handleToggleBatchDevices = (ids: string[], select: boolean) => {
+    setSelectedDeviceIds(prev => {
+      if (select) {
+        return Array.from(new Set([...prev, ...ids]));
+      } else {
+        const idSet = new Set(ids);
+        return prev.filter(item => !idSet.has(item));
+      }
+    });
+  };
+
   const handleSelectAllFiltered = () => {
     const allFilteredIds = availableDevicesAtFromLocation.map(d => d.id);
     setSelectedDeviceIds(prev => Array.from(new Set([...prev, ...allFilteredIds])));
@@ -539,6 +550,7 @@ export const TransferPage: React.FC = () => {
               availableBrands={availableBrands}
               onlySelected={onlySelected}
               setOnlySelected={setOnlySelected}
+              onToggleBatchDevices={handleToggleBatchDevices}
             />
 
             <TransferBottomBar

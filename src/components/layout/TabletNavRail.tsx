@@ -29,6 +29,7 @@ import {
   Store,
 } from 'lucide-react';
 import { NAV_PAGE_ROUTES } from '../../router/navRoutes';
+import { useNavUsage, sortNavItemsByUsage, recordNavVisit } from '../../utils/navUsage';
 
 export const TabletNavRail: React.FC = () => {
   const navigate = useNavigate();
@@ -138,6 +139,11 @@ export const TabletNavRail: React.FC = () => {
     ];
   }, [isSeller, isPartner, isCentralCashMode]);
 
+  const navUsage = useNavUsage();
+  const sortedVisibleItems = useMemo(() => {
+    return sortNavItemsByUsage(visibleItems, navUsage);
+  }, [visibleItems, navUsage]);
+
   return (
     <aside className="hidden md:flex lg:hidden flex-col w-20 border-r border-border bg-surface text-fg-muted select-none shrink-0 h-full sticky top-0 pb-3 items-center justify-between z-30">
       <div className="w-full shrink-0" style={{ height: 'var(--sa-top)' }} />
@@ -188,7 +194,7 @@ export const TabletNavRail: React.FC = () => {
       </div>
 
       <nav className="flex-1 overflow-y-auto scrollbar-none py-3 space-y-1.5 w-full px-2 flex flex-col items-center">
-        {visibleItems.map((item) => {
+        {sortedVisibleItems.map((item) => {
           const Icon = item.icon;
           const routePath = NAV_PAGE_ROUTES[item.id] || '/sale';
           const isActive = location.pathname === routePath || (location.pathname === '/' && item.id === (isStoreScoped ? 'SALE' : 'REPORTS'));
@@ -197,6 +203,7 @@ export const TabletNavRail: React.FC = () => {
             <button
               key={item.id}
               onClick={() => {
+                recordNavVisit(item.id);
                 setActivePage(item.id);
                 navigate(routePath);
               }}

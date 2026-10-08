@@ -26,7 +26,6 @@ import { useAppFields } from '../../context/AppContext';
 
 interface CashDeskPanelProps {
   storeId?: string | null;
-  onOpenExpenseModal?: () => void;
 }
 
 export const CashDeskPanel: React.FC<CashDeskPanelProps> = ({ storeId }) => {

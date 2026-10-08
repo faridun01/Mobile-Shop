@@ -2,8 +2,13 @@ import { D } from '../../common/decimal';
 import type { Express } from 'express';
 import { authenticateJwt, requireRoles, type AuthenticatedRequest } from '../../auth/auth.middleware';
 import { prisma } from '../../prisma/prisma.service';
-import { OwnersService } from './owners.service';
+import { OwnersService, type OwnerTxRestriction } from './owners.service';
 import { RealtimeSyncGateway } from '../../websocket/websocket.gateway';
+
+function partnerRestriction(req: AuthenticatedRequest): OwnerTxRestriction | undefined {
+  if (req.user!.role !== 'PARTNER') return undefined;
+  return { userId: req.user!.userId, storeId: req.user!.storeId ?? null };
+}
 
 export function registerOwnerRoutes(app: Express) {
   app.get('/api/owners', authenticateJwt, requireRoles('ADMIN'), async (_req, res, next) => {
@@ -45,7 +50,9 @@ export function registerOwnerRoutes(app: Express) {
       // pass it keep today's full-history behavior.
       const cursor = typeof req.query.cursor === 'string' ? req.query.cursor : undefined;
       const limit = req.query.limit !== undefined ? Math.min(Math.max(Number(req.query.limit) || 0, 1), 5000) : undefined;
-      res.json(await prisma.ownerTransaction.findMany({ orderBy: [{ createdAt: 'desc' }, { id: 'desc' }], ...(cursor ? { skip: 1, cursor: { id: cursor } } : {}), ...(limit ? { take: limit } : {}) }));
+      // A partner sees only their own capital moves, never the other owners'.
+      const where = req.user!.role === 'PARTNER' ? { owner: { userId: req.user!.userId } } : {};
+      res.json(await prisma.ownerTransaction.findMany({ where, orderBy: [{ createdAt: 'desc' }, { id: 'desc' }], ...(cursor ? { skip: 1, cursor: { id: cursor } } : {}), ...(limit ? { take: limit } : {}) }));
     } catch (error) {
       next(error);
     }
@@ -54,7 +61,7 @@ export function registerOwnerRoutes(app: Express) {
   app.post('/api/owners/:id/investment', authenticateJwt, requireRoles('ADMIN', 'PARTNER'), async (req: AuthenticatedRequest, res, next) => {
     try {
       const { amountUsd, destination, note } = req.body ?? {};
-      const owner = await OwnersService.investment(req.params.id, amountUsd, destination ?? 'Главный счет', note, req.user!.userId);
+      const owner = await OwnersService.investment(req.params.id, amountUsd, destination ?? 'Главный счет', note, req.user!.userId, partnerRestriction(req));
       RealtimeSyncGateway.broadcast('OWNER_TX', { ownerId: owner.id });
       res.json(owner);
     } catch (error) {
@@ -65,7 +72,7 @@ export function registerOwnerRoutes(app: Express) {
   app.post('/api/owners/:id/withdrawal', authenticateJwt, requireRoles('ADMIN', 'PARTNER'), async (req: AuthenticatedRequest, res, next) => {
     try {
       const { amountUsd, source, note } = req.body ?? {};
-      const owner = await OwnersService.withdrawal(req.params.id, amountUsd, source ?? 'Главный счет', note, req.user!.userId);
+      const owner = await OwnersService.withdrawal(req.params.id, amountUsd, source ?? 'Главный счет', note, req.user!.userId, partnerRestriction(req));
       RealtimeSyncGateway.broadcast('OWNER_TX', { ownerId: owner.id });
       res.json(owner);
     } catch (error) {

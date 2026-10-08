@@ -3,11 +3,22 @@ import { prisma } from '../../prisma/prisma.service';
 import type { TransactionClient } from '../../prisma/prisma.service';
 import { resolveActor } from '../../common/actor';
 import { requireFiniteNumber, requirePositiveMoney, roundMoney } from '../../common/money';
-import { requireTodayRate, getRateForDate } from '../exchange-rate/exchange-rate.service';
+import { requireTodayRate } from '../exchange-rate/exchange-rate.service';
 import { getStoreCashAccount } from '../finance/account.service';
 import { postTransaction } from '../finance/financial-transaction.service';
 import { allocateOwnerProfit } from '../sales/profit';
 import { findAdminOwner } from '../finance/owner-allocations';
+
+/**
+ * A PARTNER may move only their own capital, and only through their own store's register
+ * or Central Cash. ADMIN calls pass no restriction.
+ */
+export interface OwnerTxRestriction {
+  userId: string;
+  storeId: string | null;
+}
+
+const forbidden = (message: string) => Object.assign(new Error(message), { statusCode: 403 });
 
 export class OwnersService {
   /**
@@ -28,25 +39,36 @@ export class OwnersService {
       if (byId) return byId;
       const byName = await tx.store.findFirst({ where: { name: storeIdentifier } });
       if (byName) return byName;
+      // An unknown store must never silently move money through Central Cash instead.
+      throw new Error(`Касса «${storeIdentifier}» не найдена`);
     }
     return OwnersService.getMainWarehouse(tx);
   }
 
-  public static async investment(ownerId: string, amountUsd: MoneyInput, destination: string, note: string | undefined, userId: string) {
+  private static assertAllowed(
+    owner: { userId: string | null },
+    targetStore: { id: string; isMainWarehouse: boolean },
+    restriction?: OwnerTxRestriction,
+  ) {
+    if (!restriction) return;
+    if (!owner.userId || owner.userId !== restriction.userId) {
+      throw forbidden('Партнёр может проводить операции только со своим капиталом');
+    }
+    if (!targetStore.isMainWarehouse && targetStore.id !== restriction.storeId) {
+      throw forbidden('Партнёр может использовать только кассу своего магазина или Центральную кассу');
+    }
+  }
+
+  public static async investment(ownerId: string, amountUsd: MoneyInput, destination: string, note: string | undefined, userId: string, restriction?: OwnerTxRestriction) {
     amountUsd = requirePositiveMoney(amountUsd, 'Сумма инвестиции');
     return prisma.$transaction(async (tx) => {
       const actor = await resolveActor(tx, userId);
-      let exchangeRate: any;
-      try {
-        exchangeRate = await requireTodayRate(tx);
-      } catch {
-        const fallback = await getRateForDate(new Date());
-        exchangeRate = fallback ? D(fallback) : D(10);
-      }
+      const exchangeRate = await requireTodayRate(tx);
       const owner = await tx.owner.findUnique({ where: { id: ownerId } });
       if (!owner) throw new Error('Владелец не найден');
 
       const targetStore = await OwnersService.resolveTargetStore(tx, destination);
+      OwnersService.assertAllowed(owner, targetStore, restriction);
       const cashAmountTjs = roundMoney(D(amountUsd).mul(exchangeRate));
       // The register is kept in USD, so owner money moves dollar for dollar — capital and cash never drift with the rate.
       await tx.store.update({ where: { id: targetStore.id }, data: { cashBalanceUsd: { increment: amountUsd } } });
@@ -85,23 +107,18 @@ export class OwnersService {
     }, { maxWait: 10000, timeout: 25000 });
   }
 
-  public static async withdrawal(ownerId: string, amountUsd: MoneyInput, source: string, note: string | undefined, userId: string) {
+  public static async withdrawal(ownerId: string, amountUsd: MoneyInput, source: string, note: string | undefined, userId: string, restriction?: OwnerTxRestriction) {
     amountUsd = requirePositiveMoney(amountUsd, 'Сумма изъятия');
     return prisma.$transaction(async (tx) => {
       const actor = await resolveActor(tx, userId);
-      let exchangeRate: any;
-      try {
-        exchangeRate = await requireTodayRate(tx);
-      } catch {
-        const fallback = await getRateForDate(new Date());
-        exchangeRate = fallback ? D(fallback) : D(10);
-      }
+      const exchangeRate = await requireTodayRate(tx);
       const owner = await tx.owner.findUnique({ where: { id: ownerId } });
       if (!owner) throw new Error('Владелец не найден');
+      const targetStore = await OwnersService.resolveTargetStore(tx, source);
+      OwnersService.assertAllowed(owner, targetStore, restriction);
       const guard = await tx.owner.updateMany({ where: { id: ownerId, capitalBalanceUsd: { gte: amountUsd } }, data: { capitalBalanceUsd: { decrement: amountUsd } } });
       if (guard.count !== 1) throw new Error('Сумма изъятия превышает текущий капитал');
 
-      const targetStore = await OwnersService.resolveTargetStore(tx, source);
       const cashAmountTjs = roundMoney(D(amountUsd).mul(exchangeRate));
       const cashGuard = await tx.store.updateMany({ where: { id: targetStore.id, cashBalanceUsd: { gte: amountUsd } }, data: { cashBalanceUsd: { decrement: amountUsd } } });
       if (!D(cashGuard.count).eq(1)) throw new Error(`В кассе («${targetStore.name}») недостаточно наличных для изъятия (в кассе $${targetStore.cashBalanceUsd}, требуется $${amountUsd})`);

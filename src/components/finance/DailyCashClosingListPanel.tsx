@@ -144,18 +144,16 @@ export const DailyCashClosingListPanel: React.FC<DailyCashClosingListPanelProps>
       {/* KPI Cards */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
         <div className="p-3 rounded-xl bg-surface border border-border space-y-1">
-          <span className="text-[11px] text-fg-subtle">Всего закрытий смен</span>
+          <span className="text-[11px] text-fg-subtle">Всего закрытий</span>
           <p className="text-xl font-bold font-mono text-fg">{stats.totalCount}</p>
-          <span className="text-[10px] text-fg-subtle">за период {month}</span>
         </div>
 
         <div className="p-3 rounded-xl bg-surface border border-border space-y-1">
           <span className="text-[11px] text-success flex items-center gap-1">
             <CheckCircle2 className="w-3.5 h-3.5" />
-            <span>Сошлось идеально</span>
+            <span>Без расхождений</span>
           </span>
           <p className="text-xl font-bold font-mono text-success">{stats.perfectCount}</p>
-          <span className="text-[10px] text-fg-subtle">без расхождений</span>
         </div>
 
         <div className="p-3 rounded-xl bg-surface border border-border space-y-1">
@@ -164,7 +162,6 @@ export const DailyCashClosingListPanel: React.FC<DailyCashClosingListPanelProps>
             <span>С расхождениями</span>
           </span>
           <p className="text-xl font-bold font-mono text-warning">{stats.discrepancyCount}</p>
-          <span className="text-[10px] text-fg-subtle">смен с недостачей/излишком</span>
         </div>
 
         <div className="p-3 rounded-xl bg-surface border border-border space-y-1">

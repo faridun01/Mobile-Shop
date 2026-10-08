@@ -262,18 +262,18 @@ export const CashReconciliationModal: React.FC<CashReconciliationModalProps> = (
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="p-3.5 sm:p-4 border-b border-border bg-surface-raised/40 flex items-center justify-between gap-3">
+        <div className="px-4 py-3 sm:px-5 sm:py-3.5 border-b border-border bg-surface-raised/40 flex items-center justify-between gap-3 shrink-0">
           <div className="flex items-center gap-2.5 min-w-0">
-            <div className="w-9 h-9 rounded-xl bg-accent/15 text-accent flex items-center justify-center shrink-0">
-              <FileSpreadsheet className="w-5 h-5" />
+            <div className="w-8 h-8 rounded-lg bg-accent/15 text-accent flex items-center justify-center shrink-0">
+              <FileSpreadsheet className="w-4 h-4" />
             </div>
             <div className="min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
                 <h3 className="text-sm sm:text-base font-bold text-fg truncate">
-                  Сверка с продажами: «{store.storeName}»
+                  Сверка кассы · {store.storeName.replace(/^[«"'\s]+|[»"'\s]+$/g, '')}
                 </h3>
                 {data?.period && (
-                  <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-accent/15 text-accent border border-accent/25">
+                  <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-accent/10 text-accent border border-accent/20">
                     {data.period.daysCount > 0
                       ? `${data.period.daysCount} дн. без инкассации`
                       : data.period.hoursCount > 0
@@ -282,17 +282,12 @@ export const CashReconciliationModal: React.FC<CashReconciliationModalProps> = (
                   </span>
                 )}
               </div>
-              <p className="text-[11px] text-fg-subtle truncate mt-0.5">
-                {data?.period?.since
-                  ? `Продажи с момента последней инкассации (${formatDate(data.period.since)})`
-                  : 'Продажи за весь период с момента открытия кассы'}
-              </p>
             </div>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="w-8 h-8 rounded-lg text-fg-subtle hover:text-fg hover:bg-surface-raised flex items-center justify-center transition-colors cursor-pointer"
+            className="w-7 h-7 rounded-lg text-fg-subtle hover:text-fg hover:bg-surface-raised flex items-center justify-center transition-colors cursor-pointer"
             aria-label="Закрыть"
           >
             <X className="w-4 h-4" />
@@ -300,7 +295,7 @@ export const CashReconciliationModal: React.FC<CashReconciliationModalProps> = (
         </div>
 
         {/* Modal Body */}
-        <div className="flex-1 overflow-y-auto p-3.5 sm:p-5 space-y-4">
+        <div className="flex-1 overflow-y-auto p-3 sm:p-4 space-y-3">
           {loading && <LoadingState label="Загрузка чеков продаж…" />}
 
           {error && (
@@ -325,19 +320,17 @@ export const CashReconciliationModal: React.FC<CashReconciliationModalProps> = (
           {!loading && !error && data && (
             <>
               {/* Period banner */}
-              <div className="p-3 rounded-xl bg-surface-raised/70 border border-border/80 flex items-center justify-between flex-wrap gap-2 text-xs">
-                <div className="flex items-center gap-2 text-fg font-medium">
-                  <Calendar className="w-4 h-4 text-accent shrink-0" />
-                  <span>
-                    Период продаж:{' '}
-                    <strong className="text-fg">
-                      {formatDate(data.period.periodStart)} — {formatDate(data.period.until)}
-                    </strong>
+              <div className="px-3 py-2 rounded-xl bg-surface-raised/60 border border-border flex items-center justify-between flex-wrap gap-2 text-xs">
+                <div className="flex items-center gap-2 text-fg">
+                  <Calendar className="w-3.5 h-3.5 text-accent shrink-0" />
+                  <span className="text-fg-subtle text-[11px]">Период:</span>
+                  <span className="font-mono text-[11px] font-semibold text-fg">
+                    {formatDate(data.period.periodStart)} — {formatDate(data.period.until)}
                   </span>
                 </div>
                 {data.lastCollection && (
-                  <div className="text-[11px] text-fg-subtle">
-                    Предыдущая инкассация: {data.lastCollection.transactionNumber} ({formatTjs(data.lastCollection.amountTjs)})
+                  <div className="text-[11px] text-fg-subtle font-mono">
+                    Пред. инкассация: <span className="text-fg font-medium">#{data.lastCollection.transactionNumber}</span> ({formatTjs(data.lastCollection.amountTjs)})
                   </div>
                 )}
               </div>
@@ -348,61 +341,77 @@ export const CashReconciliationModal: React.FC<CashReconciliationModalProps> = (
                 const customerPaymentsSum = Number(data.summary.customerPaymentsTotalTjs || 0);
                 const hasDebt = debtSum > 0;
                 const hasCustomerPayments = customerPaymentsSum > 0;
+                const salesCount = data.summary.salesCount || 0;
+                const countText = salesCount === 1 ? '1 чек' : (salesCount >= 2 && salesCount <= 4) ? `${salesCount} чека` : `${salesCount} чеков`;
 
                 return (
-                  <div className={`grid gap-2.5 ${hasDebt || hasCustomerPayments ? 'grid-cols-2 sm:grid-cols-4' : 'grid-cols-1 sm:grid-cols-3'}`}>
+                  <div className={`grid gap-2 ${hasDebt || hasCustomerPayments ? 'grid-cols-2 sm:grid-cols-4' : 'grid-cols-1 sm:grid-cols-3'}`}>
                     {/* 1. Cash In Register */}
-                    <div className="p-3 rounded-xl border border-emerald-500/30 bg-emerald-500/5 space-y-1">
-                      <div className="flex items-center gap-1.5 text-xs font-semibold text-emerald-600 dark:text-emerald-400">
-                        <Banknote className="w-4 h-4 shrink-0" />
-                        <span>В кассе (к инкассации)</span>
+                    <div className="p-2.5 sm:p-3 rounded-xl border border-emerald-500/30 bg-emerald-500/5 space-y-0.5">
+                      <div className="flex items-center justify-between gap-1 text-[11px] font-semibold text-emerald-600 dark:text-emerald-400">
+                        <span className="flex items-center gap-1.5">
+                          <Banknote className="w-3.5 h-3.5 shrink-0" />
+                          <span>В кассе (нал)</span>
+                        </span>
+                        <span className="text-[10px] text-fg-subtle font-mono font-normal">
+                          ≈ {formatUsd(data.summary.currentCashUsd)}
+                        </span>
                       </div>
-                      <p className="text-base sm:text-lg font-bold font-mono text-fg tabular-nums">
+                      <p className="text-base sm:text-lg font-bold font-mono text-fg tabular-nums pt-0.5">
                         {formatTjs(data.summary.cashOnlyTjs ?? data.summary.currentCashTjs)}
                       </p>
-                      <p className="text-[11px] text-fg-subtle">
-                        ≈ {formatUsd(data.summary.currentCashUsd)}
+                      <p className="text-[10px] text-fg-subtle truncate">
+                        к инкассации
                       </p>
                     </div>
 
                     {/* 2. Sales Cash */}
-                    <div className="p-3 rounded-xl border border-border bg-surface-raised/50 space-y-1">
-                      <div className="flex items-center gap-1.5 text-xs font-semibold text-fg-subtle">
-                        <Receipt className="w-4 h-4 text-emerald-500 shrink-0" />
-                        <span>Выручка нал. (в кассу)</span>
+                    <div className="p-2.5 sm:p-3 rounded-xl border border-border bg-surface-raised/50 space-y-0.5">
+                      <div className="flex items-center justify-between gap-1 text-[11px] font-semibold text-fg-subtle">
+                        <span className="flex items-center gap-1.5">
+                          <Receipt className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                          <span>Выручка (нал)</span>
+                        </span>
+                        <span className="text-[10px] text-fg-subtle font-normal">
+                          {countText}
+                        </span>
                       </div>
-                      <p className="text-base sm:text-lg font-bold font-mono text-emerald-600 dark:text-emerald-400 tabular-nums">
+                      <p className="text-base sm:text-lg font-bold font-mono text-emerald-600 dark:text-emerald-400 tabular-nums pt-0.5">
                         +{formatTjs(data.summary.salesCashTjs)}
                       </p>
-                      <p className="text-[11px] text-fg-subtle">
-                        {data.summary.salesCount} чеков за период
+                      <p className="text-[10px] text-fg-subtle truncate">
+                        по чекам продаж
                       </p>
                     </div>
 
                     {/* 3. Customer debt repayments in cash (if any) or Bank */}
                     {hasCustomerPayments ? (
-                      <div className="p-3 rounded-xl border border-emerald-500/25 bg-surface-raised/50 space-y-1">
-                        <div className="flex items-center gap-1.5 text-xs font-semibold text-emerald-600 dark:text-emerald-400">
-                          <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
-                          <span>Оплата долгов (нал)</span>
+                      <div className="p-2.5 sm:p-3 rounded-xl border border-emerald-500/25 bg-surface-raised/50 space-y-0.5">
+                        <div className="flex items-center justify-between gap-1 text-[11px] font-semibold text-emerald-600 dark:text-emerald-400">
+                          <span className="flex items-center gap-1.5">
+                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                            <span>Оплата долгов</span>
+                          </span>
                         </div>
-                        <p className="text-base sm:text-lg font-bold font-mono text-emerald-600 dark:text-emerald-400 tabular-nums">
+                        <p className="text-base sm:text-lg font-bold font-mono text-emerald-600 dark:text-emerald-400 tabular-nums pt-0.5">
                           +{formatTjs(customerPaymentsSum)}
                         </p>
-                        <p className="text-[11px] text-fg-subtle">
-                          погашено клиентами в кассу
+                        <p className="text-[10px] text-fg-subtle truncate">
+                          погашено клиентами
                         </p>
                       </div>
                     ) : (
-                      <div className="p-3 rounded-xl border border-border bg-surface-raised/50 space-y-1">
-                        <div className="flex items-center gap-1.5 text-xs font-semibold text-fg-subtle">
-                          <CreditCard className="w-4 h-4 text-blue-500 shrink-0" />
-                          <span>Банк и переводы</span>
+                      <div className="p-2.5 sm:p-3 rounded-xl border border-border bg-surface-raised/50 space-y-0.5">
+                        <div className="flex items-center justify-between gap-1 text-[11px] font-semibold text-fg-subtle">
+                          <span className="flex items-center gap-1.5">
+                            <CreditCard className="w-3.5 h-3.5 text-blue-500 shrink-0" />
+                            <span>Банк и переводы</span>
+                          </span>
                         </div>
-                        <p className="text-base sm:text-lg font-bold font-mono text-blue-600 dark:text-blue-400 tabular-nums">
+                        <p className="text-base sm:text-lg font-bold font-mono text-blue-600 dark:text-blue-400 tabular-nums pt-0.5">
                           {formatTjs(data.summary.salesCardTjs)}
                         </p>
-                        <p className="text-[11px] text-fg-subtle">
+                        <p className="text-[10px] text-fg-subtle truncate">
                           на банковский счёт
                         </p>
                       </div>
@@ -410,16 +419,18 @@ export const CashReconciliationModal: React.FC<CashReconciliationModalProps> = (
 
                     {/* 4. Sales Debt (if any) */}
                     {hasDebt && (
-                      <div className="p-3 rounded-xl border border-amber-500/30 bg-amber-500/5 space-y-1">
-                        <div className="flex items-center gap-1.5 text-xs font-semibold text-amber-600 dark:text-amber-400">
-                          <Clock className="w-4 h-4 shrink-0" />
-                          <span>Остаток в долг</span>
+                      <div className="p-2.5 sm:p-3 rounded-xl border border-amber-500/30 bg-amber-500/5 space-y-0.5">
+                        <div className="flex items-center justify-between gap-1 text-[11px] font-semibold text-amber-600 dark:text-amber-400">
+                          <span className="flex items-center gap-1.5">
+                            <Clock className="w-3.5 h-3.5 shrink-0" />
+                            <span>Остаток в долг</span>
+                          </span>
                         </div>
-                        <p className="text-base sm:text-lg font-bold font-mono text-amber-600 dark:text-amber-400 tabular-nums">
+                        <p className="text-base sm:text-lg font-bold font-mono text-amber-600 dark:text-amber-400 tabular-nums pt-0.5">
                           {formatTjs(data.summary.salesDebtTjs)}
                         </p>
-                        <p className="text-[11px] text-fg-subtle">
-                          дебиторская задолженность
+                        <p className="text-[10px] text-fg-subtle truncate">
+                          долг клиентов
                         </p>
                       </div>
                     )}
@@ -429,19 +440,16 @@ export const CashReconciliationModal: React.FC<CashReconciliationModalProps> = (
 
               {/* Bonus notification if any */}
               {data.summary.bonusCount > 0 && (
-                <div className="p-2.5 sm:p-3 rounded-xl bg-amber-500/10 border border-amber-500/25 flex items-center gap-2.5 text-xs">
-                  <Gift className="w-4 h-4 text-amber-500 shrink-0" />
-                  <div className="min-w-0 text-amber-900 dark:text-amber-200">
-                    <span className="font-semibold">Бонусные устройства в выручке:</span>{' '}
-                    <span>
-                      {formatUsd(data.summary.bonusCashUsd)} ({data.summary.bonusCount} шт.) при инкассации
-                      автоматически поступят на Бонусный счёт, а остальное — в Центральную кассу.
-                    </span>
+                <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/25 flex items-center justify-between text-xs text-amber-900 dark:text-amber-200">
+                  <div className="flex items-center gap-2">
+                    <Gift className="w-4 h-4 text-amber-500 shrink-0" />
+                    <span>Бонусные устройства ({data.summary.bonusCount} шт.)</span>
                   </div>
+                  <span className="font-mono font-bold">{formatUsd(data.summary.bonusCashUsd)}</span>
                 </div>
               )}
 
-              {/* Accurate Status check callout */}
+              {/* Status callout only if there is a discrepancy */}
               {(() => {
                 const salesCash = Number(data.summary.salesCashTjs || 0);
                 const customerPaymentsCash = Number(data.summary.customerPaymentsTotalTjs || 0);
@@ -450,50 +458,17 @@ export const CashReconciliationModal: React.FC<CashReconciliationModalProps> = (
                 const netCashInflow = salesCash + customerPaymentsCash - expensesCash;
                 const diff = cashInReg - netCashInflow;
 
-                if (Math.abs(diff) < 0.01) {
-                  return (
-                    <div className="p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/25 flex items-center gap-2 text-xs text-emerald-800 dark:text-emerald-300">
-                      <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
-                      <span>
-                        Сверка сходится: Поступления в кассу ({customerPaymentsCash > 0 ? `чеки +${formatTjs(salesCash)} и долги +${formatTjs(customerPaymentsCash)}` : `чеки ${formatTjs(salesCash)}`}) в точности равны сумме наличных в кассе ({formatTjs(cashInReg)}).
-                      </span>
-                    </div>
-                  );
-                }
-
-                if (diff > 0) {
-                  return (
-                    <div className="p-2.5 rounded-xl bg-blue-500/10 border border-blue-500/25 flex items-start gap-2 text-xs text-blue-900 dark:text-blue-200">
-                      <CheckCircle2 className="w-4 h-4 text-blue-500 shrink-0 mt-0.5" />
-                      <div className="space-y-0.5">
-                        <p className="font-semibold text-fg">
-                          В кассе: {formatTjs(cashInReg)} (на +{formatTjs(diff)} больше поступлений за период)
-                        </p>
-                        <p className="text-[11px] text-fg-subtle">
-                          Выручка продаж: +{formatTjs(salesCash)}
-                          {customerPaymentsCash > 0 ? ` • Оплата долгов: +${formatTjs(customerPaymentsCash)}` : ''}
-                          {expensesCash > 0 ? ` • Расходы: -${formatTjs(expensesCash)}` : ''}
-                          {` • Переходящий остаток / внесения с прошлых смен: +${formatTjs(diff)}`}
-                        </p>
-                      </div>
-                    </div>
-                  );
-                }
+                if (Math.abs(diff) < 0.01) return null;
 
                 return (
-                  <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/25 flex items-start gap-2 text-xs text-amber-900 dark:text-amber-200">
-                    <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
-                    <div className="space-y-0.5">
-                      <p className="font-semibold text-fg">
-                        Расхождение: Поступления по чекам превышают фактическую сумму в кассе на {formatTjs(Math.abs(diff))}
-                      </p>
-                      <p className="text-[11px] text-fg-subtle">
-                        Выручка продаж: +{formatTjs(salesCash)}
-                        {customerPaymentsCash > 0 ? ` • Оплата долгов: +${formatTjs(customerPaymentsCash)}` : ''}
-                        {expensesCash > 0 ? ` • Расходы из кассы: -${formatTjs(expensesCash)}` : ''}
-                        {` • Фактически в кассе: ${formatTjs(cashInReg)}`}
-                      </p>
+                  <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/25 flex items-center justify-between text-xs text-amber-900 dark:text-amber-200">
+                    <div className="flex items-center gap-2">
+                      <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0" />
+                      <span className="font-semibold text-fg">Расхождение</span>
                     </div>
+                    <span className="font-mono font-bold">
+                      {diff > 0 ? `+${formatTjs(diff)}` : `-${formatTjs(Math.abs(diff))}`}
+                    </span>
                   </div>
                 );
               })()}
@@ -535,30 +510,30 @@ export const CashReconciliationModal: React.FC<CashReconciliationModalProps> = (
               )}
 
               {/* Sales List Header & Search */}
-              <div className="flex items-center justify-between gap-2 flex-wrap pt-1">
-                <div className="flex items-center gap-2">
+              <div className="flex items-center justify-between gap-2.5 pt-1">
+                <div className="flex items-center gap-2 shrink-0">
                   <h4 className="text-xs font-bold text-fg uppercase tracking-wide">
-                    Чеки продаж за период
+                    Чеки продаж
                   </h4>
-                  <span className="text-[11px] font-semibold px-2 py-0.2 rounded-full bg-surface-raised border border-border text-fg-subtle">
+                  <span className="text-[10px] font-bold px-1.5 py-0.2 rounded-md bg-surface-raised border border-border text-fg-subtle font-mono">
                     {filteredSales.length}
                   </span>
                 </div>
 
-                <div className="relative flex-1 sm:w-64 min-w-[200px]">
-                  <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-fg-subtle" />
+                <div className="relative flex-1 max-w-xs">
+                  <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-fg-subtle pointer-events-none" />
                   <input
                     type="text"
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
                     placeholder="Поиск по чеку, товару, продавцу…"
-                    className="w-full h-8 pl-8 pr-7 text-xs bg-surface-raised border border-border rounded-xl focus:outline-none focus:ring-1 focus:ring-accent"
+                    className="w-full h-8 pl-8 pr-7 text-xs bg-surface-raised border border-border rounded-xl focus:outline-none focus:ring-1 focus:ring-accent text-fg placeholder:text-fg-subtle"
                   />
                   {search && (
                     <button
                       type="button"
                       onClick={() => setSearch('')}
-                      className="absolute right-2 top-1/2 -translate-y-1/2 text-fg-subtle hover:text-fg"
+                      className="absolute right-2 top-1/2 -translate-y-1/2 text-fg-subtle hover:text-fg cursor-pointer"
                     >
                       <X className="w-3.5 h-3.5" />
                     </button>
@@ -582,12 +557,13 @@ export const CashReconciliationModal: React.FC<CashReconciliationModalProps> = (
                   return (
                     <div
                       key={sale.id}
-                      className="p-3 sm:p-3.5 hover:bg-surface-raised/40 transition-colors flex items-start justify-between gap-3"
+                      className="p-2.5 sm:p-3 hover:bg-surface-raised/40 transition-colors flex items-center justify-between gap-3"
                     >
-                      <div className="min-w-0 space-y-1">
-                        <div className="flex items-center gap-2 flex-wrap">
+                      {/* Left: Receipt info, items, customer */}
+                      <div className="min-w-0 space-y-1 flex-1">
+                        <div className="flex items-center gap-1.5 flex-wrap">
                           <span className="font-bold text-fg">Чек #{sale.receiptNumber}</span>
-                          <span className="text-[10px] text-fg-subtle">
+                          <span className="text-[10px] text-fg-subtle font-mono">
                             {formatShortDate(sale.createdAt)}
                           </span>
                           <span className="text-[10px] px-1.5 py-0.2 rounded bg-surface-raised border border-border text-fg-subtle font-medium">
@@ -597,17 +573,17 @@ export const CashReconciliationModal: React.FC<CashReconciliationModalProps> = (
                             <span className="text-[10px] px-1.5 py-0.2 rounded bg-danger/10 text-danger border border-danger/20 font-semibold">
                               Возврат
                             </span>
+                          ) : initialDebt > 0 && currentDebt === 0 ? (
+                            <span className="text-[10px] px-1.5 py-0.2 rounded bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20 font-semibold">
+                              Долг погашен
+                            </span>
                           ) : isPartial ? (
-                            <span className="text-[10px] px-1.5 py-0.2 rounded bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/30 font-bold">
+                            <span className="text-[10px] px-1.5 py-0.2 rounded bg-amber-500/10 text-amber-700 dark:text-amber-300 border border-amber-500/25 font-semibold">
                               Частично в долг
                             </span>
                           ) : isFullDebt ? (
-                            <span className="text-[10px] px-1.5 py-0.2 rounded bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/30 font-bold">
-                              В долг (100%)
-                            </span>
-                          ) : initialDebt > 0 && currentDebt === 0 ? (
-                            <span className="text-[10px] px-1.5 py-0.2 rounded bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30 font-bold">
-                              Долг погашен
+                            <span className="text-[10px] px-1.5 py-0.2 rounded bg-amber-500/10 text-amber-700 dark:text-amber-300 border border-amber-500/25 font-semibold">
+                              В долг
                             </span>
                           ) : sale.paymentMethod === 'CARD' ? (
                             <span className="text-[10px] px-1.5 py-0.2 rounded bg-blue-500/10 text-blue-700 dark:text-blue-300 border border-blue-500/20 font-medium">
@@ -624,8 +600,8 @@ export const CashReconciliationModal: React.FC<CashReconciliationModalProps> = (
                           )}
                         </div>
 
-                        {/* Sold Items */}
-                        <div className="flex items-center gap-1.5 flex-wrap pt-0.5">
+                        {/* Sold Items + Customer */}
+                        <div className="flex items-center gap-1.5 flex-wrap text-xs pt-0.5">
                           {sale.items.map((it) => (
                             <span
                               key={it.id}
@@ -637,81 +613,65 @@ export const CashReconciliationModal: React.FC<CashReconciliationModalProps> = (
                             >
                               {it.isBonus && <Gift className="w-3 h-3 shrink-0" />}
                               <span>
-                                {it.brand} {it.model} {it.storage}
+                                {it.brand} {it.model} {it.storage || ''}
                               </span>
                             </span>
                           ))}
-                        </div>
 
-                        {/* Customer */}
-                        {sale.customerName && (
-                          <p className="text-[11px] text-fg-subtle flex items-center gap-1">
-                            <span>Клиент:</span>
-                            <span className={`font-medium ${currentDebt > 0 ? 'text-fg font-semibold' : 'text-fg-subtle'}`}>
-                              {sale.customerName}
-                            </span>
-                            {currentDebt > 0 && (
-                              <span className="text-[10px] px-1 py-0.2 rounded bg-amber-500/10 text-amber-700 dark:text-amber-300 border border-amber-500/20 font-medium">
-                                должник
+                          {sale.customerName && (
+                            <span className="text-[11px] text-fg-subtle flex items-center gap-1 ml-0.5">
+                              <span>Клиент:</span>
+                              <span className={`font-medium ${currentDebt > 0 ? 'text-amber-600 dark:text-amber-400 font-semibold' : 'text-fg'}`}>
+                                {sale.customerName}
                               </span>
-                            )}
-                          </p>
-                        )}
+                              {currentDebt > 0 && (
+                                <span className="text-[10px] px-1 py-0.2 rounded bg-amber-500/10 text-amber-700 dark:text-amber-300 border border-amber-500/20 font-medium">
+                                  должник
+                                </span>
+                              )}
+                            </span>
+                          )}
+                        </div>
                       </div>
 
-                      {/* Right: Total amount and explicit breakdown of actual money vs debt */}
-                      <div className="text-right shrink-0 space-y-1 tabular-nums">
-                        <div>
-                          <span className="text-[10px] text-fg-subtle uppercase tracking-wider mr-1">Чек:</span>
-                          <span className="font-bold font-mono text-sm sm:text-base text-fg">
-                            {formatTjs(sale.totalTjs)}
-                          </span>
+                      {/* Right: Total amount and concise payment inflow */}
+                      <div className="text-right shrink-0 space-y-0.5 tabular-nums">
+                        <div className="font-bold font-mono text-sm sm:text-base text-fg">
+                          {formatTjs(sale.totalTjs)}
                         </div>
 
                         {hasDebtHistory ? (
-                          <div className="flex flex-col items-end gap-1 text-[11px] font-mono">
-                            <div className="flex items-center gap-1.5 flex-wrap justify-end">
-                              {cashPaid > 0 && (
-                                <span className="text-emerald-800 dark:text-emerald-300 bg-emerald-500/15 border border-emerald-500/30 px-1.5 py-0.5 rounded font-semibold flex items-center gap-1">
-                                  <span className="text-[10px] font-sans text-emerald-900 dark:text-emerald-200">
-                                    {repaidLater > 0 ? 'При покупке нал:' : 'Факт. нал:'}
-                                  </span>
-                                  +{formatTjs(cashPaid)}
-                                </span>
-                              )}
-                              {cardPaid > 0 && (
-                                <span className="text-blue-800 dark:text-blue-300 bg-blue-500/15 border border-blue-500/30 px-1.5 py-0.5 rounded font-semibold flex items-center gap-1">
-                                  <span className="text-[10px] font-sans text-blue-900 dark:text-blue-200">Банк:</span>
-                                  +{formatTjs(cardPaid)}
-                                </span>
-                              )}
-                            </div>
-                            {repaidLater > 0 && (
-                              <span className="text-emerald-700 dark:text-emerald-300 bg-emerald-500/15 border border-emerald-500/30 px-1.5 py-0.5 rounded font-semibold flex items-center gap-1">
-                                <span className="text-[10px] font-sans text-emerald-900 dark:text-emerald-200">Погашено:</span>
-                                +{formatTjs(repaidLater)}
+                          <div className="flex items-center justify-end gap-1.5 text-[11px] font-mono text-fg-subtle flex-wrap">
+                            {cashPaid > 0 && (
+                              <span className="text-emerald-600 dark:text-emerald-400 font-semibold">
+                                Нал: +{formatTjs(cashPaid)}
                               </span>
                             )}
-                            {currentDebt > 0 ? (
-                              <span className="text-amber-800 dark:text-amber-300 bg-amber-500/20 border border-amber-500/35 px-1.5 py-0.5 rounded font-bold flex items-center gap-1">
-                                <span className="text-[10px] font-sans text-amber-900 dark:text-amber-200">Остаток долга:</span>
-                                {formatTjs(currentDebt)}
+                            {cardPaid > 0 && (
+                              <span className="text-blue-600 dark:text-blue-400 font-semibold">
+                                {cashPaid > 0 ? '· ' : ''}Банк: +{formatTjs(cardPaid)}
                               </span>
-                            ) : initialDebt > 0 ? (
-                              <span className="text-emerald-700 dark:text-emerald-300 bg-emerald-500/10 border border-emerald-500/25 px-1.5 py-0.5 rounded font-medium text-[10px]">
-                                Долг закрыт
+                            )}
+                            {repaidLater > 0 && (
+                              <span className="text-emerald-600 dark:text-emerald-400 font-semibold">
+                                {(cashPaid > 0 || cardPaid > 0) ? '· ' : ''}Погашено: +{formatTjs(repaidLater)}
                               </span>
-                            ) : null}
+                            )}
+                            {currentDebt > 0 && (
+                              <span className="text-amber-600 dark:text-amber-400 font-bold">
+                                {paidAtSale > 0 ? '· ' : ''}Долг: {formatTjs(currentDebt)}
+                              </span>
+                            )}
                           </div>
                         ) : (
-                          <div className="text-[10px] flex items-center justify-end gap-1.5 flex-wrap font-medium">
+                          <div className="text-[10px] font-mono flex items-center justify-end gap-1.5 text-fg-subtle">
                             {sale.cashAmountTjs > 0 && (
-                              <span className="text-emerald-600 dark:text-emerald-400 font-mono">
+                              <span className="text-emerald-600 dark:text-emerald-400">
                                 Нал: {formatTjs(sale.cashAmountTjs)}
                               </span>
                             )}
                             {sale.cardAmountTjs > 0 && (
-                              <span className="text-blue-600 dark:text-blue-400 font-mono">
+                              <span className="text-blue-600 dark:text-blue-400">
                                 Банк: {formatTjs(sale.cardAmountTjs)}
                               </span>
                             )}

@@ -34,6 +34,7 @@ import {
   PanelLeftOpen,
 } from 'lucide-react';
 import { NAV_PAGE_ROUTES } from '../../router/navRoutes';
+import { useNavUsage, sortNavGroupsByUsage, recordNavVisit } from '../../utils/navUsage';
 
 interface NavGroup {
   title: string;
@@ -213,6 +214,11 @@ export const Sidebar: React.FC = () => {
     ];
   }, [isSeller, isPartner, isCentralCashMode, activeRetailStore, sellerStoreName]);
 
+  const navUsage = useNavUsage();
+  const sortedNavGroups = useMemo(() => {
+    return sortNavGroupsByUsage(navGroups, navUsage);
+  }, [navGroups, navUsage]);
+
   return (
     <aside className={`hidden lg:flex flex-col border-r border-border bg-surface text-fg-muted select-none shrink-0 h-full sticky top-0 transition-all duration-200 ${
       sidebarCollapsed ? 'w-16' : 'w-60'
@@ -256,7 +262,7 @@ export const Sidebar: React.FC = () => {
 
       {/* Nav Groups */}
       <nav className={`flex-1 overflow-y-auto scrollbar-none py-2 space-y-2.5 ${sidebarCollapsed ? 'px-1.5' : 'px-2.5'}`}>
-        {navGroups.map((group, gIdx) => {
+        {sortedNavGroups.map((group, gIdx) => {
           const visibleItems = group.items.filter(item => item.roles.includes(userRole));
           if (visibleItems.length === 0) return null;
           const isCollapsed = isGroupCollapsed(group.title);
@@ -290,6 +296,7 @@ export const Sidebar: React.FC = () => {
                         <button
                           key={item.id}
                           onClick={() => {
+                            recordNavVisit(item.id);
                             setActivePage(item.id);
                             navigate(routePath);
                           }}
@@ -312,6 +319,7 @@ export const Sidebar: React.FC = () => {
                       <button
                         key={item.id}
                         onClick={() => {
+                          recordNavVisit(item.id);
                           setActivePage(item.id);
                           navigate(routePath);
                         }}

@@ -105,7 +105,12 @@ export function registerNotificationRoutes(app: Express) {
 
   // Get VAPID public key for frontend push subscription
   app.get('/api/push/public-key', authenticateJwt, (_req, res) => {
-    res.json({ publicKey: PushNotificationService.getPublicKey() });
+    const publicKey = PushNotificationService.getPublicKey();
+    if (!publicKey) {
+      res.status(503).json({ message: 'Push-уведомления не настроены на сервере' });
+      return;
+    }
+    res.json({ publicKey });
   });
 
   // Save push subscription for the logged-in user
@@ -128,8 +133,8 @@ export function registerNotificationRoutes(app: Express) {
   app.post('/api/push/unsubscribe', authenticateJwt, async (req: AuthenticatedRequest, res, next) => {
     try {
       const { endpoint } = req.body || {};
-      if (endpoint) {
-        await PushNotificationService.removeSubscription(endpoint);
+      if (typeof endpoint === 'string' && endpoint) {
+        await PushNotificationService.removeSubscription(endpoint, req.user!.userId);
       }
       res.json({ success: true });
     } catch (error) {

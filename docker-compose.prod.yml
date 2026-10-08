@@ -33,6 +33,10 @@ services:
       APP_URL: "${APP_URL:?APP_URL must be set for production},capacitor://localhost,https://localhost"
       NODE_ENV: "production"
       PORT: "3000"
+      # Optional: push notifications stay disabled unless both keys are set.
+      VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:-}
+      VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY:-}
+      VAPID_SUBJECT: ${VAPID_SUBJECT:-mailto:admin@mobileshop.tj}
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:3000/api/health"]
       interval: 10s

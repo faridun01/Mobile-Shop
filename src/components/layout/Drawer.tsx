@@ -36,6 +36,7 @@ import {
   LogOut,
 } from 'lucide-react';
 import { NAV_PAGE_ROUTES } from '../../router/navRoutes';
+import { useNavUsage, sortNavGroupsByUsage, recordNavVisit } from '../../utils/navUsage';
 
 interface NavGroup {
   title: string;
@@ -257,6 +258,11 @@ export const Drawer: React.FC = () => {
       .filter((group) => group.items.length > 0);
   }, [isSeller, isPartner, isCentralCashMode, userRole]);
 
+  const navUsage = useNavUsage();
+  const sortedNavGroups = useMemo(() => {
+    return sortNavGroupsByUsage(navGroups, navUsage);
+  }, [navGroups, navUsage]);
+
   React.useEffect(() => {
     if (!drawerOpen) return;
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -472,7 +478,7 @@ export const Drawer: React.FC = () => {
           )}
 
           {/* All Navigation Groups & Items */}
-          {navGroups.map((group, gIdx) => {
+          {sortedNavGroups.map((group, gIdx) => {
             const visibleItems = group.items.filter(item => item.roles.includes(userRole));
             if (visibleItems.length === 0) return null;
             const isCollapsed = isGroupCollapsed(group.title);
@@ -508,6 +514,7 @@ export const Drawer: React.FC = () => {
                         <button
                           key={item.id}
                           onClick={() => {
+                            recordNavVisit(item.id);
                             setActivePage(item.id);
                             navigate(routePath);
                             setDrawerOpen(false);

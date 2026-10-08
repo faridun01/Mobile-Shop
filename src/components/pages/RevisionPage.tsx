@@ -393,22 +393,17 @@ export const RevisionPage: React.FC = () => {
             />
           </div>
 
-          {/* 1-Click "Everything matches" instant action */}
-          {!isAllReconciled && totalCount > 0 ? (
+          {/* 1-Click instant match action */}
+          {!isAllReconciled && totalCount > 0 && (
             <button
               type="button"
               onClick={handleCheckAll}
               className="w-full py-2.5 px-4 rounded-xl bg-accent text-accent-fg font-bold text-xs sm:text-sm flex items-center justify-center gap-2 hover:opacity-90 active:scale-[0.99] transition-all cursor-pointer shadow-xs select-none"
             >
               <CheckCircle2 className="w-4 h-4 shrink-0" />
-              <span>Всё сходится ({totalCount} шт.)</span>
+              <span>Подтвердить все ({totalCount} шт.)</span>
             </button>
-          ) : isAllReconciled ? (
-            <div className="p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-xs font-bold flex items-center justify-center gap-2">
-              <CheckCircle2 className="w-4 h-4 shrink-0" />
-              <span>Все товары склада сверены ({totalCount} шт.)</span>
-            </div>
-          ) : null}
+          )}
         </div>
 
         {/* Devices Checklist & Tabs */}
@@ -782,12 +777,7 @@ export const RevisionPage: React.FC = () => {
             </div>
           </div>
 
-          {isAllReconciled ? (
-            <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-xs font-bold flex items-center gap-2">
-              <CheckCircle2 className="w-4 h-4 shrink-0" />
-              <span>Остатки полностью сошлись (0 расхождений). Сверка прошла успешно!</span>
-            </div>
-          ) : uncheckedCount > 0 ? (
+          {uncheckedCount > 0 && (
             <div>
               <h4 className="text-xs font-bold text-amber-600 dark:text-amber-400 mb-1.5">
                 Не подтвержденные позиции ({uncheckedCount} шт.):
@@ -803,7 +793,7 @@ export const RevisionPage: React.FC = () => {
                   ))}
               </div>
             </div>
-          ) : null}
+          )}
         </div>
       </Dialog>
 

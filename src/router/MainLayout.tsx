@@ -22,6 +22,7 @@ import { LoadingState } from '../components/ui/Skeleton';
 import { useNavigationLayout } from '../hooks/useNavigationLayout';
 import { cancelScan, isNativeScanner } from '../services/scanner/scannerService';
 import { useConnectionStatus } from '../services/connectionStatus';
+import { recordNavVisit } from '../utils/navUsage';
 
 // Lazy-loaded so the ~3MB html5-qrcode dependency it pulls in only downloads the first
 // time a user actually opens the scanner, instead of riding along in the main chunk on
@@ -108,6 +109,7 @@ export function MainLayout() {
       if (pageId !== activePage) {
         setActivePage(pageId);
       }
+      recordNavVisit(pageId);
     }
   }, [location.pathname]);
 
