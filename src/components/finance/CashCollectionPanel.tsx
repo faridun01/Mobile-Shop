@@ -8,7 +8,6 @@ import {
   Gift,
   Banknote,
   CreditCard,
-  FileSpreadsheet,
   Clock,
   ChevronDown,
   ChevronUp,
@@ -20,7 +19,7 @@ import { ConfirmDialog } from '../ui/ConfirmDialog';
 import { EmptyState } from '../ui/EmptyState';
 import { LoadingState } from '../ui/Skeleton';
 import { StatusBanner, type StatusMessage } from '../ui/StatusBanner';
-import { CashReconciliationModal, type RegisterBalance } from './CashReconciliationModal';
+import { type RegisterBalance } from './CashReconciliationModal';
 import { UncollectedDaysDetailSection } from './UncollectedDaysDetailSection';
 
 interface BonusAccountBalance {
@@ -78,8 +77,6 @@ export const CashCollectionPanel: React.FC<CashCollectionPanelProps> = ({
   const [loadError, setLoadError] = useState<string | null>(null);
   const [revision, setRevision] = useState(0);
   const [collecting, setCollecting] = useState<RegisterBalance | null>(null);
-  const [inspectingStore, setInspectingStore] = useState<RegisterBalance | null>(null);
-  const [inspectingDate, setInspectingDate] = useState<string | null>(null);
   const [cancelling, setCancelling] = useState<CashCollection | null>(null);
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState<StatusMessage | null>(null);
@@ -441,20 +438,6 @@ export const CashCollectionPanel: React.FC<CashCollectionPanelProps> = ({
                     </div>
 
                     <div className="shrink-0 flex items-center justify-end gap-2 pt-2 sm:pt-0 border-t sm:border-t-0 border-border/40">
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setInspectingStore(store);
-                          setInspectingDate(null);
-                        }}
-                        className="h-8 px-2.5 rounded-lg border border-border bg-surface hover:bg-surface-raised text-fg text-xs font-semibold flex items-center gap-1.5 transition-all shadow-2xs active:scale-95 cursor-pointer"
-                        title="Сверить чеки продаж за период перед инкассацией"
-                      >
-                        <FileSpreadsheet className="w-3.5 h-3.5 text-accent" />
-                        <span className="hidden sm:inline">Сверить продажи</span>
-                        <span className="sm:hidden">Продажи</span>
-                      </button>
                       {empty ? (
                         <span className="h-8 px-2.5 rounded-lg bg-surface-raised border border-border text-fg-subtle text-xs font-medium flex items-center gap-1.5 select-none">
                           <span className="w-1.5 h-1.5 rounded-full bg-fg-subtle/50" />
@@ -486,10 +469,6 @@ export const CashCollectionPanel: React.FC<CashCollectionPanelProps> = ({
       {effectiveStoreId && selectedStore && (
         <UncollectedDaysDetailSection
           store={selectedStore}
-          onOpenReconciliation={(initDate) => {
-            setInspectingStore(selectedStore);
-            setInspectingDate(initDate ?? null);
-          }}
           onCollect={() => {
             setCollecting(selectedStore);
           }}
@@ -634,9 +613,7 @@ export const CashCollectionPanel: React.FC<CashCollectionPanelProps> = ({
         message={
           collecting && (
             <div className="space-y-3 text-xs">
-              <p className="text-fg-subtle">
-                Вся выручка кассы «{collecting.storeName}» будет полностью сдана, а касса магазина обнулится:
-              </p>
+              <p className="text-fg-subtle">Касса «{collecting.storeName}»</p>
               <div className="p-3 rounded-xl bg-surface-raised border border-border space-y-2">
                 <div className="flex justify-between items-center text-sm font-bold text-fg">
                   <span>Инкассируется всего:</span>
@@ -687,26 +664,7 @@ export const CashCollectionPanel: React.FC<CashCollectionPanelProps> = ({
                       </span>
                     </div>
                   </div>
-                ) : (
-                  <p className="text-[11px] text-fg-subtle pt-1 border-t border-border/60">
-                    Вся сумма поступит в Основную центральную кассу (бонусных продаж нет).
-                  </p>
-                )}
-              </div>
-              <div className="pt-1.5 border-t border-border/60">
-                <button
-                  type="button"
-                  onClick={() => {
-                    const s = collecting;
-                    setCollecting(null);
-                    setInspectingStore(s);
-                    setInspectingDate(null);
-                  }}
-                  className="text-xs text-accent hover:underline flex items-center gap-1.5 font-semibold cursor-pointer"
-                >
-                  <FileSpreadsheet className="w-3.5 h-3.5" />
-                  <span>Сверить с историей продаж перед инкассацией →</span>
-                </button>
+                ) : null}
               </div>
             </div>
           )
@@ -769,18 +727,6 @@ export const CashCollectionPanel: React.FC<CashCollectionPanelProps> = ({
             </div>
           )
         }
-      />
-
-      <CashReconciliationModal
-        open={inspectingStore !== null}
-        store={inspectingStore}
-        initialDate={inspectingDate}
-        onClose={() => {
-          setInspectingStore(null);
-          setInspectingDate(null);
-        }}
-        onCollect={(storeToCollect) => setCollecting(storeToCollect)}
-        busy={busy}
       />
     </div>
   );

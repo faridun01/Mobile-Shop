@@ -1,17 +1,20 @@
 import type { Express } from 'express';
-import { authenticateJwt, requireRoles, type AuthenticatedRequest } from '../../auth/auth.middleware';
+import { authenticateJwt, enforceBodyStoreScope, enforceStoreScope, requireRoles, type AuthenticatedRequest } from '../../auth/auth.middleware';
 import { CustomersService } from './customers.service';
 import { RealtimeSyncGateway } from '../../websocket/websocket.gateway';
 
 export function registerCustomerRoutes(app: Express) {
   // Summary for the "Касса" (Cash Register) overview dashboard page
-  app.get('/api/cash-desk/summary', authenticateJwt, async (req: AuthenticatedRequest, res, next) => {
+  // enforceStoreScope pins SELLER/PARTNER to their own store and rejects one with no store.
+  app.get('/api/cash-desk/summary', authenticateJwt, enforceStoreScope, async (req: AuthenticatedRequest, res, next) => {
     try {
-      const isStoreScoped = (req.user!.role === 'SELLER' || req.user!.role === 'PARTNER') && Boolean(req.user!.storeId);
-      const storeId = isStoreScoped
-        ? req.user!.storeId!
-        : (typeof req.query.storeId === 'string' && req.query.storeId !== 'all' ? req.query.storeId : undefined);
+      const storeId = typeof req.query.storeId === 'string' && req.query.storeId !== 'all' ? req.query.storeId : undefined;
       const summary = await CustomersService.getCashDeskSummary(storeId);
+      // Supplier debt is business-wide purchasing data, ADMIN-only like /api/suppliers.
+      if (req.user!.role !== 'ADMIN') {
+        res.json({ ...summary, suppliers: { totalDebtUsd: 0, totalDebtTjs: 0, debtorsCount: 0, suppliers: [] } });
+        return;
+      }
       res.json(summary);
     } catch (error) {
       next(error);
@@ -77,17 +80,15 @@ export function registerCustomerRoutes(app: Express) {
   });
 
   // Record customer debt payment
-  app.post('/api/customers/:id/payments', authenticateJwt, async (req: AuthenticatedRequest, res, next) => {
+  app.post('/api/customers/:id/payments', authenticateJwt, enforceBodyStoreScope, async (req: AuthenticatedRequest, res, next) => {
     try {
+      // enforceBodyStoreScope (on the route) has already pinned store staff to their own store.
       const { amountTjs, storeId, sourceAccount, note } = req.body || {};
-      const effectiveStoreId = (req.user!.role === 'SELLER' || req.user!.role === 'PARTNER')
-        ? req.user!.storeId || undefined
-        : storeId;
 
       const result = await CustomersService.recordPayment({
         customerId: req.params.id,
         amountTjs,
-        storeId: effectiveStoreId,
+        storeId,
         sourceAccount,
         note,
         userId: req.user!.userId,
@@ -103,8 +104,9 @@ export function registerCustomerRoutes(app: Express) {
     }
   });
 
-  // Save push subscription for customer
-  app.post('/api/customers/:id/subscribe-push', authenticateJwt, async (req: AuthenticatedRequest, res, next) => {
+  // Save push subscription for customer (ADMIN only: any user overwriting any customer's
+  // subscription would let them hijack that customer's notifications)
+  app.post('/api/customers/:id/subscribe-push', authenticateJwt, requireRoles('ADMIN'), async (req: AuthenticatedRequest, res, next) => {
     try {
       const { subscription } = req.body || {};
       const customer = await CustomersService.savePushSubscription(req.params.id, subscription);

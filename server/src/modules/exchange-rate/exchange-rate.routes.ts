@@ -21,7 +21,9 @@ export function registerExchangeRateRoutes(app: Express) {
     }
   });
 
-  app.post('/api/exchange-rate/today', authenticateJwt, requireRoles('ADMIN', 'PARTNER'), async (req: AuthenticatedRequest, res, next) => {
+  // The rate is global: every store snapshots it onto sales, refunds and registers, so only
+  // the ADMIN may set it — a store partner must not be able to skew other stores' books.
+  app.post('/api/exchange-rate/today', authenticateJwt, requireRoles('ADMIN'), async (req: AuthenticatedRequest, res, next) => {
     try {
       const raw = req.body?.rate;
       const rate = (typeof raw === 'number' || (typeof raw === 'string' && raw.trim())) && Number.isFinite(Number(raw)) ? D(raw) : null;

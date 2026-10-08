@@ -15,7 +15,8 @@ function validateCompensation(input: { baseSalaryTjs?: MoneyInput; salesCommissi
   }
 }
 
-const MIN_PASSWORD_LENGTH = 6;
+// Applies to new passwords only; existing logins keep working until their password changes.
+const MIN_PASSWORD_LENGTH = 10;
 
 function requireValidPassword(password: string): string {
   if (typeof password !== 'string' || password.length < MIN_PASSWORD_LENGTH) {

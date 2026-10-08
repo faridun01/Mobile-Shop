@@ -35,8 +35,9 @@ function requireStaffStore(user: StaffUser, bodyStoreId?: string): string {
     return storeId;
   }
   if (user.role !== 'SELLER' && user.role !== 'PARTNER') throw fail('Приход товара оформляет сотрудник магазина', 403);
-  if (!user.storeId && !bodyStoreId) throw fail('Пользователь не привязан ни к одному магазину', 403);
-  return user.storeId || bodyStoreId!;
+  // Store staff always receive into their own store; a client-sent storeId is never trusted.
+  if (!user.storeId) throw fail('Пользователь не привязан ни к одному магазину', 403);
+  return user.storeId;
 }
 
 /** Why a device cannot be received into `storeId` (null when it can). */

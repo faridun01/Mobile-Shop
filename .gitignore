@@ -14,3 +14,7 @@ playwright-report/
 # Local artifacts: DB backups, perf/QA outputs, Playwright CLI snapshots
 output/
 .playwright-cli/
+
+# Native build outputs
+*.apk
+*.aab

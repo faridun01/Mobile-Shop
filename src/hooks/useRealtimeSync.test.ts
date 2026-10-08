@@ -15,7 +15,7 @@ class FakeSocket {
   onerror: (() => void) | null = null;
   onmessage: ((event: { data: string }) => void) | null = null;
   close = vi.fn(() => this.onclose?.({ code: 1000 }));
-  constructor(public url: string) { FakeSocket.instances.push(this); }
+  constructor(public url: string, public protocols?: string | string[]) { FakeSocket.instances.push(this); }
 }
 
 describe('realtime connection recovery', () => {
@@ -38,7 +38,9 @@ describe('realtime connection recovery', () => {
     const onEvent = vi.fn();
     useRealtimeSync('token', onEvent);
     const first = FakeSocket.instances[0];
-    expect(first.url).toBe('wss://shop.test/ws?token=token');
+    // The token rides in Sec-WebSocket-Protocol, never in the URL (it would end up in access logs).
+    expect(first.url).toBe('wss://shop.test/ws');
+    expect(first.protocols).toEqual(['auth', 'token']);
     first.onopen?.();
     first.onclose?.({ code: 1006 });
     vi.advanceTimersByTime(1000);
@@ -68,7 +70,7 @@ describe('realtime connection recovery', () => {
     useRealtimeSync('new-token', vi.fn());
     vi.advanceTimersByTime(60000);
     expect(FakeSocket.instances).toHaveLength(2);
-    expect(FakeSocket.instances[1].url).toContain('token=new-token');
+    expect(FakeSocket.instances[1].protocols).toEqual(['auth', 'new-token']);
     expect(FakeSocket.instances[0].close).toHaveBeenCalled();
   });
 

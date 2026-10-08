@@ -3,7 +3,7 @@ import React, { useState, useMemo } from 'react';
 import { useAppFields } from '../../context/AppContext';
 import { Device, PaymentMethod } from '../../types';
 import { looksLikeDeviceCode, normalizeScanCode, resolveSaleScan, saleScanMessage } from '../../utils/scanLookup';
-import { formatReceiptText, paymentSummary } from '../../utils/receipt';
+import { formatReceiptText, paymentSummary, RECEIPT_WARRANTY } from '../../utils/receipt';
 import {
   Smartphone,
   Trash2,
@@ -39,6 +39,7 @@ import { ConfirmDialog } from '../ui/ConfirmDialog';
 import { soundEffects } from '../../utils/sound';
 import { useUIStore } from '../../stores/useUIStore';
 import { useUnfinishedWork } from '../../utils/pwaUpdateSafety';
+import { hasCurrentDailyRate } from '../../utils/dailyRatePrompt';
 
 interface CartItem {
   device: Device;
@@ -593,10 +594,12 @@ export const SalePage: React.FC = () => {
 
   const totalTjs = sumMoney(cart.map(item => item.salePriceTjs && item.salePriceTjs > 0 ? item.salePriceTjs : 0));
   const hasEmptyPrice = cart.some(item => item.salePriceTjs === undefined || item.salePriceTjs <= 0);
+  // A rate from an earlier day is not today's: the server refuses the sale until the admin sets it.
+  const rateReady = hasCurrentDailyRate(todayRate);
   const totalUsd = todayRate ? moneyNumber(decimal(totalTjs).div(todayRate.rate)) : 0;
   // Without today's rate there is no honest USD figure, so none is shown (the sale itself
   // requires the rate on the server anyway).
-  const usdLabel = todayRate ? `≈ $${formatMoney(totalUsd)}` : 'курс на сегодня не задан';
+  const usdLabel = rateReady ? `≈ $${formatMoney(totalUsd)}` : 'курс на сегодня не задан';
 
   const isItemBelowCost = (item: CartItem) => {
     if (!todayRate || item.salePriceTjs === undefined || isNaN(item.salePriceTjs)) return false;
@@ -697,6 +700,13 @@ export const SalePage: React.FC = () => {
     <div className="work-screen flex-1 flex flex-col h-full overflow-hidden bg-bg text-fg-muted relative">
       <StatusBanner message={paymentStatus} onDismiss={() => setPaymentStatus(null)} />
 
+      {!rateReady && !isCentralCashMode && (
+        <div className="p-3 bg-warning/15 border-b border-warning/30 text-warning text-xs font-semibold flex items-center gap-2 shrink-0" role="alert">
+          <AlertTriangle className="w-4 h-4 shrink-0" />
+          <span>Курс USD/TJS на сегодня не задан — продажа будет доступна после того, как администратор задаст курс.</span>
+        </div>
+      )}
+
       {isCurrentStoreWarehouse && (
         <div className="p-3 bg-warning/15 border-b border-warning/30 text-warning text-xs font-medium flex items-center gap-2 shrink-0">
           <AlertTriangle className="w-4 h-4 shrink-0" />
@@ -739,7 +749,7 @@ export const SalePage: React.FC = () => {
                     title="Закрыть смену"
                   >
                     <FileCheck2 className="w-4 h-4 text-accent" />
-                    <span className="hidden sm:inline">Z-Отчёт</span>
+                    <span className="hidden sm:inline">Закрыть смену</span>
                   </button>
                 )}
               </div>
@@ -1090,7 +1100,7 @@ export const SalePage: React.FC = () => {
                   fullWidth
                   leftIcon={paymentMethod === 'DEBT' ? Clock : CheckCircle2}
                   loading={isSubmittingSale}
-                  disabled={hasEmptyPrice || totalTjs <= 0 || isSubmittingSale}
+                  disabled={!rateReady || hasEmptyPrice || totalTjs <= 0 || isSubmittingSale}
                   onClick={handleFinishPayment}
                   className={`h-11 text-xs sm:text-sm font-bold flex items-center justify-center cursor-pointer shadow-md ${
                     paymentMethod === 'DEBT' ? '!bg-amber-600 hover:!bg-amber-700 text-white' : ''
@@ -1152,7 +1162,7 @@ export const SalePage: React.FC = () => {
               fullWidth
               leftIcon={paymentMethod === 'DEBT' ? Clock : CheckCircle2}
               loading={isSubmittingSale}
-              disabled={hasEmptyPrice || totalTjs <= 0 || isSubmittingSale}
+              disabled={!rateReady || hasEmptyPrice || totalTjs <= 0 || isSubmittingSale}
               onClick={handleFinishPayment}
               className={`h-12 text-sm font-bold flex items-center justify-center ${
                 paymentMethod === 'DEBT' ? '!bg-amber-600 hover:!bg-amber-700 text-white' : ''
@@ -1271,7 +1281,7 @@ export const SalePage: React.FC = () => {
               disabled={!completedSale}
               onClick={async () => {
                 if (!completedSale) return;
-                const text = formatReceiptText(completedSale, { showStore: !isStoreScoped });
+                const text = formatReceiptText(completedSale, { showStore: true, storeAddress: stores.find((s) => s.id === completedSale.storeId)?.address });
                 try {
                   if (navigator.share) {
                     await navigator.share({ title: `Чек №${completedSale.receiptNumber}`, text });
@@ -1325,6 +1335,7 @@ export const SalePage: React.FC = () => {
                 {completedSale.customerName && <p>Покупатель: <span className="text-fg-muted">{completedSale.customerName}</span></p>}
                 {completedSale.customerPhone && <p>Телефон: <span className="text-fg-muted font-mono">{completedSale.customerPhone}</span></p>}
                 <p>Продавец: <span className="text-fg-muted">{completedSale.sellerName || currentUser?.name}</span></p>
+                {RECEIPT_WARRANTY && <p>Гарантия: <span className="text-fg-muted">{RECEIPT_WARRANTY}</span></p>}
               </div>
             </div>
           ) : (

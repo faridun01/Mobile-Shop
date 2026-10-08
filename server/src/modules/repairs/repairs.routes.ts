@@ -1,6 +1,6 @@
 import { D } from '../../common/decimal';
 import type { Express } from 'express';
-import { authenticateJwt, enforceBodyStoreScope, type AuthenticatedRequest } from '../../auth/auth.middleware';
+import { authenticateJwt, enforceBodyStoreScope, enforceStoreScope, type AuthenticatedRequest } from '../../auth/auth.middleware';
 import { prisma } from '../../prisma/prisma.service';
 import { RepairsService } from './repairs.service';
 import { RealtimeSyncGateway } from '../../websocket/websocket.gateway';
@@ -9,9 +9,11 @@ import { dateRangeForPeriod, type ReportPeriod } from '../reports/reports.servic
 const VALID_PERIODS: ReportPeriod[] = ['TODAY', 'MONTH', 'SPECIFIC_MONTH', 'ALL'];
 
 export function registerRepairRoutes(app: Express) {
-  app.get('/api/repairs', authenticateJwt, async (req: AuthenticatedRequest, res, next) => {
+  // enforceStoreScope pins SELLER and PARTNER to their own store (customer names and phones
+  // of other stores' tickets must not leak) and rejects store staff without a store.
+  app.get('/api/repairs', authenticateJwt, enforceStoreScope, async (req: AuthenticatedRequest, res, next) => {
     try {
-      const storeScopeId = req.user!.role === 'SELLER' && req.user!.storeId ? req.user!.storeId : typeof req.query.storeId === 'string' ? req.query.storeId : undefined;
+      const storeScopeId = typeof req.query.storeId === 'string' ? req.query.storeId : undefined;
       // period/month let the Reports export preview ask for exactly the range it's showing,
       // instead of the client filtering the entire repairs history it used to fetch in full.
       const period = VALID_PERIODS.includes(req.query.period as ReportPeriod) ? (req.query.period as ReportPeriod) : 'ALL';
@@ -62,10 +64,11 @@ export function registerRepairRoutes(app: Express) {
         res.status(400).json({ message: 'status обязателен' });
         return;
       }
-      // A SELLER may only update tickets belonging to their own store.
-      if (req.user!.role === 'SELLER') {
-        const existing = await prisma.repairTicket.findUnique({ where: { id: req.params.id } });
-        if (!existing || existing.storeId !== req.user!.storeId) {
+      // Store staff (SELLER and PARTNER) may only update their own store's tickets: issuing a
+      // ticket books its cost as an expense from that store's register.
+      if (req.user!.role !== 'ADMIN') {
+        const existing = await prisma.repairTicket.findUnique({ where: { id: req.params.id }, select: { storeId: true } });
+        if (!existing || !req.user!.storeId || existing.storeId !== req.user!.storeId) {
           res.status(403).json({ message: 'Эта квитанция на ремонт принадлежит другому магазину' });
           return;
         }

@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import { HandCoins, Store as StoreIcon } from 'lucide-react';
+import { HandCoins } from 'lucide-react';
 import { useAppFields } from '../../context/AppContext';
 import { CashCollectionPanel } from '../finance/CashCollectionPanel';
 import { DateRangePicker } from '../ui/DateRangePicker';
+import { StoreSelector } from '../common/StoreSelector';
 import { getBusinessDateKey, currentBusinessMonth } from '../../utils/businessDate';
 
 export const CashCollectionPage: React.FC = () => {
@@ -51,21 +52,15 @@ export const CashCollectionPage: React.FC = () => {
         {/* Filter controls */}
         <div className="flex flex-wrap items-center gap-2">
           {/* Store Filter */}
-          <div className="flex items-center gap-1.5 bg-surface-raised border border-border rounded-xl px-2.5 h-9">
-            <StoreIcon className="w-3.5 h-3.5 text-fg-subtle" />
-            <select
-              value={selectedStoreId}
-              onChange={(e) => setSelectedStoreId(e.target.value)}
-              className="bg-transparent text-xs font-semibold text-fg focus:outline-none cursor-pointer"
-            >
-              <option value="all">Все магазины</option>
-              {selectableStores.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.name}
-                </option>
-              ))}
-            </select>
-          </div>
+          <StoreSelector
+            value={selectedStoreId}
+            onChange={setSelectedStoreId}
+            stores={selectableStores}
+            showAllOption
+            allOptionLabel="Все магазины"
+            allOptionValue="all"
+            className="max-w-44 sm:max-w-56"
+          />
 
           {/* Date Range Picker (Range, Month, Day) */}
           <DateRangePicker

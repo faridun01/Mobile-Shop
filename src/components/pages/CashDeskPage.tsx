@@ -3,8 +3,10 @@ import { useAppFields } from '../../context/AppContext';
 import { formatStoreName } from '../../utils/storeContext';
 import { StatusBanner, StatusMessage } from '../ui/StatusBanner';
 import { RestrictedAccess } from '../ui/RestrictedAccess';
-import { Wallet, Store as StoreIcon } from 'lucide-react';
+import { Wallet, FileCheck2 } from 'lucide-react';
 import { CashDeskPanel } from '../finance/CashDeskPanel';
+import { StoreSelector } from '../common/StoreSelector';
+import { useUIStore } from '../../stores/useUIStore';
 
 export const CashDeskPage: React.FC = () => {
   const { currentUser, stores, selectedStoreId, setSelectedStoreId } = useAppFields(
@@ -13,6 +15,7 @@ export const CashDeskPage: React.FC = () => {
     'selectedStoreId',
     'setSelectedStoreId'
   );
+  const { setDailyClosingModalOpen } = useUIStore();
 
   const [status, setStatus] = useState<StatusMessage | null>(null);
 
@@ -28,11 +31,9 @@ export const CashDeskPage: React.FC = () => {
       : (selectedStoreId || 'all');
 
   const isCentral = effectiveStoreId === 'all';
-  const currentStore = stores.find((s) => s.id === effectiveStoreId);
+  const currentStore = retailStores.find((s) => s.id === effectiveStoreId);
   const pageTitle = isCentral
-    ? 'Центральная касса (Общий итог по всем магазинам)'
-    : currentStore?.isMainWarehouse
-    ? `Центральная касса (${currentStore.name})`
+    ? 'Центральная касса (Общий итог)'
     : `Касса: ${formatStoreName(currentStore?.name || 'Магазин')}`;
 
   if (isSeller) {
@@ -44,55 +45,58 @@ export const CashDeskPage: React.FC = () => {
   }
 
   return (
-    <div className="work-screen flex-1 flex flex-col h-full overflow-hidden bg-bg text-fg select-none">
+    <div className="work-screen flex-1 h-full overflow-y-auto min-h-0 bg-bg text-fg select-none">
       <StatusBanner message={status} onDismiss={() => setStatus(null)} />
 
-      {/* Top Header Bar */}
-      <div className="p-3 sm:p-4 border-b border-border bg-surface shrink-0 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div className="flex items-center gap-2.5">
-          <div className="w-9 h-9 rounded-xl bg-accent/15 border border-accent/25 flex items-center justify-center text-accent shrink-0">
-            <Wallet className="w-5 h-5" />
+      {/* Compact Sticky Header */}
+      <header className="sticky top-0 z-20 px-3 sm:px-4 py-2 border-b border-border bg-surface/95 backdrop-blur-sm flex flex-col sm:flex-row sm:items-center justify-between gap-2 shadow-2xs">
+        <div className="flex items-center gap-2 min-w-0 w-full sm:w-auto">
+          <div className="w-8 h-8 rounded-lg bg-accent/15 border border-accent/25 flex items-center justify-center text-accent shrink-0">
+            <Wallet className="w-4 h-4" />
           </div>
-          <div>
-            <h1 className="text-base sm:text-lg font-bold text-fg leading-tight">
+          <div className="min-w-0 flex-1">
+            <h1 className="text-sm sm:text-base font-bold text-fg leading-tight truncate">
               {pageTitle}
             </h1>
-            <p className="text-[11px] text-fg-subtle">
-              Наличные деньги в кассе, должники и поставщики
+            <p className="text-[10px] text-fg-subtle truncate">
+              Наличные средства и баланс кассы
             </p>
           </div>
         </div>
 
-        {/* Store Selector (Admin) */}
-        {isAdmin && stores.length > 0 && (
-          <div className="flex items-center gap-1.5 bg-surface-raised border border-border rounded-xl px-2.5 h-9 shrink-0">
-            <StoreIcon className="w-3.5 h-3.5 text-accent shrink-0" />
-            <select
+        <div className="flex items-center gap-1.5 w-full sm:w-auto justify-between sm:justify-end min-w-0">
+          {/* Store Selector (Admin) - retail stores only; main warehouse has no cash register */}
+          {isAdmin && retailStores.length > 0 && (
+            <StoreSelector
               value={effectiveStoreId}
-              onChange={(e) => setSelectedStoreId(e.target.value)}
-              className="bg-transparent text-xs font-bold text-fg focus:outline-none cursor-pointer"
-              title="Выбрать кассу / магазин"
-            >
-              <option value="all">
-                Центральная касса (Общий итог)
-              </option>
-              {retailStores.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.name}
-                </option>
-              ))}
-              {stores.filter((s) => s.isMainWarehouse).map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.name} (Главный склад)
-                </option>
-              ))}
-            </select>
-          </div>
-        )}
-      </div>
+              onChange={setSelectedStoreId}
+              stores={retailStores}
+              retailOnly
+              showAllOption
+              allOptionLabel="Центральная касса (Все)"
+              allOptionValue="all"
+              className="flex-1 sm:flex-initial max-w-[220px] sm:max-w-56"
+              compact
+            />
+          )}
 
-      {/* Main Cash & Z-Report Content */}
-      <div className="flex-1 overflow-y-auto">
+          {/* Quick Z-Report Button - only for specific retail stores, never on central cash desk */}
+          {!isCentral && (
+            <button
+              type="button"
+              onClick={() => setDailyClosingModalOpen(true, effectiveStoreId)}
+              className="h-8 px-2.5 rounded-lg bg-accent text-accent-fg text-xs font-semibold flex items-center gap-1.5 hover:opacity-90 active:scale-95 transition-all shadow-xs cursor-pointer shrink-0"
+              title="Закрыть смену / Z-отчёт"
+            >
+              <FileCheck2 className="w-3.5 h-3.5 shrink-0" />
+              <span className="hidden sm:inline">Z-отчёт</span>
+            </button>
+          )}
+        </div>
+      </header>
+
+      {/* Main Cash & Shift Closing Content */}
+      <div className="p-3 sm:p-4 max-w-7xl mx-auto">
         <CashDeskPanel storeId={effectiveStoreId} />
       </div>
     </div>

@@ -23,6 +23,7 @@ import {
   Wrench,
   Loader2,
   Warehouse,
+  Package,
   RefreshCw,
   Download,
   Smartphone,
@@ -311,21 +312,28 @@ export const SettingsPage: React.FC = () => {
 
                       {/* Cash Balance Display & Actions */}
                       <div className="pt-2 border-t border-border/60 flex items-center justify-between gap-2">
-                        <div className="flex items-baseline gap-1.5 flex-wrap min-w-0">
-                          <span className="text-fg-subtle text-[10px] uppercase font-semibold">Касса:</span>
-                          <span className="font-bold font-mono text-accent text-xs sm:text-sm">
-                            ${formatMoney(s.cashBalanceUsd)}
-                          </span>
-                          {todayRate?.rate && (
-                            <span className="text-[10px] text-fg-subtle font-mono truncate">
-                              ≈ {formatMoney((s.cashBalanceUsd || 0) * todayRate.rate)} TJS
+                        {s.isMainWarehouse ? (
+                          <div className="flex items-center gap-1.5 text-fg-subtle text-[11px] py-0.5">
+                            <Package className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                            <span className="truncate">Только склад товаров (касса отсутствует)</span>
+                          </div>
+                        ) : (
+                          <div className="flex items-baseline gap-1.5 flex-wrap min-w-0">
+                            <span className="text-fg-subtle text-[10px] uppercase font-semibold">Касса:</span>
+                            <span className="font-bold font-mono text-accent text-xs sm:text-sm">
+                              ${formatMoney(s.cashBalanceUsd)}
                             </span>
-                          )}
-                        </div>
+                            {todayRate?.rate && (
+                              <span className="text-[10px] text-fg-subtle font-mono truncate">
+                                ≈ {formatMoney((s.cashBalanceUsd || 0) * todayRate.rate)} TJS
+                              </span>
+                            )}
+                          </div>
+                        )}
 
                         <div className="flex items-center gap-1 shrink-0">
-                          {/* Adjust balance */}
-                          {(isAdmin || (currentUser?.role === 'PARTNER' && s.id === currentUser?.storeId)) && (
+                          {/* Adjust balance (ADMIN only, only for retail stores) */}
+                          {!s.isMainWarehouse && isAdmin && (
                             <button
                               type="button"
                               onClick={() => handleOpenAdjust(s)}

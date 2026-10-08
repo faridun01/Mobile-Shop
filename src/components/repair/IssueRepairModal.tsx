@@ -4,6 +4,7 @@ import { Button } from '../ui/Button';
 import { formatMoney } from '../../utils/money';
 import { IssueRepairModalProps } from './types';
 
+/** Repairs are at the shop's expense: the parts cost is paid from Central Cash. */
 export const IssueRepairModal: React.FC<IssueRepairModalProps> = ({
   selectedTicket,
   onClose,
@@ -12,17 +13,18 @@ export const IssueRepairModal: React.FC<IssueRepairModalProps> = ({
   setIssueFinalCost,
   onConfirmIssue,
 }) => {
+  const cost = parseFloat(issueFinalCost.replace(',', '.')) || 0;
   return (
     <Dialog
       open={selectedTicket !== null}
       onClose={() => { if (!isSubmitting) onClose(); }}
-      title="Выдача ремонта клиенту"
+      title="Выдача ремонта"
       subtitle={selectedTicket ? `Квитанция #${selectedTicket.ticketNumber}` : undefined}
       footer={
         <div className="w-full grid grid-cols-2 gap-2">
           <Button variant="secondary" fullWidth disabled={isSubmitting} onClick={onClose}>Отмена</Button>
           <Button fullWidth loading={isSubmitting} onClick={onConfirmIssue}>
-            {isSubmitting ? 'Выдача…' : (parseFloat(issueFinalCost) || 0) > 0 ? 'Подтвердить выдачу' : 'Выдать без расхода'}
+            {cost > 0 ? `Выдать · ${formatMoney(cost)} TJS` : 'Выдать'}
           </Button>
         </div>
       }
@@ -31,32 +33,19 @@ export const IssueRepairModal: React.FC<IssueRepairModalProps> = ({
         <div className="space-y-3 text-sm">
           <div className="p-3 bg-surface-raised rounded-xl border border-border space-y-1">
             <p className="font-semibold text-fg-muted">{selectedTicket.deviceModel || selectedTicket.model}</p>
-            <p className="text-xs text-fg-subtle">Клиент: {selectedTicket.customerName} ({selectedTicket.customerPhone || 'телефон не указан'})</p>
+            <p className="text-xs text-fg-subtle">{selectedTicket.customerName}{selectedTicket.customerPhone ? ` · ${selectedTicket.customerPhone}` : ''}</p>
           </div>
           <label className="block">
-            <span className="block text-fg-subtle mb-1 text-xs font-semibold">Расход на ремонт, TJS</span>
+            <span className="block text-fg-subtle mb-1 text-xs font-semibold">Стоимость ремонта, TJS · из Центральной кассы</span>
             <input
-              step="0.01"
-              type="number"
+              type="text"
               inputMode="decimal"
-              min="0"
-              placeholder="0.00"
+              placeholder="0"
               value={issueFinalCost}
               onChange={(e) => setIssueFinalCost(e.target.value)}
-              className="w-full rounded-xl bg-surface-raised border border-border px-3 py-2 text-accent font-bold focus:border-accent focus:outline-none"
+              className="w-full rounded-xl bg-surface-raised border border-border px-3 py-2 text-lg text-accent font-bold font-mono focus:border-accent focus:outline-none"
             />
           </label>
-          {selectedTicket.prepaymentTjs ? (
-            <div className="p-2.5 rounded-xl bg-surface-raised border border-border flex justify-between items-center text-xs">
-              <span className="text-fg-subtle">Предоплата по квитанции (справочно)</span>
-              <span className="font-semibold text-fg-muted">{formatMoney(selectedTicket.prepaymentTjs)} TJS</span>
-            </div>
-          ) : null}
-          <p className="text-xs text-fg-subtle">
-            {(parseFloat(issueFinalCost) || 0) > 0
-              ? 'Сумма будет списана с кассы магазина как расход на запчасти и ремонт.'
-              : 'Расход не указан: ремонт будет выдан без списания с кассы.'}
-          </p>
         </div>
       )}
     </Dialog>

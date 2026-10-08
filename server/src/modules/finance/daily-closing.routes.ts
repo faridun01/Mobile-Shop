@@ -34,11 +34,9 @@ export function registerDailyClosingRoutes(app: Express) {
 
       const businessDate = typeof req.query.businessDate === 'string' ? req.query.businessDate : undefined;
       const initialOpeningTjs = typeof req.query.initialOpeningTjs === 'string' ? req.query.initialOpeningTjs : undefined;
-      const initialOpeningUsd = typeof req.query.initialOpeningUsd === 'string' ? req.query.initialOpeningUsd : undefined;
 
       const summary = await DailyClosingService.getSummary(storeId, businessDate, {
         tjs: initialOpeningTjs,
-        usd: initialOpeningUsd,
       });
 
       res.json(summary);
@@ -78,10 +76,8 @@ export function registerDailyClosingRoutes(app: Express) {
         storeId,
         businessDate: req.body?.businessDate,
         actualCashTjs: req.body?.actualCashTjs,
-        actualCashUsd: req.body?.actualCashUsd,
         comment: req.body?.comment,
         initialOpeningCashTjs: req.body?.initialOpeningCashTjs,
-        initialOpeningCashUsd: req.body?.initialOpeningCashUsd,
       });
 
       res.status(201).json(closing);
@@ -107,12 +103,16 @@ export function registerDailyClosingRoutes(app: Express) {
       let storeId = typeof req.query.storeId === 'string' ? req.query.storeId : undefined;
 
       if (user.role === 'SELLER' || user.role === 'PARTNER') {
-        storeId = user.storeId || undefined;
+        // Without a store an employee must see nothing, not every store's closings.
+        if (!user.storeId) {
+          return res.status(403).json({ message: 'Сотрудник не привязан к магазину' });
+        }
+        storeId = user.storeId;
       }
 
       const startDate = typeof req.query.startDate === 'string' ? req.query.startDate : undefined;
       const endDate = typeof req.query.endDate === 'string' ? req.query.endDate : undefined;
-      const limit = req.query.limit !== undefined ? Number(req.query.limit) || undefined : undefined;
+      const limit = req.query.limit !== undefined ? Math.min(Math.max(Number(req.query.limit) || 100, 1), 1000) : undefined;
 
       const list = await DailyClosingService.list({ storeId, startDate, endDate, limit });
       res.json(list);

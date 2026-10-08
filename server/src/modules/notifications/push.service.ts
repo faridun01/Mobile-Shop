@@ -21,6 +21,30 @@ export interface ClientPushSubscription {
 
 const DEFAULT_SUBJECT = 'mailto:admin@mobileshop.tj';
 
+// The server POSTs to whatever endpoint a subscription names, so only real browser push
+// services are accepted — anything else would let a user make the server call internal hosts.
+const PUSH_SERVICE_HOSTS = [
+  'fcm.googleapis.com',
+  'android.googleapis.com',
+  'updates.push.services.mozilla.com',
+  'push.services.mozilla.com',
+  '.push.apple.com',
+  '.notify.windows.com',
+];
+
+export function isAllowedPushEndpoint(endpoint: unknown): endpoint is string {
+  if (typeof endpoint !== 'string' || endpoint.length > 2048) return false;
+  let url: URL;
+  try {
+    url = new URL(endpoint);
+  } catch {
+    return false;
+  }
+  if (url.protocol !== 'https:' || (url.port && url.port !== '443') || url.username || url.password) return false;
+  const host = url.hostname.toLowerCase();
+  return PUSH_SERVICE_HOSTS.some((allowed) => (allowed.startsWith('.') ? host.endsWith(allowed) : host === allowed));
+}
+
 export class PushNotificationService {
   private static configured = false;
   private static warnedMissingKeys = false;
@@ -75,6 +99,9 @@ export class PushNotificationService {
     if (!sub?.endpoint || !sub?.keys?.p256dh || !sub?.keys?.auth) {
       throw new Error('Некорректная push-подписка: нужны endpoint и ключи');
     }
+    if (!isAllowedPushEndpoint(sub.endpoint)) {
+      throw new Error('Push-подписка должна указывать на сервис уведомлений браузера');
+    }
 
     return await prisma.pushSubscription.upsert({
       where: { endpoint: sub.endpoint },
@@ -112,6 +139,8 @@ export class PushNotificationService {
     onExpired?: () => Promise<unknown>
   ): Promise<boolean> {
     if (!this.init()) return false;
+    // Re-checked at send time too, so rows saved before the allowlist existed are never called.
+    if (!isAllowedPushEndpoint(sub.endpoint)) return false;
     const pushSubscription = {
       endpoint: sub.endpoint,
       keys: {

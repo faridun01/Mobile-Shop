@@ -146,13 +146,13 @@ export function MainLayout() {
               <Route path="/suppliers" element={currentUser?.role === 'ADMIN' ? <SuppliersPage /> : <Navigate to="/sale" replace />} />
               <Route path="/customers" element={<CustomersPage />} />
               <Route path="/cash" element={currentUser?.role === 'ADMIN' || currentUser?.role === 'PARTNER' ? <CashDeskPage /> : <Navigate to="/sale" replace />} />
-              <Route path="/cash-collection" element={currentUser?.role === 'ADMIN' || currentUser?.role === 'PARTNER' ? <CashCollectionPage /> : <Navigate to="/sale" replace />} />
+              <Route path="/cash-collection" element={currentUser?.role === 'ADMIN' ? <CashCollectionPage /> : <Navigate to="/sale" replace />} />
               <Route path="/bonuses" element={currentUser?.role === 'ADMIN' ? <BonusesPage /> : <Navigate to="/sale" replace />} />
               <Route path="/expenses" element={<ExpensesPage />} />
               <Route path="/owners" element={currentUser?.role === 'ADMIN' ? <OwnersPage /> : <Navigate to="/sale" replace />} />
               <Route path="/employees" element={currentUser?.role === 'ADMIN' ? <EmployeesPage /> : <Navigate to="/sale" replace />} />
               {/* Отдельная страница «Отчёты» */}
-              <Route path="/reports" element={currentUser?.role === 'ADMIN' || currentUser?.role === 'PARTNER' ? <FinancePage /> : <Navigate to="/sale" replace />} />
+              <Route path="/reports" element={currentUser?.role === 'ADMIN' ? <FinancePage /> : <Navigate to="/sale" replace />} />
               <Route path="/finance" element={<Navigate to="/reports" replace />} />
               <Route path="/audit-log" element={currentUser?.role === 'ADMIN' ? <AuditLogPage /> : <Navigate to="/sale" replace />} />
               <Route path="/settings" element={<SettingsPage />} />

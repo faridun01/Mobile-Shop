@@ -15,18 +15,18 @@ export const TransferLocationSelector: React.FC<TransferLocationSelectorProps> =
   onDestinationChange,
 }) => {
   return (
-    <div className="p-2 sm:p-2.5 border-b border-border bg-surface shrink-0">
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+    <div className="px-2.5 py-1.5 border-b border-border bg-surface shrink-0">
+      <div className="grid grid-cols-2 gap-2 text-xs">
         {/* Откуда */}
         <div className="min-w-0">
-          <div className="flex items-center justify-between mb-1">
-            <span className="text-[11px] font-semibold text-fg-subtle flex items-center gap-1">
-              <StoreIcon className="w-3 h-3 text-accent" />
-              Откуда (Отправитель):
+          <div className="flex items-center justify-between mb-0.5">
+            <span className="text-[10px] font-bold text-fg-subtle flex items-center gap-1 truncate">
+              <StoreIcon className="w-3 h-3 text-accent shrink-0" />
+              <span className="truncate">Откуда</span>
             </span>
           </div>
           {isStoreScoped ? (
-            <div className="h-8.5 px-2.5 rounded-lg bg-surface-raised border border-border text-fg font-semibold text-xs flex items-center gap-2 truncate">
+            <div className="h-8 px-2 rounded-lg bg-surface-raised border border-border text-fg font-medium text-xs flex items-center gap-1.5 truncate">
               <StoreIcon className="w-3.5 h-3.5 text-accent shrink-0" />
               <span className="truncate">{formatStoreName(sellerStoreName)}</span>
             </div>
@@ -34,11 +34,11 @@ export const TransferLocationSelector: React.FC<TransferLocationSelectorProps> =
             <select
               value={fromLocationId ?? ''}
               onChange={(e) => onOriginChange(e.target.value)}
-              className="w-full h-8.5 rounded-lg bg-surface-raised border border-border px-2.5 text-xs font-semibold text-fg focus:border-accent focus:outline-none cursor-pointer truncate"
+              className="w-full h-8 rounded-lg bg-surface-raised border border-border px-2 text-xs font-medium text-fg focus:border-accent focus:outline-none cursor-pointer truncate"
             >
               {stores.map(s => (
                 <option key={s.id} value={s.id}>
-                  {s.isMainWarehouse ? `Центральный склад (${formatStoreName(s.name)})` : formatStoreName(s.name)}
+                  {s.isMainWarehouse ? `Центр. склад (${formatStoreName(s.name)})` : formatStoreName(s.name)}
                 </option>
               ))}
             </select>
@@ -47,22 +47,22 @@ export const TransferLocationSelector: React.FC<TransferLocationSelectorProps> =
 
         {/* Куда */}
         <div className="min-w-0">
-          <div className="flex items-center justify-between mb-1">
-            <span className="text-[11px] font-semibold text-fg-subtle flex items-center gap-1">
-              <Warehouse className="w-3 h-3 text-accent" />
-              Куда (Получатель):
+          <div className="flex items-center justify-between mb-0.5">
+            <span className="text-[10px] font-bold text-fg-subtle flex items-center gap-1 truncate">
+              <Warehouse className="w-3 h-3 text-accent shrink-0" />
+              <span className="truncate">Куда</span>
             </span>
             {!isStoreScoped && !toLocationId && (
-              <span className="text-[10px] text-warning font-medium">выберите склад</span>
+              <span className="text-[9px] text-warning font-semibold truncate">выберите</span>
             )}
           </div>
           {isStoreScoped ? (
-            <div className="h-8.5 px-2.5 rounded-lg bg-surface-raised border border-border text-fg font-semibold text-xs flex items-center gap-2 truncate">
+            <div className="h-8 px-2 rounded-lg bg-surface-raised border border-border text-fg font-medium text-xs flex items-center gap-1.5 truncate">
               <Warehouse className="w-3.5 h-3.5 text-accent shrink-0" />
               <span className="truncate">
                 {mainWarehouse
                   ? (mainWarehouse.isMainWarehouse && !mainWarehouse.name.toLowerCase().includes('центральн')
-                      ? `Центральный склад (${formatStoreName(mainWarehouse.name)})`
+                      ? `Центр. склад (${formatStoreName(mainWarehouse.name)})`
                       : formatStoreName(mainWarehouse.name))
                   : 'Центральный склад'}
               </span>
@@ -72,14 +72,14 @@ export const TransferLocationSelector: React.FC<TransferLocationSelectorProps> =
               value={toLocationId ?? ''}
               onChange={(e) => onDestinationChange(e.target.value)}
               className={cn(
-                'w-full h-8.5 rounded-lg bg-surface-raised border px-2.5 text-xs font-semibold text-fg focus:border-accent focus:outline-none transition-colors cursor-pointer truncate',
-                !toLocationId ? 'border-warning/60 text-warning font-normal' : 'border-border'
+                'w-full h-8 rounded-lg bg-surface-raised border px-2 text-xs font-medium text-fg focus:border-accent focus:outline-none transition-colors cursor-pointer truncate',
+                !toLocationId ? 'border-warning/60 text-warning' : 'border-border'
               )}
             >
-              <option value="">-- Выберите получателя --</option>
+              <option value="">Выберите склад...</option>
               {stores.filter(s => s.id !== fromLocationId).map(s => (
                 <option key={s.id} value={s.id}>
-                  {s.isMainWarehouse ? `Центральный склад (${formatStoreName(s.name)})` : formatStoreName(s.name)}
+                  {s.isMainWarehouse ? `Центр. склад (${formatStoreName(s.name)})` : formatStoreName(s.name)}
                 </option>
               ))}
             </select>

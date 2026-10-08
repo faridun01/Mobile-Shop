@@ -75,6 +75,12 @@ jobs:
       - name: Run End-to-End Business Flow Suite
         run: npm run test:e2e
 
+      # Every role and money flow end to end (sales, exchanges, refunds, transfers, receipts,
+      # supplier payments, expenses, payroll, repairs, shift closing, collection, capital) with
+      # register/ledger reconciliation and realtime delivery; creates and drops its own schema.
+      - name: Run System Acceptance Suite
+        run: npm run test:system
+
       # Each creates and drops its own schema on the service DB. These cover owner-profit
       # allocation (bonuses, expense edits, refunds after exchanges) that test:e2e doesn't.
       - name: Run Financial Regression Suites

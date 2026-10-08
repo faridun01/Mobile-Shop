@@ -156,11 +156,14 @@ export class RepairsService {
         },
       });
 
+      // Repairs are at the shop's expense: the cost is the store's expense (charged to its
+      // owners' profit) but is paid out of Central Cash, never from the store's own register.
       if (D(costVal).gt(0) && newStatus === 'ISSUED') {
         await createExpense(tx, {
           category: 'REPAIR_PARTS',
           amountTjs: costVal,
           storeId: ticket.storeId,
+          sourceAccount: 'Центральная касса',
           comment: `Выдача ремонта #${ticket.ticketNumber}: ${ticket.brand} ${ticket.model}`,
           paidFromCashRegister: true,
           createdByUserId: updatedByUserId,
@@ -173,7 +176,7 @@ export class RepairsService {
           userName: actor.name,
           userRole: actor.role,
           action: 'REPAIR_STATUS_CHANGE',
-          details: `Ремонт #${ticket.ticketNumber} (${ticket.model}): статус "${newStatus}".${newStatus === 'ISSUED' && D(costVal).gt(0) ? ` Расход: ${costVal} TJS списан с кассы магазина.` : ''}`,
+          details: `Ремонт #${ticket.ticketNumber} (${ticket.model}): статус "${newStatus}".${newStatus === 'ISSUED' && D(costVal).gt(0) ? ` Расход: ${costVal} TJS списан с Центральной кассы.` : ''}`,
           targetId: ticketId,
         },
       });

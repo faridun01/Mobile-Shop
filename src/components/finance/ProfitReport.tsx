@@ -739,7 +739,7 @@ export const ProfitReport: React.FC<ProfitReportProps> = ({
                     <p className="text-[10px] text-fg-subtle">{usd(data.mainWarehouseStockCostUsd)}</p>
                   </div>
                   <div className="p-2.5 rounded-xl bg-surface-raised/40 border border-border/80">
-                    <p className="text-[10px] text-fg-subtle uppercase tracking-wider font-semibold">Касса сейчас</p>
+                    <p className="text-[10px] text-fg-subtle uppercase tracking-wider font-semibold">Центральная касса</p>
                     <p className="text-xs sm:text-sm font-bold text-fg mt-0.5">{usd(data.mainWarehouseCashUsd)}</p>
                     <p className="text-[10px] text-fg-subtle">{tjs(data.mainWarehouseCashTjs)}</p>
                   </div>

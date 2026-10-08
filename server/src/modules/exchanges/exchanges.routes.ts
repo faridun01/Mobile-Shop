@@ -13,11 +13,11 @@ export function registerExchangeRoutes(app: Express) {
         return;
       }
 
-      // A SELLER may only process an exchange against a sale from their own store —
-      // otherwise they could move another store's replacement stock via a trade-in.
-      if (req.user!.role === 'SELLER') {
-        const sourceSale = await prisma.sale.findUnique({ where: { id: body.saleId } });
-        if (!sourceSale || sourceSale.storeId !== req.user!.storeId) {
+      // Store staff (SELLER and PARTNER) may only process an exchange against a sale from their
+      // own store — otherwise they could move another store's stock and cash via a trade-in.
+      if (req.user!.role !== 'ADMIN') {
+        const sourceSale = await prisma.sale.findUnique({ where: { id: body.saleId }, select: { storeId: true } });
+        if (!sourceSale || !req.user!.storeId || sourceSale.storeId !== req.user!.storeId) {
           res.status(403).json({ message: 'Этот чек принадлежит другому магазину' });
           return;
         }

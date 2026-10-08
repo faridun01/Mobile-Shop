@@ -8,23 +8,16 @@ import {
   Edit2,
   Trash2,
   Send,
-  Eye,
   Check,
   Copy,
-  ExternalLink,
   MessageCircle,
   Sparkles,
-  User,
-  Clock,
   CheckCircle2,
   HandCoins,
   ArrowUpDown,
   Receipt,
-  Calendar,
   CreditCard,
-  ArrowUpRight,
-  Store as StoreIcon,
-  AlertCircle,
+  X,
 } from 'lucide-react';
 import { apiClient } from '../../api/client';
 import { useAppFields } from '../../context/AppContext';
@@ -35,6 +28,27 @@ import { Dialog } from '../ui/Dialog';
 import { ConfirmDialog } from '../ui/ConfirmDialog';
 import { StatusBanner, StatusMessage } from '../ui/StatusBanner';
 import { LoadingState } from '../ui/Skeleton';
+
+/** GET /customers/:id — money columns arrive as numbers or decimal strings. */
+interface CustomerDetailResponse {
+  totalDebtTjs: number;
+  totalPaidTjs: number;
+  payments: Array<{
+    id: string;
+    amountTjs: number | string;
+    createdAt: string;
+    sourceAccount: string;
+    allocations?: Array<{ sale?: { receiptNumber: number } | null }>;
+  }>;
+  sales: Array<{
+    id: string;
+    receiptNumber: number;
+    totalTjs: number | string;
+    debtAmountTjs: number | string;
+    createdAt: string;
+    store?: { name: string } | null;
+  }>;
+}
 
 interface CustomerListResponse {
   items: Customer[];
@@ -117,7 +131,7 @@ export const CustomersPage: React.FC = () => {
 
   // Detail Modal (Contact Card & DB History)
   const [detailCustomer, setDetailCustomer] = useState<Customer | null>(null);
-  const [detailCustomerFull, setDetailCustomerFull] = useState<any | null>(null);
+  const [detailCustomerFull, setDetailCustomerFull] = useState<CustomerDetailResponse | null>(null);
   const [loadingCustomerFull, setLoadingCustomerFull] = useState(false);
 
   // Push / Promo Modal
@@ -171,7 +185,7 @@ export const CustomersPage: React.FC = () => {
     }
     let cancelled = false;
     setLoadingCustomerFull(true);
-    apiClient<any>(`/customers/${detailCustomer.id}`)
+    apiClient<CustomerDetailResponse>(`/customers/${detailCustomer.id}`)
       .then((res) => {
         if (!cancelled) setDetailCustomerFull(res);
       })
@@ -238,7 +252,7 @@ export const CustomersPage: React.FC = () => {
 
       // If customer detail modal is currently open, refresh full customer state
       if (detailCustomer?.id === paymentCustomer.id) {
-        apiClient<any>(`/customers/${paymentCustomer.id}`).then((res) => {
+        apiClient<CustomerDetailResponse>(`/customers/${paymentCustomer.id}`).then((res) => {
           setDetailCustomerFull(res);
           setDetailCustomer((prev) => (prev ? { ...prev, totalDebtTjs: res.totalDebtTjs, totalPaidTjs: res.totalPaidTjs } : null));
         });
@@ -449,254 +463,155 @@ export const CustomersPage: React.FC = () => {
     <div className="work-screen flex-1 flex flex-col h-full overflow-hidden bg-bg text-fg select-none">
       <StatusBanner message={status} onDismiss={() => setStatus(null)} />
 
-      {/* Header */}
-      <div className="p-3 sm:p-4 border-b border-border bg-surface shrink-0 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div className="flex items-center gap-2.5">
-          <div className="w-10 h-10 rounded-2xl bg-accent/15 border border-accent/25 flex items-center justify-center text-accent shrink-0 shadow-2xs">
-            <Users className="w-5 h-5" />
-          </div>
-          <div>
-            <h1 className="text-base sm:text-lg font-bold text-fg leading-tight flex items-center gap-2">
-              База клиентов
-              <span className="text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full bg-accent/10 text-accent border border-accent/20">
-                {summary.totalCustomers} клиентов
+      {/* Unified Compact Toolbar */}
+      <div className="px-2.5 sm:px-4 py-1.5 sm:py-2 border-b border-border bg-surface shrink-0 flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 sm:gap-2 shadow-2xs">
+        {/* Left: Filter Pills */}
+        <div className="flex items-center gap-1 overflow-x-auto pb-0.5 sm:pb-0 scrollbar-none text-xs">
+          <button
+            type="button"
+            onClick={() => setActiveTab('ALL')}
+            className={`h-7 px-2.5 rounded-lg text-xs font-semibold cursor-pointer transition-all whitespace-nowrap flex items-center gap-1.5 ${
+              activeTab === 'ALL'
+                ? 'bg-accent text-accent-fg shadow-2xs font-bold'
+                : 'bg-surface-raised border border-border text-fg-subtle hover:text-fg'
+            }`}
+          >
+            <span>Все</span>
+            <span
+              className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono font-bold ${
+                activeTab === 'ALL' ? 'bg-black/20 text-white' : 'bg-surface border border-border text-fg-muted'
+              }`}
+            >
+              {summary.totalCustomers || customers.length}
+            </span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              setActiveTab('DEBTORS');
+              setSortBy('DEBT_DESC');
+            }}
+            className={`h-7 px-2.5 rounded-lg text-xs font-semibold cursor-pointer transition-all whitespace-nowrap flex items-center gap-1.5 ${
+              activeTab === 'DEBTORS'
+                ? 'bg-amber-500 text-black shadow-2xs font-bold'
+                : 'bg-surface-raised border border-border text-amber-600 dark:text-amber-400 hover:border-amber-500/40'
+            }`}
+          >
+            <span>С долгом</span>
+            {debtorsCount > 0 && (
+              <span
+                className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono font-bold ${
+                  activeTab === 'DEBTORS' ? 'bg-black/20 text-black' : 'bg-amber-500/15 text-amber-600 dark:text-amber-400'
+                }`}
+              >
+                {debtorsCount}
               </span>
-            </h1>
-            <p className="text-xs text-fg-subtle mt-0.5">
-              Управление покупателями, учёт долгов и приём оплаты в кассу
-            </p>
-          </div>
+            )}
+            {summary.totalDebtTjs > 0 && (
+              <span
+                className={`text-[11px] font-mono font-bold hidden xs:inline ${
+                  activeTab === 'DEBTORS' ? 'text-black' : 'text-amber-600 dark:text-amber-400'
+                }`}
+              >
+                • {formatMoney(summary.totalDebtTjs)} TJS
+              </span>
+            )}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab('WITH_PHONE')}
+            className={`h-7 px-2.5 rounded-lg text-xs font-semibold cursor-pointer transition-all whitespace-nowrap flex items-center gap-1.5 ${
+              activeTab === 'WITH_PHONE'
+                ? 'bg-accent text-accent-fg shadow-2xs font-bold'
+                : 'bg-surface-raised border border-border text-fg-subtle hover:text-fg'
+            }`}
+          >
+            <span>С телефоном</span>
+            <span
+              className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono font-bold ${
+                activeTab === 'WITH_PHONE' ? 'bg-black/20 text-white' : 'bg-surface border border-border text-fg-muted'
+              }`}
+            >
+              {withPhoneCount}
+            </span>
+          </button>
         </div>
 
-        {/* Action Buttons */}
-        <div className="flex items-center gap-2">
-          {isAdmin && (
-            <Button
-              variant="secondary"
-              size="sm"
-              leftIcon={Bell}
-              onClick={() => handleOpenPromoModal()}
-              className="h-9 px-3 text-xs font-semibold cursor-pointer"
+        {/* Right: Search + Sort + New Client button */}
+        <div className="flex items-center gap-1.5 min-w-0 flex-1 sm:flex-initial sm:justify-end">
+          <div className="relative flex-1 sm:w-44 md:w-56 min-w-0">
+            <Search className="w-3.5 h-3.5 text-fg-subtle absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Поиск клиента..."
+              className="w-full h-7.5 pl-8 pr-7 rounded-lg bg-surface-raised border border-border text-xs text-fg placeholder:text-fg-subtle focus:outline-none focus:border-accent"
+            />
+            {search && (
+              <button
+                type="button"
+                onClick={() => setSearch('')}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-fg-subtle hover:text-fg p-0.5 cursor-pointer"
+                title="Очистить"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            )}
+          </div>
+
+          {/* Sorting selector */}
+          <div className="flex items-center gap-1 bg-surface-raised border border-border rounded-lg px-2 h-7.5 shrink-0">
+            <ArrowUpDown className="w-3 h-3 text-accent shrink-0" />
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value as CustomerSortOption)}
+              className="bg-transparent text-xs font-medium text-fg focus:outline-none cursor-pointer max-w-[100px] sm:max-w-none truncate"
+              title="Сортировка клиентов"
             >
-              Отправить акцию
-            </Button>
-          )}
+              <option value="DEBT_DESC">Долг ↓</option>
+              <option value="DEBT_ASC">Долг ↑</option>
+              <option value="NAME_ASC">Имя (А-Я)</option>
+              <option value="NAME_DESC">Имя (Я-А)</option>
+              <option value="NEWEST">Новые</option>
+              <option value="OLDEST">Старые</option>
+              <option value="PAID_DESC">Оплаты ↓</option>
+              <option value="SALES_DESC">Покупки ↓</option>
+            </select>
+          </div>
 
           <Button
             variant="primary"
             size="sm"
             leftIcon={PlusCircle}
             onClick={handleOpenAdd}
-            className="h-9 px-3 font-semibold cursor-pointer"
+            className="h-7.5 px-2.5 text-xs font-bold cursor-pointer shadow-xs shrink-0 whitespace-nowrap"
           >
-            Новый клиент
+            <span>+ Клиент</span>
           </Button>
         </div>
       </div>
 
       {/* Main Body */}
-      <div className="flex-1 min-h-0 overflow-y-auto p-3 sm:p-5 space-y-4">
-        <div className="max-w-6xl mx-auto space-y-4">
+      <div className="flex-1 min-h-0 overflow-y-auto p-2 sm:p-2.5">
+        <div className="max-w-6xl mx-auto space-y-2">
           {error && (
-            <div className="p-3 bg-danger/15 border border-danger/30 text-danger text-xs font-medium rounded-xl">
+            <div className="p-2 bg-danger/15 border border-danger/30 text-danger text-xs font-medium rounded-xl">
               {error}
             </div>
           )}
 
-          {/* STATS: 4 CLEAN, RELEVANT CARDS */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3">
-            {/* Карточка 1: Всего клиентов */}
-            <div
-              onClick={() => setActiveTab('ALL')}
-              className={`p-3 sm:p-4 rounded-2xl bg-surface border transition-colors cursor-pointer shadow-2xs flex items-center gap-3 ${
-                activeTab === 'ALL' ? 'border-accent/40 bg-accent/5' : 'border-border hover:border-border/80'
-              }`}
-            >
-              <div className="w-9 h-9 rounded-xl bg-accent/10 border border-accent/20 flex items-center justify-center text-accent shrink-0">
-                <Users className="w-4 h-4" />
-              </div>
-              <div className="min-w-0">
-                <span className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-fg-subtle block truncate">
-                  Всего клиентов
-                </span>
-                <p className="text-lg sm:text-2xl font-black font-mono text-fg mt-0.5">
-                  {summary.totalCustomers || customers.length}
-                </p>
-              </div>
-            </div>
-
-            {/* Карточка 2: Долги клиентов */}
-            <div
-              onClick={() => {
-                setActiveTab('DEBTORS');
-                setSortBy('DEBT_DESC');
-              }}
-              className={`p-3 sm:p-4 rounded-2xl bg-surface border transition-colors cursor-pointer shadow-2xs flex items-center gap-3 ${
-                activeTab === 'DEBTORS' ? 'border-amber-500/50 bg-amber-500/10' : 'border-border hover:border-amber-500/30'
-              }`}
-              title="Нажмите, чтобы показать всех должников"
-            >
-              <div className="w-9 h-9 rounded-xl bg-amber-500/15 border border-amber-500/25 flex items-center justify-center text-amber-600 dark:text-amber-400 shrink-0">
-                <HandCoins className="w-4 h-4" />
-              </div>
-              <div className="min-w-0">
-                <div className="flex items-center gap-1.5 flex-wrap">
-                  <span className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-fg-subtle block truncate">
-                    Долги клиентов
-                  </span>
-                  <span className="text-[9px] font-bold px-1.5 py-0.2 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 font-mono">
-                    {debtorsCount}
-                  </span>
-                </div>
-                <p className="text-base sm:text-xl font-black font-mono text-amber-600 dark:text-amber-400 mt-0.5 truncate">
-                  {formatMoney(summary.totalDebtTjs)} TJS
-                </p>
-              </div>
-            </div>
-
-            {/* Карточка 3: С телефоном */}
-            <div
-              onClick={() => setActiveTab('WITH_PHONE')}
-              className={`p-3 sm:p-4 rounded-2xl bg-surface border transition-colors cursor-pointer shadow-2xs flex items-center gap-3 ${
-                activeTab === 'WITH_PHONE' ? 'border-info/40 bg-info/5' : 'border-border hover:border-border/80'
-              }`}
-            >
-              <div className="w-9 h-9 rounded-xl bg-info/10 border border-info/20 flex items-center justify-center text-info shrink-0">
-                <Phone className="w-4 h-4" />
-              </div>
-              <div className="min-w-0">
-                <span className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-fg-subtle block truncate">
-                  С телефоном
-                </span>
-                <p className="text-lg sm:text-2xl font-black font-mono text-fg mt-0.5">
-                  {withPhoneCount}
-                </p>
-              </div>
-            </div>
-
-            {/* Карточка 4: Push-акции */}
-            <div
-              onClick={() => setActiveTab('PUSH')}
-              className={`p-3 sm:p-4 rounded-2xl bg-surface border transition-colors cursor-pointer shadow-2xs flex items-center gap-3 ${
-                activeTab === 'PUSH' ? 'border-highlight/40 bg-highlight/5' : 'border-border hover:border-border/80'
-              }`}
-            >
-              <div className="w-9 h-9 rounded-xl bg-highlight/10 border border-highlight/20 flex items-center justify-center text-highlight shrink-0">
-                <Bell className="w-4 h-4" />
-              </div>
-              <div className="min-w-0">
-                <span className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-fg-subtle block truncate">
-                  Push-акции
-                </span>
-                <p className="text-lg sm:text-2xl font-black font-mono text-fg mt-0.5">
-                  {pushSubscribedCount}
-                </p>
-              </div>
-            </div>
-          </div>
-
-          {/* SEARCH, FILTER TABS & SORTING */}
-          <div className="bg-surface rounded-2xl border border-border shadow-2xs p-3 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
-            {/* Filter Tabs */}
-            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 md:pb-0">
-              <button
-                type="button"
-                onClick={() => setActiveTab('ALL')}
-                className={`px-3 py-1.5 rounded-xl text-xs font-semibold cursor-pointer transition-colors whitespace-nowrap ${
-                  activeTab === 'ALL'
-                    ? 'bg-accent/15 text-accent font-bold border border-accent/25'
-                    : 'text-fg-subtle hover:text-fg'
-                }`}
-              >
-                Все ({customers.length})
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setActiveTab('DEBTORS');
-                  setSortBy('DEBT_DESC');
-                }}
-                className={`px-3 py-1.5 rounded-xl text-xs font-semibold cursor-pointer transition-colors whitespace-nowrap flex items-center gap-1.5 ${
-                  activeTab === 'DEBTORS'
-                    ? 'bg-amber-500/15 text-amber-600 dark:text-amber-400 font-bold border border-amber-500/30'
-                    : 'text-fg-subtle hover:text-amber-500'
-                }`}
-              >
-                <span>С долгом</span>
-                {debtorsCount > 0 && (
-                  <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-amber-500/20 font-bold font-mono">
-                    {debtorsCount}
-                  </span>
-                )}
-              </button>
-              <button
-                type="button"
-                onClick={() => setActiveTab('WITH_PHONE')}
-                className={`px-3 py-1.5 rounded-xl text-xs font-semibold cursor-pointer transition-colors whitespace-nowrap ${
-                  activeTab === 'WITH_PHONE'
-                    ? 'bg-accent/15 text-accent font-bold border border-accent/25'
-                    : 'text-fg-subtle hover:text-fg'
-                }`}
-              >
-                С телефоном ({withPhoneCount})
-              </button>
-              <button
-                type="button"
-                onClick={() => setActiveTab('PUSH')}
-                className={`px-3 py-1.5 rounded-xl text-xs font-semibold cursor-pointer transition-colors whitespace-nowrap ${
-                  activeTab === 'PUSH'
-                    ? 'bg-accent/15 text-accent font-bold border border-accent/25'
-                    : 'text-fg-subtle hover:text-fg'
-                }`}
-              >
-                С Push-подпиской ({pushSubscribedCount})
-              </button>
-            </div>
-
-            {/* Search and Sorting Selector */}
-            <div className="flex items-center gap-2 flex-1 md:max-w-md">
-              <div className="relative flex-1">
-                <Search className="w-4 h-4 text-fg-subtle absolute left-3 top-1/2 -translate-y-1/2" />
-                <input
-                  type="text"
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  placeholder="Поиск по имени, номеру, заметке..."
-                  className="w-full h-9 pl-9 pr-3 rounded-xl bg-surface-raised border border-border text-xs text-fg focus:outline-none focus:border-accent"
-                />
-              </div>
-
-              {/* Sorting selector */}
-              <div className="flex items-center gap-1.5 bg-surface-raised border border-border rounded-xl px-2.5 h-9 shrink-0">
-                <ArrowUpDown className="w-3.5 h-3.5 text-accent shrink-0" />
-                <select
-                  value={sortBy}
-                  onChange={(e) => setSortBy(e.target.value as CustomerSortOption)}
-                  className="bg-transparent text-xs font-semibold text-fg focus:outline-none cursor-pointer"
-                  title="Сортировка клиентов"
-                >
-                  <option value="DEBT_DESC">Долг (убывание) ↓</option>
-                  <option value="DEBT_ASC">Долг (возрастание) ↑</option>
-                  <option value="NAME_ASC">Имя (А → Я)</option>
-                  <option value="NAME_DESC">Имя (Я → А)</option>
-                  <option value="NEWEST">Сначала новые</option>
-                  <option value="OLDEST">Сначала старые</option>
-                  <option value="PAID_DESC">Сумма оплат ↓</option>
-                  <option value="SALES_DESC">Число покупок ↓</option>
-                </select>
-              </div>
-            </div>
-          </div>
-
           {/* CUSTOMERS LIST / TABLE */}
-          <div className="bg-surface rounded-2xl border border-border shadow-2xs overflow-hidden">
+          <div className="bg-surface rounded-xl border border-border shadow-2xs overflow-hidden">
             {loading ? (
-              <div className="p-8 text-center">
+              <div className="p-6 text-center">
                 <LoadingState label="Загрузка списка клиентов…" />
               </div>
             ) : displayedCustomers.length === 0 ? (
-              <div className="py-16 text-center text-xs text-fg-subtle space-y-3">
-                <Users className="w-9 h-9 text-fg-subtle/40 mx-auto" />
+              <div className="py-10 text-center text-xs text-fg-subtle space-y-2">
+                <Users className="w-8 h-8 text-fg-subtle/40 mx-auto" />
                 <p className="text-sm font-semibold text-fg-muted">Клиенты не найдены</p>
                 <p className="text-xs text-fg-subtle max-w-xs mx-auto">
                   {search
@@ -706,7 +621,7 @@ export const CustomersPage: React.FC = () => {
                     : 'Сохраняйте контакты покупателей для отправки акций и спецпредложений.'}
                 </p>
                 {activeTab !== 'DEBTORS' && (
-                  <Button size="sm" onClick={handleOpenAdd} className="mt-2">
+                  <Button size="sm" onClick={handleOpenAdd} className="mt-2 h-7.5 px-3 text-xs">
                     Добавить клиента
                   </Button>
                 )}
@@ -722,12 +637,12 @@ export const CustomersPage: React.FC = () => {
                     <div
                       key={c.id}
                       onClick={() => setDetailCustomer(c)}
-                      className="p-3 sm:px-4 sm:py-3.5 hover:bg-surface-raised/40 transition-colors flex flex-col sm:flex-row sm:items-center justify-between gap-3 cursor-pointer group"
+                      className="px-2.5 sm:px-3 py-1.5 sm:py-2 hover:bg-surface-raised/50 transition-colors flex items-center justify-between gap-2 cursor-pointer group"
                     >
                       {/* Left: Avatar + Name + Badges + Note */}
-                      <div className="flex items-center gap-3 min-w-0 flex-1">
+                      <div className="flex items-center gap-2 sm:gap-2.5 min-w-0 flex-1">
                         <div
-                          className={`w-9 h-9 sm:w-10 sm:h-10 rounded-xl border flex items-center justify-center font-bold text-xs shrink-0 select-none ${
+                          className={`w-7.5 h-7.5 sm:w-8 sm:h-8 rounded-lg border flex items-center justify-center font-bold text-[11px] shrink-0 select-none ${
                             hasDebt
                               ? 'bg-amber-500/15 border-amber-500/30 text-amber-600 dark:text-amber-400'
                               : 'bg-accent/10 border-accent/20 text-accent'
@@ -737,38 +652,29 @@ export const CustomersPage: React.FC = () => {
                         </div>
 
                         <div className="min-w-0 flex-1">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <span className="font-bold text-fg group-hover:text-accent transition-colors text-sm">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="font-bold text-fg group-hover:text-accent transition-colors text-xs sm:text-sm truncate">
                               {c.name}
                             </span>
                             {hasDebt && (
-                              <span className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-600 dark:text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-full border border-amber-500/25 font-mono">
+                              <span className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-600 dark:text-amber-400 bg-amber-500/10 px-1.5 py-0.2 rounded-md border border-amber-500/25 font-mono shrink-0">
                                 Долг: {formatMoney(c.totalDebtTjs)} TJS
                               </span>
                             )}
                             {(c.totalPaidTjs || 0) > 0 && (
-                              <span className="text-[10px] text-fg-subtle font-mono hidden md:inline">
+                              <span className="text-[10px] text-fg-subtle font-mono hidden lg:inline">
                                 Оплачено: {formatMoney(c.totalPaidTjs)} TJS
                               </span>
                             )}
-                            {c.hasPushSubscription ? (
-                              <span className="inline-flex items-center gap-1 text-[10px] font-bold text-success bg-success/10 px-2 py-0.5 rounded-full border border-success/20">
-                                <Bell className="w-2.5 h-2.5" /> Push
-                              </span>
-                            ) : c.pushEnabled ? (
-                              <span className="text-[10px] text-fg-subtle bg-surface-raised px-1.5 py-0.5 rounded border border-border hidden sm:inline">
-                                Рассылки
-                              </span>
-                            ) : null}
                           </div>
 
                           {c.note ? (
-                            <p className="text-xs text-fg-subtle mt-0.5 line-clamp-1">
+                            <p className="text-[11px] text-fg-subtle truncate max-w-xs sm:max-w-md">
                               {c.note}
                             </p>
                           ) : (
-                            <p className="text-[10px] text-fg-subtle mt-0.5">
-                              Добавлен {new Date(c.createdAt).toLocaleDateString('ru-RU')}
+                            <p className="text-[10px] text-fg-subtle/80 truncate">
+                              {new Date(c.createdAt).toLocaleDateString('ru-RU')}
                               {c.salesCount ? ` • Покупок: ${c.salesCount}` : ''}
                             </p>
                           )}
@@ -776,13 +682,13 @@ export const CustomersPage: React.FC = () => {
                       </div>
 
                       {/* Middle: Phone + Quick actions */}
-                      <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+                      <div className="flex items-center gap-1.5 shrink-0">
                         {c.phone ? (
-                          <div className="flex items-center gap-1 bg-surface-raised px-2.5 py-1 rounded-xl border border-border">
+                          <div className="flex items-center gap-1 bg-surface-raised px-2 py-0.5 rounded-lg border border-border">
                             <a
                               href={`tel:${c.phone}`}
                               onClick={(e) => e.stopPropagation()}
-                              className="font-mono text-xs font-semibold text-fg hover:text-accent transition-colors"
+                              className="font-mono text-[11px] font-semibold text-fg hover:text-accent transition-colors"
                               title="Позвонить"
                             >
                               {c.phone}
@@ -790,7 +696,7 @@ export const CustomersPage: React.FC = () => {
                             <button
                               type="button"
                               onClick={(e) => handleCopyPhone(c.id, c.phone!, e)}
-                              className="p-1 text-fg-subtle hover:text-fg transition-colors rounded cursor-pointer"
+                              className="p-0.5 text-fg-subtle hover:text-fg transition-colors rounded cursor-pointer"
                               title="Скопировать номер"
                             >
                               {isCopied ? <Check className="w-3 h-3 text-success" /> : <Copy className="w-3 h-3" />}
@@ -801,53 +707,40 @@ export const CustomersPage: React.FC = () => {
                                 target="_blank"
                                 rel="noreferrer"
                                 onClick={(e) => e.stopPropagation()}
-                                className="p-1 text-fg-subtle hover:text-emerald-500 transition-colors rounded"
+                                className="p-0.5 text-fg-subtle hover:text-emerald-500 transition-colors rounded"
                                 title="Написать в WhatsApp"
                               >
-                                <MessageCircle className="w-3.5 h-3.5" />
+                                <MessageCircle className="w-3 h-3" />
                               </a>
                             )}
                           </div>
                         ) : (
-                          <span className="text-xs text-fg-subtle italic">Номер не указан</span>
+                          <span className="text-[10px] text-fg-subtle italic hidden sm:inline">Без номера</span>
                         )}
                       </div>
 
                       {/* Right: Actions */}
-                      <div className="flex items-center justify-end gap-1.5 shrink-0 pt-1 sm:pt-0 border-t sm:border-t-0 border-border/40">
+                      <div className="flex items-center justify-end gap-1 shrink-0">
                         {/* КНОПКА ПРИЕМА ОПЛАТЫ ДОЛГА */}
                         {hasDebt && (
-                          <Button
-                            variant="primary"
-                            size="sm"
-                            onClick={(e) => handleOpenPaymentModal(c, e)}
-                            className="h-8 px-2.5 text-xs font-semibold flex items-center gap-1 cursor-pointer bg-emerald-600 hover:bg-emerald-500 text-white border-0 shadow-2xs"
-                            title="Принять оплату долга в кассу"
-                          >
-                            <HandCoins className="w-3.5 h-3.5" />
-                            <span className="font-bold">Оплата долга</span>
-                          </Button>
-                        )}
-
-                        {isAdmin && (
                           <button
                             type="button"
-                            onClick={(e) => handleOpenPromoModal(c.id, e)}
-                            className="h-8 px-2.5 rounded-lg bg-surface-raised hover:bg-accent/15 hover:text-accent text-fg-muted border border-border text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
-                            title="Отправить акцию этому клиенту"
+                            onClick={(e) => handleOpenPaymentModal(c, e)}
+                            className="h-6.5 px-2 text-[11px] font-bold flex items-center gap-1 cursor-pointer bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg shadow-2xs transition-colors"
+                            title="Принять оплату долга в кассу"
                           >
-                            <Send className="w-3.5 h-3.5 text-accent" />
-                            <span className="hidden md:inline">Акция</span>
+                            <HandCoins className="w-3 h-3" />
+                            <span className="hidden xs:inline sm:inline">Оплата</span>
                           </button>
                         )}
 
                         <button
                           type="button"
                           onClick={(e) => handleOpenEdit(c, e)}
-                          className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-surface-raised text-fg-subtle hover:text-fg transition-colors cursor-pointer"
+                          className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-surface-raised text-fg-subtle hover:text-fg transition-colors cursor-pointer"
                           title="Редактировать контакт"
                         >
-                          <Edit2 className="w-3.5 h-3.5" />
+                          <Edit2 className="w-3 h-3" />
                         </button>
 
                         {isAdmin && (
@@ -857,10 +750,10 @@ export const CustomersPage: React.FC = () => {
                               e.stopPropagation();
                               setDeletingCustomer(c);
                             }}
-                            className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-danger/10 text-fg-subtle hover:text-danger transition-colors cursor-pointer"
+                            className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-danger/10 text-fg-subtle hover:text-danger transition-colors cursor-pointer"
                             title="Удалить"
                           >
-                            <Trash2 className="w-3.5 h-3.5" />
+                            <Trash2 className="w-3 h-3" />
                           </button>
                         )}
                       </div>
@@ -930,19 +823,6 @@ export const CustomersPage: React.FC = () => {
                   <p className="text-xs text-fg-muted mt-0.5">{detailCustomer.note}</p>
                 </div>
               )}
-
-              <div className="pt-2 border-t border-border flex items-center justify-between text-xs">
-                <span className="text-fg-subtle">Push-уведомления:</span>
-                {detailCustomer.hasPushSubscription ? (
-                  <span className="font-bold text-success flex items-center gap-1">
-                    <CheckCircle2 className="w-3.5 h-3.5" /> Подписка активна
-                  </span>
-                ) : detailCustomer.pushEnabled ? (
-                  <span className="text-fg-muted">Согласие дано</span>
-                ) : (
-                  <span className="text-fg-subtle">Отключено</span>
-                )}
-              </div>
             </div>
 
             {/* FINANCIAL OVERVIEW CARD */}
@@ -1009,7 +889,7 @@ export const CustomersPage: React.FC = () => {
                 <p className="text-xs text-fg-subtle py-2 text-center">Платежей по долгам пока не зарегистрировано</p>
               ) : (
                 <div className="divide-y divide-border/60 max-h-48 overflow-y-auto">
-                  {detailCustomerFull.payments.map((p: any) => (
+                  {detailCustomerFull.payments.map((p) => (
                     <div key={p.id} className="py-2 flex items-center justify-between text-xs">
                       <div>
                         <p className="font-bold text-success font-mono">
@@ -1052,7 +932,7 @@ export const CustomersPage: React.FC = () => {
                 <p className="text-xs text-fg-subtle py-2 text-center">Покупок пока нет</p>
               ) : (
                 <div className="divide-y divide-border/60 max-h-48 overflow-y-auto">
-                  {detailCustomerFull.sales.map((s: any) => (
+                  {detailCustomerFull.sales.map((s) => (
                     <div key={s.id} className="py-2 flex items-center justify-between text-xs">
                       <div>
                         <p className="font-bold text-fg">
@@ -1078,23 +958,7 @@ export const CustomersPage: React.FC = () => {
             </div>
 
             {/* Modal Bottom Actions */}
-            <div className="flex items-center justify-between gap-2 pt-2 border-t border-border">
-              {isAdmin && (
-                <Button
-                  variant="primary"
-                  size="sm"
-                  leftIcon={Send}
-                  onClick={() => {
-                    const c = detailCustomer;
-                    setDetailCustomer(null);
-                    handleOpenPromoModal(c.id);
-                  }}
-                  className="cursor-pointer"
-                >
-                  Отправить акцию
-                </Button>
-              )}
-
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-border">
               <div className="flex items-center gap-2 ml-auto">
                 <Button
                   variant="secondary"
@@ -1211,7 +1075,7 @@ export const CustomersPage: React.FC = () => {
         open={isAddEditOpen}
         onClose={() => setIsAddEditOpen(false)}
         title={editingCustomer ? 'Редактировать клиента' : 'Новый клиент'}
-        subtitle={editingCustomer ? 'Изменение контактных данных' : 'Сохранение контакта в базу для акций и уведомлений'}
+        subtitle={editingCustomer ? 'Изменение контактных данных' : 'Сохранение контакта в базу'}
       >
         <form onSubmit={handleSaveCustomer} className="space-y-3.5">
           <div>
@@ -1248,134 +1112,12 @@ export const CustomersPage: React.FC = () => {
             />
           </div>
 
-          <div className="flex items-center justify-between p-3 rounded-xl bg-surface-raised border border-border">
-            <div>
-              <span className="text-xs font-semibold text-fg block">Согласие на получение акций</span>
-              <span className="text-[10px] text-fg-subtle block">Клиент согласен получать уведомления об акциях и скидках</span>
-            </div>
-            <input
-              type="checkbox"
-              checked={formPushEnabled}
-              onChange={(e) => setFormPushEnabled(e.target.checked)}
-              className="w-4 h-4 accent-accent cursor-pointer"
-            />
-          </div>
-
           <div className="flex items-center justify-end gap-2 pt-2 border-t border-border">
             <Button type="button" variant="secondary" onClick={() => setIsAddEditOpen(false)}>
               Отмена
             </Button>
             <Button type="submit" variant="primary" loading={isSaving}>
               Сохранить
-            </Button>
-          </div>
-        </form>
-      </Dialog>
-
-      {/* PUSH / PROMO NOTIFICATION MODAL */}
-      <Dialog
-        open={isPushModalOpen}
-        onClose={() => setIsPushModalOpen(false)}
-        title="Отправка акции клиентам"
-        subtitle="Push-уведомление со специальным предложением"
-      >
-        <form onSubmit={handleSendPush} className="space-y-3.5">
-          {/* Audience selection */}
-          <div>
-            <label className="text-xs font-semibold text-fg block mb-1">Кому отправить *</label>
-            <div className="grid grid-cols-2 gap-1.5">
-              {[
-                { id: 'ALL' as const, label: 'Всем клиентам в базе' },
-                { id: 'CUSTOMER' as const, label: 'Конкретному клиенту' },
-              ].map((opt) => (
-                <button
-                  key={opt.id}
-                  type="button"
-                  onClick={() => setPushTarget(opt.id)}
-                  className={`py-2 px-3 rounded-xl text-xs font-semibold border cursor-pointer transition-colors ${
-                    pushTarget === opt.id
-                      ? 'border-accent bg-accent/15 text-accent font-bold'
-                      : 'border-border bg-surface text-fg-muted hover:text-fg'
-                  }`}
-                >
-                  {opt.label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {pushTarget === 'CUSTOMER' && (
-            <div>
-              <label className="text-xs font-semibold text-fg block mb-1">Выберите клиента *</label>
-              <select
-                value={pushSelectedCustomerId}
-                onChange={(e) => setPushSelectedCustomerId(e.target.value)}
-                required
-                className="w-full h-10 rounded-xl bg-surface border border-border px-3 text-xs font-semibold text-fg focus:outline-none focus:border-accent"
-              >
-                <option value="">Выберите клиента...</option>
-                {customers.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name} {c.phone ? `(${c.phone})` : ''}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
-
-          {/* Quick Promo Templates */}
-          <div>
-            <span className="text-[10px] font-bold uppercase tracking-wider text-fg-subtle block mb-1 flex items-center gap-1">
-              <Sparkles className="w-3 h-3 text-accent" />
-              Быстрые шаблоны акций:
-            </span>
-            <div className="flex flex-wrap gap-1.5">
-              {PROMO_TEMPLATES.map((tmpl, idx) => (
-                <button
-                  key={idx}
-                  type="button"
-                  onClick={() => {
-                    setPushTitle(tmpl.title);
-                    setPushMessage(tmpl.message);
-                  }}
-                  className="px-2.5 py-1 rounded-lg bg-surface-raised hover:bg-surface border border-border text-[11px] text-fg-muted hover:text-accent font-medium transition-colors cursor-pointer"
-                >
-                  {tmpl.label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div>
-            <label className="text-xs font-semibold text-fg block mb-1">Заголовок акции *</label>
-            <input
-              type="text"
-              value={pushTitle}
-              onChange={(e) => setPushTitle(e.target.value)}
-              placeholder="Например: Скидка 15% на чехлы и стекла!"
-              required
-              className="w-full h-10 rounded-xl bg-surface border border-border px-3 text-xs text-fg focus:outline-none focus:border-accent font-semibold"
-            />
-          </div>
-
-          <div>
-            <label className="text-xs font-semibold text-fg block mb-1">Текст сообщения *</label>
-            <textarea
-              value={pushMessage}
-              onChange={(e) => setPushMessage(e.target.value)}
-              rows={3}
-              placeholder="Опишите суть акции, условия или специальное предложение..."
-              required
-              className="w-full p-2.5 rounded-xl bg-surface border border-border text-xs text-fg focus:outline-none focus:border-accent resize-none"
-            />
-          </div>
-
-          <div className="flex items-center justify-end gap-2 pt-2 border-t border-border">
-            <Button type="button" variant="secondary" onClick={() => setIsPushModalOpen(false)}>
-              Отмена
-            </Button>
-            <Button type="submit" variant="primary" loading={isSendingPush} leftIcon={Send}>
-              Отправить акцию
             </Button>
           </div>
         </form>

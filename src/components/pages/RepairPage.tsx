@@ -406,7 +406,7 @@ export const RepairPage: React.FC = () => {
 
   const handleConfirmIssueTicket = async () => {
     if (!selectedTicket || isSubmitting) return;
-    const finalCost = parseFloat(issueFinalCost) || 0;
+    const finalCost = parseFloat(issueFinalCost.replace(',', '.')) || 0;
 
     setIsSubmitting(true);
     try {
@@ -422,7 +422,7 @@ export const RepairPage: React.FC = () => {
       setSelectedTicket(null);
       if (res.success) {
         setStatusBanner({ tone: 'success', text: finalCost > 0
-          ? `Ремонт #${selectedTicket.ticketNumber} выдан клиенту. Расход на ремонт ${formatMoney(finalCost)} TJS списан с кассы магазина.`
+          ? `Ремонт #${selectedTicket.ticketNumber} выдан клиенту. Расход на ремонт ${formatMoney(finalCost)} TJS оплачен из Центральной кассы.`
           : `Ремонт #${selectedTicket.ticketNumber} выдан клиенту без расхода.` });
       } else {
         setStatusBanner({ tone: 'error', text: res.message || 'Ошибка выдачи ремонта' });

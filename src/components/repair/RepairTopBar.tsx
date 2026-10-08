@@ -8,6 +8,7 @@ import {
   Plus
 } from 'lucide-react';
 import { MonthPicker } from '../ui/MonthPicker';
+import { StoreSelector } from '../common/StoreSelector';
 import { formatMoney } from '../../utils/money';
 import { cn } from '../../utils/cn';
 import { RepairTopBarProps } from './types';
@@ -105,16 +106,16 @@ export const RepairTopBar: React.FC<RepairTopBarProps> = ({
         <div className="flex items-center justify-between gap-1.5 text-xs flex-wrap">
           <div className="flex items-center gap-1.5 flex-wrap">
             {!isStoreScoped && isStoreModeCentral && (
-              <select
+              <StoreSelector
                 value={selectedStoreId}
-                onChange={(e) => setSelectedStoreId(e.target.value)}
-                className="h-8 bg-surface-raised border border-border text-fg text-xs font-semibold rounded-lg px-2.5 py-0.5 focus:outline-none focus:border-accent cursor-pointer"
-              >
-                <option value="ALL">Все магазины</option>
-                {retailStores.map(s => (
-                  <option key={s.id} value={s.id}>{s.name}</option>
-                ))}
-              </select>
+                onChange={setSelectedStoreId}
+                stores={retailStores}
+                showAllOption
+                allOptionLabel="Все магазины"
+                allOptionValue="ALL"
+                className="max-w-44"
+                compact
+              />
             )}
 
             <MonthPicker

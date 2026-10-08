@@ -81,15 +81,21 @@ export function registerRefundRoutes(app: Express) {
         : [];
       const profits = new Map<string, typeof profitLogs>();
       for (const log of profitLogs) if (log.targetId) profits.set(log.targetId, [...(profits.get(log.targetId) ?? []), log]);
+      // Purchase cost and profit are ADMIN-only, the same rule /api/devices applies; store
+      // staff get the receipt itself without them.
+      const showCost = req.user!.role === 'ADMIN';
       res.json(sales.map((sale) => {
         const fallbackCost = sale.saleItems.reduce((sum, item) => D(sum).plus(item.costBasisUsd), D(0));
         return {
           ...sale,
           saleItems: sale.saleItems.map((item: any) => ({
             ...item,
+            ...(showCost ? {} : { costBasisUsd: 0 }),
             ram: item.device?.ram || item.ram || undefined,
           })),
-          recognizedProfitUsd: calculateRecognizedProfit(profits.get(sale.id) ?? [], D(sale.totalUsd).minus(fallbackCost))
+          recognizedProfitUsd: showCost
+            ? calculateRecognizedProfit(profits.get(sale.id) ?? [], D(sale.totalUsd).minus(fallbackCost))
+            : undefined,
         };
       }));
     } catch (error) {

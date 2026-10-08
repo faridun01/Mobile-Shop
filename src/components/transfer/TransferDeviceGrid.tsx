@@ -6,7 +6,6 @@ import {
   Check,
   Minus,
   ArrowLeftRight,
-  ArrowUpDown,
   CheckSquare,
   Smartphone,
   Layers,
@@ -16,7 +15,7 @@ import {
 import { formatMoney } from '../../utils/money';
 import { LoadingState } from '../ui/Skeleton';
 import { cn } from '../../utils/cn';
-import { TransferDeviceGridProps, TransferDeviceSortOption } from './types';
+import { TransferDeviceGridProps } from './types';
 import { getPhoneColorHex, formatRam } from '../../utils/phoneSpecs';
 import { Device } from '../../types';
 
@@ -48,8 +47,8 @@ export const TransferDeviceGrid: React.FC<TransferDeviceGridProps> = ({
   onScanDevice,
   isInitialLoading,
   fromStoreName,
-  sortBy,
-  setSortBy,
+  sortBy = 'SELECTED_FIRST',
+  setSortBy: _setSortBy,
   selectedBrand,
   setSelectedBrand,
   availableBrands,
@@ -196,10 +195,10 @@ export const TransferDeviceGrid: React.FC<TransferDeviceGridProps> = ({
   return (
     <>
       {/* Device search & actions bar */}
-      <div className="p-2 sm:p-2.5 bg-surface border-b border-border shrink-0 space-y-2">
-        <div className="flex items-center gap-2">
+      <div className="px-2.5 py-1.5 bg-surface border-b border-border shrink-0 space-y-1.5">
+        <div className="flex items-center gap-1.5">
           <div className="relative flex-1 min-w-0">
-            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-fg-subtle" />
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-fg-subtle pointer-events-none" />
             <input
               type="text"
               value={searchQuery ?? ''}
@@ -212,9 +211,9 @@ export const TransferDeviceGrid: React.FC<TransferDeviceGridProps> = ({
               }}
               enterKeyHint="search"
               placeholder="Поиск устройства (модель, IMEI, цвет)..."
-              className="w-full h-9 rounded-xl bg-surface-raised border border-border pl-8 pr-8 text-xs text-fg placeholder:text-fg-subtle focus:border-accent focus:outline-none transition-colors"
+              className="w-full h-8 rounded-lg bg-surface-raised border border-border pl-8 pr-7 text-xs text-fg placeholder:text-fg-subtle focus:border-accent focus:outline-none transition-colors"
             />
-            {searchQuery ? (
+            {searchQuery && (
               <button
                 type="button"
                 onClick={() => setSearchQuery('')}
@@ -223,215 +222,191 @@ export const TransferDeviceGrid: React.FC<TransferDeviceGridProps> = ({
               >
                 <X className="w-3.5 h-3.5" />
               </button>
-            ) : (
-              <button
-                type="button"
-                onClick={onScanDevice}
-                className="absolute right-2 top-1/2 -translate-y-1/2 text-accent hover:text-accent-strong p-0.5 transition-colors cursor-pointer"
-                title="Сканировать IMEI или штрихкод"
-              >
-                <Scan className="w-3.5 h-3.5" />
-              </button>
             )}
           </div>
 
-          {/* Scan button on mobile/desktop */}
+          {/* Single Scanner Button */}
           <button
             type="button"
             onClick={onScanDevice}
-            className="h-9 px-2.5 sm:px-3 rounded-xl bg-surface-raised hover:bg-surface border border-border hover:border-accent text-accent text-xs font-semibold flex items-center gap-1.5 shrink-0 transition-colors cursor-pointer"
-            title="Сканировать сканером или камерой"
+            className="h-8 px-2.5 rounded-lg bg-surface-raised hover:bg-surface border border-border hover:border-accent text-accent text-xs font-semibold flex items-center gap-1.5 shrink-0 transition-colors cursor-pointer"
+            title="Сканировать IMEI или штрихкод"
           >
             <Scan className="w-3.5 h-3.5" />
             <span className="hidden sm:inline">Сканер</span>
           </button>
         </div>
 
-        {/* Brand & Selection Filter Pills */}
-        <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5 pt-0.5 scrollbar-none text-xs">
-          <button
-            type="button"
-            onClick={() => {
-              setSelectedBrand('ALL');
-              setOnlySelected(false);
-            }}
-            className={cn(
-              'h-7 px-2.5 rounded-lg text-xs font-semibold shrink-0 transition-all cursor-pointer flex items-center gap-1.5',
-              selectedBrand === 'ALL' && !onlySelected
-                ? 'bg-accent text-accent-fg shadow-2xs font-bold'
-                : 'bg-surface-raised hover:bg-surface border border-border text-fg-subtle hover:text-fg'
-            )}
-          >
-            <span>Все</span>
-            <span
-              className={cn(
-                'text-[10px] px-1 py-0.2 rounded font-mono',
-                selectedBrand === 'ALL' && !onlySelected
-                  ? 'bg-accent-fg/20 text-accent-fg'
-                  : 'bg-surface text-fg-subtle'
-              )}
-            >
-              {totalAvailableCount || availableDevices.length}
-            </span>
-          </button>
-
-          {/* Quick Filter: Selected Only */}
-          {selectedCount > 0 && (
+        {/* Brand & Selection Filter Pills (ONLY show when multiple brands exist or items are selected) */}
+        {(availableBrands.length > 1 || selectedCount > 0) && (
+          <div className="flex items-center gap-1 overflow-x-auto pb-0.5 scrollbar-none text-xs">
             <button
               type="button"
-              onClick={() => setOnlySelected(!onlySelected)}
+              onClick={() => {
+                setSelectedBrand('ALL');
+                setOnlySelected(false);
+              }}
               className={cn(
-                'h-7 px-2.5 rounded-lg text-xs font-semibold shrink-0 transition-all cursor-pointer flex items-center gap-1.5',
-                onlySelected
-                  ? 'bg-emerald-600 text-white shadow-2xs font-bold'
-                  : 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30 hover:bg-emerald-500/20'
+                'h-6.5 px-2 rounded-md text-[11px] font-semibold shrink-0 transition-all cursor-pointer flex items-center gap-1',
+                selectedBrand === 'ALL' && !onlySelected
+                  ? 'bg-accent text-accent-fg shadow-2xs font-bold'
+                  : 'bg-surface-raised hover:bg-surface border border-border text-fg-subtle hover:text-fg'
               )}
             >
-              <CheckSquare className="w-3 h-3 shrink-0" />
-              <span>Выбранные</span>
-              <span className="text-[10px] px-1 py-0.2 rounded bg-white/20 font-mono">
-                {selectedCount}
-              </span>
-            </button>
-          )}
-
-          {/* Brand Pills */}
-          {availableBrands.map((b) => {
-            const isBrandActive = selectedBrand === b.brand && !onlySelected;
-            return (
-              <button
-                key={b.brand}
-                type="button"
-                onClick={() => {
-                  setOnlySelected(false);
-                  setSelectedBrand(selectedBrand === b.brand ? 'ALL' : b.brand);
-                }}
+              <span>Все</span>
+              <span
                 className={cn(
-                  'h-7 px-2.5 rounded-lg text-xs font-semibold shrink-0 transition-all cursor-pointer flex items-center gap-1.5',
-                  isBrandActive
-                    ? 'bg-accent text-accent-fg shadow-2xs font-bold'
-                    : 'bg-surface-raised hover:bg-surface border border-border text-fg-subtle hover:text-fg'
+                  'text-[10px] px-1 py-0.1 rounded font-mono',
+                  selectedBrand === 'ALL' && !onlySelected
+                    ? 'bg-accent-fg/20 text-accent-fg'
+                    : 'bg-surface text-fg-subtle'
                 )}
               >
-                <span>{b.brand}</span>
-                <span
-                  className={cn(
-                    'text-[10px] px-1 py-0.2 rounded font-mono',
-                    isBrandActive
-                      ? 'bg-accent-fg/20 text-accent-fg'
-                      : 'bg-surface text-fg-subtle'
-                  )}
-                >
-                  {b.count}
+                {totalAvailableCount || availableDevices.length}
+              </span>
+            </button>
+
+            {/* Quick Filter: Selected Only */}
+            {selectedCount > 0 && (
+              <button
+                type="button"
+                onClick={() => setOnlySelected(!onlySelected)}
+                className={cn(
+                  'h-6.5 px-2 rounded-md text-[11px] font-semibold shrink-0 transition-all cursor-pointer flex items-center gap-1',
+                  onlySelected
+                    ? 'bg-emerald-600 text-white shadow-2xs font-bold'
+                    : 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30 hover:bg-emerald-500/20'
+                )}
+              >
+                <CheckSquare className="w-3 h-3 shrink-0" />
+                <span>Выбранные</span>
+                <span className="text-[10px] px-1 py-0.1 rounded bg-white/20 font-mono">
+                  {selectedCount}
                 </span>
               </button>
-            );
-          })}
-        </div>
+            )}
+
+            {/* Brand Pills */}
+            {availableBrands.map((b) => {
+              const isBrandActive = selectedBrand === b.brand && !onlySelected;
+              return (
+                <button
+                  key={b.brand}
+                  type="button"
+                  onClick={() => {
+                    setOnlySelected(false);
+                    setSelectedBrand(selectedBrand === b.brand ? 'ALL' : b.brand);
+                  }}
+                  className={cn(
+                    'h-6.5 px-2 rounded-md text-[11px] font-semibold shrink-0 transition-all cursor-pointer flex items-center gap-1',
+                    isBrandActive
+                      ? 'bg-accent text-accent-fg shadow-2xs font-bold'
+                      : 'bg-surface-raised hover:bg-surface border border-border text-fg-subtle hover:text-fg'
+                  )}
+                >
+                  <span>{b.brand}</span>
+                  <span
+                    className={cn(
+                      'text-[10px] px-1 py-0.1 rounded font-mono',
+                      isBrandActive
+                        ? 'bg-accent-fg/20 text-accent-fg'
+                        : 'bg-surface text-fg-subtle'
+                    )}
+                  >
+                    {b.count}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {/* Devices Toolbar: Counts + View Mode + Sorting + Actions */}
-      <div className="flex flex-wrap items-center justify-between gap-2 text-xs px-2.5 sm:px-3 py-1.5 border-b border-border/60 bg-surface/50 shrink-0">
-        <div className="flex items-center gap-2">
-          <span className="font-semibold text-fg-muted text-[11px]">
-            {onlySelected ? 'Выбранные устройства' : 'Доступные товары'}
+      <div className="flex items-center justify-between gap-1.5 text-xs px-2.5 py-1 border-b border-border/60 bg-surface/50 shrink-0 min-h-[34px]">
+        <div className="flex items-center gap-1.5 min-w-0">
+          <span className="font-bold text-fg-muted text-[11px] truncate">
+            {onlySelected ? 'Выбрано' : 'Товары'}
           </span>
-          <span className="px-1.5 py-0.2 rounded-full bg-surface-raised border border-border/80 text-[10px] font-bold text-fg-subtle font-mono">
+          <span className="px-1.5 py-0.2 rounded bg-surface-raised border border-border/80 text-[10px] font-bold text-fg-subtle font-mono shrink-0">
             {viewMode === 'BY_MODEL' ? `${modelGroups.length} мод. (${availableDevices.length} шт.)` : `${availableDevices.length} шт.`}
           </span>
           {selectedCount > 0 && !onlySelected && (
-            <span className="px-2 py-0.5 rounded-full bg-accent/15 border border-accent/30 text-accent font-bold text-[10px] flex items-center gap-1">
+            <span className="px-1.5 py-0.2 rounded bg-accent/15 border border-accent/30 text-accent font-bold text-[10px] flex items-center gap-0.5 shrink-0">
               <Check className="w-2.5 h-2.5 stroke-3" />
-              <span>Выбрано: {selectedCount}</span>
+              <span>{selectedCount}</span>
             </span>
           )}
         </div>
 
-        <div className="flex items-center gap-2 flex-wrap ml-auto">
-          {/* View mode toggle: By model vs Individual */}
-          <div className="inline-flex rounded-xl bg-surface-raised border border-border p-0.5 shrink-0">
-            <button
-              type="button"
-              onClick={() => setViewMode('BY_MODEL')}
-              className={cn(
-                'h-7 px-2.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer',
-                viewMode === 'BY_MODEL'
-                  ? 'bg-accent text-accent-fg shadow-2xs font-bold'
-                  : 'text-fg-subtle hover:text-fg'
-              )}
-              title="Группировка по моделям (список)"
-            >
-              <Layers className="w-3.5 h-3.5" />
-              <span>По моделям</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setViewMode('BY_DEVICE')}
-              className={cn(
-                'h-7 px-2.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer',
-                viewMode === 'BY_DEVICE'
-                  ? 'bg-accent text-accent-fg shadow-2xs font-bold'
-                  : 'text-fg-subtle hover:text-fg'
-              )}
-              title="Поштучный список устройств"
-            >
-              <List className="w-3.5 h-3.5" />
-              <span>Поштучно</span>
-            </button>
+        {(availableDevices.length > 0 || totalAvailableCount > 0 || searchQuery || onlySelected) && (
+          <div className="flex items-center gap-1.5 shrink-0">
+            {/* View mode toggle: By model vs Individual */}
+            <div className="inline-flex rounded-lg bg-surface-raised border border-border p-0.5 shrink-0">
+              <button
+                type="button"
+                onClick={() => setViewMode('BY_MODEL')}
+                className={cn(
+                  'h-6 px-1.5 sm:px-2 rounded text-[11px] font-semibold flex items-center gap-1 transition-all cursor-pointer',
+                  viewMode === 'BY_MODEL'
+                    ? 'bg-accent text-accent-fg shadow-2xs font-bold'
+                    : 'text-fg-subtle hover:text-fg'
+                )}
+                title="Группировка по моделям"
+              >
+                <Layers className="w-3 h-3" />
+                <span className="hidden xs:inline sm:inline">Модели</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewMode('BY_DEVICE')}
+                className={cn(
+                  'h-6 px-1.5 sm:px-2 rounded text-[11px] font-semibold flex items-center gap-1 transition-all cursor-pointer',
+                  viewMode === 'BY_DEVICE'
+                    ? 'bg-accent text-accent-fg shadow-2xs font-bold'
+                    : 'text-fg-subtle hover:text-fg'
+                )}
+                title="Поштучный список"
+              >
+                <List className="w-3 h-3" />
+                <span className="hidden xs:inline sm:inline">Штучно</span>
+              </button>
+            </div>
+
+            {availableDevices.length > 0 && (
+              <button
+                type="button"
+                onClick={onSelectAllFiltered}
+                className="text-[11px] text-accent hover:underline font-bold cursor-pointer whitespace-nowrap hidden sm:inline"
+              >
+                Все ({availableDevices.length})
+              </button>
+            )}
+
+            {selectedCount > 0 && (
+              <button
+                type="button"
+                onClick={onClearSelection}
+                className="text-[11px] text-fg-subtle hover:text-danger hover:underline cursor-pointer whitespace-nowrap"
+              >
+                Сброс ({selectedCount})
+              </button>
+            )}
           </div>
-
-          {/* Sort Selector Dropdown */}
-          <div className="flex items-center gap-1 text-[11px] bg-surface-raised border border-border rounded-lg px-2 py-1">
-            <ArrowUpDown className="w-3 h-3 text-accent shrink-0" />
-            <span className="text-fg-subtle hidden sm:inline">Сортировка:</span>
-            <select
-              value={sortBy}
-              onChange={(e) => setSortBy(e.target.value as TransferDeviceSortOption)}
-              className="bg-transparent text-xs font-semibold text-fg focus:outline-none cursor-pointer pr-1"
-            >
-              <option value="SELECTED_FIRST">Сначала выбранные</option>
-              <option value="NAME_ASC">Модель: А → Я</option>
-              <option value="NAME_DESC">Модель: Я → А</option>
-              <option value="NEWEST">Сначала новые</option>
-              <option value="OLDEST">Сначала старые</option>
-              <option value="PRICE_DESC">Цена: по убыванию</option>
-              <option value="PRICE_ASC">Цена: по возрастанию</option>
-            </select>
-          </div>
-
-          {availableDevices.length > 0 && (
-            <button
-              type="button"
-              onClick={onSelectAllFiltered}
-              className="text-[11px] text-accent hover:underline font-bold cursor-pointer whitespace-nowrap"
-            >
-              Выбрать все ({availableDevices.length})
-            </button>
-          )}
-
-          {selectedCount > 0 && (
-            <button
-              type="button"
-              onClick={onClearSelection}
-              className="text-[11px] text-fg-subtle hover:text-danger hover:underline cursor-pointer whitespace-nowrap"
-            >
-              Сбросить ({selectedCount})
-            </button>
-          )}
-        </div>
+        )}
       </div>
 
       {/* Devices Content */}
-      <div className="flex-1 overflow-y-auto bg-bg p-2 sm:p-2.5 space-y-2 pb-24 flex flex-col">
+      <div className="flex-1 bg-bg p-2 sm:p-2.5 space-y-2 pb-28 flex flex-col">
         {isInitialLoading ? (
           <LoadingState label="Загрузка устройств…" />
         ) : availableDevices.length === 0 ? (
-          <div className="flex-1 flex flex-col items-center justify-center p-6 text-center my-auto min-h-[260px]">
-            <div className="w-13 h-13 rounded-2xl bg-accent/10 border border-accent/20 flex items-center justify-center text-accent mb-3 shadow-xs">
-              <ArrowLeftRight className="w-6 h-6" />
+          <div className="flex-1 flex flex-col items-center justify-center p-4 text-center my-auto min-h-[160px]">
+            <div className="w-10 h-10 rounded-xl bg-accent/10 border border-accent/20 flex items-center justify-center text-accent mb-2.5 shadow-xs">
+              <ArrowLeftRight className="w-5 h-5" />
             </div>
 
-            <h3 className="text-sm sm:text-base font-bold text-fg">
+            <h3 className="text-xs sm:text-sm font-bold text-fg">
               {onlySelected
                 ? 'Нет выбранных устройств'
                 : searchQuery
@@ -441,17 +416,17 @@ export const TransferDeviceGrid: React.FC<TransferDeviceGridProps> = ({
                 : 'Нет доступных устройств'}
             </h3>
 
-            <p className="text-xs text-fg-subtle mt-1.5 max-w-xs leading-relaxed">
+            <p className="text-[11px] text-fg-subtle mt-1 max-w-xs leading-relaxed">
               {onlySelected
                 ? 'Вы пока не выбрали ни одного устройства для перемещения.'
                 : searchQuery
-                ? `По запросу «${searchQuery}» устройства не найдены в этой точке.`
+                ? `По запросу «${searchQuery}» устройства не найдены.`
                 : selectedBrand !== 'ALL'
                 ? `В точке «${fromStoreName}» нет устройств бренда ${selectedBrand}.`
-                : `В локации «${fromStoreName}» сейчас нет товаров на балансе для перемещения.`}
+                : `В локации «${fromStoreName}» сейчас нет товаров на балансе.`}
             </p>
 
-            <div className="mt-4 flex items-center gap-2 flex-wrap justify-center">
+            <div className="mt-3 flex items-center gap-2 flex-wrap justify-center">
               {(searchQuery || selectedBrand !== 'ALL' || onlySelected) && (
                 <button
                   type="button"
@@ -460,18 +435,18 @@ export const TransferDeviceGrid: React.FC<TransferDeviceGridProps> = ({
                     setSelectedBrand('ALL');
                     setOnlySelected(false);
                   }}
-                  className="h-8.5 px-3.5 rounded-xl bg-surface-raised border border-border text-fg text-xs font-semibold hover:border-accent hover:text-accent transition-all cursor-pointer flex items-center gap-1.5"
+                  className="h-7.5 px-3 rounded-lg bg-surface-raised border border-border text-fg text-xs font-semibold hover:border-accent hover:text-accent transition-all cursor-pointer flex items-center gap-1.5"
                 >
-                  <X className="w-3.5 h-3.5" />
+                  <X className="w-3 h-3" />
                   <span>Сбросить фильтры</span>
                 </button>
               )}
               <button
                 type="button"
                 onClick={onScanDevice}
-                className="h-8.5 px-3.5 rounded-xl bg-surface-raised border border-border text-accent text-xs font-semibold hover:border-accent hover:bg-accent/10 transition-all cursor-pointer flex items-center gap-1.5"
+                className="h-7.5 px-3 rounded-lg bg-surface-raised border border-border text-accent text-xs font-semibold hover:border-accent hover:bg-accent/10 transition-all cursor-pointer flex items-center gap-1.5"
               >
-                <Scan className="w-3.5 h-3.5" />
+                <Scan className="w-3 h-3" />
                 <span>Сканировать IMEI</span>
               </button>
             </div>

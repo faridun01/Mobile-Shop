@@ -3,20 +3,12 @@ import { useAppFields } from '../../context/AppContext';
 import { RestrictedAccess } from '../ui/RestrictedAccess';
 import { StatusBanner, StatusMessage } from '../ui/StatusBanner';
 import { ProfitReport } from '../finance/ProfitReport';
-import { FALLBACK_EXCHANGE_RATE } from '../../utils/exchangeRate';
 import { getBusinessDateKey } from '../../utils/businessDate';
-import {
-  TrendingUp,
-} from 'lucide-react';
 
 export const FinancePage: React.FC = () => {
-  const { currentUser, todayRate } = useAppFields(
-    'currentUser',
-    'todayRate'
-  );
+  const { currentUser } = useAppFields('currentUser');
 
   const isSeller = currentUser?.role === 'SELLER';
-  const rate = todayRate?.rate || FALLBACK_EXCHANGE_RATE;
 
   const [status, setStatus] = useState<StatusMessage | null>(null);
 
@@ -49,35 +41,9 @@ export const FinancePage: React.FC = () => {
     );
   }
 
-  const pageTitle = 'Отчёты';
-
   return (
     <div className="work-screen flex-1 flex flex-col h-full overflow-hidden bg-bg text-fg select-none">
       <StatusBanner message={status} onDismiss={() => setStatus(null)} />
-
-      {/* Top Header Bar */}
-      <div className="p-3 sm:p-4 border-b border-border bg-surface shrink-0 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div className="flex items-center gap-2.5">
-          <div className="w-9 h-9 rounded-xl bg-accent/15 border border-accent/25 flex items-center justify-center text-accent shrink-0">
-            <TrendingUp className="w-5 h-5" />
-          </div>
-          <div>
-            <h1 className="text-base sm:text-lg font-bold text-fg leading-tight flex items-center gap-2">
-              {pageTitle}
-              {currentUser?.role === 'ADMIN' && (
-                <span className="text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full bg-accent/10 text-accent border border-accent/20">
-                  1 USD = {rate.toFixed(2)} TJS
-                </span>
-              )}
-            </h1>
-            <p className="text-[11px] text-fg-subtle">
-              Финансовые результаты, доходы, расходы и маржинальность бизнеса
-            </p>
-          </div>
-        </div>
-
-
-      </div>
 
       {/* Main Report Content */}
       <div className="flex-1 overflow-y-auto">

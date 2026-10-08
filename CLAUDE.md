@@ -38,6 +38,7 @@ DB-backed integration suites are plain `tsx` scripts in `scripts/` (not vitest).
 
 ```bash
 npm run test:e2e             # scripts/test-e2e-isolated.ts: runs test-e2e-all.ts (boots `app`, drives the HTTP API) in a temporary schema
+npm run test:system          # every role and money flow end to end, with register/ledger reconciliation and WebSocket checks
 npm run test:store-merge     # store merge on a real temporary schema
 npm run audit:bonus-collections  # read-only check of collections and the Bonus Account
 npm run test:audit-fixes     # creates and drops its own schema, runs migrate + seed + e2e inside it

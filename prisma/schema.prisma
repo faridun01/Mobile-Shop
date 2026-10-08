@@ -242,8 +242,10 @@ model CashHandover {
 }
 
 // Daily cash closing: End-of-shift / end-of-day register count and reconciliation.
-// Compares expected cash (opening + cash sales - refunds - expenses - collections)
-// against actual counted cash by the cashier, recording any overage or shortage.
+// Compares expected cash (opening + cash sales - refunds - expenses - collections + other
+// register moves) against actual counted cash by the cashier, recording any overage or shortage.
+// The drawer is counted in TJS; every *Usd column is the book equivalent (flows at each
+// record's own rate, the discrepancy at `exchangeRate`), not a separate dollar drawer.
 // Does NOT wipe the register or mutate underlying balances, so ongoing operations continue cleanly.
 model DailyCashClosing {
   id                 String   @id @default(uuid())
@@ -262,12 +264,17 @@ model DailyCashClosing {
   refundsCashUsd     Decimal  @db.Decimal(14, 2)
   collectionsCashTjs Decimal  @db.Decimal(14, 2)
   collectionsCashUsd Decimal  @db.Decimal(14, 2)
+  // Net of customer cash debt repayments, owner deposits/withdrawals and supplier payments.
+  otherCashTjs       Decimal  @default(0) @db.Decimal(14, 2)
+  otherCashUsd       Decimal  @default(0) @db.Decimal(14, 2)
   expectedCashTjs    Decimal  @db.Decimal(14, 2)
   expectedCashUsd    Decimal  @db.Decimal(14, 2)
   actualCashTjs      Decimal  @db.Decimal(14, 2)
   actualCashUsd      Decimal  @db.Decimal(14, 2)
   differenceTjs      Decimal  @db.Decimal(14, 2)
   differenceUsd      Decimal  @db.Decimal(14, 2)
+  // Closing day's USD/TJS rate the discrepancy was valued at (null on early closings).
+  exchangeRate       Decimal? @db.Decimal(10, 4)
   comment            String?
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt

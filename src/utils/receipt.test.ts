@@ -25,6 +25,14 @@ describe('receipt text', () => {
     expect(text).toContain('Покупатель: Бехруз');
   });
 
+  it('prints seller, store address and the configured warranty', () => {
+    const text = formatReceiptText(sale, { storeAddress: 'ул. Рудаки, 10', warranty: '30 дней' });
+    expect(text).toContain('Продавец: Ахмад');
+    expect(text).toContain('Адрес: ул. Рудаки, 10');
+    expect(text).toContain('Гарантия: 30 дней');
+    expect(formatReceiptText(sale, { warranty: '' })).not.toContain('Гарантия');
+  });
+
   it('can leave the store out and names single payment methods', () => {
     expect(formatReceiptText(sale, { showStore: false })).not.toContain('Магазин:');
     expect(paymentSummary({ paymentMethod: 'CARD', cashAmountTjs: 0, cardAmountTjs: 10 })).toBe('Банк');

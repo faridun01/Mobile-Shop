@@ -39,10 +39,10 @@ try {
 
   // Саховат with its seller Фаридун; the seeded partner works in Сиёма.
   await db.store.create({ data: { id: 'store-sahovat', name: 'Саховат' } });
-  const createdSeller = await call(admin, 'POST', '/users', { login: 'faridun', password: 'seller123', name: 'Фаридун', role: 'SELLER', storeId: 'store-sahovat' });
+  const createdSeller = await call(admin, 'POST', '/users', { login: 'faridun', password: 'seller-pass-123', name: 'Фаридун', role: 'SELLER', storeId: 'store-sahovat' });
   assert.equal(createdSeller.status, 201, JSON.stringify(createdSeller));
   assert.equal((await call(admin, 'PATCH', '/users/user-partner', { storeId: 'store-siyoma' })).status, 200);
-  const seller = await login('faridun', 'seller123');
+  const seller = await login('faridun', 'seller-pass-123');
   const partner = await login('partner', 'partner123');
   const otherSeller = await login('ahmad', 'seller123');
 

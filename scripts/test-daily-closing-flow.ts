@@ -42,7 +42,6 @@ async function main() {
     storeId: store.id,
     businessDate: summaryBefore.businessDate,
     actualCashTjs,
-    actualCashUsd: 0,
     comment: 'Излишек в кассе +100 TJS проверка фиксации',
   });
 
@@ -68,7 +67,7 @@ async function main() {
   });
 
   if (!summaryAfter.alreadyClosed) throw new Error('Expected alreadyClosed to be true');
-  if (D(summaryAfter.closing.differenceTjs).toNumber() !== 100) {
+  if (D(summaryAfter.closing!.differenceTjs).toNumber() !== 100) {
     throw new Error('Discrepancy was not preserved in closing summary!');
   }
 

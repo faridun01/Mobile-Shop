@@ -8,6 +8,7 @@ import { StatusBanner, StatusMessage } from '../ui/StatusBanner';
 import { LoadingState } from '../ui/Skeleton';
 import { Button } from '../ui/Button';
 import { Dialog } from '../ui/Dialog';
+import { StoreSelector } from '../common/StoreSelector';
 import {
   PackagePlus,
   Barcode,
@@ -67,8 +68,26 @@ export const StoreReceiptPage: React.FC = () => {
   const [historyLoading, setHistoryLoading] = useState(false);
   const [historySearch, setHistorySearch] = useState('');
   const [selectedReceipt, setSelectedReceipt] = useState<StoreReceipt | null>(null);
+  const [acknowledging, setAcknowledging] = useState(false);
 
   const imeiInputRef = useRef<HTMLInputElement>(null);
+
+  // «Ознакомлен»: the admin's review mark on a receipt (no stock or cash changes).
+  const acknowledgeReceipt = async () => {
+    if (!selectedReceipt || !isAdmin || selectedReceipt.acknowledgedAt) return;
+    setAcknowledging(true);
+    try {
+      const updated = await apiClient<StoreReceipt>(`/store-receipts/${selectedReceipt.id}/acknowledge`, { method: 'POST' });
+      const patch = { acknowledgedAt: updated.acknowledgedAt ?? new Date().toISOString(), acknowledgedByName: updated.acknowledgedByName ?? currentUser?.name ?? null };
+      setSelectedReceipt((prev) => (prev && prev.id === selectedReceipt.id ? { ...prev, ...patch } : prev));
+      setHistoryList((prev) => prev.map((r) => (r.id === selectedReceipt.id ? { ...r, ...patch } : r)));
+      setStatus({ tone: 'success', text: `Приход ${selectedReceipt.receiptNumber} отмечен как просмотренный` });
+    } catch (e: any) {
+      setStatus({ tone: 'error', text: e?.message || 'Не удалось отметить приход' });
+    } finally {
+      setAcknowledging(false);
+    }
+  };
 
   // Load Store Receipts History
   const loadHistory = useCallback(async () => {
@@ -247,21 +266,14 @@ export const StoreReceiptPage: React.FC = () => {
         <div className="flex items-center gap-2 flex-wrap">
           {/* Admin Store Switcher */}
           {isAdmin && retailStores.length > 0 && (
-            <div className="flex items-center gap-1.5 bg-surface-raised hover:bg-surface border border-border rounded-xl px-2.5 h-9 shrink-0 transition-colors shadow-2xs">
-              <StoreIcon className="w-3.5 h-3.5 text-accent shrink-0" />
-              <select
-                value={effectiveStoreId}
-                onChange={(e) => setSelectedStoreId(e.target.value)}
-                className="bg-transparent text-xs font-bold text-fg focus:outline-none cursor-pointer pr-1"
-                title="Выбрать магазин приёма"
-              >
-                {retailStores.map((s) => (
-                  <option key={s.id} value={s.id} className="bg-surface text-fg font-medium">
-                    {formatStoreDisplayTitle(s)}
-                  </option>
-                ))}
-              </select>
-            </div>
+            <StoreSelector
+              value={effectiveStoreId}
+              onChange={setSelectedStoreId}
+              stores={retailStores}
+              retailOnly
+              className="max-w-44 sm:max-w-56"
+              title="Выбрать магазин приёма"
+            />
           )}
 
           {/* Tab Switcher */}
@@ -545,7 +557,7 @@ export const StoreReceiptPage: React.FC = () => {
         onClose={() => setSelectedReceipt(null)}
         title={`Накладная прихода: ${selectedReceipt?.receiptNumber || ''}`}
         footer={
-          <div className="flex justify-end w-full">
+          <div className="flex flex-col-reverse sm:flex-row justify-end gap-2 w-full">
             <Button
               type="button"
               variant="secondary"
@@ -554,6 +566,17 @@ export const StoreReceiptPage: React.FC = () => {
             >
               Закрыть
             </Button>
+            {isAdmin && selectedReceipt && !selectedReceipt.acknowledgedAt && (
+              <Button
+                type="button"
+                leftIcon={Check}
+                loading={acknowledging}
+                onClick={acknowledgeReceipt}
+                className="w-full sm:w-auto"
+              >
+                Ознакомлен
+              </Button>
+            )}
           </div>
         }
       >
@@ -581,6 +604,16 @@ export const StoreReceiptPage: React.FC = () => {
               <div className="flex justify-between">
                 <span className="text-fg-subtle">Количество устройств:</span>
                 <span className="font-bold text-fg">{selectedReceipt.itemCount} шт.</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-fg-subtle">Просмотр администратором:</span>
+                {selectedReceipt.acknowledgedAt ? (
+                  <span className="font-medium text-success">
+                    {selectedReceipt.acknowledgedByName}, {new Date(selectedReceipt.acknowledgedAt).toLocaleString('ru-RU')}
+                  </span>
+                ) : (
+                  <span className="font-medium text-warning">Не просмотрен</span>
+                )}
               </div>
             </div>
 

@@ -110,14 +110,27 @@ export function registerExpenseRoutes(app: Express) {
 
   app.put('/api/expenses/:id', authenticateJwt, requireRoles('ADMIN', 'PARTNER'), async (req: AuthenticatedRequest, res, next) => {
     try {
+      const { category, amountTjs, storeId, comment, description } = req.body ?? {};
       if (req.user!.role === 'PARTNER') {
-        const existing = await prisma.expense.findUnique({ where: { id: req.params.id }, select: { storeId: true } });
-        if (!existing || existing.storeId !== req.user!.storeId) {
+        const existing = await prisma.expense.findUnique({ where: { id: req.params.id }, select: { storeId: true, status: true, amountTjs: true } });
+        if (!existing || !req.user!.storeId || existing.storeId !== req.user!.storeId) {
           res.status(403).json({ message: 'Нет доступа к расходам другого магазина' });
           return;
         }
+        // Moving an expense moves its register debit and owner-profit charge to another store.
+        if (storeId !== undefined && storeId !== existing.storeId) {
+          res.status(403).json({ message: 'Партнёр не может переносить расход в другой магазин' });
+          return;
+        }
+        // A paid expense has already left the register; changing its amount moves real money.
+        const amountChanged = amountTjs !== undefined && amountTjs !== null && amountTjs !== ''
+          && !(Number.isFinite(Number(amountTjs)) && D(amountTjs).eq(existing.amountTjs));
+        if (amountChanged && existing.status === 'PAID') {
+          res.status(403).json({ message: 'Сумму оплаченного расхода может изменить только администратор' });
+          return;
+        }
       }
-      const expense = await updateExpense(req.params.id, req.body ?? {}, req.user!.userId);
+      const expense = await updateExpense(req.params.id, { category, amountTjs, storeId, comment, description }, req.user!.userId);
       RealtimeSyncGateway.broadcast('EXPENSE_UPDATED', { expenseId: expense.id });
       res.json(expense);
     } catch (error) {
@@ -129,7 +142,8 @@ export function registerExpenseRoutes(app: Express) {
     try {
       if (req.user!.role === 'PARTNER') {
         const existing = await prisma.expense.findUnique({ where: { id: req.params.id }, select: { storeId: true } });
-        if (!existing || existing.storeId !== req.user!.storeId) {
+        // A partner without a store must not match Central Cash expenses (storeId null).
+        if (!existing || !req.user!.storeId || existing.storeId !== req.user!.storeId) {
           res.status(403).json({ message: 'Нет доступа к расходам другого магазина' });
           return;
         }

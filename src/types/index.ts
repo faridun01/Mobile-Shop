@@ -558,6 +558,9 @@ export interface DailyCashClosing {
   refundsCashUsd: number | string;
   collectionsCashTjs: number | string;
   collectionsCashUsd: number | string;
+  // Net of other register cash moves: customer debt repayments, owner deposits/withdrawals, supplier payments.
+  otherCashTjs?: number | string;
+  otherCashUsd?: number | string;
   expectedCashTjs: number | string;
   expectedCashUsd: number | string;
   actualCashTjs: number | string;
@@ -594,6 +597,10 @@ export interface DailyClosingSummary {
   collectionsCashTjs: string;
   collectionsCashUsd: string;
   collectionsCount: number;
+  otherCashTjs: string;
+  otherCashUsd: string;
+  otherCount: number;
+  // USD figures are book equivalents of the TJS drawer, not a separate dollar drawer.
   expectedCashTjs: string;
   expectedCashUsd: string;
 }
@@ -622,6 +629,12 @@ export interface CashDeskSummary {
   cash: {
     totalUsd: number;
     totalTjs: number;
+    central?: {
+      id: string;
+      name: string;
+      cashUsd: number;
+      cashTjs: number;
+    };
     stores: {
       id: string;
       name: string;

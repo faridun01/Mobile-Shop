@@ -37,12 +37,10 @@ export function registerStoreRoutes(app: Express) {
     }
   });
 
-  app.post('/api/stores/:id/adjust-cash', authenticateJwt, requireRoles('ADMIN', 'PARTNER'), async (req: AuthenticatedRequest, res, next) => {
+  // ADMIN only: setting a register to an arbitrary balance bypasses every overdraft guard, so a
+  // store partner could erase a shortage right before a collection or a shift closing.
+  app.post('/api/stores/:id/adjust-cash', authenticateJwt, requireRoles('ADMIN'), async (req: AuthenticatedRequest, res, next) => {
     try {
-      if (req.user!.role === 'PARTNER' && req.params.id !== req.user!.storeId) {
-        res.status(403).json({ message: 'Доступно только для своего магазина' });
-        return;
-      }
       const { newBalanceUsd, newBalanceTjs, reason } = req.body ?? {};
       let targetUsd: ReturnType<typeof D> | null = null;
       if (newBalanceUsd !== undefined && newBalanceUsd !== null) {

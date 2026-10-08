@@ -8,6 +8,9 @@ import { Button } from '../ui/Button';
 import { Dialog } from '../ui/Dialog';
 import { ConfirmDialog } from '../ui/ConfirmDialog';
 import { formatUserName } from '../../utils/formatUser';
+import { StoreSelector } from '../common/StoreSelector';
+import { SearchBar } from '../ui/SearchBar';
+import { DEVICE_STATUS_LABELS, findDeviceByCode, normalizeScanCode } from '../../utils/scanLookup';
 import {
   ClipboardCheck,
   Search,
@@ -20,6 +23,8 @@ import {
   ChevronDown,
   Layers,
   List,
+  AlertTriangle,
+  X,
 } from 'lucide-react';
 
 interface ModelGroup {
@@ -40,12 +45,14 @@ export const RevisionPage: React.FC = () => {
     devices,
     selectedStoreId,
     setSelectedStoreId,
+    openScanner,
   } = useAppFields(
     'currentUser',
     'stores',
     'devices',
     'selectedStoreId',
-    'setSelectedStoreId'
+    'setSelectedStoreId',
+    'openScanner'
   );
 
   const isAdmin = currentUser?.role === 'ADMIN';
@@ -78,6 +85,9 @@ export const RevisionPage: React.FC = () => {
   // Checked IMEIs set for current revision session
   const [checkedImeis, setCheckedImeis] = useState<Set<string>>(() => new Set());
   const [status, setStatus] = useState<StatusMessage | null>(null);
+  // Scanned IMEIs that are not on this store's stock (излишки), with where they are registered.
+  const [surplus, setSurplus] = useState<Array<{ code: string; note: string }>>([]);
+  const [scanInput, setScanInput] = useState('');
 
   // Filter tabs: 'ALL' | 'UNCHECKED' | 'CHECKED'
   const [filterTab, setFilterTab] = useState<'ALL' | 'UNCHECKED' | 'CHECKED'>('ALL');
@@ -94,6 +104,7 @@ export const RevisionPage: React.FC = () => {
   // Reset revision session when store changes
   React.useEffect(() => {
     setCheckedImeis(new Set());
+    setSurplus([]);
     setStatus(null);
     setExpandedGroups(new Set());
   }, [effectiveStoreId]);
@@ -119,6 +130,42 @@ export const RevisionPage: React.FC = () => {
       text: `✓ Все товары склада (${totalCount} шт.) подтверждены как сверенные`,
     });
   };
+
+  /** One scan (camera or USB scanner): ticks a phone of this store, or records a surplus. */
+  const handleScanCode = (raw: string) => {
+    const code = normalizeScanCode(raw);
+    if (!code) return;
+    setScanInput('');
+    const own = findDeviceByCode(storeDevices, code);
+    if (own) {
+      if (checkedImeis.has(own.imei) || (own.imei2 && checkedImeis.has(own.imei2))) {
+        setStatus({ tone: 'info', text: `${own.brand} ${own.model} уже отмечен` });
+        return;
+      }
+      soundEffects.playAddToCartSuccess();
+      setCheckedImeis((prev) => {
+        const next = new Set(prev);
+        next.add(own.imei);
+        if (own.imei2) next.add(own.imei2);
+        return next;
+      });
+      setStatus({ tone: 'success', text: `✓ ${own.brand} ${own.model}` });
+      return;
+    }
+    if (surplus.some((item) => item.code === code)) {
+      setStatus({ tone: 'info', text: `IMEI ${code} уже в излишках` });
+      return;
+    }
+    const elsewhere = findDeviceByCode(devices, code);
+    const note = elsewhere
+      ? `${elsewhere.brand} ${elsewhere.model} · ${stores.find((st) => st.id === elsewhere.locationId)?.name || elsewhere.locationName || 'другая точка'} · ${DEVICE_STATUS_LABELS[elsewhere.status] || elsewhere.status}`
+      : 'Нет на остатке этой точки';
+    soundEffects.playError();
+    setSurplus((prev) => [...prev, { code, note }]);
+    setStatus({ tone: 'warning', text: `Излишек: IMEI ${code}` });
+  };
+
+  const handleScanCamera = () => openScanner((code) => handleScanCode(code));
 
   // Toggle single item manual check
   const handleToggleCheck = (device: Device) => {
@@ -171,8 +218,8 @@ export const RevisionPage: React.FC = () => {
 
   // Open reset confirm dialog
   const handleOpenResetRevision = () => {
-    if (checkedImeis.size === 0) {
-      setStatus({ tone: 'info', text: 'Сверка ещё не начата (нет отметок для сброса).' });
+    if (checkedImeis.size === 0 && surplus.length === 0) {
+      setStatus({ tone: 'info', text: 'Сверка ещё не начата' });
       return;
     }
     setIsResetConfirmOpen(true);
@@ -181,6 +228,7 @@ export const RevisionPage: React.FC = () => {
   // Perform reset
   const handleConfirmReset = () => {
     setCheckedImeis(new Set());
+    setSurplus([]);
     setIsResetConfirmOpen(false);
     setStatus({ tone: 'info', text: 'Сверка сброшена.' });
   };
@@ -291,21 +339,13 @@ export const RevisionPage: React.FC = () => {
         <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap w-full sm:w-auto">
           {/* Admin Store Switcher */}
           {isAdmin && stores.length > 0 && (
-            <div className="flex-1 sm:flex-initial flex items-center gap-1.5 bg-surface-raised hover:bg-surface border border-border rounded-xl px-2.5 h-9 min-w-0 transition-colors shadow-2xs">
-              <StoreIcon className="w-3.5 h-3.5 text-accent shrink-0" />
-              <select
-                value={effectiveStoreId}
-                onChange={(e) => setSelectedStoreId(e.target.value)}
-                className="bg-transparent text-xs font-bold text-fg focus:outline-none cursor-pointer pr-1 truncate"
-                title="Выбрать точку для сверки"
-              >
-                {stores.map((s) => (
-                  <option key={s.id} value={s.id} className="bg-surface text-fg font-medium">
-                    {formatStoreDisplayTitle(s)}
-                  </option>
-                ))}
-              </select>
-            </div>
+            <StoreSelector
+              value={effectiveStoreId}
+              onChange={setSelectedStoreId}
+              stores={stores}
+              className="flex-1 sm:flex-initial max-w-full sm:max-w-56"
+              title="Выбрать точку для сверки"
+            />
           )}
 
           <div className="flex items-center gap-1.5 shrink-0">
@@ -404,7 +444,42 @@ export const RevisionPage: React.FC = () => {
               <span>Подтвердить все ({totalCount} шт.)</span>
             </button>
           )}
+
+          <SearchBar
+            value={scanInput}
+            onChange={setScanInput}
+            onScan={handleScanCamera}
+            onSubmit={handleScanCode}
+            placeholder="Сканируйте IMEI"
+          />
         </div>
+
+        {surplus.length > 0 && (
+          <div className="p-3.5 rounded-2xl bg-danger/10 border border-danger/30 space-y-2" role="region" aria-label="Излишки">
+            <h3 className="text-xs font-bold text-danger flex items-center gap-1.5">
+              <AlertTriangle className="w-4 h-4" />
+              Излишки ({surplus.length} шт.)
+            </h3>
+            <div className="divide-y divide-danger/20">
+              {surplus.map((item) => (
+                <div key={item.code} className="py-1.5 flex items-center justify-between gap-2 text-xs">
+                  <div className="min-w-0">
+                    <p className="font-mono font-bold text-fg">{item.code}</p>
+                    <p className="text-fg-subtle truncate">{item.note}</p>
+                  </div>
+                  <button
+                    type="button"
+                    aria-label={`Убрать ${item.code} из излишков`}
+                    onClick={() => setSurplus((prev) => prev.filter((x) => x.code !== item.code))}
+                    className="w-9 h-9 shrink-0 rounded-lg flex items-center justify-center text-fg-subtle hover:text-danger hover:bg-danger/10"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Devices Checklist & Tabs */}
         <div className="rounded-2xl bg-surface border border-border shadow-xs overflow-hidden">
@@ -772,15 +847,19 @@ export const RevisionPage: React.FC = () => {
               <span className="font-bold font-mono text-emerald-600 dark:text-emerald-400">{checkedCount} шт. ({progressPercent}%)</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-amber-600 dark:text-amber-400 font-semibold">Расхождение / не сверено:</span>
+              <span className="text-amber-600 dark:text-amber-400 font-semibold">Недостача (не найдено):</span>
               <span className="font-bold font-mono text-amber-600 dark:text-amber-400">{uncheckedCount} шт.</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-danger font-semibold">Излишки:</span>
+              <span className="font-bold font-mono text-danger">{surplus.length} шт.</span>
             </div>
           </div>
 
           {uncheckedCount > 0 && (
             <div>
               <h4 className="text-xs font-bold text-amber-600 dark:text-amber-400 mb-1.5">
-                Не подтвержденные позиции ({uncheckedCount} шт.):
+                Недостача ({uncheckedCount} шт.):
               </h4>
               <div className="max-h-[160px] overflow-y-auto rounded-xl border border-border divide-y divide-border text-xs">
                 {storeDevices
@@ -791,6 +870,20 @@ export const RevisionPage: React.FC = () => {
                       <span className="font-mono text-fg-subtle text-[11px] shrink-0 ml-2">{d.imei}</span>
                     </div>
                   ))}
+              </div>
+            </div>
+          )}
+
+          {surplus.length > 0 && (
+            <div>
+              <h4 className="text-xs font-bold text-danger mb-1.5">Излишки ({surplus.length} шт.):</h4>
+              <div className="max-h-[160px] overflow-y-auto rounded-xl border border-border divide-y divide-border text-xs">
+                {surplus.map((item) => (
+                  <div key={item.code} className="p-2 flex justify-between items-center gap-2 bg-surface">
+                    <span className="text-fg-subtle truncate">{item.note}</span>
+                    <span className="font-mono text-fg text-[11px] shrink-0">{item.code}</span>
+                  </div>
+                ))}
               </div>
             </div>
           )}

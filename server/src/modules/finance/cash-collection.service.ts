@@ -469,40 +469,41 @@ export class CashCollectionService {
       createdAt: e.createdAt.toISOString(),
     }));
 
-    // Group sales and expenses by date (YYYY-MM-DD)
-    const datesSet = new Set<string>();
-    for (const s of mappedSales) {
-      datesSet.add(s.createdAt.slice(0, 10));
-    }
-    for (const e of mappedExpenses) {
-      datesSet.add(e.createdAt.slice(0, 10));
-    }
+    // Group sales and expenses by business date (BUSINESS_TIME_ZONE), the same key closings use —
+    // a UTC date would put the first hours of a local day under the previous day.
+    const saleDay = new Map(sales.map((s) => [s.id, getBusinessDateKey(s.createdAt)]));
+    const expenseDay = new Map(expenses.map((e) => [e.id, getBusinessDateKey(e.createdAt)]));
+    const datesSet = new Set<string>([...saleDay.values(), ...expenseDay.values()]);
     for (const c of dailyClosings) {
       datesSet.add(c.businessDate);
     }
 
     const sortedDates = Array.from(datesSet).sort((a, b) => b.localeCompare(a));
     const todayStr = getBusinessDateKey(now);
+    const sumActive = (list: CashCollectionBreakdownSale[], pick: (s: CashCollectionBreakdownSale) => number) =>
+      Number(list.reduce((acc, s) => (s.status !== 'REFUNDED' ? acc.plus(pick(s)) : acc), D(0)));
 
     const days: CashCollectionDailyItem[] = sortedDates.map((dateStr) => {
-      const daySales = mappedSales.filter((s) => s.createdAt.slice(0, 10) === dateStr);
-      const dayExpenses = mappedExpenses.filter((e) => e.createdAt.slice(0, 10) === dateStr);
+      const daySales = mappedSales.filter((s) => saleDay.get(s.id) === dateStr);
+      const dayExpenses = mappedExpenses.filter((e) => expenseDay.get(e.id) === dateStr);
       const closing = closingMap.get(dateStr);
 
-      const daySalesTotalTjs = daySales.reduce((acc, s) => (s.status !== 'REFUNDED' ? acc + s.totalTjs : acc), 0);
-      const daySalesCashTjs = daySales.reduce((acc, s) => (s.status !== 'REFUNDED' ? acc + s.cashAmountTjs : acc), 0);
-      const daySalesCardTjs = daySales.reduce((acc, s) => (s.status !== 'REFUNDED' ? acc + s.cardAmountTjs : acc), 0);
-      const daySalesDebtTjs = daySales.reduce((acc, s) => (s.status !== 'REFUNDED' ? acc + s.debtAmountTjs : acc), 0);
-      const dayExpensesTotalTjs = dayExpenses.reduce((acc, e) => acc + e.amountTjs, 0);
-      const netCashTjs = daySalesCashTjs - dayExpensesTotalTjs;
+      const daySalesTotalTjs = sumActive(daySales, (s) => s.totalTjs);
+      const daySalesCashTjs = sumActive(daySales, (s) => s.cashAmountTjs);
+      const daySalesCardTjs = sumActive(daySales, (s) => s.cardAmountTjs);
+      const daySalesDebtTjs = sumActive(daySales, (s) => s.debtAmountTjs);
+      const dayExpensesTotal = dayExpenses.reduce((acc, e) => acc.plus(e.amountTjs), D(0));
+      const dayExpensesTotalTjs = Number(dayExpensesTotal);
+      const netCashTjs = Number(D(daySalesCashTjs).minus(dayExpensesTotal));
 
       const dateObj = new Date(dateStr + 'T12:00:00Z');
       const dateLabel = dateObj.toLocaleDateString('ru-RU', {
         day: '2-digit',
         month: 'short',
         weekday: 'short',
+        timeZone: 'UTC',
       });
-      const daysAgo = Math.max(0, Math.floor((now.getTime() - dateObj.getTime()) / (1000 * 60 * 60 * 24)));
+      const daysAgo = Math.max(0, Math.round((Date.parse(todayStr + 'T12:00:00Z') - dateObj.getTime()) / (1000 * 60 * 60 * 24)));
 
       return {
         date: dateStr,
@@ -757,7 +758,7 @@ export class CashCollectionService {
           balanceCurrency: 'USD', amount: regularTjs, currency: 'TJS', exchangeRate: rateOf(regularTjs, regularUsd),
           amountTjs: regularTjs, amountUsd: regularUsd,
           shopId: sourceStore.id, sourceType: 'CASH_COLLECTION', sourceId: handoverId,
-          description: `Инкассация кассы: ${sourceStore.name} → ${centralStore.name}`,
+          description: `Инкассация кассы: ${sourceStore.name} → Центральная касса`,
           comment: input.comment, createdByUserId: actor.id, guardBalance: true,
         });
       }

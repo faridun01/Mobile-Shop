@@ -470,16 +470,16 @@ export const TransferPage: React.FC = () => {
   const pendingCount = statusCounts.PENDING;
 
   return (
-    <div className="work-screen flex-1 flex flex-col h-full overflow-hidden bg-bg text-fg-muted">
+    <div className="work-screen flex-1 flex flex-col h-full overflow-y-auto min-h-0 bg-bg text-fg-muted">
       <StatusBanner message={statusBanner} onDismiss={() => setStatusBanner(null)} />
 
       {/* Tabs */}
-      <div className="flex items-center gap-1.5 border-b border-border bg-surface px-2.5 sm:px-3 py-1.5 text-xs shrink-0">
+      <div className="sticky top-0 z-20 flex items-center gap-1.5 border-b border-border bg-surface/95 backdrop-blur-sm px-2.5 py-1 text-xs shrink-0 shadow-2xs">
         <button
           type="button"
           onClick={() => setActiveTab('create')}
           className={cn(
-            'h-8 px-3 rounded-lg text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5',
+            'h-7.5 px-2.5 rounded-lg text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5',
             activeTab === 'create'
               ? 'bg-accent text-accent-fg shadow-xs font-bold'
               : 'bg-surface-raised border border-border/80 text-fg-muted hover:text-fg hover:bg-surface'
@@ -493,7 +493,7 @@ export const TransferPage: React.FC = () => {
           type="button"
           onClick={() => setActiveTab('list')}
           className={cn(
-            'h-8 px-3 rounded-lg text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5',
+            'h-7.5 px-2.5 rounded-lg text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5',
             activeTab === 'list'
               ? 'bg-accent text-accent-fg shadow-xs font-bold'
               : 'bg-surface-raised border border-border/80 text-fg-muted hover:text-fg hover:bg-surface'
@@ -510,9 +510,9 @@ export const TransferPage: React.FC = () => {
       </div>
 
       {/* Content */}
-      <div className="flex-1 overflow-hidden flex flex-col relative">
+      <div className="flex-1 flex flex-col min-h-0 relative">
         {activeTab === 'create' ? (
-          <div className="flex-1 flex flex-col overflow-hidden">
+          <div className="flex-1 flex flex-col min-h-0">
             <TransferLocationSelector
               stores={stores}
               mainWarehouse={mainWarehouse}

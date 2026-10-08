@@ -9,8 +9,13 @@ export function registerTransferRoutes(app: Express) {
       // SELLERs only see transfers touching their own store — cross-store transfer
       // history is not something a store employee should be able to read.
       const userStoreId = req.user!.storeId;
-      const isStoreScoped = (req.user!.role === 'SELLER' || req.user!.role === 'PARTNER') && typeof userStoreId === 'string' && userStoreId.length > 0;
-      const storeScope = isStoreScoped
+      const isStoreScoped = req.user!.role === 'SELLER' || req.user!.role === 'PARTNER';
+      // Store staff without a store see nothing — never every store's transfers.
+      if (isStoreScoped && !userStoreId) {
+        res.json([]);
+        return;
+      }
+      const storeScope = isStoreScoped && userStoreId
         ? { OR: [{ fromStoreId: userStoreId }, { toStoreId: userStoreId }] }
         : undefined;
 

@@ -31,8 +31,8 @@ interface InventoryFiltersBarProps {
   selectedBrand: string;
   onSelectBrand: (brand: string) => void;
   brands: { value: string; label: string }[];
-  brandCountsMap: Map<string, number>;
-  devicesInActiveLocationCount: number;
+  brandCountsMap?: Map<string, number>;
+  devicesInActiveLocationCount?: number;
   selectedStatusFilter: 'ALL' | 'MAIN_WAREHOUSE' | 'STORE_STOCK' | 'BONUS_ONLY' | 'EXCHANGE_ONLY';
   onSelectStatusFilter: (status: 'ALL' | 'MAIN_WAREHOUSE' | 'STORE_STOCK' | 'BONUS_ONLY' | 'EXCHANGE_ONLY') => void;
   activeStore: StoreType | null;
@@ -70,8 +70,8 @@ export const InventoryFiltersBar: React.FC<InventoryFiltersBarProps> = ({
   selectedBrand,
   onSelectBrand,
   brands,
-  brandCountsMap,
-  devicesInActiveLocationCount,
+  brandCountsMap: _brandCountsMap,
+  devicesInActiveLocationCount: _devicesInActiveLocationCount,
   selectedStatusFilter,
   onSelectStatusFilter,
   activeStore,
@@ -340,50 +340,6 @@ export const InventoryFiltersBar: React.FC<InventoryFiltersBarProps> = ({
           </button>
         </div>
       </div>
-
-      {/* Quick Horizontal Brand Chips */}
-      {brandCountsMap.size > 1 && (
-        <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none py-0.5">
-          <button
-            type="button"
-            onClick={() => onSelectBrand('ALL')}
-            className={`px-2.5 py-1 rounded-full text-xs font-bold border transition-colors whitespace-nowrap cursor-pointer shrink-0 ${
-              selectedBrand === 'ALL'
-                ? 'bg-accent text-accent-fg border-accent shadow-xs'
-                : 'bg-surface-raised hover:bg-surface border-border text-fg-muted'
-            }`}
-          >
-            Все бренды ({devicesInActiveLocationCount})
-          </button>
-
-          {Array.from(brandCountsMap.entries())
-            .sort((a, b) => b[1] - a[1])
-            .map(([bName, count]) => {
-              const isSelected = selectedBrand === bName;
-              return (
-                <button
-                  key={bName}
-                  type="button"
-                  onClick={() => onSelectBrand(isSelected ? 'ALL' : bName)}
-                  className={`px-2.5 py-1 rounded-full text-xs font-semibold border transition-colors whitespace-nowrap cursor-pointer shrink-0 flex items-center gap-1.5 ${
-                    isSelected
-                      ? 'bg-accent text-accent-fg border-accent shadow-xs font-bold'
-                      : 'bg-surface-raised hover:bg-surface border-border text-fg-muted'
-                  }`}
-                >
-                  <span>{bName}</span>
-                  <span
-                    className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
-                      isSelected ? 'bg-accent-fg/20 text-accent-fg' : 'bg-surface text-fg-subtle'
-                    }`}
-                  >
-                    {count}
-                  </span>
-                </button>
-              );
-            })}
-        </div>
-      )}
 
       {/* Advanced Filters Panel (Desktop Inline) */}
       {showAdvancedFilters && !isMobileLayout && (

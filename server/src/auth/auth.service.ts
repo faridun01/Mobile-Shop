@@ -38,10 +38,23 @@ export class AuthService {
       const [salt, key] = hash.split(':');
       if (!salt || !key) return resolve(false);
       crypto.pbkdf2(password, salt, 100000, 64, 'sha512', (err, derivedKey) => {
-        if (err) reject(err);
-        resolve(key === derivedKey.toString('hex'));
+        if (err) return reject(err);
+        const expected = Buffer.from(key, 'hex');
+        resolve(expected.length === derivedKey.length && crypto.timingSafeEqual(expected, derivedKey));
       });
     });
+  }
+
+  private static dummyHash: Promise<string> | null = null;
+
+  /**
+   * Burns the same PBKDF2 work as a real check when the login does not exist, so response
+   * time does not reveal which logins are registered. Always resolves to false.
+   */
+  public static async verifyAgainstDummy(password: string): Promise<false> {
+    this.dummyHash ??= this.hashPassword(crypto.randomBytes(16).toString('hex'));
+    await this.verifyPassword(password, await this.dummyHash);
+    return false;
   }
 
   // Token lifetime: there is no refresh mechanism (see auth-architecture-review memory)

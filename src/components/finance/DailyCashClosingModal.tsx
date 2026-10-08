@@ -2,27 +2,21 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { Dialog } from '../ui/Dialog';
 import { ConfirmDialog } from '../ui/ConfirmDialog';
 import { Button } from '../ui/Button';
-import { Badge } from '../ui/Badge';
-import { FormField } from '../ui/FormField';
+import { StoreSelector } from '../common/StoreSelector';
 import { apiClient } from '../../api/client';
 import { useAppFields } from '../../context/AppContext';
 import { DailyClosingSummary, DailyCashClosing } from '../../types';
-import { formatMoney, formatTjs, formatUsd } from '../../utils/money';
+import { formatTjs } from '../../utils/money';
 import { soundEffects } from '../../utils/sound';
 import {
   CheckCircle2,
   AlertTriangle,
   AlertCircle,
   Banknote,
-  DollarSign,
   CreditCard,
-  Building2,
   Clock,
   UserCheck,
-  FileText,
-  ChevronDown,
   Store as StoreIcon,
-  Sparkles,
   RotateCcw,
 } from 'lucide-react';
 import { formatStoreName, useStoreContext } from '../../utils/storeContext';
@@ -37,6 +31,30 @@ interface DailyCashClosingModalProps {
   onClosed?: (closing: DailyCashClosing) => void;
 }
 
+/** Cash and bank for the day, as two large figures. */
+const DayTotals: React.FC<{ cashTjs: number | string | undefined; bankTjs: number | string | undefined }> = ({ cashTjs, bankTjs }) => (
+  <div className="grid grid-cols-2 gap-2.5">
+    <div className="p-3.5 rounded-2xl bg-surface-raised border border-border">
+      <span className="text-xs font-semibold text-fg-subtle flex items-center gap-1.5">
+        <Banknote className="w-4 h-4 text-success" />
+        Наличные
+      </span>
+      <p className="text-xl sm:text-2xl font-black font-mono text-fg mt-1.5 tracking-tight break-all">{formatTjs(cashTjs)}</p>
+    </div>
+    <div className="p-3.5 rounded-2xl bg-surface-raised border border-border">
+      <span className="text-xs font-semibold text-fg-subtle flex items-center gap-1.5">
+        <CreditCard className="w-4 h-4 text-info" />
+        Банк
+      </span>
+      <p className="text-xl sm:text-2xl font-black font-mono text-fg mt-1.5 tracking-tight break-all">{formatTjs(bankTjs)}</p>
+    </div>
+  </div>
+);
+
+/**
+ * Shift closing. The seller or partner confirms the day as the system calculated it: cash in
+ * the register and bank (card) takings. The admin sees the same figures and can reopen a day.
+ */
 export const DailyCashClosingModal: React.FC<DailyCashClosingModalProps> = ({
   isOpen,
   onClose,
@@ -47,6 +65,7 @@ export const DailyCashClosingModal: React.FC<DailyCashClosingModalProps> = ({
 }) => {
   const { currentUser, stores, selectedStoreId } = useAppFields('currentUser', 'stores', 'selectedStoreId');
   const storeCtx = useStoreContext();
+  const isAdmin = currentUser?.role === 'ADMIN';
 
   const retailStores = useMemo(
     () => stores.filter((s) => !s.isMainWarehouse && s.active),
@@ -116,43 +135,23 @@ export const DailyCashClosingModal: React.FC<DailyCashClosingModalProps> = ({
   const [loading, setLoading] = useState(false);
   const [summary, setSummary] = useState<DailyClosingSummary | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [showDetails, setShowDetails] = useState(false);
-  const [showUsdInput, setShowUsdInput] = useState(false);
-  const [reopening, setReopening] = useState(false);
-
-  const isCentralCashForbidden = retailStores.length === 0;
-
-  // Form input states
-  const [actualCashTjs, setActualCashTjs] = useState<string>('');
-  const [actualCashUsd, setActualCashUsd] = useState<string>('');
-  const [comment, setComment] = useState<string>('');
-  const [showConfirmDiscrepancy, setShowConfirmDiscrepancy] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [reopening, setReopening] = useState(false);
+  const [isReopenConfirmOpen, setIsReopenConfirmOpen] = useState(false);
+
+  const noRetailStores = retailStores.length === 0;
 
   const fetchSummary = async () => {
     const targetStoreId = effectiveStoreId || explicitStoreId || selectedStoreIdState;
     if (!targetStoreId) return;
     setLoading(true);
     setError(null);
-    setShowConfirmDiscrepancy(false);
     try {
       let url = `/daily-closings/summary?storeId=${encodeURIComponent(targetStoreId)}`;
       if (explicitBusinessDate) {
         url += `&businessDate=${encodeURIComponent(explicitBusinessDate)}`;
       }
-      const data = await apiClient<DailyClosingSummary>(url);
-      setSummary(data);
-
-      if (data.alreadyClosed && data.closing) {
-        setActualCashTjs(String(data.closing.actualCashTjs));
-        setActualCashUsd(String(data.closing.actualCashUsd));
-        setComment(data.closing.comment || '');
-      } else {
-        setActualCashTjs('');
-        setActualCashUsd('');
-        setComment('');
-        setShowDetails(false);
-      }
+      setSummary(await apiClient<DailyClosingSummary>(url));
     } catch (err: any) {
       setError(err?.message || 'Не удалось загрузить данные кассы');
     } finally {
@@ -166,101 +165,28 @@ export const DailyCashClosingModal: React.FC<DailyCashClosingModalProps> = ({
     }
   }, [isOpen, effectiveStoreId, explicitBusinessDate]);
 
-  // Calculations
-  const expectedTjs = useMemo(() => {
-    if (!summary) return 0;
-    return parseFloat(summary.expectedCashTjs) || 0;
-  }, [summary]);
-
-  const expectedUsd = useMemo(() => {
-    if (!summary) return 0;
-    return parseFloat(summary.expectedCashUsd) || 0;
-  }, [summary]);
-
-  const parsedActualTjs = useMemo(() => {
-    if (actualCashTjs.trim() === '') return null;
-    const val = parseFloat(actualCashTjs.replace(',', '.'));
-    return Number.isFinite(val) ? val : null;
-  }, [actualCashTjs]);
-
-  const parsedActualUsd = useMemo(() => {
-    if (actualCashUsd.trim() === '') {
-      return expectedUsd;
-    }
-    const val = parseFloat(actualCashUsd.replace(',', '.'));
-    return Number.isFinite(val) ? val : expectedUsd;
-  }, [actualCashUsd, expectedUsd]);
-
-  const diffTjs = useMemo(() => {
-    if (parsedActualTjs === null) return null;
-    return Math.round((parsedActualTjs - expectedTjs) * 100) / 100;
-  }, [parsedActualTjs, expectedTjs]);
-
-  const diffUsd = useMemo(() => {
-    if (actualCashUsd.trim() === '') return 0;
-    if (parsedActualUsd === null) return null;
-    return Math.round((parsedActualUsd - expectedUsd) * 100) / 100;
-  }, [actualCashUsd, parsedActualUsd, expectedUsd]);
-
-  const hasDiscrepancy = (diffTjs !== null && Math.abs(diffTjs) > 0.001) || (diffUsd !== null && Math.abs(diffUsd) > 0.001);
-
-  // 1-Click Fast Autofill: Sets actual to expected
-  const handleAutofillExpected = () => {
-    setActualCashTjs(expectedTjs.toFixed(2));
-    setActualCashUsd(expectedUsd.toFixed(2));
-    soundEffects.playAddToCartSuccess();
-  };
-
-  // Submit closing
-  const handleSubmitClosing = async () => {
-    const finalStoreId = effectiveStoreId || summary?.storeId || selectedStoreIdState || explicitStoreId;
+  // The seller/partner confirms the calculated day; no counted amount is sent.
+  const handleCloseShift = async () => {
+    const finalStoreId = effectiveStoreId || summary?.storeId;
     if (!finalStoreId || finalStoreId === 'all') {
-      setError('Пожалуйста, выберите розничный магазин для закрытия смены.');
+      setError('Выберите магазин');
       return;
     }
-
-    if (parsedActualTjs === null) {
-      setError('Пожалуйста, укажите фактически насчитанную сумму сомони (TJS).');
-      return;
-    }
-
-    if (hasDiscrepancy && !showConfirmDiscrepancy) {
-      setShowConfirmDiscrepancy(true);
-      return;
-    }
-
     setError(null);
     setSubmitting(true);
     try {
-      const payload: any = {
-        storeId: finalStoreId,
-        businessDate: explicitBusinessDate || summary?.businessDate,
-        actualCashTjs: parsedActualTjs,
-        actualCashUsd: parsedActualUsd ?? expectedUsd,
-        comment: comment.trim() || undefined,
-      };
-
       const result = await apiClient<DailyCashClosing>('/daily-closings', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
+        body: JSON.stringify({ storeId: finalStoreId, businessDate: explicitBusinessDate || summary?.businessDate }),
       });
-
       soundEffects.playAddToCartSuccess();
       onClosed?.(result);
       await fetchSummary();
     } catch (err: any) {
-      setError(err?.message || 'Ошибка при сохранении закрытия смены');
+      setError(err?.message || 'Не удалось закрыть смену');
     } finally {
       setSubmitting(false);
     }
-  };
-
-  const [isReopenConfirmOpen, setIsReopenConfirmOpen] = useState(false);
-
-  const handleReopenClosing = () => {
-    if (!summary?.closing?.id) return;
-    setIsReopenConfirmOpen(true);
   };
 
   const handleConfirmReopen = async () => {
@@ -268,9 +194,7 @@ export const DailyCashClosingModal: React.FC<DailyCashClosingModalProps> = ({
     setReopening(true);
     setError(null);
     try {
-      await apiClient(`/daily-closings/${summary.closing.id}`, {
-        method: 'DELETE',
-      });
+      await apiClient(`/daily-closings/${summary.closing.id}`, { method: 'DELETE' });
       soundEffects.playAddToCartSuccess();
       setIsReopenConfirmOpen(false);
       await fetchSummary();
@@ -281,427 +205,136 @@ export const DailyCashClosingModal: React.FC<DailyCashClosingModalProps> = ({
     }
   };
 
+  const closing = summary?.closing;
+  const closedDifference = Number(closing?.differenceTjs ?? 0);
+
   return (
     <>
       <Dialog
-      open={isOpen}
-      onClose={onClose}
-      title={isCentralCashForbidden ? 'Кассовая смена' : summary?.alreadyClosed ? 'Z-отчёт смены' : currentUser?.role === 'ADMIN' ? 'Кассовая смена' : 'Закрытие смены (Z-отчёт)'}
-      subtitle={isCentralCashForbidden ? 'Центральная касса · Только просмотр' : `${effectiveStoreName} · ${summary?.businessDate || explicitBusinessDate || 'Сегодня'}`}
-      maxWidth="md"
-      footer={
-        <div className="w-full flex flex-wrap items-center justify-between gap-2">
-          {isCentralCashForbidden ? (
-            <div className="w-full flex justify-end">
-              <Button variant="primary" size="md" onClick={onClose} className="w-full sm:w-auto">
-                Понятно
-              </Button>
-            </div>
-          ) : summary?.alreadyClosed ? (
-            <>
-              <div className="flex items-center gap-2 flex-1 sm:flex-initial min-w-0">
-                {currentUser?.role === 'ADMIN' && summary.closing?.id && (
-                  <Button
-                    variant="ghost"
-                    size="md"
-                    leftIcon={RotateCcw}
-                    onClick={handleReopenClosing}
-                    loading={reopening}
-                    className="text-xs text-danger hover:text-danger hover:bg-danger/10 w-full sm:w-auto"
-                  >
-                    Переоткрыть смену
-                  </Button>
-                )}
-              </div>
-              <div className="flex-1 sm:flex-initial flex justify-end min-w-0">
-                <Button variant="primary" size="md" onClick={onClose} className="w-full sm:w-auto">
-                  Закрыть
-                </Button>
-              </div>
-            </>
-          ) : (
-            <>
+        open={isOpen}
+        onClose={() => { if (!submitting) onClose(); }}
+        title={summary?.alreadyClosed ? 'Смена закрыта' : 'Закрытие смены'}
+        subtitle={noRetailStores ? undefined : `${effectiveStoreName} · ${summary?.businessDate || explicitBusinessDate || 'Сегодня'}`}
+        maxWidth="sm"
+        footer={
+          <div className="w-full flex flex-wrap items-center justify-end gap-2">
+            {summary?.alreadyClosed && isAdmin && closing?.id && (
               <Button
                 variant="ghost"
-                size="md"
-                onClick={onClose}
-                disabled={submitting}
-                className="flex-1 sm:flex-initial"
+                leftIcon={RotateCcw}
+                onClick={() => setIsReopenConfirmOpen(true)}
+                loading={reopening}
+                className="text-danger hover:text-danger hover:bg-danger/10 mr-auto"
               >
-                {currentUser?.role === 'ADMIN' ? 'Закрыть' : 'Отмена'}
+                Переоткрыть
               </Button>
-
-              {currentUser?.role !== 'ADMIN' && (
-                <Button
-                  variant="primary"
-                  size="md"
-                  onClick={handleSubmitClosing}
-                  loading={submitting}
-                  disabled={loading || parsedActualTjs === null}
-                  leftIcon={CheckCircle2}
-                  className="flex-1 sm:flex-initial px-4 font-bold"
-                >
-                  {showConfirmDiscrepancy ? 'Подтвердить' : 'Закрыть смену'}
+            )}
+            {!summary?.alreadyClosed && !isAdmin && summary && !noRetailStores ? (
+              <>
+                <Button variant="secondary" onClick={onClose} disabled={submitting} className="flex-1 sm:flex-initial">
+                  Отмена
                 </Button>
-              )}
-            </>
-          )}
-        </div>
-      }
-    >
-      {isCentralCashForbidden ? (
-        <div className="p-6 text-center space-y-3">
-          <div className="w-12 h-12 rounded-full bg-amber-500/10 text-amber-500 flex items-center justify-center mx-auto">
-            <StoreIcon className="w-6 h-6" />
-          </div>
-          <h3 className="text-base font-bold text-fg">Нет активных магазинов</h3>
-          <p className="text-xs text-fg-subtle max-w-sm mx-auto leading-relaxed">
-            В системе не найдены розничные магазины для закрытия смены.
-          </p>
-        </div>
-      ) : loading ? (
-        <div className="p-8 text-center text-fg-subtle space-y-3">
-          <div className="w-8 h-8 mx-auto border-2 border-accent border-t-transparent rounded-full animate-spin" />
-          <p className="text-sm">Расчёт остатка кассы...</p>
-        </div>
-      ) : error && !summary ? (
-        <div className="p-4 rounded-xl bg-danger/10 border border-danger/30 text-danger text-sm flex items-start gap-2.5">
-          <AlertTriangle className="w-5 h-5 shrink-0 mt-0.5" />
-          <div className="flex-1">
-            <p className="font-semibold">Не удалось рассчитать данные кассы</p>
-            <p className="text-xs mt-1 text-danger/90">{error}</p>
-            <Button
-              variant="secondary"
-              size="md"
-              onClick={fetchSummary}
-              className="mt-3 text-xs h-8"
-            >
-              Попробовать снова
-            </Button>
-          </div>
-        </div>
-      ) : summary ? (
-        <div className="space-y-4">
-          {/* Admin Retail Store Switcher */}
-          {currentUser?.role === 'ADMIN' && retailStores.length > 1 && (
-            <div className="flex items-center justify-between gap-2 p-2.5 rounded-xl bg-surface-raised border border-border">
-              <span className="text-xs font-semibold text-fg-subtle flex items-center gap-1.5 pl-1">
-                <StoreIcon className="w-3.5 h-3.5 text-accent" />
-                <span>Магазин смены:</span>
-              </span>
-              <select
-                value={effectiveStoreId}
-                onChange={(e) => {
-                  setSelectedStoreIdState(e.target.value);
-                  setShowConfirmDiscrepancy(false);
-                }}
-                disabled={loading || submitting || reopening}
-                className="text-xs font-bold bg-surface border border-border rounded-lg px-2.5 py-1 text-fg focus:outline-none focus:border-accent cursor-pointer"
-              >
-                {retailStores.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {formatStoreName(s.name)}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
-          {/* STATE 1: ALREADY CLOSED (Z-REPORT VIEW) */}
-          {summary.alreadyClosed ? (
-            <div className="space-y-3">
-              <div className="p-3.5 rounded-xl bg-success/15 border border-success/30 flex items-center justify-between gap-3 text-success">
-                <div className="flex items-center gap-2.5 min-w-0">
-                  <CheckCircle2 className="w-5 h-5 shrink-0" />
-                  <div className="min-w-0">
-                    <p className="text-sm font-bold truncate">Смена закрыта</p>
-                    <p className="text-xs text-success/80 flex items-center gap-1.5 flex-wrap mt-0.5">
-                      <UserCheck className="w-3.5 h-3.5" />
-                      <span>{summary.closing?.closedByName}</span>
-                      <span>·</span>
-                      <Clock className="w-3.5 h-3.5" />
-                      <span>{summary.closing?.createdAt ? new Date(summary.closing.createdAt).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }) : ''}</span>
-                    </p>
-                  </div>
-                </div>
-                <Badge tone="success" className="px-2.5 py-1 text-xs shrink-0 font-bold uppercase">
-                  Z-Отчёт ✓
-                </Badge>
-              </div>
-
-              {/* Closed Cash Amounts */}
-              <div className="grid grid-cols-2 gap-2 text-center">
-                <div className="p-3 rounded-xl bg-surface-raised border border-border">
-                  <span className="text-[10px] uppercase font-bold text-fg-subtle block">Фактически сдано (TJS)</span>
-                  <p className="text-lg font-bold font-mono text-fg mt-1">
-                    {formatTjs(summary.closing?.actualCashTjs)}
-                  </p>
-                </div>
-                <div className="p-3 rounded-xl bg-surface-raised border border-border">
-                  <span className="text-[10px] uppercase font-bold text-fg-subtle block">Расхождение</span>
-                  <p className={`text-lg font-bold font-mono mt-1 ${Number(summary.closing?.differenceTjs) < 0 ? 'text-danger' : Number(summary.closing?.differenceTjs) > 0 ? 'text-info' : 'text-success'}`}>
-                    {Number(summary.closing?.differenceTjs) === 0 ? '0.00 TJS' : `${Number(summary.closing?.differenceTjs) > 0 ? '+' : ''}${formatTjs(summary.closing?.differenceTjs)}`}
-                  </p>
-                </div>
-              </div>
-
-              {summary.closing?.comment && (
-                <div className="p-2.5 rounded-xl bg-surface border border-border text-xs text-fg-muted">
-                  <span className="text-fg-subtle font-medium block text-[10px] uppercase">Комментарий:</span>
-                  <p className="mt-0.5 italic">{summary.closing.comment}</p>
-                </div>
-              )}
-            </div>
-          ) : currentUser?.role === 'ADMIN' ? (
-            <div className="space-y-3.5">
-              <div className="p-4 rounded-2xl bg-surface-raised border border-border text-center space-y-2.5 shadow-xs">
-                <span className="text-[11px] font-bold uppercase tracking-wider text-fg-subtle block">
-                  Расчётный остаток в кассе:
-                </span>
-                <div className="text-3xl font-black font-mono text-accent tracking-tight">
-                  {formatMoney(expectedTjs)} <span className="text-base font-bold text-fg-subtle">TJS</span>
-                </div>
-                {expectedUsd > 0 && (
-                  <div className="text-xs font-mono text-fg-subtle">
-                    + ${formatMoney(expectedUsd)} USD
-                  </div>
-                )}
-                <div className="pt-2.5 border-t border-border/80">
-                  <p className="text-xs text-fg-subtle">
-                    Смена в магазине ещё не закрыта продавцом.
-                  </p>
-                </div>
-              </div>
-            </div>
-          ) : (
-            /* STATE 2: ACTIVE SHIFT CLOSING (MAXIMUM SIMPLE FLOW) */
-            <div className="space-y-3.5">
-              {/* 1. HERO CARD: THE ONLY THING THE CASHIER NEEDS TO KNOW */}
-              <div className="p-4 rounded-2xl bg-surface-raised border border-border text-center space-y-3 shadow-xs">
-                <div>
-                  <span className="text-[11px] font-bold uppercase tracking-wider text-fg-subtle block">
-                    В кассе должно быть:
-                  </span>
-                  <div className="text-3xl font-black font-mono text-accent mt-1 tracking-tight">
-                    {formatMoney(expectedTjs)} <span className="text-base font-bold text-fg-subtle">TJS</span>
-                  </div>
-                  {expectedUsd > 0 && (
-                    <div className="text-xs font-mono text-fg-subtle mt-0.5">
-                      + ${formatMoney(expectedUsd)} USD
-                    </div>
-                  )}
-                </div>
-
-                {/* THE 1-CLICK INSTANT MATCH BUTTON */}
-                <button
-                  type="button"
-                  onClick={handleAutofillExpected}
-                  className="w-full py-3 px-3 sm:px-4 rounded-xl bg-accent text-accent-fg font-bold text-xs sm:text-sm flex items-center justify-center gap-2 hover:opacity-90 active:scale-[0.99] transition-all cursor-pointer shadow-sm select-none min-w-0"
+                <Button
+                  onClick={handleCloseShift}
+                  loading={submitting}
+                  disabled={loading}
+                  leftIcon={CheckCircle2}
+                  className="flex-1 sm:flex-initial font-bold"
                 >
-                  <CheckCircle2 className="w-5 h-5 shrink-0" />
-                  <span className="truncate">Подтвердить сумму ({formatMoney(expectedTjs)} TJS)</span>
-                </button>
-              </div>
-
-              {/* 2. MANUAL ENTRY IF SUM DIFFERS */}
-              <div className="p-3.5 rounded-xl bg-surface border border-border space-y-2.5">
-                <div className="flex items-center justify-between text-xs font-semibold text-fg">
-                  <span>Фактически пересчитано:</span>
-                  {actualCashTjs && (
-                    <button
-                      type="button"
-                      onClick={() => { setActualCashTjs(''); setActualCashUsd(''); }}
-                      className="text-[11px] text-fg-subtle hover:text-danger cursor-pointer"
-                    >
-                      Очистить
-                    </button>
-                  )}
-                </div>
-
-                {/* TJS Input */}
-                <div className="relative">
-                  <input
-                    type="text"
-                    inputMode="decimal"
-                    value={actualCashTjs}
-                    onChange={(e) => setActualCashTjs(e.target.value)}
-                    placeholder="0.00"
-                    className="w-full h-11 px-3 pr-12 rounded-xl bg-surface-raised border border-border font-mono text-base font-bold text-fg placeholder:text-fg-subtle/50 placeholder:font-normal placeholder:text-xs focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent"
-                  />
-                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold font-mono text-fg-subtle">
-                    TJS
-                  </span>
-                </div>
-
-                {/* Optional USD row toggle */}
-                {(expectedUsd > 0 || showUsdInput) ? (
-                  <div className="relative pt-1">
-                    <input
-                      type="text"
-                      inputMode="decimal"
-                      value={actualCashUsd}
-                      onChange={(e) => setActualCashUsd(e.target.value)}
-                      placeholder="0.00"
-                      className="w-full h-10 px-3 pr-12 rounded-xl bg-surface-raised border border-border font-mono text-sm text-fg placeholder:text-fg-subtle/50 focus:outline-none focus:border-accent"
-                    />
-                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold font-mono text-fg-subtle">
-                      USD
-                    </span>
-                  </div>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => setShowUsdInput(true)}
-                    className="text-[11px] text-fg-subtle hover:text-accent font-medium cursor-pointer inline-flex items-center gap-1"
-                  >
-                    + Указать наличные доллары (USD)
-                  </button>
-                )}
-
-                {/* LIVE DISCREPANCY STATUS */}
-                {parsedActualTjs !== null && (
-                  <div className="pt-1">
-                    {diffTjs === 0 && (diffUsd === null || diffUsd === 0) ? null : diffTjs !== null && diffTjs < 0 ? (
-                      <div className="p-2.5 rounded-lg bg-danger/15 border border-danger/30 flex items-center justify-between text-danger text-xs font-bold">
-                        <div className="flex items-center gap-2">
-                          <AlertTriangle className="w-4 h-4 shrink-0" />
-                          <span>Недостача</span>
-                        </div>
-                        <span className="font-mono">-{formatMoney(Math.abs(diffTjs))} TJS</span>
-                      </div>
-                    ) : diffTjs !== null && diffTjs > 0 ? (
-                      <div className="p-2.5 rounded-lg bg-info/15 border border-info/30 flex items-center justify-between text-info text-xs font-bold">
-                        <div className="flex items-center gap-2">
-                          <AlertCircle className="w-4 h-4 shrink-0" />
-                          <span>Излишек</span>
-                        </div>
-                        <span className="font-mono">+{formatMoney(diffTjs)} TJS</span>
-                      </div>
-                    ) : null}
-                  </div>
-                )}
-
-                {/* Comment field (always visible if discrepancy, optional otherwise) */}
-                {(hasDiscrepancy || comment) && (
-                  <div className="pt-1">
-                    <textarea
-                      rows={2}
-                      value={comment}
-                      onChange={(e) => setComment(e.target.value)}
-                      placeholder={hasDiscrepancy ? 'Пожалуйста, укажите причину расхождения...' : 'Заметка по кассе (необязательно)...'}
-                      className={`w-full p-2.5 rounded-xl bg-surface-raised border text-xs text-fg placeholder:text-fg-subtle/50 focus:outline-none focus:ring-1 resize-none ${
-                        hasDiscrepancy && !comment.trim() && showConfirmDiscrepancy
-                          ? 'border-warning focus:ring-warning'
-                          : 'border-border focus:border-accent focus:ring-accent'
-                      }`}
-                    />
-                  </div>
-                )}
-              </div>
+                  Закрыть смену
+                </Button>
+              </>
+            ) : (
+              <Button onClick={onClose} className="w-full sm:w-auto">Закрыть</Button>
+            )}
+          </div>
+        }
+      >
+        {noRetailStores ? (
+          <div className="p-6 text-center space-y-3">
+            <div className="w-12 h-12 rounded-full bg-amber-500/10 text-amber-500 flex items-center justify-center mx-auto">
+              <StoreIcon className="w-6 h-6" />
             </div>
-          )}
+            <p className="text-sm text-fg-subtle">Нет розничных магазинов</p>
+          </div>
+        ) : loading && !summary ? (
+          <div className="p-8 text-center text-fg-subtle space-y-3">
+            <div className="w-8 h-8 mx-auto border-2 border-accent border-t-transparent rounded-full animate-spin" />
+            <p className="text-sm">Загрузка…</p>
+          </div>
+        ) : error && !summary ? (
+          <div className="p-4 rounded-xl bg-danger/10 border border-danger/30 text-danger text-sm flex items-start gap-2.5">
+            <AlertTriangle className="w-5 h-5 shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <p className="font-semibold">{error}</p>
+              <Button variant="secondary" onClick={fetchSummary} className="mt-3">
+                Повторить
+              </Button>
+            </div>
+          </div>
+        ) : summary ? (
+          <div className="space-y-3.5">
+            {isAdmin && retailStores.length > 1 && (
+              <div className="flex items-center justify-between gap-2 p-2 rounded-xl bg-surface-raised border border-border">
+                <span className="text-xs font-semibold text-fg-subtle pl-1">
+                  Магазин:
+                </span>
+                <StoreSelector
+                  value={effectiveStoreId}
+                  onChange={setSelectedStoreIdState}
+                  stores={retailStores}
+                  retailOnly
+                  className="max-w-[200px]"
+                  compact
+                />
+              </div>
+            )}
 
-          {/* 3. COLLAPSIBLE SHIFT DETAILS (ALL 6 STATS HIDDEN UNTIL REQUESTED) */}
-          <div className="border-t border-border/80 pt-2">
-            <button
-              type="button"
-              onClick={() => setShowDetails(!showDetails)}
-              className="w-full py-2 px-3 rounded-xl bg-surface hover:bg-surface-raised border border-border text-xs text-fg-subtle hover:text-fg flex items-center justify-between transition-colors cursor-pointer select-none"
-            >
-              <span className="font-semibold flex items-center gap-1.5">
-                <FileText className="w-3.5 h-3.5 text-accent" />
-                <span>Детали смены ({summary.salesCount} продаж)</span>
-              </span>
-              <ChevronDown className={`w-4 h-4 transition-transform ${showDetails ? 'rotate-180' : ''}`} />
-            </button>
-
-            {showDetails && (
-              <div className="grid grid-cols-3 gap-2 mt-2 text-xs animate-in fade-in duration-200">
-                {/* 1. Opening Cash */}
-                <div className="p-2.5 rounded-xl bg-surface border border-border space-y-0.5">
-                  <div className="flex items-center gap-1 text-fg-subtle text-[11px]">
-                    <Building2 className="w-3 h-3" />
-                    <span>Остаток на утро</span>
-                  </div>
-                  <p className="text-xs font-bold font-mono text-fg">
-                    {formatMoney(summary.openingCashTjs)} TJS
+            {summary.alreadyClosed ? (
+              <>
+                <DayTotals cashTjs={closing?.actualCashTjs} bankTjs={closing?.salesCardTjs} />
+                <p className="text-xs text-fg-subtle flex items-center gap-1.5 flex-wrap">
+                  <UserCheck className="w-3.5 h-3.5 text-success" />
+                  <span>{closing?.closedByName}</span>
+                  <span>·</span>
+                  <Clock className="w-3.5 h-3.5" />
+                  <span>
+                    {closing?.createdAt
+                      ? new Date(closing.createdAt).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })
+                      : ''}
+                  </span>
+                </p>
+                {closedDifference !== 0 && (
+                  <p className={`text-xs font-semibold ${closedDifference < 0 ? 'text-danger' : 'text-info'}`}>
+                    {closedDifference < 0 ? 'Недостача' : 'Излишек'}: {closedDifference > 0 ? '+' : ''}{formatTjs(closedDifference)}
                   </p>
-                </div>
+                )}
+              </>
+            ) : (
+              <DayTotals cashTjs={summary.expectedCashTjs} bankTjs={summary.salesCardTjs} />
+            )}
 
-                {/* 2. Cash Sales */}
-                <div className="p-2.5 rounded-xl bg-surface border border-border space-y-0.5">
-                  <div className="flex items-center justify-between text-success text-[11px]">
-                    <span className="flex items-center gap-1">
-                      <Banknote className="w-3 h-3" />
-                      <span>Продажи (нал)</span>
-                    </span>
-                    <span className="font-mono text-[10px] text-fg-subtle">
-                      {summary.salesCount}
-                    </span>
-                  </div>
-                  <p className="text-xs font-bold font-mono text-success">
-                    +{formatMoney(summary.salesCashTjs)} TJS
-                  </p>
-                </div>
-
-                {/* 3. Card Sales */}
-                <div className="p-2.5 rounded-xl bg-surface border border-border space-y-0.5">
-                  <div className="flex items-center gap-1 text-info text-[11px]">
-                    <CreditCard className="w-3 h-3" />
-                    <span>Банк</span>
-                  </div>
-                  <p className="text-xs font-bold font-mono text-fg">
-                    {formatMoney(summary.salesCardTjs)} TJS
-                  </p>
-                </div>
+            {error && (
+              <div className="p-2.5 rounded-xl bg-danger/10 border border-danger/30 text-danger text-xs flex items-center gap-2" role="alert">
+                <AlertCircle className="w-4 h-4 shrink-0" />
+                <span>{error}</span>
               </div>
             )}
           </div>
+        ) : null}
+      </Dialog>
 
-          {/* Confirmation warning for discrepancy */}
-          {!summary.alreadyClosed && showConfirmDiscrepancy && (
-            <div className="p-3 rounded-xl bg-warning/15 border border-warning/40 text-warning text-xs space-y-1 animate-in fade-in">
-              <div className="flex items-center gap-1.5 font-bold">
-                <AlertTriangle className="w-4 h-4 shrink-0" />
-                <span>Зафиксировано расхождение с кассовым расчётом!</span>
-              </div>
-              <p className="text-[11px] leading-relaxed text-warning/90">
-                Разница: <strong>{diffTjs !== null ? `${diffTjs > 0 ? '+' : ''}${diffTjs} TJS` : '0'}</strong>.
-                Нажмите «Подтвердить закрытие» для сохранения Z-отчёта.
-              </p>
-            </div>
-          )}
-
-          {error && (
-            <div className="p-2.5 rounded-xl bg-danger/10 border border-danger/30 text-danger text-xs flex items-center gap-2">
-              <AlertCircle className="w-4 h-4 shrink-0" />
-              <span>{error}</span>
-            </div>
-          )}
-        </div>
-      ) : null}
-    </Dialog>
-
-    {/* Красивый диалог подтверждения переоткрытия смены */}
-    <ConfirmDialog
-      open={isReopenConfirmOpen}
-      title="Переоткрыть смену?"
-      message={
-        <div className="space-y-1.5">
-          <p className="font-semibold text-fg">
-            Текущий Z-отчёт будет отменён.
-          </p>
-          <p className="text-xs text-fg-subtle">
-            Вы сможете повторно ввести фактическую сумму наличных в кассе и зафиксировать расхождение заново.
-          </p>
-        </div>
-      }
-      confirmLabel="Да, переоткрыть смену"
-      cancelLabel="Отмена"
-      tone="danger"
-      loading={reopening}
-      onConfirm={handleConfirmReopen}
-      onCancel={() => setIsReopenConfirmOpen(false)}
-    />
+      <ConfirmDialog
+        open={isReopenConfirmOpen}
+        title="Переоткрыть смену?"
+        message="Закрытие смены будет отменено, продавец сможет закрыть её заново."
+        confirmLabel="Переоткрыть"
+        cancelLabel="Отмена"
+        tone="danger"
+        loading={reopening}
+        onConfirm={handleConfirmReopen}
+        onCancel={() => setIsReopenConfirmOpen(false)}
+      />
     </>
   );
 };

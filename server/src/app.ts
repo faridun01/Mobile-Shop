@@ -44,7 +44,11 @@ app.set('json replacer', decimalJsonReplacer);
 // container IP. Without this every request behind the proxy looks like it comes from the
 // same address, which would make the login rate limiter below either lock out every user
 // at once or protect no one.
-app.set('trust proxy', 1);
+// TRUST_PROXY is the number of proxy hops in front of the app (docker + nginx: 1; Vercel
+// rewrite → Render: usually 2). Too low and every client shares the proxy's IP, so anyone
+// could lock any login out of the rate limiter; too high and clients can spoof their IP.
+const trustProxyHops = Number.parseInt(process.env.TRUST_PROXY ?? '1', 10);
+app.set('trust proxy', Number.isInteger(trustProxyHops) && trustProxyHops >= 0 ? trustProxyHops : 1);
 
 // Allowed origins come from APP_URL (comma-separated for multiple, e.g. a staging +
 // prod domain). In this app's actual deployment shape nothing legitimate ever calls
@@ -72,6 +76,20 @@ app.use((req, res, next) => {
   if (req.method === 'OPTIONS') {
     res.sendStatus(200);
     return;
+  }
+  next();
+});
+
+// Baseline security headers on every response. nginx adds them in the docker deployment, but
+// the Render-hosted API is reached directly (through the Vercel rewrite), without nginx.
+app.disable('x-powered-by');
+app.use((req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'SAMEORIGIN');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  if (req.path.startsWith('/api/')) res.setHeader('Cache-Control', 'no-store');
+  if (process.env.NODE_ENV === 'production' && req.secure) {
+    res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
   }
   next();
 });
@@ -128,8 +146,12 @@ app.post('/api/auth/login', async (req, res, next) => {
     }
 
     const user = await prisma.user.findUnique({ where: { login }, include: { store: true } });
+    // An unknown login still costs a full hash check, so timing does not reveal valid logins.
+    const passwordOk = user
+      ? await AuthService.verifyPassword(password, user.password)
+      : await AuthService.verifyAgainstDummy(password);
 
-    if (!user || !user.active || !(await AuthService.verifyPassword(password, user.password))) {
+    if (!user || !user.active || !passwordOk) {
       res.status(401).json({ message: 'Неверный логин или пароль' });
       return;
     }
@@ -596,8 +618,16 @@ app.use((error: any, req: Request, res: Response, _next: NextFunction) => {
   // ends up seeing — previously nothing was logged at all, so a production failure left no
   // diagnostic trail.
   console.error(`[${req.method} ${req.originalUrl}]`, error);
-  if (error?.statusCode === 409 || error?.statusCode === 403 || error?.statusCode === 404) {
+  if (error?.statusCode === 409 || error?.statusCode === 403 || error?.statusCode === 404 || error?.statusCode === 503) {
     res.status(error.statusCode).json({ message: error.message }); return;
+  }
+
+  // express.json() parse failures and oversized bodies carry parser internals in their message.
+  if (error?.type === 'entity.parse.failed') {
+    res.status(400).json({ message: 'Некорректный JSON в теле запроса' }); return;
+  }
+  if (error?.type === 'entity.too.large') {
+    res.status(413).json({ message: 'Слишком большой запрос' }); return;
   }
 
   if (error && typeof error === 'object' && 'code' in error && error.code === 'P2002') {
@@ -623,7 +653,9 @@ app.use((error: any, req: Request, res: Response, _next: NextFunction) => {
     return;
   }
 
-  if (error instanceof Error) {
+  // Services throw plain `new Error('<Russian message>')` for the client. Built-in subclasses
+  // (TypeError, RangeError, …) are programming errors whose text must not reach the client.
+  if (error instanceof Error && error.constructor === Error) {
     res.status(400).json({ message: error.message });
     return;
   }

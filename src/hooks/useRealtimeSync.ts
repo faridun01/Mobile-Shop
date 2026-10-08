@@ -15,13 +15,15 @@ export function useRealtimeSync(token: string | null, onEvent: (type: string, pa
     const customWsUrl = import.meta.env.VITE_WS_URL;
     if (Capacitor.isNativePlatform()) requireNativeUrl(customWsUrl, 'wss:', 'VITE_WS_URL');
 
+    // The token goes in Sec-WebSocket-Protocol (`auth, <jwt>`), not the URL, so proxies and
+    // access logs never record it.
     if (customWsUrl) {
-      const separator = customWsUrl.includes('?') ? '&' : '?';
-      wsUrl = `${customWsUrl}${separator}token=${encodeURIComponent(token)}`;
+      wsUrl = customWsUrl;
     } else {
       const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-      wsUrl = `${protocol}//${window.location.host}/ws?token=${encodeURIComponent(token)}`;
+      wsUrl = `${protocol}//${window.location.host}/ws`;
     }
+    const wsProtocols = ['auth', token];
 
     let socket: WebSocket | null = null;
     let stopped = false;
@@ -75,7 +77,7 @@ export function useRealtimeSync(token: string | null, onEvent: (type: string, pa
         if (import.meta.env.DEV) {
           console.debug('[WebSocket] connecting...');
         }
-        const connection = new WebSocket(wsUrl);
+        const connection = new WebSocket(wsUrl, wsProtocols);
         socket = connection;
         setRealtimeState('connecting');
 

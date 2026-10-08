@@ -78,7 +78,7 @@ export const TransferHistoryList: React.FC<TransferHistoryListProps> = ({
   }, [filteredTransfers, historySort]);
 
   return (
-    <div className="flex-1 overflow-y-auto p-2.5 sm:p-4 lg:p-6 space-y-4 bg-bg flex flex-col max-w-4xl xl:max-w-5xl mx-auto w-full">
+    <div className="flex-1 p-2.5 sm:p-4 lg:p-6 space-y-4 bg-bg flex flex-col max-w-4xl xl:max-w-5xl mx-auto w-full pb-24">
       {/* Header Toolbar: Search + Location Filter + Quick Status Tabs */}
       <div className="space-y-3 pb-2 border-b border-border/70 shrink-0">
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 flex-wrap">

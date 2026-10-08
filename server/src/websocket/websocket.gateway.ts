@@ -23,18 +23,24 @@ interface BroadcastOptions {
 // (a stuck tab reconnect-looping, or genuinely dozens of open tabs) growing the tracked
 // connection set without bound.
 const MAX_CONNECTIONS_PER_USER = 10;
+const WS_AUTH_PROTOCOL = 'auth';
 
 export class RealtimeSyncGateway {
   private static wss: WebSocketServer;
   private static clients = new Set<ConnectedClient>();
 
   public static init(server: Server) {
-    this.wss = new WebSocketServer({ server, path: '/ws' });
+    // The token travels as the second Sec-WebSocket-Protocol value (`auth, <jwt>`) rather than
+    // in the URL, so it never lands in proxy access logs. The server answers with `auth` only.
+    this.wss = new WebSocketServer({
+      server,
+      path: '/ws',
+      handleProtocols: (protocols) => (protocols.has(WS_AUTH_PROTOCOL) ? WS_AUTH_PROTOCOL : false),
+    });
 
     this.wss.on('connection', async (ws: WebSocket, request) => {
       const connectionId = crypto.randomUUID();
-      const url = new URL(request.url ?? '', 'http://localhost');
-      const token = url.searchParams.get('token');
+      const token = RealtimeSyncGateway.extractToken(request.headers['sec-websocket-protocol'], request.url);
       let user: JwtPayload | null = null;
       try { user = token ? await AuthService.authenticateToken(token) : null; }
       catch (error) { console.error('[WebSocket] Session validation failed', error); }
@@ -127,6 +133,14 @@ export class RealtimeSyncGateway {
         ws.close(1008, 'Session validation failed');
       }
     });
+  }
+
+  /** Token from `Sec-WebSocket-Protocol: auth, <jwt>`, else the legacy `?token=` (older app builds). */
+  public static extractToken(protocolHeader: string | string[] | undefined, requestUrl: string | undefined): string | null {
+    const header = Array.isArray(protocolHeader) ? protocolHeader.join(',') : protocolHeader;
+    const protocols = (header ?? '').split(',').map((p) => p.trim()).filter(Boolean);
+    if (protocols[0] === WS_AUTH_PROTOCOL && protocols[1]) return protocols[1];
+    return new URL(requestUrl ?? '', 'http://localhost').searchParams.get('token');
   }
 
   public static disconnectUser(userId: string) {

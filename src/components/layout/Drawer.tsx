@@ -131,7 +131,7 @@ export const Drawer: React.FC = () => {
         {
           title: 'Склад и касса',
           items: [
-            { id: 'INVENTORY', label: 'Склад товаров', icon: Package, roles: ['SELLER'] },
+            { id: 'INVENTORY', label: 'Склад магазина', icon: Package, roles: ['SELLER'] },
             { id: 'STORE_RECEIPT', label: 'Приход товара', icon: PackagePlus, roles: ['SELLER'] },
             { id: 'REVISION', label: 'Ревизия склада', icon: ClipboardCheck, roles: ['SELLER'] },
             { id: 'TRANSFER', label: 'Перемещение', icon: ArrowLeftRight, roles: ['SELLER'] },
@@ -164,8 +164,6 @@ export const Drawer: React.FC = () => {
           title: 'Управление точкой',
           items: [
             { id: 'CASH_DESK', label: 'Касса', icon: Wallet, roles: ['PARTNER'] },
-            { id: 'REPORTS', label: 'Отчёты', icon: TrendingUp, roles: ['PARTNER'] },
-            { id: 'CASH_COLLECTION', label: 'Инкассация', icon: HandCoins, roles: ['PARTNER'] },
             { id: 'EXPENSES', label: 'Расходы кассы', icon: Wallet, roles: ['PARTNER'] },
             { id: 'SETTINGS', label: 'Настройки системы', icon: Settings, roles: ['PARTNER'] },
           ],
@@ -469,7 +467,7 @@ export const Drawer: React.FC = () => {
             >
               <span className="flex items-center gap-2">
                 <FileCheck2 className="w-4 h-4 text-accent shrink-0" />
-                <span>Закрыть смену (Z-отчёт)</span>
+                <span>Закрыть смену</span>
               </span>
               <span className="text-[10px] uppercase font-mono px-1.5 py-0.5 rounded bg-accent/20">
                 Сверка кассы

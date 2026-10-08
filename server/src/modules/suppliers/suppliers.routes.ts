@@ -9,6 +9,27 @@ import { dateRangeForPeriod, type ReportPeriod } from '../reports/reports.servic
 
 const VALID_PERIODS: ReportPeriod[] = ['TODAY', 'MONTH', 'SPECIFIC_MONTH', 'ALL'];
 
+/**
+ * Register a supplier payment is paid from: Central Cash when none (or the "central" alias) is
+ * given, otherwise the named store. An unknown store id is an error, never a silent switch to
+ * Central Cash.
+ */
+async function resolvePaymentStoreId(storeId: unknown, sourceAccountId: unknown): Promise<string> {
+  const raw = (typeof storeId === 'string' && storeId.trim())
+    ? storeId.trim()
+    : ((typeof sourceAccountId === 'string' && sourceAccountId.trim()) ? sourceAccountId.trim() : undefined);
+
+  if (!raw || raw === 'STORE_CASH' || raw === 'central') {
+    const central = await prisma.store.findFirst({ where: { isMainWarehouse: true, active: true }, select: { id: true } });
+    if (!central) throw new Error('Центральная касса не найдена');
+    return central.id;
+  }
+
+  const store = await prisma.store.findUnique({ where: { id: raw }, select: { id: true, active: true } });
+  if (!store || !store.active) throw new Error('Касса для оплаты не найдена или магазин не активен');
+  return store.id;
+}
+
 export function registerSupplierRoutes(app: Express) {
   // Suppliers and invoices contain confidential purchase costs and debt,
   // and are restricted strictly to ADMIN.
@@ -100,29 +121,7 @@ export function registerSupplierRoutes(app: Express) {
         res.status(400).json({ message: 'Сумма оплаты (amountUsd) обязательна' });
         return;
       }
-      const centralStore = await prisma.store.findFirst({
-        where: { isMainWarehouse: true, active: true },
-        orderBy: { cashBalanceUsd: 'desc' },
-      }) ?? await prisma.store.findFirst({ where: { active: true } });
-
-      const rawStoreId = (typeof storeId === 'string' && storeId.trim())
-        ? storeId.trim()
-        : ((typeof sourceAccountId === 'string' && sourceAccountId.trim()) ? sourceAccountId.trim() : undefined);
-
-      let resolvedStoreId = rawStoreId;
-      if (!resolvedStoreId || resolvedStoreId === 'STORE_CASH' || resolvedStoreId === 'central') {
-        resolvedStoreId = centralStore?.id || 'main-warehouse';
-      }
-
-      const storeCheck = await prisma.store.findUnique({ where: { id: resolvedStoreId } });
-      if (!storeCheck) {
-        resolvedStoreId = centralStore?.id || 'main-warehouse';
-      }
-
-      if (!resolvedStoreId) {
-        res.status(400).json({ message: 'Центральная касса не найдена' });
-        return;
-      }
+      const resolvedStoreId = await resolvePaymentStoreId(storeId, sourceAccountId);
       const resolvedSourceAccount = sourceAccount || 'STORE_CASH';
       const result = await SuppliersService.pay({
         supplierId: req.params.id,
@@ -146,29 +145,7 @@ export function registerSupplierRoutes(app: Express) {
         res.status(400).json({ message: 'Сумма оплаты (amountUsd) обязательна' });
         return;
       }
-      const centralStore = await prisma.store.findFirst({
-        where: { isMainWarehouse: true, active: true },
-        orderBy: { cashBalanceUsd: 'desc' },
-      }) ?? await prisma.store.findFirst({ where: { active: true } });
-
-      const rawStoreId = (typeof storeId === 'string' && storeId.trim())
-        ? storeId.trim()
-        : ((typeof sourceAccountId === 'string' && sourceAccountId.trim()) ? sourceAccountId.trim() : undefined);
-
-      let resolvedStoreId = rawStoreId;
-      if (!resolvedStoreId || resolvedStoreId === 'STORE_CASH' || resolvedStoreId === 'central') {
-        resolvedStoreId = centralStore?.id || 'main-warehouse';
-      }
-
-      const storeCheck = await prisma.store.findUnique({ where: { id: resolvedStoreId } });
-      if (!storeCheck) {
-        resolvedStoreId = centralStore?.id || 'main-warehouse';
-      }
-
-      if (!resolvedStoreId) {
-        res.status(400).json({ message: 'Центральная касса не найдена' });
-        return;
-      }
+      const resolvedStoreId = await resolvePaymentStoreId(storeId, sourceAccountId);
       const resolvedSourceAccount = sourceAccount || 'STORE_CASH';
       const result = await SuppliersService.payInvoice({
         invoiceId: req.params.id,

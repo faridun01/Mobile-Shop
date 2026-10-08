@@ -4,7 +4,6 @@ import {
   ArrowDownToLine,
   Calendar,
   CalendarDays,
-  FileSpreadsheet,
 } from 'lucide-react';
 import { apiClient } from '../../api/client';
 import { formatTjs } from '../../utils/money';
@@ -14,7 +13,7 @@ import type { RegisterBalance, StoreBreakdown, BreakdownDailyItem } from './Cash
 
 export interface UncollectedDaysDetailSectionProps {
   store: RegisterBalance;
-  onOpenReconciliation: (initialDate?: string | null) => void;
+  onOpenReconciliation?: (initialDate?: string | null) => void;
   onCollect: () => void;
   busy?: boolean;
 }
@@ -42,7 +41,7 @@ const formatDayAmount = (amount: number): string => {
 
 export const UncollectedDaysDetailSection: React.FC<UncollectedDaysDetailSectionProps> = ({
   store,
-  onOpenReconciliation,
+  onOpenReconciliation: _onOpenReconciliation,
   onCollect,
   busy,
 }) => {
@@ -82,16 +81,6 @@ export const UncollectedDaysDetailSection: React.FC<UncollectedDaysDetailSection
             {daysCount > 1 ? `Дни без инкассации (${daysCount})` : 'Выручка к инкассации'}
           </h3>
         </div>
-
-        <button
-          type="button"
-          onClick={() => onOpenReconciliation(null)}
-          className="h-7 px-2.5 rounded-lg border border-border bg-surface hover:bg-surface-raised text-fg text-xs font-medium flex items-center gap-1.5 transition-all shadow-2xs active:scale-95 cursor-pointer"
-          title="Открыть полную сверку смен и чеков"
-        >
-          <FileSpreadsheet className="w-3.5 h-3.5 text-accent" />
-          <span>Сверка</span>
-        </button>
       </div>
 
       {loading && !data && (

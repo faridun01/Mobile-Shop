@@ -4,7 +4,7 @@ import { requireTodayRate, getRateForDate } from '../exchange-rate/exchange-rate
 import { requirePositiveMoney, roundMoney } from '../../common/money';
 import { getStoreCashAccount } from '../finance/account.service';
 import { postTransaction } from '../finance/financial-transaction.service';
-import { PushNotificationService } from '../notifications/push.service';
+import { PushNotificationService, isAllowedPushEndpoint } from '../notifications/push.service';
 import { Prisma } from '@prisma/client';
 
 export interface CustomerFilter {
@@ -30,7 +30,7 @@ export class CustomersService {
   public static async list(filter: CustomerFilter = {}) {
     const { search, debtorsOnly, limit = 50, offset = 0 } = filter;
 
-    const where: any = {};
+    const where: Prisma.CustomerWhereInput = {};
     if (search && search.trim()) {
       const q = search.trim();
       where.OR = [
@@ -137,11 +137,13 @@ export class CustomersService {
     });
 
     if (!customer) throw new Error('Клиент не найден');
+    // The subscription (endpoint + keys) is a delivery secret; clients only need to know it exists.
+    const { pushSubscription, ...rest } = customer;
     return {
-      ...customer,
+      ...rest,
       totalDebtTjs: Number(customer.totalDebtTjs),
       totalPaidTjs: Number(customer.totalPaidTjs),
-      hasPushSubscription: Boolean(customer.pushSubscription),
+      hasPushSubscription: Boolean(pushSubscription),
     };
   }
 
@@ -175,7 +177,7 @@ export class CustomersService {
     const existing = await prisma.customer.findUnique({ where: { id } });
     if (!existing) throw new Error('Клиент не найден');
 
-    const updateData: any = {};
+    const updateData: Prisma.CustomerUpdateInput = {};
     if (data.name !== undefined) {
       const trimmed = data.name.trim();
       if (!trimmed) throw new Error('Имя клиента не может быть пустым');
@@ -194,10 +196,11 @@ export class CustomersService {
     if (data.note !== undefined) updateData.note = data.note ? data.note.trim() : null;
     if (data.pushEnabled !== undefined) updateData.pushEnabled = Boolean(data.pushEnabled);
 
-    return await prisma.customer.update({
+    const { pushSubscription, ...updated } = await prisma.customer.update({
       where: { id },
       data: updateData,
     });
+    return { ...updated, hasPushSubscription: Boolean(pushSubscription) };
   }
 
   /**
@@ -228,6 +231,22 @@ export class CustomersService {
       if (!customer) throw new Error('Клиент не найден');
       if (D(customer.totalDebtTjs).lte(0)) {
         throw new Error('У клиента нет задолженности для погашения');
+      }
+      if (D(amountTjs).gt(customer.totalDebtTjs)) {
+        throw new Error(`Сумма оплаты (${amountTjs} TJS) превышает долг клиента (${customer.totalDebtTjs} TJS)`);
+      }
+
+      // Conditional decrement first: the row lock serializes concurrent payments, and a payment
+      // that would push the debt below zero matches no row and is rejected.
+      const debtGuard = await tx.customer.updateMany({
+        where: { id: customer.id, totalDebtTjs: { gte: amountTjs } },
+        data: {
+          totalDebtTjs: { decrement: amountTjs },
+          totalPaidTjs: { increment: amountTjs },
+        },
+      });
+      if (debtGuard.count !== 1) {
+        throw Object.assign(new Error('Долг клиента изменился — обновите данные и повторите оплату'), { statusCode: 409 });
       }
 
       const rate = await requireTodayRate(tx);
@@ -282,15 +301,11 @@ export class CustomersService {
 
         remainingToAllocate = remainingToAllocate.minus(allocation);
       }
+      if (remainingToAllocate.gt(0)) {
+        throw new Error('Сумма оплаты превышает долг по чекам клиента');
+      }
 
-      // Decrement customer total debt and increment total paid
-      const updatedCustomer = await tx.customer.update({
-        where: { id: customer.id },
-        data: {
-          totalDebtTjs: { decrement: amountTjs },
-          totalPaidTjs: { increment: amountTjs },
-        },
-      });
+      const updatedCustomer = await tx.customer.findUniqueOrThrow({ where: { id: customer.id }, omit: { pushSubscription: true } });
 
       // Credit cash to store register
       await tx.store.update({
@@ -363,14 +378,24 @@ export class CustomersService {
    * Save web push subscription for a customer.
    */
   public static async savePushSubscription(customerId: string, subscription: any) {
-    if (!subscription?.endpoint) throw new Error('Некорректные параметры push-подписки');
-    return await prisma.customer.update({
+    if (!subscription?.endpoint || !subscription?.keys?.p256dh || !subscription?.keys?.auth) {
+      throw new Error('Некорректные параметры push-подписки');
+    }
+    if (!isAllowedPushEndpoint(subscription.endpoint)) {
+      throw new Error('Push-подписка должна указывать на сервис уведомлений браузера');
+    }
+    // Only the fields web-push needs are stored, never arbitrary client JSON.
+    const { pushSubscription: _secret, ...customer } = await prisma.customer.update({
       where: { id: customerId },
       data: {
-        pushSubscription: subscription,
+        pushSubscription: {
+          endpoint: subscription.endpoint,
+          keys: { p256dh: String(subscription.keys.p256dh), auth: String(subscription.keys.auth) },
+        },
         pushEnabled: true,
       },
     });
+    return { ...customer, hasPushSubscription: true };
   }
 
   /**
@@ -388,8 +413,11 @@ export class CustomersService {
     if (!title.trim() || !message.trim()) {
       throw new Error('Заголовок и текст push-уведомления обязательны');
     }
+    if (!PushNotificationService.isEnabled()) {
+      throw Object.assign(new Error('Push-уведомления не настроены на сервере'), { statusCode: 503 });
+    }
 
-    const where: any = {
+    const where: Prisma.CustomerWhereInput = {
       pushEnabled: true,
       pushSubscription: { not: Prisma.DbNull },
     };
@@ -410,18 +438,17 @@ export class CustomersService {
     let failed = 0;
 
     for (const recipient of recipients) {
-      const sub = recipient.pushSubscription as any;
+      const sub = recipient.pushSubscription as { endpoint?: string; keys?: { p256dh?: string; auth?: string } } | null;
       if (!sub || !sub.endpoint || !sub.keys?.p256dh || !sub.keys?.auth) continue;
 
-      try {
-        await (PushNotificationService as any).sendToSubscription(
-          { id: recipient.id, endpoint: sub.endpoint, p256dh: sub.keys.p256dh, auth: sub.keys.auth },
-          { title, message, targetRoute }
-        );
-        sent++;
-      } catch (err) {
-        failed++;
-      }
+      const delivered = await PushNotificationService.sendToSubscription(
+        { id: recipient.id, endpoint: sub.endpoint, p256dh: sub.keys.p256dh, auth: sub.keys.auth },
+        { title, message, targetRoute },
+        // Customer subscriptions live on the customer row, not in push_subscriptions.
+        () => prisma.customer.update({ where: { id: recipient.id }, data: { pushSubscription: Prisma.DbNull } }),
+      );
+      if (delivered) sent++;
+      else failed++;
     }
 
     await prisma.auditLog.create({
@@ -447,7 +474,8 @@ export class CustomersService {
    * 4. Customer debts (total and list of debtors)
    */
   public static async getCashDeskSummary(storeId?: string) {
-    const [rateVal, stores, inStockDevices, suppliersWithDebt, customerDebtors] = await Promise.all([
+    const debtorWhere = { totalDebtTjs: { gt: 0 } };
+    const [rateVal, stores, inStockDevices, suppliersWithDebt, customerDebtors, customerDebtTotals] = await Promise.all([
       getRateForDate(new Date()),
       prisma.store.findMany({ where: { active: true }, orderBy: { name: 'asc' } }),
       prisma.device.findMany({
@@ -472,8 +500,9 @@ export class CustomersService {
         where: { active: true, totalDebtUsd: { gt: 0 } },
         orderBy: { totalDebtUsd: 'desc' },
       }),
+      // The list is capped for display; the totals below come from an aggregate over every debtor.
       prisma.customer.findMany({
-        where: { totalDebtTjs: { gt: 0 } },
+        where: debtorWhere,
         orderBy: { totalDebtTjs: 'desc' },
         take: 50,
         include: {
@@ -485,32 +514,48 @@ export class CustomersService {
           },
         },
       }),
+      prisma.customer.aggregate({ where: debtorWhere, _sum: { totalDebtTjs: true }, _count: { _all: true } }),
     ]);
 
-    const rate = rateVal ? Number(rateVal) : 10.9;
-    const storeMap = new Map<string, string>(stores.map((s: any) => [s.id, s.name]));
+    // Read-only valuation of balances: today's rate (or the latest known one). With no rate
+    // at all the TJS equivalents are reported as 0 rather than guessed.
+    const rate = rateVal && D(rateVal).gt(0) ? D(rateVal) : null;
+    const toTjs = (usd: MoneyInput) => (rate ? roundMoney(D(usd).mul(rate)) : D(0));
+    const toUsd = (tjs: MoneyInput) => (rate ? roundMoney(D(tjs).div(rate)) : D(0));
+    const deviceCostUsd = (d: { costBasisUsd: MoneyInput | null; purchasePriceUsd: MoneyInput | null }) =>
+      D(d.costBasisUsd || d.purchasePriceUsd || 0);
+    const storeMap = new Map<string, string>(stores.map((s) => [s.id, s.name]));
 
     // 1. Cash Balances
-    const storeCash = stores.map((s: any) => {
-      const cashUsd = Number(s.cashBalanceUsd);
-      const cashTjs = roundMoney(D(cashUsd).mul(rate));
-      return {
-        id: s.id as string,
-        name: s.name as string,
-        isMainWarehouse: Boolean(s.isMainWarehouse),
-        cashUsd,
-        cashTjs: Number(cashTjs),
-      };
-    });
+    // Главный склад — это место хранения товаров (денег там нет, касса не ведётся).
+    // Все сданные средства и основной фонд хранятся в Центральной кассе.
+    // В розничных магазинах отображаются остатки выручки до проведения инкассации.
+    const mainWarehouseStore = stores.find((s) => s.isMainWarehouse);
+    const centralCashUsd = mainWarehouseStore ? D(mainWarehouseStore.cashBalanceUsd) : D(0);
 
-    const relevantStores = storeId && storeId !== 'all' ? storeCash.filter((s: any) => s.id === storeId) : storeCash;
-    const totalCashUsd = relevantStores.reduce((sum: number, s: any) => sum + s.cashUsd, 0);
-    const totalCashTjs = roundMoney(D(totalCashUsd).mul(rate));
+    const retailStores = stores.filter((s) => !s.isMainWarehouse);
+    const retailStoresCash = retailStores.map((s) => ({
+      id: s.id,
+      name: s.name,
+      isMainWarehouse: false,
+      cashUsd: Number(s.cashBalanceUsd),
+      cashTjs: Number(toTjs(s.cashBalanceUsd)),
+      _cashUsd: D(s.cashBalanceUsd),
+    }));
+
+    const isSpecificStore = Boolean(storeId && storeId !== 'all');
+    const selectedRetailStore = isSpecificStore ? retailStoresCash.find((s) => s.id === storeId) : null;
+
+    // Total cash across the business:
+    // If specific retail store selected: that store's uncollected cash
+    // If all (Central): Central Cash + uncollected cash currently in all retail stores
+    const totalCashUsd = selectedRetailStore
+      ? selectedRetailStore._cashUsd
+      : centralCashUsd.plus(retailStoresCash.reduce((sum, s) => sum.plus(s._cashUsd), D(0)));
 
     // 2. Stock Inventory by Cost Price
     const totalStockCount = inStockDevices.length;
-    const totalStockCostUsd = inStockDevices.reduce((sum: number, d: any) => sum + Number(d.costBasisUsd || d.purchasePriceUsd || 0), 0);
-    const totalStockCostTjs = roundMoney(D(totalStockCostUsd).mul(rate));
+    const totalStockCostUsd = inStockDevices.reduce((sum, d) => sum.plus(deviceCostUsd(d)), D(0));
 
     // Aggregate inventory by model
     const modelMap = new Map<string, {
@@ -520,7 +565,7 @@ export class CustomersService {
       storage?: string | null;
       color?: string | null;
       count: number;
-      totalCostUsd: number;
+      totalCostUsd: ReturnType<typeof D>;
       storesMap: Map<string, { storeId: string; storeName: string; count: number }>;
     }>();
 
@@ -530,7 +575,6 @@ export class CustomersService {
       const storage = d.storage || null;
       const color = d.color || null;
       const key = `${brand}|${model}|${storage || ''}|${color || ''}`;
-      const itemCost = Number(d.costBasisUsd || d.purchasePriceUsd || 0);
       const storeName = storeMap.get(d.storeId) || 'Склад';
 
       let entry = modelMap.get(key);
@@ -542,13 +586,13 @@ export class CustomersService {
           storage,
           color,
           count: 0,
-          totalCostUsd: 0,
+          totalCostUsd: D(0),
           storesMap: new Map(),
         };
         modelMap.set(key, entry);
       }
       entry.count += 1;
-      entry.totalCostUsd += itemCost;
+      entry.totalCostUsd = entry.totalCostUsd.plus(deviceCostUsd(d));
 
       const storeEntry = entry.storesMap.get(d.storeId) || { storeId: d.storeId, storeName, count: 0 };
       storeEntry.count += 1;
@@ -557,9 +601,8 @@ export class CustomersService {
 
     const models = Array.from(modelMap.values())
       .map((m) => {
-        const roundedCostUsd = roundMoney(D(m.totalCostUsd));
-        const roundedCostTjs = roundMoney(D(roundedCostUsd).mul(rate));
-        const avgCostUsd = m.count > 0 ? roundMoney(D(roundedCostUsd).div(m.count)) : 0;
+        const roundedCostUsd = roundMoney(m.totalCostUsd);
+        const avgCostUsd = m.count > 0 ? roundMoney(roundedCostUsd.div(m.count)) : D(0);
         return {
           key: m.key,
           brand: m.brand,
@@ -569,14 +612,14 @@ export class CustomersService {
           count: m.count,
           avgCostUsd: Number(avgCostUsd),
           totalCostUsd: Number(roundedCostUsd),
-          totalCostTjs: Number(roundedCostTjs),
+          totalCostTjs: Number(toTjs(roundedCostUsd)),
           stores: Array.from(m.storesMap.values()),
         };
       })
       .sort((a, b) => b.totalCostUsd - a.totalCostUsd);
 
-    const items = inStockDevices.map((d: any) => {
-      const costUsd = Number(d.costBasisUsd || d.purchasePriceUsd || 0);
+    const items = inStockDevices.map((d) => {
+      const costUsd = deviceCostUsd(d);
       return {
         id: d.id,
         brand: d.brand,
@@ -584,8 +627,8 @@ export class CustomersService {
         storage: d.storage,
         color: d.color,
         imei: d.imei,
-        costBasisUsd: costUsd,
-        costBasisTjs: Number(roundMoney(D(costUsd).mul(rate))),
+        costBasisUsd: Number(costUsd),
+        costBasisTjs: Number(toTjs(costUsd)),
         retailPriceTjs: Number(d.retailPriceTjs || 0),
         storeId: d.storeId,
         storeName: storeMap.get(d.storeId) || 'Склад',
@@ -593,44 +636,48 @@ export class CustomersService {
     });
 
     // 3. Supplier Debt
-    const totalSupplierDebtUsd = suppliersWithDebt.reduce((sum: number, s: any) => sum + Number(s.totalDebtUsd), 0);
-    const totalSupplierDebtTjs = roundMoney(D(totalSupplierDebtUsd).mul(rate));
+    const totalSupplierDebtUsd = suppliersWithDebt.reduce((sum, s) => sum.plus(s.totalDebtUsd), D(0));
 
-    // 4. Customer Debt
-    const totalCustomerDebtTjs = customerDebtors.reduce((sum: number, c: any) => sum + Number(c.totalDebtTjs), 0);
-    const totalCustomerDebtUsd = rate > 0 ? roundMoney(D(totalCustomerDebtTjs).div(rate)) : 0;
+    // 4. Customer Debt (all debtors, not just the listed top 50)
+    const totalCustomerDebtTjs = D(customerDebtTotals._sum.totalDebtTjs ?? 0);
 
     return {
-      exchangeRate: rate,
+      exchangeRate: rate ? Number(rate) : null,
       cash: {
-        totalUsd: totalCashUsd,
-        totalTjs: Number(totalCashTjs),
-        stores: relevantStores,
+        totalUsd: Number(roundMoney(totalCashUsd)),
+        totalTjs: Number(toTjs(totalCashUsd)),
+        central: {
+          id: mainWarehouseStore?.id || 'central',
+          name: 'Центральная касса',
+          cashUsd: Number(roundMoney(centralCashUsd)),
+          cashTjs: Number(toTjs(centralCashUsd)),
+        },
+        stores: (selectedRetailStore ? [selectedRetailStore] : retailStoresCash).map(({ _cashUsd, ...s }) => s),
       },
       inventory: {
         totalCount: totalStockCount,
-        totalCostUsd: Number(roundMoney(D(totalStockCostUsd))),
-        totalCostTjs: Number(totalStockCostTjs),
+        totalCostUsd: Number(roundMoney(totalStockCostUsd)),
+        totalCostTjs: Number(toTjs(totalStockCostUsd)),
         models,
         items,
       },
       suppliers: {
-        totalDebtUsd: totalSupplierDebtUsd,
-        totalDebtTjs: Number(totalSupplierDebtTjs),
+        totalDebtUsd: Number(roundMoney(totalSupplierDebtUsd)),
+        totalDebtTjs: Number(toTjs(totalSupplierDebtUsd)),
         debtorsCount: suppliersWithDebt.length,
-        suppliers: suppliersWithDebt.map((s: any) => ({
+        suppliers: suppliersWithDebt.map((s) => ({
           id: s.id,
           name: s.name,
           phone: s.phone,
           totalDebtUsd: Number(s.totalDebtUsd),
-          totalDebtTjs: Number(roundMoney(D(s.totalDebtUsd).mul(rate))),
+          totalDebtTjs: Number(toTjs(s.totalDebtUsd)),
         })),
       },
       customers: {
-        totalDebtTjs: totalCustomerDebtTjs,
-        totalDebtUsd: Number(totalCustomerDebtUsd),
-        debtorsCount: customerDebtors.length,
-        debtors: customerDebtors.map((c: any) => ({
+        totalDebtTjs: Number(roundMoney(totalCustomerDebtTjs)),
+        totalDebtUsd: Number(toUsd(totalCustomerDebtTjs)),
+        debtorsCount: customerDebtTotals._count._all,
+        debtors: customerDebtors.map((c) => ({
           id: c.id,
           name: c.name,
           phone: c.phone,
