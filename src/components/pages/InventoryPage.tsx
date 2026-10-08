@@ -174,13 +174,13 @@ export const InventoryPage: React.FC = () => {
       if (d.brand?.trim()) set.add(d.brand.trim());
     });
     return [
-      { value: 'ALL', label: `Все бренды (${devicesInActiveLocation.length})` },
+      { value: 'ALL', label: 'Все бренды' },
       ...Array.from(set).sort().map(b => ({
         value: b,
-        label: `${b} (${brandCountsMap.get(b) || 0} шт.)`
+        label: b
       }))
     ];
-  }, [devicesInActiveLocation, brandCountsMap]);
+  }, [devicesInActiveLocation]);
 
   const availableRams = useMemo(() => {
     const set = new Set<string>();

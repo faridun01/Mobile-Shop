@@ -247,23 +247,13 @@ export const TransferDeviceGrid: React.FC<TransferDeviceGridProps> = ({
                 setOnlySelected(false);
               }}
               className={cn(
-                'h-6.5 px-2 rounded-md text-[11px] font-semibold shrink-0 transition-all cursor-pointer flex items-center gap-1',
+                'h-6.5 px-2.5 rounded-md text-[11px] font-semibold shrink-0 transition-all cursor-pointer flex items-center gap-1',
                 selectedBrand === 'ALL' && !onlySelected
                   ? 'bg-accent text-accent-fg shadow-2xs font-bold'
                   : 'bg-surface-raised hover:bg-surface border border-border text-fg-subtle hover:text-fg'
               )}
             >
               <span>Все</span>
-              <span
-                className={cn(
-                  'text-[10px] px-1 py-0.1 rounded font-mono',
-                  selectedBrand === 'ALL' && !onlySelected
-                    ? 'bg-accent-fg/20 text-accent-fg'
-                    : 'bg-surface text-fg-subtle'
-                )}
-              >
-                {totalAvailableCount || availableDevices.length}
-              </span>
             </button>
 
             {/* Quick Filter: Selected Only */}
@@ -298,23 +288,13 @@ export const TransferDeviceGrid: React.FC<TransferDeviceGridProps> = ({
                     setSelectedBrand(selectedBrand === b.brand ? 'ALL' : b.brand);
                   }}
                   className={cn(
-                    'h-6.5 px-2 rounded-md text-[11px] font-semibold shrink-0 transition-all cursor-pointer flex items-center gap-1',
+                    'h-6.5 px-2.5 rounded-md text-[11px] font-semibold shrink-0 transition-all cursor-pointer flex items-center gap-1',
                     isBrandActive
                       ? 'bg-accent text-accent-fg shadow-2xs font-bold'
                       : 'bg-surface-raised hover:bg-surface border border-border text-fg-subtle hover:text-fg'
                   )}
                 >
                   <span>{b.brand}</span>
-                  <span
-                    className={cn(
-                      'text-[10px] px-1 py-0.1 rounded font-mono',
-                      isBrandActive
-                        ? 'bg-accent-fg/20 text-accent-fg'
-                        : 'bg-surface text-fg-subtle'
-                    )}
-                  >
-                    {b.count}
-                  </span>
                 </button>
               );
             })}
@@ -397,7 +377,7 @@ export const TransferDeviceGrid: React.FC<TransferDeviceGridProps> = ({
       </div>
 
       {/* Devices Content */}
-      <div className="flex-1 bg-bg p-2 sm:p-2.5 space-y-2 pb-28 flex flex-col">
+      <div className="flex-1 bg-bg p-1.5 sm:p-2 space-y-1.5 pb-20 flex flex-col">
         {isInitialLoading ? (
           <LoadingState label="Загрузка устройств…" />
         ) : availableDevices.length === 0 ? (
@@ -453,7 +433,7 @@ export const TransferDeviceGrid: React.FC<TransferDeviceGridProps> = ({
           </div>
         ) : viewMode === 'BY_MODEL' ? (
           /* GROUPED BY MODEL LIST VIEW */
-          <div className="space-y-2">
+          <div className="space-y-1.5">
             {modelGroups.map((group) => {
               const isExpanded = expandedGroupKeys.has(group.key);
               const allSelected = group.allSelected;
@@ -472,7 +452,7 @@ export const TransferDeviceGrid: React.FC<TransferDeviceGridProps> = ({
                   )}
                 >
                   {/* Model Header Row */}
-                  <div className="p-2 sm:p-2.5 flex items-center justify-between gap-2.5">
+                  <div className="p-1.5 sm:p-2 flex items-center justify-between gap-2">
                     <div
                       className="flex items-center gap-2 min-w-0 flex-1 cursor-pointer select-none"
                       onClick={() => toggleExpandGroup(group.key)}

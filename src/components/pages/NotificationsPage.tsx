@@ -27,7 +27,6 @@ import { NAV_PAGE_ROUTES } from '../../router/navRoutes';
 import { formatTjs, formatUsd } from '../../utils/money';
 import { Button } from '../ui/Button';
 import { EmptyState } from '../ui/EmptyState';
-import { FilterPillGroup } from '../ui/FilterPillGroup';
 import { LoadingState } from '../ui/Skeleton';
 import { useStoreContext } from '../../utils/storeContext';
 import { PushNotificationBanner } from '../notifications/PushNotificationBanner';
@@ -216,6 +215,7 @@ export const NotificationsPage: React.FC = () => {
   const markAll = async () => {
     try {
       await apiClient('/notifications/read-all', { method: 'POST' });
+      setItems((prev) => (prev ?? []).map((x) => ({ ...x, read: true, isRead: true })));
       void fetchNotifications();
     } catch {
       setError('Не удалось отметить уведомления прочитанными');
@@ -238,85 +238,96 @@ export const NotificationsPage: React.FC = () => {
 
   return (
     <div className="work-screen flex-1 flex flex-col h-full overflow-hidden bg-bg text-fg-muted">
-      {/* Desktop Header */}
-      <div className="hidden sm:flex items-center justify-between gap-3 px-4 py-3 border-b border-border bg-surface shrink-0">
-        <div className="min-w-0 flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-xl bg-accent/10 border border-accent/25 flex items-center justify-center text-accent shrink-0">
-            <Bell className="w-4 h-4" />
+      {/* Sleek Compact Header & Controls Toolbar */}
+      <div className="px-2.5 sm:px-3 py-1.5 border-b border-border bg-surface/90 backdrop-blur-xs flex flex-wrap items-center justify-between gap-1.5 shrink-0">
+        {/* Left: Title + Filter Tabs */}
+        <div className="flex items-center gap-2 min-w-0">
+          <div className="flex items-center gap-1.5 shrink-0">
+            <div className="w-6 h-6 rounded-lg bg-accent/10 border border-accent/25 flex items-center justify-center text-accent">
+              <Bell className="w-3.5 h-3.5" />
+            </div>
+            <h1 className="text-xs font-bold text-fg hidden xs:inline">Уведомления</h1>
           </div>
-          <div>
-            <h1 className="text-sm font-bold text-fg leading-none">Уведомления</h1>
-            <p className="text-[11px] text-fg-subtle mt-0.5">Оповещения за последние 24 часа</p>
-          </div>
-        </div>
-        {hasUnread && (
-          <button
-            type="button"
-            onClick={markAll}
-            className="px-3 py-1.5 rounded-xl bg-surface-raised hover:bg-surface border border-border text-xs font-semibold text-fg-muted hover:text-fg transition-all active:scale-95 flex items-center gap-1.5 cursor-pointer shadow-2xs"
-          >
-            <CheckCheck className="w-3.5 h-3.5 text-accent" />
-            <span>Прочитать все</span>
-          </button>
-        )}
-      </div>
 
-      {/* Compact Filters Strip */}
-      <div className="p-2.5 sm:p-3 border-b border-border bg-surface/50 space-y-2 shrink-0">
-        <div className="flex items-center justify-between gap-2">
-          <FilterPillGroup
-            options={[
-              { value: 'UNREAD', label: `Непрочитанные${unreadCount > 0 ? ` (${unreadCount})` : ''}` },
-              { value: 'ALL', label: 'Все' },
-            ]}
-            value={view}
-            onChange={setView}
-          />
-          {hasUnread && (
+          <div className="flex items-center p-0.5 rounded-lg bg-surface-raised border border-border/80 text-[11px] font-medium">
             <button
               type="button"
-              onClick={markAll}
-              className="sm:hidden px-2 py-1 rounded-lg bg-surface-raised hover:bg-accent/10 border border-border hover:border-accent/30 text-fg-subtle hover:text-accent text-xs font-semibold flex items-center gap-1 transition-all cursor-pointer active:scale-95 shrink-0"
-              title="Отметить все прочитанными"
+              onClick={() => setView('UNREAD')}
+              className={`px-2 py-0.5 rounded-md transition-all cursor-pointer flex items-center gap-1 ${
+                view === 'UNREAD'
+                  ? 'bg-accent text-white font-semibold shadow-2xs'
+                  : 'text-fg-subtle hover:text-fg'
+              }`}
             >
-              <CheckCheck className="w-3.5 h-3.5 text-accent" />
-              <span className="text-[11px]">Прочитать</span>
+              <span>Непрочитанные</span>
+              {unreadCount > 0 && (
+                <span className={`px-1 py-0.2 rounded-full text-[9px] font-bold ${
+                  view === 'UNREAD' ? 'bg-white/20 text-white' : 'bg-accent/15 text-accent'
+                }`}>
+                  {unreadCount}
+                </span>
+              )}
             </button>
-          )}
+            <button
+              type="button"
+              onClick={() => setView('ALL')}
+              className={`px-2 py-0.5 rounded-md transition-all cursor-pointer ${
+                view === 'ALL'
+                  ? 'bg-accent text-white font-semibold shadow-2xs'
+                  : 'text-fg-subtle hover:text-fg'
+              }`}
+            >
+              Все
+            </button>
+          </div>
         </div>
 
-        {/* Clean 2-column select row */}
-        <div className="grid grid-cols-2 gap-2">
+        {/* Right: Store & Action filters + Mark All */}
+        <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar ml-auto sm:ml-0">
           {storeCtx.mode === 'CENTRAL' && (
-            <div className="relative">
+            <div className="relative shrink-0">
               <select
                 value={storeId}
                 onChange={(e) => setStoreId(e.target.value)}
                 aria-label="Магазин"
-                className="w-full h-8 pl-2.5 pr-7 rounded-lg bg-surface border border-border text-fg-muted hover:border-accent/40 text-xs font-medium appearance-none truncate cursor-pointer focus:outline-hidden focus:border-accent transition-colors"
+                className="h-7 pl-2 pr-6 rounded-lg bg-surface-raised border border-border text-fg-muted hover:border-accent/40 text-[11px] font-medium appearance-none max-w-[125px] sm:max-w-[150px] truncate cursor-pointer focus:outline-hidden focus:border-accent transition-colors"
               >
                 <option value="">Все магазины</option>
                 {retailStores.map((s) => (
                   <option key={s.id} value={s.id}>{s.name}</option>
                 ))}
               </select>
-              <ChevronDown className="w-3.5 h-3.5 text-fg-subtle absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" />
+              <ChevronDown className="w-3 h-3 text-fg-subtle absolute right-1.5 top-1/2 -translate-y-1/2 pointer-events-none" />
             </div>
           )}
-          <div className={`relative ${storeCtx.mode !== 'CENTRAL' ? 'col-span-2' : ''}`}>
+
+          <div className="relative shrink-0">
             <select
               value={actionType}
               onChange={(e) => setActionType(e.target.value)}
               aria-label="Действие"
-              className="w-full h-8 pl-2.5 pr-7 rounded-lg bg-surface border border-border text-fg-muted hover:border-accent/40 text-xs font-medium appearance-none truncate cursor-pointer focus:outline-hidden focus:border-accent transition-colors"
+              className="h-7 pl-2 pr-6 rounded-lg bg-surface-raised border border-border text-fg-muted hover:border-accent/40 text-[11px] font-medium appearance-none max-w-[125px] sm:max-w-[160px] truncate cursor-pointer focus:outline-hidden focus:border-accent transition-colors"
             >
               <option value="">Все действия</option>
               {Object.entries(ACTION_LABELS).map(([value, label]) => (
                 <option key={value} value={value}>{label}</option>
               ))}
             </select>
-            <ChevronDown className="w-3.5 h-3.5 text-fg-subtle absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" />
+            <ChevronDown className="w-3 h-3 text-fg-subtle absolute right-1.5 top-1/2 -translate-y-1/2 pointer-events-none" />
           </div>
+
+          {hasUnread && (
+            <button
+              type="button"
+              onClick={markAll}
+              className="h-7 px-2 rounded-lg bg-surface-raised hover:bg-surface border border-border text-[11px] font-semibold text-fg-muted hover:text-accent transition-all active:scale-95 flex items-center gap-1 cursor-pointer shrink-0"
+              title="Отметить все прочитанными"
+            >
+              <CheckCheck className="w-3.5 h-3.5 text-accent" />
+              <span className="hidden xs:inline">Прочитать все</span>
+              <span className="xs:hidden">Все</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -325,7 +336,7 @@ export const NotificationsPage: React.FC = () => {
 
       {/* Notifications List */}
       <div className="flex-1 overflow-y-auto">
-        {error && <p className="m-3 text-xs text-danger bg-danger/10 border border-danger/30 rounded-xl p-2.5">{error}</p>}
+        {error && <p className="m-2 text-xs text-danger bg-danger/10 border border-danger/30 rounded-xl p-2">{error}</p>}
         {items === null ? (
           <LoadingState label="Загрузка уведомлений…" />
         ) : items.length === 0 ? (
@@ -335,7 +346,7 @@ export const NotificationsPage: React.FC = () => {
             description={view === 'UNREAD' ? 'Все события за 24 часа просмотрены' : 'За последние 24 часа новых событий не зафиксировано'}
           />
         ) : (
-          <div className="p-2 sm:p-3 space-y-2">
+          <div className="p-2 sm:p-2.5 space-y-1.5">
             {items.map((n) => {
               const unread = !n.read;
               const path = targetPath(n);
@@ -349,37 +360,41 @@ export const NotificationsPage: React.FC = () => {
                 <div
                   key={n.id}
                   onClick={() => open(n)}
-                  className={`group relative rounded-xl border transition-all text-left p-3 cursor-pointer select-none active:scale-[0.99] ${
+                  className={`group relative rounded-xl border transition-all text-left p-2 sm:p-2.5 cursor-pointer select-none active:scale-[0.995] ${
                     unread
                       ? 'bg-accent/[0.04] border-accent/30 hover:border-accent/50 shadow-2xs'
                       : 'bg-surface hover:bg-surface-raised/80 border-border/80 text-fg-muted'
                   }`}
                 >
-                  {/* Top Row: Icon + Title + Date + Mark Read */}
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="flex items-center gap-2.5 min-w-0">
-                      <div className={`w-7 h-7 rounded-lg border flex items-center justify-center shrink-0 ${badgeStyle}`}>
-                        <EventIcon className="w-3.5 h-3.5" />
+                  {/* Row 1: Icon + Title + Action Badge + Amounts + Date + Mark Read */}
+                  <div className="flex items-center justify-between gap-1.5 min-w-0">
+                    <div className="flex items-center gap-2 min-w-0 flex-1">
+                      <div className={`w-6 h-6 rounded-lg border flex items-center justify-center shrink-0 ${badgeStyle}`}>
+                        <EventIcon className="w-3 h-3" />
                       </div>
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-1.5 flex-wrap">
-                          <span className={`text-xs sm:text-sm font-bold truncate ${unread ? 'text-fg' : 'text-fg-muted'}`}>
-                            {n.title}
-                          </span>
-                          {unread && (
-                            <span className="w-1.5 h-1.5 rounded-full bg-accent shrink-0 animate-pulse" />
-                          )}
-                        </div>
-                        {n.actionType && ACTION_LABELS[n.actionType] &&
-                         !n.title.toLowerCase().includes(ACTION_LABELS[n.actionType].toLowerCase()) && (
-                          <span className="text-[10px] text-fg-subtle font-medium block truncate">
-                            {ACTION_LABELS[n.actionType]}
-                          </span>
-                        )}
-                      </div>
+                      
+                      <span className={`text-xs truncate ${unread ? 'font-bold text-fg' : 'font-medium text-fg-muted'}`}>
+                        {n.title}
+                      </span>
+
+                      {unread && (
+                        <span className="w-1.5 h-1.5 rounded-full bg-accent shrink-0 animate-pulse" />
+                      )}
+
+                      {n.actionType && ACTION_LABELS[n.actionType] &&
+                       !n.title.toLowerCase().includes(ACTION_LABELS[n.actionType].toLowerCase()) && (
+                        <span className="hidden xs:inline-flex px-1.5 py-0.2 rounded text-[10px] font-medium bg-surface-raised border border-border/60 text-fg-subtle shrink-0">
+                          {ACTION_LABELS[n.actionType]}
+                        </span>
+                      )}
                     </div>
 
                     <div className="flex items-center gap-1.5 shrink-0">
+                      {amounts && (
+                        <span className="text-[11px] font-bold font-mono text-emerald-400 bg-emerald-500/10 px-1.5 py-0.2 rounded border border-emerald-500/20 shrink-0">
+                          {amounts}
+                        </span>
+                      )}
                       <span className="text-[10px] font-mono text-fg-subtle whitespace-nowrap">
                         {dateLabel}
                       </span>
@@ -391,7 +406,7 @@ export const NotificationsPage: React.FC = () => {
                             void markRead(n);
                           }}
                           title="Отметить прочитанным"
-                          className="w-6 h-6 rounded-md hover:bg-accent/15 text-fg-subtle hover:text-accent flex items-center justify-center transition-colors cursor-pointer"
+                          className="w-5 h-5 rounded hover:bg-accent/20 text-fg-subtle hover:text-accent flex items-center justify-center transition-colors cursor-pointer"
                         >
                           <Check className="w-3.5 h-3.5" />
                         </button>
@@ -399,58 +414,48 @@ export const NotificationsPage: React.FC = () => {
                     </div>
                   </div>
 
-                  {/* Message Body */}
+                  {/* Row 2: Message body (if present) */}
                   {n.message && (
-                    <p className="text-xs text-fg-muted mt-1.5 leading-relaxed wrap-break-word">
+                    <p className="text-[11px] text-fg-muted/90 mt-1 pl-8 leading-snug line-clamp-1 sm:line-clamp-2">
                       {n.message}
                     </p>
                   )}
 
                   {/* IMEI preview if any */}
                   {imeis && imeis.length > 0 && (
-                    <p className="text-[11px] font-mono text-fg-subtle mt-1.5 break-all bg-surface-raised/60 px-2 py-0.5 rounded border border-border/50">
-                      IMEI: {imeis.slice(0, 5).join(', ')}{imeis.length > 5 ? ` +${imeis.length - 5}` : ''}
-                    </p>
+                    <div className="flex items-center gap-1 text-[10px] font-mono text-fg-subtle mt-1 pl-8">
+                      <span className="text-fg-subtle">IMEI:</span>
+                      <span className="bg-surface-raised px-1.5 py-0.2 rounded border border-border/40 truncate">
+                        {imeis.slice(0, 5).join(', ')}{imeis.length > 5 ? ` +${imeis.length - 5}` : ''}
+                      </span>
+                    </div>
                   )}
 
-                  {/* Bottom Metadata & Action Tag */}
-                  <div className="flex items-center justify-between gap-2 mt-2 pt-2 border-t border-border/40 text-[11px] flex-wrap">
-                    <div className="flex items-center gap-1.5 flex-wrap text-fg-subtle">
-                      {n.storeName && (
-                        <span className="px-1.5 py-0.5 rounded bg-surface-raised border border-border text-[10px] font-medium text-fg-muted">
-                          {n.storeName}
-                        </span>
-                      )}
-                      {n.actorName && (
-                        <span className="text-fg-subtle text-[11px]">
-                          {n.actorName}
-                        </span>
-                      )}
-                      {amounts && (
-                        <>
-                          <span>·</span>
-                          <span className="font-semibold text-fg-muted">
-                            {amounts}
+                  {/* Row 3: Store, Actor, DocRef, and Link */}
+                  {(n.storeName || n.actorName || n.documentRef || path) && (
+                    <div className="flex items-center justify-between gap-2 mt-1.5 pt-1 border-t border-border/30 text-[10px] pl-8">
+                      <div className="flex items-center gap-1.5 flex-wrap text-fg-subtle">
+                        {n.storeName && (
+                          <span className="px-1.5 py-0.2 rounded bg-surface-raised border border-border/50 text-[10px] font-medium text-fg-muted">
+                            {n.storeName}
                           </span>
-                        </>
-                      )}
-                      {n.documentRef && (
-                        <>
-                          <span>·</span>
-                          <span className="font-mono text-fg-subtle">
-                            {n.documentRef}
-                          </span>
-                        </>
+                        )}
+                        {n.actorName && (
+                          <span>{n.actorName}</span>
+                        )}
+                        {n.documentRef && (
+                          <span className="font-mono text-fg-subtle">{n.documentRef}</span>
+                        )}
+                      </div>
+
+                      {path && (
+                        <span className="inline-flex items-center gap-0.5 text-[10px] font-semibold text-accent group-hover:underline ml-auto shrink-0">
+                          Перейти
+                          <ChevronRight className="w-3 h-3 transition-transform group-hover:translate-x-0.5" />
+                        </span>
                       )}
                     </div>
-
-                    {path && (
-                      <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-accent group-hover:underline ml-auto">
-                        Перейти
-                        <ChevronRight className="w-3 h-3 transition-transform group-hover:translate-x-0.5" />
-                      </span>
-                    )}
-                  </div>
+                  )}
                 </div>
               );
             })}

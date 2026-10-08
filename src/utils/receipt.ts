@@ -8,9 +8,6 @@ export const PAYMENT_METHOD_LABELS: Record<PaymentMethod, string> = {
   DEBT: 'В долг',
 };
 
-/** Warranty line printed on every receipt, set per deployment (VITE_RECEIPT_WARRANTY, e.g. «30 дней»). */
-export const RECEIPT_WARRANTY = (import.meta.env?.VITE_RECEIPT_WARRANTY || '').trim();
-
 /** How the customer paid, with the split amounts when both were used. */
 export function paymentSummary(sale: Pick<Sale, 'paymentMethod' | 'cashAmountTjs' | 'cardAmountTjs'>): string {
   if (sale.paymentMethod === 'SPLIT') {
@@ -22,9 +19,8 @@ export function paymentSummary(sale: Pick<Sale, 'paymentMethod' | 'cashAmountTjs
 /** Plain-text receipt for sharing with the customer (messenger, SMS) or copying. */
 export function formatReceiptText(
   sale: Sale,
-  opts: { showStore?: boolean; storeAddress?: string; warranty?: string } = {},
+  opts: { showStore?: boolean; storeAddress?: string } = {},
 ): string {
-  const warranty = (opts.warranty ?? RECEIPT_WARRANTY).trim();
   const address = opts.storeAddress?.trim();
   const lines = [
     `Чек №${sale.receiptNumber}`,
@@ -43,7 +39,6 @@ export function formatReceiptText(
       : sale.customerPhone
       ? [`Покупатель: ${sale.customerPhone}`]
       : []),
-    ...(warranty ? [`Гарантия: ${warranty}`] : []),
   ];
   return lines.join('\n');
 }

@@ -20,6 +20,9 @@ interface CustomSelectProps<T extends string = string> {
   className?: string;
   triggerClassName?: string;
   disabled?: boolean;
+  size?: 'sm' | 'md' | 'lg';
+  align?: 'left' | 'right';
+  menuWidth?: string;
 }
 
 /**
@@ -36,6 +39,9 @@ export function CustomSelect<T extends string = string>({
   className,
   triggerClassName,
   disabled = false,
+  size = 'md',
+  align = 'left',
+  menuWidth,
 }: CustomSelectProps<T>) {
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -71,21 +77,25 @@ export function CustomSelect<T extends string = string>({
     setIsOpen(false);
   };
 
+  const isFullWidth = className?.includes('w-full');
+
   return (
-    <div ref={containerRef} className={cn('relative inline-block', className)}>
+    <div ref={containerRef} className={cn('relative inline-block', isFullWidth && 'w-full', className)}>
       {/* Trigger Button */}
       <button
         type="button"
         disabled={disabled}
         onClick={() => !disabled && setIsOpen((prev) => !prev)}
         className={cn(
-          'flex items-center justify-between gap-2 px-3 py-1.5 rounded-xl bg-surface-raised border border-border text-fg text-xs font-semibold hover:border-accent/50 active:bg-surface transition-all cursor-pointer select-none text-left min-h-[34px]',
+          'flex items-center justify-between gap-2 rounded-xl bg-surface-raised border border-border text-fg text-xs font-semibold hover:border-accent/50 active:bg-surface transition-all cursor-pointer select-none text-left shadow-2xs',
+          size === 'sm' ? 'px-2.5 py-1 min-h-[30px] rounded-lg text-xs' : 'px-3 py-1.5 min-h-[34px] rounded-xl text-xs',
+          isFullWidth && 'w-full',
           isOpen && 'border-accent ring-1 ring-accent/30',
           disabled && 'opacity-50 cursor-not-allowed',
           triggerClassName
         )}
       >
-        <div className="flex items-center gap-2 min-w-0 truncate">
+        <div className="flex items-center gap-1.5 sm:gap-2 min-w-0 flex-1 truncate">
           {icon && <span className="text-accent shrink-0">{icon}</span>}
           {selectedOption?.icon && !icon && (
             <span className="text-accent shrink-0">{selectedOption.icon}</span>
@@ -94,7 +104,7 @@ export function CustomSelect<T extends string = string>({
         </div>
         <ChevronDown
           className={cn(
-            'w-3.5 h-3.5 text-fg-subtle transition-transform duration-200 shrink-0',
+            'w-3.5 h-3.5 text-fg-subtle transition-transform duration-200 shrink-0 ml-1',
             isOpen && 'rotate-180 text-accent'
           )}
         />
@@ -102,8 +112,14 @@ export function CustomSelect<T extends string = string>({
 
       {/* Desktop Floating Dropdown Menu */}
       {isOpen && (
-        <div className="hidden sm:block absolute z-50 top-full left-0 mt-1 min-w-[200px] w-full max-w-xs rounded-xl bg-surface border border-border shadow-xl p-1 space-y-0.5 animate-in fade-in-50 zoom-in-95 duration-150">
-          <div className="max-h-60 overflow-y-auto space-y-0.5">
+        <div
+          className={cn(
+            'hidden sm:block absolute z-50 top-full mt-1 min-w-[200px] rounded-xl bg-surface border border-border shadow-xl p-1 space-y-0.5 animate-in fade-in-50 zoom-in-95 duration-150',
+            align === 'right' ? 'right-0 left-auto' : 'left-0',
+            menuWidth || 'w-full max-w-xs'
+          )}
+        >
+          <div className="max-h-60 overflow-y-auto space-y-0.5 scrollbar-thin">
             {options.map((opt) => {
               const isSelected = opt.value === value;
               return (
@@ -112,20 +128,20 @@ export function CustomSelect<T extends string = string>({
                   type="button"
                   onClick={() => handleSelect(opt.value)}
                   className={cn(
-                    'w-full px-2.5 py-2 rounded-lg text-left text-xs flex items-center justify-between gap-2 transition-colors cursor-pointer',
+                    'w-full px-2.5 py-1.5 rounded-lg text-left text-xs flex items-center justify-between gap-2 transition-colors cursor-pointer',
                     isSelected
                       ? 'bg-accent/15 text-accent font-bold'
                       : 'hover:bg-surface-raised text-fg'
                   )}
                 >
-                  <div className="flex items-center gap-2 min-w-0">
+                  <div className="flex items-center gap-2 min-w-0 flex-1">
                     {opt.icon && (
                       <span className={cn('shrink-0', isSelected ? 'text-accent' : 'text-fg-subtle')}>
                         {opt.icon}
                       </span>
                     )}
-                    <div className="min-w-0">
-                      <span className="truncate block">{opt.label}</span>
+                    <div className="min-w-0 flex-1">
+                      <span className="truncate block font-semibold">{opt.label}</span>
                       {opt.sublabel && (
                         <span className="text-[10px] text-fg-subtle font-normal block truncate">
                           {opt.sublabel}
@@ -133,7 +149,14 @@ export function CustomSelect<T extends string = string>({
                       )}
                     </div>
                   </div>
-                  {isSelected && <Check className="w-3.5 h-3.5 text-accent shrink-0" />}
+                  <div className="flex items-center gap-1.5 shrink-0 ml-2">
+                    {opt.badge && (
+                      <span className="px-1.5 py-0.2 rounded text-[10px] font-mono bg-surface-raised border border-border/70 text-fg-subtle">
+                        {opt.badge}
+                      </span>
+                    )}
+                    {isSelected && <Check className="w-3.5 h-3.5 text-accent shrink-0" />}
+                  </div>
                 </button>
               );
             })}

@@ -11,6 +11,12 @@ import {
   Filter,
   RotateCcw,
   X,
+  Smartphone,
+  Cpu,
+  HardDrive,
+  ArrowUpDown,
+  Store,
+  Check,
 } from 'lucide-react';
 import { SearchBar } from '../ui/SearchBar';
 import { Dialog } from '../ui/Dialog';
@@ -95,101 +101,121 @@ export const InventoryFiltersBar: React.FC<InventoryFiltersBarProps> = ({
   onResetAllFilters,
 }) => {
   const filterFields = (
-    <div>
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5 sm:gap-3 text-xs">
+    <div className="space-y-2">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 sm:gap-2.5 text-xs">
         {/* Filter 1: Brand */}
-        <div>
-          <label className="block text-[11px] font-semibold text-fg-subtle mb-1 truncate">
-            Бренд
+        <div className="space-y-1 min-w-0">
+          <label className="text-[10px] sm:text-[11px] font-bold text-fg-subtle flex items-center gap-1.5 truncate">
+            <Smartphone className="w-3 h-3 text-accent shrink-0" />
+            <span className="truncate">Бренд</span>
           </label>
-          <select
-            value={selectedBrand}
-            onChange={(e) => onSelectBrand(e.target.value)}
-            className="w-full h-9 rounded-xl bg-surface border border-border px-2.5 py-1.5 text-fg text-xs font-semibold focus:border-accent focus:outline-none cursor-pointer truncate"
-          >
-            {brands.map(b => (
-              <option key={b.value} value={b.value}>{b.label}</option>
-            ))}
-          </select>
+          <div className="relative">
+            <select
+              value={selectedBrand}
+              onChange={(e) => onSelectBrand(e.target.value)}
+              className="w-full h-8 sm:h-8.5 rounded-lg bg-surface-raised border border-border/80 hover:border-accent/50 pl-2.5 pr-7 py-1 text-fg text-xs font-semibold focus:border-accent focus:ring-1 focus:ring-accent/25 focus:outline-none cursor-pointer appearance-none truncate transition-colors shadow-2xs"
+            >
+              {brands.map(b => (
+                <option key={b.value} value={b.value}>{b.label}</option>
+              ))}
+            </select>
+            <ChevronDown className="w-3.5 h-3.5 text-fg-subtle absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" />
+          </div>
         </div>
 
         {/* Filter 2: Status / Type */}
-        <div>
-          <label className="block text-[11px] font-semibold text-fg-subtle mb-1 truncate">
-            Наличие
+        <div className="space-y-1 min-w-0">
+          <label className="text-[10px] sm:text-[11px] font-bold text-fg-subtle flex items-center gap-1.5 truncate">
+            <Store className="w-3 h-3 text-accent shrink-0" />
+            <span className="truncate">Наличие</span>
           </label>
-          <select
-            value={selectedStatusFilter}
-            onChange={(e) => onSelectStatusFilter(e.target.value as any)}
-            className="w-full h-9 rounded-xl bg-surface border border-border px-2.5 py-1.5 text-fg text-xs font-semibold focus:border-accent focus:outline-none cursor-pointer truncate"
-          >
-            <option value="ALL">Все {activeStore ? `(«${activeStore.name}»)` : 'в наличии'}</option>
-            {selectedLocationId === 'ALL' && (
-              <>
-                <option value="MAIN_WAREHOUSE">Центральный склад</option>
-                <option value="STORE_STOCK">В магазинах</option>
-              </>
-            )}
-            <option value="BONUS_ONLY">Бонусы поставщиков</option>
-            <option value="EXCHANGE_ONLY">После обмена</option>
-          </select>
+          <div className="relative">
+            <select
+              value={selectedStatusFilter}
+              onChange={(e) => onSelectStatusFilter(e.target.value as any)}
+              className="w-full h-8 sm:h-8.5 rounded-lg bg-surface-raised border border-border/80 hover:border-accent/50 pl-2.5 pr-7 py-1 text-fg text-xs font-semibold focus:border-accent focus:ring-1 focus:ring-accent/25 focus:outline-none cursor-pointer appearance-none truncate transition-colors shadow-2xs"
+            >
+              <option value="ALL">Все {activeStore ? `(«${activeStore.name}»)` : 'в наличии'}</option>
+              {selectedLocationId === 'ALL' && (
+                <>
+                  <option value="MAIN_WAREHOUSE">Центральный склад</option>
+                  <option value="STORE_STOCK">В магазинах</option>
+                </>
+              )}
+              <option value="BONUS_ONLY">Бонусы поставщиков</option>
+              <option value="EXCHANGE_ONLY">После обмена</option>
+            </select>
+            <ChevronDown className="w-3.5 h-3.5 text-fg-subtle absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" />
+          </div>
         </div>
 
         {/* Filter 3: RAM */}
-        <div>
-          <label className="block text-[11px] font-semibold text-fg-subtle mb-1 truncate">
-            Оперативная память
+        <div className="space-y-1 min-w-0">
+          <label className="text-[10px] sm:text-[11px] font-bold text-fg-subtle flex items-center gap-1.5 truncate">
+            <Cpu className="w-3 h-3 text-accent shrink-0" />
+            <span className="truncate">Опер. память</span>
           </label>
-          <select
-            value={selectedRam}
-            onChange={(e) => onSelectRam(e.target.value)}
-            className="w-full h-9 rounded-xl bg-surface border border-border px-2.5 py-1.5 text-fg text-xs font-semibold focus:border-accent focus:outline-none cursor-pointer truncate"
-          >
-            <option value="ALL">Любая память</option>
-            {availableRams.map(ram => (
-              <option key={ram} value={ram}>{ram} GB</option>
-            ))}
-          </select>
+          <div className="relative">
+            <select
+              value={selectedRam}
+              onChange={(e) => onSelectRam(e.target.value)}
+              className="w-full h-8 sm:h-8.5 rounded-lg bg-surface-raised border border-border/80 hover:border-accent/50 pl-2.5 pr-7 py-1 text-fg text-xs font-semibold focus:border-accent focus:ring-1 focus:ring-accent/25 focus:outline-none cursor-pointer appearance-none truncate transition-colors shadow-2xs"
+            >
+              <option value="ALL">Любая память</option>
+              {availableRams.map(ram => (
+                <option key={ram} value={ram}>{ram} GB</option>
+              ))}
+            </select>
+            <ChevronDown className="w-3.5 h-3.5 text-fg-subtle absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" />
+          </div>
         </div>
 
         {/* Filter 4: Storage */}
-        <div>
-          <label className="block text-[11px] font-semibold text-fg-subtle mb-1 truncate">
-            Встроенная память
+        <div className="space-y-1 min-w-0">
+          <label className="text-[10px] sm:text-[11px] font-bold text-fg-subtle flex items-center gap-1.5 truncate">
+            <HardDrive className="w-3 h-3 text-accent shrink-0" />
+            <span className="truncate">Встр. память</span>
           </label>
-          <select
-            value={selectedStorage}
-            onChange={(e) => onSelectStorage(e.target.value)}
-            className="w-full h-9 rounded-xl bg-surface border border-border px-2.5 py-1.5 text-fg text-xs font-semibold focus:border-accent focus:outline-none cursor-pointer truncate"
-          >
-            <option value="ALL">Любой объем</option>
-            {availableStorages.map(st => (
-              <option key={st} value={st}>{st}</option>
-            ))}
-          </select>
+          <div className="relative">
+            <select
+              value={selectedStorage}
+              onChange={(e) => onSelectStorage(e.target.value)}
+              className="w-full h-8 sm:h-8.5 rounded-lg bg-surface-raised border border-border/80 hover:border-accent/50 pl-2.5 pr-7 py-1 text-fg text-xs font-semibold focus:border-accent focus:ring-1 focus:ring-accent/25 focus:outline-none cursor-pointer appearance-none truncate transition-colors shadow-2xs"
+            >
+              <option value="ALL">Любой объем</option>
+              {availableStorages.map(st => (
+                <option key={st} value={st}>{st}</option>
+              ))}
+            </select>
+            <ChevronDown className="w-3.5 h-3.5 text-fg-subtle absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" />
+          </div>
         </div>
 
         {/* Filter 5: Sorting */}
-        <div className="col-span-2 sm:col-span-1">
-          <label className="block text-[11px] font-semibold text-fg-subtle mb-1 truncate">
-            Сортировка
+        <div className="col-span-2 sm:col-span-1 space-y-1 min-w-0">
+          <label className="text-[10px] sm:text-[11px] font-bold text-fg-subtle flex items-center gap-1.5 truncate">
+            <ArrowUpDown className="w-3 h-3 text-accent shrink-0" />
+            <span className="truncate">Сортировка</span>
           </label>
-          <select
-            value={sortBy}
-            onChange={(e) => onSortByChange(e.target.value as any)}
-            className="w-full h-9 rounded-xl bg-surface border border-border px-2.5 py-1 text-fg text-xs font-semibold focus:border-accent focus:outline-none cursor-pointer truncate"
-          >
-            <option value="COUNT_DESC">По количеству: больше → меньше</option>
-            <option value="COUNT_ASC">По количеству: меньше → больше</option>
-            <option value="NAME_ASC">По названию бренда: А → Я</option>
-            <option value="NAME_DESC">По названию бренда: Я → А</option>
-            {isAdmin && (
-              <>
-                <option value="PRICE_DESC">По цене: дорогие → дешевые</option>
-                <option value="PRICE_ASC">По цене: дешевые → дорогие</option>
-              </>
-            )}
-          </select>
+          <div className="relative">
+            <select
+              value={sortBy}
+              onChange={(e) => onSortByChange(e.target.value as any)}
+              className="w-full h-8 sm:h-8.5 rounded-lg bg-surface-raised border border-border/80 hover:border-accent/50 pl-2.5 pr-7 py-1 text-fg text-xs font-semibold focus:border-accent focus:ring-1 focus:ring-accent/25 focus:outline-none cursor-pointer appearance-none truncate transition-colors shadow-2xs"
+            >
+              <option value="COUNT_DESC">По количеству: больше → меньше</option>
+              <option value="COUNT_ASC">По количеству: меньше → больше</option>
+              <option value="NAME_ASC">По названию бренда: А → Я</option>
+              <option value="NAME_DESC">По названию бренда: Я → А</option>
+              {isAdmin && (
+                <>
+                  <option value="PRICE_DESC">По цене: дорогие → дешевые</option>
+                  <option value="PRICE_ASC">По цене: дешевые → дорогие</option>
+                </>
+              )}
+            </select>
+            <ChevronDown className="w-3.5 h-3.5 text-fg-subtle absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" />
+          </div>
         </div>
       </div>
     </div>
@@ -491,19 +517,30 @@ export const InventoryFiltersBar: React.FC<InventoryFiltersBarProps> = ({
         open={isMobileLayout && showAdvancedFilters}
         onClose={onToggleAdvancedFilters}
         title="Фильтры"
-        subtitle={`Найдено: ${filteredDevicesCount} шт.`}
+        compact={true}
+        maxWidth="sm"
         footer={
           <div className="w-full grid grid-cols-2 gap-2">
             <Button
               variant="secondary"
+              size="sm"
               fullWidth
               disabled={activeFiltersCount === 0}
               onClick={onResetAllFilters}
+              leftIcon={RotateCcw}
+              className="h-8.5 rounded-xl text-xs font-semibold cursor-pointer"
             >
               Сбросить{activeFiltersCount > 0 ? ` (${activeFiltersCount})` : ''}
             </Button>
-            <Button fullWidth onClick={onToggleAdvancedFilters}>
-              Показать {filteredDevicesCount} шт.
+            <Button
+              variant="primary"
+              size="sm"
+              fullWidth
+              onClick={onToggleAdvancedFilters}
+              leftIcon={Check}
+              className="h-8.5 rounded-xl text-xs font-bold shadow-xs cursor-pointer"
+            >
+              Применить
             </Button>
           </div>
         }

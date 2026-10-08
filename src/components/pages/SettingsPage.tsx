@@ -230,9 +230,84 @@ export const SettingsPage: React.FC = () => {
         <div className="max-w-5xl xl:max-w-6xl mx-auto">
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-3.5 sm:gap-4 items-start">
             {/* ============================================================== */}
-            {/* Left Column: Stores & Parameters (lg:col-span-7 xl:col-span-8) */}
+            {/* Left Column: Parameters & Stores (lg:col-span-7 xl:col-span-8) */}
             {/* ============================================================== */}
             <div className="lg:col-span-7 xl:col-span-8 space-y-3.5 sm:space-y-4">
+              {/* Quick Parameters: Exchange Rate & Theme */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-stretch">
+                {/* 1. Exchange Rate Card - ADMIN only */}
+                {currentUser?.role === 'ADMIN' && (
+                  <div className="p-3.5 rounded-2xl bg-surface border border-border shadow-2xs flex flex-col justify-between gap-2.5">
+                    <div className="flex items-center justify-between pb-1.5 border-b border-border/50">
+                      <div className="flex items-center gap-2">
+                        <DollarSign className="w-3.5 h-3.5 text-accent shrink-0" />
+                        <h4 className="text-xs font-bold text-fg uppercase tracking-wide">Курс валют</h4>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={openDailyRateModal}
+                        className="px-2.5 py-1 rounded-lg bg-accent hover:bg-accent-strong text-[10px] font-bold text-accent-fg uppercase transition-colors shadow-2xs cursor-pointer"
+                      >
+                        Изменить
+                      </button>
+                    </div>
+
+                    <div className="px-3 py-1.5 rounded-xl bg-surface-raised border border-border/70 flex items-center justify-between gap-2">
+                      <div className="flex items-baseline gap-1.5">
+                        <span className="text-base sm:text-lg font-bold font-mono text-accent">
+                          {(todayRate?.rate ?? 9.5).toFixed(2)} TJS
+                        </span>
+                        <span className="text-[11px] text-fg-subtle">за $1 USD</span>
+                      </div>
+
+                      <div className="text-right">
+                        <span className="text-fg font-mono font-medium text-[11px]">
+                          {todayRate?.date}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* 2. Theme Configuration Card */}
+                <div className={cn(
+                  "p-3.5 rounded-2xl bg-surface border border-border shadow-2xs flex flex-col justify-between gap-2.5",
+                  currentUser?.role !== 'ADMIN' && "sm:col-span-2"
+                )}>
+                  <div className="flex items-center gap-2 pb-1.5 border-b border-border/50">
+                    <Sparkles className="w-3.5 h-3.5 text-accent shrink-0" />
+                    <h4 className="text-xs font-bold text-fg uppercase tracking-wide">Тема оформления</h4>
+                  </div>
+
+                  <div className="flex items-center bg-surface-raised p-1 rounded-xl border border-border">
+                    <button
+                      type="button"
+                      onClick={() => setTheme('light')}
+                      className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 px-2.5 rounded-lg text-xs transition-all cursor-pointer ${
+                        theme === 'light'
+                          ? 'bg-surface text-accent shadow-xs border border-border/80 font-bold'
+                          : 'text-fg-subtle hover:text-fg font-medium'
+                      }`}
+                    >
+                      <Sun className="w-3.5 h-3.5" />
+                      <span>Светлая</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setTheme('dark')}
+                      className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 px-2.5 rounded-lg text-xs transition-all cursor-pointer ${
+                        theme === 'dark'
+                          ? 'bg-surface text-accent shadow-xs border border-border/80 font-bold'
+                          : 'text-fg-subtle hover:text-fg font-medium'
+                      }`}
+                    >
+                      <Moon className="w-3.5 h-3.5" />
+                      <span>Тёмная</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+
               {/* Stores & Branches Section */}
               <div className="p-3.5 sm:p-4 rounded-2xl bg-surface border border-border shadow-2xs space-y-3">
                 <div className="flex items-center justify-between pb-2.5 border-b border-border/60 gap-2">
@@ -300,7 +375,7 @@ export const SettingsPage: React.FC = () => {
 
                         {s.address ? (
                           <p className="text-[11px] text-fg-subtle flex items-center gap-1 mt-1 pl-6 truncate">
-                            <MapPin className="w-3 h-3 text-fg-subtle shrink-0" />
+                            <MapPin className="w-3.5 h-3.5 text-fg-subtle shrink-0" />
                             <span className="truncate">{s.address}</span>
                           </p>
                         ) : (
@@ -384,78 +459,6 @@ export const SettingsPage: React.FC = () => {
                     </div>
                   ))}
                 </div>
-              </div>
-
-              {/* Theme Switcher & Exchange Rate Grid */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-stretch">
-                {/* 1. Theme Configuration Card */}
-                <div className="p-3.5 rounded-2xl bg-surface border border-border shadow-2xs flex flex-col justify-between gap-2.5">
-                  <div className="flex items-center gap-2 pb-1.5 border-b border-border/50">
-                    <Sparkles className="w-3.5 h-3.5 text-accent shrink-0" />
-                    <h4 className="text-xs font-bold text-fg uppercase tracking-wide">Тема оформления</h4>
-                  </div>
-
-                  <div className="flex items-center bg-surface-raised p-1 rounded-xl border border-border">
-                    <button
-                      type="button"
-                      onClick={() => setTheme('light')}
-                      className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 px-2.5 rounded-lg text-xs transition-all cursor-pointer ${
-                        theme === 'light'
-                          ? 'bg-surface text-accent shadow-xs border border-border/80 font-bold'
-                          : 'text-fg-subtle hover:text-fg font-medium'
-                      }`}
-                    >
-                      <Sun className="w-3.5 h-3.5" />
-                      <span>Светлая</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setTheme('dark')}
-                      className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 px-2.5 rounded-lg text-xs transition-all cursor-pointer ${
-                        theme === 'dark'
-                          ? 'bg-surface text-accent shadow-xs border border-border/80 font-bold'
-                          : 'text-fg-subtle hover:text-fg font-medium'
-                      }`}
-                    >
-                      <Moon className="w-3.5 h-3.5" />
-                      <span>Тёмная</span>
-                    </button>
-                  </div>
-                </div>
-
-                {/* 2. Exchange Rate Card - ADMIN only */}
-                {currentUser?.role === 'ADMIN' && (
-                  <div className="p-3.5 rounded-2xl bg-surface border border-border shadow-2xs flex flex-col justify-between gap-2.5">
-                    <div className="flex items-center justify-between pb-1.5 border-b border-border/50">
-                      <div className="flex items-center gap-2">
-                        <DollarSign className="w-3.5 h-3.5 text-accent shrink-0" />
-                        <h4 className="text-xs font-bold text-fg uppercase tracking-wide">Курс валют</h4>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={openDailyRateModal}
-                        className="px-2.5 py-1 rounded-lg bg-accent hover:bg-accent-strong text-[10px] font-bold text-accent-fg uppercase transition-colors shadow-2xs cursor-pointer"
-                      >
-                        Изменить
-                      </button>
-                    </div>
-
-                    <div className="px-3 py-1.5 rounded-xl bg-surface-raised border border-border/70 flex items-center justify-between gap-2">
-                      <div className="flex items-baseline gap-1.5">
-                        <span className="text-base sm:text-lg font-bold font-mono text-accent">
-                          {(todayRate?.rate ?? 9.5).toFixed(2)} TJS
-                        </span>
-                        <span className="text-[11px] text-fg-subtle">за $1 USD</span>
-                      </div>
-
-                      <div className="text-right">
-                        <span className="text-fg font-mono font-medium text-[11px]">
-                          {todayRate?.date}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                )}
               </div>
             </div>
 

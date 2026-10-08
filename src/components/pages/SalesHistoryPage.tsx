@@ -338,7 +338,7 @@ export const SalesHistoryPage: React.FC = () => {
     <div className="work-screen flex-1 flex flex-col h-full overflow-hidden bg-bg text-fg-muted">
       <StatusBanner message={status} onDismiss={() => setStatus(null)} />
 
-      <div className="p-2.5 sm:p-3 border-b border-border bg-surface space-y-2 shrink-0">
+      <div className="p-2 sm:p-2.5 border-b border-border bg-surface space-y-1.5 shrink-0">
         <SearchBar
           value={searchQuery}
           onChange={setSearchQuery}
@@ -557,16 +557,16 @@ export const SalesHistoryPage: React.FC = () => {
               <table className="w-full text-left text-xs">
                 <thead className="bg-surface text-[10px] font-bold text-fg-subtle border-b border-border sticky top-0 z-10 uppercase tracking-wider select-none">
                   <tr>
-                    <th className="py-2.5 px-3">Чек</th>
-                    <th className="py-2.5 px-3">Дата и время</th>
-                    <th className="py-2.5 px-3">Товары</th>
-                    {!isStoreScoped && <th className="py-2.5 px-3">Точка продаж</th>}
-                    <th className="py-2.5 px-3">Продавец</th>
-                    <th className="py-2.5 px-3">Покупатель</th>
-                    <th className="py-2.5 px-3">Оплата</th>
-                    <th className="py-2.5 px-3 text-right">Сумма</th>
-                    {isAdmin && <th className="py-2.5 px-3 text-right">Прибыль</th>}
-                    <th className="py-2.5 px-3 text-center">Статус</th>
+                    <th className="py-1.5 px-2.5">Чек</th>
+                    <th className="py-1.5 px-2.5">Дата и время</th>
+                    <th className="py-1.5 px-2.5">Товары</th>
+                    {!isStoreScoped && <th className="py-1.5 px-2.5">Точка продаж</th>}
+                    <th className="py-1.5 px-2.5">Продавец</th>
+                    <th className="py-1.5 px-2.5">Покупатель</th>
+                    <th className="py-1.5 px-2.5">Оплата</th>
+                    <th className="py-1.5 px-2.5 text-right">Сумма</th>
+                    {isAdmin && <th className="py-1.5 px-2.5 text-right">Прибыль</th>}
+                    <th className="py-1.5 px-2.5 text-center">Статус</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
@@ -579,38 +579,38 @@ export const SalesHistoryPage: React.FC = () => {
                         onClick={() => openSale(sale.id)}
                         className="hover:bg-surface-raised/70 active:bg-surface-raised transition-colors cursor-pointer"
                       >
-                        <td className="py-2.5 px-3 whitespace-nowrap font-bold text-accent font-mono">
+                        <td className="py-1.5 px-2.5 whitespace-nowrap font-bold text-accent font-mono text-xs">
                           #{sale.receiptNumber}
                         </td>
-                        <td className="py-2.5 px-3 whitespace-nowrap text-fg-subtle text-[11px] font-mono">
+                        <td className="py-1.5 px-2.5 whitespace-nowrap text-fg-subtle text-[11px] font-mono">
                           {dateStr} {timeStr}
                         </td>
-                        <td className="py-2.5 px-3 font-medium text-fg max-w-xs truncate" title={sale.items.map(i => `${i.brand} ${i.model}`).join(', ')}>
+                        <td className="py-1.5 px-2.5 font-medium text-fg max-w-xs truncate text-xs" title={sale.items.map(i => `${i.brand} ${i.model}`).join(', ')}>
                           {sale.items.map(i => `${i.brand} ${i.model}`).join(', ')}
                         </td>
                         {!isStoreScoped && (
-                          <td className="py-2.5 px-3 whitespace-nowrap text-fg-muted">
+                          <td className="py-1.5 px-2.5 whitespace-nowrap text-fg-muted">
                             <span className="inline-flex items-center gap-1 text-[11px]">
                               <Store className="w-3 h-3 text-accent shrink-0" />
                               <span>{formatStoreName(sale.storeName)}</span>
                             </span>
                           </td>
                         )}
-                        <td className="py-2.5 px-3 whitespace-nowrap text-fg-muted text-[11px]">
+                        <td className="py-1.5 px-2.5 whitespace-nowrap text-fg-muted text-[11px]">
                           {sale.sellerName}
                         </td>
-                        <td className="py-2.5 px-3 whitespace-nowrap text-fg-subtle text-[11px]">
+                        <td className="py-1.5 px-2.5 whitespace-nowrap text-fg-subtle text-[11px]">
                           {sale.customerName || <span className="opacity-40">—</span>}
                         </td>
-                        <td className="py-2.5 px-3 whitespace-nowrap text-[11px]">
+                        <td className="py-1.5 px-2.5 whitespace-nowrap text-[11px]">
                           <span className={sale.paymentMethod === 'DEBT' && (sale.debtAmountTjs ?? 0) > 0 ? 'text-danger font-semibold' : 'text-fg-subtle'}>
                             {sale.paymentMethod === 'CASH' ? 'Наличные' : sale.paymentMethod === 'CARD' ? 'Банк' : sale.paymentMethod === 'DEBT' ? ((sale.debtAmountTjs ?? 0) > 0 ? `В долг (${formatMoney(sale.debtAmountTjs ?? 0)} TJS)` : 'В долг (погашено)') : 'Смешанная'}
                           </span>
                         </td>
-                        <td className="py-2.5 px-3 text-right whitespace-nowrap font-mono">
+                        <td className="py-1.5 px-2.5 text-right whitespace-nowrap font-mono">
                           {sale.status === 'REFUNDED' ? (
                             <div>
-                              <span className="line-through text-fg-subtle text-xs block">{formatMoney(sale.totalTjs)} TJS</span>
+                              <span className="line-through text-fg-subtle text-[11px] block">{formatMoney(sale.totalTjs)} TJS</span>
                               <span className="text-danger font-bold text-xs block">Возврат: {formatMoney(sale.actualRefundAmountTjs ?? sale.totalTjs)} TJS</span>
                             </div>
                           ) : (
@@ -620,7 +620,7 @@ export const SalesHistoryPage: React.FC = () => {
                         {isAdmin && (() => {
                           const profit = computeSaleProfit(sale, todayRate?.rate || 1);
                           return (
-                            <td className="py-2.5 px-3 text-right whitespace-nowrap font-mono">
+                            <td className="py-1.5 px-2.5 text-right whitespace-nowrap font-mono">
                               {sale.status === 'REFUNDED' ? (
                                 profit.profitUsd > 0 ? (
                                   <div>
@@ -632,7 +632,7 @@ export const SalesHistoryPage: React.FC = () => {
                                     </span>
                                   </div>
                                 ) : (
-                                  <span className="text-fg-subtle text-xs">$0 (возврат)</span>
+                                  <span className="text-fg-subtle text-[11px]">$0 (возврат)</span>
                                 )
                               ) : (
                                 <div>
@@ -650,7 +650,7 @@ export const SalesHistoryPage: React.FC = () => {
                             </td>
                           );
                         })()}
-                        <td className="py-2.5 px-3 text-center whitespace-nowrap">
+                        <td className="py-1.5 px-2.5 text-center whitespace-nowrap">
                           {sale.status === 'EXCHANGED' && <Badge tone="accent">Обмен</Badge>}
                           {sale.status === 'REFUNDED' && <Badge tone="danger">Возврат</Badge>}
                           {sale.status === 'COMPLETED' && <Badge tone="neutral">Оплачен</Badge>}
@@ -662,7 +662,7 @@ export const SalesHistoryPage: React.FC = () => {
               </table>
             </div>
 
-            {/* Mobile Cards View (< 768px) */}
+            {/* Mobile Cards View (< 768px) - Compact */}
             <div className="md:hidden divide-y divide-border">
               {filteredSales.map((sale) => {
                 const timeStr = new Date(sale.date).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
@@ -672,53 +672,53 @@ export const SalesHistoryPage: React.FC = () => {
                   <button
                     key={sale.id}
                     onClick={() => openSale(sale.id)}
-                    className="w-full text-left px-4 py-3 active:bg-surface-raised flex items-center justify-between gap-3 transition-colors"
+                    className="w-full text-left px-2.5 py-1.5 active:bg-surface-raised flex items-center justify-between gap-2 transition-colors cursor-pointer"
                   >
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="text-sm font-semibold text-accent">#{sale.receiptNumber}</span>
-                        <span className="text-xs text-fg-subtle">{dateStr} {timeStr}</span>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="text-xs font-bold text-accent font-mono">#{sale.receiptNumber}</span>
+                        <span className="text-[10px] text-fg-subtle font-mono">{dateStr} {timeStr}</span>
                         {sale.status === 'EXCHANGED' && <Badge tone="accent">Обмен</Badge>}
                         {sale.status === 'REFUNDED' && <Badge tone="danger">Возврат</Badge>}
                       </div>
-                      <p className="text-sm font-medium text-fg-muted mt-0.5 truncate">
+                      <p className="text-xs font-medium text-fg-muted mt-0.5 truncate">
                         {sale.items.map(i => `${i.brand} ${i.model}`).join(', ')}
                       </p>
-                      <div className="flex items-center gap-1.5 text-xs text-fg-subtle mt-0.5">
+                      <div className="flex items-center gap-1 text-[10px] text-fg-subtle mt-0.5 truncate">
                         {!isStoreScoped && <><span>{formatStoreName(sale.storeName)}</span><span>·</span></>}
                         <span>{sale.sellerName}</span>
                         {sale.customerName && <><span>·</span><span>{sale.customerName}</span></>}
                       </div>
                     </div>
 
-                    <div className="text-right shrink-0 flex items-center gap-2">
+                    <div className="text-right shrink-0 flex items-center gap-1.5">
                       <div>
                         {sale.status === 'REFUNDED' ? (
                           <>
-                            <p className="text-sm font-semibold line-through text-fg-subtle">{formatMoney(sale.totalTjs)} TJS</p>
-                            <p className="text-xs text-danger font-semibold">Возвращено: {formatMoney(sale.actualRefundAmountTjs ?? sale.totalTjs)} TJS</p>
+                            <p className="text-xs font-semibold line-through text-fg-subtle font-mono">{formatMoney(sale.totalTjs)} TJS</p>
+                            <p className="text-[11px] text-danger font-semibold font-mono">Возврат: {formatMoney(sale.actualRefundAmountTjs ?? sale.totalTjs)} TJS</p>
                           </>
                         ) : (
                           <>
-                            <p className="text-sm font-semibold text-fg-muted">{formatMoney(sale.totalTjs)} TJS</p>
+                            <p className="text-xs font-bold text-fg-muted font-mono">{formatMoney(sale.totalTjs)} TJS</p>
                             {isAdmin && (() => {
                               const profit = computeSaleProfit(sale, todayRate?.rate || 1);
                               return (
                                 <p className={cn(
-                                  "text-[11px] font-bold font-mono",
+                                  "text-[10px] font-bold font-mono",
                                   profit.profitUsd >= 0 ? "text-emerald-400" : "text-danger"
-                                )}>
+                                  )}>
                                   {profit.profitUsd >= 0 ? '+' : ''}${profit.profitUsd.toFixed(2)}
                                 </p>
                               );
                             })()}
-                            <p className={`text-xs ${sale.paymentMethod === 'DEBT' && (sale.debtAmountTjs ?? 0) > 0 ? 'text-danger font-semibold' : 'text-fg-subtle'}`}>
+                            <p className={`text-[10px] ${sale.paymentMethod === 'DEBT' && (sale.debtAmountTjs ?? 0) > 0 ? 'text-danger font-semibold' : 'text-fg-subtle'}`}>
                               {sale.paymentMethod === 'CASH' ? 'Наличные' : sale.paymentMethod === 'CARD' ? 'Банк' : sale.paymentMethod === 'DEBT' ? ((sale.debtAmountTjs ?? 0) > 0 ? `В долг (${formatMoney(sale.debtAmountTjs ?? 0)} TJS)` : 'В долг (погашено)') : 'Смешанная'}
                             </p>
                           </>
                         )}
                       </div>
-                      <ChevronRight className="w-4 h-4 text-fg-subtle" />
+                      <ChevronRight className="w-3.5 h-3.5 text-fg-subtle shrink-0" />
                     </div>
                   </button>
                 );

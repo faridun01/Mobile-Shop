@@ -78,32 +78,32 @@ export const TransferHistoryList: React.FC<TransferHistoryListProps> = ({
   }, [filteredTransfers, historySort]);
 
   return (
-    <div className="flex-1 p-2.5 sm:p-4 lg:p-6 space-y-4 bg-bg flex flex-col max-w-4xl xl:max-w-5xl mx-auto w-full pb-24">
+    <div className="flex-1 p-2 sm:p-3 space-y-2.5 bg-bg flex flex-col max-w-4xl xl:max-w-5xl mx-auto w-full pb-20">
       {/* Header Toolbar: Search + Location Filter + Quick Status Tabs */}
-      <div className="space-y-3 pb-2 border-b border-border/70 shrink-0">
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 flex-wrap">
+      <div className="space-y-1.5 pb-2 border-b border-border/70 shrink-0">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-1.5 flex-wrap">
           {/* Search Input */}
-          <div className="relative flex-1 min-w-[220px]">
-            <Search className="w-4 h-4 text-fg-subtle absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+          <div className="relative flex-1 min-w-[200px]">
+            <Search className="w-3.5 h-3.5 text-fg-subtle absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
             <input
               type="text"
               value={historySearchQuery}
               onChange={(e) => setHistorySearchQuery(e.target.value)}
               placeholder="Поиск по номеру, IMEI, модели или точке..."
-              className="w-full pl-9 pr-8 py-2 rounded-xl bg-surface border border-border text-xs text-fg placeholder:text-fg-subtle focus:outline-none focus:border-accent transition-colors"
+              className="w-full h-8 pl-8 pr-7 rounded-lg bg-surface border border-border text-xs text-fg placeholder:text-fg-subtle focus:outline-none focus:border-accent transition-colors"
             />
             {historySearchQuery && (
               <button
                 type="button"
                 onClick={() => setHistorySearchQuery('')}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-fg-subtle hover:text-fg p-0.5 cursor-pointer"
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-fg-subtle hover:text-fg p-0.5 cursor-pointer"
               >
                 <X className="w-3.5 h-3.5" />
               </button>
             )}
           </div>
 
-          <div className="flex items-center gap-2 flex-wrap">
+          <div className="flex items-center gap-1.5 flex-wrap">
             {/* Location Filter Dropdown (if central / multi-store) */}
             {!isStoreScoped && isCentralMode && (
               <div className="relative flex items-center w-full sm:w-auto">
@@ -111,50 +111,50 @@ export const TransferHistoryList: React.FC<TransferHistoryListProps> = ({
                 <select
                   value={historyFilterChoice}
                   onChange={(e) => setHistoryFilterChoice(e.target.value)}
-                  className="w-full sm:w-auto pl-8 pr-7 py-2 rounded-xl bg-surface border border-border text-xs font-semibold text-fg focus:outline-none focus:border-accent cursor-pointer appearance-none transition-colors"
+                  className="w-full sm:w-auto h-8 pl-8 pr-6 rounded-lg bg-surface border border-border text-xs font-semibold text-fg focus:outline-none focus:border-accent cursor-pointer appearance-none transition-colors"
                 >
-                  <option value="ALL">Все локации (склад и магазины)</option>
+                  <option value="ALL">Все локации</option>
                   {stores.map(s => (
                     <option key={s.id} value={s.id}>
-                      {s.isMainWarehouse ? `Центральный склад (${formatStoreName(s.name)})` : formatStoreName(s.name)}
+                      {s.isMainWarehouse ? `Центр. склад (${formatStoreName(s.name)})` : formatStoreName(s.name)}
                     </option>
                   ))}
                 </select>
-                <ChevronDown className="w-3.5 h-3.5 text-fg-subtle absolute right-2 pointer-events-none" />
+                <ChevronDown className="w-3 h-3 text-fg-subtle absolute right-2 pointer-events-none" />
               </div>
             )}
 
             {/* Sorting Selector */}
-            <div className="flex items-center gap-1.5 bg-surface border border-border rounded-xl px-2.5 py-1.5 shrink-0">
-              <ArrowUpDown className="w-3.5 h-3.5 text-accent shrink-0" />
+            <div className="flex items-center gap-1 bg-surface border border-border rounded-lg h-8 px-2 shrink-0">
+              <ArrowUpDown className="w-3 h-3 text-accent shrink-0" />
               <select
                 value={historySort}
                 onChange={(e) => setHistorySort(e.target.value as any)}
                 className="bg-transparent text-xs font-semibold text-fg focus:outline-none cursor-pointer pr-1"
               >
-                <option value="NEWEST">Сначала новые</option>
-                <option value="OLDEST">Сначала старые</option>
-                <option value="ITEMS_DESC">Количество (больше)</option>
-                <option value="ITEMS_ASC">Количество (меньше)</option>
+                <option value="NEWEST">Новые</option>
+                <option value="OLDEST">Старые</option>
+                <option value="ITEMS_DESC">Штук (↓)</option>
+                <option value="ITEMS_ASC">Штук (↑)</option>
               </select>
             </div>
           </div>
         </div>
 
         {/* Status Filter Chips */}
-        <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5 no-scrollbar text-xs">
+        <div className="flex items-center gap-1 overflow-x-auto pb-0.5 no-scrollbar text-xs">
           <button
             type="button"
             onClick={() => setHistoryStatusFilter('ALL')}
             className={cn(
-              'px-3 py-1.5 rounded-lg font-bold text-xs transition-all cursor-pointer shrink-0 flex items-center gap-1.5',
+              'h-6.5 px-2.5 rounded-lg font-bold text-xs transition-all cursor-pointer shrink-0 flex items-center gap-1',
               historyStatusFilter === 'ALL'
                 ? 'bg-accent text-accent-fg shadow-2xs'
                 : 'bg-surface border border-border/80 text-fg-muted hover:text-fg hover:bg-surface-raised'
             )}
           >
             <span>Все</span>
-            <span className="px-1.5 py-0.2 rounded-md bg-black/10 dark:bg-white/10 text-[10px] font-mono">
+            <span className="px-1 py-0.1 rounded bg-black/10 dark:bg-white/10 text-[10px] font-mono">
               {statusCounts.ALL}
             </span>
           </button>
@@ -163,16 +163,16 @@ export const TransferHistoryList: React.FC<TransferHistoryListProps> = ({
             type="button"
             onClick={() => setHistoryStatusFilter('PENDING')}
             className={cn(
-              'px-3 py-1.5 rounded-lg font-bold text-xs transition-all cursor-pointer shrink-0 flex items-center gap-1.5',
+              'h-6.5 px-2.5 rounded-lg font-bold text-xs transition-all cursor-pointer shrink-0 flex items-center gap-1',
               historyStatusFilter === 'PENDING'
                 ? 'bg-warning text-black shadow-2xs font-black'
                 : 'bg-surface border border-border/80 text-fg-muted hover:text-fg hover:bg-surface-raised'
             )}
           >
             <Clock className="w-3 h-3 text-warning" />
-            <span>Ожидают приёмки</span>
+            <span>Ожидают</span>
             {statusCounts.PENDING > 0 && (
-              <span className="px-1.5 py-0.2 rounded-md bg-warning/20 text-warning-fg text-[10px] font-mono font-bold">
+              <span className="px-1 py-0.1 rounded bg-warning/20 text-warning-fg text-[10px] font-mono font-bold">
                 {statusCounts.PENDING}
               </span>
             )}
@@ -182,7 +182,7 @@ export const TransferHistoryList: React.FC<TransferHistoryListProps> = ({
             type="button"
             onClick={() => setHistoryStatusFilter('APPROVED')}
             className={cn(
-              'px-3 py-1.5 rounded-lg font-bold text-xs transition-all cursor-pointer shrink-0 flex items-center gap-1.5',
+              'h-6.5 px-2.5 rounded-lg font-bold text-xs transition-all cursor-pointer shrink-0 flex items-center gap-1',
               historyStatusFilter === 'APPROVED'
                 ? 'bg-accent text-accent-fg shadow-2xs'
                 : 'bg-surface border border-border/80 text-fg-muted hover:text-fg hover:bg-surface-raised'
@@ -190,7 +190,7 @@ export const TransferHistoryList: React.FC<TransferHistoryListProps> = ({
           >
             <CheckCircle2 className="w-3 h-3 text-accent" />
             <span>Выполнены</span>
-            <span className="px-1.5 py-0.2 rounded-md bg-black/10 dark:bg-white/10 text-[10px] font-mono">
+            <span className="px-1 py-0.1 rounded bg-black/10 dark:bg-white/10 text-[10px] font-mono">
               {statusCounts.APPROVED}
             </span>
           </button>
@@ -199,7 +199,7 @@ export const TransferHistoryList: React.FC<TransferHistoryListProps> = ({
             type="button"
             onClick={() => setHistoryStatusFilter('REJECTED')}
             className={cn(
-              'px-3 py-1.5 rounded-lg font-bold text-xs transition-all cursor-pointer shrink-0 flex items-center gap-1.5',
+              'h-6.5 px-2.5 rounded-lg font-bold text-xs transition-all cursor-pointer shrink-0 flex items-center gap-1',
               historyStatusFilter === 'REJECTED'
                 ? 'bg-danger text-white shadow-2xs'
                 : 'bg-surface border border-border/80 text-fg-muted hover:text-fg hover:bg-surface-raised'
@@ -207,7 +207,7 @@ export const TransferHistoryList: React.FC<TransferHistoryListProps> = ({
           >
             <XCircle className="w-3 h-3 text-danger" />
             <span>Отклонены</span>
-            <span className="px-1.5 py-0.2 rounded-md bg-black/10 dark:bg-white/10 text-[10px] font-mono">
+            <span className="px-1 py-0.1 rounded bg-black/10 dark:bg-white/10 text-[10px] font-mono">
               {statusCounts.REJECTED}
             </span>
           </button>
@@ -216,30 +216,30 @@ export const TransferHistoryList: React.FC<TransferHistoryListProps> = ({
 
       {/* Empty State when no transfers exist at all */}
       {visibleTransfers.length === 0 ? (
-        <div className="flex-1 flex flex-col items-center justify-center p-8 text-center my-auto min-h-[260px]">
-          <div className="w-14 h-14 rounded-2xl bg-surface-raised border border-border flex items-center justify-center text-fg-subtle mb-3 shadow-xs">
-            <Clock className="w-7 h-7" />
+        <div className="flex-1 flex flex-col items-center justify-center p-8 text-center my-auto min-h-[220px]">
+          <div className="w-12 h-12 rounded-2xl bg-surface-raised border border-border flex items-center justify-center text-fg-subtle mb-3 shadow-xs">
+            <Clock className="w-6 h-6" />
           </div>
           <h3 className="text-sm sm:text-base font-bold text-fg">
             История перемещений пуста
           </h3>
-          <p className="text-xs text-fg-subtle mt-1.5 max-w-xs leading-relaxed">
+          <p className="text-xs text-fg-subtle mt-1 max-w-xs leading-relaxed">
             Здесь будут отображаться созданные перемещения между складами и магазинами, а также их статусы.
           </p>
           <button
             type="button"
             onClick={onNavigateToCreate}
-            className="mt-4 h-9 px-4 rounded-xl bg-accent hover:bg-accent-strong text-accent-fg text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 cursor-pointer"
+            className="mt-3.5 h-8 px-3.5 rounded-xl bg-accent hover:bg-accent-strong text-accent-fg text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 cursor-pointer"
           >
-            <ArrowLeftRight className="w-4 h-4" />
+            <ArrowLeftRight className="w-3.5 h-3.5" />
             <span>{isStoreScoped ? 'Создать отправку' : 'Создать перемещение'}</span>
           </button>
         </div>
       ) : filteredTransfers.length === 0 ? (
         /* Empty Search / Filter State */
-        <div className="flex-1 flex flex-col items-center justify-center p-8 text-center my-auto min-h-[240px]">
-          <div className="w-12 h-12 rounded-2xl bg-surface-raised border border-border flex items-center justify-center text-fg-subtle mb-3">
-            <Search className="w-6 h-6" />
+        <div className="flex-1 flex flex-col items-center justify-center p-8 text-center my-auto min-h-[200px]">
+          <div className="w-10 h-10 rounded-xl bg-surface-raised border border-border flex items-center justify-center text-fg-subtle mb-2.5">
+            <Search className="w-5 h-5" />
           </div>
           <h4 className="text-sm font-bold text-fg">Ничего не найдено</h4>
           <p className="text-xs text-fg-subtle mt-1 max-w-xs">
@@ -248,14 +248,14 @@ export const TransferHistoryList: React.FC<TransferHistoryListProps> = ({
           <button
             type="button"
             onClick={() => { setHistorySearchQuery(''); setHistoryStatusFilter('ALL'); }}
-            className="mt-3 px-3 py-1.5 rounded-lg bg-surface border border-border text-xs font-semibold text-accent hover:bg-surface-raised transition-colors cursor-pointer"
+            className="mt-2.5 px-3 py-1 rounded-lg bg-surface border border-border text-xs font-semibold text-accent hover:bg-surface-raised transition-colors cursor-pointer"
           >
             Сбросить фильтры
           </button>
         </div>
       ) : (
         /* Transfers List */
-        <div className="space-y-3.5">
+        <div className="space-y-2">
           {sortedTransfers.map((tr: TransferRequest) => {
             const isExpanded = expandedTransferIds.has(tr.id);
             const deviceCount = (tr.deviceIds || []).length;
@@ -266,175 +266,116 @@ export const TransferHistoryList: React.FC<TransferHistoryListProps> = ({
               <div
                 key={tr.id}
                 className={cn(
-                  'p-3.5 sm:p-4 rounded-2xl bg-surface border transition-all duration-200 space-y-3 shadow-2xs hover:shadow-xs',
+                  'p-2.5 sm:p-3 rounded-xl bg-surface border transition-all duration-200 space-y-2 shadow-2xs hover:shadow-xs',
                   tr.status === 'PENDING_APPROVAL'
                     ? 'border-warning/50 hover:border-warning/70'
                     : tr.status === 'REJECTED'
                     ? 'border-danger/30 hover:border-danger/50'
-                    : 'border-border/90 hover:border-border-strong'
+                    : 'border-border/80 hover:border-border-strong'
                 )}
               >
                 {/* Card Header: Number, Status, Creator, Date */}
-                <div className="flex flex-wrap items-center justify-between gap-2.5 border-b border-border/70 pb-3">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <div className="w-7 h-7 rounded-lg bg-surface-raised border border-border flex items-center justify-center text-accent shrink-0">
-                      <ArrowLeftRight className="w-3.5 h-3.5" />
-                    </div>
-
-                    <div className="flex items-center gap-1.5">
-                      <button
-                        type="button"
-                        onClick={() => onOpenInvoice(tr)}
-                        title="Открыть накладную на перемещение"
-                        className="font-bold font-mono text-fg text-xs sm:text-sm hover:text-accent hover:underline cursor-pointer transition-colors text-left"
-                      >
-                        Перемещение #{tr.transferNumber || tr.id.slice(-6)}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => onCopyText(tr.transferNumber || tr.id.slice(-6))}
-                        title="Скопировать номер"
-                        className="text-fg-subtle hover:text-accent p-0.5 rounded transition-colors cursor-pointer"
-                      >
-                        {copiedImei === (tr.transferNumber || tr.id.slice(-6)) ? (
-                          <Check className="w-3 h-3 text-accent" />
-                        ) : (
-                          <Copy className="w-3 h-3" />
-                        )}
-                      </button>
-                    </div>
-
+                <div className="flex items-center justify-between gap-1.5 flex-wrap">
+                  <div className="flex items-center gap-1.5 flex-wrap min-w-0">
                     {/* Status Badge */}
-                    <span className={`inline-flex items-center gap-1 text-[11px] px-2.5 py-0.5 rounded-full font-bold border ${
+                    <span className={`inline-flex items-center gap-1 text-[10px] px-2 py-0.2 rounded-full font-bold border shrink-0 ${
                       tr.status === 'APPROVED' ? 'bg-accent/15 text-accent border-accent/30' :
                       tr.status === 'PENDING_APPROVAL' ? 'bg-warning/15 text-warning border-warning/30' :
                       'bg-danger/15 text-danger border-danger/30'
                     }`}>
-                      {tr.status === 'APPROVED' && <CheckCircle2 className="w-3 h-3" />}
-                      {tr.status === 'PENDING_APPROVAL' && <Clock className="w-3 h-3 animate-pulse" />}
-                      {tr.status === 'REJECTED' && <XCircle className="w-3 h-3" />}
+                      {tr.status === 'APPROVED' && <CheckCircle2 className="w-2.5 h-2.5" />}
+                      {tr.status === 'PENDING_APPROVAL' && <Clock className="w-2.5 h-2.5 animate-pulse" />}
+                      {tr.status === 'REJECTED' && <XCircle className="w-2.5 h-2.5" />}
                       <span>
-                        {tr.status === 'APPROVED' ? 'Выполнено' : tr.status === 'PENDING_APPROVAL' ? 'Ожидает подтверждения' : 'Отклонено'}
+                        {tr.status === 'APPROVED' ? 'Выполнено' : tr.status === 'PENDING_APPROVAL' ? 'Ожидает' : 'Отклонено'}
                       </span>
                     </span>
 
-                    {/* Waybill Button */}
                     <button
                       type="button"
                       onClick={() => onOpenInvoice(tr)}
-                      title="Посмотреть официальную накладную"
-                      className="px-2.5 py-1 rounded-lg bg-surface border border-accent/40 hover:border-accent text-accent hover:bg-accent hover:text-accent-fg font-bold text-xs transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                      title="Открыть накладную"
+                      className="font-bold font-mono text-fg text-xs hover:text-accent hover:underline cursor-pointer transition-colors"
                     >
-                      <FileText className="w-3.5 h-3.5" />
+                      #{tr.transferNumber || tr.id.slice(-6)}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => onCopyText(tr.transferNumber || tr.id.slice(-6))}
+                      title="Скопировать номер"
+                      className="text-fg-subtle hover:text-accent p-0.5 rounded cursor-pointer"
+                    >
+                      {copiedImei === (tr.transferNumber || tr.id.slice(-6)) ? (
+                        <Check className="w-3 h-3 text-accent" />
+                      ) : (
+                        <Copy className="w-3 h-3" />
+                      )}
+                    </button>
+
+                    {tr.requestedBy && (
+                      <span className="hidden sm:inline text-[10px] text-fg-subtle truncate max-w-[140px]">
+                        · {tr.requestedBy}
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="flex items-center gap-2 shrink-0 ml-auto">
+                    {tr.requestedAt && (
+                      <span className="text-[10px] font-mono text-fg-subtle whitespace-nowrap">
+                        {new Date(tr.requestedAt).toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit' })}{' '}
+                        {new Date(tr.requestedAt).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}
+                      </span>
+                    )}
+
+                    <button
+                      type="button"
+                      onClick={() => onOpenInvoice(tr)}
+                      title="Накладная"
+                      className="h-6 px-1.5 rounded-md bg-surface-raised hover:bg-surface border border-border text-accent text-[11px] font-semibold flex items-center gap-1 cursor-pointer"
+                    >
+                      <FileText className="w-3 h-3" />
                       <span>Накладная</span>
                     </button>
                   </div>
-
-                  <div className="flex items-center gap-2.5 text-fg-subtle text-[11px] font-medium ml-auto sm:ml-0">
-                    {tr.requestedBy && (
-                      <span className="hidden sm:inline">
-                        Создал: <strong className="text-fg-muted font-semibold">{tr.requestedBy}</strong>
-                      </span>
-                    )}
-                    {tr.requestedAt && (
-                      <span className="flex items-center gap-1 bg-surface-raised/70 px-2 py-0.5 rounded-md border border-border/60">
-                        <Clock className="w-3 h-3 text-fg-subtle" />
-                        <span>{new Date(tr.requestedAt).toLocaleString('ru-RU')}</span>
-                      </span>
-                    )}
-                  </div>
                 </div>
 
-                {/* Route Visualizer Card */}
-                <div className="p-3 rounded-xl bg-surface-raised/50 border border-border/80 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 sm:gap-3">
-                  {/* Origin */}
-                  <div className="flex items-center gap-2.5 min-w-0 flex-1">
-                    <div className="w-8 h-8 rounded-lg bg-surface border border-border flex items-center justify-center shrink-0 text-accent shadow-2xs">
-                      {isLocationWarehouse(stores, mainWarehouse, tr.fromLocationId, tr.fromLocationName) ? (
-                        <Warehouse className="w-4 h-4" />
-                      ) : (
-                        <StoreIcon className="w-4 h-4" />
-                      )}
-                    </div>
-                    <div className="min-w-0">
-                      <div className="text-[10px] font-bold uppercase tracking-wider text-fg-subtle">
-                        Откуда (Отправитель)
-                      </div>
-                      <div className="text-xs sm:text-sm font-bold text-fg truncate">
-                        {tr.fromLocationName}
-                      </div>
-                    </div>
+                {/* Compact Route Line */}
+                <div className="flex items-center justify-between gap-1.5 px-2 py-1 rounded-lg bg-surface-raised/50 border border-border/60 text-xs">
+                  <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                    <StoreIcon className="w-3.5 h-3.5 text-accent shrink-0" />
+                    <span className="font-semibold text-fg truncate text-[11px] sm:text-xs" title={tr.fromLocationName}>
+                      {tr.fromLocationName}
+                    </span>
+                    <ArrowRight className="w-3 h-3 text-fg-subtle shrink-0" />
+                    <span className="font-semibold text-fg truncate text-[11px] sm:text-xs" title={tr.toLocationName}>
+                      {tr.toLocationName}
+                    </span>
                   </div>
 
-                  {/* Direction Arrow Connector */}
-                  <div className="flex items-center justify-center shrink-0 self-center">
-                    <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-surface border border-border text-accent shadow-2xs">
-                      <ArrowRight className="w-3.5 h-3.5" />
-                      <span className="text-[11px] font-bold font-mono text-fg">
-                        {deviceCount} шт.
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Destination */}
-                  <div className="flex items-center sm:justify-end gap-2.5 min-w-0 flex-1 sm:text-right">
-                    <div className="min-w-0 order-2 sm:order-1">
-                      <div className="text-[10px] font-bold uppercase tracking-wider text-fg-subtle">
-                        Куда (Получатель)
-                      </div>
-                      <div className="text-xs sm:text-sm font-bold text-fg truncate">
-                        {tr.toLocationName}
-                      </div>
-                    </div>
-                    <div className="w-8 h-8 rounded-lg bg-surface border border-border flex items-center justify-center shrink-0 text-accent shadow-2xs order-1 sm:order-2">
-                      {isLocationWarehouse(stores, mainWarehouse, tr.toLocationId, tr.toLocationName) ? (
-                        <Warehouse className="w-4 h-4" />
-                      ) : (
-                        <StoreIcon className="w-4 h-4" />
-                      )}
-                    </div>
-                  </div>
+                  <span className="px-1.5 py-0.2 rounded-full bg-accent/15 text-accent font-bold font-mono text-[10px] shrink-0">
+                    {deviceCount} шт.
+                  </span>
                 </div>
 
-                {/* Devices Box */}
-                <div className="rounded-xl bg-surface-raised/40 border border-border/80 overflow-hidden">
-                  <div className="flex items-center justify-between px-3 py-2 bg-surface-raised/80 border-b border-border/70 text-xs">
-                    <div className="flex items-center gap-2">
-                      <Smartphone className="w-3.5 h-3.5 text-accent" />
-                      <span className="font-bold text-fg text-xs">
-                        Передаваемые устройства
-                      </span>
-                      <span className="text-[10px] px-1.5 py-0.2 rounded-md bg-surface border border-border font-bold font-mono text-fg-muted">
-                        {deviceCount} шт.
-                      </span>
-                    </div>
-
-                    <div className="flex items-center gap-3">
-                      <button
-                        type="button"
-                        onClick={() => onOpenInvoice(tr)}
-                        className="text-[11px] font-bold text-accent hover:underline flex items-center gap-1 cursor-pointer"
-                        title="Посмотреть полную накладную"
-                      >
-                        <FileText className="w-3 h-3" />
-                        <span>Накладная</span>
-                      </button>
-
-                      {rawModels.length > 3 && (
-                        <button
-                          type="button"
-                          onClick={() => onToggleExpandTransfer(tr.id)}
-                          className="text-[11px] font-semibold text-fg-muted hover:text-fg hover:underline flex items-center gap-1 cursor-pointer"
-                        >
-                          <span>{isExpanded ? 'Свернуть' : `Все (${rawModels.length})`}</span>
-                          {isExpanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
-                        </button>
-                      )}
-                    </div>
+                {/* Devices Summary / Expand */}
+                <div className="flex items-center justify-between gap-2 px-1 text-[11px]">
+                  <div className="text-fg-subtle truncate flex-1 min-w-0">
+                    {displayModels.slice(0, 3).join(', ')}{rawModels.length > 3 ? ` и ещё ${rawModels.length - 3} шт.` : ''}
                   </div>
+                  <button
+                    type="button"
+                    onClick={() => onToggleExpandTransfer(tr.id)}
+                    className="text-[10px] font-semibold text-accent hover:underline flex items-center gap-0.5 shrink-0 cursor-pointer"
+                  >
+                    <span>{isExpanded ? 'Скрыть устройства' : `Все устройства (${rawModels.length})`}</span>
+                    {isExpanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                  </button>
+                </div>
 
-                  <div className="divide-y divide-border/60">
-                    {displayModels.map((mod, idx) => {
+                {/* Expanded Device List (Only when toggled) */}
+                {isExpanded && (
+                  <div className="rounded-lg border border-border/70 bg-surface-raised/30 divide-y divide-border/50 overflow-hidden text-xs">
+                    {rawModels.map((mod, idx) => {
                       const deviceId = tr.deviceIds?.[idx];
                       const imei = tr.deviceImeis?.[idx] || '—';
                       const foundDevice = (deviceId ? devicesById.get(deviceId) : null) || (imei !== '—' ? devicesByImei.get(imei) : null);
@@ -447,78 +388,52 @@ export const TransferHistoryList: React.FC<TransferHistoryListProps> = ({
                       const ram = rawRam && storage && !storage.toLowerCase().includes(rawRam.toLowerCase()) ? rawRam : null;
 
                       return (
-                        <div
-                          key={idx}
-                          className="p-2.5 sm:p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs hover:bg-surface-raised/60 transition-colors"
-                        >
-                          <div className="flex items-center gap-2.5 min-w-0">
-                            <div className="w-7 h-7 rounded-lg bg-surface border border-border flex items-center justify-center shrink-0 text-accent/80">
-                              <Smartphone className="w-3.5 h-3.5" />
-                            </div>
-
-                            <div className="min-w-0">
-                              <div className="flex items-center gap-1.5 flex-wrap">
-                                <span className="font-bold text-fg text-xs truncate">
-                                  {fullName}
-                                </span>
-                                {storage && (
-                                  <span className="px-1.5 py-0.2 rounded-md bg-surface border border-border text-[10px] font-bold font-mono text-fg shrink-0">
-                                    {storage}
-                                  </span>
-                                )}
-                                {ram && (
-                                  <span className="px-1.5 py-0.2 rounded-md bg-accent/10 border border-accent/25 text-[10px] font-bold font-mono text-accent shrink-0">
-                                    ОЗУ {ram}
-                                  </span>
-                                )}
-                                {color && (
-                                  <span className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded-md bg-surface border border-border/60 text-[10px] text-fg-muted shrink-0">
-                                    {colorHex && (
-                                      <span
-                                        className="w-2 h-2 rounded-full border border-black/20 shrink-0"
-                                        style={{ backgroundColor: colorHex }}
-                                      />
-                                    )}
-                                    <span>{color}</span>
-                                  </span>
-                                )}
-                              </div>
-                            </div>
+                        <div key={idx} className="p-1.5 sm:p-2 flex items-center justify-between gap-2 hover:bg-surface-raised/60 transition-colors">
+                          <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                            <Smartphone className="w-3 h-3 text-accent/70 shrink-0" />
+                            <span className="font-semibold text-fg truncate text-[11px]">{fullName}</span>
+                            {storage && (
+                              <span className="px-1 py-0.1 rounded bg-surface border border-border text-[9px] font-mono font-bold text-fg shrink-0">
+                                {storage}
+                              </span>
+                            )}
+                            {ram && (
+                              <span className="px-1 py-0.1 rounded bg-accent/10 border border-accent/20 text-[9px] font-mono text-accent shrink-0">
+                                {ram}
+                              </span>
+                            )}
+                            {colorHex && (
+                              <span className="w-2 h-2 rounded-full border border-black/20 shrink-0" style={{ backgroundColor: colorHex }} />
+                            )}
                           </div>
 
-                          {/* IMEI chip with copy button */}
-                          <div className="flex items-center gap-1.5 self-start sm:self-auto shrink-0">
-                            <button
-                              type="button"
-                              onClick={() => onCopyText(imei)}
-                              title="Скопировать IMEI"
-                              className="group flex items-center gap-1.5 px-2 py-1 rounded-lg bg-surface border border-border/80 hover:border-accent/50 text-[11px] font-mono text-fg-muted hover:text-fg transition-all cursor-pointer"
-                            >
-                              <span className="text-[10px] text-fg-subtle font-sans">IMEI:</span>
-                              <span className="font-bold text-fg">{imei}</span>
-                              {copiedImei === imei ? (
-                                <span className="text-accent flex items-center gap-0.5 text-[10px] font-sans font-bold">
-                                  <Check className="w-3 h-3" />
-                                  <span className="hidden sm:inline">Скопировано</span>
-                                </span>
-                              ) : (
-                                <Copy className="w-3 h-3 text-fg-subtle group-hover:text-accent transition-colors opacity-70 group-hover:opacity-100" />
-                              )}
-                            </button>
-                          </div>
+                          <button
+                            type="button"
+                            onClick={() => onCopyText(imei)}
+                            className="group flex items-center gap-1 px-1.5 py-0.5 rounded bg-surface border border-border/80 text-[10px] font-mono text-fg-subtle hover:text-fg shrink-0 cursor-pointer"
+                            title="Скопировать IMEI"
+                          >
+                            <span>IMEI:</span>
+                            <span className="font-bold text-fg">{imei}</span>
+                            {copiedImei === imei ? (
+                              <Check className="w-2.5 h-2.5 text-accent" />
+                            ) : (
+                              <Copy className="w-2.5 h-2.5 opacity-60 group-hover:opacity-100" />
+                            )}
+                          </button>
                         </div>
                       );
                     })}
                   </div>
-                </div>
+                )}
 
                 {/* Rejected Reason Banner */}
                 {tr.status === 'REJECTED' && tr.rejectedReason && (
-                  <div className="p-2.5 rounded-xl bg-danger/10 border border-danger/25 text-xs text-danger flex items-start gap-2">
-                    <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                  <div className="p-2 rounded-lg bg-danger/10 border border-danger/20 text-[11px] text-danger flex items-start gap-1.5">
+                    <AlertCircle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
                     <div className="min-w-0">
-                      <span className="font-bold block">Причина отклонения:</span>
-                      <span className="text-[11px] text-danger/90">{tr.rejectedReason}</span>
+                      <span className="font-bold">Причина: </span>
+                      <span>{tr.rejectedReason}</span>
                     </div>
                   </div>
                 )}
@@ -533,33 +448,33 @@ export const TransferHistoryList: React.FC<TransferHistoryListProps> = ({
 
                   if (canApprove) {
                     return (
-                      <div className="pt-2 border-t border-border/70 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
-                        <div className="flex items-center gap-2 text-warning text-xs font-semibold">
-                          <Clock className="w-4 h-4 text-warning shrink-0" />
-                          <span>Требуется подтверждение приёмки</span>
+                      <div className="pt-1.5 border-t border-border/50 flex items-center justify-between gap-2 flex-wrap">
+                        <div className="flex items-center gap-1.5 text-warning text-[11px] font-semibold">
+                          <Clock className="w-3.5 h-3.5 text-warning shrink-0" />
+                          <span>Требуется приёмка</span>
                         </div>
-                        <div className="flex items-center justify-end gap-2.5">
+                        <div className="flex items-center gap-1.5 ml-auto">
                           <button
                             type="button"
                             onClick={() => onRequestReject(tr)}
                             disabled={processingTransferId === tr.id}
-                            className="flex-1 sm:flex-initial px-4 py-2 rounded-xl bg-danger/10 hover:bg-danger/15 text-danger border border-danger/30 text-xs font-bold transition-all cursor-pointer disabled:opacity-50 flex items-center justify-center gap-1.5"
+                            className="h-7 px-2.5 rounded-lg bg-danger/10 hover:bg-danger/15 text-danger border border-danger/30 text-xs font-bold transition-all cursor-pointer disabled:opacity-50 flex items-center gap-1"
                           >
-                            <XCircle className="w-3.5 h-3.5" />
+                            <XCircle className="w-3 h-3" />
                             <span>Отклонить</span>
                           </button>
                           <button
                             type="button"
                             onClick={() => onApprove(tr.id)}
                             disabled={processingTransferId === tr.id}
-                            className="flex-1 sm:flex-initial px-5 py-2 rounded-xl bg-accent hover:bg-accent-strong text-accent-fg text-xs font-bold shadow-xs transition-all cursor-pointer disabled:opacity-60 flex items-center justify-center gap-2"
+                            className="h-7 px-3 rounded-lg bg-accent hover:bg-accent-strong text-accent-fg text-xs font-bold shadow-2xs transition-all cursor-pointer disabled:opacity-60 flex items-center gap-1.5"
                           >
                             {processingTransferId === tr.id ? (
-                              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                              <Loader2 className="w-3 h-3 animate-spin" />
                             ) : (
-                              <Check className="w-3.5 h-3.5" />
+                              <Check className="w-3 h-3" />
                             )}
-                            <span>{processingTransferId === tr.id ? 'Обработка…' : 'Подтвердить и принять'}</span>
+                            <span>{processingTransferId === tr.id ? 'Обработка…' : 'Принять'}</span>
                           </button>
                         </div>
                       </div>
@@ -567,12 +482,12 @@ export const TransferHistoryList: React.FC<TransferHistoryListProps> = ({
                   }
 
                   return (
-                    <div className="pt-2 border-t border-border/70 flex items-center gap-2 text-xs text-warning bg-warning/10 p-2.5 rounded-xl border border-warning/20">
-                      <Clock className="w-4 h-4 shrink-0" />
+                    <div className="pt-1.5 border-t border-border/50 flex items-center gap-1.5 text-[11px] text-warning bg-warning/10 p-2 rounded-lg border border-warning/20">
+                      <Clock className="w-3.5 h-3.5 shrink-0" />
                       <span className="font-medium">
                         {isToWarehouse
-                          ? 'Ожидает приёмки администратором на главном складе'
-                          : 'Ожидает подтверждения принимающей стороной в магазине'}
+                          ? 'Ожидает приёмки на складе'
+                          : 'Ожидает подтверждения в магазине'}
                       </span>
                     </div>
                   );

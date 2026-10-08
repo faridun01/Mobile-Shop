@@ -3,7 +3,7 @@ import React, { useState, useMemo } from 'react';
 import { useAppFields } from '../../context/AppContext';
 import { Device, PaymentMethod } from '../../types';
 import { looksLikeDeviceCode, normalizeScanCode, resolveSaleScan, saleScanMessage } from '../../utils/scanLookup';
-import { formatReceiptText, paymentSummary, RECEIPT_WARRANTY } from '../../utils/receipt';
+import { formatReceiptText, paymentSummary } from '../../utils/receipt';
 import {
   Smartphone,
   Trash2,
@@ -1335,7 +1335,6 @@ export const SalePage: React.FC = () => {
                 {completedSale.customerName && <p>Покупатель: <span className="text-fg-muted">{completedSale.customerName}</span></p>}
                 {completedSale.customerPhone && <p>Телефон: <span className="text-fg-muted font-mono">{completedSale.customerPhone}</span></p>}
                 <p>Продавец: <span className="text-fg-muted">{completedSale.sellerName || currentUser?.name}</span></p>
-                {RECEIPT_WARRANTY && <p>Гарантия: <span className="text-fg-muted">{RECEIPT_WARRANTY}</span></p>}
               </div>
             </div>
           ) : (
