@@ -255,7 +255,7 @@ export const SettingsPage: React.FC = () => {
                     <div className="px-3 py-1.5 rounded-xl bg-surface-raised border border-border/70 flex items-center justify-between gap-2">
                       <div className="flex items-baseline gap-1.5">
                         <span className="text-base sm:text-lg font-bold font-mono text-accent">
-                          {(todayRate?.rate ?? 9.5).toFixed(2)} TJS
+                          {todayRate?.rate ? `${Number(todayRate.rate).toFixed(2)} TJS` : 'не задан'}
                         </span>
                         <span className="text-[11px] text-fg-subtle">за $1 USD</span>
                       </div>

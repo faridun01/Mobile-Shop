@@ -70,9 +70,6 @@ export const RepairPage: React.FC = () => {
   const [imei, setImei] = useState('');
   const [imei2, setImei2] = useState('');
   const [defectDescription, setDefectDescription] = useState('');
-  const [estimatedCostTjs, setEstimatedCostTjs] = useState<string>('0');
-  const [prepaymentTjs, setPrepaymentTjs] = useState<string>('0');
-  const [masterNote, setMasterNote] = useState('');
 
   // Modal state for ISSUING REPAIR & SETTLEMENT
   const [selectedTicket, setSelectedTicket] = useState<RepairTicket | null>(null);
@@ -356,9 +353,6 @@ export const RepairPage: React.FC = () => {
         customerName: clientName.trim(),
         customerPhone: clientPhone.trim(),
         problemDescription: defectDescription.trim(),
-        comment: masterNote.trim() || undefined,
-        estimatedCostTjs: parseFloat(estimatedCostTjs) || 0,
-        prepaymentTjs: parseFloat(prepaymentTjs) || 0,
         storeId: isStoreScoped ? (currentUser?.storeId || undefined) : (createTicketStoreId || undefined),
       });
 
@@ -371,9 +365,6 @@ export const RepairPage: React.FC = () => {
         setImei('');
         setImei2('');
         setDefectDescription('');
-        setEstimatedCostTjs('0');
-        setPrepaymentTjs('0');
-        setMasterNote('');
         setReceiptSearch('');
       } else {
         setStatusMessage({ type: 'error', text: res.message || 'Ошибка создания квитанции' });

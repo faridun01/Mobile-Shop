@@ -86,7 +86,7 @@ export const ConfirmTransferModal: React.FC<ConfirmTransferModalProps> = ({
                     {fromStoreName}
                   </span>
                   <span className="text-[10px] text-fg-subtle block">
-                    {fromStore?.isMainWarehouse ? 'Центральный склад' : 'Магазин'}
+                    {fromStore?.isMainWarehouse ? 'Главный склад' : 'Магазин'}
                   </span>
                 </div>
               </div>
@@ -107,7 +107,7 @@ export const ConfirmTransferModal: React.FC<ConfirmTransferModalProps> = ({
                     {toStoreName}
                   </span>
                   <span className="text-[10px] text-fg-subtle block">
-                    {toStore?.isMainWarehouse ? 'Центральный склад' : 'Магазин'}
+                    {toStore?.isMainWarehouse ? 'Главный склад' : 'Магазин'}
                   </span>
                 </div>
                 <div className="w-8 h-8 rounded-lg bg-accent/10 border border-accent/25 flex items-center justify-center shrink-0">

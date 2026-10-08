@@ -122,7 +122,6 @@ export const Drawer: React.FC = () => {
           title: 'Основные операции',
           items: [
             { id: 'SALE', label: 'POS Терминал', icon: ShoppingBag, roles: ['SELLER'] },
-            { id: 'CUSTOMERS', label: 'База клиентов', icon: Users, roles: ['SELLER'] },
             { id: 'SALES_HISTORY', label: 'История продаж', icon: History, roles: ['SELLER'] },
             { id: 'EXCHANGE', label: 'Обмен (Trade-In)', icon: RefreshCw, roles: ['SELLER'] },
             { id: 'REPAIR', label: 'Сервис и ремонт', icon: Wrench, roles: ['SELLER'] },
@@ -145,7 +144,6 @@ export const Drawer: React.FC = () => {
           title: 'Магазин и продажи',
           items: [
             { id: 'SALE', label: 'POS Терминал', icon: ShoppingBag, roles: ['PARTNER'] },
-            { id: 'CUSTOMERS', label: 'База клиентов', icon: Users, roles: ['PARTNER'] },
             { id: 'SALES_HISTORY', label: 'История продаж', icon: History, roles: ['PARTNER'] },
             { id: 'EXCHANGE', label: 'Обмен (Trade-In)', icon: RefreshCw, roles: ['PARTNER'] },
             { id: 'REPAIR', label: 'Сервис и ремонт', icon: Wrench, roles: ['PARTNER'] },
@@ -212,7 +210,6 @@ export const Drawer: React.FC = () => {
           title: 'Магазин и продажи',
           items: [
             { id: 'SALE', label: 'POS Терминал', icon: ShoppingBag, roles: ['ADMIN'] },
-            { id: 'CUSTOMERS', label: 'База клиентов', icon: Users, roles: ['ADMIN'] },
             { id: 'SALES_HISTORY', label: 'История продаж', icon: History, roles: ['ADMIN'] },
             { id: 'EXCHANGE', label: 'Обмен (Trade-In)', icon: RefreshCw, roles: ['ADMIN'] },
             { id: 'REPAIR', label: 'Сервис и ремонт', icon: Wrench, roles: ['ADMIN'] },

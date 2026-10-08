@@ -17,8 +17,12 @@ import {
   ChevronDown,
   Sparkles,
   Package,
-  Banknote
+  Banknote,
+  AlertTriangle,
 } from 'lucide-react';
+import { EmptyState } from '../ui/EmptyState';
+import { LoadingState } from '../ui/Skeleton';
+import { Button } from '../ui/Button';
 import { DateRangePicker } from '../ui/DateRangePicker';
 import { currentBusinessMonth, getBusinessDateKey, wholeMonthOf } from '../../utils/businessDate';
 import { StatCard } from '../ui/StatCard';
@@ -27,7 +31,6 @@ import {
   buildSalesReportTable,
   type ComprehensiveReportSummary,
 } from '../../utils/exportReports';
-import { FALLBACK_EXCHANGE_RATE } from '../../utils/exchangeRate';
 import { expenseCategoryLabel } from '../../utils/expenseCategories';
 import { ReportPreviewModal } from '../common/ReportPreviewModal';
 import { useStoreContext, formatStoreName } from '../../utils/storeContext';
@@ -212,7 +215,7 @@ export const ProfitReport: React.FC<ProfitReportProps> = ({
   const [salesReportStoreId, setSalesReportStoreId] = useState<string | null>(null);
   const [expandedStoreId, setExpandedStoreId] = useState<string | null>(null);
 
-  const rate = todayRate?.rate || FALLBACK_EXCHANGE_RATE;
+  const rate = Number(todayRate?.rate) || 0;
   const namesLookup = useMemo(() => buildNameLookup(users), [users]);
   const periodLabel = useMemo(() => formatPeriodLabel(startDate, endDate, month), [startDate, endDate, month]);
   const retailStores = useMemo(() => stores.filter((s) => !s.isMainWarehouse), [stores]);
@@ -417,11 +420,27 @@ export const ProfitReport: React.FC<ProfitReportProps> = ({
     />
   );
 
-  if (summaryError) return <div className="p-4 space-y-3" role="alert">
-    {datePicker}<p>Не удалось загрузить финансовый отчёт. Итоги недоступны.</p>
-    <p>{summaryError}</p><button type="button" onClick={() => setRevision(v => v + 1)}>Повторить загрузку</button>
-  </div>;
-  if (!summary) return <div className="p-4" role="status">{datePicker}<p>Загрузка финансового отчёта…</p></div>;
+  if (summaryError) {
+    return (
+      <div className="flex flex-col">
+        <div className="px-3 py-2.5 border-b border-border bg-surface">{datePicker}</div>
+        <EmptyState
+          icon={AlertTriangle}
+          title="Не удалось загрузить отчёт"
+          description={summaryError}
+          action={<Button onClick={() => setRevision(v => v + 1)}>Повторить</Button>}
+        />
+      </div>
+    );
+  }
+  if (!summary) {
+    return (
+      <div className="flex flex-col">
+        <div className="px-3 py-2.5 border-b border-border bg-surface">{datePicker}</div>
+        <LoadingState label="Загрузка отчёта…" />
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col">

@@ -10,7 +10,8 @@ import {
   Store as StoreIcon,
   Tag,
   User,
-  ArrowUpDown
+  ArrowUpDown,
+  ChevronUp
 } from 'lucide-react';
 import { formatMoney } from '../../utils/money';
 import { formatStoreName } from '../../utils/storeContext';
@@ -336,12 +337,15 @@ export const ExpensesHeaderBar: React.FC<ExpensesHeaderBarProps> = ({
 
         {/* Collapsible Advanced Filters Panel */}
         {filtersOpen && (
-          <div className="pt-2.5 border-t border-border mt-1">
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 text-xs">
+          <div className="pt-2 border-t border-border mt-1">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
               {/* Store Filter */}
               {isAdmin && isStoreModeCentral && (
                 <div>
-                  <label className="block text-fg-subtle mb-1 text-[11px] font-bold">Филиал / Точка:</label>
+                  <label className="flex items-center gap-1 text-fg-subtle mb-1 text-[11px] font-semibold">
+                    <StoreIcon className="w-3 h-3 text-accent shrink-0" />
+                    <span>Филиал / Точка</span>
+                  </label>
                   <Select
                     value={selectedStoreFilter}
                     onChange={(e) => setSelectedStoreFilter(e.target.value)}
@@ -350,7 +354,7 @@ export const ExpensesHeaderBar: React.FC<ExpensesHeaderBarProps> = ({
                     <option value="ALL">Все филиалы и склады</option>
                     {stores.map(s => (
                       <option key={s.id} value={s.id}>
-                        {s.isMainWarehouse ? `Центральный склад (${formatStoreName(s.name)})` : formatStoreName(s.name)}
+                        {s.isMainWarehouse ? 'Главный склад' : formatStoreName(s.name)}
                       </option>
                     ))}
                   </Select>
@@ -360,14 +364,17 @@ export const ExpensesHeaderBar: React.FC<ExpensesHeaderBarProps> = ({
               {/* Category Filter */}
               <div>
                 <div className="flex items-center justify-between mb-1">
-                  <label className="text-fg-subtle text-[11px] font-bold">Категория:</label>
+                  <label className="flex items-center gap-1 text-fg-subtle text-[11px] font-semibold">
+                    <Tag className="w-3 h-3 text-accent shrink-0" />
+                    <span>Категория</span>
+                  </label>
                   {canAddCategory && (
                     <button
                       type="button"
                       onClick={onOpenAddCategoryModal}
                       className="text-[10px] text-accent hover:underline font-bold flex items-center gap-0.5 cursor-pointer"
                     >
-                      <Plus className="w-3 h-3" />
+                      <Plus className="w-2.5 h-2.5" />
                       <span>Новая</span>
                     </button>
                   )}
@@ -377,21 +384,21 @@ export const ExpensesHeaderBar: React.FC<ExpensesHeaderBarProps> = ({
                   onChange={(e) => setSelectedCategoryTab(e.target.value)}
                   className="w-full !h-8 px-2.5 text-xs font-semibold"
                 >
-                  <option value="ALL">Все категории ({totalExpensesCount})</option>
-                  {allCategoryOptions.map(c => {
-                    const cnt = categoryCounts[c.id] || 0;
-                    return (
-                      <option key={c.id} value={c.id}>
-                        {c.label} {cnt > 0 ? `(${cnt})` : ''}
-                      </option>
-                    );
-                  })}
+                  <option value="ALL">Все категории</option>
+                  {allCategoryOptions.map(c => (
+                    <option key={c.id} value={c.id}>
+                      {c.label}
+                    </option>
+                  ))}
                 </Select>
               </div>
 
               {/* Employee Filter */}
               <div>
-                <label className="block text-fg-subtle mb-1 text-[11px] font-bold">Сотрудник / Назначение:</label>
+                <label className="flex items-center gap-1 text-fg-subtle mb-1 text-[11px] font-semibold">
+                  <User className="w-3 h-3 text-accent shrink-0" />
+                  <span>Сотрудник</span>
+                </label>
                 <Select
                   value={selectedEmployeeFilter}
                   onChange={(e) => setSelectedEmployeeFilter(e.target.value)}
@@ -409,7 +416,10 @@ export const ExpensesHeaderBar: React.FC<ExpensesHeaderBarProps> = ({
 
               {/* Sorting */}
               <div>
-                <label className="block text-fg-subtle mb-1 text-[11px] font-bold">Сортировка:</label>
+                <label className="flex items-center gap-1 text-fg-subtle mb-1 text-[11px] font-semibold">
+                  <ArrowUpDown className="w-3 h-3 text-accent shrink-0" />
+                  <span>Сортировка</span>
+                </label>
                 <Select
                   value={sortBy}
                   onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
@@ -423,9 +433,10 @@ export const ExpensesHeaderBar: React.FC<ExpensesHeaderBarProps> = ({
               </div>
             </div>
 
-            <div className="flex items-center justify-between pt-2 mt-2 border-t border-border/60">
-              <span className="text-[11px] text-fg-subtle">
-                Найдено <strong className="text-fg">{filteredExpensesCount}</strong> из {totalExpensesCount} расходов
+            <div className="flex items-center justify-between pt-2 mt-2 border-t border-border/50">
+              <span className="text-[11px] text-fg-subtle flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-accent" />
+                <span>Найдено: <strong className="text-fg font-semibold">{filteredExpensesCount}</strong> из {totalExpensesCount}</span>
               </span>
               <div className="flex items-center gap-2">
                 {hasActiveFilters && (
@@ -434,16 +445,17 @@ export const ExpensesHeaderBar: React.FC<ExpensesHeaderBarProps> = ({
                     onClick={onResetFilters}
                     className="text-xs text-danger hover:underline font-semibold flex items-center gap-1 cursor-pointer"
                   >
-                    <RotateCcw className="w-3.5 h-3.5" />
+                    <RotateCcw className="w-3 h-3" />
                     <span>Сбросить</span>
                   </button>
                 )}
                 <button
                   type="button"
                   onClick={() => setFiltersOpen(false)}
-                  className="px-2.5 py-0.5 rounded-lg bg-surface-raised border border-border text-xs font-semibold text-fg-muted hover:text-fg cursor-pointer"
+                  className="px-2.5 py-1 rounded-lg bg-surface-raised hover:bg-surface border border-border text-xs font-semibold text-fg-muted hover:text-fg transition-all flex items-center gap-1 cursor-pointer shadow-2xs"
                 >
-                  Свернуть
+                  <ChevronUp className="w-3.5 h-3.5" />
+                  <span>Свернуть</span>
                 </button>
               </div>
             </div>

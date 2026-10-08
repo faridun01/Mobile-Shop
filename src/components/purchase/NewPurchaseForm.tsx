@@ -140,7 +140,7 @@ export const NewPurchaseForm: React.FC<NewPurchaseFormProps> = ({
             <span className="text-fg-subtle font-medium">Склад поступления:</span>
             <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-accent/10 border border-accent/25 text-accent font-semibold text-xs">
               <span className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse" />
-              Главный склад (Центральный)
+              Главный склад
             </span>
           </div>
         </div>

@@ -66,7 +66,6 @@ export const TabletNavRail: React.FC = () => {
     if (isSeller) {
       return [
         { id: 'SALE' as PageId, label: 'POS', icon: ShoppingBag },
-        { id: 'CUSTOMERS' as PageId, label: 'Клиенты', icon: Users },
         { id: 'SALES_HISTORY' as PageId, label: 'Продажи', icon: History },
         { id: 'EXCHANGE' as PageId, label: 'Обмен', icon: RefreshCw },
         { id: 'REPAIR' as PageId, label: 'Ремонт', icon: Wrench },
@@ -80,7 +79,6 @@ export const TabletNavRail: React.FC = () => {
     if (isPartner) {
       return [
         { id: 'SALE' as PageId, label: 'POS', icon: ShoppingBag },
-        { id: 'CUSTOMERS' as PageId, label: 'Клиенты', icon: Users },
         { id: 'SALES_HISTORY' as PageId, label: 'Продажи', icon: History },
         { id: 'CASH_DESK' as PageId, label: 'Касса', icon: Wallet },
         { id: 'EXCHANGE' as PageId, label: 'Обмен', icon: RefreshCw },
@@ -121,7 +119,6 @@ export const TabletNavRail: React.FC = () => {
     // Retail Store Selling Mode for Admin — matches Partner
     return [
       { id: 'SALE' as PageId, label: 'POS', icon: ShoppingBag },
-      { id: 'CUSTOMERS' as PageId, label: 'Клиенты', icon: Users },
       { id: 'SALES_HISTORY' as PageId, label: 'Продажи', icon: History },
       { id: 'CASH_DESK' as PageId, label: 'Касса', icon: Wallet },
       { id: 'FINANCE' as PageId, label: 'Отчёты', icon: TrendingUp },

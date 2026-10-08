@@ -84,9 +84,9 @@ try {
   const admin = await login('admin', 'admin123');
   const seller = await login('ahmad', 'seller123');
 
-  // A second retail store and a partner bound to Сиёма (the seed partner has no store).
+  // A second retail store; the seeded partner is bound to Сиёма.
   const storeB = ok(await call(admin, 'POST', '/stores', { name: 'Тестовая точка', address: 'ул. Проверки, 1' }));
-  await db.user.update({ where: { id: 'user-partner' }, data: { storeId: 'store-siyoma' } });
+  assert.equal((await db.user.findUniqueOrThrow({ where: { id: 'user-partner' } })).storeId, 'store-siyoma', 'seed must bind the partner to a store');
   const partner = await login('partner', 'partner123');
   ok(await call(admin, 'POST', '/users', { login: 'sellerb', password: 'seller-b-pass-1', name: 'Продавец Б', role: 'SELLER', storeId: storeB.id }));
   const sellerB = await login('sellerb', 'seller-b-pass-1');
@@ -308,7 +308,7 @@ try {
     sales.debt = ok(await sale({ paymentMethod: 'DEBT', items: [{ deviceId: d.id, salePriceTjs: 6000 }], cashAmountTjs: 1000, cardAmountTjs: 0, debtAmountTjs: 5000, customerName: 'Фарид Должник', customerPhone: '+992900000001' }));
     const customer = await db.customer.findFirstOrThrow({ where: { phone: '+992900000001' } });
     assert.equal(money(customer.totalDebtTjs), '5000.00');
-    const debtors = ok(await call(seller, 'GET', '/customers?debtorsOnly=true'));
+    const debtors = ok(await call(admin, 'GET', '/customers?debtorsOnly=true'));
     assert(debtors.items.some((c: any) => c.id === customer.id), 'customer missing from debtors');
   });
   await step('продажа ниже себестоимости помечается и попадает в аудит', async () => {
@@ -364,12 +364,26 @@ try {
     assert.equal(money(before.minus(await storeCash('store-siyoma'))), money(D(100).div(RATE)));
     await reconciled('store-siyoma');
   });
+  await step('штраф больше оплаченной суммы отклоняется', async () => {
+    const r = await call(partner, 'POST', `/sales/${sales.card.id}/refund`, { reason: 'x', refundAmountTjs: 0, penaltyFeeTjs: 999999, paymentMethod: 'CASH' });
+    assert.equal(r.status, 400, JSON.stringify(r));
+  });
   await step('продавец не может оформить возврат', async () => {
     assert.equal((await call(seller, 'POST', `/sales/${sales.card.id}/refund`, { reason: 'x', refundAmountTjs: 1, paymentMethod: 'CASH' })).status, 403);
   });
 
   // ------------------------------------------------------------------ BLOCK 10
   block = 'Блок 10: клиенты';
+  await step('база клиентов только в Центральной кассе; на кассе — короткий поиск для продажи в долг', async () => {
+    assert.equal((await call(seller, 'GET', '/customers')).status, 403);
+    assert.equal((await call(partner, 'GET', '/customers?debtorsOnly=true')).status, 403);
+    const anyCustomer = await db.customer.findFirstOrThrow();
+    assert.equal((await call(seller, 'GET', `/customers/${anyCustomer.id}`)).status, 403);
+    assert.equal((await call(seller, 'PATCH', `/customers/${anyCustomer.id}`, { name: 'X' })).status, 403);
+    const lookup = ok(await call(seller, 'GET', '/customers?search=900000001'));
+    assert.deepEqual(Object.keys(lookup.items[0]).sort(), ['id', 'name', 'phone', 'totalDebtTjs']);
+    ok(await call(admin, 'GET', '/customers'));
+  });
   await step('поиск клиента по имени и по телефону', async () => {
     const byName = ok(await call(seller, 'GET', `/customers?search=${encodeURIComponent('Фарид')}`));
     const byPhone = ok(await call(seller, 'GET', '/customers?search=900000001'));

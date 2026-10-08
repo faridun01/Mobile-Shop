@@ -107,7 +107,7 @@ function escapeCsvField(field: any): string {
  * Builds the sales report table (headers/rows/totals) shown in the on-screen
  * report preview.
  */
-export function buildSalesReportTable(sales: Sale[], rate: number = 9.5, cashBonusesUsd: number = 0): ReportTable {
+export function buildSalesReportTable(sales: Sale[], rate: number, cashBonusesUsd: number = 0): ReportTable {
   const headers = [
     '№ Чека',
     'Дата и время',

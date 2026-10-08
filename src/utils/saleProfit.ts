@@ -21,7 +21,7 @@ export interface SaleItemProfitResult {
 /**
  * Calculates net profit and cost metrics for an individual sale item.
  */
-export function computeSaleItemProfit(item: SaleItem, exchangeRate: number = 1): SaleItemProfitResult {
+export function computeSaleItemProfit(item: SaleItem, exchangeRate: number): SaleItemProfitResult {
   const costUsd = Number(item.costBasisUsd) || 0;
   const priceUsd = Number(item.salePriceUsd) || 0;
   const profitUsd = Math.round((priceUsd - costUsd) * 100) / 100;
@@ -47,7 +47,7 @@ export function computeSaleItemProfit(item: SaleItem, exchangeRate: number = 1):
  * - Prefers recognizedProfitUsd if stored by the backend audit log.
  * - Falls back to sum of item profits (price - cost).
  */
-export function computeSaleProfit(sale: Sale, fallbackExchangeRate: number = 1): SaleProfitResult {
+export function computeSaleProfit(sale: Sale, fallbackExchangeRate: number = 0): SaleProfitResult {
   const costUsd = (sale.items || []).reduce((acc, item) => acc + (Number(item.costBasisUsd) || 0), 0);
   const revenueUsd = Number(sale.totalUsd) || 0;
 

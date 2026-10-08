@@ -86,16 +86,10 @@ export const RepairTicketCard: React.FC<RepairTicketCardProps> = ({
         </span>
       </div>
 
-      {/* Line 4 (if not issued): Actions & Prepayment */}
+      {/* Line 4 (if not issued): Actions */}
       {!isIssued && (
         <div className="flex items-center justify-between gap-2 pt-1 border-t border-border/50 text-xs" onClick={(e) => e.stopPropagation()}>
-          <div>
-            {ticket.prepaymentTjs ? (
-              <span className="text-[10px] text-fg-subtle font-mono">
-                Предоплата: <strong className="text-fg font-semibold">{formatMoney(ticket.prepaymentTjs)} TJS</strong>
-              </span>
-            ) : <div />}
-          </div>
+          <div />
 
           <div className="flex items-center gap-1.5 shrink-0">
             {isAccepted && (

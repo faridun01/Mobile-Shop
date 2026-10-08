@@ -22,9 +22,23 @@ export function registerCustomerRoutes(app: Express) {
   });
 
   // List customers with search and debt filtering
+  // The customer base is an ADMIN (Central Cash) page. Store staff only get the POS lookup:
+  // a search of at least 2 characters, at most 5 matches, name/phone/debt only.
   app.get('/api/customers', authenticateJwt, async (req: AuthenticatedRequest, res, next) => {
     try {
       const search = typeof req.query.search === 'string' ? req.query.search : undefined;
+      if (req.user!.role !== 'ADMIN') {
+        if (!search || search.trim().length < 2) {
+          res.status(403).json({ message: 'База клиентов доступна в Центральной кассе' });
+          return;
+        }
+        const found = await CustomersService.list({ search, limit: 5, offset: 0 });
+        res.json({
+          items: found.items.map((c) => ({ id: c.id, name: c.name, phone: c.phone, totalDebtTjs: c.totalDebtTjs })),
+          total: found.items.length,
+        });
+        return;
+      }
       const debtorsOnly = req.query.debtorsOnly === 'true';
       const limit = req.query.limit ? Math.min(Number(req.query.limit) || 50, 200) : 50;
       const offset = req.query.offset ? Math.max(Number(req.query.offset) || 0, 0) : 0;
@@ -37,7 +51,7 @@ export function registerCustomerRoutes(app: Express) {
   });
 
   // Get customer by ID
-  app.get('/api/customers/:id', authenticateJwt, async (req: AuthenticatedRequest, res, next) => {
+  app.get('/api/customers/:id', authenticateJwt, requireRoles('ADMIN'), async (req: AuthenticatedRequest, res, next) => {
     try {
       const customer = await CustomersService.getById(req.params.id);
       res.json(customer);
@@ -47,7 +61,7 @@ export function registerCustomerRoutes(app: Express) {
   });
 
   // Create customer
-  app.post('/api/customers', authenticateJwt, async (req: AuthenticatedRequest, res, next) => {
+  app.post('/api/customers', authenticateJwt, requireRoles('ADMIN'), async (req: AuthenticatedRequest, res, next) => {
     try {
       const customer = await CustomersService.create(req.body || {});
       RealtimeSyncGateway.broadcast('CUSTOMERS_UPDATED', { customerId: customer.id });
@@ -58,7 +72,7 @@ export function registerCustomerRoutes(app: Express) {
   });
 
   // Update customer
-  app.patch('/api/customers/:id', authenticateJwt, async (req: AuthenticatedRequest, res, next) => {
+  app.patch('/api/customers/:id', authenticateJwt, requireRoles('ADMIN'), async (req: AuthenticatedRequest, res, next) => {
     try {
       const customer = await CustomersService.update(req.params.id, req.body || {});
       RealtimeSyncGateway.broadcast('CUSTOMERS_UPDATED', { customerId: customer.id });

@@ -13,10 +13,12 @@ import {
   Receipt,
   ArrowLeft,
   Store,
+  Building2,
   Smartphone,
   User,
   X
 } from 'lucide-react';
+import { CustomSelect, CustomSelectOption } from '../ui/CustomSelect';
 import { formatRam, formatStorage, getPhoneColorHex } from '../../utils/phoneSpecs';
 import { SearchBar } from '../ui/SearchBar';
 import { DateRangePicker } from '../ui/DateRangePicker';
@@ -87,6 +89,16 @@ export const SalesHistoryPage: React.FC = () => {
   };
 
   const retailStores = useMemo(() => stores.filter((s) => !s.isMainWarehouse), [stores]);
+
+  const storeFilterOptions = useMemo<CustomSelectOption[]>(() => [
+    { value: 'ALL', label: 'Все магазины', icon: <Building2 className="w-3.5 h-3.5 text-accent shrink-0" /> },
+    ...retailStores.map((s) => ({
+      value: s.id,
+      label: formatStoreName(s.name),
+      icon: <Store className="w-3.5 h-3.5 text-accent shrink-0" />,
+      badge: 'Магазин',
+    })),
+  ], [retailStores]);
 
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedSaleId, setSelectedSaleId] = useState<string | null>(null);
@@ -210,7 +222,7 @@ export const SalesHistoryPage: React.FC = () => {
     let totalProfitUsd = 0;
     let totalProfitTjs = 0;
     let totalCostUsd = 0;
-    const fallbackRate = todayRate?.rate || 1;
+    const fallbackRate = Number(todayRate?.rate) || 0;
     for (const sale of filteredSales) {
       const res = computeSaleProfit(sale, fallbackRate);
       totalProfitUsd += res.profitUsd;
@@ -298,16 +310,21 @@ export const SalesHistoryPage: React.FC = () => {
     }
   };
 
+  // What the customer actually paid (an unpaid debt is written off, not returned) and the penalty.
+  const refundCollectedTjs = selectedSale ? Math.max(0, selectedSale.totalTjs - (selectedSale.debtAmountTjs ?? 0)) : 0;
+  const penaltyVal = Math.max(0, parseFloat(penaltyFeeTjs.replace(',', '.')) || 0);
+  const penaltyError = penaltyVal > refundCollectedTjs + 0.001
+    ? `Штраф не может быть больше оплаченной суммы (${formatMoney(refundCollectedTjs)} TJS)`
+    : null;
+
   const handleExecuteRefund = async () => {
-    if (!selectedSale || isSubmittingRefund) return;
+    if (!selectedSale || isSubmittingRefund || penaltyError) return;
     if (!refundReason.trim()) {
       setStatus({ tone: 'error', text: 'Укажите причину возврата' });
       return;
     }
 
-    const penaltyVal = Math.max(0, parseFloat(penaltyFeeTjs) || 0);
-    const amountActuallyCollectedTjs = selectedSale.totalTjs - (selectedSale.debtAmountTjs ?? 0);
-    const actualRefundVal = Math.max(0, amountActuallyCollectedTjs - penaltyVal);
+    const actualRefundVal = Math.max(0, refundCollectedTjs - penaltyVal);
 
     setIsSubmittingRefund(true);
     try {
@@ -415,41 +432,15 @@ export const SalesHistoryPage: React.FC = () => {
           </div>
 
           {isAdmin && storeCtx.mode === 'CENTRAL' ? (
-            <div className="relative inline-flex items-center shrink-0">
-              <div
-                className={cn(
-                  'h-8 pl-2.5 pr-7 rounded-xl border text-xs font-semibold flex items-center gap-1.5 transition-all select-none shadow-xs',
-                  selectedStoreFilter !== 'ALL'
-                    ? 'border-accent/50 bg-accent/10 text-accent font-bold hover:bg-accent/15'
-                    : 'border-border/80 bg-surface text-fg-muted hover:text-fg hover:border-accent/40'
-                )}
-                title={`Точка продаж: ${selectedStoreFilter === 'ALL' ? 'Все магазины' : formatStoreName(retailStores.find(s => s.id === selectedStoreFilter)?.name) || 'Магазин'}`}
-              >
-                <Store className={cn('w-3.5 h-3.5 shrink-0', selectedStoreFilter !== 'ALL' ? 'text-accent' : 'text-fg-subtle')} />
-                <span className="truncate max-w-32 sm:max-w-44">
-                  {selectedStoreFilter === 'ALL'
-                    ? 'Все магазины'
-                    : formatStoreName(retailStores.find(s => s.id === selectedStoreFilter)?.name) || 'Магазин'}
-                </span>
-                <ChevronDown className="w-3.5 h-3.5 text-fg-subtle shrink-0 pointer-events-none absolute right-2" />
-              </div>
-              <select
-                value={selectedStoreFilter}
-                onChange={(e) => setSelectedStoreFilter(e.target.value)}
-                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer text-xs"
-                title="Фильтр по точке продаж"
-                aria-label="Фильтр по точке продаж"
-              >
-                <option value="ALL" className="text-fg bg-surface">
-                  Все магазины
-                </option>
-                {retailStores.map((s) => (
-                  <option key={s.id} value={s.id} className="text-fg bg-surface font-medium">
-                    {formatStoreName(s.name)}
-                  </option>
-                ))}
-              </select>
-            </div>
+            <CustomSelect
+              value={selectedStoreFilter}
+              onChange={setSelectedStoreFilter}
+              options={storeFilterOptions}
+              size="sm"
+              align="right"
+              className="shrink-0"
+              title="Фильтр по точке продаж"
+            />
           ) : null}
         </div>
 
@@ -618,7 +609,7 @@ export const SalesHistoryPage: React.FC = () => {
                           )}
                         </td>
                         {isAdmin && (() => {
-                          const profit = computeSaleProfit(sale, todayRate?.rate || 1);
+                          const profit = computeSaleProfit(sale, Number(todayRate?.rate) || 0);
                           return (
                             <td className="py-1.5 px-2.5 text-right whitespace-nowrap font-mono">
                               {sale.status === 'REFUNDED' ? (
@@ -662,8 +653,8 @@ export const SalesHistoryPage: React.FC = () => {
               </table>
             </div>
 
-            {/* Mobile Cards View (< 768px) - Compact */}
-            <div className="md:hidden divide-y divide-border">
+            {/* Mobile Cards View (< 768px) - Beautiful & Compact 2-Line Feed */}
+            <div className="md:hidden divide-y divide-border/60">
               {filteredSales.map((sale) => {
                 const timeStr = new Date(sale.date).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
                 const dateStr = new Date(sale.date).toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit' });
@@ -672,53 +663,114 @@ export const SalesHistoryPage: React.FC = () => {
                   <button
                     key={sale.id}
                     onClick={() => openSale(sale.id)}
-                    className="w-full text-left px-2.5 py-1.5 active:bg-surface-raised flex items-center justify-between gap-2 transition-colors cursor-pointer"
+                    className="w-full text-left px-3 py-2 hover:bg-surface-raised/60 active:bg-surface-raised transition-colors cursor-pointer flex flex-col gap-1 group select-none"
                   >
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-1.5 flex-wrap">
-                        <span className="text-xs font-bold text-accent font-mono">#{sale.receiptNumber}</span>
-                        <span className="text-[10px] text-fg-subtle font-mono">{dateStr} {timeStr}</span>
-                        {sale.status === 'EXCHANGED' && <Badge tone="accent">Обмен</Badge>}
-                        {sale.status === 'REFUNDED' && <Badge tone="danger">Возврат</Badge>}
+                    {/* Row 1: Receipt# + Badges + Device Name (Left) | Price + Chevron (Right) */}
+                    <div className="flex items-center justify-between gap-2 w-full min-w-0">
+                      <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                        <span className="font-mono text-[10.5px] font-bold text-accent bg-accent/10 border border-accent/20 px-1.5 py-0.2 rounded shrink-0">
+                          #{sale.receiptNumber}
+                        </span>
+                        {sale.status === 'EXCHANGED' && (
+                          <Badge tone="accent" className="!text-[10px] !px-1.5 !py-0 shrink-0">Обмен</Badge>
+                        )}
+                        {sale.status === 'REFUNDED' && (
+                          <Badge tone="danger" className="!text-[10px] !px-1.5 !py-0 shrink-0">Возврат</Badge>
+                        )}
+                        <span className="text-xs font-bold text-fg truncate group-hover:text-accent transition-colors">
+                          {sale.items.map(i => `${i.brand} ${i.model}`).join(', ')}
+                        </span>
+                        {sale.items.length > 1 && (
+                          <span className="text-[10px] font-bold text-fg-subtle bg-surface-raised border border-border px-1 py-0.2 rounded shrink-0">
+                            +{sale.items.length - 1}
+                          </span>
+                        )}
                       </div>
-                      <p className="text-xs font-medium text-fg-muted mt-0.5 truncate">
-                        {sale.items.map(i => `${i.brand} ${i.model}`).join(', ')}
-                      </p>
-                      <div className="flex items-center gap-1 text-[10px] text-fg-subtle mt-0.5 truncate">
-                        {!isStoreScoped && <><span>{formatStoreName(sale.storeName)}</span><span>·</span></>}
-                        <span>{sale.sellerName}</span>
-                        {sale.customerName && <><span>·</span><span>{sale.customerName}</span></>}
+
+                      <div className="flex items-center gap-1 shrink-0 text-right">
+                        {sale.status === 'REFUNDED' ? (
+                          <div className="flex items-baseline gap-1">
+                            <span className="text-[10px] line-through text-fg-subtle font-mono">{formatMoney(sale.totalTjs)}</span>
+                            <span className="text-xs font-extrabold text-danger font-mono">{formatMoney(sale.actualRefundAmountTjs ?? sale.totalTjs)} TJS</span>
+                          </div>
+                        ) : (
+                          <span className="text-xs font-extrabold text-fg font-mono tracking-tight">
+                            {formatMoney(sale.totalTjs)} <span className="text-[10px] text-fg-subtle font-sans font-semibold">TJS</span>
+                          </span>
+                        )}
+                        <ChevronRight className="w-3.5 h-3.5 text-fg-subtle shrink-0 group-hover:text-accent group-hover:translate-x-0.5 transition-all" />
                       </div>
                     </div>
 
-                    <div className="text-right shrink-0 flex items-center gap-1.5">
-                      <div>
-                        {sale.status === 'REFUNDED' ? (
+                    {/* Row 2: Metadata (Date · Store · Seller · Customer) | Profit + Payment Method Badges */}
+                    <div className="flex items-center justify-between gap-2 w-full min-w-0 text-[10.5px]">
+                      <div className="flex items-center gap-1 text-fg-subtle min-w-0 flex-1 truncate">
+                        <span className="font-mono shrink-0">{dateStr} {timeStr}</span>
+                        {!isStoreScoped && (
                           <>
-                            <p className="text-xs font-semibold line-through text-fg-subtle font-mono">{formatMoney(sale.totalTjs)} TJS</p>
-                            <p className="text-[11px] text-danger font-semibold font-mono">Возврат: {formatMoney(sale.actualRefundAmountTjs ?? sale.totalTjs)} TJS</p>
+                            <span className="opacity-40">·</span>
+                            <span className="truncate">{formatStoreName(sale.storeName)}</span>
                           </>
-                        ) : (
+                        )}
+                        <span className="opacity-40">·</span>
+                        <span className="shrink-0">{sale.sellerName}</span>
+                        {sale.customerName && (
                           <>
-                            <p className="text-xs font-bold text-fg-muted font-mono">{formatMoney(sale.totalTjs)} TJS</p>
-                            {isAdmin && (() => {
-                              const profit = computeSaleProfit(sale, todayRate?.rate || 1);
-                              return (
-                                <p className={cn(
-                                  "text-[10px] font-bold font-mono",
-                                  profit.profitUsd >= 0 ? "text-emerald-400" : "text-danger"
-                                  )}>
-                                  {profit.profitUsd >= 0 ? '+' : ''}${profit.profitUsd.toFixed(2)}
-                                </p>
-                              );
-                            })()}
-                            <p className={`text-[10px] ${sale.paymentMethod === 'DEBT' && (sale.debtAmountTjs ?? 0) > 0 ? 'text-danger font-semibold' : 'text-fg-subtle'}`}>
-                              {sale.paymentMethod === 'CASH' ? 'Наличные' : sale.paymentMethod === 'CARD' ? 'Банк' : sale.paymentMethod === 'DEBT' ? ((sale.debtAmountTjs ?? 0) > 0 ? `В долг (${formatMoney(sale.debtAmountTjs ?? 0)} TJS)` : 'В долг (погашено)') : 'Смешанная'}
-                            </p>
+                            <span className="opacity-40">·</span>
+                            <span className="truncate">{sale.customerName}</span>
                           </>
                         )}
                       </div>
-                      <ChevronRight className="w-3.5 h-3.5 text-fg-subtle shrink-0" />
+
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        {isAdmin && (() => {
+                          const profit = computeSaleProfit(sale, Number(todayRate?.rate) || 0);
+                          if (sale.status === 'REFUNDED') {
+                            return profit.profitUsd > 0 ? (
+                              <span className="text-[10px] font-bold font-mono text-warning bg-warning/10 border border-warning/20 px-1.5 py-0.2 rounded">
+                                штраф +${profit.profitUsd % 1 === 0 ? profit.profitUsd.toFixed(0) : profit.profitUsd.toFixed(2)}
+                              </span>
+                            ) : null;
+                          }
+                          const isPos = profit.profitUsd >= 0;
+                          const valStr = Math.abs(profit.profitUsd) % 1 === 0
+                            ? Math.abs(profit.profitUsd).toFixed(0)
+                            : Math.abs(profit.profitUsd).toFixed(2);
+                          return (
+                            <span className={cn(
+                              "text-[10px] font-bold font-mono px-1.5 py-0.2 rounded border",
+                              isPos
+                                ? "text-emerald-400 bg-emerald-500/10 border-emerald-500/20"
+                                : "text-danger bg-danger/10 border-danger/20"
+                            )}>
+                              {isPos ? '+' : '-'}${valStr}
+                            </span>
+                          );
+                        })()}
+
+                        <span className={cn(
+                          "text-[10px] px-1.5 py-0.2 rounded font-medium border shrink-0",
+                          sale.paymentMethod === 'CASH'
+                            ? "bg-surface-raised border-border text-fg-subtle"
+                            : sale.paymentMethod === 'CARD'
+                            ? "bg-info/10 border-info/20 text-info"
+                            : sale.paymentMethod === 'DEBT'
+                            ? (sale.debtAmountTjs ?? 0) > 0
+                              ? "bg-danger/10 border-danger/20 text-danger font-semibold"
+                              : "bg-surface-raised border-border text-fg-subtle"
+                            : "bg-highlight/10 border-highlight/20 text-highlight"
+                        )}>
+                          {sale.paymentMethod === 'CASH'
+                            ? 'Наличные'
+                            : sale.paymentMethod === 'CARD'
+                            ? 'Банк'
+                            : sale.paymentMethod === 'DEBT'
+                            ? (sale.debtAmountTjs ?? 0) > 0
+                              ? `В долг (${formatMoney(sale.debtAmountTjs ?? 0)} TJS)`
+                              : 'В долг (погашено)'
+                            : 'Смешанная'}
+                        </span>
+                      </div>
                     </div>
                   </button>
                 );
@@ -758,7 +810,7 @@ export const SalesHistoryPage: React.FC = () => {
           ) : dialogView === 'refund' ? (
             <>
               <Button variant="secondary" fullWidth disabled={isSubmittingRefund} onClick={() => setDialogView('details')}>Отмена</Button>
-              <Button variant="danger" fullWidth loading={isSubmittingRefund} onClick={handleExecuteRefund}>Подтвердить возврат</Button>
+              <Button variant="danger" fullWidth loading={isSubmittingRefund} disabled={Boolean(penaltyError)} onClick={handleExecuteRefund}>Подтвердить возврат</Button>
             </>
           ) : (
             <Button variant="secondary" fullWidth leftIcon={ArrowLeft} onClick={() => setDialogView('details')}>Назад</Button>
@@ -854,7 +906,7 @@ export const SalesHistoryPage: React.FC = () => {
                         </p>
 
                         {isAdmin && (() => {
-                          const itemProfit = computeSaleItemProfit(item, selectedSale.exchangeRate || todayRate?.rate || 1);
+                          const itemProfit = computeSaleItemProfit(item, selectedSale.exchangeRate || Number(todayRate?.rate) || 0);
                           return (
                             <div className="mt-1.5 pt-1 border-t border-border/60 text-right">
                               <div className="text-[10px] text-fg-subtle flex items-center justify-end gap-1">
@@ -992,7 +1044,7 @@ export const SalesHistoryPage: React.FC = () => {
               </div>
 
               {isAdmin && (() => {
-                const saleProfit = computeSaleProfit(selectedSale, todayRate?.rate || 1);
+                const saleProfit = computeSaleProfit(selectedSale, Number(todayRate?.rate) || 0);
                 return (
                   <div className="flex justify-between items-center pt-2.5 mt-2 border-t border-border/80 bg-surface-raised/70 -mx-3.5 -mb-3.5 px-3.5 py-2.5 rounded-b-xl">
                     <div className="flex flex-col">
@@ -1080,26 +1132,17 @@ export const SalesHistoryPage: React.FC = () => {
                 <span>Удержать штраф за возврат (TJS)</span>
                 <span className="text-warning font-normal">100% в чистую прибыль</span>
               </label>
-              <div className="flex items-center gap-1.5 mb-2">
-                <input step="0.01"
-                  type="number"
-                  min="0"
-                  max={selectedSale.totalTjs - (selectedSale.debtAmountTjs ?? 0)}
+              <div className="mb-2">
+                <input
+                  type="text"
+                  inputMode="decimal"
                   value={penaltyFeeTjs}
                   onChange={(e) => setPenaltyFeeTjs(e.target.value)}
                   placeholder="0"
-                  className="flex-1 h-11 rounded-lg bg-bg border border-border px-3 text-sm font-semibold text-warning focus:outline-none focus:border-warning focus:ring-1 focus:ring-warning"
+                  aria-invalid={Boolean(penaltyError)}
+                  className={`w-full h-11 rounded-lg bg-bg border px-3 text-sm font-semibold text-warning focus:outline-none focus:ring-1 ${penaltyError ? 'border-danger focus:border-danger focus:ring-danger' : 'border-border focus:border-warning focus:ring-warning'}`}
                 />
-                {[0, 5, 10, 15, 20].map((pct) => (
-                  <button
-                    key={pct}
-                    type="button"
-                    onClick={() => setPenaltyFeeTjs(Math.round(((selectedSale.totalTjs - (selectedSale.debtAmountTjs ?? 0)) * pct) / 100).toString())}
-                    className="h-11 px-2.5 bg-surface hover:bg-surface-raised border border-border text-xs font-semibold text-fg-muted rounded-lg transition-colors"
-                  >
-                    {pct}%
-                  </button>
-                ))}
+                {penaltyError && <p className="mt-1 text-xs text-danger" role="alert">{penaltyError}</p>}
               </div>
 
               <div className="p-3 rounded-lg bg-surface border border-border space-y-1 text-xs">
@@ -1115,12 +1158,12 @@ export const SalesHistoryPage: React.FC = () => {
                 )}
                 <div className="flex justify-between font-semibold">
                   <span className="text-fg-muted">Возврат покупателю</span>
-                  <span className="text-accent">{formatMoney(Math.max(0, (selectedSale.totalTjs - (selectedSale.debtAmountTjs ?? 0)) - (parseFloat(penaltyFeeTjs) || 0)))} TJS</span>
+                  <span className="text-accent">{formatMoney(Math.max(0, refundCollectedTjs - penaltyVal))} TJS</span>
                 </div>
-                {(parseFloat(penaltyFeeTjs) || 0) > 0 && (
+                {penaltyVal > 0 && (
                   <div className="flex justify-between pt-1 border-t border-border font-semibold">
                     <span className="text-warning">Штраф за возврат</span>
-                    <span className="text-warning">+{formatMoney(parseFloat(penaltyFeeTjs) || 0)} TJS</span>
+                    <span className="text-warning">+{formatMoney(penaltyVal)} TJS</span>
                   </div>
                 )}
               </div>

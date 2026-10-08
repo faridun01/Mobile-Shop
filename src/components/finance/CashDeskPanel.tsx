@@ -28,7 +28,9 @@ interface CashDeskPanelProps {
 
 export const CashDeskPanel: React.FC<CashDeskPanelProps> = ({ storeId }) => {
   const navigate = useNavigate();
-  const { stores, setSelectedStoreId } = useAppFields('stores', 'setSelectedStoreId');
+  const { stores, setSelectedStoreId, currentUser } = useAppFields('stores', 'setSelectedStoreId', 'currentUser');
+  // Cash collection, the customer base and suppliers are ADMIN-only pages.
+  const isAdmin = currentUser?.role === 'ADMIN';
 
   const [data, setData] = useState<CashDeskSummary | null>(null);
   const [loading, setLoading] = useState(true);
@@ -151,14 +153,14 @@ export const CashDeskPanel: React.FC<CashDeskPanelProps> = ({ storeId }) => {
                 </div>
               </div>
             </div>
-            <button
+            {isAdmin && <button
               type="button"
               onClick={() => navigate('/cash-collection')}
               className="p-1 rounded-lg bg-accent/10 border border-accent/20 text-accent hover:bg-accent/20 transition-colors cursor-pointer shrink-0"
               title="Перейти к инкассации"
             >
               <HandCoins className="w-3.5 h-3.5" />
-            </button>
+            </button>}
           </div>
           <div className="text-[10px] text-fg-subtle flex items-center justify-between pt-1.5 border-t border-border/50">
             <span className="font-mono font-medium">≈ ${formatMoney(data?.cash.totalUsd || 0)} USD</span>
@@ -215,14 +217,14 @@ export const CashDeskPanel: React.FC<CashDeskPanelProps> = ({ storeId }) => {
                 </div>
               </div>
             </div>
-            <button
+            {isAdmin && <button
               type="button"
               onClick={() => navigate('/customers')}
               className="p-1 rounded-lg bg-surface-raised border border-border hover:bg-surface text-fg transition-colors cursor-pointer shrink-0"
               title="Перейти к клиентам"
             >
               <ArrowUpRight className="w-3.5 h-3.5 text-accent" />
-            </button>
+            </button>}
           </div>
           <div className="text-[10px] text-fg-subtle flex items-center justify-between pt-1.5 border-t border-border/50">
             <span className="font-mono font-medium">≈ ${formatMoney(data?.customers.totalDebtUsd || 0)} USD</span>
@@ -246,14 +248,14 @@ export const CashDeskPanel: React.FC<CashDeskPanelProps> = ({ storeId }) => {
                 </div>
               </div>
             </div>
-            <button
+            {isAdmin && <button
               type="button"
               onClick={() => navigate('/suppliers')}
               className="p-1 rounded-lg bg-surface-raised border border-border hover:bg-surface text-fg transition-colors cursor-pointer shrink-0"
               title="Перейти к поставщикам"
             >
               <ArrowUpRight className="w-3.5 h-3.5 text-accent" />
-            </button>
+            </button>}
           </div>
           <div className="text-[10px] text-fg-subtle flex items-center justify-between pt-1.5 border-t border-border/50">
             <span className="font-mono font-medium">≈ {formatMoney(data?.suppliers.totalDebtTjs || 0)} TJS</span>
@@ -294,14 +296,14 @@ export const CashDeskPanel: React.FC<CashDeskPanelProps> = ({ storeId }) => {
                 </div>
               </div>
 
-              <button
+              {isAdmin && <button
                 type="button"
                 onClick={() => navigate('/cash-collection')}
                 className="h-8 px-2.5 rounded-lg bg-accent text-accent-fg text-xs font-semibold flex items-center gap-1.5 hover:opacity-90 active:scale-95 transition-all shadow-xs cursor-pointer shrink-0"
               >
                 <HandCoins className="w-3.5 h-3.5" />
                 <span>Инкассация</span>
-              </button>
+              </button>}
             </div>
           </div>
 

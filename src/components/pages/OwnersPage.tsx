@@ -2,7 +2,6 @@ import React, { useState, useMemo } from 'react';
 import { formatUserName } from '../../utils/formatUser';
 import { capitalByLocation } from '../../utils/ownerCapital';
 import { useAppFields } from '../../context/AppContext';
-import { FALLBACK_EXCHANGE_RATE } from '../../utils/exchangeRate';
 import {
   Plus,
   Percent,
@@ -65,7 +64,7 @@ export const OwnersPage: React.FC = () => {
 
   const [isQuarterModalOpen, setIsQuarterModalOpen] = useState(false);
 
-  const rate = todayRate?.rate || FALLBACK_EXCHANGE_RATE;
+  const rate = Number(todayRate?.rate) || 0;
   const storeCtx = useStoreContext();
 
   const handleInitializeOwners = async () => {

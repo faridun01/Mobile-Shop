@@ -2,6 +2,7 @@ import React from 'react';
 import { SupplierInvoice, Supplier, Store, User } from '../../types';
 import { formatInvoiceDate } from './types';
 import { MonthPicker } from '../ui/MonthPicker';
+import { CustomSelect, CustomSelectOption } from '../ui/CustomSelect';
 import {
   Search,
   Scan,
@@ -111,16 +112,21 @@ export const PurchaseHistoryList: React.FC<PurchaseHistoryListProps> = ({
               className="h-7 px-2.5 rounded-xl border border-accent text-accent text-xs font-semibold bg-surface focus:outline-none cursor-pointer"
             />
 
-            <select
+            <CustomSelect
               value={selectedSupplierFilter}
-              onChange={(e) => onSupplierFilterChange(e.target.value)}
-              className="h-7 bg-surface border border-border text-fg text-xs font-semibold rounded-xl px-2.5 py-0.5 focus:outline-none focus:border-accent cursor-pointer"
-            >
-              <option value="all">Все поставщики</option>
-              {suppliers.map(s => (
-                <option key={s.id} value={s.id}>{s.name}</option>
-              ))}
-            </select>
+              onChange={onSupplierFilterChange}
+              options={[
+                { value: 'all', label: 'Все поставщики', icon: <Truck className="w-3.5 h-3.5 text-accent shrink-0" /> },
+                ...suppliers.map((s) => ({
+                  value: s.id,
+                  label: s.name,
+                  icon: <Truck className="w-3.5 h-3.5 text-accent shrink-0" />,
+                })),
+              ]}
+              size="sm"
+              placeholder="Все поставщики"
+              className="w-auto min-w-[150px]"
+            />
 
             {(searchQuery || selectedSupplierFilter !== 'all') && (
               <button

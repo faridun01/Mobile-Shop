@@ -10,14 +10,17 @@ interface SearchBarProps {
   onSubmit?: (value: string) => void;
   placeholder?: string;
   className?: string;
+  /** Lets a page put the cursor back here (e.g. ready for the next scanner read). */
+  inputRef?: React.Ref<HTMLInputElement>;
 }
 
 /** The search+scan input row duplicated near-verbatim across every list screen. */
-export const SearchBar: React.FC<SearchBarProps> = ({ value, onChange, onScan, onSubmit, placeholder = 'Поиск…', className }) => (
+export const SearchBar: React.FC<SearchBarProps> = ({ value, onChange, onScan, onSubmit, placeholder = 'Поиск…', className, inputRef }) => (
   <div className={`flex items-center gap-2 ${className || ''}`}>
     <div className="relative flex-1 min-w-0">
       <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-fg-subtle pointer-events-none" />
       <input
+        ref={inputRef}
         type="search"
         value={value}
         onChange={(e) => onChange(e.target.value)}

@@ -1,7 +1,6 @@
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { useAppFields } from '../../context/AppContext';
 import { SupplierBonus } from '../../types';
-import { FALLBACK_EXCHANGE_RATE } from '../../utils/exchangeRate';
 import { apiClient } from '../../api/client';
 import { formatMoney, formatTjs, formatUsd } from '../../utils/money';
 import { StatusBanner, StatusMessage } from '../ui/StatusBanner';
@@ -120,7 +119,7 @@ export const BonusesPage: React.FC = () => {
     'openScanner'
   );
 
-  const rate = todayRate?.rate || FALLBACK_EXCHANGE_RATE;
+  const rate = Number(todayRate?.rate) || 0;
   const isAdmin = currentUser?.role === 'ADMIN';
 
   // Active view tab

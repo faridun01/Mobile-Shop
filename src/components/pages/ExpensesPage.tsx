@@ -4,7 +4,6 @@ import { currentBusinessMonth, getBusinessDateKey, monthBounds } from '../../uti
 import { formatMoney, sumMoney, moneyNumber } from '../../utils/money';
 import { useAppFields } from '../../context/AppContext';
 import { Expense, ExpenseCategory } from '../../types';
-import { FALLBACK_EXCHANGE_RATE } from '../../utils/exchangeRate';
 import { Receipt, RotateCcw } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { LoadingState } from '../ui/Skeleton';
@@ -327,7 +326,7 @@ export const ExpensesPage: React.FC = () => {
     setStatus({ tone: 'success', text: `Новая категория "${name}" добавлена` });
   };
 
-  const rate = todayRate?.rate || FALLBACK_EXCHANGE_RATE;
+  const rate = Number(todayRate?.rate) || 0;
 
   const activeEmployees = useMemo(() => {
     return users.filter(u => u.isActive ?? u.active);

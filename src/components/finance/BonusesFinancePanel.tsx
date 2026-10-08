@@ -26,7 +26,6 @@ import { MonthPicker } from '../ui/MonthPicker';
 import { StatCard } from '../ui/StatCard';
 import { Badge } from '../ui/Badge';
 import { useReportsSummary, usd, tjs, monthLabel } from './reportTypes';
-import { FALLBACK_EXCHANGE_RATE } from '../../utils/exchangeRate';
 import { useDataRefreshRevision } from '../../hooks/useDataRefreshRevision';
 import { BonusPoolEntry, BonusDistributionLog } from '../../types';
 
@@ -73,7 +72,7 @@ export const BonusesFinancePanel: React.FC<BonusesFinancePanelProps> = ({ month,
   } = useAppFields('supplierBonuses', 'devices', 'users', 'todayRate');
 
   const namesLookup = useMemo(() => buildNameLookup(users), [users]);
-  const rate = todayRate?.rate || FALLBACK_EXCHANGE_RATE;
+  const rate = Number(todayRate?.rate) || 0;
   const periodLabel = monthLabel(month);
 
   // Authoritative server aggregates for the month

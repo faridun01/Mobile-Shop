@@ -25,6 +25,7 @@ import { getPhoneColorHex, formatRam } from '../../utils/phoneSpecs';
 import { cn } from '../../utils/cn';
 import { TransferHistoryListProps, isLocationWarehouse } from './types';
 import { TransferRequest } from '../../types';
+import { CustomSelect, CustomSelectOption } from '../ui/CustomSelect';
 
 export const TransferHistoryList: React.FC<TransferHistoryListProps> = ({
   visibleTransfers,
@@ -77,6 +78,25 @@ export const TransferHistoryList: React.FC<TransferHistoryListProps> = ({
     });
   }, [filteredTransfers, historySort]);
 
+  const locationOptions = useMemo<CustomSelectOption[]>(() => {
+    return [
+      { value: 'ALL', label: 'Все локации', icon: <Building2 className="w-3.5 h-3.5 text-accent shrink-0" /> },
+      ...stores.map(s => ({
+        value: s.id,
+        label: s.isMainWarehouse ? 'Главный склад' : formatStoreName(s.name),
+        icon: s.isMainWarehouse ? <Warehouse className="w-3.5 h-3.5 text-warning shrink-0" /> : <StoreIcon className="w-3.5 h-3.5 text-accent shrink-0" />,
+        badge: s.isMainWarehouse ? 'Склад' : 'Магазин'
+      }))
+    ];
+  }, [stores]);
+
+  const sortOptions = useMemo<CustomSelectOption[]>(() => [
+    { value: 'NEWEST', label: 'Новые' },
+    { value: 'OLDEST', label: 'Старые' },
+    { value: 'ITEMS_DESC', label: 'Штук (↓)' },
+    { value: 'ITEMS_ASC', label: 'Штук (↑)' },
+  ], []);
+
   return (
     <div className="flex-1 p-2 sm:p-3 space-y-2.5 bg-bg flex flex-col max-w-4xl xl:max-w-5xl mx-auto w-full pb-20">
       {/* Header Toolbar: Search + Location Filter + Quick Status Tabs */}
@@ -106,38 +126,31 @@ export const TransferHistoryList: React.FC<TransferHistoryListProps> = ({
           <div className="flex items-center gap-1.5 flex-wrap">
             {/* Location Filter Dropdown (if central / multi-store) */}
             {!isStoreScoped && isCentralMode && (
-              <div className="relative flex items-center w-full sm:w-auto">
-                <Building2 className="w-3.5 h-3.5 text-accent absolute left-2.5 pointer-events-none" />
-                <select
-                  value={historyFilterChoice}
-                  onChange={(e) => setHistoryFilterChoice(e.target.value)}
-                  className="w-full sm:w-auto h-8 pl-8 pr-6 rounded-lg bg-surface border border-border text-xs font-semibold text-fg focus:outline-none focus:border-accent cursor-pointer appearance-none transition-colors"
-                >
-                  <option value="ALL">Все локации</option>
-                  {stores.map(s => (
-                    <option key={s.id} value={s.id}>
-                      {s.isMainWarehouse ? `Центр. склад (${formatStoreName(s.name)})` : formatStoreName(s.name)}
-                    </option>
-                  ))}
-                </select>
-                <ChevronDown className="w-3 h-3 text-fg-subtle absolute right-2 pointer-events-none" />
-              </div>
+              <CustomSelect
+                value={historyFilterChoice}
+                onChange={setHistoryFilterChoice}
+                options={locationOptions}
+                placeholder="Локация..."
+                title="Фильтр по локации"
+                size="sm"
+                className="w-full sm:w-auto"
+                triggerClassName="h-8 px-2.5 rounded-lg text-xs"
+              />
             )}
 
             {/* Sorting Selector */}
-            <div className="flex items-center gap-1 bg-surface border border-border rounded-lg h-8 px-2 shrink-0">
-              <ArrowUpDown className="w-3 h-3 text-accent shrink-0" />
-              <select
-                value={historySort}
-                onChange={(e) => setHistorySort(e.target.value as any)}
-                className="bg-transparent text-xs font-semibold text-fg focus:outline-none cursor-pointer pr-1"
-              >
-                <option value="NEWEST">Новые</option>
-                <option value="OLDEST">Старые</option>
-                <option value="ITEMS_DESC">Штук (↓)</option>
-                <option value="ITEMS_ASC">Штук (↑)</option>
-              </select>
-            </div>
+            <CustomSelect
+              value={historySort}
+              onChange={(val) => setHistorySort(val as any)}
+              options={sortOptions}
+              placeholder="Сортировка..."
+              title="Сортировка перемещений"
+              icon={<ArrowUpDown className="w-3 h-3 text-accent shrink-0" />}
+              size="sm"
+              align="right"
+              className="w-full sm:w-auto"
+              triggerClassName="h-8 px-2.5 rounded-lg text-xs"
+            />
           </div>
         </div>
 

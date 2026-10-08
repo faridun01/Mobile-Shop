@@ -194,7 +194,7 @@ export const InventoryLocationsView: React.FC<InventoryLocationsViewProps> = ({
                 </div>
                 <div className="min-w-0">
                   <h4 className="text-xs sm:text-sm font-bold text-fg-muted truncate">
-                    Центральный склад ({mainWarehouse.name})
+                    Главный склад
                   </h4>
                   <p className="text-[11px] text-amber-400/90 font-medium">
                     Основной хаб приходов

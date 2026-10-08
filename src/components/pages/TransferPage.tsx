@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useAppFields } from '../../context/AppContext';
 import { TransferRequest } from '../../types';
@@ -61,7 +61,14 @@ export const TransferPage: React.FC = () => {
   const [fromLocationId, setFromLocationId] = useState<string>(defaultFromId);
   const [toLocationId, setToLocationId] = useState<string>(defaultToId);
   const [searchQuery, setSearchQuery] = useState<string>('');
-  const [selectedDeviceIds, setSelectedDeviceIds] = useState<string[]>([]);
+  const [selectionsByOrigin, setSelectionsByOrigin] = useState<Record<string, string[]>>({});
+  const storedSelection = selectionsByOrigin[fromLocationId];
+  const setSelectedDeviceIds = useCallback((next: string[] | ((prev: string[]) => string[])) => {
+    setSelectionsByOrigin((prev) => {
+      const current = prev[fromLocationId] ?? [];
+      return { ...prev, [fromLocationId]: typeof next === 'function' ? next(current) : next };
+    });
+  }, [fromLocationId]);
   const [deviceSortBy, setDeviceSortBy] = useState<TransferDeviceSortOption>('SELECTED_FIRST');
   const [selectedBrand, setSelectedBrand] = useState<string>('ALL');
   const [onlySelected, setOnlySelected] = useState<boolean>(false);
@@ -157,12 +164,12 @@ export const TransferPage: React.FC = () => {
 
   const fromStore = stores.find(s => s.id === fromLocationId);
   const fromStoreName = fromStore
-    ? (fromStore.isMainWarehouse ? `Центральный склад (${formatStoreName(fromStore.name)})` : formatStoreName(fromStore.name))
+    ? (fromStore.isMainWarehouse ? 'Главный склад' : formatStoreName(fromStore.name))
     : 'Исходный склад';
 
   const toStore = stores.find(s => s.id === toLocationId);
   const toStoreName = toStore
-    ? (toStore.isMainWarehouse ? `Центральный склад (${formatStoreName(toStore.name)})` : formatStoreName(toStore.name))
+    ? (toStore.isMainWarehouse ? 'Главный склад' : formatStoreName(toStore.name))
     : 'Не выбран';
 
   const rawAvailableAtLocation = useMemo(() => {
@@ -171,6 +178,13 @@ export const TransferPage: React.FC = () => {
       return d.status === 'STORE_STOCK' || d.status === 'MAIN_WAREHOUSE' || d.status === 'IN_STOCK_AFTER_EXCHANGE';
     });
   }, [devices, fromLocationId]);
+
+  const selectedDeviceIds = useMemo(() => {
+    if (!storedSelection?.length) return [];
+    const available = new Set(rawAvailableAtLocation.map((d) => d.id));
+    return storedSelection.filter((id) => available.has(id));
+  }, [storedSelection, rawAvailableAtLocation]);
+  const selectedIdSet = useMemo(() => new Set(selectedDeviceIds), [selectedDeviceIds]);
 
   const availableBrands = useMemo(() => {
     const counts = new Map<string, number>();
@@ -203,12 +217,12 @@ export const TransferPage: React.FC = () => {
     }
 
     if (onlySelected) {
-      list = list.filter(d => selectedDeviceIds.includes(d.id));
+      list = list.filter(d => selectedIdSet.has(d.id));
     }
 
     return [...list].sort((a, b) => {
-      const aSelected = selectedDeviceIds.includes(a.id);
-      const bSelected = selectedDeviceIds.includes(b.id);
+      const aSelected = selectedIdSet.has(a.id);
+      const bSelected = selectedIdSet.has(b.id);
 
       if (deviceSortBy === 'SELECTED_FIRST') {
         if (aSelected && !bSelected) return -1;
@@ -256,11 +270,11 @@ export const TransferPage: React.FC = () => {
 
       return 0;
     });
-  }, [rawAvailableAtLocation, searchQuery, selectedBrand, onlySelected, deviceSortBy, selectedDeviceIds]);
+  }, [rawAvailableAtLocation, searchQuery, selectedBrand, onlySelected, deviceSortBy, selectedIdSet]);
 
   const selectedDevices = useMemo(() => {
-    return devices.filter(d => selectedDeviceIds.includes(d.id));
-  }, [devices, selectedDeviceIds]);
+    return devices.filter(d => selectedIdSet.has(d.id));
+  }, [devices, selectedIdSet]);
 
   const handleToggleSelectDevice = (id: string) => {
     setSelectedDeviceIds(prev =>
@@ -298,7 +312,7 @@ export const TransferPage: React.FC = () => {
       (device.status === 'STORE_STOCK' || device.status === 'MAIN_WAREHOUSE' || device.status === 'IN_STOCK_AFTER_EXCHANGE');
     if (device && isAvailableHere) {
       if (source === 'enter') setSearchQuery('');
-      if (selectedDeviceIds.includes(device.id)) {
+      if (selectedIdSet.has(device.id)) {
         setStatusBanner({ tone: 'info', text: `${device.brand} ${device.model} уже выбран` });
       } else {
         setSelectedDeviceIds(prev => [...prev, device.id]);
@@ -522,8 +536,7 @@ export const TransferPage: React.FC = () => {
               toLocationId={toLocationId}
               onOriginChange={(id) => {
                 setFromLocationId(id);
-                setSelectedDeviceIds([]);
-                setToLocationId('');
+                setToLocationId((prev) => (prev === id ? '' : prev));
                 setSelectedBrand('ALL');
                 setOnlySelected(false);
               }}

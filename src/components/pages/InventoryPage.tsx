@@ -6,6 +6,8 @@ import {
   List,
   Building2,
   Smartphone,
+  Warehouse,
+  Store as StoreIcon,
 } from 'lucide-react';
 import { useGroupedDevices } from '../../hooks/useGroupedDevices';
 import { EmptyState } from '../ui/EmptyState';
@@ -14,7 +16,7 @@ import { StatusBanner, StatusMessage } from '../ui/StatusBanner';
 import { useNavigationLayout } from '../../hooks/useNavigationLayout';
 import { useVirtualRows } from '../../hooks/useVirtualRows';
 import { findDeviceByCode, looksLikeDeviceCode, normalizeScanCode } from '../../utils/scanLookup';
-import { useStoreContext } from '../../utils/storeContext';
+import { useStoreContext, formatStoreName } from '../../utils/storeContext';
 import { IN_STOCK_STATUSES, InventoryViewMode, BrandGroupItem, STATUS_LABELS } from '../inventory/types';
 import { InventoryStatsBar } from '../inventory/InventoryStatsBar';
 import { InventoryFiltersBar } from '../inventory/InventoryFiltersBar';
@@ -23,6 +25,7 @@ import { BrandGroupedList } from '../inventory/BrandGroupedList';
 import { ModelGroupedList } from '../inventory/ModelGroupedList';
 import { FlatDevicesTable } from '../inventory/FlatDevicesTable';
 import { DeviceDetailsModal } from '../inventory/DeviceDetailsModal';
+import { CustomSelect, CustomSelectOption } from '../ui/CustomSelect';
 
 export const InventoryPage: React.FC = () => {
   const {
@@ -61,6 +64,22 @@ export const InventoryPage: React.FC = () => {
 
   const mainWarehouse = useMemo(() => stores.find(s => s.isMainWarehouse), [stores]);
   const retailStores = useMemo(() => stores.filter(s => !s.isMainWarehouse), [stores]);
+
+  const locationOptions = useMemo<CustomSelectOption[]>(() => [
+    { value: 'ALL', label: 'Все локации', icon: <Building2 className="w-3.5 h-3.5 text-accent shrink-0" /> },
+    ...(mainWarehouse ? [{
+      value: mainWarehouse.id,
+      label: 'Главный склад',
+      icon: <Warehouse className="w-3.5 h-3.5 text-warning shrink-0" />,
+      badge: 'Склад'
+    }] : []),
+    ...retailStores.map(s => ({
+      value: s.id,
+      label: formatStoreName(s.name),
+      icon: <StoreIcon className="w-3.5 h-3.5 text-accent shrink-0" />,
+      badge: 'Магазин'
+    }))
+  ], [mainWarehouse, retailStores]);
 
   // Tab mode: 'DEVICES' (list of goods) or 'LOCATIONS' (list of warehouse and stores)
   const [viewTab, setViewTab] = useState<'DEVICES' | 'LOCATIONS'>('DEVICES');
@@ -544,24 +563,19 @@ export const InventoryPage: React.FC = () => {
           {!isStoreScoped && storeCtx.mode === 'CENTRAL' && (
             <div className="flex items-center gap-1.5 shrink-0 ml-auto">
               <span className="text-xs text-fg-subtle font-medium hidden sm:inline">Локация:</span>
-              <select
+              <CustomSelect
                 value={selectedLocationId}
-                onChange={(e) => {
-                  setSelectedLocationId(e.target.value);
-                  if (selectedStatusFilter === 'MAIN_WAREHOUSE' && e.target.value !== mainWarehouse?.id) {
+                onChange={(val) => {
+                  setSelectedLocationId(val);
+                  if (selectedStatusFilter === 'MAIN_WAREHOUSE' && val !== mainWarehouse?.id) {
                     setSelectedStatusFilter('ALL');
                   }
                 }}
-                className="bg-surface-raised border border-border text-fg text-xs font-semibold rounded-xl px-2.5 py-1.5 focus:outline-none focus:border-accent cursor-pointer max-w-[130px] sm:max-w-none truncate"
-              >
-                <option value="ALL">Все локации</option>
-                {mainWarehouse && (
-                  <option value={mainWarehouse.id}>{mainWarehouse.name} (Центр)</option>
-                )}
-                {retailStores.map(s => (
-                  <option key={s.id} value={s.id}>{s.name}</option>
-                ))}
-              </select>
+                options={locationOptions}
+                size="sm"
+                align="right"
+                className="w-auto min-w-[130px] sm:min-w-[160px]"
+              />
             </div>
           )}
         </div>

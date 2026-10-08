@@ -82,7 +82,7 @@ export const DailyRateModal: React.FC<DailyRateModalProps> = ({ isOpen, onClose 
       >
         <div className="flex items-start gap-3 text-sm text-fg-muted">
           <Clock className="w-5 h-5 text-warning shrink-0 mt-0.5" />
-          <p>Администратор или партнёр ещё не установил базовый курс USD/TJS. Обратитесь к администратору для первоначальной настройки курса.</p>
+          <p>Администратор ещё не задал курс USD/TJS на сегодня.</p>
         </div>
       </Dialog>
     );

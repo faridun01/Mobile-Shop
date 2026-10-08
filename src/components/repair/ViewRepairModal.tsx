@@ -128,12 +128,6 @@ export const ViewRepairModal: React.FC<ViewRepairModalProps> = ({
                   {viewingTicket.finalCostTjs ? `${formatMoney(viewingTicket.finalCostTjs)} TJS` : 'Задаётся при выдаче'}
                 </span>
               </div>
-              {viewingTicket.prepaymentTjs ? (
-                <div>
-                  <span className="text-fg-subtle block text-[10px]">Предоплата (справочно):</span>
-                  <span className="font-bold text-fg-muted">{formatMoney(viewingTicket.prepaymentTjs)} TJS</span>
-                </div>
-              ) : null}
             </div>
           </div>
         </div>

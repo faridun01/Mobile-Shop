@@ -144,7 +144,7 @@ export function MainLayout() {
               <Route path="/exchange" element={<ExchangePage />} />
               <Route path="/repair" element={<RepairPage />} />
               <Route path="/suppliers" element={currentUser?.role === 'ADMIN' ? <SuppliersPage /> : <Navigate to="/sale" replace />} />
-              <Route path="/customers" element={<CustomersPage />} />
+              <Route path="/customers" element={currentUser?.role === 'ADMIN' ? <CustomersPage /> : <Navigate to="/sale" replace />} />
               <Route path="/cash" element={currentUser?.role === 'ADMIN' || currentUser?.role === 'PARTNER' ? <CashDeskPage /> : <Navigate to="/sale" replace />} />
               <Route path="/cash-collection" element={currentUser?.role === 'ADMIN' ? <CashCollectionPage /> : <Navigate to="/sale" replace />} />
               <Route path="/bonuses" element={currentUser?.role === 'ADMIN' ? <BonusesPage /> : <Navigate to="/sale" replace />} />

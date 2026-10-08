@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useSyncExternalStore } from 'react';
 import {
   Search,
   X,
@@ -18,6 +18,18 @@ import { cn } from '../../utils/cn';
 import { TransferDeviceGridProps } from './types';
 import { getPhoneColorHex, formatRam } from '../../utils/phoneSpecs';
 import { Device } from '../../types';
+import { useVirtualRows } from '../../hooks/useVirtualRows';
+
+// Same breakpoints as the card grid used to have: 1 / sm:2 / lg:3 / xl:4 columns.
+const COLUMN_QUERIES: Array<[string, number]> = [['(min-width: 1280px)', 4], ['(min-width: 1024px)', 3], ['(min-width: 640px)', 2]];
+const readColumns = () => {
+  if (typeof window === 'undefined' || !window.matchMedia) return 1;
+  return COLUMN_QUERIES.find(([query]) => window.matchMedia(query).matches)?.[1] ?? 1;
+};
+const subscribeColumns = (onChange: () => void) => {
+  window.addEventListener('resize', onChange);
+  return () => window.removeEventListener('resize', onChange);
+};
 
 interface ModelGroupItem {
   key: string;
@@ -57,6 +69,7 @@ export const TransferDeviceGrid: React.FC<TransferDeviceGridProps> = ({
   onToggleBatchDevices,
 }) => {
   const selectedCount = selectedDeviceIds.length;
+  const selectedSet = useMemo(() => new Set(selectedDeviceIds), [selectedDeviceIds]);
   const [viewMode, setViewMode] = useState<'BY_MODEL' | 'BY_DEVICE'>('BY_MODEL');
   const [expandedGroupKeys, setExpandedGroupKeys] = useState<Set<string>>(new Set());
 
@@ -94,7 +107,7 @@ export const TransferDeviceGrid: React.FC<TransferDeviceGridProps> = ({
         group.storageMap.set(storageKey, sInfo);
       }
       sInfo.count++;
-      if (selectedDeviceIds.includes(dev.id)) {
+      if (selectedSet.has(dev.id)) {
         sInfo.selectedCount++;
       }
 
@@ -104,7 +117,6 @@ export const TransferDeviceGrid: React.FC<TransferDeviceGridProps> = ({
     }
 
     const result: ModelGroupItem[] = [];
-    const selectedSet = new Set(selectedDeviceIds);
 
     for (const g of map.values()) {
       const groupSelectedCount = g.devices.filter(d => selectedSet.has(d.id)).length;
@@ -147,7 +159,7 @@ export const TransferDeviceGrid: React.FC<TransferDeviceGridProps> = ({
       }
       return `${a.brand} ${a.model}`.localeCompare(`${b.brand} ${b.model}`);
     });
-  }, [availableDevices, selectedDeviceIds, sortBy]);
+  }, [availableDevices, selectedSet, sortBy]);
 
   // Auto-expand group if search query matches an IMEI
   useEffect(() => {
@@ -182,7 +194,7 @@ export const TransferDeviceGrid: React.FC<TransferDeviceGridProps> = ({
       onToggleBatchDevices(groupDeviceIds, shouldSelect);
     } else {
       for (const id of groupDeviceIds) {
-        const isCurrentlySelected = selectedDeviceIds.includes(id);
+        const isCurrentlySelected = selectedSet.has(id);
         if (shouldSelect && !isCurrentlySelected) {
           onToggleSelectDevice(id);
         } else if (!shouldSelect && isCurrentlySelected) {
@@ -190,6 +202,120 @@ export const TransferDeviceGrid: React.FC<TransferDeviceGridProps> = ({
         }
       }
     }
+  };
+
+  const columns = useSyncExternalStore(subscribeColumns, readColumns, () => 1);
+  const deviceRows = useMemo(() => {
+    const rows: Device[][] = [];
+    for (let i = 0; i < availableDevices.length; i += columns) rows.push(availableDevices.slice(i, i + columns));
+    return rows;
+  }, [availableDevices, columns]);
+  const gridRows = useVirtualRows<HTMLDivElement>({
+    count: viewMode === 'BY_DEVICE' ? deviceRows.length : 0,
+    estimateSize: 64,
+    threshold: 60,
+    resetKey: `${columns}|${availableDevices.length}|${availableDevices[0]?.id ?? ''}|${sortBy}`,
+  });
+
+  const renderDeviceCard = (dev: Device) => {
+              const isChecked = selectedSet.has(dev.id);
+              const colorHex = getPhoneColorHex(dev.color);
+              const formattedRam = formatRam(dev.ram);
+
+              return (
+                <button
+                  type="button"
+                  key={dev.id}
+                  onClick={() => onToggleSelectDevice(dev.id)}
+                  aria-pressed={isChecked}
+                  className={cn(
+                    'w-full text-left px-2.5 py-1.5 sm:py-2 rounded-xl border flex items-center justify-between gap-2 cursor-pointer transition-all duration-150 select-none shadow-2xs relative group',
+                    isChecked
+                      ? 'bg-accent/10 border-accent text-fg ring-1 ring-accent/30 shadow-xs'
+                      : 'bg-surface hover:bg-surface-raised border-border/80 text-fg hover:border-accent/40'
+                  )}
+                >
+                  <div className="flex items-center gap-2 min-w-0 flex-1">
+                    {/* Checkbox */}
+                    <div
+                      aria-hidden="true"
+                      className={cn(
+                        'w-4.5 h-4.5 shrink-0 rounded-md border flex items-center justify-center transition-all',
+                        isChecked
+                          ? 'bg-accent border-accent text-accent-fg shadow-2xs scale-105'
+                          : 'border-border bg-surface-raised group-hover:border-accent/60'
+                      )}
+                    >
+                      {isChecked && <Check className="w-3 h-3 stroke-3" />}
+                    </div>
+
+                    {/* Device Details */}
+                    <div className="min-w-0 flex-1">
+                      {/* Top line: Brand & Model + Badges */}
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        <span className="font-bold text-xs text-fg truncate">
+                          {dev.brand} {dev.model}
+                        </span>
+
+                        {dev.storage && (
+                          <span className="px-1.5 py-0.2 rounded bg-surface-raised border border-border text-[10px] font-mono font-bold text-fg shrink-0">
+                            {dev.storage}
+                          </span>
+                        )}
+
+                        {dev.color && (
+                          <span className="hidden xs:inline-flex sm:inline-flex items-center gap-1 px-1.5 py-0.2 rounded bg-surface-raised border border-border text-[10px] text-fg-muted shrink-0">
+                            {colorHex && (
+                              <span
+                                className="w-2 h-2 rounded-full border border-black/20 shrink-0"
+                                style={{ backgroundColor: colorHex }}
+                              />
+                            )}
+                            <span className="truncate max-w-[80px]">{dev.color}</span>
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Bottom line: IMEI tag + RAM + color fallback on mobile */}
+                      <div className="flex items-center gap-1.5 text-[10px] text-fg-subtle pt-0.5 min-w-0">
+                        <span className="font-mono truncate bg-surface-raised/80 px-1 py-0.2 rounded border border-border/60">
+                          IMEI: <strong className="text-fg font-semibold">{dev.imei}</strong>
+                        </span>
+                        {formattedRam && !dev.storage.toLowerCase().includes(formattedRam.toLowerCase()) && (
+                          <span className="hidden sm:inline font-mono font-semibold text-accent">
+                            RAM {formattedRam}
+                          </span>
+                        )}
+                        {dev.color && (
+                          <span className="xs:hidden inline-flex items-center gap-1 text-fg-muted">
+                            {colorHex && (
+                              <span
+                                className="w-2 h-2 rounded-full border border-black/20 shrink-0"
+                                style={{ backgroundColor: colorHex }}
+                              />
+                            )}
+                            <span className="truncate max-w-[70px]">{dev.color}</span>
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Right side: Price & Selected Badge */}
+                  <div className="flex items-center gap-1.5 shrink-0 text-right">
+                    {(dev.retailPriceTjs ?? 0) > 0 && (
+                      <span className="text-xs font-bold text-accent font-mono block">
+                        {formatMoney(dev.retailPriceTjs)} TJS
+                      </span>
+                    )}
+                    {isChecked && (
+                      <span className="px-1.5 py-0.5 rounded bg-accent text-accent-fg font-bold text-[9px] uppercase tracking-wider shadow-2xs shrink-0">
+                        Выбран
+                      </span>
+                    )}
+                  </div>
+                </button>
+              );
   };
 
   return (
@@ -569,7 +695,7 @@ export const TransferDeviceGrid: React.FC<TransferDeviceGridProps> = ({
                   {isExpanded && (
                     <div className="border-t border-border/70 bg-surface-raised/30 p-1.5 sm:p-2 divide-y divide-border/50">
                       {group.devices.map((dev) => {
-                        const isChecked = selectedDeviceIds.includes(dev.id);
+                        const isChecked = selectedSet.has(dev.id);
                         const colorHex = getPhoneColorHex(dev.color);
                         const formattedRam = formatRam(dev.ram);
 
@@ -646,108 +772,20 @@ export const TransferDeviceGrid: React.FC<TransferDeviceGridProps> = ({
             })}
           </div>
         ) : (
-          /* FLAT CARDS GRID VIEW - ULTRA-COMPACT & BEAUTIFUL */
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-1.5 sm:gap-2">
-            {availableDevices.map((dev) => {
-              const isChecked = selectedDeviceIds.includes(dev.id);
-              const colorHex = getPhoneColorHex(dev.color);
-              const formattedRam = formatRam(dev.ram);
-
-              return (
-                <button
-                  type="button"
-                  key={dev.id}
-                  onClick={() => onToggleSelectDevice(dev.id)}
-                  aria-pressed={isChecked}
-                  className={cn(
-                    'w-full text-left px-2.5 py-1.5 sm:py-2 rounded-xl border flex items-center justify-between gap-2 cursor-pointer transition-all duration-150 select-none shadow-2xs relative group',
-                    isChecked
-                      ? 'bg-accent/10 border-accent text-fg ring-1 ring-accent/30 shadow-xs'
-                      : 'bg-surface hover:bg-surface-raised border-border/80 text-fg hover:border-accent/40'
-                  )}
-                >
-                  <div className="flex items-center gap-2 min-w-0 flex-1">
-                    {/* Checkbox */}
-                    <div
-                      aria-hidden="true"
-                      className={cn(
-                        'w-4.5 h-4.5 shrink-0 rounded-md border flex items-center justify-center transition-all',
-                        isChecked
-                          ? 'bg-accent border-accent text-accent-fg shadow-2xs scale-105'
-                          : 'border-border bg-surface-raised group-hover:border-accent/60'
-                      )}
-                    >
-                      {isChecked && <Check className="w-3 h-3 stroke-3" />}
-                    </div>
-
-                    {/* Device Details */}
-                    <div className="min-w-0 flex-1">
-                      {/* Top line: Brand & Model + Badges */}
-                      <div className="flex items-center gap-1.5 min-w-0">
-                        <span className="font-bold text-xs text-fg truncate">
-                          {dev.brand} {dev.model}
-                        </span>
-
-                        {dev.storage && (
-                          <span className="px-1.5 py-0.2 rounded bg-surface-raised border border-border text-[10px] font-mono font-bold text-fg shrink-0">
-                            {dev.storage}
-                          </span>
-                        )}
-
-                        {dev.color && (
-                          <span className="hidden xs:inline-flex sm:inline-flex items-center gap-1 px-1.5 py-0.2 rounded bg-surface-raised border border-border text-[10px] text-fg-muted shrink-0">
-                            {colorHex && (
-                              <span
-                                className="w-2 h-2 rounded-full border border-black/20 shrink-0"
-                                style={{ backgroundColor: colorHex }}
-                              />
-                            )}
-                            <span className="truncate max-w-[80px]">{dev.color}</span>
-                          </span>
-                        )}
-                      </div>
-
-                      {/* Bottom line: IMEI tag + RAM + color fallback on mobile */}
-                      <div className="flex items-center gap-1.5 text-[10px] text-fg-subtle pt-0.5 min-w-0">
-                        <span className="font-mono truncate bg-surface-raised/80 px-1 py-0.2 rounded border border-border/60">
-                          IMEI: <strong className="text-fg font-semibold">{dev.imei}</strong>
-                        </span>
-                        {formattedRam && !dev.storage.toLowerCase().includes(formattedRam.toLowerCase()) && (
-                          <span className="hidden sm:inline font-mono font-semibold text-accent">
-                            RAM {formattedRam}
-                          </span>
-                        )}
-                        {dev.color && (
-                          <span className="xs:hidden inline-flex items-center gap-1 text-fg-muted">
-                            {colorHex && (
-                              <span
-                                className="w-2 h-2 rounded-full border border-black/20 shrink-0"
-                                style={{ backgroundColor: colorHex }}
-                              />
-                            )}
-                            <span className="truncate max-w-[70px]">{dev.color}</span>
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Right side: Price & Selected Badge */}
-                  <div className="flex items-center gap-1.5 shrink-0 text-right">
-                    {(dev.retailPriceTjs ?? 0) > 0 && (
-                      <span className="text-xs font-bold text-accent font-mono block">
-                        {formatMoney(dev.retailPriceTjs)} TJS
-                      </span>
-                    )}
-                    {isChecked && (
-                      <span className="px-1.5 py-0.5 rounded bg-accent text-accent-fg font-bold text-[9px] uppercase tracking-wider shadow-2xs shrink-0">
-                        Выбран
-                      </span>
-                    )}
-                  </div>
-                </button>
-              );
-            })}
+          /* FLAT GRID: rows of cards; with a large warehouse only the rows near the screen are rendered */
+          <div ref={gridRows.listRef as React.RefObject<HTMLDivElement | null>} className="space-y-1.5 sm:space-y-2">
+            {gridRows.padTop > 0 && <div aria-hidden="true" style={{ height: gridRows.padTop }} />}
+            {deviceRows.slice(gridRows.from, gridRows.to).map((row, i) => (
+              <div
+                key={row[0].id}
+                ref={gridRows.measure(gridRows.from + i)}
+                className="grid gap-1.5 sm:gap-2"
+                style={{ gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))` }}
+              >
+                {row.map(renderDeviceCard)}
+              </div>
+            ))}
+            {gridRows.padBottom > 0 && <div aria-hidden="true" style={{ height: gridRows.padBottom }} />}
           </div>
         )}
       </div>

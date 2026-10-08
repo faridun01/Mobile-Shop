@@ -1,5 +1,5 @@
 import { decimal, moneyNumber, sumMoney, formatMoney } from '../../utils/money';
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import { useAppFields } from '../../context/AppContext';
 import { Device, PaymentMethod } from '../../types';
 import { looksLikeDeviceCode, normalizeScanCode, resolveSaleScan, saleScanMessage } from '../../utils/scanLookup';
@@ -409,6 +409,7 @@ export const SalePage: React.FC = () => {
   );
   const [receiptShareState, setReceiptShareState] = useState<'idle' | 'copied' | 'failed'>('idle');
   const [isSubmittingSale, setIsSubmittingSale] = useState(false);
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
   React.useEffect(() => {
     if (selectedCustomerId) {
@@ -606,15 +607,46 @@ export const SalePage: React.FC = () => {
     return decimal(item.salePriceTjs).lt(decimal(item.device.costBasisUsd).mul(todayRate.rate));
   };
 
-  const handleOpenCart = () => {
-    if (cart.length === 0) return;
+  // Keep the payment amounts in step with the total when phones are added or prices change.
+  // Customer and payment method stay as the cashier left them until the sale is done.
+  React.useEffect(() => {
+    if (paymentMethod === 'CASH') {
+      setCashAmountInput(totalTjs > 0 ? totalTjs.toString() : '');
+      setCardAmountInput('0');
+    } else if (paymentMethod === 'CARD') {
+      setCardAmountInput(totalTjs > 0 ? totalTjs.toString() : '');
+      setCashAmountInput('0');
+    } else if (paymentMethod === 'SPLIT') {
+      const cash = parseFloat(cashAmountInput.replace(',', '.')) || 0;
+      const card = parseFloat(cardAmountInput.replace(',', '.')) || 0;
+      if (Math.abs(cash + card - totalTjs) > 0.01) {
+        const half = Math.floor(totalTjs / 2);
+        setCashAmountInput(half.toString());
+        setCardAmountInput(moneyNumber(decimal(totalTjs).minus(half)).toString());
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [totalTjs, paymentMethod]);
+
+  /** A fresh checkout after a completed sale or a cleared cart. */
+  const resetCheckout = () => {
     setPaymentMethod('CASH');
-    setCashAmountInput(totalTjs > 0 ? totalTjs.toString() : '');
-    setCardAmountInput('0');
     setCustomerNameInput('');
     setCustomerPhoneInput('');
     setSelectedCustomerId(null);
     setCustomerSuggestions([]);
+    setDownpaymentInput('0');
+    setDownpaymentMethod('CASH');
+  };
+
+  /** Back to search for the next USB/Bluetooth scanner read (not on touch screens: no keyboard pop-up). */
+  const focusSearchForScanner = () => {
+    if (typeof window === 'undefined' || !window.matchMedia?.('(pointer: fine)').matches) return;
+    setTimeout(() => searchInputRef.current?.focus(), 80);
+  };
+
+  const handleOpenCart = () => {
+    if (cart.length === 0) return;
     setPaymentStatus(null);
     setIsCartOpen(true);
   };
@@ -684,10 +716,7 @@ export const SalePage: React.FC = () => {
         setCompletedReceiptNumber(res.receiptNumber);
         setIsCartOpen(false);
         setCart([]);
-        setCustomerNameInput('');
-        setCustomerPhoneInput('');
-        setSelectedCustomerId(null);
-        setDownpaymentInput('0');
+        resetCheckout();
       } else {
         setPaymentStatus({ tone: 'error', text: res.message || 'Ошибка оформления продажи' });
       }
@@ -734,6 +763,7 @@ export const SalePage: React.FC = () => {
               <div className="flex items-center gap-2">
                 <div className="flex-1 min-w-0">
                   <SearchBar
+                    inputRef={searchInputRef}
                     value={searchQuery}
                     onChange={setSearchQuery}
                     onScan={handleTriggerScanner}
@@ -1128,6 +1158,7 @@ export const SalePage: React.FC = () => {
         confirmLabel="Очистить"
         onConfirm={() => {
           setCart([]);
+          resetCheckout();
           setIsClearConfirmOpen(false);
         }}
         onCancel={() => setIsClearConfirmOpen(false)}
@@ -1269,7 +1300,7 @@ export const SalePage: React.FC = () => {
       {/* Receipt */}
       <Dialog
         open={completedReceiptNumber !== null}
-        onClose={() => { setCompletedReceiptNumber(null); setReceiptShareState('idle'); }}
+        onClose={() => { setCompletedReceiptNumber(null); setReceiptShareState('idle'); focusSearchForScanner(); }}
         title="Продажа завершена"
         maxWidth="sm"
         footer={
@@ -1297,7 +1328,7 @@ export const SalePage: React.FC = () => {
             >
               {receiptShareState === 'copied' ? 'Скопировано' : 'Отправить чек'}
             </Button>
-            <Button fullWidth onClick={() => { setCompletedReceiptNumber(null); setReceiptShareState('idle'); }}>Новый чек</Button>
+            <Button fullWidth onClick={() => { setCompletedReceiptNumber(null); setReceiptShareState('idle'); focusSearchForScanner(); }}>Новый чек</Button>
           </div>
         }
       >
