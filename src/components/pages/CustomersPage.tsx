@@ -277,10 +277,7 @@ export const CustomersPage: React.FC = () => {
 
           <button
             type="button"
-            onClick={() => {
-              setActiveTab('DEBTORS');
-              setSortBy('DEBT_DESC');
-            }}
+            onClick={() => setActiveTab('DEBTORS')}
             className={`h-7 px-2.5 rounded-lg text-xs font-semibold cursor-pointer transition-all whitespace-nowrap flex items-center gap-1.5 ${
               activeTab === 'DEBTORS'
                 ? 'bg-amber-500 text-black shadow-2xs font-bold'
