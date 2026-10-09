@@ -339,50 +339,48 @@ export const CashDeskPanel: React.FC<CashDeskPanelProps> = ({ storeId }) => {
         </div>
       )}
 
-      {/* 3. ЗАКРЫТЫЕ СМЕНЫ / Z-ОТЧЕТЫ (ТОЛЬКО ДЛЯ РОЗНИЧНЫХ МАГАЗИНОВ, В ЦЕНТРАЛЬНОЙ КАССЕ СМЕН НЕТ) */}
-      {!isCentral && (
-        <div className="space-y-2.5 pt-1">
-          {/* Month Selector Bar */}
-          <div className="flex items-center justify-between gap-2 flex-wrap bg-surface p-2 sm:p-2.5 rounded-xl border border-border shadow-2xs">
-            <div className="flex items-center gap-2">
-              <Calendar className="w-4 h-4 text-accent" />
-              <span className="text-xs font-bold text-fg capitalize">{monthLabel}</span>
-            </div>
-
-            <div className="flex items-center gap-1">
-              <button
-                type="button"
-                onClick={handlePrevMonth}
-                className="p-1 rounded-lg bg-surface-raised border border-border hover:bg-surface text-fg transition-colors cursor-pointer"
-                title="Предыдущий месяц"
-              >
-                <ChevronLeft className="w-4 h-4" />
-              </button>
-              <button
-                type="button"
-                onClick={handleCurrentMonth}
-                className="px-2 py-1 rounded-lg bg-surface-raised border border-border hover:bg-surface text-[11px] font-semibold text-fg transition-colors cursor-pointer"
-              >
-                Текущий месяц
-              </button>
-              <button
-                type="button"
-                onClick={handleNextMonth}
-                className="p-1 rounded-lg bg-surface-raised border border-border hover:bg-surface text-fg transition-colors cursor-pointer"
-                title="Следующий месяц"
-              >
-                <ChevronRight className="w-4 h-4" />
-              </button>
-            </div>
+      {/* 3. ЗАКРЫТЫЕ СМЕНЫ / Z-ОТЧЕТЫ */}
+      <div className="space-y-2.5 pt-1">
+        {/* Month Selector Bar */}
+        <div className="flex items-center justify-between gap-2 flex-wrap bg-surface p-2 sm:p-2.5 rounded-xl border border-border shadow-2xs">
+          <div className="flex items-center gap-2">
+            <Calendar className="w-4 h-4 text-accent" />
+            <span className="text-xs font-bold text-fg capitalize">{monthLabel}</span>
           </div>
 
-          {/* Closed Shifts Panel */}
-          <DailyCashClosingListPanel
-            month={selectedMonth}
-            storeId={selectedStoreId}
-          />
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              onClick={handlePrevMonth}
+              className="p-1 rounded-lg bg-surface-raised border border-border hover:bg-surface text-fg transition-colors cursor-pointer"
+              title="Предыдущий месяц"
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </button>
+            <button
+              type="button"
+              onClick={handleCurrentMonth}
+              className="px-2 py-1 rounded-lg bg-surface-raised border border-border hover:bg-surface text-[11px] font-semibold text-fg transition-colors cursor-pointer"
+            >
+              Текущий месяц
+            </button>
+            <button
+              type="button"
+              onClick={handleNextMonth}
+              className="p-1 rounded-lg bg-surface-raised border border-border hover:bg-surface text-fg transition-colors cursor-pointer"
+              title="Следующий месяц"
+            >
+              <ChevronRight className="w-4 h-4" />
+            </button>
+          </div>
         </div>
-      )}
+
+        {/* Closed Shifts Panel */}
+        <DailyCashClosingListPanel
+          month={selectedMonth}
+          storeId={selectedStoreId}
+        />
+      </div>
     </div>
   );
 };

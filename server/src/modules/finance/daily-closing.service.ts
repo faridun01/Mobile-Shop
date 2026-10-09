@@ -66,11 +66,13 @@ function usdAt(tjs: Money, rate: MoneyInput | null | undefined): Money {
 async function rateForBusinessDate(db: Db, businessDate: string, strict: boolean): Promise<Money | null> {
   const exact = await db.exchangeRate.findUnique({ where: { date: businessDate } });
   if (exact?.rate && D(exact.rate).gt(0)) return D(exact.rate);
+  const latest = await db.exchangeRate.findFirst({ where: { date: { lte: businessDate } }, orderBy: { date: 'desc' } })
+    ?? await db.exchangeRate.findFirst({ orderBy: { date: 'desc' } });
+  if (latest?.rate && D(latest.rate).gt(0)) return D(latest.rate);
   if (strict) {
     throw new Error(`Сначала задайте курс USD/TJS на ${businessDate}`);
   }
-  const latest = await db.exchangeRate.findFirst({ where: { date: { lte: businessDate } }, orderBy: { date: 'desc' } });
-  return latest?.rate && D(latest.rate).gt(0) ? D(latest.rate) : null;
+  return null;
 }
 
 type ExchangeSettlement = { cashAmountTjs: MoneyInput | null; cardAmountTjs: MoneyInput | null; paymentMethod: string | null; differenceTjs: MoneyInput };
@@ -393,7 +395,7 @@ export class DailyClosingService {
         },
       });
       if (existing) {
-        throw Object.assign(new Error(`Кассовая смена магазина ${store.name} за ${businessDate} уже закрыта`), { statusCode: 409 });
+        throw Object.assign(new Error(`Кассовая смена магазина ${store.name} за ${businessDate} уже закрыта. Касса закрывается только один раз.`), { statusCode: 409 });
       }
 
       const rate = (await rateForBusinessDate(tx, businessDate, true))!;

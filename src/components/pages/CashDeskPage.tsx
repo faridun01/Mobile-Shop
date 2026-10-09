@@ -51,6 +51,17 @@ export const CashDeskPage: React.FC = () => {
               </div>
               <span className="text-xs font-bold text-fg truncate">Центральная касса (Все точки)</span>
             </div>
+
+            {/* Quick Z-Report Button for Central Mode */}
+            <button
+              type="button"
+              onClick={() => setDailyClosingModalOpen(true, undefined)}
+              className="h-8 px-2.5 rounded-lg bg-accent text-accent-fg text-xs font-semibold flex items-center gap-1.5 hover:opacity-90 active:scale-95 transition-all shadow-xs cursor-pointer shrink-0"
+              title="Закрыть смену / Z-отчёт"
+            >
+              <FileCheck2 className="w-3.5 h-3.5 shrink-0" />
+              <span>Z-отчёт</span>
+            </button>
           </div>
         )
       ) : (

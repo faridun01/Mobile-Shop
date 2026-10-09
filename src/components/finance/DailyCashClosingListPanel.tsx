@@ -5,7 +5,6 @@ import { formatTjs, sumMoney } from '../../utils/money';
 import { Button } from '../ui/Button';
 import { EmptyState } from '../ui/EmptyState';
 import { DailyCashClosingModal } from './DailyCashClosingModal';
-import { useAppFields } from '../../context/AppContext';
 import { useUIStore } from '../../stores/useUIStore';
 import { AlertCircle, Banknote, CreditCard, FileCheck2, Calendar, Store, UserCheck } from 'lucide-react';
 
@@ -19,8 +18,6 @@ export const DailyCashClosingListPanel: React.FC<DailyCashClosingListPanelProps>
   month,
   storeId,
 }) => {
-  const { currentUser } = useAppFields('currentUser');
-  const isAdmin = currentUser?.role === 'ADMIN';
   const { setDailyClosingModalOpen } = useUIStore();
   const [closings, setClosings] = useState<DailyCashClosing[]>([]);
   const [loading, setLoading] = useState(false);
@@ -79,14 +76,12 @@ export const DailyCashClosingListPanel: React.FC<DailyCashClosingListPanelProps>
           <FileCheck2 className="w-4 h-4 text-accent" />
           Закрытые смены
         </h2>
-        {!isAdmin && storeId && storeId !== 'all' && (
-          <Button
-            leftIcon={FileCheck2}
-            onClick={() => setDailyClosingModalOpen(true, storeId)}
-          >
-            Закрыть смену
-          </Button>
-        )}
+        <Button
+          leftIcon={FileCheck2}
+          onClick={() => setDailyClosingModalOpen(true, storeId && storeId !== 'all' ? storeId : undefined)}
+        >
+          Закрыть смену
+        </Button>
       </div>
 
       <div className="grid grid-cols-3 gap-2.5">
