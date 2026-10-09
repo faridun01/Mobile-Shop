@@ -437,6 +437,38 @@ try {
   await OwnersService.withdrawal('owner-partner', D(0.01), 'Главный счет', undefined, 'user-admin');
   assert.equal((await prisma.owner.findUniqueOrThrow({ where: { id: 'owner-partner' } })).capitalBalanceUsd, D(partnerOwner.capitalBalanceUsd).minus(0.01));
   console.log(`PASS: with $${owedUsd} of profit owed back, only capital minus that amount can be withdrawn`);
+
+  // A customer debt no sale backs (written outside the app) cannot be repaid: the cash would reach
+  // the register with no sale income behind it. The owner check reports such a debt by name.
+  const orphan = await prisma.customer.create({ data: { name: 'Долг без чека', totalDebtTjs: D(500) } });
+  const orphanCash = await siyomaCash();
+  await assert.rejects(CustomersService.recordPayment({ customerId: orphan.id, amountTjs: D(500), storeId: 'store-siyoma', userId: 'user-admin' }), /превышает долг по чекам/);
+  assert.equal(await siyomaCash(), orphanCash);
+  assert.equal((await prisma.customer.findUniqueOrThrow({ where: { id: orphan.id } })).totalDebtTjs, 500);
+  assert.equal(await prisma.customerPayment.count({ where: { customerId: orphan.id } }), 0);
+  assert(/FAIL Долг без чека: долг 500\.00 TJS, по чекам 0\.00 TJS/.test(ownerChecks()), ownerChecks());
+  await prisma.customer.delete({ where: { id: orphan.id } });
+  console.log('PASS: repaying a 500 TJS debt no sale backs is rejected with nothing changed, and the owner check names it');
+
+  // A payment accepted before that check (simulated: its allocation is gone) is reported, and the
+  // fix books its $50 to the store's owners exactly once; a dry run changes nothing.
+  const legacyDebt = await SalesService.executeSale({ storeId: 'store-siyoma', userId: 'user-admin',
+    items: [{ deviceId: (await device()).id, salePriceTjs: D(2000) }], paymentMethod: 'DEBT', cashAmountTjs: D(1500), customerName: 'Старая оплата' });
+  const legacyPayment = await CustomersService.recordPayment({ customerId: legacyDebt.customerId!, amountTjs: D(500), storeId: 'store-siyoma', userId: 'user-admin' });
+  await prisma.customerPaymentAllocation.deleteMany({ where: { paymentId: legacyPayment.payment.id } });
+  assert(/FAIL оплата Старая оплата от .*: 500\.00 TJS не относятся ни к одному чеку/.test(ownerChecks()), ownerChecks());
+  const fix = (...args: string[]) => {
+    const result = spawnSync(process.execPath, ['--import', 'tsx', 'scripts/fix-unbacked-customer-payments.ts', ...args], { env: process.env, encoding: 'utf8', timeout: 120000 });
+    assert.equal(result.status, 0, result.stdout + result.stderr);
+  };
+  assert.deepEqual(await change(async () => fix()), none);
+  const booked = await change(async () => fix('--apply'));
+  assert.equal(D(booked[0].accrued).plus(booked[1].accrued), 50);
+  const stored = (await prisma.customerPayment.findUniqueOrThrow({ where: { id: legacyPayment.payment.id } })).ownerProfitAllocations as { ownerId: string; amountUsd: number }[];
+  assert.deepEqual(['owner-admin', 'owner-partner'].map((id, i) => D(stored.find((s) => s.ownerId === id)?.amountUsd ?? 0).eq(booked[i].accrued)), [true, true]);
+  assert.deepEqual(await change(async () => fix('--apply')), none);
+  assert(!ownerChecks().includes('FAIL'), ownerChecks());
+  console.log('PASS: an unallocated 500 TJS payment is reported, booked once as $50 owner income, and the check is clean after');
 } finally {
   await disconnectService?.();
   await db.$executeRawUnsafe(`DROP SCHEMA "${schema}" CASCADE`);

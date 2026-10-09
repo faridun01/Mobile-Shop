@@ -54,9 +54,46 @@ async function main() {
       console.log(`  ${ok ? 'OK  ' : 'FAIL'} ${label}: ${fmt(actual)}${ok ? '' : ` (ожидалось ${fmt(expected)}, разница ${fmt(diff)})`}`);
     }
   }
+  problems += await checkCustomerDebts();
   problems += await reconcileCapital(owners);
   console.log(problems ? `\nНайдено расхождений: ${problems}` : '\nРасхождений нет');
   return problems ? 1 : 0;
+}
+
+/**
+ * Customer debt comes only from debt sales and goes away only through payments allocated to those
+ * sales or a refund, so a customer's debt equals the open debt of their sales. A difference means
+ * debt was written outside the app. A payment with an unallocated part (accepted before payments
+ * were checked against sale debts) put cash in a register with no sale income behind it, which
+ * breaks the capital reconciliation until scripts/fix-unbacked-customer-payments.ts books it.
+ */
+async function checkCustomerDebts() {
+  const [customers, saleDebts, payments, booked] = await Promise.all([
+    prisma.customer.findMany({ select: { id: true, name: true, totalDebtTjs: true } }),
+    prisma.sale.groupBy({ by: ['customerId'], _sum: { debtAmountTjs: true }, where: { customerId: { not: null } } }),
+    prisma.customerPayment.findMany({ select: { id: true, amountTjs: true, createdAt: true, customer: { select: { name: true } }, allocations: { select: { allocatedAmountTjs: true } } } }),
+    prisma.auditLog.findMany({ where: { action: 'CUSTOMER_PAYMENT_UNBACKED_INCOME' }, select: { targetId: true } }),
+  ]);
+  const bookedIds = new Set(booked.map((b) => b.targetId));
+  const tjs = (v: Prisma.Decimal) => `${v.toFixed(2)} TJS`;
+  let problems = 0;
+  console.log('\nДолги клиентов');
+  for (const customer of customers) {
+    const salesDebt = D(saleDebts.find((s) => s.customerId === customer.id)?._sum.debtAmountTjs ?? 0);
+    if (!D(customer.totalDebtTjs).eq(salesDebt)) {
+      problems++;
+      console.log(`  FAIL ${customer.name}: долг ${tjs(D(customer.totalDebtTjs))}, по чекам ${tjs(salesDebt)}`);
+    }
+  }
+  for (const payment of payments) {
+    const unallocated = D(payment.amountTjs).minus(payment.allocations.reduce((sum, a) => sum.plus(a.allocatedAmountTjs), D(0)));
+    if (unallocated.gt(0) && !bookedIds.has(payment.id)) {
+      problems++;
+      console.log(`  FAIL оплата ${payment.customer.name} от ${payment.createdAt.toISOString().slice(0, 10)}: ${tjs(unallocated)} не относятся ни к одному чеку (npm run fix:unbacked-payments)`);
+    }
+  }
+  if (!problems) console.log('  OK   долг каждого клиента = долг по его чекам; каждая оплата отнесена на чеки');
+  return problems;
 }
 
 /**

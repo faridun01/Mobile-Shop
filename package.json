@@ -34,6 +34,8 @@
     "audit:system": "tsx scripts/audit-system.ts",
     "audit:owners": "tsx scripts/check-owner-balances.ts",
     "audit:bonus-collections": "tsx scripts/reconcile-bonus-collections.ts",
+    "fix:unbacked-payments": "tsx scripts/fix-unbacked-customer-payments.ts",
+    "fix:unbacked-payments:apply": "tsx scripts/fix-unbacked-customer-payments.ts --apply",
     "db:clean": "tsx scripts/clear-data-keep-users.ts",
     "server": "tsx watch server/src/index.ts"
   },

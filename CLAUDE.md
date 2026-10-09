@@ -44,7 +44,7 @@ npm run audit:bonus-collections  # read-only check of collections and the Bonus 
 npm run test:audit-fixes     # creates and drops its own schema, runs migrate + seed + e2e inside it
 npm run test:profit-refund
 npm run test:functional
-npm run audit:owners         # check owner balance consistency
+npm run audit:owners         # owner balances, customer debt vs sale debt, capital reconciliation; exits 1 on any mismatch
 ```
 
 CI (`.github/workflows/ci-cd.yml`) runs: `lint` → `test` → `migrate deploy` → `db seed` → `test:e2e` → `test:audit-fixes` + `test:profit-refund` → `build`.
@@ -63,7 +63,9 @@ Native: `npm run native:sync` (runs `vite build --mode native`, then `cap sync`)
 
 - **Never use JS `number` arithmetic for money.** Use `D()` from `server/src/common/decimal.ts` (Prisma.Decimal, precision 40, ROUND_HALF_UP). Use `requirePositiveMoney`, `requireNonNegativeMoney` and `roundMoney` from `common/money.ts` to validate input. Decimals are converted to numbers only at the JSON boundary (`decimalJsonReplacer` on the app, and `moneyJson()` for JSON columns such as `AuditLog.financialDetails`). Money columns are `Decimal` in Postgres.
 - **Exchange rates:** `ExchangeRate` has one row per business day, keyed `YYYY-MM-DD` in `BUSINESS_TIME_ZONE` (default `Asia/Tashkent`, see `common/business-date.ts`). Write operations call `requireTodayRate(tx)` and **snapshot** `exchangeRate` and the USD amounts onto the record. Reports must sum each record's own stored USD amount or rate, never a period's TJS total divided by today's rate.
-- **Two parallel bookkeeping layers are kept in sync:** (1) denormalized balances on domain rows, such as `Store.cashBalanceTjs`, `Supplier.totalDebtUsd` and `Owner.capitalBalanceUsd`, with `LedgerEntry` rows; (2) a double-entry-style ledger, where `postTransaction()` in `server/src/modules/finance/financial-transaction.service.ts` writes a `FinancialTransaction` and moves `FinancialAccount` balances, rejecting overdrafts by default. Money-moving code updates both inside the same transaction.
+- **Two parallel bookkeeping layers are kept in sync:** (1) denormalized balances on domain rows, such as `Store.cashBalanceUsd`, `Supplier.totalDebtUsd` and `Owner.capitalBalanceUsd`, with `LedgerEntry` rows; (2) a double-entry-style ledger, where `postTransaction()` in `server/src/modules/finance/financial-transaction.service.ts` writes a `FinancialTransaction` and moves `FinancialAccount` balances, rejecting overdrafts by default. Money-moving code updates both inside the same transaction.
+- **Cash registers are kept in USD** (`Store.cashBalanceUsd`; the register's account posts with `balanceCurrency: 'USD'`). TJS taken or paid out converts at the day's rate when it happens.
+- **Customer debt** (`Customer.totalDebtTjs`) is created only by a debt sale and must always equal the open `Sale.debtAmountTjs` of that customer's sales. A repayment is allocated to those sales (`CustomerPaymentAllocation`) and is rejected if they don't cover it. `audit:owners` checks this; `npm run fix:unbacked-payments` (dry run, then `fix:unbacked-payments:apply`) books legacy payments that no sale backs as owner income of the receiving store.
 - Owner profit is split by `profitSharePercent` (must total exactly 100%) with cent-exact remainder distribution (`allocateOwnerProfit` in `modules/sales/profit.ts`, `modules/finance/owner-allocations.ts`). Sales accrue owner profit per sale; refunds and exchanges reverse it.
 - Every business write also creates an `AuditLog` row (Russian `details`, with optional `financialDetails`).
 
