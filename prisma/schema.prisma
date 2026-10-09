@@ -665,6 +665,10 @@ model CustomerPayment {
   storeId         String?
   createdByUserId String
   createdAt       DateTime @default(now())
+  // Dollars received minus the dollars the paid-off sales booked for this debt (see recordPayment);
+  // the difference is the owners' exchange-rate result, split as ownerProfitAllocations.
+  fxGainUsd              Decimal @default(0) @db.Decimal(14, 2)
+  ownerProfitAllocations Json?
 
   customer    Customer                    @relation(fields: [customerId], references: [id])
   allocations CustomerPaymentAllocation[]
@@ -678,6 +682,9 @@ model CustomerPaymentAllocation {
   paymentId          String
   saleId             String
   allocatedAmountTjs Decimal @db.Decimal(14, 2)
+  // The sale's booked dollars for this part of its debt (null on payments made before this was stored).
+  bookedAmountUsd    Decimal? @db.Decimal(14, 2)
+  fxGainUsd          Decimal  @default(0) @db.Decimal(14, 2)
 
   payment CustomerPayment @relation(fields: [paymentId], references: [id], onDelete: Cascade)
   sale    Sale            @relation(fields: [saleId], references: [id])
@@ -876,6 +883,10 @@ model Expense {
   category             String
   amountTjs            Decimal   @db.Decimal(14, 2)
   amountUsd            Decimal?  @db.Decimal(14, 2)
+  // Registered dollars minus the dollars that left at payment (payExpense re-states amountUsd to
+  // the payment-day rate). Reports keep the registered amount in the expense's own month and show
+  // this exchange-rate result in the month it was paid, the same months the owners were charged.
+  paymentFxUsd         Decimal   @default(0) @db.Decimal(14, 2)
   ownerProfitAllocations Json?
   exchangeRate         Decimal?  @db.Decimal(10, 4)
   targetType           String    @default("STORE")

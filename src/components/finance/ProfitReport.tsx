@@ -74,6 +74,11 @@ interface ReportsSummary {
   expensesUsd: number;
   periodRefundPenaltiesUsd: number;
   periodRefundPenaltiesTjs: number;
+  /** Exchange-rate results already inside profit/net profit: refunds, customer debt repaid, and
+   *  expenses paid at another rate than they were booked at. */
+  periodRefundFxUsd?: number;
+  periodDebtFxUsd?: number;
+  periodExpenseFxUsd?: number;
   netProfitUsd: number;
   netProfitTjs: number;
   /** Supplier bonuses are nobody's income: shown for reference, never in profit or owner shares. */
@@ -305,6 +310,7 @@ export const ProfitReport: React.FC<ProfitReportProps> = ({
   }, [salesReportStoreId, month, startDate, endDate, namesLookup, revision]);
 
   const data: ReportsSummary = summary ?? EMPTY_SUMMARY;
+  const fxResultUsd = sumMoney([data.periodRefundFxUsd ?? 0, data.periodDebtFxUsd ?? 0, data.periodExpenseFxUsd ?? 0]);
 
   const totalStockCostUsd = useMemo(() => {
     if (selectedStore !== 'all') {
@@ -360,8 +366,8 @@ export const ProfitReport: React.FC<ProfitReportProps> = ({
         netProfitTjs: data.netProfitTjs, netProfitUsd: data.netProfitUsd,
       };
     } else {
-      const expensesTjs = sumMoney(reportExpenses.map((expense) => expense.amountTjs || 0));
-      const expensesUsd = sumMoney(reportExpenses.map((expense) => expense.amountUsd ?? moneyNumber((expense.amountTjs || 0) / (expense.exchangeRate || rate))));
+      const expensesTjs = breakdown?.expensesTjs ?? sumMoney(reportExpenses.map((expense) => expense.amountTjs || 0));
+      const expensesUsd = breakdown?.expensesUsd ?? sumMoney(reportExpenses.map((expense) => expense.amountUsd ?? moneyNumber((expense.amountTjs || 0) / (expense.exchangeRate || rate))));
       const revenueTjs = breakdown?.revenueTjs ?? 0;
       const revenueUsd = breakdown?.revenueUsd ?? 0;
       const cogsTjs = breakdown?.cogsTjs ?? 0;
@@ -385,8 +391,8 @@ export const ProfitReport: React.FC<ProfitReportProps> = ({
         cashBonusesTjs: 0, cashBonusesUsd: 0,
         expensesTjs: +expensesTjs.toFixed(2),
         expensesUsd: +expensesUsd.toFixed(2),
-        netProfitTjs: +(profitTjs - expensesTjs).toFixed(2),
-        netProfitUsd: moneyNumber(decimal(profitUsd).minus(expensesUsd)),
+        netProfitTjs: breakdown?.netProfitTjs ?? +(profitTjs - expensesTjs).toFixed(2),
+        netProfitUsd: breakdown?.netProfitUsd ?? moneyNumber(decimal(profitUsd).minus(expensesUsd)),
       };
     }
 
@@ -501,6 +507,7 @@ export const ProfitReport: React.FC<ProfitReportProps> = ({
                     ...(data.bonusDeviceProfitUsd ? [{ label: 'Прибыль бонусных телефонов (не доход)', value: `−${usd(data.bonusDeviceProfitUsd)}` }] : []),
                     ...(data.periodRefundPenaltiesUsd ? [{ label: 'Удержано при возвратах', value: `+${usd(data.periodRefundPenaltiesUsd)}` }] : []),
                     { label: 'Расходы (включая зарплату)', value: `−${usd(data.expensesUsd)}` },
+                    ...(fxResultUsd ? [{ label: 'Курсовая разница', value: `${fxResultUsd > 0 ? '+' : '−'}${usd(Math.abs(fxResultUsd))}` }] : []),
                   ].map((row) => (
                     <div key={row.label} className="flex items-center justify-between text-fg-muted">
                       <span>{row.label}</span>

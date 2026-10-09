@@ -2,20 +2,35 @@ import 'dotenv/config';
 import { PrismaClient, Prisma } from '@prisma/client';
 
 // Read-only reconciliation of partner profit balances. Every profit movement keeps
-//   available = accrued - paid - reinvested
-// and paid/reinvested/capital must match the owner transaction history. A mismatch
-// usually means balances were redistributed by shares ("rebalance") at some point.
+//   available = carried over + accrued - paid - reinvested
+// and paid/reinvested/capital must match the owner transaction history. A quarter close resets the
+// accrued/paid/reinvested counters (its snapshot keeps the old ones), so those are compared with
+// the history since the last close, and the profit it left available is carried over. Capital is
+// never reset and is compared with the whole history. A mismatch usually means balances were
+// redistributed by shares ("rebalance") at some point.
 const prisma = new PrismaClient();
 const D = (v: Prisma.Decimal.Value) => new Prisma.Decimal(v);
 const fmt = (v: Prisma.Decimal) => `$${v.toFixed(2)}`;
 
 async function main() {
-  const [owners, sums] = await Promise.all([
+  const [owners, sums, lastClose] = await Promise.all([
     prisma.owner.findMany({ orderBy: { createdAt: 'asc' } }),
     prisma.ownerTransaction.groupBy({ by: ['ownerId', 'type'], _sum: { amountUsd: true } }),
+    prisma.quarterClosure.findFirst({ orderBy: { closedAt: 'desc' }, select: { quarterName: true, closedAt: true, snapshot: true } }),
   ]);
-  const history = (ownerId: string, type: string) =>
-    D(sums.find((s) => s.ownerId === ownerId && s.type === type)?._sum.amountUsd ?? 0);
+  // The close's own reinvestments share its transaction timestamp, so they belong to the closed period.
+  const periodSums = lastClose
+    ? await prisma.ownerTransaction.groupBy({ by: ['ownerId', 'type'], _sum: { amountUsd: true }, where: { createdAt: { gt: lastClose.closedAt } } })
+    : sums;
+  const sumOf = (rows: typeof sums, ownerId: string, type: string) =>
+    D(rows.find((s) => s.ownerId === ownerId && s.type === type)?._sum.amountUsd ?? 0);
+  const history = (ownerId: string, type: string) => sumOf(sums, ownerId, type);
+  const sinceClose = (ownerId: string, type: string) => sumOf(periodSums, ownerId, type);
+  const carriedOver = (ownerId: string) => {
+    const rows = Array.isArray(lastClose?.snapshot) ? lastClose.snapshot as { ownerId?: string; availableProfitUsd?: number }[] : [];
+    return D(rows.find((row) => row?.ownerId === ownerId)?.availableProfitUsd ?? 0);
+  };
+  if (lastClose) console.log(`Последнее закрытие периода: ${lastClose.quarterName} (${lastClose.closedAt.toISOString().slice(0, 10)}); счётчики прибыли сверяются с историей после него`);
 
   let problems = 0;
   for (const owner of owners) {
@@ -25,9 +40,9 @@ async function main() {
     const available = D(owner.availableProfitUsd);
     const capital = D(owner.capitalBalanceUsd);
     const checks: [string, Prisma.Decimal, Prisma.Decimal][] = [
-      ['Доступно = начислено − выплачено − реинвестировано', available, accrued.minus(paid).minus(reinvested)],
-      ['Выплачено = сумма выплат в истории', paid, history(owner.id, 'PROFIT_PAYOUT')],
-      ['Реинвестировано = сумма реинвестиций в истории', reinvested, history(owner.id, 'REINVEST')],
+      ['Доступно = перенесено + начислено − выплачено − реинвестировано', available, carriedOver(owner.id).plus(accrued).minus(paid).minus(reinvested)],
+      ['Выплачено = сумма выплат в истории периода', paid, sinceClose(owner.id, 'PROFIT_PAYOUT')],
+      ['Реинвестировано = сумма реинвестиций в истории периода', reinvested, sinceClose(owner.id, 'REINVEST')],
       ['Капитал = вложения + реинвест − изъятия', capital,
         history(owner.id, 'INVESTMENT').plus(history(owner.id, 'REINVEST')).minus(history(owner.id, 'WITHDRAWAL'))],
     ];
@@ -55,7 +70,7 @@ async function main() {
  */
 async function reconcileCapital(owners: { capitalBalanceUsd: Prisma.Decimal; availableProfitUsd: Prisma.Decimal }[]) {
   const sum = (values: Prisma.Decimal.Value[]) => values.reduce<Prisma.Decimal>((acc, v) => acc.plus(v), D(0));
-  const [stores, stock, supplierDebt, pool, unpaid, cashBonuses, keptSales, adjustments, customerDebt, rate, salePostings, bonusAccount, bonusPayouts] = await Promise.all([
+  const [stores, stock, supplierDebt, pool, unpaid, cashBonuses, keptSales, adjustments, salePostings, bonusAccount, bonusPayouts] = await Promise.all([
     prisma.store.findMany({ select: { cashBalanceUsd: true } }),
     prisma.device.aggregate({ _sum: { costBasisUsd: true }, where: { status: { not: 'SOLD' } } }),
     prisma.supplier.aggregate({ _sum: { totalDebtUsd: true } }),
@@ -65,10 +80,8 @@ async function reconcileCapital(owners: { capitalBalanceUsd: Prisma.Decimal; ava
     prisma.bonusPoolEntry.aggregate({ _sum: { profitUsd: true }, where: { sale: { status: { not: 'REFUNDED' } }, OR: [{ status: { in: ['PENDING', 'ANNULLED'] } }, { status: 'DISTRIBUTED', annulledAt: { not: null } }] } }),
     prisma.expense.findMany({ where: { status: 'UNPAID', cancelledAt: null }, select: { amountUsd: true, amountTjs: true, exchangeRate: true } }),
     prisma.supplierBonus.findMany({ where: { bonusType: 'CASH_DISCOUNT' }, select: { amountUsd: true, ownerProfitAllocations: true, bonusAccountTransactionId: true } }),
-    prisma.sale.findMany({ where: { status: { not: 'REFUNDED' } }, select: { id: true, totalUsd: true, totalTjs: true, cardAmountTjs: true } }),
+    prisma.sale.findMany({ where: { status: { not: 'REFUNDED' } }, select: { id: true, totalUsd: true, totalTjs: true, cardAmountTjs: true, debtAmountTjs: true } }),
     prisma.financialTransaction.findMany({ where: { type: 'ADJUSTMENT', status: 'POSTED', sourceType: 'STORE_ADJUSTMENT' }, select: { direction: true, amountUsd: true } }),
-    prisma.customer.aggregate({ _sum: { totalDebtTjs: true } }),
-    prisma.exchangeRate.findFirst({ orderBy: { date: 'desc' }, select: { rate: true } }),
     // The posting each sale made into its register ("Чек #N: ..."), to tell which sales put their card part there.
     prisma.financialTransaction.findMany({ where: { sourceType: 'SALE', type: 'INCOME', description: { startsWith: 'Чек #' } }, select: { sourceId: true, description: true } }),
     prisma.financialAccount.findFirst({ where: { OR: [{ systemKey: 'BONUS_ACCOUNT' }, { name: 'Бонусный счёт', storeId: null }] }, orderBy: { createdAt: 'asc' }, select: { balanceUsd: true } }),
@@ -91,7 +104,9 @@ async function reconcileCapital(owners: { capitalBalanceUsd: Prisma.Decimal; ava
   for (const p of salePostings) if (p.sourceId) postingsBySale.set(p.sourceId, [...(postingsBySale.get(p.sourceId) ?? []), p.description]);
   const cardOutside = (saleId: string) => (postingsBySale.get(saleId) ?? []).every((d) => d.includes('продажа наличными'));
   const cardTakings = sum(keptSales.map((s) => D(s.totalTjs).gt(0) && D(s.cardAmountTjs ?? 0).gt(0) && cardOutside(s.id) ? D(s.totalUsd).mul(s.cardAmountTjs ?? 0).div(s.totalTjs) : D(0)));
-  const customerReceivable = rate?.rate ? D(customerDebt._sum.totalDebtTjs ?? 0).div(rate.rate) : D(0);
+  // Each sale booked its unpaid TJS in dollars at its own rate; repayments book their exchange
+  // difference to the owners, so the receivable is worth exactly that booked amount (never today's rate).
+  const customerReceivable = sum(keptSales.map((s) => D(s.totalTjs).gt(0) && D(s.debtAmountTjs).gt(0) ? D(s.totalUsd).mul(s.debtAmountTjs).div(s.totalTjs) : D(0)));
   const unpaidUsd = sum(unpaid.map((e) => e.amountUsd ?? (e.exchangeRate ? D(e.amountTjs).div(e.exchangeRate) : 0)));
   const manual = sum(adjustments.map((a) => (a.direction === 'IN' ? D(a.amountUsd) : D(a.amountUsd).negated())));
   const explained: [string, Prisma.Decimal][] = [
@@ -111,7 +126,7 @@ async function reconcileCapital(owners: { capitalBalanceUsd: Prisma.Decimal; ava
 
   console.log('\nСверка капитала (USD)');
   console.log(`  Капитал ${fmt(capital)} + нераспределённая прибыль ${fmt(profit)} = ${fmt(ownersSide)}`);
-  console.log(`  Кассы ${fmt(registers)} + Бонусный счёт ${fmt(bonusHeld)} + склад по себестоимости ${fmt(stockCost)} − долг поставщикам ${fmt(debt)} = ${fmt(businessSide)}`);
+  console.log(`  Кассы ${fmt(registers)} Бонусный счёт ${fmt(bonusHeld)} + склад по себестоимости ${fmt(stockCost)} − долг поставщикам ${fmt(debt)} = ${fmt(businessSide)}`);
   console.log(`  Разница ${fmt(ownersSide.minus(businessSide))}, из неё объяснено:`);
   for (const [label, value] of explained) if (!value.isZero()) console.log(`    ${label}: ${fmt(value)}`);
   console.log(`  ${ok ? 'OK  ' : 'FAIL'} Необъяснённый остаток: ${fmt(residual)}${ok ? '' : ' — проверьте операции вне учёта (корректировки, старые данные до перевода касс в USD, бонусные устройства с себестоимостью)'}`);

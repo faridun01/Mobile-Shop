@@ -4,6 +4,9 @@ import { requireTodayRate, getRateForDate } from '../exchange-rate/exchange-rate
 import { requirePositiveMoney, roundMoney } from '../../common/money';
 import { getStoreCashAccount } from '../finance/account.service';
 import { postTransaction } from '../finance/financial-transaction.service';
+import { currentOwnerAllocations, replaceOwnerAllocations } from '../finance/owner-allocations';
+import type { OwnerProfitAllocation } from '../sales/profit';
+import { allocateMoney } from '../../common/allocation';
 import { PushNotificationService, isAllowedPushEndpoint } from '../notifications/push.service';
 import { Prisma } from '@prisma/client';
 
@@ -281,29 +284,68 @@ export class CustomersService {
         orderBy: { createdAt: 'asc' },
       });
 
+      // Each sale booked its whole price in dollars at its own day's rate, debt included. The
+      // TJS paid today are worth today's dollars, so the difference is an exchange-rate result
+      // for the owners of the sale's store (same rule as a refund). Example: 6280 TJS of debt
+      // from a sale at 9.2 booked $682.61; paid at 10.0 it brings $628.00 — a $54.61 loss.
+      const parts: { sale: (typeof unpaidSales)[number]; allocationTjs: Prisma.Decimal; bookedUsd: Prisma.Decimal }[] = [];
       let remainingToAllocate = D(amountTjs);
       for (const sale of unpaidSales) {
         if (remainingToAllocate.lte(0)) break;
         const allocation = D(sale.debtAmountTjs).lte(remainingToAllocate) ? D(sale.debtAmountTjs) : remainingToAllocate;
-
-        await tx.customerPaymentAllocation.create({
-          data: {
-            paymentId: payment.id,
-            saleId: sale.id,
-            allocatedAmountTjs: allocation,
-          },
-        });
-
-        await tx.sale.update({
-          where: { id: sale.id },
-          data: { debtAmountTjs: { decrement: allocation } },
-        });
-
+        const bookedShareUsd = (tjs: MoneyInput) => (D(sale.totalTjs).gt(0) ? roundMoney(D(sale.totalUsd).mul(tjs).div(sale.totalTjs)) : D(0));
+        let bookedUsd = bookedShareUsd(allocation);
+        if (allocation.eq(sale.debtAmountTjs)) {
+          // The payment that clears the sale takes whatever its debt booked minus the earlier
+          // payments, so rounding never leaves stray cents between register and profit.
+          const earlier = await tx.customerPaymentAllocation.findMany({ where: { saleId: sale.id }, select: { allocatedAmountTjs: true, bookedAmountUsd: true } });
+          const originalDebtTjs = earlier.reduce((sum, a) => sum.plus(a.allocatedAmountTjs), D(allocation));
+          const earlierBookedUsd = earlier.reduce((sum, a) => sum.plus(a.bookedAmountUsd ?? bookedShareUsd(a.allocatedAmountTjs)), D(0));
+          bookedUsd = roundMoney(bookedShareUsd(originalDebtTjs).minus(earlierBookedUsd));
+        }
+        parts.push({ sale, allocationTjs: allocation, bookedUsd });
         remainingToAllocate = remainingToAllocate.minus(allocation);
       }
       if (remainingToAllocate.gt(0)) {
         throw new Error('Сумма оплаты превышает долг по чекам клиента');
       }
+
+      const paidUsdParts = allocateMoney(amountUsd, parts.map((p) => p.allocationTjs));
+      const fxByStore = new Map<string, Prisma.Decimal>();
+      let fxGainUsd = D(0);
+      for (const [index, part] of parts.entries()) {
+        const partFxUsd = roundMoney(D(paidUsdParts[index]).minus(part.bookedUsd));
+        await tx.customerPaymentAllocation.create({
+          data: {
+            paymentId: payment.id,
+            saleId: part.sale.id,
+            allocatedAmountTjs: part.allocationTjs,
+            bookedAmountUsd: part.bookedUsd,
+            fxGainUsd: partFxUsd,
+          },
+        });
+        await tx.sale.update({
+          where: { id: part.sale.id },
+          data: { debtAmountTjs: { decrement: part.allocationTjs } },
+        });
+        fxGainUsd = fxGainUsd.plus(partFxUsd);
+        fxByStore.set(part.sale.storeId, (fxByStore.get(part.sale.storeId) ?? D(0)).plus(partFxUsd));
+      }
+
+      const ownerProfitAllocations: OwnerProfitAllocation[] = [];
+      for (const [saleStoreId, storeFxUsd] of fxByStore) {
+        if (storeFxUsd.isZero()) continue;
+        for (const row of await currentOwnerAllocations(tx, storeFxUsd, saleStoreId)) {
+          const existing = ownerProfitAllocations.find((a) => a.ownerId === row.ownerId);
+          if (existing) existing.amountUsd = roundMoney(D(existing.amountUsd).plus(row.amountUsd));
+          else ownerProfitAllocations.push(row);
+        }
+      }
+      await replaceOwnerAllocations(tx, [], ownerProfitAllocations, 1);
+      await tx.customerPayment.update({
+        where: { id: payment.id },
+        data: { fxGainUsd, ownerProfitAllocations: moneyJson(ownerProfitAllocations) },
+      });
 
       const updatedCustomer = await tx.customer.findUniqueOrThrow({ where: { id: customer.id }, omit: { pushSubscription: true } });
 
@@ -353,12 +395,14 @@ export class CustomersService {
         data: {
           userId: input.userId,
           action: 'CUSTOMER_PAYMENT',
-          details: `Принята оплата долга от клиента ${customer.name}: ${amountTjs} TJS ($${amountUsd}), остаток долга: ${updatedCustomer.totalDebtTjs} TJS`,
+          details: `Принята оплата долга от клиента ${customer.name}: ${amountTjs} TJS ($${amountUsd}), остаток долга: ${updatedCustomer.totalDebtTjs} TJS${fxGainUsd.isZero() ? '' : `. Курсовая разница партнёрам: ${fxGainUsd.gt(0) ? '+' : '−'}$${fxGainUsd.abs().toFixed(2)}`}`,
           financialDetails: moneyJson({
             amountTjs,
             amountUsd,
             exchangeRate: rate,
             remainingDebtTjs: updatedCustomer.totalDebtTjs,
+            fxGainUsd,
+            ownerProfitAllocations: moneyJson(ownerProfitAllocations),
           }),
           targetId: payment.id,
         },

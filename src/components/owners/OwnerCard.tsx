@@ -25,6 +25,8 @@ export const OwnerCard: React.FC<OwnerCardProps> = ({
 }) => {
   const capUsd = owner.capitalBalanceUsd ?? 0;
   const capTjs = moneyNumber(decimal(capUsd).mul(rate));
+  // A refund after the profit was already reinvested leaves it negative: future profit repays it.
+  const profitOwedUsd = Math.max(0, -(owner.availableProfitUsd ?? 0));
 
   return (
     <div className="rounded-2xl bg-surface border border-border p-3.5 sm:p-4 space-y-3.5 hover:border-fg-subtle/50 transition-all shadow-xs flex flex-col justify-between">
@@ -68,6 +70,11 @@ export const OwnerCard: React.FC<OwnerCardProps> = ({
           <span className="text-xs text-fg-subtle font-mono block mt-0.5">
             ≈ {formatTjs(capTjs)}
           </span>
+          {profitOwedUsd > 0 && (
+            <span className="text-xs text-danger font-semibold block mt-1.5">
+              К удержанию из будущей прибыли: {formatUsd(profitOwedUsd)}
+            </span>
+          )}
         </div>
       </div>
 

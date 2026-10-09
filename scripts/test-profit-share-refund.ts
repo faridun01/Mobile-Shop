@@ -314,14 +314,78 @@ try {
   const laterExpense = await createExpenseStandalone({ category: 'Аренда', amountTjs: D(1050), storeId: 'main-warehouse',
     paidFromCashRegister: false, createdByUserId: 'user-admin' });
   const mainCash = async () => D((await prisma.store.findUniqueOrThrow({ where: { id: 'main-warehouse' } })).cashBalanceUsd);
+  // Registered in January 2000: that month keeps its $105 after the payment; the $9.55 the payment
+  // saved is an exchange-rate result of the payment month (when the owners got it back too).
+  await prisma.expense.update({ where: { id: laterExpense.id }, data: { createdAt: new Date('2000-01-15T12:00:00Z') } });
+  const january = () => reportsModule.computeReportsSummary({ startDate: '2000-01-01', endDate: '2000-01-31' });
+  assert.equal((await january()).expensesUsd, 105);
+  const expenseFxBefore = D((await reportsModule.computeReportsSummary({ period: 'MONTH' })).periodExpenseFxUsd);
   await setTodayRate(11, 'user-admin');
   const mainCashBefore = await mainCash();
   assert.deepEqual(await change(() => payExpense(laterExpense.id, 'user-admin')),
     [{ accrued: 9.55, available: 9.55 }, { accrued: 0, available: 0 }]);
   assert.equal((await mainCash()).minus(mainCashBefore), -95.45);
   assert.equal((await prisma.expense.findUniqueOrThrow({ where: { id: laterExpense.id } })).amountUsd, 95.45);
+  assert.equal((await january()).expensesUsd, 105);
+  assert.equal(D((await reportsModule.computeReportsSummary({ period: 'MONTH' })).periodExpenseFxUsd).minus(expenseFxBefore), 9.55);
   await setTodayRate(10, 'user-admin');
   console.log('PASS: 1050 TJS expense paid at 11 takes $95.45 from the register and is re-stated from $105');
+  console.log('PASS: its January report keeps $105; the $9.55 rate result is reported in the payment month');
+
+  // Editing or cancelling a paid expense credits the register it really left (its posting), even
+  // when the expense's labels point elsewhere: 100 TJS paid from Сиёма, labelled "Центральная касса".
+  const { deleteExpense } = await import('../server/src/modules/expenses/expenses.service');
+  const mainAccount = async () => D((await prisma.financialAccount.findUniqueOrThrow({ where: { storeId: 'main-warehouse' } })).balanceUsd);
+  const labelled = await createExpenseStandalone({ category: 'Аренда', amountTjs: D(100), storeId: 'store-siyoma', createdByUserId: 'user-admin' });
+  await prisma.expense.update({ where: { id: labelled.id }, data: { sourceAccount: 'Центральная касса' } });
+  const siyomaAfterExpense = await siyomaCash();
+  const mainBeforeEdit = await mainCash();
+  await updateExpense(labelled.id, { amountTjs: D(200) }, 'user-admin');
+  assert.equal((await siyomaCash()).minus(siyomaAfterExpense), -10);
+  assert.equal(await mainCash(), mainBeforeEdit);
+  await deleteExpense(labelled.id, 'user-admin');
+  assert.equal((await siyomaCash()).minus(siyomaAfterExpense), 10);
+  assert.equal(await mainCash(), mainBeforeEdit);
+  assert.equal(await siyomaAccount(), await siyomaCash());
+  assert.equal(await mainAccount(), await mainCash());
+  console.log('PASS: editing and cancelling a paid expense return the money to the register it was paid from');
+
+  // A free bonus phone cannot carry a cost: nothing was paid or owed for it.
+  const { SuppliersService } = await import('../server/src/modules/suppliers/suppliers.service');
+  const freePhone = (imei: string, costBasisUsd: number) => SuppliersService.createBonus({ supplierId: 'sup-dubai', bonusType: 'FREE_DEVICES',
+    freeDevices: [{ brand: 'Test', model: 'Bonus', ram: '8GB', storage: '128GB', color: 'Black', imei, costBasisUsd }], createdByUserId: 'user-admin' });
+  await assert.rejects(freePhone('990000000000901', 150), /себестоимость должна быть 0/);
+  assert.equal(await prisma.device.count({ where: { imei: '990000000000901' } }), 0);
+  await freePhone('990000000000902', 0);
+  assert.equal((await prisma.device.findUniqueOrThrow({ where: { imei: '990000000000902' } })).costBasisUsd, 0);
+  console.log('PASS: a free bonus phone with a $150 cost is rejected; at cost 0 it is accepted');
+
+  // Customer debt is TJS, the sale booked it in dollars at the sale's rate. Repaid at another
+  // rate, the register gets more or fewer dollars; the difference is the owners' FX result.
+  // 2000 TJS at 10 ($200, cost $100), 500 TJS up front, 1500 TJS debt:
+  //   600 TJS at 12 = $50.00 vs $60.00 booked → −$10.00 (−6 / −4 at Сиёма 60/40);
+  //   900 TJS at 8 = $112.50 vs the remaining $90.00 → +$22.50 (+13.50 / +9.00).
+  const { CustomersService } = await import('../server/src/modules/customers/customers.service');
+  const debtItem = await device();
+  const debtSale = await SalesService.executeSale({ storeId: 'store-siyoma', userId: 'user-admin',
+    items: [{ deviceId: debtItem.id, salePriceTjs: D(2000) }], paymentMethod: 'DEBT', cashAmountTjs: D(500), customerName: 'Долг FX тест' });
+  const debtCustomerId = debtSale.customerId!;
+  const debtFxBefore = D((await reportsModule.computeReportsSummary({ period: 'MONTH' })).periodDebtFxUsd);
+  const debtCashBefore = await siyomaCash();
+  const pay = (amountTjs: number) => CustomersService.recordPayment({ customerId: debtCustomerId, amountTjs: D(amountTjs), storeId: 'store-siyoma', userId: 'user-admin' });
+  await setTodayRate(12, 'user-admin');
+  assert.deepEqual(await change(() => pay(600)), [{ accrued: -6, available: -6 }, { accrued: -4, available: -4 }]);
+  await setTodayRate(8, 'user-admin');
+  assert.deepEqual(await change(() => pay(900)), [{ accrued: 13.5, available: 13.5 }, { accrued: 9, available: 9 }]);
+  assert.equal((await siyomaCash()).minus(debtCashBefore), 162.5);
+  assert.equal(await siyomaAccount(), await siyomaCash());
+  assert.equal(D((await reportsModule.computeReportsSummary({ period: 'MONTH' })).periodDebtFxUsd).minus(debtFxBefore), 12.5);
+  // Register in: $50 + $50 + $112.50 = $212.50 for a $100 phone — exactly the owners' $112.50.
+  // Refund at 8 pays $250 back: −$100 profit and −$50 FX, which the register (−$250) and the
+  // returned phone (+$100) match to the cent.
+  assert.deepEqual(await change(() => refund(debtSale.id)), [{ accrued: -90, available: -90 }, { accrued: -60, available: -60 }]);
+  await setTodayRate(10, 'user-admin');
+  console.log('PASS: debt repaid at 12 and 8 books −$10 and +$22.50 FX to the 60/40 owners; register, profit and report agree');
 
   // A partner who moved to another store still gets their original share reversed on refund.
   const partnerSale = await makeSale();
@@ -341,6 +405,38 @@ try {
   assert.equal((await prisma.device.findUniqueOrThrow({ where: { id: legacy.item.id } })).status, 'SOLD');
   assert.equal((await prisma.sale.findUniqueOrThrow({ where: { id: legacy.sale.id } })).status, 'COMPLETED');
   console.log('PASS: missing historical allocation leaves sale, stock, cash and owner balances unchanged');
+
+  // A quarter close resets the profit counters. The owner check carries the profit left available
+  // over and compares the counters with the history since the last close, so it stays clean
+  // after a close that keeps the profit and after one that reinvests it.
+  const ownerChecks = () => {
+    const result = spawnSync(process.execPath, ['--import', 'tsx', 'scripts/check-owner-balances.ts'], { env: process.env, encoding: 'utf8', timeout: 120000 });
+    return result.stdout.split('Сверка капитала')[0] + result.stderr;
+  };
+  await makeSale();
+  assert(!ownerChecks().includes('FAIL'), ownerChecks());
+  await OwnersService.closeQuarter('Тест: перенос прибыли', false, 'user-admin');
+  await makeSale();
+  assert(!ownerChecks().includes('FAIL'), ownerChecks());
+  await OwnersService.closeQuarter('Тест: реинвест', true, 'user-admin');
+  await makeSale();
+  const afterReinvest = ownerChecks();
+  assert(!afterReinvest.includes('FAIL') && afterReinvest.includes('Тест: реинвест'), afterReinvest);
+  console.log('PASS: owner balance check stays clean after a quarter close that carries profit over and one that reinvests it');
+
+  // A refund after the profit was reinvested leaves it negative; that much capital is owed back
+  // from future profit and can't be withdrawn.
+  const reinvestedSale = await makeSale();
+  await OwnersService.closeQuarter('Тест: удержание', true, 'user-admin');
+  await refund(reinvestedSale.sale.id);
+  const partnerOwner = await prisma.owner.findUniqueOrThrow({ where: { id: 'owner-partner' } });
+  const owedUsd = D(partnerOwner.availableProfitUsd).negated();
+  assert(owedUsd.gt(0) && D(partnerOwner.capitalBalanceUsd).gt(owedUsd), `owed ${owedUsd}, capital ${partnerOwner.capitalBalanceUsd}`);
+  await assert.rejects(OwnersService.withdrawal('owner-partner', partnerOwner.capitalBalanceUsd, 'Главный счет', undefined, 'user-admin'), /к удержанию из будущей прибыли/);
+  await assert.rejects(OwnersService.withdrawal('owner-partner', D(partnerOwner.capitalBalanceUsd).minus(owedUsd).plus(0.01), 'Главный счет', undefined, 'user-admin'), /к удержанию из будущей прибыли/);
+  await OwnersService.withdrawal('owner-partner', D(0.01), 'Главный счет', undefined, 'user-admin');
+  assert.equal((await prisma.owner.findUniqueOrThrow({ where: { id: 'owner-partner' } })).capitalBalanceUsd, D(partnerOwner.capitalBalanceUsd).minus(0.01));
+  console.log(`PASS: with $${owedUsd} of profit owed back, only capital minus that amount can be withdrawn`);
 } finally {
   await disconnectService?.();
   await db.$executeRawUnsafe(`DROP SCHEMA "${schema}" CASCADE`);

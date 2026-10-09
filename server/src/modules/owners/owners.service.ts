@@ -1,4 +1,4 @@
-import { D, moneyJson, type MoneyInput } from '../../common/decimal';
+import { D, decimalMax, moneyJson, type MoneyInput } from '../../common/decimal';
 import { prisma } from '../../prisma/prisma.service';
 import type { TransactionClient } from '../../prisma/prisma.service';
 import { resolveActor } from '../../common/actor';
@@ -112,10 +112,21 @@ export class OwnersService {
     return prisma.$transaction(async (tx) => {
       const actor = await resolveActor(tx, userId);
       const exchangeRate = await requireTodayRate(tx);
+      // Locked so a refund that pushes profit below zero can't slip in between the check and the write.
+      await tx.$queryRaw`SELECT id FROM owners WHERE id = ${ownerId} FOR UPDATE`;
       const owner = await tx.owner.findUnique({ where: { id: ownerId } });
       if (!owner) throw new Error('Владелец не найден');
       const targetStore = await OwnersService.resolveTargetStore(tx, source);
       OwnersService.assertAllowed(owner, targetStore, restriction);
+      // Negative available profit (a refund after the profit was already reinvested or carried
+      // over) is owed back from future profit, so that much of the capital can't be taken out.
+      const profitOwedUsd = D(owner.availableProfitUsd).lt(0) ? D(owner.availableProfitUsd).negated() : D(0);
+      const withdrawableUsd = D(owner.capitalBalanceUsd).minus(profitOwedUsd);
+      if (D(amountUsd).gt(withdrawableUsd)) {
+        throw new Error(profitOwedUsd.gt(0)
+          ? `Сумма изъятия превышает доступный капитал: можно вывести $${roundMoney(decimalMax(withdrawableUsd, 0))} (капитал $${owner.capitalBalanceUsd}, к удержанию из будущей прибыли $${profitOwedUsd})`
+          : 'Сумма изъятия превышает текущий капитал');
+      }
       const guard = await tx.owner.updateMany({ where: { id: ownerId, capitalBalanceUsd: { gte: amountUsd } }, data: { capitalBalanceUsd: { decrement: amountUsd } } });
       if (guard.count !== 1) throw new Error('Сумма изъятия превышает текущий капитал');
 

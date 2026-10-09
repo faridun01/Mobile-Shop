@@ -32,7 +32,6 @@ import {
   Store,
   ArrowRight,
   HandCoins,
-  LogOut,
 } from 'lucide-react';
 import { NAV_PAGE_ROUTES } from '../../router/navRoutes';
 import { recordNavVisit } from '../../utils/navUsage';
@@ -86,7 +85,6 @@ export const Drawer: React.FC = () => {
     stores,
     selectedStoreId,
     setSelectedStoreId,
-    logout,
   } = useAppFields(
     'currentUser',
     'setActivePage',
@@ -94,8 +92,7 @@ export const Drawer: React.FC = () => {
     'setDrawerOpen',
     'stores',
     'selectedStoreId',
-    'setSelectedStoreId',
-    'logout'
+    'setSelectedStoreId'
   );
   const { notifications } = useNotifications();
   const { setStoreSwitchModalOpen, triggerStoreTransition } = useUIStore();
@@ -603,22 +600,6 @@ export const Drawer: React.FC = () => {
               </div>
             );
           })}
-
-          {/* Quick Logout Button at the bottom of the scroll list */}
-          <div className="pt-2">
-            <button
-              type="button"
-              onClick={() => {
-                closeDrawer();
-                logout();
-                navigate('/login');
-              }}
-              className="w-full flex items-center justify-center gap-2 p-2.5 rounded-xl border border-danger/25 bg-danger/5 hover:bg-danger/10 text-danger text-xs font-semibold transition-all active:scale-[0.98] cursor-pointer"
-            >
-              <LogOut className="w-4 h-4" />
-              <span>Выйти из аккаунта</span>
-            </button>
-          </div>
         </div>
       </div>
     </>

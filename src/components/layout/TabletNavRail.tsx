@@ -23,7 +23,6 @@ import {
   FileText,
   Settings,
   Bell,
-  LogOut,
   Landmark,
   TrendingUp,
   Store,
@@ -37,14 +36,12 @@ export const TabletNavRail: React.FC = () => {
   const {
     currentUser,
     setActivePage,
-    logout,
     stores,
     selectedStoreId,
     setSelectedStoreId,
   } = useAppFields(
     'currentUser',
     'setActivePage',
-    'logout',
     'stores',
     'selectedStoreId',
     'setSelectedStoreId'
@@ -223,16 +220,6 @@ export const TabletNavRail: React.FC = () => {
           );
         })}
       </nav>
-
-      <div className="flex flex-col items-center pt-2 border-t border-border w-full px-2">
-        <button
-          onClick={logout}
-          className="w-10 h-10 flex items-center justify-center rounded-lg bg-surface-raised hover:bg-danger/10 text-fg-muted hover:text-danger border border-border transition-colors"
-          title="Выйти из системы"
-        >
-          <LogOut className="w-4 h-4" />
-        </button>
-      </div>
     </aside>
   );
 };

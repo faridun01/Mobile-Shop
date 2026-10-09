@@ -25,7 +25,6 @@ import {
   FileText,
   Settings,
   Bell,
-  LogOut,
   Landmark,
   TrendingUp,
   Store,
@@ -52,13 +51,11 @@ export const Sidebar: React.FC = () => {
   const {
     currentUser,
     setActivePage,
-    logout,
     stores,
     selectedStoreId,
   } = useAppFields(
     'currentUser',
     'setActivePage',
-    'logout',
     'stores',
     'selectedStoreId'
   );
@@ -350,68 +347,45 @@ export const Sidebar: React.FC = () => {
       </nav>
 
       {/* User profile & Store info footer */}
-      <div className={`border-t border-border bg-surface shrink-0 ${sidebarCollapsed ? 'p-2 flex flex-col items-center gap-2' : 'p-2.5 space-y-2'}`}>
+      <div className={`border-t border-border bg-surface shrink-0 ${sidebarCollapsed ? 'p-2 flex flex-col items-center' : 'p-2.5'}`}>
         {sidebarCollapsed ? (
-          <>
-            <div
-              title={cleanDisplayName}
-              className="w-10 h-10 rounded-xl bg-accent/10 border border-accent/25 text-accent font-bold text-xs flex items-center justify-center cursor-default"
-            >
+          <div
+            title={cleanDisplayName}
+            className="w-10 h-10 rounded-xl bg-accent/10 border border-accent/25 text-accent font-bold text-xs flex items-center justify-center cursor-default"
+          >
+            {cleanDisplayName.substring(0, 2).toUpperCase()}
+          </div>
+        ) : (
+          <div className="flex items-center gap-2.5 px-1 min-w-0">
+            <div className="w-8 h-8 rounded-lg bg-accent/10 border border-accent/30 text-accent font-bold text-xs flex items-center justify-center shrink-0">
               {cleanDisplayName.substring(0, 2).toUpperCase()}
             </div>
-            <button
-              type="button"
-              onClick={logout}
-              title="Выйти из аккаунта"
-              className="w-10 h-10 flex items-center justify-center rounded-xl bg-surface-raised hover:bg-danger/10 text-fg-subtle hover:text-danger border border-border hover:border-danger/30 transition-colors cursor-pointer"
-            >
-              <LogOut className="w-4 h-4" />
-            </button>
-          </>
-        ) : (
-          <>
-            <div className="flex items-center gap-2.5 px-1 min-w-0">
-              <div className="w-8 h-8 rounded-lg bg-accent/10 border border-accent/30 text-accent font-bold text-xs flex items-center justify-center shrink-0">
-                {cleanDisplayName.substring(0, 2).toUpperCase()}
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className="text-xs font-semibold text-fg-muted truncate">{cleanDisplayName}</p>
-                {isStoreScoped ? (
-                  sellerStoreName ? (
-                    <p className="text-[10px] text-fg-subtle truncate flex items-center gap-1">
-                      <Store className="w-2.5 h-2.5 text-accent shrink-0" />
-                      <span>{sellerStoreName}</span>
-                    </p>
-                  ) : null
-                ) : (
+            <div className="min-w-0 flex-1">
+              <p className="text-xs font-semibold text-fg-muted truncate">{cleanDisplayName}</p>
+              {isStoreScoped ? (
+                sellerStoreName ? (
                   <p className="text-[10px] text-fg-subtle truncate flex items-center gap-1">
-                    {isCentralCashMode ? (
-                      <>
-                        <Landmark className="w-2.5 h-2.5 text-accent shrink-0" />
-                        <span>Центральная касса</span>
-                      </>
-                    ) : (
-                      <>
-                        <Store className="w-2.5 h-2.5 text-warning shrink-0" />
-                        <span>{activeRetailStore?.name || 'Магазин'}</span>
-                      </>
-                    )}
+                    <Store className="w-2.5 h-2.5 text-accent shrink-0" />
+                    <span>{sellerStoreName}</span>
                   </p>
-                )}
-              </div>
+                ) : null
+              ) : (
+                <p className="text-[10px] text-fg-subtle truncate flex items-center gap-1">
+                  {isCentralCashMode ? (
+                    <>
+                      <Landmark className="w-2.5 h-2.5 text-accent shrink-0" />
+                      <span>Центральная касса</span>
+                    </>
+                  ) : (
+                    <>
+                      <Store className="w-2.5 h-2.5 text-warning shrink-0" />
+                      <span>{activeRetailStore?.name || 'Магазин'}</span>
+                    </>
+                  )}
+                </p>
+              )}
             </div>
-
-            <div className="pt-0.5">
-              <button
-                type="button"
-                onClick={logout}
-                className="w-full flex items-center justify-center gap-1.5 h-8 rounded-lg bg-surface-raised hover:bg-danger/10 text-fg-subtle hover:text-danger border border-border hover:border-danger/30 text-xs font-semibold transition-colors cursor-pointer"
-              >
-                <LogOut className="w-3.5 h-3.5" />
-                <span>Выход</span>
-              </button>
-            </div>
-          </>
+          </div>
         )}
       </div>
     </aside>

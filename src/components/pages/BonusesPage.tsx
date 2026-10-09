@@ -636,7 +636,7 @@ export const BonusesPage: React.FC = () => {
             onClick={() => setIsCreateModalOpen(true)}
             className="h-7.5 px-2.5 text-xs font-bold cursor-pointer shadow-xs shrink-0 whitespace-nowrap"
           >
-            <span>+ Бонус</span>
+            <span>Бонус</span>
           </Button>
         </div>
       </div>
@@ -800,7 +800,10 @@ export const BonusesPage: React.FC = () => {
         {activeTab === 'HISTORY' ? (
           <div className="space-y-2">
             {/* Collapsible header */}
-            <div className="flex items-center justify-between gap-2 px-1 py-0.5">
+            <div
+              onClick={() => setIsHistoryCollapsed((c) => !c)}
+              className="flex items-center justify-between gap-2 px-1 py-0.5 cursor-pointer select-none"
+            >
               <div className="flex items-center gap-2">
                 <h3 className="text-xs font-bold text-fg uppercase tracking-wider">
                   Журнал бонусов
@@ -811,7 +814,10 @@ export const BonusesPage: React.FC = () => {
               </div>
               <button
                 type="button"
-                onClick={() => setIsHistoryCollapsed((c) => !c)}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setIsHistoryCollapsed((c) => !c);
+                }}
                 className="h-6.5 px-2.5 rounded-lg text-xs font-semibold text-fg-subtle hover:text-fg bg-surface-raised border border-border hover:border-accent/40 flex items-center gap-1.5 cursor-pointer transition-colors"
                 title={isHistoryCollapsed ? 'Развернуть историю' : 'Свернуть историю'}
               >
@@ -824,18 +830,9 @@ export const BonusesPage: React.FC = () => {
               </button>
             </div>
 
-            {/* Collapsed state placeholder or full list */}
-            {isHistoryCollapsed ? (
-              <div
-                onClick={() => setIsHistoryCollapsed(false)}
-                className="p-3.5 rounded-xl bg-surface border border-border border-dashed text-center text-xs text-fg-subtle hover:text-fg hover:border-accent/40 cursor-pointer transition-colors flex items-center justify-center gap-2 shadow-2xs"
-              >
-                <span>История бонусов свернута ({filteredBonuses.length} записей)</span>
-                <span className="text-accent font-semibold flex items-center gap-0.5">
-                  Развернуть <ChevronDown className="w-3.5 h-3.5" />
-                </span>
-              </div>
-            ) : filteredBonuses.length === 0 ? (
+            {/* List or empty state (when not collapsed) */}
+            {!isHistoryCollapsed && (
+              filteredBonuses.length === 0 ? (
               <EmptyState
                 icon={Gift}
                 title={selectedMonth ? `За ${monthLabel} бонусов нет` : 'Бонусов пока нет'}
@@ -977,7 +974,8 @@ export const BonusesPage: React.FC = () => {
                       </div>
                     );
                   })}
-              </div>
+                </div>
+              )
             )}
           </div>
         ) : (

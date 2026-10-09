@@ -53,12 +53,10 @@ export const SaleVariantRow: React.FC<SaleVariantRowProps> = ({ variant, expande
 
         <div className="text-right shrink-0 flex items-center gap-2">
           <div className="flex flex-col items-end gap-0.5">
-            {minRetail !== undefined ? (
+            {minRetail !== undefined && (
               <span className="text-sm font-bold tabular-nums text-accent whitespace-nowrap">
                 {formatMoney(minRetail)}{maxRetail !== undefined && maxRetail > minRetail ? `–${formatMoney(maxRetail)}` : ''} TJS
               </span>
-            ) : (
-              <span className="text-xs text-fg-subtle whitespace-nowrap">Цена не задана</span>
             )}
             <span className="text-xs text-fg-subtle tabular-nums">{variant.devices.length} шт.</span>
           </div>

@@ -65,7 +65,7 @@ interface SupplierBonusInput {
   campaignTitle?: string;
   bonusType: 'FREE_DEVICES' | 'CASH_DISCOUNT';
   amountUsd?: MoneyInput;
-  freeDevices?: { brand: string; model: string; ram?: string; storage: string; color: string; imei: string; costBasisUsd: MoneyInput }[];
+  freeDevices?: { brand: string; model: string; ram?: string; storage: string; color: string; imei: string; costBasisUsd?: MoneyInput }[];
   destinationStoreId?: string;
   createdByUserId: string;
 }
@@ -361,7 +361,10 @@ export class SuppliersService {
           if (!device.ram || !String(device.ram).trim()) {
             throw new Error('RAM обязателен для каждого устройства');
           }
-          const costBasisUsd = requireNonNegativeMoney(device.costBasisUsd, 'Себестоимость бонусного устройства');
+          // A free phone costs nothing: no debt, cash or capital stands behind it, so a cost would add
+          // stock out of thin air. Its whole price goes to the bonus pool when it is sold.
+          const costBasisUsd = requireNonNegativeMoney(device.costBasisUsd ?? 0, 'Себестоимость бонусного устройства');
+          if (costBasisUsd.gt(0)) throw new Error('Бонусное устройство поступает бесплатно: себестоимость должна быть 0');
           const created = await tx.device.create({
             data: {
               imei: device.imei,

@@ -68,6 +68,19 @@ async function getCentralStore(tx: TransactionClient) {
   );
 }
 
+/**
+ * The register a paid expense actually left: the store behind its posted ledger transaction.
+ * Undoing the payment must credit that same register, because the ledger reversal goes to that
+ * account. Null for old expenses without a posting (callers fall back to the source-account rules).
+ */
+async function paidExpenseStoreId(tx: TransactionClient, expenseId: string) {
+  const posted = await tx.financialTransaction.findFirst({
+    where: { sourceType: 'EXPENSE', sourceId: expenseId, status: 'POSTED', reversedTransactionId: null },
+    select: { account: { select: { storeId: true } } },
+  });
+  return posted?.account.storeId ?? null;
+}
+
 /** Runs inside a caller-supplied transaction so repair-cost bookings share one atomic unit. */
 export async function createExpense(tx: TransactionClient, input: CreateExpenseInput) {
   if (input.employeeId) await tx.$queryRaw`SELECT id FROM users WHERE id = ${input.employeeId} FOR UPDATE`;
@@ -278,6 +291,7 @@ export async function payExpense(id: string, actorId: string, storeIdForBusiness
         paidFromCashRegister: true,
         sourceAccount: cashStore.isMainWarehouse ? 'Центральная касса' : `Касса ${cashStore.name}`,
         amountUsd: paidUsd,
+        paymentFxUsd: roundMoney(D(registeredUsd).minus(paidUsd)),
         exchangeRate: rate,
         ...(restatedAllocations ? { ownerProfitAllocations: moneyJson(restatedAllocations) } : {}),
       },
@@ -337,6 +351,11 @@ export async function updateExpense(
     // cash balance and owner profit below — simpler and safer than trying to patch a
     // POSTED row in place, and it naturally handles the store-changed case too.
     const existingTransaction = await tx.financialTransaction.findFirst({ where: { sourceType: 'EXPENSE', sourceId: id, status: 'POSTED', reversedTransactionId: null } });
+    // The register the payment really left (its posting's account): the reversal below credits
+    // that account, so the register must get the money back too. Null for old unposted expenses.
+    const paidFromStoreId = existingTransaction
+      ? (await tx.financialAccount.findUnique({ where: { id: existingTransaction.accountId }, select: { storeId: true } }))?.storeId ?? null
+      : null;
     if (existingTransaction) {
       await cancelTransaction(tx, existingTransaction.id, actor.id);
     }
@@ -346,7 +365,7 @@ export async function updateExpense(
       const centralStore = await getCentralStore(tx);
       const isOldSalaryOrAdvance = existing.category === 'SALARY' || existing.category === 'Зарплата' || existing.category === 'EMPLOYEE_ADVANCE' || existing.category === 'Аванс сотрудника' || existing.isEmployeeAdvance;
       const isOldCentral = existing.sourceAccount === 'Центральная касса' || isOldSalaryOrAdvance || !existing.storeId;
-      const oldCashStoreId = isOldCentral ? centralStore?.id : existing.storeId;
+      const oldCashStoreId = paidFromStoreId ?? (isOldCentral ? centralStore?.id : existing.storeId);
       if (oldCashStoreId) {
         await tx.store.update({
           where: { id: oldCashStoreId },
@@ -360,7 +379,11 @@ export async function updateExpense(
       const newStore = newStoreId ? await tx.store.findUnique({ where: { id: newStoreId } }) : null;
       const isNewSalaryOrAdvance = newCategory === 'SALARY' || newCategory === 'Зарплата' || newCategory === 'EMPLOYEE_ADVANCE' || newCategory === 'Аванс сотрудника' || existing.isEmployeeAdvance;
       const isCentral = existing.sourceAccount === 'Центральная касса' || isNewSalaryOrAdvance || (!newStoreId && Boolean(centralStore));
-      const targetStore = isCentral ? (centralStore || newStore) : (newStore || centralStore);
+      // Same store and category: the payment stays on the register it was made from.
+      const keepsRegister = paidFromStoreId && (newStoreId ?? null) === (existing.storeId ?? null) && newCategory === existing.category;
+      const targetStore = keepsRegister
+        ? await tx.store.findUnique({ where: { id: paidFromStoreId } })
+        : isCentral ? (centralStore || newStore) : (newStore || centralStore);
       if (!targetStore) throw new Error('Касса для списания расхода не найдена');
       const cashGuard = await tx.store.updateMany({
         where: { id: targetStore.id, cashBalanceUsd: { gte: newAmountUsd } },
@@ -483,7 +506,7 @@ export async function deleteExpense(id: string, actorId: string) {
       const centralStore = await getCentralStore(tx);
       const isSalaryOrAdvance = existing.category === 'SALARY' || existing.category === 'Зарплата' || existing.category === 'EMPLOYEE_ADVANCE' || existing.category === 'Аванс сотрудника' || existing.isEmployeeAdvance;
       const isCentral = existing.sourceAccount === 'Центральная касса' || isSalaryOrAdvance || !existing.storeId;
-      const targetStoreId = isCentral ? centralStore?.id : existing.storeId;
+      const targetStoreId = (await paidExpenseStoreId(tx, id)) ?? (isCentral ? centralStore?.id : existing.storeId);
       if (targetStoreId) {
         await tx.store.update({
           where: { id: targetStoreId },

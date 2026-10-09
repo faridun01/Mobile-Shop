@@ -19,6 +19,7 @@ exports[`financial report query optimization preserves all totals > preserves th
   "mainWarehouseCashTjs": 345.7,
   "mainWarehouseCashUsd": 34.57,
   "mainWarehouseExpenses": {
+    "expenseFxUsd": 0,
     "expensesByCategory": [],
     "expensesTjs": 0,
     "expensesUsd": 0,
@@ -82,6 +83,9 @@ exports[`financial report query optimization preserves all totals > preserves th
   "netProfitUsd": 223534.53,
   "periodCashBonusesTjs": 255,
   "periodCashBonusesUsd": 25.5,
+  "periodDebtFxTjs": 0,
+  "periodDebtFxUsd": 0,
+  "periodExpenseFxUsd": 0,
   "periodFreeDeviceBonusesReceived": 1,
   "periodRefundFxTjs": 0,
   "periodRefundFxUsd": 0,
@@ -102,6 +106,8 @@ exports[`financial report query optimization preserves all totals > preserves th
       "cashUsd": 101,
       "cogsTjs": 166008.3,
       "cogsUsd": 16600.83,
+      "debtFxUsd": 0,
+      "expenseFxUsd": 0,
       "expensesByCategory": [
         {
           "amountTjs": 1234,
@@ -168,6 +174,8 @@ exports[`financial report query optimization preserves all totals > preserves th
       "cashUsd": 102,
       "cogsTjs": 166008.3,
       "cogsUsd": 16600.83,
+      "debtFxUsd": 0,
+      "expenseFxUsd": 0,
       "expensesByCategory": [
         {
           "amountTjs": 1234,
@@ -234,6 +242,8 @@ exports[`financial report query optimization preserves all totals > preserves th
       "cashUsd": 107,
       "cogsTjs": 166008.3,
       "cogsUsd": 16600.83,
+      "debtFxUsd": 0,
+      "expenseFxUsd": 0,
       "expensesByCategory": [
         {
           "amountTjs": 1234,
@@ -300,6 +310,8 @@ exports[`financial report query optimization preserves all totals > preserves th
       "cashUsd": 108,
       "cogsTjs": 166008.3,
       "cogsUsd": 16600.83,
+      "debtFxUsd": 0,
+      "expenseFxUsd": 0,
       "expensesByCategory": [
         {
           "amountTjs": 1234,
@@ -366,6 +378,8 @@ exports[`financial report query optimization preserves all totals > preserves th
       "cashUsd": 114,
       "cogsTjs": 166008.3,
       "cogsUsd": 16600.83,
+      "debtFxUsd": 0,
+      "expenseFxUsd": 0,
       "expensesByCategory": [
         {
           "amountTjs": 1234,
@@ -432,6 +446,8 @@ exports[`financial report query optimization preserves all totals > preserves th
       "cashUsd": 115,
       "cogsTjs": 166008.3,
       "cogsUsd": 16600.83,
+      "debtFxUsd": 0,
+      "expenseFxUsd": 0,
       "expensesByCategory": [
         {
           "amountTjs": 1234,
@@ -498,6 +514,8 @@ exports[`financial report query optimization preserves all totals > preserves th
       "cashUsd": 100,
       "cogsTjs": 162008.1,
       "cogsUsd": 16200.81,
+      "debtFxUsd": 0,
+      "expenseFxUsd": 0,
       "expensesByCategory": [
         {
           "amountTjs": 1234,
@@ -564,6 +582,8 @@ exports[`financial report query optimization preserves all totals > preserves th
       "cashUsd": 103,
       "cogsTjs": 162008.1,
       "cogsUsd": 16200.81,
+      "debtFxUsd": 0,
+      "expenseFxUsd": 0,
       "expensesByCategory": [
         {
           "amountTjs": 1234,
@@ -630,6 +650,8 @@ exports[`financial report query optimization preserves all totals > preserves th
       "cashUsd": 104,
       "cogsTjs": 164008.2,
       "cogsUsd": 16400.82,
+      "debtFxUsd": 0,
+      "expenseFxUsd": 0,
       "expensesByCategory": [
         {
           "amountTjs": 1234,
@@ -696,6 +718,8 @@ exports[`financial report query optimization preserves all totals > preserves th
       "cashUsd": 105,
       "cogsTjs": 164008.2,
       "cogsUsd": 16400.82,
+      "debtFxUsd": 0,
+      "expenseFxUsd": 0,
       "expensesByCategory": [
         {
           "amountTjs": 1234,
@@ -762,6 +786,8 @@ exports[`financial report query optimization preserves all totals > preserves th
       "cashUsd": 106,
       "cogsTjs": 162008.1,
       "cogsUsd": 16200.81,
+      "debtFxUsd": 0,
+      "expenseFxUsd": 0,
       "expensesByCategory": [
         {
           "amountTjs": 1234,
@@ -828,6 +854,8 @@ exports[`financial report query optimization preserves all totals > preserves th
       "cashUsd": 109,
       "cogsTjs": 162008.1,
       "cogsUsd": 16200.81,
+      "debtFxUsd": 0,
+      "expenseFxUsd": 0,
       "expensesByCategory": [
         {
           "amountTjs": 1234,
@@ -894,6 +922,8 @@ exports[`financial report query optimization preserves all totals > preserves th
       "cashUsd": 110,
       "cogsTjs": 164008.2,
       "cogsUsd": 16400.82,
+      "debtFxUsd": 0,
+      "expenseFxUsd": 0,
       "expensesByCategory": [
         {
           "amountTjs": 1234,
@@ -960,6 +990,8 @@ exports[`financial report query optimization preserves all totals > preserves th
       "cashUsd": 111,
       "cogsTjs": 164008.2,
       "cogsUsd": 16400.82,
+      "debtFxUsd": 0,
+      "expenseFxUsd": 0,
       "expensesByCategory": [
         {
           "amountTjs": 1234,
@@ -1026,6 +1058,8 @@ exports[`financial report query optimization preserves all totals > preserves th
       "cashUsd": 112,
       "cogsTjs": 164008.2,
       "cogsUsd": 16400.82,
+      "debtFxUsd": 0,
+      "expenseFxUsd": 0,
       "expensesByCategory": [
         {
           "amountTjs": 1234,
@@ -1092,6 +1126,8 @@ exports[`financial report query optimization preserves all totals > preserves th
       "cashUsd": 113,
       "cogsTjs": 164008.2,
       "cogsUsd": 16400.82,
+      "debtFxUsd": 0,
+      "expenseFxUsd": 0,
       "expensesByCategory": [
         {
           "amountTjs": 1234,
@@ -1158,6 +1194,8 @@ exports[`financial report query optimization preserves all totals > preserves th
       "cashUsd": 116,
       "cogsTjs": 164008.2,
       "cogsUsd": 16400.82,
+      "debtFxUsd": 0,
+      "expenseFxUsd": 0,
       "expensesByCategory": [
         {
           "amountTjs": 1234,
@@ -1224,6 +1262,8 @@ exports[`financial report query optimization preserves all totals > preserves th
       "cashUsd": 117,
       "cogsTjs": 164008.2,
       "cogsUsd": 16400.82,
+      "debtFxUsd": 0,
+      "expenseFxUsd": 0,
       "expensesByCategory": [
         {
           "amountTjs": 1234,
@@ -1290,6 +1330,8 @@ exports[`financial report query optimization preserves all totals > preserves th
       "cashUsd": 118,
       "cogsTjs": 162008.1,
       "cogsUsd": 16200.81,
+      "debtFxUsd": 0,
+      "expenseFxUsd": 0,
       "expensesByCategory": [
         {
           "amountTjs": 1234,
@@ -1356,6 +1398,8 @@ exports[`financial report query optimization preserves all totals > preserves th
       "cashUsd": 119,
       "cogsTjs": 164008.2,
       "cogsUsd": 16400.82,
+      "debtFxUsd": 0,
+      "expenseFxUsd": 0,
       "expensesByCategory": [
         {
           "amountTjs": 1234,
@@ -1450,6 +1494,7 @@ exports[`financial report query optimization preserves all totals > preserves th
   "mainWarehouseCashTjs": 345.7,
   "mainWarehouseCashUsd": 34.57,
   "mainWarehouseExpenses": {
+    "expenseFxUsd": 0,
     "expensesByCategory": [],
     "expensesTjs": 0,
     "expensesUsd": 0,
@@ -1513,6 +1558,9 @@ exports[`financial report query optimization preserves all totals > preserves th
   "netProfitUsd": 11297.07,
   "periodCashBonusesTjs": 0,
   "periodCashBonusesUsd": 0,
+  "periodDebtFxTjs": 0,
+  "periodDebtFxUsd": 0,
+  "periodExpenseFxUsd": 0,
   "periodFreeDeviceBonusesReceived": 1,
   "periodRefundFxTjs": 0,
   "periodRefundFxUsd": 0,
@@ -1533,6 +1581,8 @@ exports[`financial report query optimization preserves all totals > preserves th
       "cashUsd": 100,
       "cogsTjs": 162008.1,
       "cogsUsd": 16200.81,
+      "debtFxUsd": 0,
+      "expenseFxUsd": 0,
       "expensesByCategory": [
         {
           "amountTjs": 1234,
@@ -1627,6 +1677,7 @@ exports[`financial report query optimization preserves all totals > preserves th
   "mainWarehouseCashTjs": 345.7,
   "mainWarehouseCashUsd": 34.57,
   "mainWarehouseExpenses": {
+    "expenseFxUsd": 0,
     "expensesByCategory": [],
     "expensesTjs": 0,
     "expensesUsd": 0,
@@ -1690,6 +1741,9 @@ exports[`financial report query optimization preserves all totals > preserves th
   "netProfitUsd": 11195.94,
   "periodCashBonusesTjs": 0,
   "periodCashBonusesUsd": 0,
+  "periodDebtFxTjs": 0,
+  "periodDebtFxUsd": 0,
+  "periodExpenseFxUsd": 0,
   "periodFreeDeviceBonusesReceived": 1,
   "periodRefundFxTjs": 0,
   "periodRefundFxUsd": 0,
@@ -1710,6 +1764,8 @@ exports[`financial report query optimization preserves all totals > preserves th
       "cashUsd": 101,
       "cogsTjs": 166008.3,
       "cogsUsd": 16600.83,
+      "debtFxUsd": 0,
+      "expenseFxUsd": 0,
       "expensesByCategory": [
         {
           "amountTjs": 1234,

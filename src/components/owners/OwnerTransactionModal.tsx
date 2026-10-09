@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, Users, ArrowDownLeft, ArrowUpRight, Store, Loader2, AlertTriangle, Landmark } from 'lucide-react';
 import { CustomSelect } from '../ui/CustomSelect';
-import { formatMoney } from '../../utils/money';
+import { decimal, formatMoney, moneyNumber } from '../../utils/money';
 import { formatStoreName } from '../../utils/storeContext';
 import { Store as StoreType, Owner } from '../../types';
 
@@ -68,7 +68,9 @@ export const OwnerTransactionModal: React.FC<OwnerTransactionModalProps> = ({
   const selectedStore = stores.find(s => s.id === selectedStoreId) || centralStore || stores[0];
   const selectedOwner = displayOwners.find(o => o.id === selectedOwnerId);
   const storeCash = selectedStore?.cashBalanceUsd ?? 0;
-  const ownerCapital = selectedOwner?.capitalBalanceUsd ?? 0;
+  // Profit owed back (negative available profit) can't be withdrawn — the server enforces the same.
+  const profitOwedUsd = Math.max(0, -(selectedOwner?.availableProfitUsd ?? 0));
+  const ownerCapital = moneyNumber(decimal(selectedOwner?.capitalBalanceUsd ?? 0).minus(profitOwedUsd));
 
   // Handle numeric input with comma/dot normalization for iOS Russian keyboard
   const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -249,7 +251,9 @@ export const OwnerTransactionModal: React.FC<OwnerTransactionModalProps> = ({
                 )}
                 {isCapitalInsufficient && (
                   <li>
-                    Капитал учредителя составляет <strong>${formatMoney(ownerCapital)}</strong>.
+                    {profitOwedUsd > 0
+                      ? <>Можно вывести <strong>${formatMoney(Math.max(0, ownerCapital))}</strong>: капитал <strong>${formatMoney(selectedOwner?.capitalBalanceUsd ?? 0)}</strong> минус <strong>${formatMoney(profitOwedUsd)}</strong> к удержанию из будущей прибыли.</>
+                      : <>Капитал учредителя составляет <strong>${formatMoney(ownerCapital)}</strong>.</>}
                   </li>
                 )}
               </ul>

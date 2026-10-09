@@ -6,7 +6,7 @@ import { writeFileSync, mkdirSync } from 'node:fs';
 const db = vi.hoisted(() => ({
   sale: { findMany: vi.fn() }, expense: { findMany: vi.fn() }, supplierBonus: { findMany: vi.fn() },
   supplier: { aggregate: vi.fn(), findMany: vi.fn() }, store: { findFirst: vi.fn(), findMany: vi.fn() },
-  auditLog: { findMany: vi.fn() }, device: { findMany: vi.fn() },
+  auditLog: { findMany: vi.fn() }, device: { findMany: vi.fn() }, customerPaymentAllocation: { findMany: vi.fn() },
 }));
 vi.mock('../../prisma/prisma.service', () => ({ prisma: db }));
 const rates = vi.hoisted(() => ({ byDay: new Map<string, number>(), fallback: 10 }));
@@ -45,13 +45,14 @@ beforeEach(() => {
   db.sale.findMany.mockImplementation(async ({ where, select }) => result('sales', sales.filter((sale) =>
     (!where.storeId || sale.storeId === where.storeId) && (!where.id || where.id.in.includes(sale.id)) &&
     (where.status !== 'REFUNDED' || sale.status === 'REFUNDED')), select));
-  db.expense.findMany.mockImplementation(async ({ where, select }) => result('expenses', expenses.filter((expense) => !where?.storeId || expense.storeId === where.storeId), select));
+  db.expense.findMany.mockImplementation(async ({ where, select }) => result('expenses', expenses.filter((expense: any) => (!where?.storeId || expense.storeId === where.storeId) && (!where?.paymentFxUsd || Number(expense.paymentFxUsd ?? 0) !== 0)), select));
   db.auditLog.findMany.mockImplementation(async ({ where, select }) => {
     const ids = where.targetId ? new Set(where.targetId.in) : undefined;
     const actions: string[] = where.action.in ?? [where.action];
     return result('profitLogs', logs.filter((log) => (!ids || ids.has(log.targetId)) && actions.includes(log.action)), select);
   });
   db.supplierBonus.findMany.mockResolvedValue([{ bonusType: 'CASH_DISCOUNT', amountUsd: 25.5, exchangeRate: 10, dateReceived: date }, { bonusType: 'FREE_DEVICES', dateReceived: date, status: 'IN_STOCK' }]);
+  db.customerPaymentAllocation.findMany.mockResolvedValue([]);
   db.supplier.aggregate.mockResolvedValue({ _sum: { totalDebtUsd: 123.45 } });
   db.supplier.findMany.mockResolvedValue([{ id: 'supplier', name: 'Supplier', totalPurchasedUsd: 200, totalPaidUsd: 76.55, totalDebtUsd: 123.45 }]);
   db.store.findFirst.mockResolvedValue({ id: 'warehouse', cashBalanceUsd: 34.57 });
