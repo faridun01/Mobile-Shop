@@ -84,6 +84,7 @@ export const Sidebar: React.FC = () => {
           title: 'Основные операции',
           items: [
             { id: 'SALE', label: 'POS Терминал', icon: ShoppingBag, roles: ['SELLER'] },
+            { id: 'STORE_RECEIPT', label: 'Приход товара', icon: PackagePlus, roles: ['SELLER'] },
             { id: 'INVENTORY', label: 'Склад магазина', icon: Package, roles: ['SELLER'] },
             { id: 'SALES_HISTORY', label: 'История продаж', icon: History, roles: ['SELLER'] },
             { id: 'EXCHANGE', label: 'Обмен (Trade-In)', icon: RefreshCw, roles: ['SELLER'] },
@@ -93,7 +94,6 @@ export const Sidebar: React.FC = () => {
         {
           title: 'Склад и касса',
           items: [
-            { id: 'STORE_RECEIPT', label: 'Приход товара', icon: PackagePlus, roles: ['SELLER'] },
             { id: 'TRANSFER', label: 'Перемещение', icon: ArrowLeftRight, roles: ['SELLER'] },
             { id: 'REVISION', label: 'Ревизия склада', icon: ClipboardCheck, roles: ['SELLER'] },
             { id: 'EXPENSES', label: 'Расходы кассы', icon: Wallet, roles: ['SELLER'] },
@@ -109,6 +109,7 @@ export const Sidebar: React.FC = () => {
           title: 'Магазин и продажи',
           items: [
             { id: 'SALE', label: 'POS Терминал', icon: ShoppingBag, roles: ['PARTNER'] },
+            { id: 'STORE_RECEIPT', label: 'Приход товара', icon: PackagePlus, roles: ['PARTNER'] },
             { id: 'CASH_DESK', label: 'Касса', icon: Wallet, roles: ['PARTNER'] },
             { id: 'SALES_HISTORY', label: 'История продаж', icon: History, roles: ['PARTNER'] },
             { id: 'EXCHANGE', label: 'Обмен (Trade-In)', icon: RefreshCw, roles: ['PARTNER'] },
@@ -119,7 +120,6 @@ export const Sidebar: React.FC = () => {
           title: 'Склад',
           items: [
             { id: 'INVENTORY', label: 'Склад магазина', icon: Package, roles: ['PARTNER'] },
-            { id: 'STORE_RECEIPT', label: 'Приход товара', icon: PackagePlus, roles: ['PARTNER'] },
             { id: 'TRANSFER', label: 'Перемещение', icon: ArrowLeftRight, roles: ['PARTNER'] },
             { id: 'REVISION', label: 'Ревизия склада', icon: ClipboardCheck, roles: ['PARTNER'] },
           ],
@@ -141,21 +141,20 @@ export const Sidebar: React.FC = () => {
         {
           title: 'Центральная касса и финансы',
           items: [
+            { id: 'PURCHASE', label: 'Приходы (партии)', icon: PlusCircle, roles: ['ADMIN'] },
             { id: 'REPORTS', label: 'Отчёты', icon: TrendingUp, roles: ['ADMIN'] },
             { id: 'CASH_DESK', label: 'Касса', icon: Wallet, roles: ['ADMIN'] },
-            { id: 'CASH_COLLECTION', label: 'Инкассация', icon: HandCoins, roles: ['ADMIN'] },
             { id: 'SALES_HISTORY', label: 'История продаж', icon: History, roles: ['ADMIN'] },
+            { id: 'CASH_COLLECTION', label: 'Инкассация', icon: HandCoins, roles: ['ADMIN'] },
             { id: 'EXPENSES', label: 'Расходы кассы', icon: Wallet, roles: ['ADMIN'] },
             { id: 'BONUSES', label: 'Бонусы поставщиков', icon: Gift, roles: ['ADMIN'] },
             { id: 'OWNERS', label: 'Партнеры и капитал', icon: Users, roles: ['ADMIN'] },
-            { id: 'CUSTOMERS', label: 'База клиентов', icon: Users, roles: ['ADMIN'] },
           ],
         },
         {
           title: 'Склад и логистика',
           items: [
             { id: 'INVENTORY', label: 'Склад товаров', icon: Package, roles: ['ADMIN'] },
-            { id: 'PURCHASE', label: 'Приходы (партии)', icon: PlusCircle, roles: ['ADMIN'] },
             { id: 'TRANSFER', label: 'Перемещение', icon: ArrowLeftRight, roles: ['ADMIN'] },
             { id: 'REVISION', label: 'Ревизия склада', icon: ClipboardCheck, roles: ['ADMIN'] },
             { id: 'SUPPLIERS', label: 'Поставщики', icon: Truck, roles: ['ADMIN'] },
@@ -166,6 +165,7 @@ export const Sidebar: React.FC = () => {
           title: 'Система и доступ',
           items: [
             { id: 'EMPLOYEES', label: 'Сотрудники', icon: UserCheck, roles: ['ADMIN'] },
+            { id: 'CUSTOMERS', label: 'База клиентов', icon: Users, roles: ['ADMIN'] },
             { id: 'NOTIFICATIONS', label: 'Уведомления', icon: Bell, roles: ['ADMIN'] },
             { id: 'AUDIT_LOG', label: 'Журнал аудита', icon: FileText, roles: ['ADMIN'] },
             { id: 'SETTINGS', label: 'Настройки системы', icon: Settings, roles: ['ADMIN'] },
@@ -180,6 +180,7 @@ export const Sidebar: React.FC = () => {
         title: 'Магазин и продажи',
         items: [
           { id: 'SALE', label: 'POS Терминал', icon: ShoppingBag, roles: ['ADMIN'] },
+          { id: 'STORE_RECEIPT', label: 'Приход товара', icon: PackagePlus, roles: ['ADMIN'] },
           { id: 'CASH_DESK', label: 'Касса', icon: Wallet, roles: ['ADMIN'] },
           { id: 'SALES_HISTORY', label: 'История продаж', icon: History, roles: ['ADMIN'] },
           { id: 'EXCHANGE', label: 'Обмен (Trade-In)', icon: RefreshCw, roles: ['ADMIN'] },
@@ -190,7 +191,6 @@ export const Sidebar: React.FC = () => {
         title: 'Склад',
         items: [
           { id: 'INVENTORY', label: 'Склад магазина', icon: Package, roles: ['ADMIN'] },
-          { id: 'STORE_RECEIPT', label: 'Приход товара', icon: PackagePlus, roles: ['ADMIN'] },
           { id: 'TRANSFER', label: 'Перемещение', icon: ArrowLeftRight, roles: ['ADMIN'] },
           { id: 'REVISION', label: 'Ревизия склада', icon: ClipboardCheck, roles: ['ADMIN'] },
         ],
@@ -208,6 +208,7 @@ export const Sidebar: React.FC = () => {
         title: 'Система и доступ',
         items: [
           { id: 'EMPLOYEES', label: 'Сотрудники', icon: UserCheck, roles: ['ADMIN'] },
+          { id: 'CUSTOMERS', label: 'База клиентов', icon: Users, roles: ['ADMIN'] },
           { id: 'NOTIFICATIONS', label: 'Уведомления', icon: Bell, roles: ['ADMIN'] },
           { id: 'AUDIT_LOG', label: 'Журнал аудита', icon: FileText, roles: ['ADMIN'] },
         ],

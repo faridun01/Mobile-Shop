@@ -7,9 +7,7 @@ import {
   History,
   Package,
   Menu,
-  Landmark,
   Home,
-  Truck,
   ArrowLeftRight,
   PackagePlus,
 } from 'lucide-react';
@@ -65,8 +63,6 @@ export const MobileBottomNav: React.FC = () => {
   };
 
   if (isCentralCashMode) {
-    const isFinanceActive = location.pathname === '/reports' || location.pathname === '/finance';
-
     return (
       <nav className="app-bottom-nav md:hidden shrink-0 w-full bg-surface border-t border-border flex items-stretch justify-around select-none">
         <NavItem
@@ -79,12 +75,13 @@ export const MobileBottomNav: React.FC = () => {
           }}
         />
         <NavItem
-          routePath="/suppliers"
-          label="Поставщики"
-          icon={Truck}
+          routePath="/sales-history"
+          label="История"
+          title="История продаж"
+          icon={History}
           onSelect={() => {
-            setActivePage('SUPPLIERS');
-            navigate('/suppliers');
+            setActivePage('SALES_HISTORY');
+            navigate('/sales-history');
           }}
         />
 

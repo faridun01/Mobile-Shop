@@ -77,12 +77,12 @@ export const TabletNavRail: React.FC = () => {
     if (isPartner) {
       return [
         { id: 'SALE' as PageId, label: 'POS', icon: ShoppingBag },
+        { id: 'STORE_RECEIPT' as PageId, label: 'Приход', icon: PackagePlus },
         { id: 'SALES_HISTORY' as PageId, label: 'Продажи', icon: History },
         { id: 'CASH_DESK' as PageId, label: 'Касса', icon: Wallet },
         { id: 'EXCHANGE' as PageId, label: 'Обмен', icon: RefreshCw },
         { id: 'REPAIR' as PageId, label: 'Ремонт', icon: Wrench },
         { id: 'INVENTORY' as PageId, label: 'Склад', icon: Package },
-        { id: 'STORE_RECEIPT' as PageId, label: 'Приход', icon: PackagePlus },
         { id: 'REVISION' as PageId, label: 'Ревизия', icon: ClipboardCheck },
         { id: 'TRANSFER' as PageId, label: 'Перемещ.', icon: ArrowLeftRight },
         { id: 'EXPENSES' as PageId, label: 'Расходы', icon: Wallet },
@@ -92,21 +92,21 @@ export const TabletNavRail: React.FC = () => {
 
     if (isCentralCashMode) {
       const items: { id: PageId; label: string; icon: any }[] = [
+        { id: 'PURCHASE' as PageId, label: 'Приход', icon: PlusCircle },
         { id: 'CASH_DESK' as PageId, label: 'Касса', icon: Wallet },
         { id: 'REPORTS' as PageId, label: 'Отчёты', icon: TrendingUp },
-        { id: 'CASH_COLLECTION' as PageId, label: 'Инкасс.', icon: HandCoins },
-        { id: 'CUSTOMERS' as PageId, label: 'Клиенты', icon: Users },
         { id: 'SALES_HISTORY' as PageId, label: 'Продажи', icon: History },
+        { id: 'CASH_COLLECTION' as PageId, label: 'Инкасс.', icon: HandCoins },
         { id: 'EXPENSES' as PageId, label: 'Расходы', icon: Wallet },
         { id: 'BONUSES' as PageId, label: 'Бонусы', icon: Gift },
         { id: 'INVENTORY' as PageId, label: 'Склад', icon: Package },
-        { id: 'PURCHASE' as PageId, label: 'Приход', icon: PlusCircle },
         { id: 'REVISION' as PageId, label: 'Ревизия', icon: ClipboardCheck },
         { id: 'TRANSFER' as PageId, label: 'Перемещ.', icon: ArrowLeftRight },
         { id: 'REPAIR' as PageId, label: 'Ремонт', icon: Wrench },
         { id: 'SUPPLIERS' as PageId, label: 'Поставщ.', icon: Truck },
         { id: 'OWNERS' as PageId, label: 'Партнеры', icon: Users },
         { id: 'EMPLOYEES' as PageId, label: 'Кадры', icon: UserCheck },
+        { id: 'CUSTOMERS' as PageId, label: 'Клиенты', icon: Users },
         { id: 'AUDIT_LOG' as PageId, label: 'Аудит', icon: FileText },
         { id: 'NOTIFICATIONS' as PageId, label: 'Увед.', icon: Bell },
         { id: 'SETTINGS' as PageId, label: 'Опции', icon: Settings },
@@ -117,6 +117,7 @@ export const TabletNavRail: React.FC = () => {
     // Retail Store Selling Mode for Admin — matches Partner
     return [
       { id: 'SALE' as PageId, label: 'POS', icon: ShoppingBag },
+      { id: 'STORE_RECEIPT' as PageId, label: 'Приход', icon: PackagePlus },
       { id: 'SALES_HISTORY' as PageId, label: 'Продажи', icon: History },
       { id: 'CASH_DESK' as PageId, label: 'Касса', icon: Wallet },
       { id: 'FINANCE' as PageId, label: 'Отчёты', icon: TrendingUp },
@@ -124,7 +125,6 @@ export const TabletNavRail: React.FC = () => {
       { id: 'EXCHANGE' as PageId, label: 'Обмен', icon: RefreshCw },
       { id: 'REPAIR' as PageId, label: 'Ремонт', icon: Wrench },
       { id: 'INVENTORY' as PageId, label: 'Склад', icon: Package },
-      { id: 'STORE_RECEIPT' as PageId, label: 'Приход', icon: PackagePlus },
       { id: 'REVISION' as PageId, label: 'Ревизия', icon: ClipboardCheck },
       { id: 'TRANSFER' as PageId, label: 'Перемещ.', icon: ArrowLeftRight },
       { id: 'EXPENSES' as PageId, label: 'Расходы', icon: Wallet },
