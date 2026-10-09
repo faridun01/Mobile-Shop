@@ -87,8 +87,6 @@ export const Sidebar: React.FC = () => {
             { id: 'STORE_RECEIPT', label: 'Приход товара', icon: PackagePlus, roles: ['SELLER'] },
             { id: 'INVENTORY', label: 'Склад магазина', icon: Package, roles: ['SELLER'] },
             { id: 'SALES_HISTORY', label: 'История продаж', icon: History, roles: ['SELLER'] },
-            { id: 'EXCHANGE', label: 'Обмен (Trade-In)', icon: RefreshCw, roles: ['SELLER'] },
-            { id: 'REPAIR', label: 'Сервис и ремонт', icon: Wrench, roles: ['SELLER'] },
           ],
         },
         {
@@ -97,6 +95,8 @@ export const Sidebar: React.FC = () => {
             { id: 'TRANSFER', label: 'Перемещение', icon: ArrowLeftRight, roles: ['SELLER'] },
             { id: 'REVISION', label: 'Ревизия склада', icon: ClipboardCheck, roles: ['SELLER'] },
             { id: 'EXPENSES', label: 'Расходы кассы', icon: Wallet, roles: ['SELLER'] },
+            { id: 'EXCHANGE', label: 'Обмен (Trade-In)', icon: RefreshCw, roles: ['SELLER'] },
+            { id: 'REPAIR', label: 'Сервис и ремонт', icon: Wrench, roles: ['SELLER'] },
           ],
         },
       ];
@@ -112,8 +112,6 @@ export const Sidebar: React.FC = () => {
             { id: 'STORE_RECEIPT', label: 'Приход товара', icon: PackagePlus, roles: ['PARTNER'] },
             { id: 'CASH_DESK', label: 'Касса', icon: Wallet, roles: ['PARTNER'] },
             { id: 'SALES_HISTORY', label: 'История продаж', icon: History, roles: ['PARTNER'] },
-            { id: 'EXCHANGE', label: 'Обмен (Trade-In)', icon: RefreshCw, roles: ['PARTNER'] },
-            { id: 'REPAIR', label: 'Сервис и ремонт', icon: Wrench, roles: ['PARTNER'] },
           ],
         },
         {
@@ -129,6 +127,8 @@ export const Sidebar: React.FC = () => {
           items: [
             { id: 'EXPENSES', label: 'Расходы кассы', icon: Wallet, roles: ['PARTNER'] },
             { id: 'SETTINGS', label: 'Настройки системы', icon: Settings, roles: ['PARTNER'] },
+            { id: 'EXCHANGE', label: 'Обмен (Trade-In)', icon: RefreshCw, roles: ['PARTNER'] },
+            { id: 'REPAIR', label: 'Сервис и ремонт', icon: Wrench, roles: ['PARTNER'] },
           ],
         },
       ];
@@ -158,7 +158,6 @@ export const Sidebar: React.FC = () => {
             { id: 'TRANSFER', label: 'Перемещение', icon: ArrowLeftRight, roles: ['ADMIN'] },
             { id: 'REVISION', label: 'Ревизия склада', icon: ClipboardCheck, roles: ['ADMIN'] },
             { id: 'SUPPLIERS', label: 'Поставщики', icon: Truck, roles: ['ADMIN'] },
-            { id: 'REPAIR', label: 'Сервис и ремонт', icon: Wrench, roles: ['ADMIN'] },
           ],
         },
         {
@@ -166,6 +165,8 @@ export const Sidebar: React.FC = () => {
           items: [
             { id: 'EMPLOYEES', label: 'Сотрудники', icon: UserCheck, roles: ['ADMIN'] },
             { id: 'CUSTOMERS', label: 'База клиентов', icon: Users, roles: ['ADMIN'] },
+            { id: 'EXCHANGE', label: 'Обмен (Trade-In)', icon: RefreshCw, roles: ['ADMIN'] },
+            { id: 'REPAIR', label: 'Сервис и ремонт', icon: Wrench, roles: ['ADMIN'] },
             { id: 'NOTIFICATIONS', label: 'Уведомления', icon: Bell, roles: ['ADMIN'] },
             { id: 'AUDIT_LOG', label: 'Журнал аудита', icon: FileText, roles: ['ADMIN'] },
             { id: 'SETTINGS', label: 'Настройки системы', icon: Settings, roles: ['ADMIN'] },
@@ -183,8 +184,6 @@ export const Sidebar: React.FC = () => {
           { id: 'STORE_RECEIPT', label: 'Приход товара', icon: PackagePlus, roles: ['ADMIN'] },
           { id: 'CASH_DESK', label: 'Касса', icon: Wallet, roles: ['ADMIN'] },
           { id: 'SALES_HISTORY', label: 'История продаж', icon: History, roles: ['ADMIN'] },
-          { id: 'EXCHANGE', label: 'Обмен (Trade-In)', icon: RefreshCw, roles: ['ADMIN'] },
-          { id: 'REPAIR', label: 'Сервис и ремонт', icon: Wrench, roles: ['ADMIN'] },
         ],
       },
       {
@@ -209,6 +208,8 @@ export const Sidebar: React.FC = () => {
         items: [
           { id: 'EMPLOYEES', label: 'Сотрудники', icon: UserCheck, roles: ['ADMIN'] },
           { id: 'CUSTOMERS', label: 'База клиентов', icon: Users, roles: ['ADMIN'] },
+          { id: 'EXCHANGE', label: 'Обмен (Trade-In)', icon: RefreshCw, roles: ['ADMIN'] },
+          { id: 'REPAIR', label: 'Сервис и ремонт', icon: Wrench, roles: ['ADMIN'] },
           { id: 'NOTIFICATIONS', label: 'Уведомления', icon: Bell, roles: ['ADMIN'] },
           { id: 'AUDIT_LOG', label: 'Журнал аудита', icon: FileText, roles: ['ADMIN'] },
         ],
