@@ -841,26 +841,61 @@ export const RevisionPage: React.FC = () => {
         </div>
       </Dialog>
 
-      {/* Красивый диалог подтверждения сброса сверки вместо системного alert */}
+      {/* Премиальный диалог подтверждения сброса сверки */}
       <ConfirmDialog
         open={isResetConfirmOpen}
         title="Сбросить отметки сверки?"
-        message={
-          <div className="space-y-1.5">
-            <p className="font-semibold text-fg">
-              Вы уверены, что хотите сбросить текущую сверку для магазина{' '}
-              <span className="text-accent underline font-bold">«{currentStore?.name || 'магазина'}»</span>?
-            </p>
-            <p className="text-xs text-fg-subtle">
-              Все отмеченные позиции ({checkedCount} из {totalCount} шт.) будут очищены, и сверка начнётся заново.
-            </p>
-          </div>
-        }
         confirmLabel="Сбросить и начать заново"
         cancelLabel="Отмена"
         tone="danger"
+        icon={RotateCcw}
         onConfirm={handleConfirmReset}
         onCancel={() => setIsResetConfirmOpen(false)}
+        message={
+          <div className="space-y-3">
+            <p className="font-medium text-fg text-sm">
+              Вы уверены, что хотите сбросить текущую сверку для{' '}
+              <span className="inline-flex items-center gap-1.5 font-bold text-fg bg-surface-raised border border-border px-2 py-0.5 rounded-lg text-xs align-baseline shadow-2xs">
+                <StoreIcon className="w-3.5 h-3.5 text-accent shrink-0" />
+                {formatStoreDisplayTitle(currentStore)}
+              </span>
+              ?
+            </p>
+
+            {/* Impact & progress info card */}
+            <div className="p-3 rounded-xl bg-surface-raised border border-border/80 space-y-2">
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-fg-subtle">Прогресс проверки:</span>
+                <span className="font-mono font-bold text-fg">
+                  {checkedCount} из {totalCount} шт. ({progressPercent}%)
+                </span>
+              </div>
+
+              {/* Progress bar */}
+              <div className="h-1.5 w-full rounded-full bg-border overflow-hidden">
+                <div
+                  className="h-full rounded-full bg-amber-500 transition-all duration-300"
+                  style={{ width: `${Math.min(100, Math.max(0, progressPercent))}%` }}
+                />
+              </div>
+
+              <div className="text-[11px] text-fg-subtle leading-normal">
+                {checkedCount > 0 ? (
+                  <span>
+                    Все <strong className="text-danger font-semibold">{checkedCount} шт.</strong> отмеченных позиций будут очищены, и сверка начнётся заново.
+                  </span>
+                ) : (
+                  <span>Отмеченные позиции будут сброшены, сверка начнётся заново.</span>
+                )}
+                {surplus.length > 0 && (
+                  <span className="block text-warning font-medium mt-1">
+                    ⚠️ Также будут удалены {surplus.length} шт. зафиксированных излишков.
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+        }
       />
     </div>
   );

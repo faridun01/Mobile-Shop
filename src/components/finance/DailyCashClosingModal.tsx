@@ -19,7 +19,7 @@ import {
   Store as StoreIcon,
   RotateCcw,
 } from 'lucide-react';
-import { formatStoreName, useStoreContext } from '../../utils/storeContext';
+import { formatStoreName, formatStoreDisplayTitle, useStoreContext } from '../../utils/storeContext';
 import { useUIStore } from '../../stores/useUIStore';
 
 interface DailyCashClosingModalProps {
@@ -131,6 +131,10 @@ export const DailyCashClosingModal: React.FC<DailyCashClosingModalProps> = ({
     [stores, effectiveStoreId]
   );
   const effectiveStoreName = explicitStoreName || (activeStore ? formatStoreName(activeStore.name) : 'Магазин');
+  const isStoreScoped =
+    Boolean(explicitStoreId && explicitStoreId !== 'all') ||
+    storeCtx.mode === 'STORE' ||
+    Boolean(selectedStoreId && selectedStoreId !== 'all');
 
   const [loading, setLoading] = useState(false);
   const [summary, setSummary] = useState<DailyClosingSummary | null>(null);
@@ -274,19 +278,26 @@ export const DailyCashClosingModal: React.FC<DailyCashClosingModalProps> = ({
           </div>
         ) : summary ? (
           <div className="space-y-3.5">
-            {isAdmin && retailStores.length > 1 && (
-              <div className="flex items-center justify-between gap-2 p-2 rounded-xl bg-surface-raised border border-border">
-                <span className="text-xs font-semibold text-fg-subtle pl-1">
+            {activeStore && (
+              <div className="flex items-center justify-between gap-2 p-2 px-2.5 rounded-xl bg-surface-raised border border-border">
+                <span className="text-xs font-semibold text-fg-subtle">
                   Магазин:
                 </span>
-                <StoreSelector
-                  value={effectiveStoreId}
-                  onChange={setSelectedStoreIdState}
-                  stores={retailStores}
-                  retailOnly
-                  className="max-w-[200px]"
-                  compact
-                />
+                {isAdmin && !isStoreScoped && retailStores.length > 1 ? (
+                  <StoreSelector
+                    value={effectiveStoreId}
+                    onChange={setSelectedStoreIdState}
+                    stores={retailStores}
+                    retailOnly
+                    className="max-w-[200px]"
+                    compact
+                  />
+                ) : (
+                  <span className="text-xs font-bold text-fg flex items-center gap-1.5 truncate">
+                    <StoreIcon className="w-3.5 h-3.5 text-accent shrink-0" />
+                    <span className="truncate">{formatStoreDisplayTitle(activeStore)}</span>
+                  </span>
+                )}
               </div>
             )}
 

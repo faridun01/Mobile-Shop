@@ -114,26 +114,6 @@ export const CashDeskPanel: React.FC<CashDeskPanelProps> = ({ storeId }) => {
         </div>
       )}
 
-      {/* Selected store navigation banner */}
-      {!isCentral && (
-        <div className="p-2.5 px-3 rounded-xl bg-surface border border-border/80 flex items-center justify-between gap-2 shadow-2xs">
-          <div className="flex items-center gap-2 min-w-0">
-            <StoreIcon className="w-4 h-4 text-accent shrink-0" />
-            <div className="text-xs truncate">
-              <span className="text-fg-subtle">Просмотр кассы: </span>
-              <span className="font-bold text-fg">{formatStoreName(currentStoreName)}</span>
-              <span className="text-[11px] text-fg-subtle ml-1.5 hidden sm:inline">(деньги в кассе до сдачи в центральную)</span>
-            </div>
-          </div>
-          <button
-            type="button"
-            onClick={() => setSelectedStoreId('all')}
-            className="text-xs text-accent font-semibold hover:underline cursor-pointer shrink-0"
-          >
-            ← Вся сеть (Центральная)
-          </button>
-        </div>
-      )}
 
       {/* 1. COMPACT KPI METRICS: КАССА, СКЛАД, КЛИЕНТЫ, ПОСТАВЩИКИ */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3">

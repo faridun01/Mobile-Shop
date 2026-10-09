@@ -11,6 +11,7 @@ import {
   CheckCircle2,
   FileText,
   X,
+  Truck,
 } from 'lucide-react';
 
 interface NewPurchaseFormProps {
@@ -46,8 +47,8 @@ interface NewPurchaseFormProps {
 
 export const NewPurchaseForm: React.FC<NewPurchaseFormProps> = ({
   suppliers,
-  stores,
-  currentUser,
+  stores: _stores,
+  currentUser: _currentUser,
   selectedSupplierId,
   onSelectSupplierId,
   groups,
@@ -75,200 +76,229 @@ export const NewPurchaseForm: React.FC<NewPurchaseFormProps> = ({
   onOpenScannerForImei2,
 }) => {
   return (
-    <div className="work-screen flex-1 flex flex-col h-full overflow-y-auto bg-bg text-fg-muted min-h-0">
+    <div className="work-screen flex-1 flex flex-col h-full overflow-y-auto bg-bg text-fg select-none min-h-0">
       <form onSubmit={onSubmitForm} className="flex-1 flex flex-col min-h-full">
-        {/* Top Header with Back Button */}
-        <div className="p-3.5 sm:p-4 border-b border-border bg-surface space-y-3 shrink-0">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-2">
+        {/* Compact Sticky Top Bar */}
+        <div className="px-2.5 sm:px-4 py-2 border-b border-border bg-surface shrink-0 sticky top-0 z-20 shadow-2xs space-y-2">
+          {/* Row 1: Back + Title + Warehouse Badge */}
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2 min-w-0">
               <button
                 type="button"
                 onClick={onBackToList}
-                className="flex items-center space-x-1 px-2.5 py-1.5 rounded-lg bg-surface-raised hover:bg-surface text-fg-muted hover:text-fg-muted text-xs font-bold transition-colors border border-border"
+                className="h-7.5 px-2.5 rounded-lg bg-surface-raised hover:bg-surface border border-border text-fg hover:text-accent text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer shadow-2xs shrink-0"
               >
                 <ArrowLeft className="w-3.5 h-3.5" />
-                <span>Список приходов</span>
+                <span className="hidden xs:inline">К списку приходов</span>
+                <span className="xs:hidden">Назад</span>
               </button>
+              <h1 className="text-xs sm:text-sm font-bold text-fg truncate">
+                Новый приход (партия)
+              </h1>
+            </div>
 
+            <div className="flex items-center gap-1.5 shrink-0">
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-500/10 border border-emerald-500/25 text-emerald-600 dark:text-emerald-400 font-semibold text-xs">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                Главный склад
+              </span>
             </div>
           </div>
 
-          <div className="text-xs">
-            <div>
-              <label className="block text-fg-subtle mb-1 font-semibold">
-                Поставщик <span className="text-danger">* (обязательно выберите)</span>
-              </label>
-              <div className="flex items-center gap-2">
-                <select
-                  required
-                  value={selectedSupplierId}
-                  onChange={(e) => onSelectSupplierId(e.target.value)}
-                  className={`w-full rounded-lg bg-surface-raised border px-3 py-2 text-xs font-semibold focus:outline-none transition-colors ${
-                    !selectedSupplierId
-                      ? 'border-amber-500/70 text-fg-subtle focus:border-accent'
-                      : 'border-border text-fg-muted focus:border-accent'
-                  }`}
-                >
-                  <option value="">-- Выберите поставщика (обязательно) --</option>
-                  {suppliers.map(s => (
-                    <option key={s.id} value={s.id}>{s.name} (Долг: ${s.totalDebtUsd})</option>
-                  ))}
-                </select>
-                <button
-                  type="button"
-                  onClick={onOpenAddSupplier}
-                  title="Добавить нового поставщика"
-                  className="shrink-0 p-2 rounded-lg bg-surface-raised hover:bg-surface border border-border text-fg-muted hover:text-accent hover:border-accent transition-colors"
-                >
-                  <Plus className="w-4 h-4" />
-                </button>
-              </div>
-
+          {/* Row 2: Supplier Selection Bar */}
+          <div className="flex items-center gap-2 p-1.5 sm:p-2 rounded-xl bg-surface-raised border border-border/80 text-xs">
+            <div className="flex items-center gap-1.5 text-fg font-bold shrink-0 pl-1">
+              <Truck className="w-3.5 h-3.5 text-accent shrink-0" />
+              <span className="hidden sm:inline">Поставщик:</span>
             </div>
-          </div>
 
-          {/* Destination location: All receipts go to Main Warehouse */}
-          <div className="pt-2 border-t border-border flex items-center gap-2 text-xs">
-            <span className="text-fg-subtle font-medium">Склад поступления:</span>
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-accent/10 border border-accent/25 text-accent font-semibold text-xs">
-              <span className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse" />
-              Главный склад
-            </span>
+            <div className="flex items-center gap-1.5 flex-1 min-w-0">
+              <select
+                required
+                value={selectedSupplierId}
+                onChange={(e) => onSelectSupplierId(e.target.value)}
+                className={`flex-1 min-w-0 h-7.5 rounded-lg bg-surface border px-2.5 text-xs font-semibold focus:outline-none transition-all cursor-pointer shadow-2xs truncate ${
+                  !selectedSupplierId
+                    ? 'border-amber-500/70 text-amber-600 dark:text-amber-400 focus:border-accent'
+                    : 'border-border text-fg focus:border-accent'
+                }`}
+              >
+                <option value="">-- Выберите поставщика (обязательно) --</option>
+                {suppliers.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.name} (Долг: ${s.totalDebtUsd})
+                  </option>
+                ))}
+              </select>
+
+              <button
+                type="button"
+                onClick={onOpenAddSupplier}
+                title="Добавить нового поставщика"
+                className="h-7.5 px-2.5 rounded-lg bg-surface hover:bg-surface-raised border border-border text-fg hover:text-accent flex items-center gap-1 font-semibold transition-all cursor-pointer shadow-2xs shrink-0"
+              >
+                <Plus className="w-3.5 h-3.5 text-accent" />
+                <span className="hidden sm:inline text-xs">Новый</span>
+              </button>
+            </div>
           </div>
         </div>
 
         {/* Groups list */}
-        <div className="flex-1 p-3.5 sm:p-4 space-y-4 bg-bg pb-8">
+        <div className="flex-1 p-2.5 sm:p-4 space-y-3 bg-bg pb-6 max-w-7xl mx-auto w-full">
           {groups.map((group, groupIdx) => (
             <div
               key={group.id}
-              className="rounded-xl border border-border bg-surface shadow-xs p-3.5 sm:p-4 space-y-3 relative"
+              className="rounded-xl border border-border bg-surface shadow-2xs p-3 sm:p-3.5 space-y-2.5 relative transition-all"
             >
-              <div className="flex items-center justify-between border-b border-border pb-2">
-                <span className="text-xs font-bold text-fg-muted tracking-wider font-mono">
-                  Позиция #{groupIdx + 1}
-                </span>
+              {/* Position Header */}
+              <div className="flex items-center justify-between pb-2 border-b border-border gap-2">
+                <div className="flex items-center gap-2 min-w-0">
+                  <span className="px-2 py-0.5 rounded-md bg-accent/10 border border-accent/25 text-accent text-xs font-bold font-mono">
+                    #{groupIdx + 1}
+                  </span>
+                  <span className="text-xs font-bold text-fg truncate">
+                    {group.brand || group.model ? `${group.brand} ${group.model}`.trim() : `Позиция #${groupIdx + 1}`}
+                  </span>
+                  {(group.storage || group.color) && (
+                    <span className="text-[11px] text-fg-subtle truncate hidden sm:inline">
+                      ({[group.storage, group.color].filter(Boolean).join(', ')})
+                    </span>
+                  )}
+                </div>
 
                 {groups.length > 1 && (
                   <button
                     type="button"
                     onClick={() => onRemoveGroup(groupIdx)}
-                    className="text-fg-subtle hover:text-danger p-1 transition-colors"
+                    className="w-7 h-7 flex items-center justify-center rounded-lg text-fg-subtle hover:text-danger hover:bg-danger/10 transition-colors cursor-pointer"
                     title="Удалить позицию"
                   >
-                    <Trash2 className="w-4 h-4" />
+                    <Trash2 className="w-3.5 h-3.5" />
                   </button>
                 )}
               </div>
 
               {/* Group Specs Form */}
-              <div className="grid grid-cols-2 sm:grid-cols-6 gap-2.5 text-xs font-mono">
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 text-xs">
                 <div>
-                  <label className="block text-fg-subtle mb-1">Бренд</label>
+                  <label className="block text-[10px] font-bold text-fg-subtle uppercase tracking-wider mb-1 truncate">
+                    Бренд
+                  </label>
                   <Combobox
                     required
                     options={brandOptions}
                     value={group.brand}
                     onChange={(v) => onUpdateGroup(groupIdx, 'brand', v)}
-                    className="rounded-lg bg-surface-raised border border-border px-2.5 py-1.5 text-xs text-fg-muted focus:border-accent focus:outline-none"
+                    className="h-7.5 rounded-lg bg-surface-raised border border-border px-2 text-xs text-fg font-medium focus:border-accent focus:bg-surface focus:outline-none transition-all shadow-2xs"
                     placeholder="Apple"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-fg-subtle mb-1">Модель</label>
+                  <label className="block text-[10px] font-bold text-fg-subtle uppercase tracking-wider mb-1 truncate">
+                    Модель
+                  </label>
                   <Combobox
                     required
                     options={getModelOptions(group.brand)}
                     value={group.model}
                     onChange={(v) => onUpdateGroup(groupIdx, 'model', v)}
-                    className="rounded-lg bg-surface-raised border border-border px-2.5 py-1.5 text-xs text-fg-muted focus:border-accent focus:outline-none"
+                    className="h-7.5 rounded-lg bg-surface-raised border border-border px-2 text-xs text-fg font-medium focus:border-accent focus:bg-surface focus:outline-none transition-all shadow-2xs"
                     placeholder="iPhone 16 Pro"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-fg-subtle mb-1">
-                    RAM (ОЗУ) <span className="text-rose-500 font-bold">*</span>
+                  <label className="block text-[10px] font-bold text-fg-subtle uppercase tracking-wider mb-1 truncate">
+                    ОЗУ (RAM) <span className="text-danger">*</span>
                   </label>
                   <Combobox
                     required
                     options={ramOptions}
                     value={group.ram || ''}
                     onChange={(v) => onUpdateGroup(groupIdx, 'ram', v)}
-                    className="rounded-lg bg-surface-raised border border-border px-2.5 py-1.5 text-xs text-fg-muted focus:border-accent focus:outline-none"
+                    className="h-7.5 rounded-lg bg-surface-raised border border-border px-2 text-xs text-fg font-medium focus:border-accent focus:bg-surface focus:outline-none transition-all shadow-2xs"
                     placeholder="8 GB"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-fg-subtle mb-1">Память</label>
+                  <label className="block text-[10px] font-bold text-fg-subtle uppercase tracking-wider mb-1 truncate">
+                    Память
+                  </label>
                   <Combobox
                     options={storageOptions}
                     value={group.storage}
                     onChange={(v) => onUpdateGroup(groupIdx, 'storage', v)}
-                    className="rounded-lg bg-surface-raised border border-border px-2.5 py-1.5 text-xs text-fg-muted focus:border-accent focus:outline-none"
+                    className="h-7.5 rounded-lg bg-surface-raised border border-border px-2 text-xs text-fg font-medium focus:border-accent focus:bg-surface focus:outline-none transition-all shadow-2xs"
                     placeholder="256 GB"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-fg-subtle mb-1">Цвет</label>
+                  <label className="block text-[10px] font-bold text-fg-subtle uppercase tracking-wider mb-1 truncate">
+                    Цвет
+                  </label>
                   <Combobox
                     options={colorOptions}
                     value={group.color}
                     onChange={(v) => onUpdateGroup(groupIdx, 'color', v)}
-                    className="rounded-lg bg-surface-raised border border-border px-2.5 py-1.5 text-xs text-fg-muted focus:border-accent focus:outline-none"
+                    className="h-7.5 rounded-lg bg-surface-raised border border-border px-2 text-xs text-fg font-medium focus:border-accent focus:bg-surface focus:outline-none transition-all shadow-2xs"
                     placeholder="Black Titanium"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-fg-subtle mb-1">
+                  <label className="block text-[10px] font-bold text-fg-subtle uppercase tracking-wider mb-1 truncate">
                     Цена закупки ($)
                   </label>
-                  <input
-                    type="number"
-                    required
-                    min="0.01"
-                    step="0.01"
-                    value={group.purchasePriceUsd || ''}
-                    onChange={(e) => onUpdateGroup(groupIdx, 'purchasePriceUsd', parseFloat(e.target.value) || 0)}
-                    className="w-full rounded-lg bg-surface-raised border border-border px-2.5 py-1.5 text-xs text-accent font-bold focus:border-accent focus:outline-none font-mono"
-                    placeholder="0"
-                  />
+                  <div className="relative">
+                    <span className="absolute left-2 top-1/2 -translate-y-1/2 text-xs font-mono font-bold text-emerald-600 dark:text-emerald-400 pointer-events-none">$</span>
+                    <input
+                      type="number"
+                      required
+                      min="0.01"
+                      step="0.01"
+                      value={group.purchasePriceUsd || ''}
+                      onChange={(e) => onUpdateGroup(groupIdx, 'purchasePriceUsd', parseFloat(e.target.value) || 0)}
+                      className="w-full h-7.5 rounded-lg bg-surface-raised border border-border pl-5 pr-2 text-xs text-emerald-600 dark:text-emerald-400 font-bold font-mono focus:border-accent focus:bg-surface focus:outline-none transition-all shadow-2xs"
+                      placeholder="0"
+                    />
+                  </div>
                 </div>
               </div>
 
               {/* IMEI Input List with Batch Paste */}
               <div className="pt-2 border-t border-border space-y-2">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-2">
-                    <span className="text-xs font-semibold text-fg-muted font-mono">
-                      Список IMEI ({group.items.filter(i => i.imei.trim().length > 0).length} шт.)
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2 text-xs font-mono">
+                    <span className="font-bold text-fg">
+                      IMEI устройств:
                     </span>
-                    <span className="text-[10px] text-fg-subtle font-mono">
-                      Сумма: ${group.items.filter(i => i.imei.trim().length > 0).length * group.purchasePriceUsd}
+                    <span className="px-2 py-0.2 rounded-full bg-accent/10 text-accent font-bold text-[11px] font-mono">
+                      {group.items.filter((i) => i.imei.trim().length > 0).length} шт.
+                    </span>
+                    <span className="text-[11px] text-fg-subtle font-mono hidden sm:inline">
+                      • Сумма: <strong className="text-emerald-600 dark:text-emerald-400 font-semibold">${(group.items.filter((i) => i.imei.trim().length > 0).length * (group.purchasePriceUsd || 0)).toLocaleString()}</strong>
                     </span>
                   </div>
 
-                  <div className="flex items-center space-x-2">
-                    <button
-                      type="button"
-                      onClick={() => onAddImeiToGroup(groupIdx)}
-                      className="px-2.5 py-1 rounded-lg bg-surface-raised hover:bg-surface border border-border text-fg-muted text-xs font-mono font-medium flex items-center space-x-1 transition-colors"
-                    >
-                      <Plus className="w-3 h-3" />
-                      <span>Добавить устройство</span>
-                    </button>
-                  </div>
+                  <button
+                    type="button"
+                    onClick={() => onAddImeiToGroup(groupIdx)}
+                    className="h-6.5 px-2 rounded-lg bg-surface-raised hover:bg-surface border border-border text-fg hover:text-accent text-[11px] font-semibold flex items-center gap-1 transition-colors cursor-pointer shadow-2xs"
+                  >
+                    <Plus className="w-3 h-3 text-accent" />
+                    <span>+ Устройство</span>
+                  </button>
                 </div>
 
                 {/* Batch Paste text helper */}
-                <div className="pt-1">
+                <div>
                   <input
                     type="text"
-                    placeholder="Быстрая вставка списка IMEI..."
+                    placeholder="Быстрая вставка списка IMEI (через пробел, запятую или Enter)..."
                     onKeyDown={(e) => {
                       if (e.key === 'Enter') {
                         e.preventDefault();
@@ -282,30 +312,29 @@ export const NewPurchaseForm: React.FC<NewPurchaseFormProps> = ({
                         e.target.value = '';
                       }
                     }}
-                    className="w-full rounded-lg bg-surface-raised border border-dashed border-border px-3 py-1 text-[11px] font-mono text-fg-muted placeholder-fg-subtle focus:border-accent focus:outline-none"
+                    className="w-full h-7 rounded-lg bg-surface-raised border border-dashed border-border px-2.5 text-[11px] font-mono text-fg placeholder:text-fg-subtle focus:border-accent focus:bg-surface focus:outline-none transition-all"
                   />
                 </div>
 
-                <div className="space-y-2 pt-1 font-mono">
+                <div className="space-y-1.5 pt-0.5 font-mono">
                   {group.items.map((item, itemIdx) => {
                     const [imei1, imei2] = getImeiPair(item.imei);
                     return (
-                      <div key={itemIdx} className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                      <div key={itemIdx} className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 p-1.5 rounded-lg bg-surface-raised/40 border border-border/50">
                         <div>
-                          <label className="block text-fg-subtle mb-1">IMEI 1</label>
                           <div className="relative">
                             <input
                               type="text"
                               required
                               value={imei1}
                               onChange={(e) => onUpdateImei(groupIdx, itemIdx, `${e.target.value} / ${imei2}`.replace(/ \/ $/, ''))}
-                              placeholder="IMEI 1"
-                              className="w-full rounded-lg bg-surface-raised border border-border px-2.5 py-1.5 text-xs text-fg-muted font-mono focus:border-accent focus:outline-none pr-8"
+                              placeholder={`IMEI 1 #${itemIdx + 1}`}
+                              className="w-full h-7.5 rounded-lg bg-surface border border-border px-2.5 pr-8 text-xs text-fg font-mono focus:border-accent focus:outline-none shadow-2xs"
                             />
                             <button
                               type="button"
                               onClick={() => onScanImei(groupIdx, itemIdx)}
-                              className="absolute right-1.5 top-1.5 text-fg-subtle hover:text-accent p-0.5"
+                              className="absolute right-1 top-1/2 -translate-y-1/2 text-fg-subtle hover:text-accent p-1 cursor-pointer"
                               title="Сканировать IMEI 1"
                               aria-label="Сканировать IMEI 1"
                             >
@@ -314,33 +343,31 @@ export const NewPurchaseForm: React.FC<NewPurchaseFormProps> = ({
                           </div>
                         </div>
 
-                        <div className="flex items-end gap-1">
-                          <div className="flex-1">
-                            <label className="block text-fg-subtle mb-1">IMEI 2 <span className="text-fg-subtle/70">(необязательно)</span></label>
-                            <div className="relative">
-                              <input
-                                type="text"
-                                value={imei2}
-                                onChange={(e) => onUpdateImei2(groupIdx, itemIdx, e.target.value)}
-                                placeholder="IMEI 2 (необязательно)"
-                                className="w-full rounded-lg bg-surface-raised border border-border px-2.5 py-1.5 text-xs text-fg-muted font-mono focus:border-accent focus:outline-none pr-8"
-                              />
-                              <button
-                                type="button"
-                                onClick={() => onOpenScannerForImei2(groupIdx, itemIdx)}
-                                className="absolute right-1.5 top-1.5 text-fg-subtle hover:text-accent p-0.5"
-                                title="Сканировать IMEI 2"
-                                aria-label="Сканировать IMEI 2"
-                              >
-                                <Scan className="w-3.5 h-3.5" />
-                              </button>
-                            </div>
+                        <div className="flex items-center gap-1.5">
+                          <div className="relative flex-1">
+                            <input
+                              type="text"
+                              value={imei2}
+                              onChange={(e) => onUpdateImei2(groupIdx, itemIdx, e.target.value)}
+                              placeholder="IMEI 2 (необязательно)"
+                              className="w-full h-7.5 rounded-lg bg-surface border border-border px-2.5 pr-8 text-xs text-fg font-mono focus:border-accent focus:outline-none shadow-2xs"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => onOpenScannerForImei2(groupIdx, itemIdx)}
+                              className="absolute right-1 top-1/2 -translate-y-1/2 text-fg-subtle hover:text-accent p-1 cursor-pointer"
+                              title="Сканировать IMEI 2"
+                              aria-label="Сканировать IMEI 2"
+                            >
+                              <Scan className="w-3.5 h-3.5" />
+                            </button>
                           </div>
+
                           {group.items.length > 1 && (
                             <button
                               type="button"
                               onClick={() => onRemoveImeiFromGroup(groupIdx, itemIdx)}
-                              className="text-fg-subtle hover:text-danger p-1"
+                              className="w-7.5 h-7.5 flex items-center justify-center rounded-lg text-fg-subtle hover:text-danger hover:bg-danger/10 transition-colors cursor-pointer shrink-0"
                               title="Удалить устройство"
                               aria-label="Удалить устройство"
                             >
@@ -360,15 +387,15 @@ export const NewPurchaseForm: React.FC<NewPurchaseFormProps> = ({
           <button
             type="button"
             onClick={onAddGroup}
-            className="w-full py-2.5 rounded-xl border border-dashed border-border hover:border-accent bg-surface-raised hover:bg-surface text-fg-muted hover:text-accent text-xs font-mono font-bold flex items-center justify-center space-x-2 transition-colors"
+            className="w-full py-2 rounded-xl border border-dashed border-border hover:border-accent bg-surface-raised hover:bg-surface text-fg hover:text-accent text-xs font-semibold flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-2xs"
           >
-            <Plus className="w-4 h-4" />
-            <span>Добавить модель</span>
+            <Plus className="w-3.5 h-3.5 text-accent" />
+            <span>+ Добавить ещё одну модель</span>
           </button>
         </div>
 
         {/* Bottom Actions & Total Bar (Sticky at bottom) */}
-        <div className="sticky bottom-0 z-20 p-3.5 sm:p-4 border-t border-border bg-surface/95 backdrop-blur-md flex flex-col sm:flex-row items-center justify-between gap-3 shrink-0 shadow-lg font-mono">
+        <div className="sticky bottom-0 z-20 px-3 sm:px-4 py-2 border-t border-border bg-surface/95 backdrop-blur-md flex flex-wrap items-center justify-between gap-2 shrink-0 shadow-lg font-mono text-xs">
           {statusMessage ? (
             <div className={`flex items-center space-x-2 text-xs ${
               statusMessage.type === 'success' ? 'text-accent' : 'text-danger'
@@ -377,25 +404,26 @@ export const NewPurchaseForm: React.FC<NewPurchaseFormProps> = ({
               <span>{statusMessage.text}</span>
             </div>
           ) : (
-            <div className="text-xs text-fg-subtle">
-              Позиций: <strong className="text-fg-muted">{groups.length}</strong> • 
-              Устройств: <strong className="text-accent font-bold text-sm ml-1">{totalFormUnits} шт.</strong>
+            <div className="flex items-center gap-2.5 text-xs">
+              <span className="text-fg-subtle">
+                Позиций: <strong className="text-fg">{groups.length}</strong> • Устройств: <strong className="text-accent font-bold">{totalFormUnits} шт.</strong>
+              </span>
+              <span className="text-border">|</span>
+              <div className="flex items-center gap-1 font-mono">
+                <span className="text-fg-subtle text-[11px]">Итого:</span>
+                <span className="text-sm sm:text-base font-black text-emerald-600 dark:text-emerald-400">
+                  ${totalFormUsd.toLocaleString()}
+                </span>
+              </div>
             </div>
           )}
 
-          <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto justify-end">
-            <div className="text-left mr-auto sm:mr-2">
-              <span className="text-[10px] text-fg-subtle block font-medium">Итого</span>
-              <span className="text-base font-bold text-accent font-mono">
-                ${totalFormUsd.toLocaleString()}
-              </span>
-            </div>
-
+          <div className="flex items-center gap-2 ml-auto">
             <button
               type="button"
               disabled={isSubmitting}
               onClick={onBackToList}
-              className="px-3 py-2 rounded-xl bg-surface-raised hover:bg-surface border border-border text-fg-muted text-xs font-semibold transition-colors disabled:opacity-50"
+              className="h-8 px-3 rounded-lg bg-surface-raised hover:bg-surface border border-border text-fg text-xs font-semibold transition-all cursor-pointer"
             >
               Отмена
             </button>
@@ -403,9 +431,9 @@ export const NewPurchaseForm: React.FC<NewPurchaseFormProps> = ({
             <button
               type="submit"
               disabled={totalFormUnits === 0 || isSubmitting}
-              className="px-5 py-2 rounded-xl bg-accent hover:bg-accent-strong active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed text-xs font-bold text-accent-fg shadow-xs transition-colors flex items-center space-x-1.5"
+              className="h-8 px-3.5 rounded-lg bg-accent hover:opacity-90 active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed text-xs font-bold text-accent-fg shadow-xs transition-all flex items-center gap-1.5 cursor-pointer"
             >
-              <FileText className="w-4 h-4" />
+              <FileText className="w-3.5 h-3.5" />
               <span>Просмотреть чек</span>
             </button>
           </div>

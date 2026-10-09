@@ -10,7 +10,7 @@ import { dateRangeForPeriod, dateRangeForCustomDates, type ReportPeriod } from '
 import { cashBalanceFromLedger, loadCashLedger, registerLedgerBalance } from './cash-balance';
 import { notifyAdmins } from '../notifications/notification.service';
 
-type Db = Pick<TransactionClient, 'financialAccount' | 'financialTransaction' | 'auditLog' | 'cashHandover' | 'bonusPoolEntry' | 'sale'>;
+type Db = Pick<TransactionClient, 'financialAccount' | 'financialTransaction' | 'auditLog' | 'cashHandover' | 'bonusPoolEntry' | 'sale' | 'expense' | 'customerPayment' | 'dailyCashClosing'>;
 type Money = ReturnType<typeof D>;
 
 export interface RegisterBalance {
@@ -37,6 +37,9 @@ export interface RegisterBalance {
   cardOnlyTjs: string;
   lastCollectedAt?: string | null;
   daysWithoutCollection?: number;
+  /** Whether the shift is closed and ready for collection. */
+  isShiftClosed?: boolean;
+  unclosedReason?: string | null;
 }
 
 /**
@@ -138,6 +141,85 @@ async function paymentBreakdown(db: Db, storeId: string, totalCashTjs: Money): P
   }
 
   return splitPaymentBreakdown(totalCashTjs, cardSum);
+}
+
+/**
+ * Checks whether a store's cash register shift(s) are closed and ready for collection.
+ * Any business date with sales, expenses, or customer payments since the last collection
+ * must have a corresponding DailyCashClosing record (Z-отчёт). If there have been no
+ * new transactions since the last collection, the current business date's shift must be closed.
+ */
+export async function checkStoreShiftStatus(
+  db: Db | TransactionClient,
+  storeId: string,
+  cutoff: Date | null,
+): Promise<{ isShiftClosed: boolean; unclosedDates: string[]; unclosedReason: string | null }> {
+  const businessDate = getBusinessDateKey(new Date());
+
+  const [sales, expenses, customerPayments] = await Promise.all([
+    db.sale.findMany({
+      where: {
+        storeId,
+        status: { not: 'REFUNDED' },
+        ...(cutoff ? { createdAt: { gt: cutoff } } : {}),
+      },
+      select: { createdAt: true },
+    }),
+    db.expense.findMany({
+      where: {
+        storeId,
+        paidFromCashRegister: true,
+        status: 'PAID',
+        cancelledAt: null,
+        ...(cutoff ? { createdAt: { gt: cutoff } } : {}),
+      },
+      select: { createdAt: true },
+    }),
+    db.customerPayment.findMany({
+      where: {
+        storeId,
+        sourceAccount: 'STORE_CASH',
+        ...(cutoff ? { createdAt: { gt: cutoff } } : {}),
+      },
+      select: { createdAt: true },
+    }),
+  ]);
+
+  const activeDates = new Set<string>();
+  for (const s of sales) activeDates.add(getBusinessDateKey(s.createdAt));
+  for (const e of expenses) activeDates.add(getBusinessDateKey(e.createdAt));
+  for (const cp of customerPayments) activeDates.add(getBusinessDateKey(cp.createdAt));
+
+  if (activeDates.size === 0) {
+    activeDates.add(businessDate);
+  }
+
+  const closings = await (db as any).dailyCashClosing.findMany({
+    where: {
+      storeId,
+      businessDate: { in: Array.from(activeDates) },
+    },
+    select: { businessDate: true },
+  });
+  const closedSet = new Set(closings.map((c: { businessDate: string }) => c.businessDate));
+  const unclosedDates = Array.from(activeDates).filter((d) => !closedSet.has(d)).sort();
+
+  if (unclosedDates.length > 0) {
+    return {
+      isShiftClosed: false,
+      unclosedDates,
+      unclosedReason:
+        unclosedDates.length === 1
+          ? `Смена за ${unclosedDates[0]} не закрыта`
+          : `Смены не закрыты (${unclosedDates.join(', ')})`,
+    };
+  }
+
+  return {
+    isShiftClosed: true,
+    unclosedDates: [],
+    unclosedReason: null,
+  };
 }
 
 /**
@@ -537,13 +619,19 @@ export class CashCollectionService {
       };
     });
 
+    const shiftStatus = await checkStoreShiftStatus(db, store.id, cutoff);
+
     return {
       store: {
         id: store.id,
         name: store.name,
         isMainWarehouse: store.isMainWarehouse,
       },
-      balance,
+      balance: {
+        ...balance,
+        isShiftClosed: shiftStatus.isShiftClosed,
+        unclosedReason: shiftStatus.unclosedReason,
+      },
       period: {
         since: cutoff ? cutoff.toISOString() : null,
         periodStart: periodStart.toISOString(),
@@ -608,25 +696,30 @@ export class CashCollectionService {
     const lastHandoverMap = new Map(lastHandovers.map((h) => [h.storeId, h.createdAt]));
     const now = new Date();
 
-    const enrichedStores = rows
-      .filter((r) => !r.isMainWarehouse)
-      .map((r) => {
-        const lastAt = lastHandoverMap.get(r.storeId) ?? null;
-        let days = 0;
-        if (lastAt) {
-          days = Math.max(0, Math.floor((now.getTime() - lastAt.getTime()) / (1000 * 60 * 60 * 24)));
-        } else {
-          const st = stores.find((s) => s.id === r.storeId);
-          if (st?.createdAt) {
-            days = Math.max(0, Math.floor((now.getTime() - new Date(st.createdAt).getTime()) / (1000 * 60 * 60 * 24)));
+    const enrichedStores = await Promise.all(
+      rows
+        .filter((r) => !r.isMainWarehouse)
+        .map(async (r) => {
+          const lastAt = lastHandoverMap.get(r.storeId) ?? null;
+          let days = 0;
+          if (lastAt) {
+            days = Math.max(0, Math.floor((now.getTime() - lastAt.getTime()) / (1000 * 60 * 60 * 24)));
+          } else {
+            const st = stores.find((s) => s.id === r.storeId);
+            if (st?.createdAt) {
+              days = Math.max(0, Math.floor((now.getTime() - new Date(st.createdAt).getTime()) / (1000 * 60 * 60 * 24)));
+            }
           }
-        }
-        return {
-          ...r,
-          lastCollectedAt: lastAt ? lastAt.toISOString() : null,
-          daysWithoutCollection: days,
-        };
-      });
+          const shiftStatus = await checkStoreShiftStatus(db, r.storeId, lastAt);
+          return {
+            ...r,
+            lastCollectedAt: lastAt ? lastAt.toISOString() : null,
+            daysWithoutCollection: days,
+            isShiftClosed: shiftStatus.isShiftClosed,
+            unclosedReason: shiftStatus.unclosedReason,
+          };
+        })
+    );
 
     return {
       stores: enrichedStores,
@@ -718,6 +811,19 @@ export class CashCollectionService {
       if (sourceStore.isMainWarehouse) throw new Error('Нельзя производить инкассацию из Центральной кассы в Центральную кассу');
       const amountUsd = D(sourceStore.cashBalanceUsd);
       if (amountUsd.lte(0)) throw new Error(`В кассе «${sourceStore.name}» нет наличных для инкассации`);
+
+      // 1b. Verify shift is closed before collecting
+      const lastHandover = await tx.cashHandover.findFirst({
+        where: { storeId: sourceStore.id, cancelledAt: null },
+        orderBy: { createdAt: 'desc' },
+        select: { createdAt: true },
+      });
+      const shiftStatus = await checkStoreShiftStatus(tx, sourceStore.id, lastHandover?.createdAt ?? null);
+      if (!shiftStatus.isShiftClosed) {
+        throw Object.assign(new Error(
+          `Нельзя произвести инкассацию кассы «${sourceStore.name}»: ${shiftStatus.unclosedReason || 'кассовая смена не закрыта'}. Сначала выполните закрытие смены (Z-отчёт).`
+        ), { statusCode: 400 });
+      }
       if (!amountUsd.eq(expectedCashUsd)) {
         throw Object.assign(new Error(
           `Остаток кассы «${sourceStore.name}» изменился: подтверждено $${D(expectedCashUsd)}, сейчас $${amountUsd}. Обновите данные и подтвердите инкассацию снова`,

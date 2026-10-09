@@ -25,7 +25,13 @@ export const PWAUpdateNotifier: React.FC = () => {
             {offline ? <WifiOff className="w-4 h-4 text-rose-400" /> : <Wifi className="w-4 h-4 text-emerald-400" />}
             <span>{offline ? 'АВТОНОМНЫЙ РЕЖИМ (НЕТ ИНТЕРНЕТА)' : 'СВЯЗЬ ВОССТАНОВЛЕНА (ОНЛАЙН)'}</span>
           </div>
-          <button onClick={dismissNetworkNotice} className="text-slate-400 hover:text-slate-200 cursor-pointer">
+          <button
+            type="button"
+            onClick={dismissNetworkNotice}
+            title="Закрыть уведомление"
+            aria-label="Закрыть"
+            className="w-8 h-8 -mr-1 -my-1 flex items-center justify-center rounded-lg text-slate-300 hover:text-white hover:bg-white/10 active:scale-90 transition-all cursor-pointer shrink-0"
+          >
             <X className="w-4 h-4" />
           </button>
         </div>

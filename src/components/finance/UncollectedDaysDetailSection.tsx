@@ -4,12 +4,15 @@ import {
   ArrowDownToLine,
   Calendar,
   CalendarDays,
+  CheckCircle2,
+  FileCheck2,
 } from 'lucide-react';
 import { apiClient } from '../../api/client';
 import { formatTjs } from '../../utils/money';
 import { Button } from '../ui/Button';
 import { LoadingState } from '../ui/Skeleton';
 import type { RegisterBalance, StoreBreakdown, BreakdownDailyItem } from './CashReconciliationModal';
+import { useUIStore } from '../../stores/useUIStore';
 
 export interface UncollectedDaysDetailSectionProps {
   store: RegisterBalance;
@@ -48,6 +51,7 @@ export const UncollectedDaysDetailSection: React.FC<UncollectedDaysDetailSection
   const [data, setData] = useState<StoreBreakdown | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const setDailyClosingModalOpen = useUIStore((s) => s.setDailyClosingModalOpen);
 
   const fetchData = () => {
     setLoading(true);
@@ -138,6 +142,17 @@ export const UncollectedDaysDetailSection: React.FC<UncollectedDaysDetailSection
                           {day.daysAgo} дн. назад
                         </span>
                       )}
+                      {day.hasClosing ? (
+                        <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
+                          <CheckCircle2 className="w-3 h-3" />
+                          <span>Z-отчёт закрыт</span>
+                        </span>
+                      ) : (
+                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-500/10 border border-amber-500/30 text-amber-600 dark:text-amber-400 flex items-center gap-1">
+                          <AlertTriangle className="w-3 h-3" />
+                          <span>Смена не закрыта</span>
+                        </span>
+                      )}
                     </div>
                   </div>
 
@@ -171,6 +186,24 @@ export const UncollectedDaysDetailSection: React.FC<UncollectedDaysDetailSection
           )}
 
           {/* Action Footer: Total sum & Collection Button */}
+          {(data?.balance?.isShiftClosed === false || store.isShiftClosed === false) && Number(store.cashUsd) > 0 && (
+            <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/25 text-amber-700 dark:text-amber-300 text-xs flex items-center justify-between flex-wrap gap-2 mt-3">
+              <div className="flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0" />
+                <span>{data?.balance?.unclosedReason || store.unclosedReason || 'Кассовая смена не закрыта'}. Перед проведением инкассации необходимо закрыть смену.</span>
+              </div>
+              <Button
+                size="sm"
+                variant="secondary"
+                leftIcon={FileCheck2}
+                onClick={() => setDailyClosingModalOpen(true, store.storeId)}
+                className="shrink-0 font-semibold text-xs"
+              >
+                Закрыть смену
+              </Button>
+            </div>
+          )}
+
           <div className="p-3.5 rounded-2xl bg-surface-raised/50 border border-border flex items-center justify-between gap-3 mt-3">
             <div className="min-w-0">
               <p className="text-[10px] sm:text-[11px] font-bold text-fg-subtle uppercase tracking-wider">
@@ -186,9 +219,14 @@ export const UncollectedDaysDetailSection: React.FC<UncollectedDaysDetailSection
             <Button
               variant="primary"
               size="md"
-              disabled={Number(store.cashUsd) === 0 || busy}
+              disabled={
+                Number(store.cashUsd) === 0 ||
+                busy ||
+                (data?.balance?.isShiftClosed ?? store.isShiftClosed) === false
+              }
               onClick={onCollect}
               className="font-bold shadow-xs active:scale-95"
+              title={(data?.balance?.isShiftClosed ?? store.isShiftClosed) === false ? 'Инкассация невозможна: сначала выполните закрытие смены (Z-отчёт)' : undefined}
             >
               <ArrowDownToLine className="w-4 h-4 mr-1.5" />
               <span>Инкассировать</span>

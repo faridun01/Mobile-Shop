@@ -33,6 +33,8 @@ export interface RegisterBalance {
   cardOnlyTjs?: string;
   lastCollectedAt?: string | null;
   daysWithoutCollection?: number;
+  isShiftClosed?: boolean;
+  unclosedReason?: string | null;
 }
 
 export interface BreakdownItem {
@@ -319,6 +321,16 @@ export const CashReconciliationModal: React.FC<CashReconciliationModalProps> = (
 
           {!loading && !error && data && (
             <>
+              {/* Unclosed shift warning banner */}
+              {(data?.balance?.isShiftClosed === false || store.isShiftClosed === false) && (
+                <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/25 text-amber-700 dark:text-amber-300 text-xs flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0" />
+                    <span>{data?.balance?.unclosedReason || store.unclosedReason || 'Кассовая смена не закрыта'}. Перед проведением инкассации необходимо закрыть смену (Z-отчёт).</span>
+                  </div>
+                </div>
+              )}
+
               {/* Period banner */}
               <div className="px-3 py-2 rounded-xl bg-surface-raised/60 border border-border flex items-center justify-between flex-wrap gap-2 text-xs">
                 <div className="flex items-center gap-2 text-fg">
@@ -705,12 +717,13 @@ export const CashReconciliationModal: React.FC<CashReconciliationModalProps> = (
           {!isZeroCash && (
             <Button
               variant="primary"
-              disabled={busy || !store}
+              disabled={busy || !store || (data?.balance?.isShiftClosed ?? store.isShiftClosed) === false}
               onClick={() => {
                 onClose();
                 onCollect(store);
               }}
               className="gap-1.5"
+              title={(data?.balance?.isShiftClosed ?? store.isShiftClosed) === false ? 'Инкассация невозможна: сначала закройте смену (Z-отчёт)' : undefined}
             >
               <ArrowDownToLine className="w-4 h-4" />
               <span>Инкассировать {formatTjs(store.cashTjs)}</span>
