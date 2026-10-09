@@ -66,6 +66,24 @@ describe('mutation retry protocol', () => {
     expect(keys[0]).toBe(keys[1]);
     expect(keys[2]).not.toBe(keys[1]);
   });
+  it('explains lost connections and proxy errors to the cashier, never as developer hints', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => { throw new TypeError('Failed to fetch'); }));
+    await expect(apiClient('/sales', { method: 'POST', body: '{"n":1}' })).rejects.toThrow('Нет связи с сервером. Результат операции пока неизвестен');
+    await expect(apiClient('/sales')).rejects.toThrow('Нет связи с сервером. Проверьте интернет');
+    await expect(apiClient('/auth/login', { method: 'POST', body: '{}' })).rejects.toThrow('Нет связи с сервером. Проверьте интернет');
+
+    const proxy = (status: number) => vi.stubGlobal('fetch', vi.fn(async () => new Response('<html>nginx</html>', { status })));
+    proxy(502);
+    await expect(apiClient('/sales', { method: 'POST', body: '{"n":2}' })).rejects.toThrow('Сервер временно недоступен. Результат операции пока неизвестен');
+    proxy(504);
+    await expect(apiClient('/sales')).rejects.toThrow('Сервер временно недоступен. Повторите попытку через минуту');
+    proxy(503);
+    await expect(apiClient('/sales')).rejects.toThrow('Слишком много запросов');
+    proxy(500);
+    const error = await apiClient('/sales').catch((e: Error) => e);
+    expect((error as Error).message).toBe('Ошибка сервера (код 500). Повторите попытку.');
+    expect((error as Error).message).not.toMatch(/npm|HTTP|backend|бэкенд/i);
+  });
   it('rejects an old response after account switching', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => { auth.token = 'new-session'; return new Response('[]'); }));
     await expect(apiClient('/sales')).rejects.toThrow('Сессия изменилась');

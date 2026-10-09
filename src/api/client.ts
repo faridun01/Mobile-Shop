@@ -78,6 +78,10 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
   };
 
   const url = apiUrl(endpoint);
+  const mutation = ['POST', 'PUT', 'PATCH', 'DELETE'].includes((options.method || 'GET').toUpperCase()) && !endpoint.startsWith('/auth/');
+  // A write that never got an answer may still have been committed; the persisted
+  // Idempotency-Key makes an identical retry return that result instead of repeating it.
+  const unknownOutcome = 'Результат операции пока неизвестен. Проверьте историю перед новой операцией; повтор с теми же данными защищён от дублирования.';
 
   const controller = new AbortController();
   let timedOut = false;
@@ -104,24 +108,28 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
       if (response.status === 401 && !endpoint.startsWith('/auth/')) {
         useAuthStore.getState().logout();
       }
+      // Non-JSON bodies come from the proxy, not the app (nginx rate limit, a restarting backend).
       const errorData = await response.json().catch(() => ({
-        message: response.status === 504 || response.status === 502
-          ? 'Сервер API недоступен. Запустите бэкенд: npm run server'
-          : `Ошибка API (HTTP ${response.status})`
+        message: response.status === 502 || response.status === 504
+          ? `Сервер временно недоступен.${mutation ? ` ${unknownOutcome}` : ' Повторите попытку через минуту.'}`
+          : response.status === 503 || response.status === 429
+            ? 'Слишком много запросов. Повторите через несколько секунд.'
+            : `Ошибка сервера (код ${response.status}). Повторите попытку.`
       }));
-      throw Object.assign(new Error(errorData.message || errorData.error || `HTTP error! status: ${response.status}`), { status: response.status });
+      throw Object.assign(new Error(errorData.message || errorData.error || `Ошибка сервера (код ${response.status})`), { status: response.status });
     }
 
     return await response.json();
   } catch (err: any) {
     if (timedOut) {
-      const mutation = ['POST', 'PUT', 'PATCH', 'DELETE'].includes((options.method || 'GET').toUpperCase());
       throw new Error(mutation
-        ? 'Сервер не ответил вовремя. Результат операции пока неизвестен. Проверьте историю перед новой операцией; повтор с теми же данными защищён от дублирования.'
+        ? `Сервер не ответил вовремя. ${unknownOutcome}`
         : 'Сервер не ответил вовремя. Не удалось обновить данные.');
     }
     if (err.name === 'TypeError' || err.message?.includes('Failed to fetch')) {
-      throw new Error('Сервер API недоступен. Запустите бэкенд: npm run server');
+      throw new Error(mutation
+        ? `Нет связи с сервером. ${unknownOutcome}`
+        : 'Нет связи с сервером. Проверьте интернет и повторите попытку.');
     }
     throw err;
   } finally {
