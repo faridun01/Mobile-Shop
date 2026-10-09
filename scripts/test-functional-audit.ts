@@ -116,6 +116,7 @@ try {
   assert.equal(racePurchase.status, 201);
   const raceId = racePurchase.data.invoice.id;
   const raceDeviceId = racePurchase.data.devices[0].id;
+  await db.device.update({ where: { id: raceDeviceId }, data: { storeId: 'store-siyoma', status: 'STORE_STOCK' } });
   const [saleRace, editRace] = await Promise.all([
     api('POST', '/sales', { storeId: 'store-siyoma', paymentMethod: 'CASH', items: [{ deviceId: raceDeviceId, salePriceTjs: 200 }] }),
     api('PUT', '/supplier-invoices/' + raceId, { totalAmountUsd: 12 }),

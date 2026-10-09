@@ -45,6 +45,7 @@ await withDisposableApi('merge', async ({ db, env, call }) => {
   await setRate(10);
   await sell('store-x', 1000, 50);                // $100
   await sell('store-x', 500, 0, true);            // $50 bonus phone
+  await call('POST', '/daily-closings', { storeId: 'store-x' });
   const collected = await call('POST', '/cash-collections', { storeId: 'store-x', expectedCashUsd: '150' });
   assert.equal(collected.status, 201, JSON.stringify(collected));
   await setRate(11);
@@ -106,6 +107,7 @@ await withDisposableApi('merge', async ({ db, env, call }) => {
 
   // Сиёма's next collection: the bonus phone was collected before, so nothing is bonus now.
   const bonus0 = await db.financialAccount.findUnique({ where: { systemKey: 'BONUS_ACCOUNT' } });
+  await call('POST', '/daily-closings', { storeId: 'store-siyoma' });
   const next = await call('POST', '/cash-collections', { storeId: 'store-siyoma', expectedCashUsd: t1.usd.toString() });
   assert.equal(next.status, 201, JSON.stringify(next));
   assert.equal(String(next.data.regularAmountUsd), t1.usd.toString());

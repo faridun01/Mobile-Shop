@@ -117,9 +117,12 @@ function makeCtx(db: PrismaClient, base: string) {
     const b = await bonus();
     assert.equal(b.usd.toString(), b.ledgerUsd.toString(), 'Bonus Account cached balance = sum of its ledger rows (no off-ledger credit)');
   };
-  const collect = (storeId: string, expectedCashUsd: Prisma.Decimal.Value, key?: string) =>
-    call('POST', '/cash-collections', { storeId, expectedCashUsd: D(expectedCashUsd).toString() }, key);
-  return { db, call, login, setRate, store, device, sell, reg, bonus, ledger, bonusAccounts, assertReconciled, collect };
+  const closeShift = (storeId: string) => call('POST', '/daily-closings', { storeId });
+  const collect = async (storeId: string, expectedCashUsd: Prisma.Decimal.Value, key?: string) => {
+    await closeShift(storeId);
+    return call('POST', '/cash-collections', { storeId, expectedCashUsd: D(expectedCashUsd).toString() }, key);
+  };
+  return { db, call, login, setRate, store, device, sell, reg, bonus, ledger, bonusAccounts, assertReconciled, collect, closeShift };
 }
 
 /** Collects a store and checks the split and conservation in both currencies. */

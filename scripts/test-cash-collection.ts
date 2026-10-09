@@ -105,6 +105,17 @@ try {
   const centralBefore = await register('main-warehouse');
   const centralLedgerBefore = (await call(admin, 'GET', '/cash-collections/balances')).data.central;
 
+  // ---------- unclosed shift is refused ----------
+  const unclosed = await call(admin, 'POST', '/cash-collections', { storeId: 'store-siyoma', expectedCashUsd: expectedUsd.toString() });
+  assert.equal(unclosed.status, 400);
+  assert.match(unclosed.data.message, /не закрыта/);
+  pass('collection is refused (400) when store cash register shift is not closed');
+
+  // ---------- close the shift ----------
+  const closed = await call(seller, 'POST', '/daily-closings', {});
+  assert.equal(closed.status, 201);
+  pass('seller closes the daily shift');
+
   // ---------- stale confirmation is refused and changes nothing ----------
   const stale = await call(admin, 'POST', '/cash-collections', { storeId: 'store-siyoma', expectedCashUsd: '200.00' });
   assert.equal(stale.status, 409, JSON.stringify(stale));
