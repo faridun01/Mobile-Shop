@@ -68,7 +68,7 @@ export default defineConfig(({ mode }) => {
       tailwindcss(),
       versionJsonPlugin(commitSha, buildTime, appVersion),
       !nativeBuild && VitePWA({
-        registerType: 'prompt',
+        registerType: 'autoUpdate',
         injectRegister: 'auto',
         devOptions: {
           enabled: false,
@@ -111,6 +111,8 @@ export default defineConfig(({ mode }) => {
           ]
         },
         workbox: {
+          skipWaiting: true,
+          clientsClaim: true,
           importScripts: ['/sw-push.js'],
           globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2,ttf}'],
           // Preserve offline access to every existing page. Exclude on-demand deps and version.json from precache.

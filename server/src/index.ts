@@ -19,12 +19,16 @@ app.use(express.static(path.join(projectRoot, 'dist'), {
     if (filePath.includes(`${path.sep}assets${path.sep}`)) {
       res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
     } else {
-      res.setHeader('Cache-Control', 'no-cache');
+      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate, max-age=0');
+      res.setHeader('Pragma', 'no-cache');
+      res.setHeader('Expires', '0');
     }
   },
 }));
 app.get('*', (_req, res) => {
-  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate, max-age=0');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
   res.sendFile(path.join(projectRoot, 'dist', 'index.html'));
 });
 

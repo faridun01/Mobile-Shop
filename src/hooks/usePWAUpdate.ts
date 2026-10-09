@@ -14,7 +14,7 @@ export function usePWAUpdate() {
     isStandalone: pwaUpdateService.isStandalone(),
     buildInfo: pwaUpdateService.getBuildInfo(),
     checkForUpdates: (force?: boolean) => pwaUpdateService.checkForUpdates(force),
-    applyUpdate: () => pwaUpdateService.applyUpdate(),
+    applyUpdate: (force?: boolean) => pwaUpdateService.applyUpdate(force),
     dismissNetworkNotice: () => pwaUpdateService.dismissNetworkNotice(),
   };
 }

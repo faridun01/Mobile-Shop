@@ -64,15 +64,25 @@ class PWAUpdateService {
     if (this.initialized || typeof window === 'undefined') return;
     this.initialized = true;
 
-    // 1. Hook into Service Worker registration if available
+    // 1. In development mode, unregister any service worker that might have been left over
+    // from a production build on localhost (prevents HMR and dev changes from being masked)
+    if (typeof import.meta !== 'undefined' && Boolean(import.meta.env?.DEV) && typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
+      navigator.serviceWorker.getRegistrations?.().then((regs) => {
+        for (const reg of regs) {
+          reg.unregister();
+        }
+      }).catch(() => {});
+    }
+
+    // 2. Hook into Service Worker registration if available
     if ('serviceWorker' in navigator) {
       this.setupServiceWorker();
     }
 
-    // 2. Setup Foreground / Visibility / Online / Periodic Listeners (Requirements 3 & 6)
+    // 3. Setup Foreground / Visibility / Online / Periodic Listeners (Requirements 3 & 6)
     this.setupLifecycleHooks();
 
-    // 3. Initial check on application launch
+    // 4. Initial check on application launch
     this.checkForUpdates(true);
   }
 
@@ -342,40 +352,46 @@ class PWAUpdateService {
     }
   }
 
-  public applyUpdate() {
-    if (this.state.isUpdating) return;
+  public applyUpdate(force = false) {
+    if (this.state.isUpdating && !force) return;
     this.state.isUpdating = true;
     this.notify();
 
+    if (force && typeof sessionStorage !== 'undefined') {
+      sessionStorage.removeItem('ms_pwa_last_reload_timestamp');
+    }
+
     // Fallback: If Service Worker does not trigger controllerchange/reload within 1500ms, force reload
     const fallbackTimer = setTimeout(() => {
-      this.performSafeReload();
+      this.performSafeReload(force);
     }, 1500);
 
-    if (this.state.waitingWorker) {
+    const targetWorker = this.state.waitingWorker || this.registration?.waiting;
+
+    if (targetWorker) {
       try {
-        this.state.waitingWorker.addEventListener?.('statechange', (e: any) => {
+        targetWorker.addEventListener?.('statechange', (e: any) => {
           if (e.target?.state === 'activated') {
             clearTimeout(fallbackTimer);
-            this.performSafeReload();
+            this.performSafeReload(force);
           }
         });
       } catch {
         // Ignore if addEventListener not supported on mock/worker
       }
       // Post message to waiting service worker to activate
-      this.state.waitingWorker.postMessage({ type: 'SKIP_WAITING' });
+      targetWorker.postMessage({ type: 'SKIP_WAITING' });
     } else {
       clearTimeout(fallbackTimer);
       // Direct safe reload
-      this.performSafeReload();
+      this.performSafeReload(force);
     }
   }
 
   /**
    * Reloads the page safely while preventing infinite reload loops (Requirement 13).
    */
-  private performSafeReload() {
+  private performSafeReload(force = false) {
     // In development mode (Vite dev server), do not automatically reload the page
     if (typeof import.meta !== 'undefined' && Boolean(import.meta.env?.DEV) && import.meta.env?.MODE !== 'test') {
       console.info('[PWA] Automatic page reload suppressed in development mode.');
@@ -386,17 +402,19 @@ class PWAUpdateService {
 
     const RELOAD_KEY = 'ms_pwa_last_reload_timestamp';
     const now = Date.now();
-    const lastReload = Number(sessionStorage.getItem(RELOAD_KEY) || '0');
+    const lastReload = typeof sessionStorage !== 'undefined' ? Number(sessionStorage.getItem(RELOAD_KEY) || '0') : 0;
 
-    // Prevent repeated reloads within 10 seconds
-    if (now - lastReload < 10_000) {
+    // Prevent repeated reloads within 10 seconds unless forced by user
+    if (!force && now - lastReload < 10_000) {
       console.warn('[PWA] Reload loop prevented. Last reload occurred less than 10s ago.');
       this.state.isUpdating = false;
       this.notify();
       return;
     }
 
-    sessionStorage.setItem(RELOAD_KEY, String(now));
+    if (typeof sessionStorage !== 'undefined') {
+      sessionStorage.setItem(RELOAD_KEY, String(now));
+    }
 
     // Perform reload
     if (typeof window !== 'undefined') {
