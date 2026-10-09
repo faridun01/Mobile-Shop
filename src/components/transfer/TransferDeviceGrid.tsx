@@ -112,7 +112,8 @@ export const TransferDeviceGrid: React.FC<TransferDeviceGridProps> = ({
       }
 
       if (dev.color) {
-        group.colorMap.set(dev.color, (group.colorMap.get(dev.color) || 0) + 1);
+        const normColor = formatPhoneColor(dev.color);
+        group.colorMap.set(normColor, (group.colorMap.get(normColor) || 0) + 1);
       }
     }
 

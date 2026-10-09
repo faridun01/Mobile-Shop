@@ -30,7 +30,7 @@ import {
 } from 'lucide-react';
 import { MonthPicker } from '../ui/MonthPicker';
 import { currentBusinessMonth } from '../../utils/businessDate';
-import { DEFAULT_PHONE_COLORS_RU, normalizePhoneColor } from '../../utils/phoneSpecs';
+import { DEFAULT_PHONE_COLORS_RU, normalizePhoneColor, formatPhoneColor } from '../../utils/phoneSpecs';
 
 interface BonusAccountBalance {
   balanceUsd: string;
@@ -260,7 +260,12 @@ export const BonusesPage: React.FC = () => {
   const colorOptions = useMemo(() => {
     const set = new Set<string>(DEFAULT_PHONE_COLORS_RU);
     (devices || []).forEach((d) => {
-      if (d.color) set.add(normalizePhoneColor(d.color));
+      if (d.color) {
+        const translated = normalizePhoneColor(d.color);
+        if (translated && !/[a-zA-Z]/.test(translated)) {
+          set.add(translated);
+        }
+      }
     });
     return Array.from(set);
   }, [devices]);
@@ -497,7 +502,7 @@ export const BonusesPage: React.FC = () => {
     setEditBrand(fd?.brand || bonus.brand || '');
     setEditModel(fd?.model || bonus.model || '');
     setEditStorage(fd?.storage || bonus.storage || '');
-    setEditColor(fd?.color || bonus.color || '');
+    setEditColor(normalizePhoneColor(fd?.color || bonus.color || ''));
     setEditImei(fd?.imei || bonus.imei || '');
     setEditImei2('');
     setEditingBonus(bonus);
@@ -1003,7 +1008,7 @@ export const BonusesPage: React.FC = () => {
                           {d.brand} {d.model}
                         </h3>
                         <p className="text-[11px] text-fg-subtle truncate">
-                          {d.storage} • {d.color} {d.ram && `• RAM ${d.ram}`}
+                          {d.storage} • {formatPhoneColor(d.color)} {d.ram && `• RAM ${d.ram}`}
                         </p>
                       </div>
 

@@ -2,7 +2,7 @@ import React from 'react';
 import { Supplier, Store, User } from '../../types';
 import { PurchaseItemGroup, getImeiPair } from './types';
 import { Combobox } from '../ui/Combobox';
-import { normalizePhoneColor } from '../../utils/phoneSpecs';
+import { normalizePhoneColor, formatPhoneColor } from '../../utils/phoneSpecs';
 import {
   ArrowLeft,
   Plus,
@@ -163,7 +163,7 @@ export const NewPurchaseForm: React.FC<NewPurchaseFormProps> = ({
                   </span>
                   {(group.storage || group.color) && (
                     <span className="text-[11px] text-fg-subtle truncate hidden sm:inline">
-                      ({[group.storage, group.color].filter(Boolean).join(', ')})
+                      ({[group.storage, formatPhoneColor(group.color)].filter(Boolean).join(', ')})
                     </span>
                   )}
                 </div>

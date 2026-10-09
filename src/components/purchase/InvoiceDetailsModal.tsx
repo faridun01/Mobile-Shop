@@ -62,10 +62,11 @@ export const InvoiceDetailsModal: React.FC<InvoiceDetailsModalProps> = ({
   const variantGroups = new Map<string, { brand: string; model: string; ram?: string; storage: string; color: string; devices: typeof containedDevices }>();
   if (hasGroups) {
     for (const dev of containedDevices) {
-      const key = `${dev.brand}|${dev.model}|${dev.ram || ''}|${dev.storage}|${dev.color}`;
+      const normColor = formatPhoneColor(dev.color);
+      const key = `${dev.brand}|${dev.model}|${dev.ram || ''}|${dev.storage}|${normColor}`;
       let g = variantGroups.get(key);
       if (!g) {
-        g = { brand: dev.brand, model: dev.model, ram: dev.ram, storage: dev.storage, color: dev.color, devices: [] };
+        g = { brand: dev.brand, model: dev.model, ram: dev.ram, storage: dev.storage, color: normColor, devices: [] };
         variantGroups.set(key, g);
       }
       g.devices.push(dev);
@@ -104,7 +105,7 @@ export const InvoiceDetailsModal: React.FC<InvoiceDetailsModalProps> = ({
                     style={{ backgroundColor: colorHex }}
                   />
                 )}
-                <span>{dev.color}</span>
+                <span>{formatPhoneColor(dev.color)}</span>
               </span>
             )}
             {(dev.purchaseCostUsd === 0 || dev.isBonus) && (

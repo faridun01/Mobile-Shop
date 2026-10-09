@@ -3,6 +3,7 @@ import { useAppFields } from '../../context/AppContext';
 import { formatStoreDisplayTitle } from '../../utils/storeContext';
 import { apiClient } from '../../api/client';
 import { StoreReceipt, StoreReceiptItem } from '../../types';
+import { formatPhoneColor, normalizePhoneColor } from '../../utils/phoneSpecs';
 import { soundEffects } from '../../utils/sound';
 import { StatusBanner, StatusMessage } from '../ui/StatusBanner';
 import { LoadingState } from '../ui/Skeleton';
@@ -142,7 +143,7 @@ export const StoreReceiptPage: React.FC = () => {
         model: res.model,
         ram: res.ram,
         storage: res.storage,
-        color: res.color,
+        color: normalizePhoneColor(res.color),
       };
 
       setScannedItems((prev) => [newItem, ...prev]);
@@ -150,7 +151,7 @@ export const StoreReceiptPage: React.FC = () => {
       soundEffects.playAddToCartSuccess();
       setStatus({
         tone: 'success',
-        text: `Добавлен: ${res.brand} ${res.model} (${res.storage || ''} ${res.color || ''}) [IMEI: ${res.imei}]`,
+        text: `Добавлен: ${res.brand} ${res.model} (${res.storage || ''} ${formatPhoneColor(res.color) || ''}) [IMEI: ${res.imei}]`,
       });
 
       // Refocus input for continuous rapid scanning
@@ -392,7 +393,7 @@ export const StoreReceiptPage: React.FC = () => {
                             </p>
                             <div className="flex items-center gap-2 text-[11px] text-fg-subtle flex-wrap mt-0.5">
                               {item.storage && <span>{item.storage}</span>}
-                              {item.color && <span>• {item.color}</span>}
+                              {item.color && <span>• {formatPhoneColor(item.color)}</span>}
                               <span className="font-mono text-accent font-semibold">• IMEI: {item.imei}</span>
                             </div>
                           </div>
@@ -607,7 +608,7 @@ export const StoreReceiptPage: React.FC = () => {
                       <tr key={item.id || item.imei} className="hover:bg-surface-raised/50">
                         <td className="p-2 font-mono text-fg-subtle">{idx + 1}</td>
                         <td className="p-2 font-bold text-fg">{item.brand} {item.model}</td>
-                        <td className="p-2 text-fg-subtle">{item.storage || '—'} {item.color ? `• ${item.color}` : ''}</td>
+                        <td className="p-2 text-fg-subtle">{item.storage || '—'} {item.color ? `• ${formatPhoneColor(item.color)}` : ''}</td>
                         <td className="p-2 font-mono font-bold text-accent">{item.imei}</td>
                       </tr>
                     ))}

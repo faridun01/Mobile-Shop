@@ -195,7 +195,12 @@ export const PurchasePage: React.FC = () => {
   const colorOptions = useMemo(() => {
     const set = new Set<string>(DEFAULT_PHONE_COLORS_RU);
     (devices || []).forEach((d) => {
-      if (d.color) set.add(normalizePhoneColor(d.color));
+      if (d.color) {
+        const translated = normalizePhoneColor(d.color);
+        if (translated && !/[a-zA-Z]/.test(translated)) {
+          set.add(translated);
+        }
+      }
     });
     return Array.from(set);
   }, [devices]);

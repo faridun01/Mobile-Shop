@@ -285,7 +285,8 @@ export const RevisionPage: React.FC = () => {
   const modelGroups = useMemo(() => {
     const map = new Map<string, ModelGroup>();
     storeDevices.forEach((d) => {
-      const key = `${d.brand}|||${d.model}|||${d.storage || ''}|||${d.color || ''}`.toLowerCase();
+      const normColor = formatPhoneColor(d.color);
+      const key = `${d.brand}|||${d.model}|||${d.storage || ''}|||${normColor}`.toLowerCase();
       let group = map.get(key);
       if (!group) {
         group = {
@@ -293,7 +294,7 @@ export const RevisionPage: React.FC = () => {
           brand: d.brand,
           model: d.model,
           storage: d.storage,
-          color: d.color,
+          color: normColor,
           items: [],
           total: 0,
           checked: 0,
@@ -983,7 +984,7 @@ export const RevisionPage: React.FC = () => {
                   .filter((d) => !checkedImeis.has(d.imei) && (!d.imei2 || !checkedImeis.has(d.imei2)))
                   .map((d) => (
                     <div key={d.id} className="p-2 flex justify-between items-center bg-surface">
-                      <span className="font-semibold text-fg truncate">{d.brand} {d.model} ({d.storage || ''} {d.color || ''})</span>
+                      <span className="font-semibold text-fg truncate">{d.brand} {d.model} ({[d.storage, formatPhoneColor(d.color)].filter(Boolean).join(' ')})</span>
                       <span className="font-mono text-fg-subtle text-[11px] shrink-0 ml-2">{d.imei}</span>
                     </div>
                   ))}

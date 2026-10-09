@@ -180,9 +180,10 @@ export const SalePage: React.FC = () => {
 
     for (const dev of availableDevices) {
       const ramPart = dev.ram ? dev.ram.trim() : '';
-      const key = `${dev.brand}_${dev.model}_${ramPart}_${dev.storage}_${dev.color}`;
+      const normColor = formatPhoneColor(dev.color);
+      const key = `${dev.brand}_${dev.model}_${ramPart}_${dev.storage}_${normColor}`;
       if (!groups[key]) {
-        groups[key] = { variantKey: key, brand: dev.brand, model: dev.model, ram: dev.ram, storage: dev.storage, color: dev.color, devices: [] };
+        groups[key] = { variantKey: key, brand: dev.brand, model: dev.model, ram: dev.ram, storage: dev.storage, color: normColor, devices: [] };
       }
       groups[key].devices.push(dev);
     }

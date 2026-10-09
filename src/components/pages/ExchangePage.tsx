@@ -1,4 +1,5 @@
 import { decimal, moneyNumber, formatMoney } from '../../utils/money';
+import { formatPhoneColor } from '../../utils/phoneSpecs';
 import React, { useState, useMemo, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useAppFields } from '../../context/AppContext';
@@ -382,7 +383,7 @@ export const ExchangePage: React.FC = () => {
                       >
                         <div>
                           <p className="font-bold text-fg-muted">{item.brand} {item.model}</p>
-                          <p className="text-[11px] text-fg-muted mt-0.5">{item.storage} • {item.color}</p>
+                          <p className="text-[11px] text-fg-muted mt-0.5">{item.storage} • {formatPhoneColor(item.color)}</p>
                           <p className="text-[10px] text-fg-subtle mt-0.5">IMEI: {item.imei}</p>
                         </div>
                         <span className="font-bold text-accent text-xs">{item.salePriceTjs.toLocaleString()} TJS</span>
@@ -411,7 +412,7 @@ export const ExchangePage: React.FC = () => {
                     {selectedOldDevice.brand} {selectedOldDevice.model}
                   </h4>
                   <p className="text-xs text-fg-muted mt-0.5">
-                    {selectedOldDevice.storage} • {selectedOldDevice.color}
+                    {selectedOldDevice.storage} • {formatPhoneColor(selectedOldDevice.color)}
                   </p>
                   <p className="text-xs text-fg-subtle mt-1">
                     IMEI: {selectedOldDevice.imei}
@@ -477,7 +478,7 @@ export const ExchangePage: React.FC = () => {
                     {replacementDevice.brand} {replacementDevice.model}
                   </h4>
                   <p className="text-xs text-fg-muted mt-0.5">
-                    {replacementDevice.ram ? `${replacementDevice.ram} • ` : ''}{replacementDevice.storage} • {replacementDevice.color}
+                    {replacementDevice.ram ? `${replacementDevice.ram} • ` : ''}{replacementDevice.storage} • {formatPhoneColor(replacementDevice.color)}
                   </p>
                   <p className="text-xs text-fg-subtle mt-1">
                     IMEI: {replacementDevice.imei}
@@ -543,7 +544,7 @@ export const ExchangePage: React.FC = () => {
                       >
                         <div>
                           <p className="font-bold text-fg-muted group-hover:text-accent transition-colors">{d.brand} {d.model}</p>
-                          <p className="text-[11px] text-fg-muted mt-0.5">{d.ram ? `${d.ram} • ` : ''}{d.storage} • {d.color}</p>
+                          <p className="text-[11px] text-fg-muted mt-0.5">{d.ram ? `${d.ram} • ` : ''}{d.storage} • {formatPhoneColor(d.color)}</p>
                           <p className="text-[10px] text-fg-subtle mt-0.5">IMEI: {d.imei}</p>
                         </div>
                         <span className="font-bold text-accent text-xs">

@@ -1189,7 +1189,7 @@ export const SalesHistoryPage: React.FC = () => {
               >
                 <div className="min-w-0">
                   <p className="text-sm font-semibold text-fg-muted">{item.brand} {item.model}</p>
-                  <p className="text-xs text-fg-subtle">{item.ram ? `${item.ram} · ` : ''}{item.storage} · {item.color} · IMEI: {item.imei}</p>
+                  <p className="text-xs text-fg-subtle">{item.ram ? `${item.ram} · ` : ''}{item.storage} · {formatPhoneColor(item.color)} · IMEI: {item.imei}</p>
                 </div>
                 <ChevronRight className="w-4 h-4 text-fg-subtle shrink-0" />
               </button>

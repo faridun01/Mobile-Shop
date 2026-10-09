@@ -2,6 +2,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { Supplier, Store } from '../../types';
 import { PurchasePreviewData, formatInvoiceDate } from './types';
 import { formatMoney } from '../../utils/money';
+import { formatPhoneColor } from '../../utils/phoneSpecs';
 import {
   FileText,
   X,
@@ -169,7 +170,7 @@ export const ReceiptPreviewModal: React.FC<ReceiptPreviewModalProps> = ({
                     {g.brand} {g.model}
                   </p>
                   <p className="text-[11px] text-fg-muted mt-0.5 truncate">
-                    {[g.ram, g.storage, g.color].filter(Boolean).join(' • ')}
+                    {[g.ram, g.storage, formatPhoneColor(g.color)].filter(Boolean).join(' • ')}
                   </p>
                   <p className="text-[10px] text-fg-subtle mt-0.5">
                     {g.items.length} шт. × ${formatMoney(g.purchasePriceUsd)}

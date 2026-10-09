@@ -86,7 +86,8 @@ export const EditSupplierInvoiceModal: React.FC<EditSupplierInvoiceModalProps> =
       for (const dev of containedDevices) {
         const isBonus = Boolean(dev.isBonus || dev.purchaseCostUsd === 0);
         const cost = isBonus ? 0 : dev.purchaseCostUsd || 0;
-        const key = `${dev.brand}|${dev.model}|${dev.ram || ''}|${dev.storage}|${dev.color}|${cost}`;
+        const normColor = formatPhoneColor(dev.color);
+        const key = `${dev.brand}|${dev.model}|${dev.ram || ''}|${dev.storage}|${normColor}|${cost}`;
         let g = map.get(key);
         if (!g) {
           g = {
@@ -94,7 +95,7 @@ export const EditSupplierInvoiceModal: React.FC<EditSupplierInvoiceModalProps> =
             model: dev.model,
             ram: dev.ram,
             storage: dev.storage,
-            color: dev.color,
+            color: normColor,
             unitPriceUsd: cost,
             isBonus,
             bonusCampaign: dev.bonusCampaign,

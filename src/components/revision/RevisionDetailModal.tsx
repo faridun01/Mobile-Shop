@@ -5,6 +5,7 @@ import { Button } from '../ui/Button';
 import { CheckCircle2, AlertTriangle, Store, UserCheck, Calendar, Package, AlertCircle } from 'lucide-react';
 import { formatStoreName } from '../../utils/storeContext';
 import { formatUserName } from '../../utils/formatUser';
+import { formatPhoneColor } from '../../utils/phoneSpecs';
 
 interface RevisionDetailModalProps {
   revision: StockRevision | null;
@@ -193,7 +194,7 @@ export const RevisionDetailModal: React.FC<RevisionDetailModalProps> = ({
                     </div>
                     <div className="text-[11px] text-fg-subtle flex items-center gap-1.5 flex-wrap">
                       {item.storage && <span>{item.storage}</span>}
-                      {item.color && <span>• {item.color}</span>}
+                      {item.color && <span>• {formatPhoneColor(item.color)}</span>}
                       {isAdmin && item.purchasePriceUsd && (
                         <span className="font-mono text-fg-muted">• ${item.purchasePriceUsd}</span>
                       )}

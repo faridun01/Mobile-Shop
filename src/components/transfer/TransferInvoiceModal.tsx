@@ -16,6 +16,7 @@ import { TransferRequest, Device, Store, User } from '../../types';
 import { Dialog } from '../ui/Dialog';
 import { formatMoney } from '../../utils/money';
 import { getTransferInvoiceItems, formatTransferInvoiceText } from '../../utils/transferInvoice';
+import { formatPhoneColor } from '../../utils/phoneSpecs';
 import { isLocationWarehouse } from './types';
 
 export interface TransferInvoiceModalProps {
@@ -367,7 +368,7 @@ export const TransferInvoiceModal: React.FC<TransferInvoiceModalProps> = ({
                                   style={{ backgroundColor: it.colorHex }}
                                 />
                               )}
-                              <span>{it.color}</span>
+                              <span>{formatPhoneColor(it.color)}</span>
                             </span>
                           )}
                         </div>
