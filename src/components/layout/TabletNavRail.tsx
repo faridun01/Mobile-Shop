@@ -26,6 +26,7 @@ import {
   Landmark,
   TrendingUp,
   Store,
+  Home,
 } from 'lucide-react';
 import { NAV_PAGE_ROUTES } from '../../router/navRoutes';
 import { useNavUsage, sortNavItemsByUsage, recordNavVisit } from '../../utils/navUsage';
@@ -151,11 +152,11 @@ export const TabletNavRail: React.FC = () => {
                   isCentral: true,
                 });
                 setSelectedStoreId('all');
-                setActivePage('REPORTS');
-                navigate('/reports');
-              } else if (location.pathname !== '/reports') {
-                setActivePage('REPORTS');
-                navigate('/reports');
+                setActivePage('WELCOME');
+                navigate('/');
+              } else if (location.pathname !== '/') {
+                setActivePage('WELCOME');
+                navigate('/');
               } else {
                 setStoreSwitchModalOpen(true);
               }
@@ -167,15 +168,15 @@ export const TabletNavRail: React.FC = () => {
             }`}
             title={
               isCentralCashMode
-                ? location.pathname === '/finance'
-                  ? 'Центральная касса (Нажмите для выбора магазина)'
-                  : 'Перейти в Центральную кассу'
-                : `${activeRetailStore?.name || 'Магазин'} (Нажмите для перехода в Центральную кассу)`
+                ? location.pathname === '/'
+                  ? 'Главная (Нажмите для выбора магазина)'
+                  : 'На главную'
+                : `${activeRetailStore?.name || 'Магазин'} (Нажмите для перехода на Главную)`
             }
           >
-            {isCentralCashMode ? <Landmark className="w-5 h-5" /> : <Store className="w-5 h-5" />}
+            {isCentralCashMode ? <Home className="w-5 h-5" /> : <Store className="w-5 h-5" />}
             <span className="text-[10px] font-bold mt-0.5 leading-none truncate max-w-11">
-              {isCentralCashMode ? 'Офис' : (activeRetailStore?.name || 'Магазин')}
+              {isCentralCashMode ? 'Главная' : (activeRetailStore?.name || 'Магазин')}
             </span>
           </button>
         ) : (

@@ -1,12 +1,14 @@
 import React from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAppFields } from '../../context/AppContext';
+import { useUIStore } from '../../stores/useUIStore';
 import {
   ShoppingBag,
   History,
   Package,
   Menu,
   Landmark,
+  Home,
   Truck,
   ArrowLeftRight,
   PackagePlus,
@@ -27,6 +29,12 @@ export const MobileBottomNav: React.FC = () => {
   const isAdmin = userRole === 'ADMIN';
   const isPartnerOrSeller = userRole === 'PARTNER' || userRole === 'SELLER';
   const isCentralCashMode = isAdmin && (!selectedStoreId || selectedStoreId === 'all');
+
+  const toggleDrawer = () => {
+    const next = !drawerOpen;
+    setDrawerOpen(next);
+    useUIStore.getState().setDrawerOpen(next);
+  };
 
   const NavItem: React.FC<{
     routePath: string;
@@ -80,20 +88,20 @@ export const MobileBottomNav: React.FC = () => {
           }}
         />
 
-        {/* Center primary action in Central Cash — Finance Dashboard */}
+        {/* Center primary action in Central Cash — Welcome / Home */}
         <div className="flex-1 flex justify-center items-center relative">
           <button
             onClick={() => {
-              setActivePage('REPORTS');
-              navigate('/reports');
+              setActivePage('WELCOME');
+              navigate('/');
             }}
-            className={`w-13 h-13 -mt-4 rounded-full flex flex-col items-center justify-center active:scale-95 transition-transform shadow-md ${
-              isFinanceActive ? 'bg-accent-strong text-accent-fg' : 'bg-accent text-accent-fg'
+            className={`w-13 h-13 -mt-4 rounded-full flex flex-col items-center justify-center active:scale-95 transition-transform shadow-md cursor-pointer ${
+              location.pathname === '/' ? 'bg-accent-strong text-accent-fg' : 'bg-accent text-accent-fg'
             }`}
-            title="Центральная касса и финансы"
+            title="Главная"
           >
-            <Landmark className="w-5 h-5" strokeWidth={2.5} />
-            <span className="text-[9px] font-bold tracking-tight leading-none mt-0.5">Офис</span>
+            <Home className="w-5 h-5" strokeWidth={2.5} />
+            <span className="text-[9px] font-bold tracking-tight leading-none mt-0.5">Главная</span>
           </button>
         </div>
 
@@ -108,7 +116,7 @@ export const MobileBottomNav: React.FC = () => {
         />
 
         <button
-          onClick={() => setDrawerOpen(!drawerOpen)}
+          onClick={toggleDrawer}
           className={`flex-1 pt-2 pb-1 flex flex-col items-center justify-start gap-1 transition-colors ${
             drawerOpen ? 'text-accent' : 'text-fg-subtle active:text-fg'
           }`}
@@ -188,7 +196,7 @@ export const MobileBottomNav: React.FC = () => {
       )}
 
       <button
-        onClick={() => setDrawerOpen(!drawerOpen)}
+        onClick={toggleDrawer}
         className={`flex-1 pt-2 pb-1 flex flex-col items-center justify-start gap-1 transition-colors ${
           drawerOpen ? 'text-accent' : 'text-fg-subtle active:text-fg'
         }`}

@@ -2,16 +2,23 @@ import React from 'react';
 import { useAuthStore } from '../../stores/useAuthStore';
 import { useAppFields } from '../../context/AppContext';
 import { useUIStore } from '../../stores/useUIStore';
-import { useNavigationLayout } from '../../hooks/useNavigationLayout';
 import { formatUserName } from '../../utils/formatUser';
 import { formatStoreName } from '../../utils/storeContext';
-import { Smartphone, Menu, Sparkles, Calendar, Store, ShieldCheck } from 'lucide-react';
+import { Smartphone, Menu, Calendar, Store, ShieldCheck } from 'lucide-react';
 
 export const WelcomePage: React.FC = () => {
   const { currentUser } = useAuthStore();
-  const { stores, selectedStoreId } = useAppFields('stores', 'selectedStoreId');
-  const { setDrawerOpen } = useUIStore();
-  const navigationLayout = useNavigationLayout();
+  const { stores, selectedStoreId, setDrawerOpen: setAppDrawerOpen } = useAppFields(
+    'stores',
+    'selectedStoreId',
+    'setDrawerOpen'
+  );
+  const setUiDrawerOpen = useUIStore((s) => s.setDrawerOpen);
+
+  const handleOpenMenu = () => {
+    setAppDrawerOpen(true);
+    setUiDrawerOpen(true);
+  };
 
   const getGreeting = () => {
     const hour = new Date().getHours();
@@ -85,21 +92,21 @@ export const WelcomePage: React.FC = () => {
         {/* Minimalist instruction */}
         <div className="p-3.5 rounded-2xl bg-surface-raised/60 border border-border/50 text-xs text-fg-subtle leading-relaxed">
           <p>
-            Для начала работы выберите нужный раздел в боковом меню.
+            Для начала работы выберите нужный раздел в меню.
           </p>
         </div>
 
         {/* Mobile menu trigger */}
-        {navigationLayout === 'mobile' && (
+        <div className="md:hidden pt-1">
           <button
             type="button"
-            onClick={() => setDrawerOpen(true)}
-            className="w-full min-h-[44px] inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-accent hover:bg-accent-strong active:scale-95 text-xs font-bold text-accent-fg uppercase tracking-wider transition-all shadow-xs cursor-pointer"
+            onClick={handleOpenMenu}
+            className="w-full min-h-[48px] inline-flex items-center justify-center gap-2 px-4 py-3 rounded-2xl bg-accent hover:bg-accent-strong active:scale-95 text-xs sm:text-sm font-bold text-accent-fg uppercase tracking-wider transition-all shadow-md cursor-pointer"
           >
-            <Menu className="w-4 h-4" />
+            <Menu className="w-5 h-5" />
             <span>Открыть меню разделов</span>
           </button>
-        )}
+        </div>
 
         <div className="pt-2 flex items-center justify-center gap-1.5 text-[10px] text-fg-subtle uppercase tracking-widest">
           <ShieldCheck className="w-3.5 h-3.5 text-accent" />

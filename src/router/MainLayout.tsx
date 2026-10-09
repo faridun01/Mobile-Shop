@@ -128,7 +128,7 @@ export function MainLayout() {
 
   return (
     <div className="app-safe-area app-viewport flex w-full max-w-full overflow-hidden bg-bg text-fg antialiased selection:bg-accent selection:text-accent-fg">
-      {navigationLayout === 'mobile' && <Drawer />}
+      {navigationLayout !== 'desktop' && <Drawer />}
       {navigationLayout === 'tablet' && <TabletNavRail />}
       {navigationLayout === 'desktop' && <Sidebar />}
 

@@ -95,7 +95,8 @@ export const Drawer: React.FC = () => {
     'setSelectedStoreId'
   );
   const { notifications } = useNotifications();
-  const { setStoreSwitchModalOpen, triggerStoreTransition } = useUIStore();
+  const { setStoreSwitchModalOpen, triggerStoreTransition, drawerOpen: uiDrawerOpen, setDrawerOpen: setUiDrawerOpen } = useUIStore();
+  const isEffectiveDrawerOpen = drawerOpen || uiDrawerOpen;
 
   const { isCollapsed: isGroupCollapsed, toggle: toggleGroup } = useCollapsedNavGroups();
 
@@ -273,10 +274,11 @@ export const Drawer: React.FC = () => {
   const closeDrawer = React.useCallback(() => {
     saveScroll();
     setDrawerOpen(false);
-  }, [saveScroll, setDrawerOpen]);
+    setUiDrawerOpen(false);
+  }, [saveScroll, setDrawerOpen, setUiDrawerOpen]);
 
   React.useEffect(() => {
-    if (!drawerOpen) return;
+    if (!isEffectiveDrawerOpen) return;
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') closeDrawer();
     };
@@ -331,21 +333,21 @@ export const Drawer: React.FC = () => {
       cancelAnimationFrame(rafId);
       clearTimeout(timerId);
     };
-  }, [drawerOpen, location.pathname]);
+  }, [isEffectiveDrawerOpen, location.pathname]);
 
-  if (!drawerOpen) return null;
+  if (!isEffectiveDrawerOpen) return null;
 
   return (
     <>
       {/* Backdrop overlay for outside click */}
       <div
-        className="fixed inset-0 bg-black/60 backdrop-blur-xs z-40 md:hidden transition-opacity"
+        className="fixed inset-0 bg-black/60 backdrop-blur-xs z-40 lg:hidden transition-opacity"
         onClick={closeDrawer}
         aria-hidden="true"
       />
 
       {/* Main Drawer Shell */}
-      <div className="app-safe-area fixed inset-0 z-50 flex md:hidden flex-col bg-bg text-fg-muted w-full h-[100dvh] max-h-[100dvh] overflow-hidden shadow-2xl animate-in slide-in-from-top-2 duration-200">
+      <div className="app-safe-area fixed inset-0 z-50 flex lg:hidden flex-col bg-bg text-fg-muted w-full h-[100dvh] max-h-[100dvh] overflow-hidden shadow-2xl animate-in slide-in-from-top-2 duration-200">
         {/* Sticky Header with User Info & Close Button */}
         <header className="sticky top-0 z-20 border-b border-border bg-surface/95 backdrop-blur-md shrink-0 shadow-2xs">
           <div className="w-full shrink-0" style={{ height: 'var(--sa-top)' }} />
@@ -566,6 +568,7 @@ export const Drawer: React.FC = () => {
                             setActivePage(item.id);
                             navigate(routePath);
                             setDrawerOpen(false);
+                            setUiDrawerOpen(false);
                           }}
                           className={`w-full flex items-center justify-between px-3.5 py-2.5 text-left transition-colors active:bg-surface-raised cursor-pointer ${
                             isActive
