@@ -15,7 +15,7 @@ import {
 } from 'lucide-react';
 import { apiClient } from '../../api/client';
 import { SearchBar } from '../ui/SearchBar';
-import { formatRam, formatStorage, getPhoneColorHex } from '../../utils/phoneSpecs';
+import { formatRam, formatStorage, getPhoneColorHex, formatPhoneColor } from '../../utils/phoneSpecs';
 import { FilterPillGroup } from '../ui/FilterPillGroup';
 import { Button } from '../ui/Button';
 import { IconButton } from '../ui/IconButton';
@@ -603,7 +603,7 @@ export const SalePage: React.FC = () => {
                               return (
                                 <span className="inline-flex items-center gap-1 text-[11px] text-fg-subtle">
                                   {colorHex && <span className="w-2 h-2 rounded-full border border-black/20 shrink-0" style={{ backgroundColor: colorHex }} />}
-                                  <span>{item.device.color}</span>
+                                  <span>{formatPhoneColor(item.device.color)}</span>
                                 </span>
                               );
                             })()}
@@ -796,7 +796,7 @@ export const SalePage: React.FC = () => {
                   <div className="min-w-0">
                     <p className="text-sm font-semibold text-fg-muted">{item.device.brand} {item.device.model}</p>
                     <p className="text-xs text-fg-subtle">
-                      {item.device.ram ? `${item.device.ram} · ` : ''}{item.device.storage} · {item.device.color}
+                      {item.device.ram ? `${item.device.ram} · ` : ''}{item.device.storage} · {formatPhoneColor(item.device.color)}
                     </p>
                     <p className="text-xs text-fg-subtle mt-0.5">
                       IMEI: {item.device.imei}{item.device.imei2 ? ` / ${item.device.imei2}` : ''}

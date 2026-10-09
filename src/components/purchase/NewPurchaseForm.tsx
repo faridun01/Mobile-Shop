@@ -2,6 +2,7 @@ import React from 'react';
 import { Supplier, Store, User } from '../../types';
 import { PurchaseItemGroup, getImeiPair } from './types';
 import { Combobox } from '../ui/Combobox';
+import { normalizePhoneColor } from '../../utils/phoneSpecs';
 import {
   ArrowLeft,
   Plus,
@@ -243,9 +244,9 @@ export const NewPurchaseForm: React.FC<NewPurchaseFormProps> = ({
                   <Combobox
                     options={colorOptions}
                     value={group.color}
-                    onChange={(v) => onUpdateGroup(groupIdx, 'color', v)}
+                    onChange={(v) => onUpdateGroup(groupIdx, 'color', normalizePhoneColor(v))}
                     className="h-7.5 rounded-lg bg-surface-raised border border-border px-2 text-xs text-fg font-medium focus:border-accent focus:bg-surface focus:outline-none transition-all shadow-2xs"
-                    placeholder="Black Titanium"
+                    placeholder="Черный"
                   />
                 </div>
 

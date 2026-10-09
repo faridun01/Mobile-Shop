@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { SupplierInvoice, Device, User } from '../../types';
 import { formatInvoiceDate } from './types';
 import { formatMoney } from '../../utils/money';
-import { getPhoneColorHex, formatRam, formatStorage } from '../../utils/phoneSpecs';
+import { getPhoneColorHex, formatRam, formatStorage, formatPhoneColor } from '../../utils/phoneSpecs';
 import {
   Receipt,
   CheckCircle2,
@@ -360,7 +360,7 @@ export const InvoiceDetailsModal: React.FC<InvoiceDetailsModalProps> = ({
                                   style={{ backgroundColor: colorHex }}
                                 />
                               )}
-                              <span>{grp.color}</span>
+                              <span>{formatPhoneColor(grp.color)}</span>
                             </span>
                           )}
                         </div>
@@ -437,7 +437,7 @@ export const InvoiceDetailsModal: React.FC<InvoiceDetailsModalProps> = ({
                                   style={{ backgroundColor: colorHex }}
                                 />
                               )}
-                              <span>{group.color}</span>
+                              <span>{formatPhoneColor(group.color)}</span>
                             </span>
                           )}
                         </div>

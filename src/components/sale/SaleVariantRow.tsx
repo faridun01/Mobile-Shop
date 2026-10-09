@@ -3,6 +3,7 @@ import { ChevronDown } from 'lucide-react';
 import { Device } from '../../types';
 import { formatMoney } from '../../utils/money';
 import { Badge } from '../ui/Badge';
+import { formatPhoneColor } from '../../utils/phoneSpecs';
 
 /** One sellable variant in the POS catalog: same brand, model, RAM, storage and colour. */
 export interface SaleVariant {
@@ -47,7 +48,7 @@ export const SaleVariantRow: React.FC<SaleVariantRowProps> = ({ variant, expande
         <div className="min-w-0">
           <p className="text-sm font-semibold text-fg-muted truncate">{variant.brand} {variant.model}</p>
           <p className="text-xs text-fg-subtle mt-0.5">
-            {variant.ram ? `${variant.ram} · ` : ''}{variant.storage} · {variant.color}
+            {variant.ram ? `${variant.ram} · ` : ''}{variant.storage} · {formatPhoneColor(variant.color)}
           </p>
         </div>
 

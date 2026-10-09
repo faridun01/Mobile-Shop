@@ -21,7 +21,7 @@ import { Dialog } from '../ui/Dialog';
 import { Button } from '../ui/Button';
 import { Badge } from '../ui/Badge';
 import { cn } from '../../utils/cn';
-import { approxTjs, formatTimelineDate, getTimelineBadge, STATUS_LABELS, STATUS_TONE } from './types';
+import { approxTjs, formatTimelineDate, getTimelineBadge, STATUS_LABELS, STATUS_TONE, formatPhoneColor } from './types';
 
 interface DeviceDetailsModalProps {
   device: Device | null;
@@ -221,7 +221,7 @@ export const DeviceDetailsModal: React.FC<DeviceDetailsModalProps> = ({
               </div>
               <div className="mt-1">
                 <span className="text-xs sm:text-sm font-extrabold text-fg truncate block" title={currentDevice.color}>
-                  {currentDevice.color || '—'}
+                  {formatPhoneColor(currentDevice.color) || '—'}
                 </span>
               </div>
             </div>

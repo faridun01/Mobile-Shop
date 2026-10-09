@@ -18,7 +18,7 @@ import {
   X,
 } from 'lucide-react';
 import { CustomSelect, CustomSelectOption } from '../ui/CustomSelect';
-import { formatRam, formatStorage, getPhoneColorHex } from '../../utils/phoneSpecs';
+import { formatRam, formatStorage, getPhoneColorHex, formatPhoneColor } from '../../utils/phoneSpecs';
 import { SearchBar } from '../ui/SearchBar';
 import { DateRangePicker } from '../ui/DateRangePicker';
 import { cn } from '../../utils/cn';
@@ -881,7 +881,7 @@ export const SalesHistoryPage: React.FC = () => {
                                     style={{ backgroundColor: colorHex }}
                                   />
                                 )}
-                                <span>{item.color}</span>
+                                <span>{formatPhoneColor(item.color)}</span>
                               </span>
                             )}
                           </div>

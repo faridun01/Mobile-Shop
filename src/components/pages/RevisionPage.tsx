@@ -12,6 +12,7 @@ import { formatUserName } from '../../utils/formatUser';
 import { StoreSelector } from '../common/StoreSelector';
 import { SearchBar } from '../ui/SearchBar';
 import { DEVICE_STATUS_LABELS, findDeviceByCode, normalizeScanCode } from '../../utils/scanLookup';
+import { formatPhoneColor } from '../../utils/phoneSpecs';
 import { RevisionHistoryPanel } from '../revision/RevisionHistoryPanel';
 import {
   CheckCircle2,
@@ -708,7 +709,7 @@ export const RevisionPage: React.FC = () => {
 
                               {group.color && (
                                 <span className="text-[10px] text-fg-muted shrink-0">
-                                  • {group.color}
+                                  • {formatPhoneColor(group.color)}
                                 </span>
                               )}
 
@@ -855,7 +856,7 @@ export const RevisionPage: React.FC = () => {
 
                             {device.color && (
                               <span className="text-[10px] text-fg-muted shrink-0">
-                                • {device.color}
+                                • {formatPhoneColor(device.color)}
                               </span>
                             )}
 

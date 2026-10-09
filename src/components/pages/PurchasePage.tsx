@@ -6,6 +6,7 @@ import { SupplierInvoice } from '../../types';
 import { soundEffects } from '../../utils/sound';
 import { getBusinessDateKey } from '../../utils/businessDate';
 import { useUnfinishedWork } from '../../utils/pwaUpdateSafety';
+import { DEFAULT_PHONE_COLORS_RU, normalizePhoneColor } from '../../utils/phoneSpecs';
 
 import {
   PurchaseItemGroup,
@@ -192,26 +193,11 @@ export const PurchasePage: React.FC = () => {
   }, [devices]);
 
   const colorOptions = useMemo(() => {
-    const set = new Set<string>([
-      'Black',
-      'White',
-      'Titanium',
-      'Natural Titanium',
-      'Black Titanium',
-      'Desert Titanium',
-      'Midnight',
-      'Starlight',
-      'Silver',
-      'Gold',
-      'Blue',
-      'Graphite',
-      'Purple',
-      'Green',
-    ]);
+    const set = new Set<string>(DEFAULT_PHONE_COLORS_RU);
     (devices || []).forEach((d) => {
-      if (d.color) set.add(d.color.trim());
+      if (d.color) set.add(normalizePhoneColor(d.color));
     });
-    return Array.from(set).sort();
+    return Array.from(set);
   }, [devices]);
 
   // Filtered list of purchase invoices
@@ -367,7 +353,8 @@ export const PurchasePage: React.FC = () => {
   const handleUpdateGroup = (idx: number, field: keyof Omit<PurchaseItemGroup, 'items'>, value: any) => {
     setGroups((prev) => {
       const next = [...prev];
-      next[idx] = { ...next[idx], [field]: value };
+      const val = field === 'color' && typeof value === 'string' ? normalizePhoneColor(value) : value;
+      next[idx] = { ...next[idx], [field]: val };
       return next;
     });
   };
@@ -504,7 +491,7 @@ export const PurchasePage: React.FC = () => {
           model: g.model.trim(),
           ram: ramStr,
           storage: storageStr,
-          color: g.color.trim(),
+          color: normalizePhoneColor(g.color.trim()),
           purchasePriceUsd: g.purchasePriceUsd,
           items: validItems,
           imeis: validItems.map((i) => i.imei),

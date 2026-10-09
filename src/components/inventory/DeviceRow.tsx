@@ -9,7 +9,7 @@ import {
   Store,
 } from 'lucide-react';
 import { Badge } from '../ui/Badge';
-import { approxTjs, getPhoneColorHex, STATUS_LABELS, STATUS_TONE } from './types';
+import { approxTjs, getPhoneColorHex, formatPhoneColor, STATUS_LABELS, STATUS_TONE } from './types';
 
 export interface DeviceRowProps {
   device: Device;
@@ -88,7 +88,7 @@ export const DeviceRow = React.forwardRef<HTMLButtonElement, DeviceRowProps>(
                       style={{ backgroundColor: colorHex }}
                     />
                   )}
-                  <span className="truncate">{device.color}</span>
+                  <span className="truncate">{formatPhoneColor(device.color)}</span>
                 </span>
               )}
 

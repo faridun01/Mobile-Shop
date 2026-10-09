@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { SupplierInvoice, Device, Supplier, Store } from '../../types';
 import { formatMoney } from '../../utils/money';
-import { getPhoneColorHex, formatRam, formatStorage } from '../../utils/phoneSpecs';
+import { getPhoneColorHex, formatRam, formatStorage, formatPhoneColor } from '../../utils/phoneSpecs';
 import { formatStoreName } from '../../utils/storeContext';
 import {
   Receipt,
@@ -437,7 +437,7 @@ export const EditInvoiceModal: React.FC<EditInvoiceModalProps> = ({
                                       style={{ backgroundColor: colorHex }}
                                     />
                                   )}
-                                  <span>{group.color}</span>
+                                  <span>{formatPhoneColor(group.color)}</span>
                                 </span>
                               )}
                             </div>

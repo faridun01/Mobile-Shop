@@ -16,7 +16,7 @@ import { formatMoney } from '../../utils/money';
 import { LoadingState } from '../ui/Skeleton';
 import { cn } from '../../utils/cn';
 import { TransferDeviceGridProps } from './types';
-import { getPhoneColorHex, formatRam } from '../../utils/phoneSpecs';
+import { getPhoneColorHex, formatRam, formatPhoneColor } from '../../utils/phoneSpecs';
 import { Device } from '../../types';
 import { useVirtualRows } from '../../hooks/useVirtualRows';
 
@@ -271,7 +271,7 @@ export const TransferDeviceGrid: React.FC<TransferDeviceGridProps> = ({
                                 style={{ backgroundColor: colorHex }}
                               />
                             )}
-                            <span className="truncate max-w-[80px]">{dev.color}</span>
+                            <span className="truncate max-w-[80px]">{formatPhoneColor(dev.color)}</span>
                           </span>
                         )}
                       </div>
@@ -294,7 +294,7 @@ export const TransferDeviceGrid: React.FC<TransferDeviceGridProps> = ({
                                 style={{ backgroundColor: colorHex }}
                               />
                             )}
-                            <span className="truncate max-w-[70px]">{dev.color}</span>
+                            <span className="truncate max-w-[70px]">{formatPhoneColor(dev.color)}</span>
                           </span>
                         )}
                       </div>
@@ -741,7 +741,7 @@ export const TransferDeviceGrid: React.FC<TransferDeviceGridProps> = ({
                                         style={{ backgroundColor: colorHex }}
                                       />
                                     )}
-                                    <span>{dev.color}</span>
+                                    <span>{formatPhoneColor(dev.color)}</span>
                                   </span>
                                 )}
                                 <span className="font-mono text-[10px] text-fg-subtle bg-surface px-1.5 py-0.2 rounded border border-border/50">

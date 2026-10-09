@@ -9,7 +9,7 @@ import {
   Check
 } from 'lucide-react';
 import { Dialog } from '../ui/Dialog';
-import { getPhoneColorHex, formatRam } from '../../utils/phoneSpecs';
+import { getPhoneColorHex, formatRam, formatPhoneColor } from '../../utils/phoneSpecs';
 import { ConfirmTransferModalProps } from './types';
 
 export const ConfirmTransferModal: React.FC<ConfirmTransferModalProps> = ({
@@ -166,7 +166,7 @@ export const ConfirmTransferModal: React.FC<ConfirmTransferModalProps> = ({
                                 style={{ backgroundColor: colorHex }}
                               />
                             )}
-                            <span className="truncate">{dev.color}</span>
+                            <span className="truncate">{formatPhoneColor(dev.color)}</span>
                           </span>
                         )}
                       </div>
