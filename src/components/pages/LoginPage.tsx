@@ -38,7 +38,7 @@ export const LoginPage: React.FC = () => {
           });
           navigate('/sale');
         } else {
-          navigate('/reports');
+          navigate('/');
         }
       } else {
         setError(res.message || 'Неверный логин или пароль');

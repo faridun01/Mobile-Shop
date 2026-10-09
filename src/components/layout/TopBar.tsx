@@ -48,6 +48,7 @@ export const TopBar: React.FC = () => {
 
   const getPageTitle = () => {
     switch (activePage) {
+      case 'WELCOME': return 'Главная';
       case 'SALE': return 'POS Терминал';
       case 'SALES_HISTORY': return 'История продаж';
       case 'INVENTORY': return 'Склад товаров';

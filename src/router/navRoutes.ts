@@ -4,6 +4,7 @@
  * and NotificationsPage maps notification targets its own way.
  */
 export const NAV_PAGE_ROUTES: Record<string, string> = {
+  WELCOME: '/',
   SALE: '/sale',
   SALES_HISTORY: '/sales-history',
   INVENTORY: '/inventory',

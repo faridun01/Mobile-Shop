@@ -45,6 +45,7 @@ export type ExpenseCategory =
   | (string & {});
 
 export type PageId =
+  | 'WELCOME'
   | 'SALE'
   | 'SALES_HISTORY'
   | 'INVENTORY'

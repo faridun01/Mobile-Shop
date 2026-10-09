@@ -52,8 +52,10 @@ const CashDeskPage = lazy(() => import('../components/pages/CashDeskPage').then(
 const CustomersPage = lazy(() => import('../components/pages/CustomersPage').then(m => ({ default: m.CustomersPage })));
 const StoreReceiptPage = lazy(() => import('../components/pages/StoreReceiptPage').then(m => ({ default: m.StoreReceiptPage })));
 const RevisionPage = lazy(() => import('../components/pages/RevisionPage').then(m => ({ default: m.RevisionPage })));
+const WelcomePage = lazy(() => import('../components/pages/WelcomePage').then(m => ({ default: m.WelcomePage })));
 
 const PAGE_ROUTES: Record<string, string> = {
+  WELCOME: '/',
   SALE: '/sale',
   SALES_HISTORY: '/sales-history',
   INVENTORY: '/inventory',
@@ -135,7 +137,7 @@ export function MainLayout() {
         <main className="flex-1 flex flex-col min-w-0 max-w-full min-h-0 overflow-y-auto overflow-x-hidden relative bg-bg">
           <Suspense fallback={<LoadingFallback />}>
             <Routes>
-              <Route path="/" element={<Navigate to={currentUser?.role === 'ADMIN' ? "/reports" : "/sale"} replace />} />
+              <Route path="/" element={currentUser?.role === 'ADMIN' ? <WelcomePage /> : <Navigate to="/sale" replace />} />
               <Route path="/sale" element={<SalePage />} />
               <Route path="/sales-history" element={<SalesHistoryPage />} />
               <Route path="/inventory" element={<InventoryPage />} />
@@ -159,7 +161,7 @@ export function MainLayout() {
               <Route path="/notifications" element={currentUser?.role === 'ADMIN' ? <NotificationsPage /> : <Navigate to="/sale" replace />} />
               <Route path="/receipts" element={<StoreReceiptPage />} />
               <Route path="/revision" element={<RevisionPage />} />
-              <Route path="*" element={<Navigate to={currentUser?.role === 'ADMIN' ? "/reports" : "/sale"} replace />} />
+              <Route path="*" element={<Navigate to={currentUser?.role === 'ADMIN' ? "/" : "/sale"} replace />} />
             </Routes>
           </Suspense>
         </main>

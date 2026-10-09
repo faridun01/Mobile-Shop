@@ -57,7 +57,7 @@ export const MobileBottomNav: React.FC = () => {
   };
 
   if (isCentralCashMode) {
-    const isFinanceActive = location.pathname === '/reports' || location.pathname === '/finance' || location.pathname === '/';
+    const isFinanceActive = location.pathname === '/reports' || location.pathname === '/finance';
 
     return (
       <nav className="app-bottom-nav md:hidden shrink-0 w-full bg-surface border-t border-border flex items-stretch justify-around select-none">

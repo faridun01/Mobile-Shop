@@ -240,10 +240,18 @@ export const Sidebar: React.FC = () => {
             </button>
           ) : (
             <>
-              <div className="flex items-center gap-2.5 min-w-0">
-                <div className="w-2.5 h-2.5 rounded-sm bg-accent shrink-0" />
-                <span className="font-bold text-xs tracking-wider text-fg-muted uppercase truncate">Mobile Shop</span>
-              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setActivePage('WELCOME');
+                  navigate('/');
+                }}
+                className="flex items-center gap-2.5 min-w-0 text-left hover:opacity-85 transition-opacity cursor-pointer group"
+                title="На главную"
+              >
+                <div className="w-2.5 h-2.5 rounded-sm bg-accent shrink-0 group-hover:scale-110 transition-transform" />
+                <span className="font-bold text-xs tracking-wider text-fg-muted group-hover:text-fg uppercase truncate transition-colors">Mobile Shop</span>
+              </button>
               <button
                 type="button"
                 onClick={toggleSidebar}
@@ -287,7 +295,7 @@ export const Sidebar: React.FC = () => {
                   {visibleItems.map(item => {
                     const Icon = item.icon;
                     const routePath = NAV_PAGE_ROUTES[item.id] || '/sale';
-                    const isActive = location.pathname === routePath || (location.pathname === '/' && item.id === (isStoreScoped ? 'SALE' : 'FINANCE'));
+                    const isActive = location.pathname === routePath || (location.pathname === '/' && isStoreScoped && item.id === 'SALE');
                     const isNotif = item.id === 'NOTIFICATIONS';
 
                     if (sidebarCollapsed) {

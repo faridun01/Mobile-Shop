@@ -551,7 +551,7 @@ export const Drawer: React.FC = () => {
                     {visibleItems.map(item => {
                       const Icon = item.icon;
                       const routePath = NAV_PAGE_ROUTES[item.id] || '/sale';
-                      const isActive = location.pathname === routePath || (location.pathname === '/' && item.id === (isStoreScoped ? 'SALE' : 'FINANCE'));
+                      const isActive = location.pathname === routePath || (location.pathname === '/' && isStoreScoped && item.id === 'SALE');
                       const isNotif = item.id === 'NOTIFICATIONS';
                       const style = ITEM_STYLES[item.id] || { bg: 'bg-surface-raised', text: 'text-fg-subtle' };
 
