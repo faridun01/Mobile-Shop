@@ -114,17 +114,19 @@ export const TopBar: React.FC = () => {
         {isAdmin && (
           <div className="flex items-center gap-1.5">
             {isCentralCashMode ? (
-              <button
-                type="button"
-                onClick={() => setStoreSwitchModalOpen(true)}
-                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-surface-raised hover:bg-accent hover:text-accent-fg border border-border text-xs font-semibold text-fg transition-all shadow-2xs active:scale-95 cursor-pointer"
-                title="Перейти в режим розничных продаж"
-              >
-                <Store className="w-3.5 h-3.5 text-accent" />
-                <span className="hidden sm:inline">Продавать в магазине</span>
-                <span className="sm:hidden">Магазины</span>
-                <ArrowRight className="w-3 h-3 opacity-60" />
-              </button>
+              activePage !== 'CASH_DESK' && (
+                <button
+                  type="button"
+                  onClick={() => setStoreSwitchModalOpen(true)}
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-surface-raised hover:bg-accent hover:text-accent-fg border border-border text-xs font-semibold text-fg transition-all shadow-2xs active:scale-95 cursor-pointer"
+                  title="Перейти в режим розничных продаж"
+                >
+                  <Store className="w-3.5 h-3.5 text-accent" />
+                  <span className="hidden sm:inline">Продавать в магазине</span>
+                  <span className="sm:hidden">Магазины</span>
+                  <ArrowRight className="w-3 h-3 opacity-60" />
+                </button>
+              )
             ) : (
               <div className="flex items-center gap-1 sm:gap-1.5">
                 <button

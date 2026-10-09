@@ -28,7 +28,7 @@ interface CashDeskPanelProps {
 
 export const CashDeskPanel: React.FC<CashDeskPanelProps> = ({ storeId }) => {
   const navigate = useNavigate();
-  const { stores, setSelectedStoreId, currentUser } = useAppFields('stores', 'setSelectedStoreId', 'currentUser');
+  const { stores, currentUser } = useAppFields('stores', 'currentUser');
   // Cash collection, the customer base and suppliers are ADMIN-only pages.
   const isAdmin = currentUser?.role === 'ADMIN';
 
@@ -306,8 +306,7 @@ export const CashDeskPanel: React.FC<CashDeskPanelProps> = ({ storeId }) => {
                   return (
                     <div
                       key={st.id}
-                      onClick={() => setSelectedStoreId(st.id)}
-                      className="p-2.5 rounded-lg bg-surface-raised border border-border hover:border-accent/40 transition-all flex items-center justify-between gap-2 cursor-pointer active:scale-[0.99]"
+                      className="p-2.5 rounded-lg bg-surface-raised border border-border flex items-center justify-between gap-2"
                     >
                       <div className="min-w-0">
                         <div className="flex items-center gap-1.5">
@@ -329,9 +328,6 @@ export const CashDeskPanel: React.FC<CashDeskPanelProps> = ({ storeId }) => {
                       <div className="text-right shrink-0">
                         <span className={`text-xs sm:text-sm font-black font-mono block ${hasCash ? 'text-emerald-600 dark:text-emerald-400' : 'text-fg-subtle'}`}>
                           {formatMoney(st.cashTjs)} TJS
-                        </span>
-                        <span className="text-[9px] text-accent font-semibold hover:underline">
-                          Смотреть →
                         </span>
                       </div>
                     </div>

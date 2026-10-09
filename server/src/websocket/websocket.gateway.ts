@@ -24,12 +24,18 @@ interface BroadcastOptions {
 // connection set without bound.
 const MAX_CONNECTIONS_PER_USER = 10;
 const WS_AUTH_PROTOCOL = 'auth';
+// Proxies drop a socket that carries no traffic: nginx after proxy_read_timeout (60s by default).
+// Every dropped socket reconnects and refetches all data, so the server pings well inside that
+// window. Browsers answer pings on their own; a socket that misses a whole interval is dead
+// (a half-open TCP connection) and is terminated so it stops counting against the user's cap.
+const HEARTBEAT_INTERVAL_MS = 30_000;
 
 export class RealtimeSyncGateway {
   private static wss: WebSocketServer;
   private static clients = new Set<ConnectedClient>();
+  private static heartbeat: ReturnType<typeof setInterval> | undefined;
 
-  public static init(server: Server) {
+  public static init(server: Server, options: { heartbeatIntervalMs?: number } = {}) {
     // The token travels as the second Sec-WebSocket-Protocol value (`auth, <jwt>`) rather than
     // in the URL, so it never lands in proxy access logs. The server answers with `auth` only.
     this.wss = new WebSocketServer({
@@ -38,7 +44,21 @@ export class RealtimeSyncGateway {
       handleProtocols: (protocols) => (protocols.has(WS_AUTH_PROTOCOL) ? WS_AUTH_PROTOCOL : false),
     });
 
+    const alive = new WeakSet<WebSocket>();
+    const wss = this.wss;
+    this.heartbeat = setInterval(() => {
+      for (const ws of wss.clients) {
+        if (!alive.has(ws)) { ws.terminate(); continue; }
+        alive.delete(ws);
+        ws.ping();
+      }
+    }, options.heartbeatIntervalMs ?? HEARTBEAT_INTERVAL_MS);
+    this.heartbeat.unref();
+    wss.on('close', () => clearInterval(this.heartbeat));
+
     this.wss.on('connection', async (ws: WebSocket, request) => {
+      alive.add(ws);
+      ws.on('pong', () => alive.add(ws));
       const connectionId = crypto.randomUUID();
       const token = RealtimeSyncGateway.extractToken(request.headers['sec-websocket-protocol'], request.url);
       let user: JwtPayload | null = null;
@@ -153,6 +173,14 @@ export class RealtimeSyncGateway {
     for (const client of this.clients) {
       if (client.user.sessionId === sessionId) client.ws.close(1008, 'Session disabled');
     }
+  }
+
+  /** Shutdown: 1001 tells clients to reconnect (to the next instance) rather than re-login. */
+  public static close() {
+    if (!this.wss) return;
+    clearInterval(this.heartbeat);
+    for (const ws of this.wss.clients) ws.close(1001, 'Server shutting down');
+    this.wss.close();
   }
 
   public static broadcast(eventType: string, payload: any, options: BroadcastOptions = {}) {

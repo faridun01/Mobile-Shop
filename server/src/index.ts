@@ -38,10 +38,25 @@ const server = app.listen(port, '0.0.0.0', () => {
 
 RealtimeSyncGateway.init(server);
 
-const shutdown = async () => {
-  server.close();
-  await prisma.$disconnect();
+// Stop accepting connections, close realtime sockets (they would otherwise keep server.close
+// waiting forever), let in-flight requests finish, then exit. Docker sends SIGKILL 10s after
+// SIGTERM, so a request that hangs past 8s is cut here first; every write is one transaction,
+// so nothing is left half-done either way.
+let shuttingDown = false;
+const shutdown = (signal: string) => {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  console.log(`${signal} received, shutting down`);
+  setTimeout(() => {
+    console.error('Shutdown timed out, forcing exit');
+    process.exit(1);
+  }, 8_000).unref();
+  RealtimeSyncGateway.close();
+  server.close(async () => {
+    await prisma.$disconnect().catch((error) => console.error('Prisma disconnect failed', error));
+    process.exit(0);
+  });
 };
 
-process.on('SIGINT', shutdown);
-process.on('SIGTERM', shutdown);
+process.on('SIGINT', () => shutdown('SIGINT'));
+process.on('SIGTERM', () => shutdown('SIGTERM'));

@@ -4,22 +4,17 @@ import { StatusBanner, StatusMessage } from '../ui/StatusBanner';
 import { RestrictedAccess } from '../ui/RestrictedAccess';
 import { FileCheck2, Landmark, Store as StoreIcon } from 'lucide-react';
 import { CashDeskPanel } from '../finance/CashDeskPanel';
-import { StoreSelector } from '../common/StoreSelector';
 import { useUIStore } from '../../stores/useUIStore';
 import { formatStoreDisplayTitle } from '../../utils/storeContext';
 
 export const CashDeskPage: React.FC = () => {
-  const { currentUser, stores, selectedStoreId, setSelectedStoreId } = useAppFields(
+  const { currentUser, stores, selectedStoreId } = useAppFields(
     'currentUser',
     'stores',
-    'selectedStoreId',
-    'setSelectedStoreId'
+    'selectedStoreId'
   );
   const { setDailyClosingModalOpen } = useUIStore();
-
   const [status, setStatus] = useState<StatusMessage | null>(null);
-
-  const retailStores = stores.filter((s) => !s.isMainWarehouse);
 
   const isSeller = currentUser?.role === 'SELLER';
   const isAdmin = currentUser?.role === 'ADMIN';
@@ -47,24 +42,15 @@ export const CashDeskPage: React.FC = () => {
 
       {/* Sticky Controls Bar */}
       {isCentral ? (
-        // Central Cash Desk Mode (Admin not in a specific store): view all or pick a store to enter
-        isAdmin && retailStores.length > 0 && (
-          <div className="sticky top-0 z-20 px-3 sm:px-4 py-1.5 border-b border-border bg-surface/95 backdrop-blur-sm flex items-center justify-between gap-2 shadow-2xs">
-            <div className="flex items-center gap-1.5 min-w-0">
-              <Landmark className="w-3.5 h-3.5 text-accent shrink-0" />
+        // Central Cash Desk Mode: pure financial overview without switching to stores
+        isAdmin && (
+          <div className="sticky top-0 z-20 px-3 sm:px-4 py-2 border-b border-border bg-surface/95 backdrop-blur-sm flex items-center justify-between gap-2 shadow-2xs">
+            <div className="flex items-center gap-2 min-w-0">
+              <div className="w-6 h-6 rounded-md bg-accent/15 text-accent flex items-center justify-center shrink-0">
+                <Landmark className="w-3.5 h-3.5" />
+              </div>
               <span className="text-xs font-bold text-fg truncate">Центральная касса (Все точки)</span>
             </div>
-            <StoreSelector
-              value={effectiveStoreId}
-              onChange={setSelectedStoreId}
-              stores={retailStores}
-              retailOnly
-              showAllOption
-              allOptionLabel="Центральная касса (Все)"
-              allOptionValue="all"
-              className="flex-1 sm:flex-initial max-w-[220px] sm:max-w-56"
-              compact
-            />
           </div>
         )
       ) : (

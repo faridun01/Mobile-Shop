@@ -56,6 +56,7 @@ async function main() {
   }
   problems += await reconcileCapital(owners);
   console.log(problems ? `\nНайдено расхождений: ${problems}` : '\nРасхождений нет');
+  return problems ? 1 : 0;
 }
 
 /**
@@ -134,5 +135,6 @@ async function reconcileCapital(owners: { capitalBalanceUsd: Prisma.Decimal; ava
 }
 
 main()
+  .then((code) => { process.exitCode = code; })
   .catch((error) => { console.error(error); process.exitCode = 1; })
   .finally(() => prisma.$disconnect());
