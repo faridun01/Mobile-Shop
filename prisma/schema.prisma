@@ -159,6 +159,7 @@ model Store {
   storeReceipts         StoreReceipt[]         @relation("ReceiptStore")
   receiptsShipped       StoreReceipt[]         @relation("ReceiptSource")
   dailyCashClosings     DailyCashClosing[]
+  stockRevisions        StockRevision[]
 
   @@map("stores")
 }
@@ -287,6 +288,35 @@ model DailyCashClosing {
   @@map("daily_cash_closings")
 }
 
+// Stock revision (сверка / ревизия склада): audit of devices physically present in a store/warehouse.
+// Records expected vs actual devices, missing items (недостача), and surplus items (излишки).
+model StockRevision {
+  id              String   @id @default(uuid())
+  storeId         String
+  storeName       String
+  userId          String
+  userName        String
+  userRole        String
+  totalExpected   Int
+  totalChecked    Int
+  totalMissing    Int
+  totalSurplus    Int
+  status          String   // 'MATCH' | 'DISCREPANCY'
+  missingDevices  Json?
+  surplusDevices  Json?
+  checkedImeis    Json?
+  comment         String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  store           Store    @relation(fields: [storeId], references: [id])
+  user            User?    @relation(fields: [userId], references: [id])
+
+  @@index([storeId, createdAt])
+  @@index([createdAt])
+  @@map("stock_revisions")
+}
+
 model User {
   id                     String   @id @default(uuid())
   login                  String   @unique
@@ -310,6 +340,7 @@ model User {
   sessions      AuthSession[]
   payrollPayouts PayrollPayout[]
   pushSubscriptions PushSubscription[]
+  stockRevisions    StockRevision[]
 
   @@map("users")
 }

@@ -1,7 +1,10 @@
 import React, { useState } from 'react';
 import { User, Store, Expense, Sale } from '../../types';
 import { MonthPicker } from '../ui/MonthPicker';
-import { Receipt, X, Calendar } from 'lucide-react';
+import { Dialog } from '../ui/Dialog';
+import { Button } from '../ui/Button';
+import { Receipt } from 'lucide-react';
+import { cn } from '../../utils/cn';
 
 interface EmployeeFinancialHistoryModalProps {
   user: User | null;
@@ -65,187 +68,195 @@ export const EmployeeFinancialHistoryModal: React.FC<EmployeeFinancialHistoryMod
   const grossAccrued = baseSal + commAmount;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-xs">
-      <div className="w-full max-w-3xl rounded-2xl bg-surface border border-info/40 p-5 text-fg-muted shadow-2xl space-y-4">
-        <div className="flex items-center justify-between pb-3 border-b border-border">
-          <div>
-            <h4 className="text-xs sm:text-sm font-bold text-info uppercase tracking-wider flex items-center space-x-2">
-              <Receipt className="w-4 h-4 text-info" />
-              <span>ФИНАНСОВАЯ ИСТОРИЯ И ОПЕРАЦИИ: {user.name}</span>
-            </h4>
-            <span className="text-[10px] text-fg-subtle">{resolvedStoreName}</span>
-          </div>
-          <button type="button" onClick={onClose} className="text-fg-subtle hover:text-fg-muted">
-            <X className="w-4 h-4" />
-          </button>
-        </div>
-
-        {/* Interactive Month Selector Bar */}
-        <div className="bg-bg p-3 rounded-lg border border-border space-y-2">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <label className="text-xs font-bold text-fg-muted uppercase flex items-center space-x-1.5">
-              <Calendar className="w-4 h-4 text-warning" />
-              <span>ФИЛЬТР ПО МЕСЯЦУ:</span>
-            </label>
-            <div className="flex items-center space-x-2">
-              <MonthPicker
-                value={selectedHistoryMonth === 'ALL' ? '' : selectedHistoryMonth}
-                onChange={setSelectedHistoryMonth}
-                className="rounded-lg bg-surface border border-border px-3 py-1 text-xs text-warning font-bold focus:border-warning focus:outline-none"
-              />
-              {selectedHistoryMonth !== 'ALL' && (
-                <button
-                  type="button"
-                  onClick={() => setSelectedHistoryMonth('ALL')}
-                  className="px-2 py-1 rounded-lg bg-surface-raised hover:bg-surface border border-border text-[10px] text-fg-muted font-bold cursor-pointer"
-                >
-                  СБРОСИТЬ ФИЛЬТР
-                </button>
-              )}
-            </div>
-          </div>
-
-          {/* Month Quick Filter Chips */}
-          <div className="flex flex-wrap gap-1.5 pt-1">
+    <Dialog
+      open={Boolean(user)}
+      onClose={onClose}
+      title={`Финансы: ${user.name}`}
+      subtitle={resolvedStoreName}
+      icon={Receipt}
+      compact
+      maxWidth="lg"
+      footer={
+        <Button
+          type="button"
+          variant="secondary"
+          size="sm"
+          onClick={onClose}
+          className="h-8 px-4 text-xs font-semibold"
+        >
+          Закрыть
+        </Button>
+      }
+    >
+      <div className="space-y-2.5">
+        {/* Компактный фильтр по месяцам в одну строку */}
+        <div className="flex items-center justify-between gap-2 pb-2 border-b border-border text-xs flex-wrap">
+          <div className="flex items-center gap-1 overflow-x-auto scrollbar-none py-0.5">
             <button
               type="button"
               onClick={() => setSelectedHistoryMonth('ALL')}
-              className={`px-2.5 py-1 rounded-md text-[10px] font-bold transition-colors cursor-pointer ${
+              className={cn(
+                'h-7 px-2.5 rounded-lg text-xs font-semibold cursor-pointer transition-all whitespace-nowrap',
                 selectedHistoryMonth === 'ALL'
-                  ? 'bg-warning text-black'
-                  : 'bg-surface-raised text-fg-muted hover:bg-surface hover:text-fg-muted border border-border'
-              }`}
+                  ? 'bg-accent text-accent-fg font-bold shadow-2xs'
+                  : 'bg-surface-raised border border-border text-fg-subtle hover:text-fg'
+              )}
             >
-              🌐 ВСЕ МЕСЯЦЫ
+              Все месяцы
             </button>
             {availableMonths.map((m) => (
               <button
                 key={m}
                 type="button"
                 onClick={() => setSelectedHistoryMonth(m)}
-                className={`px-2.5 py-1 rounded-md text-[10px] font-bold transition-colors cursor-pointer ${
+                className={cn(
+                  'h-7 px-2.5 rounded-lg text-xs font-semibold cursor-pointer transition-all whitespace-nowrap font-mono',
                   selectedHistoryMonth === m
-                    ? 'bg-warning text-black'
-                    : 'bg-surface-raised text-fg-muted hover:bg-surface hover:text-fg-muted border border-border'
-                }`}
+                    ? 'bg-accent text-accent-fg font-bold shadow-2xs'
+                    : 'bg-surface-raised border border-border text-fg-subtle hover:text-fg'
+                )}
               >
-                📅 {m}
+                {m}
               </button>
             ))}
           </div>
+
+          <MonthPicker
+            value={selectedHistoryMonth === 'ALL' ? '' : selectedHistoryMonth}
+            onChange={(m) => setSelectedHistoryMonth(m || 'ALL')}
+            className="h-7 px-2 bg-surface-raised border border-border rounded-lg text-xs font-semibold text-fg focus:outline-none cursor-pointer shrink-0"
+            placeholder="Выбрать месяц..."
+          />
         </div>
 
-        {/* Calculations & Breakdown for Selected Month / All */}
-        <div className="space-y-3">
-          {/* Summary Cards */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 bg-bg p-3 rounded-lg border border-border text-xs">
-            <div>
-              <span className="text-[10px] text-fg-subtle uppercase block">ВЫРУЧКА ПРОДАЖ:</span>
-              <strong className="text-fg-muted text-xs font-bold">
-                {totalSalesRev.toLocaleString()} TJS ({filteredSales.length} шт)
-              </strong>
+        {/* 4 ключевые сводки без лишнего текста */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+          <div className="p-2 rounded-xl bg-surface-raised border border-border">
+            <span className="text-[10px] font-semibold text-fg-subtle block uppercase">Выручка</span>
+            <div className="text-xs sm:text-sm font-bold font-mono text-fg mt-0.5 truncate">
+              {totalSalesRev.toLocaleString()} TJS
             </div>
-            <div>
-              <span className="text-[10px] text-fg-subtle uppercase block">НАЧИСЛЕНО (ОКЛАД+PROFIT):</span>
-              <strong className="text-accent text-xs font-bold">{grossAccrued.toLocaleString()} TJS</strong>
-            </div>
-            <div>
-              <span className="text-[10px] text-fg-subtle uppercase block">ВЫДАНО АВАНСОВ:</span>
-              <strong className="text-warning text-xs font-bold">{totalAdvancesTaken.toLocaleString()} TJS</strong>
-            </div>
-            <div>
-              <span className="text-[10px] text-fg-subtle uppercase block">ВЫПЛАЧЕНО ЗАРПЛАТЫ:</span>
-              <strong className="text-info text-xs font-bold">{totalSalaryPaid.toLocaleString()} TJS</strong>
-            </div>
+            <span className="text-[10px] text-fg-subtle font-mono">{filteredSales.length} продаж</span>
           </div>
 
-          <div className="space-y-1.5">
-            <div className="flex items-center justify-between text-xs">
-              <span className="font-bold text-fg-muted uppercase">
-                Все операции за {selectedHistoryMonth === 'ALL' ? 'весь период' : `месяц ${selectedHistoryMonth}`} (
-                {filteredExpenses.length + filteredSales.length}):
-              </span>
+          <div className="p-2 rounded-xl bg-surface-raised border border-border">
+            <span className="text-[10px] font-semibold text-fg-subtle block uppercase">Начислено</span>
+            <div className="text-xs sm:text-sm font-bold font-mono text-accent mt-0.5 truncate">
+              {grossAccrued.toLocaleString()} TJS
             </div>
+            <span className="text-[10px] text-fg-subtle">оклад + %</span>
+          </div>
 
-            <div className="max-h-72 overflow-y-auto rounded-lg border border-border bg-bg">
-              {filteredExpenses.length === 0 && filteredSales.length === 0 ? (
-                <div className="p-4 text-center text-fg-subtle text-xs">Операций за выбранный месяц не найдено</div>
-              ) : (
-                <table className="w-full text-left text-xs">
-                  <thead className="bg-surface text-[10px] text-fg-subtle uppercase border-b border-border">
-                    <tr>
-                      <th className="p-2">Дата</th>
-                      <th className="p-2">Тип операции</th>
-                      <th className="p-2">Описание</th>
-                      <th className="p-2 text-right">Сумма (TJS)</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-border text-[11px]">
-                    {combinedOperations.map((op) =>
-                      op.kind === 'expense' ? (
-                        <tr key={`e-${op.data.id}`} className="hover:bg-surface-raised">
-                          <td className="p-2 text-fg-subtle whitespace-nowrap">
-                            {new Date(op.data.date).toLocaleDateString()}
+          <div className="p-2 rounded-xl bg-surface-raised border border-border">
+            <span className="text-[10px] font-semibold text-fg-subtle block uppercase">Авансы</span>
+            <div className="text-xs sm:text-sm font-bold font-mono text-warning mt-0.5 truncate">
+              {totalAdvancesTaken.toLocaleString()} TJS
+            </div>
+            <span className="text-[10px] text-fg-subtle font-mono">{advanceExpenses.length} выплат</span>
+          </div>
+
+          <div className="p-2 rounded-xl bg-surface-raised border border-border">
+            <span className="text-[10px] font-semibold text-fg-subtle block uppercase">Выплачено ЗП</span>
+            <div className="text-xs sm:text-sm font-bold font-mono text-info mt-0.5 truncate">
+              {totalSalaryPaid.toLocaleString()} TJS
+            </div>
+            <span className="text-[10px] text-fg-subtle font-mono">{salaryExpenses.length} выплат</span>
+          </div>
+        </div>
+
+        {/* Таблица операций */}
+        <div className="space-y-1">
+          <div className="flex items-center justify-between text-xs px-0.5">
+            <span className="text-[11px] font-bold text-fg-subtle uppercase tracking-wider">
+              Операции ({combinedOperations.length})
+            </span>
+            {selectedHistoryMonth !== 'ALL' && (
+              <span className="text-[11px] text-fg-subtle font-mono">период: {selectedHistoryMonth}</span>
+            )}
+          </div>
+
+          <div className="max-h-60 sm:max-h-72 overflow-y-auto rounded-xl border border-border bg-surface-raised/40">
+            {combinedOperations.length === 0 ? (
+              <div className="p-4 text-center text-fg-subtle text-xs">
+                Операций за выбранный период не найдено
+              </div>
+            ) : (
+              <table className="w-full text-left text-xs">
+                <thead className="bg-surface-raised text-[10px] text-fg-subtle uppercase border-b border-border sticky top-0 z-10">
+                  <tr>
+                    <th className="py-1.5 px-2.5">Дата</th>
+                    <th className="py-1.5 px-2.5">Тип</th>
+                    <th className="py-1.5 px-2.5">Описание</th>
+                    <th className="py-1.5 px-2.5 text-right">Сумма</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border/60 text-xs">
+                  {combinedOperations.map((op) => {
+                    const isExpense = op.kind === 'expense';
+                    const isSalary = isExpense && op.data.category === 'SALARY';
+                    const dateStr = new Date(op.data.date).toLocaleDateString('ru-RU');
+
+                    if (isExpense) {
+                      return (
+                        <tr key={`e-${op.data.id}`} className="hover:bg-surface-raised transition-colors">
+                          <td className="py-1.5 px-2.5 text-fg-subtle whitespace-nowrap font-mono text-[11px]">
+                            {dateStr}
                           </td>
-                          <td className="p-2">
-                            {op.data.category === 'SALARY' ? (
-                              <span className="px-1.5 py-0.5 rounded-md bg-accent/10 text-accent border border-accent/30 text-[10px] font-bold">
-                                ЗАРПЛАТА
-                              </span>
-                            ) : (
-                              <span className="px-1.5 py-0.5 rounded-md bg-warning/10 text-warning border border-warning/30 text-[10px] font-bold">
-                                АВАНС
-                              </span>
-                            )}
-                          </td>
-                          <td className="p-2 text-fg-muted truncate max-w-55">
-                            {op.data.description || op.data.comment || '-'}
-                          </td>
-                          <td
-                            className={`p-2 text-right font-bold ${
-                              op.data.category === 'SALARY' ? 'text-accent' : 'text-warning'
-                            }`}
-                          >
-                            {op.data.amountTjs.toLocaleString()} TJS
-                          </td>
-                        </tr>
-                      ) : (
-                        <tr key={`s-${op.data.id}`} className="hover:bg-surface-raised">
-                          <td className="p-2 text-fg-subtle whitespace-nowrap">
-                            {new Date(op.data.date).toLocaleDateString()}
-                          </td>
-                          <td className="p-2">
-                            <span className="px-1.5 py-0.5 rounded-md bg-info/10 text-info border border-info/30 text-[10px] font-bold">
-                              ПРОДАЖА #{op.data.receiptNumber}
+                          <td className="py-1.5 px-2.5 whitespace-nowrap">
+                            <span
+                              className={cn(
+                                'px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider',
+                                isSalary
+                                  ? 'bg-accent/15 text-accent border border-accent/25'
+                                  : 'bg-warning/15 text-warning border border-warning/30'
+                              )}
+                            >
+                              {isSalary ? 'Зарплата' : 'Аванс'}
                             </span>
                           </td>
-                          <td className="p-2 text-fg-muted truncate max-w-55">
-                            {op.data.items.map((i) => `${i.brand} ${i.model}`).join(', ')} (
-                            {op.data.customerName || 'Покупатель'})
+                          <td className="py-1.5 px-2.5 text-fg truncate max-w-56 text-[11px]">
+                            {op.data.description || op.data.comment || (isSalary ? 'Выплата зарплаты' : 'Выдан аванс')}
                           </td>
-                          <td className="p-2 text-right font-bold text-fg-muted">
-                            +{op.data.totalTjs.toLocaleString()} TJS
+                          <td
+                            className={cn(
+                              'py-1.5 px-2.5 text-right font-bold font-mono text-xs whitespace-nowrap',
+                              isSalary ? 'text-accent' : 'text-warning'
+                            )}
+                          >
+                            -{op.data.amountTjs.toLocaleString()} TJS
                           </td>
                         </tr>
-                      )
-                    )}
-                  </tbody>
-                </table>
-              )}
-            </div>
+                      );
+                    }
+
+                    // Sale
+                    const sale = op.data;
+                    return (
+                      <tr key={`s-${sale.id}`} className="hover:bg-surface-raised transition-colors">
+                        <td className="py-1.5 px-2.5 text-fg-subtle whitespace-nowrap font-mono text-[11px]">
+                          {dateStr}
+                        </td>
+                        <td className="py-1.5 px-2.5 whitespace-nowrap">
+                          <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-info/15 text-info border border-info/30">
+                            Продажа #{sale.receiptNumber}
+                          </span>
+                        </td>
+                        <td className="py-1.5 px-2.5 text-fg truncate max-w-56 text-[11px]">
+                          {sale.items.map((i) => `${i.brand} ${i.model}`).join(', ')}
+                          {sale.customerName ? ` (${sale.customerName})` : ''}
+                        </td>
+                        <td className="py-1.5 px-2.5 text-right font-bold font-mono text-xs text-success whitespace-nowrap">
+                          +{sale.totalTjs.toLocaleString()} TJS
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            )}
           </div>
         </div>
-
-        <div className="pt-2 border-t border-border flex justify-end">
-          <button
-            type="button"
-            onClick={onClose}
-            className="py-2.5 px-4 rounded-xl bg-surface-raised hover:bg-surface border border-border text-xs font-bold text-fg-muted cursor-pointer"
-          >
-            ЗАКРЫТЬ
-          </button>
-        </div>
       </div>
-    </div>
+    </Dialog>
   );
 };

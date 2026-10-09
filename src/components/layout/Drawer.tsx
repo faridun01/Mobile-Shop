@@ -31,7 +31,6 @@ import {
   TrendingUp,
   Store,
   ArrowRight,
-  FileCheck2,
   HandCoins,
   LogOut,
 } from 'lucide-react';
@@ -99,7 +98,7 @@ export const Drawer: React.FC = () => {
     'logout'
   );
   const { notifications } = useNotifications();
-  const { setStoreSwitchModalOpen, triggerStoreTransition, setDailyClosingModalOpen } = useUIStore();
+  const { setStoreSwitchModalOpen, triggerStoreTransition } = useUIStore();
 
   const { isCollapsed: isGroupCollapsed, toggle: toggleGroup } = useCollapsedNavGroups();
 
@@ -366,9 +365,11 @@ export const Drawer: React.FC = () => {
                   <h2 className="text-sm font-bold text-fg truncate leading-tight">
                     {cleanDisplayName}
                   </h2>
-                  <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-md bg-surface-raised border border-border text-fg-subtle shrink-0">
-                    {isAdmin ? 'Админ' : isPartner ? 'Партнер' : 'Продавец'}
-                  </span>
+                  {isAdmin && (
+                    <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-md bg-surface-raised border border-border text-fg-subtle shrink-0">
+                      Админ
+                    </span>
+                  )}
                 </div>
                 {isStoreScoped ? (
                   userStoreName ? (
@@ -522,26 +523,6 @@ export const Drawer: React.FC = () => {
                 </div>
               )}
             </div>
-          )}
-
-          {/* Quick Shift Closing Button for Store Cashiers / Partners */}
-          {!isAdmin && (
-            <button
-              type="button"
-              onClick={() => {
-                closeDrawer();
-                setDailyClosingModalOpen(true, currentUser?.storeId || (selectedStoreId !== 'all' ? selectedStoreId : undefined));
-              }}
-              className="w-full py-2.5 px-3 rounded-xl bg-accent/10 hover:bg-accent/15 border border-accent/25 text-accent text-xs font-bold flex items-center justify-between transition-colors shadow-2xs cursor-pointer active:scale-[0.99]"
-            >
-              <span className="flex items-center gap-2">
-                <FileCheck2 className="w-4 h-4 text-accent shrink-0" />
-                <span>Закрыть смену</span>
-              </span>
-              <span className="text-[10px] uppercase font-mono px-1.5 py-0.5 rounded bg-accent/20">
-                Сверка кассы
-              </span>
-            </button>
           )}
 
           {/* All Navigation Groups & Items */}

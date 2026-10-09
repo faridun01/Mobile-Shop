@@ -9,7 +9,6 @@ import {
   Landmark,
   ArrowRight,
   Coins,
-  FileCheck2,
 } from 'lucide-react';
 import { formatStoreName } from '../../utils/storeContext';
 
@@ -37,7 +36,6 @@ export const TopBar: React.FC = () => {
     setStoreSwitchModalOpen,
     triggerStoreTransition,
     setDailyRateModalOpen,
-    setDailyClosingModalOpen,
   } = useUIStore();
 
   const isStoreScoped = currentUser?.role === 'SELLER' || currentUser?.role === 'PARTNER';
@@ -109,19 +107,6 @@ export const TopBar: React.FC = () => {
             <Coins className="w-3.5 h-3.5 text-accent shrink-0" />
             <span className="text-[10px] uppercase font-bold text-fg-subtle">USD/TJS</span>
             <span className="font-mono text-accent font-bold">{todayRate.rate}</span>
-          </button>
-        )}
-
-        {isStoreScoped && (
-          <button
-            type="button"
-            onClick={() => setDailyClosingModalOpen(true, currentUser?.storeId)}
-            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-surface-raised hover:bg-accent hover:text-accent-fg border border-border text-xs font-semibold text-fg transition-all shadow-2xs active:scale-95 cursor-pointer"
-            title="Закрыть смену"
-            aria-label="Закрыть смену"
-          >
-            <FileCheck2 className="w-3.5 h-3.5 text-accent" />
-            <span className="hidden sm:inline">Закрыть смену</span>
           </button>
         )}
 

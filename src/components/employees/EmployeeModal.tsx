@@ -1,6 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { User, Store, Role } from '../../types';
-import { Users, X, Eye, EyeOff, Loader2 } from 'lucide-react';
+import { Users, Eye, EyeOff } from 'lucide-react';
+import { Dialog } from '../ui/Dialog';
+import { Button } from '../ui/Button';
+import { formatStoreDisplayTitle } from '../../utils/storeContext';
 
 interface EmployeeModalProps {
   open: boolean;
@@ -118,50 +121,76 @@ export const EmployeeModal: React.FC<EmployeeModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-xs">
-      <form onSubmit={handleSubmit} className="w-full max-w-md rounded-2xl bg-surface border border-border p-5 text-fg-muted shadow-2xl space-y-3.5">
-        <div className="flex items-center justify-between pb-3 border-b border-border">
-          <h4 className="text-xs font-bold text-fg-muted uppercase tracking-wider flex items-center space-x-2">
-            <Users className="w-4 h-4 text-accent" />
-            <span>{editingUser ? 'РЕДАКТИРОВАНИЕ СОТРУДНИКА' : 'НОВЫЙ СОТРУДНИК'}</span>
-          </h4>
-          <button
+    <Dialog
+      open={open}
+      onClose={onClose}
+      title={editingUser ? 'РЕДАКТИРОВАНИЕ СОТРУДНИКА' : 'НОВЫЙ СОТРУДНИК'}
+      icon={Users}
+      compact
+      maxWidth="md"
+      footer={
+        <div className="grid grid-cols-2 gap-2 w-full">
+          <Button
             type="button"
+            variant="secondary"
+            size="sm"
             onClick={onClose}
-            className="text-fg-subtle hover:text-fg-muted"
+            disabled={isSubmitting}
+            className="w-full !h-8 text-xs font-semibold"
           >
-            <X className="w-4 h-4" />
-          </button>
+            Отмена
+          </Button>
+          <Button
+            type="submit"
+            variant="primary"
+            size="sm"
+            form="employee-form"
+            loading={isSubmitting}
+            className="w-full !h-8 text-xs font-bold"
+          >
+            {editingUser ? 'Сохранить' : 'Создать'}
+          </Button>
+        </div>
+      }
+    >
+      <form id="employee-form" onSubmit={handleSubmit} className="space-y-2">
+        {/* Row 1: ФИО сотрудника (полная ширина) */}
+        <div>
+          <label className="block text-[11px] font-semibold text-fg-subtle mb-0.5">
+            ФИО сотрудника <span className="text-danger">*</span>
+          </label>
+          <input
+            type="text"
+            required
+            value={name ?? ''}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="Саид Каримов"
+            className="w-full h-8 rounded-lg bg-surface-raised border border-border px-2.5 text-xs text-fg focus:border-accent focus:outline-none transition-colors"
+          />
         </div>
 
-        <div className="text-xs space-y-3">
+        {/* Row 2: Логин + Пароль в 2 колонки */}
+        <div className="grid grid-cols-2 gap-2">
           <div>
-            <label className="block text-fg-subtle text-[10px] uppercase mb-1">ФИО СОТРУДНИКА *</label>
-            <input
-              type="text"
-              required
-              value={name ?? ''}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="Саид Каримов"
-              className="w-full rounded-lg bg-surface-raised border border-border px-3 py-2 text-fg-muted focus:border-accent focus:outline-none"
-            />
-          </div>
-
-          <div>
-            <label className="block text-fg-subtle text-[10px] uppercase mb-1">ЛОГИН ДЛЯ ВХОДА *</label>
+            <label className="block text-[11px] font-semibold text-fg-subtle mb-0.5">
+              Логин для входа <span className="text-danger">*</span>
+            </label>
             <input
               type="text"
               required
               value={login ?? ''}
               onChange={(e) => setLogin(e.target.value)}
               placeholder="seller3"
-              className="w-full rounded-lg bg-surface-raised border border-border px-3 py-2 text-fg-muted focus:border-accent focus:outline-none"
+              className="w-full h-8 rounded-lg bg-surface-raised border border-border px-2.5 text-xs text-fg font-mono focus:border-accent focus:outline-none transition-colors"
             />
           </div>
 
           <div>
-            <label className="block text-fg-subtle text-[10px] uppercase mb-1">
-              <span>{editingUser ? 'НОВЫЙ ПАРОЛЬ (оставьте пустым, чтобы не менять)' : 'ПАРОЛЬ ДЛЯ ВХОДА *'}</span>
+            <label className="block text-[11px] font-semibold text-fg-subtle mb-0.5 truncate">
+              {editingUser ? 'Новый пароль' : 'Пароль для входа'}{' '}
+              <span className={editingUser ? 'text-fg-subtle font-normal' : 'text-danger'}>
+                {editingUser ? '(не менять)' : '*'}
+              </span>
             </label>
             <div className="relative">
               <input
@@ -169,121 +198,108 @@ export const EmployeeModal: React.FC<EmployeeModalProps> = ({
                 required={!editingUser}
                 value={password ?? ''}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder={editingUser ? 'Оставьте пустым, чтобы не менять пароль' : 'Пароль для входа в систему'}
-                className="w-full rounded-lg bg-surface-raised border border-border pl-3 pr-10 py-2 text-fg-muted focus:border-accent focus:outline-none font-mono text-xs"
+                placeholder={editingUser ? 'Не менять пароль' : 'Пароль'}
+                className="w-full h-8 rounded-lg bg-surface-raised border border-border pl-2.5 pr-8 text-xs text-fg font-mono focus:border-accent focus:outline-none transition-colors"
               />
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
-                className="absolute inset-y-0 right-0 flex items-center pr-3 text-fg-subtle hover:text-fg-muted transition-colors"
-                title={showPassword ? 'Скрыть пароль' : 'Показать пароль сотрудника'}
+                className="absolute inset-y-0 right-0 flex items-center pr-2 text-fg-subtle hover:text-fg transition-colors cursor-pointer"
+                title={showPassword ? 'Скрыть пароль' : 'Показать пароль'}
               >
-                {showPassword ? <EyeOff className="w-4 h-4 text-accent" /> : <Eye className="w-4 h-4 text-fg-subtle hover:text-accent" />}
+                {showPassword ? <EyeOff className="w-3.5 h-3.5 text-accent" /> : <Eye className="w-3.5 h-3.5" />}
               </button>
             </div>
           </div>
+        </div>
 
-          <div>
-            <label className="block text-fg-subtle text-[10px] uppercase mb-1">РОЛЬ ДОСТУПА</label>
+        {/* Row 3: Роль + Магазин в 2 колонки */}
+        <div className="grid grid-cols-2 gap-2">
+          <div className={role === 'ADMIN' ? 'col-span-2' : ''}>
+            <label className="block text-[11px] font-semibold text-fg-subtle mb-0.5">
+              Роль доступа
+            </label>
             <select
               value={role ?? 'SELLER'}
               onChange={(e) => setRole(e.target.value as Role)}
-              className="w-full rounded-lg bg-surface-raised border border-border px-3 py-2 text-fg-muted focus:border-accent focus:outline-none"
+              className="w-full h-8 rounded-lg bg-surface-raised border border-border px-2 text-xs text-fg font-medium focus:border-accent focus:outline-none cursor-pointer transition-colors"
             >
-              <option value="SELLER">Продавец (ограничен своим магазином, без себестоимости)</option>
-              <option value="PARTNER">Партнер филиала (доля прибыли, финансы магазина)</option>
-              <option value="ADMIN">Администратор (полный доступ)</option>
+              <option value="SELLER">Продавец (касса/склад)</option>
+              <option value="PARTNER">Партнер филиала</option>
+              <option value="ADMIN">Администратор (полный)</option>
             </select>
           </div>
 
           {(role === 'SELLER' || role === 'PARTNER') && (
             <div>
-              <label className="block text-warning text-[10px] uppercase mb-1 font-bold">
-                ПРИВЯЗКА К МАГАЗИНУ <span className="text-danger font-bold">* (ОБЯЗАТЕЛЬНО)</span>
+              <label className="block text-[11px] font-semibold text-warning mb-0.5 truncate">
+                Привязка к магазину <span className="text-danger">*</span>
               </label>
               <select
                 required
                 value={storeId ?? ''}
                 onChange={(e) => setStoreId(e.target.value)}
-                className="w-full rounded-lg bg-surface-raised border border-warning/40 px-3 py-2 text-fg font-bold focus:border-warning focus:outline-none cursor-pointer"
+                className="w-full h-8 rounded-lg bg-surface-raised border border-warning/50 px-2 text-xs text-fg font-semibold focus:border-warning focus:outline-none cursor-pointer transition-colors"
               >
-                <option value="">-- Выберите магазин * --</option>
+                <option value="">-- Выберите магазин --</option>
                 {stores.filter((s) => !s.isMainWarehouse).map((s) => (
-                  <option key={s.id} value={s.id}>{s.name}</option>
+                  <option key={s.id} value={s.id}>{formatStoreDisplayTitle(s)}</option>
                 ))}
               </select>
-              <p className="text-[10px] text-fg-subtle mt-1">
-                {role === 'PARTNER'
-                  ? 'Партнёр обязательно прикрепляется к филиалу и получает долю от прибыли этого магазина.'
-                  : 'Продавец работает только с кассой и складом выбранного магазина.'}
-              </p>
             </div>
           )}
+        </div>
 
-          {role === 'SELLER' && (
-            <div className="grid grid-cols-2 gap-2.5 p-3 rounded-lg bg-surface-raised border border-border">
-              <div>
-                <label className="block text-accent text-[10px] uppercase mb-1 font-bold">ОКЛАД (TJS/МЕС)</label>
-                <input
-                  step="0.01"
-                  type="number"
-                  min="0"
-                  value={baseSalaryTjs}
-                  onChange={(e) => setBaseSalaryTjs(e.target.value)}
-                  placeholder="1500"
-                  className="w-full rounded-lg bg-surface border border-border px-3 py-1.5 text-fg-muted font-mono text-xs focus:border-accent focus:outline-none"
-                />
-              </div>
-              <div>
-                <label className="block text-accent text-[10px] uppercase mb-1 font-bold">КОМИССИЯ ПРОДАЖ (%)</label>
-                <input
-                  type="number"
-                  min="0"
-                  max="100"
-                  step="0.0001"
-                  value={salesCommissionPercent}
-                  onChange={(e) => setSalesCommissionPercent(e.target.value)}
-                  placeholder="2.5"
-                  className="w-full rounded-lg bg-surface border border-border px-3 py-1.5 text-fg-muted font-mono text-xs focus:border-accent focus:outline-none"
-                />
-              </div>
-            </div>
-          )}
-
-          {editingUser && (
-            <div className="pt-2 border-t border-border">
-              <label className="flex items-center space-x-2 cursor-pointer text-fg-muted">
-                <input
-                  type="checkbox"
-                  checked={isActive}
-                  onChange={(e) => setIsActive(e.target.checked)}
-                  className="rounded bg-surface-raised border-border text-accent focus:ring-0"
-                />
-                <span>Активная учетная запись</span>
+        {/* Row 4: Оклад и Комиссия для продавца (SELLER) */}
+        {role === 'SELLER' && (
+          <div className="grid grid-cols-2 gap-2 p-2 rounded-lg bg-surface-raised border border-border">
+            <div>
+              <label className="block text-accent text-[10px] font-bold uppercase tracking-wider mb-0.5">
+                Оклад (TJS/мес)
               </label>
+              <input
+                step="0.01"
+                type="number"
+                min="0"
+                value={baseSalaryTjs}
+                onChange={(e) => setBaseSalaryTjs(e.target.value)}
+                placeholder="1500"
+                className="w-full h-7.5 rounded-md bg-surface border border-border px-2 text-xs text-fg font-mono focus:border-accent focus:outline-none transition-colors"
+              />
             </div>
-          )}
-        </div>
+            <div>
+              <label className="block text-accent text-[10px] font-bold uppercase tracking-wider mb-0.5">
+                Комиссия продаж (%)
+              </label>
+              <input
+                type="number"
+                min="0"
+                max="100"
+                step="0.0001"
+                value={salesCommissionPercent}
+                onChange={(e) => setSalesCommissionPercent(e.target.value)}
+                placeholder="2.5"
+                className="w-full h-7.5 rounded-md bg-surface border border-border px-2 text-xs text-fg font-mono focus:border-accent focus:outline-none transition-colors"
+              />
+            </div>
+          </div>
+        )}
 
-        <div className="flex space-x-2 pt-2">
-          <button
-            type="button"
-            disabled={isSubmitting}
-            onClick={onClose}
-            className="flex-1 py-2.5 rounded-xl bg-surface-raised hover:bg-surface border border-border text-xs font-bold text-fg-muted uppercase disabled:opacity-50"
-          >
-            ОТМЕНА
-          </button>
-          <button
-            type="submit"
-            disabled={isSubmitting}
-            className="flex-1 py-2.5 rounded-xl bg-accent hover:bg-accent-strong text-xs font-bold uppercase text-accent-fg shadow-xs disabled:opacity-60 flex items-center justify-center gap-1.5"
-          >
-            {isSubmitting && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-            {isSubmitting ? 'СОХРАНЕНИЕ…' : editingUser ? 'СОХРАНИТЬ' : 'СОЗДАТЬ'}
-          </button>
-        </div>
+        {/* Row 5: Статус учетной записи при редактировании */}
+        {editingUser && (
+          <div className="pt-0.5">
+            <label className="inline-flex items-center gap-2 cursor-pointer text-xs text-fg font-medium select-none">
+              <input
+                type="checkbox"
+                checked={isActive}
+                onChange={(e) => setIsActive(e.target.checked)}
+                className="w-3.5 h-3.5 rounded border-border text-accent focus:ring-0 cursor-pointer accent-accent"
+              />
+              <span>Активная учетная запись</span>
+            </label>
+          </div>
+        )}
       </form>
-    </div>
+    </Dialog>
   );
 };

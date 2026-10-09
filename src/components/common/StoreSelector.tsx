@@ -14,8 +14,12 @@ export interface StoreSelectorProps {
   includeMainWarehouse?: boolean;
   retailOnly?: boolean;
   className?: string;
+  triggerClassName?: string;
   title?: string;
   compact?: boolean;
+  align?: 'left' | 'right';
+  variant?: 'dropdown' | 'sheet' | 'auto';
+  menuWidth?: string;
 }
 
 export const StoreSelector: React.FC<StoreSelectorProps> = ({
@@ -28,8 +32,12 @@ export const StoreSelector: React.FC<StoreSelectorProps> = ({
   includeMainWarehouse = true,
   retailOnly = false,
   className = '',
+  triggerClassName = '',
   title = 'Выбрать магазин',
   compact = false,
+  align = 'left',
+  variant = 'dropdown',
+  menuWidth,
 }) => {
   const filteredStores = useMemo(() => {
     return stores.filter((s) => {
@@ -46,6 +54,7 @@ export const StoreSelector: React.FC<StoreSelectorProps> = ({
         value: allOptionValue,
         label: allOptionLabel,
         icon: <Building2 className="w-3.5 h-3.5 text-accent shrink-0" />,
+        badge: 'Все',
       });
     }
     filteredStores.forEach((s) => {
@@ -73,6 +82,10 @@ export const StoreSelector: React.FC<StoreSelectorProps> = ({
       title={title}
       size={compact ? 'sm' : 'md'}
       className={className}
+      triggerClassName={triggerClassName}
+      align={align}
+      variant={variant}
+      menuWidth={menuWidth}
     />
   );
 };

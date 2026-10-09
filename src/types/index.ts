@@ -702,3 +702,38 @@ export interface CashDeskSummary {
   };
 }
 
+export interface StockRevisionItem {
+  id: string;
+  imei: string;
+  imei2?: string | null;
+  brand: string;
+  model: string;
+  storage?: string | null;
+  color?: string | null;
+  purchasePriceUsd?: string | null;
+}
+
+export interface StockRevisionSurplus {
+  code: string;
+  note?: string;
+}
+
+export interface StockRevision {
+  id: string;
+  storeId: string;
+  storeName: string;
+  userId: string;
+  userName: string;
+  userRole: string;
+  totalExpected: number;
+  totalChecked: number;
+  totalMissing: number;
+  totalSurplus: number;
+  status: 'MATCH' | 'DISCREPANCY';
+  missingDevices?: StockRevisionItem[] | null;
+  surplusDevices?: StockRevisionSurplus[] | null;
+  checkedImeis?: string[] | null;
+  comment?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}

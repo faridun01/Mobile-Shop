@@ -643,109 +643,109 @@ export const BonusesPage: React.FC = () => {
 
       {/* Main Scrollable Content */}
       <div className="flex-1 overflow-y-auto p-2 sm:p-3 space-y-2.5">
-        {/* 1. БОНУСНЫЙ РЕЗЕРВ (НАВЕРХУ) */}
-        <div className="p-3 sm:p-3.5 rounded-xl bg-gradient-to-r from-success/15 via-surface to-surface border border-success/30 shadow-2xs flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2.5 sm:gap-4">
-          <div className="flex items-center gap-3 min-w-0">
-            <div className="w-10 h-10 rounded-xl bg-success/20 border border-success/30 flex items-center justify-center text-success shrink-0 shadow-xs">
-              <Wallet className="w-5 h-5" />
-            </div>
-            <div className="min-w-0">
-              <div className="flex items-center gap-2">
-                <span className="text-[11px] font-bold uppercase tracking-wider text-fg-subtle">
-                  Бонусный резерв
-                </span>
-                <span className="text-[10px] px-1.5 py-0.2 rounded-md bg-success/20 text-success font-semibold border border-success/30">
-                  Доступно к распределению
-                </span>
-              </div>
-              <div className="text-xl sm:text-2xl font-black font-mono text-success leading-tight mt-0.5 flex items-baseline gap-2 flex-wrap">
-                <span>${formatMoney(availableReserveUsd)}</span>
-                <span className="text-xs sm:text-sm font-semibold text-fg-subtle font-mono">
+        {/* 1. КОМПАКТНАЯ СТАТИСТИКА В 1 РЯД (3 КАРТОЧКИ) */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 shrink-0">
+          {/* CARD 1: БОНУСНЫЙ РЕЗЕРВ */}
+          <div className="p-2 sm:p-2.5 rounded-xl bg-gradient-to-br from-success/15 via-surface to-surface border border-success/30 shadow-2xs flex flex-col justify-between">
+            <div className="flex items-start justify-between gap-1.5">
+              <div className="min-w-0">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-fg-subtle truncate">
+                    Бонусный резерв
+                  </span>
+                  <span className="text-[9px] px-1 py-0.2 rounded font-semibold bg-success/20 text-success border border-success/30">
+                    Резерв
+                  </span>
+                </div>
+                <div className="text-base sm:text-lg font-black font-mono text-success leading-tight mt-0.5">
+                  ${formatMoney(availableReserveUsd)}
+                </div>
+                <span className="text-[10px] text-fg-subtle font-mono block">
                   ≈ {formatMoney(availableReserveTjs)} TJS
                 </span>
               </div>
+              <div className="w-6 h-6 rounded-lg bg-success/20 border border-success/30 flex items-center justify-center text-success shrink-0">
+                <Wallet className="w-3.5 h-3.5" />
+              </div>
+            </div>
+
+            <div className="flex items-center gap-1 pt-1.5 mt-1 border-t border-border/60">
+              <button
+                type="button"
+                disabled={availableReserveUsd <= 0}
+                onClick={() => openReserveAction('transfer')}
+                className="flex-1 h-6 px-1.5 rounded-md bg-surface-raised hover:bg-accent/15 border border-accent/40 text-accent font-bold text-[10px] transition-colors disabled:opacity-40 cursor-pointer disabled:cursor-not-allowed flex items-center justify-center gap-1"
+                title="Перевести в Центральную кассу"
+              >
+                <Landmark className="w-3 h-3" />
+                <span>В кассу</span>
+              </button>
+              <button
+                type="button"
+                disabled={availableReserveUsd <= 0}
+                onClick={() => openReserveAction('payout')}
+                className="flex-1 h-6 px-1.5 rounded-md bg-surface-raised hover:bg-warning/15 border border-warning/40 text-warning font-bold text-[10px] transition-colors disabled:opacity-40 cursor-pointer disabled:cursor-not-allowed flex items-center justify-center gap-1"
+                title="Выдать как прибыль"
+              >
+                <HandCoins className="w-3 h-3" />
+                <span>Выдать</span>
+              </button>
             </div>
           </div>
 
-          <div className="flex items-center gap-2 shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-border/50">
-            <Button
-              variant="secondary"
-              size="sm"
-              leftIcon={Landmark}
-              disabled={availableReserveUsd <= 0}
-              onClick={() => openReserveAction('transfer')}
-              className="h-8 px-3 text-xs font-semibold text-accent border-accent/40 hover:bg-accent/10 cursor-pointer disabled:opacity-40"
-              title="Перевести в Центральную кассу"
-            >
-              В кассу
-            </Button>
-            <Button
-              variant="secondary"
-              size="sm"
-              leftIcon={HandCoins}
-              disabled={availableReserveUsd <= 0}
-              onClick={() => openReserveAction('payout')}
-              className="h-8 px-3 text-xs font-semibold text-warning border-warning/40 hover:bg-warning/10 cursor-pointer disabled:opacity-40"
-              title="Выдать прибыль"
-            >
-              Выдать
-            </Button>
-          </div>
-        </div>
-
-        {/* 2. СТАТИСТИКА ЗА МЕСЯЦ */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-2.5">
-          {/* CARD 1: Денежные бонусы */}
-          <div className="p-2.5 sm:p-3 rounded-xl bg-surface border border-border shadow-2xs flex flex-col justify-between">
-            <div className="flex items-start justify-between gap-2">
+          {/* CARD 2: ДЕНЕЖНЫЕ БОНУСЫ ЗА МЕСЯЦ */}
+          <div className="p-2 sm:p-2.5 rounded-xl bg-surface border border-border shadow-2xs flex flex-col justify-between">
+            <div className="flex items-start justify-between gap-1.5">
               <div className="min-w-0">
                 <span className="text-[10px] font-bold uppercase tracking-wider text-fg-subtle block truncate">
-                  Денежные бонусы {selectedMonth ? `(${monthLabel})` : '(все периоды)'}
+                  Денежные бонусы {selectedMonth ? `(${monthLabel})` : ''}
                 </span>
                 <div className="text-base sm:text-lg font-black font-mono text-accent leading-tight mt-0.5">
-                  ${formatMoney(monthStats?.cashBonusesUsd || 0)}{' '}
-                  <span className="text-[11px] font-semibold text-fg-subtle font-mono">
-                    ≈ {formatMoney(monthStats?.cashBonusesTjs || 0)} TJS
-                  </span>
+                  ${formatMoney(monthStats?.cashBonusesUsd || 0)}
                 </div>
+                <span className="text-[10px] text-fg-subtle font-mono block">
+                  ≈ {formatMoney(monthStats?.cashBonusesTjs || 0)} TJS
+                </span>
               </div>
-              <div className="w-7 h-7 rounded-lg bg-accent/10 border border-accent/20 flex items-center justify-center text-accent shrink-0">
+              <div className="w-6 h-6 rounded-lg bg-accent/10 border border-accent/20 flex items-center justify-center text-accent shrink-0">
                 <Banknote className="w-3.5 h-3.5" />
               </div>
             </div>
-            <div className="pt-1.5 mt-1.5 border-t border-border/60 flex items-center justify-between text-[10px] text-fg-subtle">
+
+            <div className="pt-1.5 mt-1 border-t border-border/60 flex items-center justify-between text-[10px] text-fg-subtle">
               <span>Кампаний: <strong className="text-fg font-semibold font-mono">{monthStats?.cashBonusesCount || 0}</strong></span>
               <span className="text-accent font-medium">От поставщиков</span>
             </div>
           </div>
 
-          {/* CARD 2: Подарочные телефоны */}
-          <div className="p-2.5 sm:p-3 rounded-xl bg-surface border border-border shadow-2xs flex flex-col justify-between">
-            <div className="flex items-start justify-between gap-2">
+          {/* CARD 3: ПОДАРОЧНЫЕ ТЕЛЕФОНЫ */}
+          <div className="p-2 sm:p-2.5 rounded-xl bg-surface border border-border shadow-2xs flex flex-col justify-between">
+            <div className="flex items-start justify-between gap-1.5">
               <div className="min-w-0">
                 <span className="text-[10px] font-bold uppercase tracking-wider text-fg-subtle block truncate">
-                  Подарочные телефоны ($0)
+                  Телефоны ($0)
                 </span>
                 <div className="text-base sm:text-lg font-black font-mono text-warning leading-tight mt-0.5">
                   {totalBonusDevicesInStock}{' '}
-                  <span className="text-[11px] font-semibold text-fg-subtle">на складе</span>
-                  <span className="text-[10px] text-success font-mono font-semibold ml-1.5">
-                    (продано: {totalBonusDevicesSold})
-                  </span>
+                  <span className="text-[10px] font-semibold text-fg-subtle">на складе</span>
                 </div>
+                <span className="text-[10px] text-success font-mono font-semibold block">
+                  Продано: {totalBonusDevicesSold} шт.
+                </span>
               </div>
-              <div className="w-7 h-7 rounded-lg bg-warning/15 border border-warning/25 flex items-center justify-center text-warning shrink-0">
+              <div className="w-6 h-6 rounded-lg bg-warning/15 border border-warning/25 flex items-center justify-center text-warning shrink-0">
                 <Smartphone className="w-3.5 h-3.5" />
               </div>
             </div>
-            <div className="pt-1.5 mt-1.5 border-t border-border/60 flex items-center justify-between text-[10px]">
-              <span className="text-fg-subtle">Себестоимость: $0</span>
+
+            <div className="pt-1.5 mt-1 border-t border-border/60 flex items-center justify-between text-[10px]">
+              <span className="text-fg-subtle">Себест: $0</span>
               <button
                 type="button"
                 onClick={() => { setActiveTab('DEVICES'); setDeviceFilter('IN_STOCK'); }}
-                className="text-[11px] font-bold text-accent hover:underline flex items-center gap-0.5 cursor-pointer"
+                className="text-[10px] font-bold text-accent hover:underline flex items-center gap-0.5 cursor-pointer"
               >
-                Устройства →
+                К устройствам →
               </button>
             </div>
           </div>
@@ -865,16 +865,16 @@ export const BonusesPage: React.FC = () => {
                     return (
                       <div
                         key={bonus.id}
-                        className="px-3 py-2 sm:py-2.5 rounded-xl bg-surface border border-border hover:border-accent/40 transition-colors shadow-2xs space-y-1.5 text-xs"
+                        className="px-2.5 py-1.5 sm:py-2 rounded-xl bg-surface border border-border hover:border-accent/40 transition-colors shadow-2xs space-y-1 text-xs"
                       >
                         <div className="flex items-center justify-between gap-2">
                           <div className="min-w-0 flex items-center gap-1.5 flex-wrap">
-                            <span className="font-bold text-fg text-xs sm:text-sm truncate">
+                            <span className="font-bold text-fg text-xs truncate">
                               {bonus.campaignTitle || bonus.campaignName || `Бонус от ${bonus.supplierName}`}
                             </span>
                             <span
                               className={cn(
-                                'text-[9px] sm:text-[10px] px-1.5 py-0.5 rounded font-bold uppercase tracking-wider',
+                                'text-[9px] px-1.5 py-0.2 rounded font-bold uppercase tracking-wider',
                                 isCash
                                   ? 'bg-accent/15 text-accent border border-accent/25'
                                   : 'bg-warning/15 text-warning border border-warning/30'
@@ -882,8 +882,8 @@ export const BonusesPage: React.FC = () => {
                             >
                               {isCash ? 'Денежный' : 'Телефон ($0)'}
                             </span>
-                            <span className="text-[11px] text-fg-subtle truncate">
-                              • Поставщик: <strong className="text-fg font-medium">{bonus.supplierName}</strong>
+                            <span className="text-[10px] text-fg-subtle truncate">
+                              • {bonus.supplierName}
                               {bonusDate && <span> • {bonusDate}</span>}
                             </span>
                           </div>
@@ -891,7 +891,7 @@ export const BonusesPage: React.FC = () => {
                           <div className="text-right shrink-0">
                             {isCash ? (
                               <div className="flex items-baseline justify-end gap-1.5">
-                                <span className="text-sm sm:text-base font-black font-mono text-accent leading-none">
+                                <span className="text-xs sm:text-sm font-black font-mono text-accent leading-none">
                                   +${formatMoney(bonus.amountUsd || 0)}
                                 </span>
                                 <span className="text-[10px] text-fg-subtle font-mono hidden xs:inline">
@@ -900,10 +900,10 @@ export const BonusesPage: React.FC = () => {
                               </div>
                             ) : (
                               <div className="flex items-baseline justify-end gap-1.5">
-                                <span className="text-xs sm:text-sm font-bold font-mono text-warning leading-none">
+                                <span className="text-xs font-bold font-mono text-warning leading-none">
                                   +{bonus.freeDevices?.length || 1} шт.
                                 </span>
-                                <span className="text-[10px] text-success font-semibold">
+                                <span className="text-[9px] text-success font-semibold">
                                   ($0)
                                 </span>
                               </div>
@@ -913,14 +913,14 @@ export const BonusesPage: React.FC = () => {
 
                         {/* Details for Free Devices */}
                         {hasFreeDevices && (
-                          <div className="px-2 py-1 rounded-lg bg-surface-raised border border-border text-[11px] flex items-center gap-2 flex-wrap">
+                          <div className="px-2 py-0.5 rounded-lg bg-surface-raised border border-border text-[10px] flex items-center gap-1.5 flex-wrap">
                             <span className="text-warning font-semibold flex items-center gap-1 shrink-0">
                               <Smartphone className="w-3 h-3" /> Подарочные:
                             </span>
                             {bonus.freeDevices!.map((fd) => (
                               <span
                                 key={fd.imei}
-                                className="px-1.5 py-0.5 rounded bg-surface border border-border font-mono text-[10px] text-fg"
+                                className="px-1 py-0.2 rounded bg-surface border border-border font-mono text-[9px] text-fg"
                               >
                                 {fd.brand} {fd.model} {fd.storage} • {fd.imei}
                               </span>
@@ -929,7 +929,7 @@ export const BonusesPage: React.FC = () => {
                         )}
 
                         {/* Action buttons */}
-                        <div className="pt-1 border-t border-border/70 flex items-center justify-between gap-2 text-xs">
+                        <div className="pt-0.5 border-t border-border/50 flex items-center justify-between gap-2 text-xs">
                           <div className="flex items-center gap-2">
                             {isCash && (
                               <div className="flex items-center gap-1.5">
@@ -937,32 +937,32 @@ export const BonusesPage: React.FC = () => {
                                 <button
                                   type="button"
                                   onClick={() => openReserveAction('transfer', bonus.amountUsd)}
-                                  className="text-[11px] font-semibold text-accent hover:underline flex items-center gap-0.5 cursor-pointer"
+                                  className="text-[10px] font-semibold text-accent hover:underline flex items-center gap-0.5 cursor-pointer"
                                   title="Перевести сумму в Центральную кассу"
                                 >
-                                  <Landmark className="w-3 h-3 text-accent" /> В кассу
+                                  <Landmark className="w-2.5 h-2.5 text-accent" /> В кассу
                                 </button>
                                 <span className="text-border">•</span>
                                 <button
                                   type="button"
                                   onClick={() => openReserveAction('payout', bonus.amountUsd)}
-                                  className="text-[11px] font-semibold text-warning hover:underline flex items-center gap-0.5 cursor-pointer"
+                                  className="text-[10px] font-semibold text-warning hover:underline flex items-center gap-0.5 cursor-pointer"
                                   title="Выдать прибыль"
                                 >
-                                  <HandCoins className="w-3 h-3 text-warning" /> Выдать
+                                  <HandCoins className="w-2.5 h-2.5 text-warning" /> Выдать
                                 </button>
                               </div>
                             )}
                           </div>
 
-                          <div className="flex items-center gap-1">
+                          <div className="flex items-center gap-0.5">
                             <button
                               type="button"
                               onClick={() => handleStartEditBonus(bonus)}
                               className="text-fg-subtle hover:text-accent p-1 rounded hover:bg-surface-raised cursor-pointer transition-colors"
                               title="Редактировать бонус"
                             >
-                              <Edit className="w-3.5 h-3.5" />
+                              <Edit className="w-3 h-3" />
                             </button>
                             <button
                               type="button"
@@ -970,7 +970,7 @@ export const BonusesPage: React.FC = () => {
                               className="text-fg-subtle hover:text-danger p-1 rounded hover:bg-surface-raised cursor-pointer transition-colors"
                               title="Удалить бонус"
                             >
-                              <Trash2 className="w-3.5 h-3.5" />
+                              <Trash2 className="w-3 h-3" />
                             </button>
                           </div>
                         </div>
@@ -1067,97 +1067,112 @@ export const BonusesPage: React.FC = () => {
         )}
       </div>
 
-      {/* MODAL: ЗАФИКСИРОВАТЬ БОНУС С РЕШЕНИЕМ */}
+      {/* MODAL: ЗАФИКСИРОВАТЬ БОНУС С РЕШЕНИЕМ (КОМПАКТНЫЙ И УДОБНЫЙ) */}
       {isCreateModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-xs overflow-y-auto">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-3 sm:p-4 backdrop-blur-xs overflow-y-auto">
           <form
             onSubmit={handleCreateBonus}
-            className="w-full max-w-lg rounded-2xl bg-surface border border-border p-5 text-fg shadow-2xl space-y-4 my-8"
+            className="w-full max-w-md rounded-2xl bg-surface border border-border p-3.5 sm:p-4 text-fg shadow-2xl space-y-2.5 my-auto max-h-[92vh] flex flex-col"
           >
-            <div className="flex items-center justify-between border-b border-border pb-3">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between border-b border-border pb-2.5 shrink-0">
               <div className="flex items-center gap-2">
-                <Gift className="w-5 h-5 text-accent" />
-                <h3 className="text-base font-bold text-fg">Зафиксировать бонус от поставщика</h3>
+                <div className="w-7 h-7 rounded-lg bg-accent/15 border border-accent/30 text-accent flex items-center justify-center">
+                  <Gift className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-fg leading-tight">Зафиксировать бонус</h3>
+                  <p className="text-[10px] text-fg-subtle">Бонусная выплата или подарок от поставщика</p>
+                </div>
               </div>
               <button
                 type="button"
                 onClick={() => setIsCreateModalOpen(false)}
-                className="text-fg-subtle hover:text-fg p-1 cursor-pointer"
+                className="w-7 h-7 rounded-lg hover:bg-surface-raised text-fg-subtle hover:text-fg flex items-center justify-center transition-colors cursor-pointer"
               >
-                <X className="w-5 h-5" />
+                <X className="w-4 h-4" />
               </button>
             </div>
 
-            <div className="space-y-3.5 text-xs">
-              {/* Поставщик */}
-              <div>
-                <label className="block text-fg font-semibold mb-1">Поставщик *</label>
-                <select
-                  value={supplierId}
-                  onChange={(e) => setSupplierId(e.target.value)}
-                  className="w-full h-10 px-3 bg-surface-raised border border-border rounded-xl text-xs font-semibold text-fg focus:outline-none focus:border-accent cursor-pointer"
-                >
-                  {suppliers.map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.name}
-                    </option>
-                  ))}
-                </select>
+            {/* Scrollable Form Body */}
+            <div className="overflow-y-auto pr-0.5 space-y-2.5 text-xs flex-1 scrollbar-thin">
+              {/* Row 1: Поставщик и Повод */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <div>
+                  <label className="block text-[11px] font-semibold text-fg-subtle mb-0.5">Поставщик *</label>
+                  <select
+                    value={supplierId}
+                    onChange={(e) => setSupplierId(e.target.value)}
+                    className="w-full h-8 px-2 bg-surface-raised border border-border rounded-lg text-xs font-semibold text-fg focus:outline-none focus:border-accent cursor-pointer"
+                  >
+                    {suppliers.map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {s.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-semibold text-fg-subtle mb-0.5">Повод (необязательно)</label>
+                  <input
+                    type="text"
+                    value={campaignTitle}
+                    onChange={(e) => setCampaignTitle(e.target.value)}
+                    placeholder="Объём продаж, акция..."
+                    className="w-full h-8 px-2.5 bg-surface-raised border border-border rounded-lg text-xs text-fg focus:outline-none focus:border-accent"
+                  />
+                </div>
               </div>
 
-              {/* Название кампании */}
+              {/* Row 2: Вид бонуса (Segmented Switch) */}
               <div>
-                <label className="block text-fg font-semibold mb-1">Повод (необязательно)</label>
-                <input
-                  type="text"
-                  value={campaignTitle}
-                  onChange={(e) => setCampaignTitle(e.target.value)}
-                  placeholder="Бонус за объем продаж, сезонная акция..."
-                  className="w-full h-10 px-3 bg-surface-raised border border-border rounded-xl text-xs text-fg focus:outline-none focus:border-accent"
-                />
-              </div>
-
-              {/* Тип бонуса: Переключатель */}
-              <div>
-                <label className="block text-fg font-semibold mb-1.5">В каком виде получен бонус? *</label>
-                <div className="grid grid-cols-2 gap-2">
+                <label className="block text-[11px] font-semibold text-fg-subtle mb-1">Вид бонуса *</label>
+                <div className="grid grid-cols-2 p-0.5 rounded-xl bg-surface-raised border border-border">
                   <button
                     type="button"
                     onClick={() => setBonusType('CASH_DISCOUNT')}
                     className={cn(
-                      'p-3 rounded-xl border text-xs font-bold flex flex-col items-center gap-1.5 transition-all cursor-pointer',
+                      'h-8 px-2 rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer',
                       bonusType === 'CASH_DISCOUNT'
-                        ? 'border-accent bg-accent/15 text-accent shadow-xs'
-                        : 'border-border bg-surface-raised text-fg-subtle hover:text-fg hover:border-accent/40'
+                        ? 'bg-accent text-accent-fg shadow-xs'
+                        : 'text-fg-subtle hover:text-fg'
                     )}
                   >
-                    <Banknote className="w-5 h-5" />
-                    <span>💵 Деньгами (Скидка)</span>
+                    <Banknote className="w-3.5 h-3.5" />
+                    <span>Деньгами (скидка)</span>
                   </button>
 
                   <button
                     type="button"
                     onClick={() => setBonusType('FREE_DEVICES')}
                     className={cn(
-                      'p-3 rounded-xl border text-xs font-bold flex flex-col items-center gap-1.5 transition-all cursor-pointer',
+                      'h-8 px-2 rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer',
                       bonusType === 'FREE_DEVICES'
-                        ? 'border-warning bg-warning/15 text-warning shadow-xs'
-                        : 'border-border bg-surface-raised text-fg-subtle hover:text-fg hover:border-warning/40'
+                        ? 'bg-warning text-black shadow-xs font-extrabold'
+                        : 'text-fg-subtle hover:text-fg'
                     )}
                   >
-                    <Smartphone className="w-5 h-5" />
-                    <span>📱 Подарочный телефон ($0)</span>
+                    <Smartphone className="w-3.5 h-3.5" />
+                    <span>Телефон ($0)</span>
                   </button>
                 </div>
               </div>
 
               {/* ЕСЛИ ДЕНЕЖНЫЙ БОНУС */}
               {bonusType === 'CASH_DISCOUNT' ? (
-                <div className="space-y-3 pt-1">
+                <div className="space-y-2.5 pt-0.5">
                   <div>
-                    <label className="block text-fg font-semibold mb-1">Сумма бонуса ($ USD) *</label>
+                    <div className="flex items-center justify-between mb-0.5">
+                      <label className="text-[11px] font-semibold text-fg-subtle">Сумма бонуса ($ USD) *</label>
+                      {amountUsd && Number(amountUsd) > 0 && (
+                        <span className="text-[10px] font-mono font-semibold text-accent">
+                          ≈ {formatMoney(Number(amountUsd) * rate)} TJS
+                        </span>
+                      )}
+                    </div>
                     <div className="relative">
-                      <span className="absolute left-3 top-2.5 text-accent font-bold">$</span>
+                      <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-accent font-bold text-xs">$</span>
                       <input
                         type="text"
                         inputMode="decimal"
@@ -1168,126 +1183,112 @@ export const BonusesPage: React.FC = () => {
                           setAmountUsd(val);
                         }}
                         placeholder="500.00"
-                        className="w-full h-10 pl-8 pr-3 bg-surface-raised border border-border rounded-xl text-base font-bold font-mono text-accent focus:outline-none focus:border-accent"
+                        className="w-full h-8.5 pl-6 pr-3 bg-surface-raised border border-border rounded-lg text-sm font-bold font-mono text-accent focus:outline-none focus:border-accent"
                       />
                     </div>
-                    {amountUsd && Number(amountUsd) > 0 && (
-                      <span className="text-[11px] text-fg-subtle font-mono mt-1 block">
-                        ≈ {formatMoney(Number(amountUsd) * rate)} TJS по текущему курсу {rate}
-                      </span>
-                    )}
                   </div>
 
-                  {/* РЕШЕНИЕ АДМИНИСТРАТОРА */}
-                  <div className="p-3.5 rounded-2xl bg-surface-raised border border-border space-y-2.5">
-                    <label className="block text-xs font-bold text-fg flex items-center gap-1.5">
-                      <Sparkles className="w-4 h-4 text-accent" />
-                      <span>Что сделать с бонусом прямо сейчас?</span>
-                    </label>
-
-                    <div className="space-y-2">
+                  {/* РЕШЕНИЕ: КУДА НАПРАВИТЬ БОНУС */}
+                  <div className="p-2.5 rounded-xl bg-surface-raised/70 border border-border space-y-1.5">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-fg-subtle block">
+                      Куда направить бонус?
+                    </span>
+                    <div className="space-y-1">
                       <label
                         className={cn(
-                          'p-2.5 rounded-xl border flex items-start gap-2.5 cursor-pointer transition-all',
+                          'px-2.5 py-1.5 rounded-lg border flex items-center justify-between gap-2 cursor-pointer transition-colors text-xs',
                           cashAction === 'CENTRAL_CASH'
-                            ? 'border-accent bg-accent/10 text-fg'
-                            : 'border-border/80 bg-surface hover:border-accent/40 text-fg-muted'
+                            ? 'border-accent bg-accent/15 text-accent font-semibold shadow-2xs'
+                            : 'border-border/60 bg-surface hover:bg-surface-raised text-fg-muted'
                         )}
                       >
-                        <input
-                          type="radio"
-                          name="cashAction"
-                          checked={cashAction === 'CENTRAL_CASH'}
-                          onChange={() => setCashAction('CENTRAL_CASH')}
-                          className="mt-0.5 text-accent"
-                        />
-                        <div className="text-xs">
-                          <span className="font-bold block text-accent flex items-center gap-1">
-                            <Building2 className="w-3.5 h-3.5" /> Внести в центральную кассу (в бизнес)
-                          </span>
-                          <span className="text-[11px] text-fg-subtle">
-                            Деньги сразу поступят в Центральную кассу компании и будут в обороте для закупок
+                        <div className="flex items-center gap-2 min-w-0">
+                          <input
+                            type="radio"
+                            name="cashAction"
+                            checked={cashAction === 'CENTRAL_CASH'}
+                            onChange={() => setCashAction('CENTRAL_CASH')}
+                            className="text-accent shrink-0"
+                          />
+                          <span className="flex items-center gap-1.5 truncate">
+                            <Building2 className="w-3.5 h-3.5 shrink-0" />
+                            <span>В центральную кассу</span>
                           </span>
                         </div>
+                        <span className="text-[10px] text-fg-subtle shrink-0">в оборот</span>
                       </label>
 
                       <label
                         className={cn(
-                          'p-2.5 rounded-xl border flex items-start gap-2.5 cursor-pointer transition-all',
+                          'px-2.5 py-1.5 rounded-lg border flex items-center justify-between gap-2 cursor-pointer transition-colors text-xs',
                           cashAction === 'PAYOUT'
-                            ? 'border-warning bg-warning/10 text-fg'
-                            : 'border-border/80 bg-surface hover:border-warning/40 text-fg-muted'
+                            ? 'border-warning bg-warning/15 text-warning font-semibold shadow-2xs'
+                            : 'border-border/60 bg-surface hover:bg-surface-raised text-fg-muted'
                         )}
                       >
-                        <input
-                          type="radio"
-                          name="cashAction"
-                          checked={cashAction === 'PAYOUT'}
-                          onChange={() => setCashAction('PAYOUT')}
-                          className="mt-0.5 text-warning"
-                        />
-                        <div className="text-xs">
-                          <span className="font-bold block text-warning flex items-center gap-1">
-                            <Users className="w-3.5 h-3.5" /> Выдать как прибыль (поделить)
-                          </span>
-                          <span className="text-[11px] text-fg-subtle">
-                            Сразу зафиксировать выплату прибыли/дивидендов на руки (не раздувает кассу)
+                        <div className="flex items-center gap-2 min-w-0">
+                          <input
+                            type="radio"
+                            name="cashAction"
+                            checked={cashAction === 'PAYOUT'}
+                            onChange={() => setCashAction('PAYOUT')}
+                            className="text-warning shrink-0"
+                          />
+                          <span className="flex items-center gap-1.5 truncate">
+                            <Users className="w-3.5 h-3.5 shrink-0" />
+                            <span>Выдать как прибыль</span>
                           </span>
                         </div>
+                        <span className="text-[10px] text-fg-subtle shrink-0">партнерам</span>
                       </label>
 
                       <label
                         className={cn(
-                          'p-2.5 rounded-xl border flex items-start gap-2.5 cursor-pointer transition-all',
+                          'px-2.5 py-1.5 rounded-lg border flex items-center justify-between gap-2 cursor-pointer transition-colors text-xs',
                           cashAction === 'RESERVE'
-                            ? 'border-border bg-surface-raised text-fg font-semibold'
-                            : 'border-border/80 bg-surface hover:border-border text-fg-muted'
+                            ? 'border-border bg-surface-raised text-fg font-semibold shadow-2xs'
+                            : 'border-border/60 bg-surface hover:bg-surface-raised text-fg-muted'
                         )}
                       >
-                        <input
-                          type="radio"
-                          name="cashAction"
-                          checked={cashAction === 'RESERVE'}
-                          onChange={() => setCashAction('RESERVE')}
-                          className="mt-0.5"
-                        />
-                        <div className="text-xs">
-                          <span className="font-bold block text-fg">
-                            ⏳ Оставить в резерве на бонусном счёте
-                          </span>
-                          <span className="text-[11px] text-fg-subtle">
-                            Решение перевести в кассу или выдать можно принять позже
+                        <div className="flex items-center gap-2 min-w-0">
+                          <input
+                            type="radio"
+                            name="cashAction"
+                            checked={cashAction === 'RESERVE'}
+                            onChange={() => setCashAction('RESERVE')}
+                            className="shrink-0"
+                          />
+                          <span className="flex items-center gap-1.5 truncate">
+                            <Wallet className="w-3.5 h-3.5 shrink-0" />
+                            <span>В резерв счёта</span>
                           </span>
                         </div>
+                        <span className="text-[10px] text-fg-subtle shrink-0">решить позже</span>
                       </label>
                     </div>
 
                     {cashAction === 'CENTRAL_CASH' && (
-                      <div>
-                        <label className="block text-[11px] font-semibold text-fg-subtle mb-1">
-                          Примечание к операции (необязательно)
-                        </label>
-                        <input
-                          type="text"
-                          value={decisionNote}
-                          onChange={(e) => setDecisionNote(e.target.value)}
-                          placeholder="Основание для перевода в кассу..."
-                          className="w-full h-8 px-2.5 bg-surface border border-border rounded-lg text-xs text-fg focus:outline-none focus:border-accent"
-                        />
-                      </div>
+                      <input
+                        type="text"
+                        value={decisionNote}
+                        onChange={(e) => setDecisionNote(e.target.value)}
+                        placeholder="Примечание к кассовой операции (необязательно)..."
+                        className="w-full h-7 px-2 bg-surface border border-border rounded-lg text-xs text-fg focus:outline-none focus:border-accent mt-1"
+                      />
                     )}
                   </div>
                 </div>
               ) : (
                 /* ЕСЛИ ПОДАРОЧНЫЙ ТЕЛЕФОН */
-                <div className="space-y-3 pt-1">
-                  <div className="p-3 bg-warning/10 border border-warning/25 rounded-xl text-xs text-warning">
-                    Подарочный телефон приходуется на склад с <strong>себестоимостью $0</strong>. При продаже вся вырученная сумма сразу поступает в кассу точки как 100% прибыль.
+                <div className="space-y-2 pt-0.5">
+                  <div className="px-2 py-1 rounded-lg bg-warning/10 border border-warning/20 text-[11px] text-warning flex items-center gap-1.5">
+                    <Smartphone className="w-3.5 h-3.5 shrink-0" />
+                    <span>Себестоимость $0 · Выручка от продажи станет 100% прибылью</span>
                   </div>
 
                   <div className="grid grid-cols-2 gap-2">
                     <div>
-                      <label className="block text-fg font-semibold mb-1">Бренд *</label>
+                      <label className="block text-[11px] font-semibold text-fg-subtle mb-0.5">Бренд *</label>
                       <input
                         type="text"
                         required
@@ -1295,7 +1296,7 @@ export const BonusesPage: React.FC = () => {
                         value={bonusBrand}
                         onChange={(e) => setBonusBrand(e.target.value)}
                         placeholder="Apple"
-                        className="w-full h-9 px-2.5 bg-surface-raised border border-border rounded-xl text-xs text-fg focus:outline-none focus:border-accent"
+                        className="w-full h-8 px-2 bg-surface-raised border border-border rounded-lg text-xs text-fg focus:outline-none focus:border-accent"
                       />
                       <datalist id="bonus-brand-list">
                         {brandOptions.map((b) => (
@@ -1305,7 +1306,7 @@ export const BonusesPage: React.FC = () => {
                     </div>
 
                     <div>
-                      <label className="block text-fg font-semibold mb-1">Модель *</label>
+                      <label className="block text-[11px] font-semibold text-fg-subtle mb-0.5">Модель *</label>
                       <input
                         type="text"
                         required
@@ -1313,7 +1314,7 @@ export const BonusesPage: React.FC = () => {
                         value={bonusModel}
                         onChange={(e) => setBonusModel(e.target.value)}
                         placeholder="iPhone 15"
-                        className="w-full h-9 px-2.5 bg-surface-raised border border-border rounded-xl text-xs text-fg focus:outline-none focus:border-accent"
+                        className="w-full h-8 px-2 bg-surface-raised border border-border rounded-lg text-xs text-fg focus:outline-none focus:border-accent"
                       />
                       <datalist id="bonus-model-list">
                         {getModelOptions(bonusBrand).map((m) => (
@@ -1323,9 +1324,9 @@ export const BonusesPage: React.FC = () => {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-3 gap-2">
+                  <div className="grid grid-cols-3 gap-1.5">
                     <div>
-                      <label className="block text-fg font-semibold mb-1">RAM (ОЗУ) *</label>
+                      <label className="block text-[11px] font-semibold text-fg-subtle mb-0.5">RAM *</label>
                       <input
                         type="text"
                         required
@@ -1333,7 +1334,7 @@ export const BonusesPage: React.FC = () => {
                         value={bonusRam}
                         onChange={(e) => setBonusRam(e.target.value)}
                         placeholder="8 GB"
-                        className="w-full h-9 px-2.5 bg-surface-raised border border-border rounded-xl text-xs text-fg focus:outline-none focus:border-accent"
+                        className="w-full h-8 px-2 bg-surface-raised border border-border rounded-lg text-xs text-fg focus:outline-none focus:border-accent"
                       />
                       <datalist id="bonus-ram-list">
                         {ramOptions.map((r) => (
@@ -1343,7 +1344,7 @@ export const BonusesPage: React.FC = () => {
                     </div>
 
                     <div>
-                      <label className="block text-fg font-semibold mb-1">Память (ROM) *</label>
+                      <label className="block text-[11px] font-semibold text-fg-subtle mb-0.5">Память *</label>
                       <input
                         type="text"
                         required
@@ -1351,7 +1352,7 @@ export const BonusesPage: React.FC = () => {
                         value={bonusStorage}
                         onChange={(e) => setBonusStorage(e.target.value)}
                         placeholder="128 GB"
-                        className="w-full h-9 px-2.5 bg-surface-raised border border-border rounded-xl text-xs text-fg focus:outline-none focus:border-accent"
+                        className="w-full h-8 px-2 bg-surface-raised border border-border rounded-lg text-xs text-fg focus:outline-none focus:border-accent"
                       />
                       <datalist id="bonus-storage-list">
                         {storageOptions.map((s) => (
@@ -1361,14 +1362,14 @@ export const BonusesPage: React.FC = () => {
                     </div>
 
                     <div>
-                      <label className="block text-fg font-semibold mb-1">Цвет</label>
+                      <label className="block text-[11px] font-semibold text-fg-subtle mb-0.5">Цвет</label>
                       <input
                         type="text"
                         list="bonus-color-list"
                         value={bonusColor}
                         onChange={(e) => setBonusColor(e.target.value)}
                         placeholder="Black"
-                        className="w-full h-9 px-2.5 bg-surface-raised border border-border rounded-xl text-xs text-fg focus:outline-none focus:border-accent"
+                        className="w-full h-8 px-2 bg-surface-raised border border-border rounded-lg text-xs text-fg focus:outline-none focus:border-accent"
                       />
                       <datalist id="bonus-color-list">
                         {colorOptions.map((c) => (
@@ -1379,34 +1380,34 @@ export const BonusesPage: React.FC = () => {
                   </div>
 
                   <div>
-                    <label className="block text-fg font-semibold mb-1">IMEI устройства *</label>
-                    <div className="flex gap-2">
+                    <label className="block text-[11px] font-semibold text-fg-subtle mb-0.5">IMEI устройства *</label>
+                    <div className="flex gap-1.5">
                       <input
                         type="text"
                         required
                         value={bonusImei}
                         onChange={(e) => setBonusImei(e.target.value)}
                         placeholder="15-значный IMEI..."
-                        className="flex-1 h-9 px-2.5 bg-surface-raised border border-border rounded-xl text-xs font-mono text-fg focus:outline-none focus:border-accent"
+                        className="flex-1 h-8 px-2 bg-surface-raised border border-border rounded-lg text-xs font-mono text-fg focus:outline-none focus:border-accent"
                       />
                       <button
                         type="button"
                         onClick={() => openScanner((code) => setBonusImei(code.trim()))}
-                        className="h-9 px-3 bg-surface-raised hover:bg-surface border border-border rounded-xl text-xs font-semibold text-fg flex items-center gap-1 cursor-pointer"
+                        className="h-8 px-2.5 bg-surface-raised hover:bg-surface border border-border rounded-lg text-xs font-semibold text-fg flex items-center gap-1 cursor-pointer"
                         title="Сканировать IMEI"
                       >
-                        <Scan className="w-3.5 h-3.5" />
-                        <span>Сканер</span>
+                        <Scan className="w-3.5 h-3.5 text-accent" />
+                        <span className="hidden xs:inline">Сканер</span>
                       </button>
                     </div>
                   </div>
 
                   <div>
-                    <label className="block text-fg font-semibold mb-1">Склад поступления *</label>
+                    <label className="block text-[11px] font-semibold text-fg-subtle mb-0.5">Склад поступления *</label>
                     <select
                       value={destinationLocationId}
                       onChange={(e) => setDestinationLocationId(e.target.value)}
-                      className="w-full h-9 px-3 bg-surface-raised border border-border rounded-xl text-xs font-semibold text-fg focus:outline-none focus:border-accent cursor-pointer"
+                      className="w-full h-8 px-2 bg-surface-raised border border-border rounded-lg text-xs font-semibold text-fg focus:outline-none focus:border-accent cursor-pointer"
                     >
                       {stores.map((s) => (
                         <option key={s.id} value={s.id}>
@@ -1419,26 +1420,31 @@ export const BonusesPage: React.FC = () => {
               )}
             </div>
 
-            <div className="flex items-center justify-end gap-2 pt-3 border-t border-border">
+            {/* Modal Actions */}
+            <div className="flex items-center justify-end gap-2 pt-2.5 border-t border-border shrink-0">
               <Button
                 type="button"
                 variant="secondary"
+                size="sm"
                 disabled={isSubmitting}
                 onClick={() => setIsCreateModalOpen(false)}
+                className="h-8 px-3 text-xs"
               >
                 Отмена
               </Button>
               <Button
                 type="submit"
                 variant="primary"
+                size="sm"
                 loading={isSubmitting}
                 leftIcon={CheckCircle2}
+                className="h-8 px-3 text-xs font-bold"
               >
                 {bonusType === 'CASH_DISCOUNT' && cashAction === 'CENTRAL_CASH'
-                  ? 'Зафиксировать и внести в кассу'
+                  ? 'Внести в кассу'
                   : bonusType === 'CASH_DISCOUNT' && cashAction === 'PAYOUT'
-                  ? 'Зафиксировать и выдать'
-                  : 'Зафиксировать бонус'}
+                  ? 'Выдать прибыль'
+                  : 'Зафиксировать'}
               </Button>
             </div>
           </form>
@@ -1456,13 +1462,13 @@ export const BonusesPage: React.FC = () => {
               : 'Выдача с Бонусного счёта'
           }
         >
-          <form onSubmit={handleExecuteReserveAction} className="space-y-4 pt-1">
-            <div className="p-3 bg-surface-raised rounded-xl border border-border text-xs space-y-1">
+          <form onSubmit={handleExecuteReserveAction} className="space-y-2.5 pt-0.5">
+            <div className="p-2.5 bg-surface-raised rounded-xl border border-border text-xs space-y-1">
               <div className="flex items-center justify-between text-fg-subtle">
                 <span>Доступно в резерве:</span>
                 <strong className="text-success font-mono font-bold">${formatMoney(availableReserveUsd)} USD</strong>
               </div>
-              <p className="text-[11px] text-fg-subtle mt-1">
+              <p className="text-[11px] text-fg-subtle mt-0.5">
                 {reserveModalKind === 'transfer'
                   ? 'Деньги перейдут в Центральную кассу компании и будут доступны для закупок.'
                   : 'Сумма будет списана с Бонусного счёта.'}
@@ -1470,7 +1476,7 @@ export const BonusesPage: React.FC = () => {
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-fg mb-1">Сумма ($ USD) *</label>
+              <label className="block text-[11px] font-semibold text-fg mb-0.5">Сумма ($ USD) *</label>
               <input
                 type="text"
                 inputMode="decimal"
@@ -1481,13 +1487,13 @@ export const BonusesPage: React.FC = () => {
                   setReserveAmountInput(val);
                 }}
                 placeholder="0.00"
-                className="w-full h-10 px-3 bg-surface-raised border border-border rounded-xl text-base font-bold font-mono text-fg focus:outline-none focus:border-accent"
+                className="w-full h-8.5 px-3 bg-surface-raised border border-border rounded-lg text-sm font-bold font-mono text-fg focus:outline-none focus:border-accent"
               />
             </div>
 
             {reserveModalKind === 'transfer' && (
               <div>
-                <label className="block text-xs font-semibold text-fg mb-1">
+                <label className="block text-[11px] font-semibold text-fg mb-0.5">
                   Примечание (необязательно)
                 </label>
                 <input
@@ -1495,7 +1501,7 @@ export const BonusesPage: React.FC = () => {
                   value={reserveCommentInput}
                   onChange={(e) => setReserveCommentInput(e.target.value)}
                   placeholder="Пополнение центральной кассы..."
-                  className="w-full h-9 px-3 bg-surface-raised border border-border rounded-xl text-xs text-fg focus:outline-none focus:border-accent"
+                  className="w-full h-8 px-2.5 bg-surface-raised border border-border rounded-lg text-xs text-fg focus:outline-none focus:border-accent"
                 />
               </div>
             )}
@@ -1504,16 +1510,20 @@ export const BonusesPage: React.FC = () => {
               <Button
                 type="button"
                 variant="secondary"
+                size="sm"
                 disabled={isSubmittingReserveAction}
                 onClick={() => setReserveModalKind(null)}
+                className="h-8 px-3 text-xs"
               >
                 Отмена
               </Button>
               <Button
                 type="submit"
                 variant="primary"
+                size="sm"
                 loading={isSubmittingReserveAction}
                 leftIcon={CheckCircle2}
+                className="h-8 px-3 text-xs font-bold"
               >
                 {reserveModalKind === 'transfer' ? 'Перевести в кассу' : 'Выдать'}
               </Button>
@@ -1524,12 +1534,12 @@ export const BonusesPage: React.FC = () => {
 
       {/* MODAL: Редактирование бонуса */}
       {editingBonus && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-xs">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-3 sm:p-4 backdrop-blur-xs overflow-y-auto">
           <form
             onSubmit={handleSaveEditBonus}
-            className="w-full max-w-md rounded-2xl bg-surface border border-border p-5 text-fg shadow-2xl space-y-4"
+            className="w-full max-w-md rounded-2xl bg-surface border border-border p-3.5 sm:p-4 text-fg shadow-2xl space-y-2.5 my-auto max-h-[92vh] flex flex-col"
           >
-            <div className="flex items-center justify-between border-b border-border pb-3">
+            <div className="flex items-center justify-between border-b border-border pb-2.5 shrink-0">
               <h4 className="text-sm font-bold text-fg flex items-center gap-2">
                 <Edit className="w-4 h-4 text-accent" />
                 <span>Редактировать бонус</span>
@@ -1537,36 +1547,36 @@ export const BonusesPage: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setEditingBonus(null)}
-                className="text-fg-subtle hover:text-fg cursor-pointer"
+                className="w-7 h-7 rounded-lg hover:bg-surface-raised text-fg-subtle hover:text-fg flex items-center justify-center transition-colors cursor-pointer"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
-            <div className="text-xs space-y-3">
+            <div className="text-xs space-y-2.5 overflow-y-auto pr-0.5 flex-1 scrollbar-thin">
               <div>
-                <label className="block text-fg-subtle mb-1">Название кампании</label>
+                <label className="block text-[11px] font-semibold text-fg-subtle mb-0.5">Название кампании</label>
                 <input
                   type="text"
                   value={editCampaignTitle}
                   onChange={(e) => setEditCampaignTitle(e.target.value)}
-                  className="w-full rounded-xl bg-surface-raised border border-border px-3 py-2 text-fg focus:border-accent focus:outline-none"
+                  className="w-full h-8 px-2.5 bg-surface-raised border border-border rounded-lg text-xs text-fg focus:outline-none focus:border-accent"
                 />
               </div>
 
               {editingBonus.bonusType === 'CASH_DISCOUNT' ? (
                 <div>
-                  <label className="block text-fg font-semibold mb-1">Сумма бонуса ($ USD)</label>
+                  <label className="block text-[11px] font-semibold text-fg-subtle mb-0.5">Сумма бонуса ($ USD) *</label>
                   <input
                     type="number"
                     step="0.01"
                     value={editAmountUsd}
                     onChange={(e) => setEditAmountUsd(e.target.value)}
-                    className="w-full rounded-xl bg-surface-raised border border-border px-3 py-2 text-xs font-bold text-accent font-mono focus:border-accent focus:outline-none"
+                    className="w-full h-8.5 px-3 bg-surface-raised border border-border rounded-lg text-sm font-bold text-accent font-mono focus:border-accent focus:outline-none"
                   />
                 </div>
               ) : (
-                <div className="p-3 rounded-xl bg-surface-raised border border-border space-y-2">
+                <div className="p-2.5 rounded-xl bg-surface-raised border border-border space-y-2">
                   <span className="text-[11px] font-semibold text-fg">Данные подарочного устройства:</span>
                   <div className="grid grid-cols-2 gap-2">
                     <input
@@ -1574,28 +1584,28 @@ export const BonusesPage: React.FC = () => {
                       value={editBrand}
                       onChange={(e) => setEditBrand(e.target.value)}
                       placeholder="Apple"
-                      className="rounded-lg bg-surface border border-border px-2 py-1.5 text-xs text-fg focus:border-accent focus:outline-none"
+                      className="h-8 rounded-lg bg-surface border border-border px-2.5 text-xs text-fg focus:border-accent focus:outline-none"
                     />
                     <input
                       type="text"
                       value={editModel}
                       onChange={(e) => setEditModel(e.target.value)}
                       placeholder="iPhone 16"
-                      className="rounded-lg bg-surface border border-border px-2 py-1.5 text-xs text-fg focus:border-accent focus:outline-none"
+                      className="h-8 rounded-lg bg-surface border border-border px-2.5 text-xs text-fg focus:border-accent focus:outline-none"
                     />
                     <input
                       type="text"
                       value={editStorage}
                       onChange={(e) => setEditStorage(e.target.value)}
                       placeholder="128 GB"
-                      className="rounded-lg bg-surface border border-border px-2 py-1.5 text-xs text-fg focus:border-accent focus:outline-none"
+                      className="h-8 rounded-lg bg-surface border border-border px-2.5 text-xs text-fg focus:border-accent focus:outline-none"
                     />
                     <input
                       type="text"
                       value={editColor}
                       onChange={(e) => setEditColor(e.target.value)}
                       placeholder="Black"
-                      className="rounded-lg bg-surface border border-border px-2 py-1.5 text-xs text-fg focus:border-accent focus:outline-none"
+                      className="h-8 rounded-lg bg-surface border border-border px-2.5 text-xs text-fg focus:border-accent focus:outline-none"
                     />
                   </div>
                   <div>
@@ -1605,26 +1615,30 @@ export const BonusesPage: React.FC = () => {
                       required
                       value={editImei}
                       onChange={(e) => setEditImei(e.target.value)}
-                      className="w-full rounded-lg bg-surface border border-border px-2 py-1.5 text-xs text-fg font-mono focus:border-accent focus:outline-none"
+                      className="w-full h-8 rounded-lg bg-surface border border-border px-2.5 text-xs text-fg font-mono focus:border-accent focus:outline-none"
                     />
                   </div>
                 </div>
               )}
             </div>
 
-            <div className="flex items-center justify-end gap-2 pt-2 border-t border-border">
+            <div className="flex items-center justify-end gap-2 pt-2.5 border-t border-border shrink-0">
               <Button
                 type="button"
                 variant="secondary"
+                size="sm"
                 disabled={isSubmitting}
                 onClick={() => setEditingBonus(null)}
+                className="h-8 px-3 text-xs"
               >
                 Отмена
               </Button>
               <Button
                 type="submit"
                 variant="primary"
+                size="sm"
                 loading={isSubmitting}
+                className="h-8 px-3 text-xs font-bold"
               >
                 Сохранить
               </Button>

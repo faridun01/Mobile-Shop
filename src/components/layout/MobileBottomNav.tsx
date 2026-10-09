@@ -9,6 +9,7 @@ import {
   Landmark,
   Truck,
   ArrowLeftRight,
+  PackagePlus,
 } from 'lucide-react';
 
 export const MobileBottomNav: React.FC = () => {
@@ -24,6 +25,7 @@ export const MobileBottomNav: React.FC = () => {
 
   const userRole = currentUser?.role || 'SELLER';
   const isAdmin = userRole === 'ADMIN';
+  const isPartnerOrSeller = userRole === 'PARTNER' || userRole === 'SELLER';
   const isCentralCashMode = isAdmin && (!selectedStoreId || selectedStoreId === 'all');
 
   const NavItem: React.FC<{
@@ -161,16 +163,29 @@ export const MobileBottomNav: React.FC = () => {
         </button>
       </div>
 
-      <NavItem
-        routePath="/transfer"
-        label="Перемещение"
-        title="Перемещение"
-        icon={ArrowLeftRight}
-        onSelect={() => {
-          setActivePage('TRANSFER');
-          navigate('/transfer');
-        }}
-      />
+      {isPartnerOrSeller ? (
+        <NavItem
+          routePath="/receipts"
+          label="Приход"
+          title="Приход в магазин"
+          icon={PackagePlus}
+          onSelect={() => {
+            setActivePage('STORE_RECEIPT');
+            navigate('/receipts');
+          }}
+        />
+      ) : (
+        <NavItem
+          routePath="/transfer"
+          label="Перемещение"
+          title="Перемещение"
+          icon={ArrowLeftRight}
+          onSelect={() => {
+            setActivePage('TRANSFER');
+            navigate('/transfer');
+          }}
+        />
+      )}
 
       <button
         onClick={() => setDrawerOpen(!drawerOpen)}

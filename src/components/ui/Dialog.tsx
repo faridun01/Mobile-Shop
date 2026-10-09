@@ -18,6 +18,7 @@ interface DialogProps {
   onClose: () => void;
   title: string;
   subtitle?: string;
+  icon?: React.ElementType;
   children: React.ReactNode;
   footer?: React.ReactNode;
   maxWidth?: MaxWidth;
@@ -38,6 +39,7 @@ export const Dialog: React.FC<DialogProps> = ({
   onClose,
   title,
   subtitle,
+  icon: Icon,
   children,
   footer,
   maxWidth = 'md',
@@ -69,9 +71,12 @@ export const Dialog: React.FC<DialogProps> = ({
           'flex items-center justify-between gap-2.5 border-b border-border shrink-0 min-w-0 w-full',
           compact ? 'px-3.5 py-2' : 'px-4 py-3'
         )}>
-          <div className="min-w-0 flex-1">
-            <h2 className={cn('font-semibold text-fg leading-snug truncate', compact ? 'text-sm' : 'text-base')}>{title}</h2>
-            {subtitle && <p className="text-xs text-fg-subtle mt-0.5 truncate">{subtitle}</p>}
+          <div className="min-w-0 flex-1 flex items-center gap-2">
+            {Icon && <Icon className="w-4 h-4 text-accent shrink-0" />}
+            <div className="min-w-0 flex-1">
+              <h2 className={cn('font-semibold text-fg leading-snug truncate', compact ? 'text-xs uppercase tracking-wider font-bold' : 'text-base')}>{title}</h2>
+              {subtitle && <p className="text-xs text-fg-subtle mt-0.5 truncate">{subtitle}</p>}
+            </div>
           </div>
           {dismissable && <IconButton icon={X} aria-label="Закрыть" onClick={onClose} size="sm" className="shrink-0 ml-1" />}
         </div>

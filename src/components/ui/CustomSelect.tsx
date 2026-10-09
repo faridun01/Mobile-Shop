@@ -23,11 +23,12 @@ interface CustomSelectProps<T extends string = string> {
   size?: 'sm' | 'md' | 'lg';
   align?: 'left' | 'right';
   menuWidth?: string;
+  variant?: 'dropdown' | 'sheet' | 'auto';
 }
 
 /**
- * Modern, theme-aware custom select dropdown & mobile bottom-sheet picker.
- * Replaces native HTML <select> elements that open jarring white OS dialogs on Android.
+ * Modern, theme-aware custom select dropdown & mobile picker.
+ * Replaces native HTML <select> elements with sleek, high-finish UI.
  */
 export function CustomSelect<T extends string = string>({
   value,
@@ -42,6 +43,7 @@ export function CustomSelect<T extends string = string>({
   size = 'md',
   align = 'left',
   menuWidth,
+  variant = 'dropdown',
 }: CustomSelectProps<T>) {
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -51,7 +53,7 @@ export function CustomSelect<T extends string = string>({
   useEffect(() => {
     if (!isOpen) return;
 
-    const handleClickOutside = (e: MouseEvent) => {
+    const handleClickOutside = (e: MouseEvent | TouchEvent) => {
       if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
         setIsOpen(false);
       }
@@ -64,10 +66,12 @@ export function CustomSelect<T extends string = string>({
     };
 
     document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('touchstart', handleClickOutside);
     document.addEventListener('keydown', handleKeyDown);
 
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('touchstart', handleClickOutside);
       document.removeEventListener('keydown', handleKeyDown);
     };
   }, [isOpen]);
@@ -87,7 +91,7 @@ export function CustomSelect<T extends string = string>({
         disabled={disabled}
         onClick={() => !disabled && setIsOpen((prev) => !prev)}
         className={cn(
-          'flex items-center justify-between gap-2 rounded-xl bg-surface-raised border border-border text-fg text-xs font-semibold hover:border-accent/50 active:bg-surface transition-all cursor-pointer select-none text-left shadow-2xs',
+          'flex items-center justify-between gap-1.5 sm:gap-2 rounded-xl bg-surface-raised border border-border text-fg text-xs font-semibold hover:border-accent/50 active:bg-surface transition-all cursor-pointer select-none text-left shadow-2xs',
           size === 'sm' ? 'px-2.5 py-1 min-h-[30px] rounded-lg text-xs' : 'px-3 py-1.5 min-h-[34px] rounded-xl text-xs',
           isFullWidth && 'w-full',
           isOpen && 'border-accent ring-1 ring-accent/30',
@@ -110,16 +114,26 @@ export function CustomSelect<T extends string = string>({
         />
       </button>
 
-      {/* Desktop Floating Dropdown Menu */}
-      {isOpen && (
+      {/* Floating Dropdown Menu */}
+      {isOpen && (variant === 'dropdown' || variant !== 'sheet') && (
         <div
           className={cn(
-            'hidden sm:block absolute z-50 top-full mt-1 min-w-[200px] rounded-xl bg-surface border border-border shadow-xl p-1 space-y-0.5 animate-in fade-in-50 zoom-in-95 duration-150',
+            'absolute z-50 top-full mt-1.5 min-w-[200px] rounded-2xl bg-surface/98 backdrop-blur-md border border-border shadow-xl shadow-black/10 dark:shadow-black/40 p-1.5 space-y-0.5 animate-in fade-in-0 zoom-in-95 duration-150',
+            variant === 'auto' && 'hidden sm:block',
             align === 'right' ? 'right-0 left-auto' : 'left-0',
             menuWidth || 'w-full max-w-xs'
           )}
         >
-          <div className="max-h-60 overflow-y-auto space-y-0.5 scrollbar-thin">
+          {title && (
+            <div className="px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-fg-subtle border-b border-border/50 mb-1 flex items-center justify-between">
+              <span className="flex items-center gap-1.5">
+                {icon && <span className="text-accent">{icon}</span>}
+                <span>{title}</span>
+              </span>
+              <span className="text-[9px] text-fg-subtle font-mono">{options.length}</span>
+            </div>
+          )}
+          <div className="max-h-64 overflow-y-auto space-y-0.5 scrollbar-thin">
             {options.map((opt) => {
               const isSelected = opt.value === value;
               return (
@@ -128,30 +142,33 @@ export function CustomSelect<T extends string = string>({
                   type="button"
                   onClick={() => handleSelect(opt.value)}
                   className={cn(
-                    'w-full px-2.5 py-1.5 rounded-lg text-left text-xs flex items-center justify-between gap-2 transition-colors cursor-pointer',
+                    'w-full px-2.5 py-2 rounded-xl text-left text-xs flex items-center justify-between gap-2.5 transition-all cursor-pointer select-none active:scale-[0.99]',
                     isSelected
-                      ? 'bg-accent/15 text-accent font-bold'
-                      : 'hover:bg-surface-raised text-fg'
+                      ? 'bg-accent/15 text-accent font-bold shadow-2xs'
+                      : 'hover:bg-surface-raised text-fg-muted hover:text-fg'
                   )}
                 >
                   <div className="flex items-center gap-2 min-w-0 flex-1">
                     {opt.icon && (
-                      <span className={cn('shrink-0', isSelected ? 'text-accent' : 'text-fg-subtle')}>
+                      <span className={cn(
+                        'shrink-0 w-6 h-6 rounded-lg flex items-center justify-center border transition-colors',
+                        isSelected ? 'bg-accent/20 border-accent/40 text-accent' : 'bg-surface border-border/60 text-fg-subtle'
+                      )}>
                         {opt.icon}
                       </span>
                     )}
                     <div className="min-w-0 flex-1">
-                      <span className="truncate block font-semibold">{opt.label}</span>
+                      <span className="truncate block font-semibold leading-tight">{opt.label}</span>
                       {opt.sublabel && (
-                        <span className="text-[10px] text-fg-subtle font-normal block truncate">
+                        <span className="text-[10px] text-fg-subtle font-normal block truncate mt-0.5">
                           {opt.sublabel}
                         </span>
                       )}
                     </div>
                   </div>
-                  <div className="flex items-center gap-1.5 shrink-0 ml-2">
+                  <div className="flex items-center gap-1.5 shrink-0 ml-1.5">
                     {opt.badge && (
-                      <span className="px-1.5 py-0.2 rounded text-[10px] font-mono bg-surface-raised border border-border/70 text-fg-subtle">
+                      <span className="px-1.5 py-0.5 rounded-md text-[9px] font-mono font-semibold bg-surface-raised border border-border/70 text-fg-subtle uppercase">
                         {opt.badge}
                       </span>
                     )}
@@ -165,7 +182,7 @@ export function CustomSelect<T extends string = string>({
       )}
 
       {/* Mobile Bottom Sheet Modal */}
-      {isOpen && (
+      {isOpen && (variant === 'sheet' || variant === 'auto') && (
         <div className="sm:hidden fixed inset-0 z-[70] flex flex-col justify-end">
           {/* Backdrop */}
           <div

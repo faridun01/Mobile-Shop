@@ -5,7 +5,6 @@ import {
   Check,
   CheckCheck,
   ChevronRight,
-  ChevronDown,
   ShoppingBag,
   RotateCcw,
   RefreshCw,
@@ -17,6 +16,7 @@ import {
   Gift,
   Wrench,
   Users,
+  ClipboardCheck,
 } from 'lucide-react';
 import { useAppFields } from '../../context/AppContext';
 import { useNotifications } from '../../context/NotificationsContext';
@@ -30,6 +30,7 @@ import { EmptyState } from '../ui/EmptyState';
 import { LoadingState } from '../ui/Skeleton';
 import { useStoreContext } from '../../utils/storeContext';
 import { PushNotificationBanner } from '../notifications/PushNotificationBanner';
+import { StoreSelector } from '../common/StoreSelector';
 
 /** Names of the business events, for the action filter and the item label. */
 export const ACTION_LABELS: Record<string, string> = {
@@ -62,6 +63,7 @@ export const ACTION_LABELS: Record<string, string> = {
   PROFIT_PAYOUT: 'Выплата прибыли',
   REINVEST: 'Капитализация прибыли',
   QUARTER_CLOSE: 'Закрытие периода',
+  STOCK_REVISION: 'Сверка остатков',
 };
 
 function formatNotificationDate(rawDate?: string | number | Date): string {
@@ -82,6 +84,8 @@ function formatNotificationDate(rawDate?: string | number | Date): string {
 
 function getEventIconConfig(actionType?: string): { icon: React.ElementType; tone: 'accent' | 'warning' | 'danger' | 'info' | 'purple' } {
   switch (actionType) {
+    case 'STOCK_REVISION':
+      return { icon: ClipboardCheck, tone: 'accent' };
     case 'SALE':
     case 'SALE_BELOW_COST':
       return { icon: ShoppingBag, tone: 'accent' };
@@ -237,7 +241,7 @@ export const NotificationsPage: React.FC = () => {
   return (
     <div className="work-screen flex-1 flex flex-col h-full overflow-hidden bg-bg text-fg-muted">
       {/* Sleek Compact Header & Controls Toolbar */}
-      <div className="px-2.5 sm:px-3 py-1.5 border-b border-border bg-surface/90 backdrop-blur-xs flex flex-wrap items-center justify-between gap-1.5 shrink-0">
+      <div className="px-2.5 sm:px-3 py-1.5 border-b border-border bg-surface/90 backdrop-blur-xs flex flex-wrap items-center justify-between gap-1.5 shrink-0 relative z-20">
         {/* Left: Title + Filter Tabs */}
         <div className="flex items-center gap-2 min-w-0">
           <div className="flex items-center gap-1.5 shrink-0">
@@ -281,22 +285,23 @@ export const NotificationsPage: React.FC = () => {
         </div>
 
         {/* Right: Store & Action filters + Mark All */}
-        <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar ml-auto sm:ml-0">
+        <div className="flex items-center gap-1.5 ml-auto sm:ml-0">
           {storeCtx.mode === 'CENTRAL' && (
-            <div className="relative shrink-0">
-              <select
-                value={storeId}
-                onChange={(e) => setStoreId(e.target.value)}
-                aria-label="Магазин"
-                className="h-7 pl-2 pr-6 rounded-lg bg-surface-raised border border-border text-fg-muted hover:border-accent/40 text-[11px] font-medium appearance-none max-w-[125px] sm:max-w-[150px] truncate cursor-pointer focus:outline-hidden focus:border-accent transition-colors"
-              >
-                <option value="">Все магазины</option>
-                {retailStores.map((s) => (
-                  <option key={s.id} value={s.id}>{s.name}</option>
-                ))}
-              </select>
-              <ChevronDown className="w-3 h-3 text-fg-subtle absolute right-1.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-            </div>
+            <StoreSelector
+              value={storeId}
+              onChange={setStoreId}
+              stores={retailStores}
+              showAllOption
+              allOptionLabel="Все магазины"
+              allOptionValue=""
+              retailOnly
+              compact
+              align="right"
+              variant="dropdown"
+              title="Магазин"
+              triggerClassName="h-7 text-[11px] font-medium"
+              menuWidth="min-w-[210px]"
+            />
           )}
 
 

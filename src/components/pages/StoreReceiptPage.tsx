@@ -238,135 +238,109 @@ export const StoreReceiptPage: React.FC = () => {
     <div className="work-screen flex-1 flex flex-col h-full overflow-hidden bg-bg text-fg select-none">
       <StatusBanner message={status} onDismiss={() => setStatus(null)} />
 
-      {/* Top Header Bar */}
-      <div className="p-3 sm:p-4 border-b border-border bg-surface shrink-0 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div className="flex items-center gap-2.5">
-          <div className="w-9 h-9 rounded-xl bg-accent/15 border border-accent/25 flex items-center justify-center text-accent shrink-0">
-            <PackagePlus className="w-5 h-5" />
-          </div>
-          <div>
-            <div className="flex items-center gap-2 flex-wrap">
-              <h1 className="text-base sm:text-lg font-bold text-fg leading-tight">
-                Приход в магазин
-              </h1>
-              <span className="inline-flex items-center gap-1.5 text-xs font-bold px-2.5 py-0.5 rounded-full bg-accent/10 text-accent border border-accent/25 shadow-2xs">
-                <StoreIcon className="w-3.5 h-3.5 shrink-0" />
-                <span>{formatStoreDisplayTitle(currentStore)}</span>
-              </span>
-            </div>
-            <p className="text-[11px] text-fg-subtle mt-0.5">
-              Приём устройств по IMEI с автоматическим созданием накладной
-            </p>
-          </div>
-        </div>
-
-        {/* Header Actions & Mode Switcher */}
-        <div className="flex items-center gap-2 flex-wrap">
-          {/* Admin Store Switcher */}
-          {isAdmin && retailStores.length > 0 && (
+      {/* Top Header Controls Bar */}
+      <div className="px-3 py-2 border-b border-border bg-surface shrink-0 flex items-center justify-between gap-2 flex-wrap">
+        <div className="flex items-center gap-2">
+          {/* Admin Store Switcher or Store Badge */}
+          {isAdmin && retailStores.length > 0 ? (
             <StoreSelector
               value={effectiveStoreId}
               onChange={setSelectedStoreId}
               stores={retailStores}
               retailOnly
-              className="max-w-44 sm:max-w-56"
+              className="w-44 sm:w-56"
               title="Выбрать магазин приёма"
             />
+          ) : (
+            <span className="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-lg bg-surface-raised border border-border text-fg-muted">
+              <StoreIcon className="w-3.5 h-3.5 text-accent shrink-0" />
+              <span>{formatStoreDisplayTitle(currentStore)}</span>
+            </span>
           )}
+        </div>
 
-          {/* Tab Switcher */}
-          <div className="flex items-center bg-surface-raised border border-border rounded-xl p-0.5">
-            <button
-              type="button"
-              onClick={() => setActiveTab('NEW')}
-              className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer flex items-center gap-1.5 ${
-                activeTab === 'NEW'
-                  ? 'bg-accent text-accent-fg shadow-2xs'
-                  : 'text-fg-subtle hover:text-fg'
-              }`}
-            >
-              <PackagePlus className="w-3.5 h-3.5" />
-              Новый приход {scannedItems.length > 0 && `(${scannedItems.length})`}
-            </button>
-            <button
-              type="button"
-              onClick={() => setActiveTab('HISTORY')}
-              className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer flex items-center gap-1.5 ${
-                activeTab === 'HISTORY'
-                  ? 'bg-accent text-accent-fg shadow-2xs'
-                  : 'text-fg-subtle hover:text-fg'
-              }`}
-            >
-              <History className="w-3.5 h-3.5" />
-              История накладных
-            </button>
-          </div>
+        {/* Tab Switcher */}
+        <div className="flex items-center bg-surface-raised border border-border rounded-lg p-0.5">
+          <button
+            type="button"
+            onClick={() => setActiveTab('NEW')}
+            className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all cursor-pointer flex items-center gap-1.5 ${
+              activeTab === 'NEW'
+                ? 'bg-accent text-accent-fg shadow-2xs font-bold'
+                : 'text-fg-subtle hover:text-fg'
+            }`}
+          >
+            <PackagePlus className="w-3.5 h-3.5" />
+            Новый приход {scannedItems.length > 0 && `(${scannedItems.length})`}
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab('HISTORY')}
+            className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all cursor-pointer flex items-center gap-1.5 ${
+              activeTab === 'HISTORY'
+                ? 'bg-accent text-accent-fg shadow-2xs font-bold'
+                : 'text-fg-subtle hover:text-fg'
+            }`}
+          >
+            <History className="w-3.5 h-3.5" />
+            История накладных
+          </button>
         </div>
       </div>
 
       {/* Main Content Area */}
       <div className="flex-1 overflow-y-auto p-3 sm:p-5">
         {activeTab === 'NEW' ? (
-          <div className="max-w-4xl mx-auto space-y-4">
-            {/* IMEI Scan & Input Panel */}
-            <div className="p-4 sm:p-5 rounded-2xl bg-surface border border-border shadow-xs space-y-3">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h2 className="text-sm font-bold text-fg flex items-center gap-2">
-                    <Barcode className="w-4 h-4 text-accent" />
-                    Сканирование IMEI
-                  </h2>
-                  <p className="text-xs text-fg-subtle mt-0.5">
-                    Отсканируйте сканером или введите вручную IMEI каждого телефона
-                  </p>
-                </div>
-
-                <Button
-                  type="button"
-                  variant="secondary"
-                  size="sm"
-                  onClick={() => openScanner((code) => handleLookupImei(code))}
-                  leftIcon={Barcode}
-                  className="h-8 text-xs cursor-pointer text-accent border-accent/30 hover:border-accent"
-                >
-                  Камера-сканер
-                </Button>
-              </div>
-
-              <form onSubmit={handleInputSubmit} className="flex gap-2">
-                <div className="relative flex-1">
-                  <input
-                    ref={imeiInputRef}
-                    type="text"
-                    value={imeiInput}
-                    onChange={(e) => setImeiInput(e.target.value)}
-                    placeholder="Введите или отсканируйте 15-значный IMEI..."
-                    disabled={isLookingUp || isSubmitting}
-                    className="w-full h-11 pl-4 pr-10 rounded-xl border border-border bg-bg text-fg font-mono text-sm focus:outline-none focus:border-accent"
-                    autoFocus
-                  />
+          <div className="max-w-4xl mx-auto space-y-3 sm:space-y-4">
+            {/* IMEI Input & Scanner Form */}
+            <form onSubmit={handleInputSubmit} className="flex items-center gap-2">
+              <div className="relative flex-1">
+                <input
+                  ref={imeiInputRef}
+                  type="text"
+                  value={imeiInput}
+                  onChange={(e) => setImeiInput(e.target.value)}
+                  placeholder="Введите или отсканируйте 15-значный IMEI..."
+                  disabled={isLookingUp || isSubmitting}
+                  className="w-full h-10 pl-3.5 pr-20 rounded-xl border border-border bg-surface text-fg font-mono text-xs sm:text-sm focus:outline-none focus:border-accent shadow-xs"
+                  autoFocus
+                />
+                <div className="absolute right-1.5 top-1/2 -translate-y-1/2 flex items-center gap-1">
                   {imeiInput && (
                     <button
                       type="button"
-                      onClick={() => setImeiInput('')}
-                      className="absolute right-3 top-3 text-fg-subtle hover:text-fg cursor-pointer"
+                      onClick={() => {
+                        setImeiInput('');
+                        imeiInputRef.current?.focus();
+                      }}
+                      className="p-1 rounded-md text-fg-subtle hover:text-fg hover:bg-surface-raised cursor-pointer transition-colors"
+                      title="Очистить"
                     >
-                      <X className="w-5 h-5" />
+                      <X className="w-4 h-4" />
                     </button>
                   )}
+                  <button
+                    type="button"
+                    onClick={() => openScanner((code) => handleLookupImei(code))}
+                    className="p-1.5 rounded-lg text-accent hover:bg-accent/15 border border-transparent hover:border-accent/25 cursor-pointer transition-colors"
+                    title="Сканировать IMEI камерой"
+                    aria-label="Сканировать IMEI камерой"
+                  >
+                    <Barcode className="w-5 h-5" />
+                  </button>
                 </div>
+              </div>
 
-                <Button
-                  type="submit"
-                  loading={isLookingUp}
-                  disabled={!imeiInput.trim() || isLookingUp || isSubmitting}
-                  leftIcon={Plus}
-                  className="h-11 px-5 cursor-pointer font-bold shrink-0"
-                >
-                  Добавить
-                </Button>
-              </form>
-            </div>
+              <Button
+                type="submit"
+                loading={isLookingUp}
+                disabled={!imeiInput.trim() || isLookingUp || isSubmitting}
+                leftIcon={Plus}
+                className="h-10 px-4 cursor-pointer font-bold shrink-0 rounded-xl"
+              >
+                Добавить
+              </Button>
+            </form>
 
             {/* Scanned Batch Items */}
             <div className="p-4 sm:p-5 rounded-2xl bg-surface border border-border shadow-xs space-y-3">
@@ -391,13 +365,13 @@ export const StoreReceiptPage: React.FC = () => {
               </div>
 
               {scannedItems.length === 0 ? (
-                <div className="py-12 text-center text-fg-subtle space-y-2">
-                  <div className="w-12 h-12 rounded-full bg-surface-raised flex items-center justify-center mx-auto text-fg-subtle">
-                    <Barcode className="w-6 h-6 opacity-60" />
+                <div className="py-8 text-center text-fg-subtle space-y-1.5">
+                  <div className="w-10 h-10 rounded-full bg-surface-raised flex items-center justify-center mx-auto text-fg-subtle">
+                    <Barcode className="w-5 h-5 opacity-50" />
                   </div>
-                  <p className="text-sm font-medium">Список прихода пуст</p>
-                  <p className="text-xs text-fg-muted max-w-sm mx-auto">
-                    Сканируйте телефоны штрихкод-сканером или вводите IMEI выше. Информация о моделях определится автоматически.
+                  <p className="text-xs font-semibold text-fg">Список прихода пуст</p>
+                  <p className="text-[11px] text-fg-subtle">
+                    Отсканируйте или введите IMEI выше
                   </p>
                 </div>
               ) : (

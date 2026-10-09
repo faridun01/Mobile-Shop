@@ -482,9 +482,11 @@ export const SettingsPage: React.FC = () => {
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-1.5 flex-wrap">
                       <span className="text-sm font-bold text-fg truncate">{formatUserName(currentUser?.name)}</span>
-                      <span className="text-[9px] font-bold px-1.5 py-0.2 rounded-md bg-accent/15 text-accent border border-accent/25 uppercase">
-                        {currentUser?.role === 'ADMIN' ? 'Администратор' : currentUser?.role === 'PARTNER' ? 'Партнер' : 'Продавец'}
-                      </span>
+                      {currentUser?.role === 'ADMIN' && (
+                        <span className="text-[9px] font-bold px-1.5 py-0.2 rounded-md bg-accent/15 text-accent border border-accent/25 uppercase">
+                          Администратор
+                        </span>
+                      )}
                     </div>
                     <p className="text-xs text-fg-subtle truncate mt-0.5">
                       Логин: <strong className="text-fg font-medium">@{currentUser?.login}</strong>
@@ -605,12 +607,6 @@ export const SettingsPage: React.FC = () => {
                     </span>
                   </div>
 
-                  <div className="flex items-center justify-between text-xs px-3 py-2 rounded-xl bg-surface-raised border border-border/60">
-                    <span className="text-[11px] text-fg-subtle">Версия ПО:</span>
-                    <span className="text-[11px] font-bold font-mono text-accent">
-                      Mobile Shop v1.3.0 {pwa.currentCommit && pwa.currentCommit !== 'dev' ? `(${pwa.currentCommit.slice(0, 7)})` : ''}
-                    </span>
-                  </div>
                 </div>
               </div>
 

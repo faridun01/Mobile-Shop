@@ -1,7 +1,8 @@
 import React, { useState, useMemo } from 'react';
 import { useAppFields } from '../../context/AppContext';
 import { formatStoreDisplayTitle } from '../../utils/storeContext';
-import { Device } from '../../types';
+import { apiClient } from '../../api/client';
+import { Device, StockRevision } from '../../types';
 import { soundEffects } from '../../utils/sound';
 import { StatusBanner, StatusMessage } from '../ui/StatusBanner';
 import { Button } from '../ui/Button';
@@ -11,18 +12,21 @@ import { formatUserName } from '../../utils/formatUser';
 import { StoreSelector } from '../common/StoreSelector';
 import { SearchBar } from '../ui/SearchBar';
 import { DEVICE_STATUS_LABELS, findDeviceByCode, normalizeScanCode } from '../../utils/scanLookup';
+import { RevisionHistoryPanel } from '../revision/RevisionHistoryPanel';
 import {
   CheckCircle2,
   RotateCcw,
   Smartphone,
   Check,
   Store as StoreIcon,
-  Printer,
   ChevronDown,
   Layers,
   List,
   AlertTriangle,
   X,
+  History,
+  FileCheck2,
+  ClipboardCheck,
 } from 'lucide-react';
 
 interface ModelGroup {
@@ -98,10 +102,16 @@ export const RevisionPage: React.FC = () => {
   // Reset confirmation dialog modal
   const [isResetConfirmOpen, setIsResetConfirmOpen] = useState(false);
 
+  // Active page tab: 'AUDIT' (live scanning) vs 'HISTORY' (past revisions)
+  const [pageTab, setPageTab] = useState<'AUDIT' | 'HISTORY'>('AUDIT');
+  const [revisionComment, setRevisionComment] = useState('');
+  const [isSavingRevision, setIsSavingRevision] = useState(false);
+
   // Reset revision session when store changes
   React.useEffect(() => {
     setCheckedImeis(new Set());
     setSurplus([]);
+    setRevisionComment('');
     setStatus(null);
     setExpandedGroups(new Set());
   }, [effectiveStoreId]);
@@ -226,8 +236,48 @@ export const RevisionPage: React.FC = () => {
   const handleConfirmReset = () => {
     setCheckedImeis(new Set());
     setSurplus([]);
+    setRevisionComment('');
     setIsResetConfirmOpen(false);
     setStatus({ tone: 'info', text: 'Сверка сброшена.' });
+  };
+
+  // Complete and save revision to history
+  const handleSaveRevision = async () => {
+    setIsSavingRevision(true);
+    try {
+      await apiClient<StockRevision>('/revisions', {
+        method: 'POST',
+        body: JSON.stringify({
+          storeId: effectiveStoreId,
+          comment: revisionComment.trim() || undefined,
+          checkedImeis: Array.from(checkedImeis),
+          surplusDevices: surplus,
+        }),
+      });
+
+      soundEffects.playAddToCartSuccess();
+      setStatus({
+        tone: 'success',
+        text: '✓ Ревизия успешно сохранена в истории',
+      });
+
+      // Clear current audit session
+      setCheckedImeis(new Set());
+      setSurplus([]);
+      setRevisionComment('');
+      setIsSummaryModalOpen(false);
+
+      // Navigate to History tab so user immediately sees the saved record
+      setPageTab('HISTORY');
+    } catch (err: any) {
+      soundEffects.playError();
+      setStatus({
+        tone: 'error',
+        text: err?.message || 'Не удалось сохранить ревизию',
+      });
+    } finally {
+      setIsSavingRevision(false);
+    }
   };
 
   // Grouped models list for display
@@ -288,57 +338,151 @@ export const RevisionPage: React.FC = () => {
       <StatusBanner message={status} onDismiss={() => setStatus(null)} />
 
       {/* Top Header Bar */}
-      <div className="px-2.5 sm:px-4 py-1.5 sm:py-2 border-b border-border bg-surface shrink-0 flex items-center justify-between gap-2 shadow-2xs sticky top-0 z-20">
-        <div className="flex items-center gap-2 min-w-0">
-          {!isAdmin && (
-            <span className="inline-flex items-center gap-1.5 text-xs font-bold px-2 py-0.5 rounded-lg bg-accent/10 text-accent border border-accent/25 truncate">
-              <StoreIcon className="w-3.5 h-3.5 shrink-0" />
-              <span className="truncate">{formatStoreDisplayTitle(currentStore)}</span>
-            </span>
-          )}
+      <div className="px-2.5 sm:px-4 py-1.5 sm:py-2 border-b border-border bg-surface shrink-0 shadow-2xs sticky top-0 z-20">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+          {/* Left Group: Store Selector + Tabs (Desktop) */}
+          <div className="flex items-center gap-2 min-w-0 flex-wrap sm:flex-nowrap">
+            {!isAdmin && (
+              <span className="inline-flex items-center gap-1.5 text-xs font-bold px-2.5 py-1 rounded-lg bg-accent/10 text-accent border border-accent/25 shrink-0">
+                <StoreIcon className="w-3.5 h-3.5 shrink-0" />
+                <span className="truncate max-w-44">{formatStoreDisplayTitle(currentStore)}</span>
+              </span>
+            )}
 
-          {/* Admin Store Switcher */}
-          {isAdmin && stores.length > 0 && (
-            <StoreSelector
-              value={effectiveStoreId}
-              onChange={setSelectedStoreId}
-              stores={stores}
-              className="max-w-full sm:max-w-56"
-              title="Выбрать точку для сверки"
-            />
-          )}
-        </div>
+            {isAdmin && stores.length > 0 && (
+              <StoreSelector
+                value={effectiveStoreId}
+                onChange={setSelectedStoreId}
+                stores={stores}
+                compact
+                className="w-full xs:w-auto xs:max-w-48 sm:max-w-52 shrink-0"
+                title="Точка для сверки"
+              />
+            )}
 
-        <div className="flex items-center gap-1.5 shrink-0">
-          <Button
-            type="button"
-            variant="secondary"
-            size="sm"
-            onClick={handleOpenResetRevision}
-            leftIcon={RotateCcw}
-            data-compact="true"
-            className="min-h-0 h-7.5 px-2.5 text-xs text-fg-subtle hover:text-fg cursor-pointer"
-            title="Сбросить отметки текущей сверки"
-          >
-            Сброс
-          </Button>
+            {/* Desktop Tabs */}
+            <div className="hidden sm:flex items-center bg-surface-raised border border-border rounded-lg p-0.5 shrink-0">
+              <button
+                type="button"
+                onClick={() => setPageTab('AUDIT')}
+                className={`px-3 py-1 text-xs font-semibold rounded-md transition-all cursor-pointer flex items-center gap-1.5 ${
+                  pageTab === 'AUDIT'
+                    ? 'bg-accent text-accent-fg shadow-2xs font-bold'
+                    : 'text-fg-subtle hover:text-fg'
+                }`}
+              >
+                <ClipboardCheck className="w-3.5 h-3.5" />
+                <span>Сверка склада</span>
+                {checkedCount > 0 && (
+                  <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
+                    pageTab === 'AUDIT' ? 'bg-black/20 text-white' : 'bg-accent/15 text-accent'
+                  }`}>
+                    {checkedCount}/{totalCount}
+                  </span>
+                )}
+              </button>
+              <button
+                type="button"
+                onClick={() => setPageTab('HISTORY')}
+                className={`px-3 py-1 text-xs font-semibold rounded-md transition-all cursor-pointer flex items-center gap-1.5 ${
+                  pageTab === 'HISTORY'
+                    ? 'bg-accent text-accent-fg shadow-2xs font-bold'
+                    : 'text-fg-subtle hover:text-fg'
+                }`}
+              >
+                <History className="w-3.5 h-3.5" />
+                <span>История ревизий</span>
+              </button>
+            </div>
+          </div>
 
-          <Button
-            type="button"
-            variant="primary"
-            size="sm"
-            onClick={() => setIsSummaryModalOpen(true)}
-            leftIcon={CheckCircle2}
-            data-compact="true"
-            className="min-h-0 h-7.5 px-3 text-xs font-bold cursor-pointer shadow-xs"
-          >
-            Итоги сверки
-          </Button>
+          {/* Right Group on Desktop / Row 2 on Mobile: Mobile Tabs + Action Buttons */}
+          <div className="flex items-center justify-between sm:justify-end gap-2 shrink-0">
+            {/* Mobile Tabs (only shown on screen < sm) */}
+            <div className="flex sm:hidden items-center bg-surface-raised border border-border rounded-lg p-0.5 shrink-0">
+              <button
+                type="button"
+                onClick={() => setPageTab('AUDIT')}
+                className={`px-2.5 py-1 text-xs font-semibold rounded-md transition-all cursor-pointer flex items-center gap-1 ${
+                  pageTab === 'AUDIT'
+                    ? 'bg-accent text-accent-fg shadow-2xs font-bold'
+                    : 'text-fg-subtle hover:text-fg'
+                }`}
+              >
+                <ClipboardCheck className="w-3.5 h-3.5 shrink-0" />
+                <span>Сверка</span>
+                {checkedCount > 0 && (
+                  <span className={`text-[9px] px-1 py-0.2 rounded-full font-bold ${
+                    pageTab === 'AUDIT' ? 'bg-black/20 text-white' : 'bg-accent/15 text-accent'
+                  }`}>
+                    {checkedCount}/{totalCount}
+                  </span>
+                )}
+              </button>
+              <button
+                type="button"
+                onClick={() => setPageTab('HISTORY')}
+                className={`px-2.5 py-1 text-xs font-semibold rounded-md transition-all cursor-pointer flex items-center gap-1 ${
+                  pageTab === 'HISTORY'
+                    ? 'bg-accent text-accent-fg shadow-2xs font-bold'
+                    : 'text-fg-subtle hover:text-fg'
+                }`}
+              >
+                <History className="w-3.5 h-3.5 shrink-0" />
+                <span>История</span>
+              </button>
+            </div>
+
+            {/* Actions */}
+            {pageTab === 'AUDIT' ? (
+              <div className="flex items-center gap-1.5 shrink-0">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  onClick={handleOpenResetRevision}
+                  leftIcon={RotateCcw}
+                  data-compact="true"
+                  className="min-h-0 h-7.5 px-2.5 text-xs text-fg-subtle hover:text-fg cursor-pointer"
+                  title="Сбросить отметки текущей сверки"
+                >
+                  Сброс
+                </Button>
+
+                <Button
+                  type="button"
+                  variant="primary"
+                  size="sm"
+                  onClick={() => setIsSummaryModalOpen(true)}
+                  leftIcon={CheckCircle2}
+                  data-compact="true"
+                  className="min-h-0 h-7.5 px-3 text-xs font-bold cursor-pointer shadow-xs whitespace-nowrap"
+                >
+                  Итоги сверки
+                </Button>
+              </div>
+            ) : (
+              <div className="flex items-center gap-1.5 shrink-0">
+                <Button
+                  type="button"
+                  variant="primary"
+                  size="sm"
+                  onClick={() => setPageTab('AUDIT')}
+                  leftIcon={ClipboardCheck}
+                  data-compact="true"
+                  className="min-h-0 h-7.5 px-3 text-xs font-bold cursor-pointer shadow-xs whitespace-nowrap"
+                >
+                  Новая сверка
+                </Button>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
       {/* Main Content Area */}
-      <div className="p-2 sm:p-2.5 space-y-2">
+      {pageTab === 'AUDIT' ? (
+        <div className="p-2 sm:p-2.5 space-y-2">
         {/* Progress & Live Counters Bar */}
         <div className="p-2 sm:p-2.5 rounded-xl bg-surface border border-border shadow-2xs space-y-1.5">
           <div className="flex items-center justify-between gap-2">
@@ -746,6 +890,11 @@ export const RevisionPage: React.FC = () => {
           )}
         </div>
       </div>
+      ) : (
+        <div className="p-2 sm:p-4 max-w-5xl mx-auto w-full">
+          <RevisionHistoryPanel storeId={effectiveStoreId} isAdmin={isAdmin} />
+        </div>
+      )}
 
       {/* SUMMARY MODAL */}
       <Dialog
@@ -757,19 +906,21 @@ export const RevisionPage: React.FC = () => {
             <Button
               type="button"
               variant="secondary"
-              leftIcon={Printer}
-              onClick={() => window.print()}
+              onClick={() => setIsSummaryModalOpen(false)}
+              disabled={isSavingRevision}
               className="flex-1 sm:flex-initial"
             >
-              Печать акта
+              Продолжить сверку
             </Button>
             <Button
               type="button"
               variant="primary"
-              onClick={() => setIsSummaryModalOpen(false)}
+              onClick={handleSaveRevision}
+              disabled={isSavingRevision}
+              leftIcon={FileCheck2}
               className="flex-1 sm:flex-initial font-bold"
             >
-              Готово
+              {isSavingRevision ? 'Сохранение...' : 'Завершить и сохранить в историю'}
             </Button>
           </div>
         }
@@ -805,6 +956,20 @@ export const RevisionPage: React.FC = () => {
               <span className="text-danger font-semibold">Излишки:</span>
               <span className="font-bold font-mono text-danger">{surplus.length} шт.</span>
             </div>
+          </div>
+
+          {/* Optional comment */}
+          <div className="space-y-1">
+            <label className="text-xs font-semibold text-fg-subtle">
+              Комментарий к ревизии (необязательно):
+            </label>
+            <textarea
+              value={revisionComment}
+              onChange={(e) => setRevisionComment(e.target.value)}
+              placeholder="Укажите примечание или причину расхождений..."
+              rows={2}
+              className="w-full p-2.5 text-xs rounded-xl bg-surface-raised border border-border text-fg placeholder:text-fg-subtle focus:outline-hidden focus:border-accent resize-none"
+            />
           </div>
 
           {uncheckedCount > 0 && (

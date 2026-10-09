@@ -5,9 +5,9 @@ import { cn } from '../../utils/cn';
 /** No default width — sizes to content like a native select. Pass `w-full` explicitly for a form-field-style select. */
 export const Select = React.forwardRef<HTMLSelectElement, React.SelectHTMLAttributes<HTMLSelectElement>>(
   ({ className, children, ...rest }, ref) => {
-    const hasCustomHeight = !!className && /\b(h-|min-h-)/.test(className);
-    const hasCustomText = !!className && /\btext-/.test(className);
-    const hasCustomPy = !!className && /\bpy-/.test(className);
+    const hasCustomHeight = !!className && /(?:^|[\s!])(h-|min-h-)/.test(className);
+    const hasCustomText = !!className && /(?:^|[\s!])text-/.test(className);
+    const hasCustomPy = !!className && /(?:^|[\s!])py-/.test(className);
 
     return (
       <select

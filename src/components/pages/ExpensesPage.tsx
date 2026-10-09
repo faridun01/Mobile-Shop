@@ -101,7 +101,6 @@ export const ExpensesPage: React.FC = () => {
 
   const todayStr = getBusinessDateKey();
   const thisMonthStr = currentBusinessMonth();
-  const [filtersOpen, setFiltersOpen] = useState(false);
   const [periodFilter, setPeriodFilter] = useState<'TODAY' | 'CUSTOM' | 'MONTH' | 'ALL'>('MONTH');
   const [selectedMonth, setSelectedMonth] = useState<string>(thisMonthStr);
   const [selectedStartDate, setSelectedStartDate] = useState<string>(() => monthBounds(thisMonthStr).start);
@@ -114,10 +113,7 @@ export const ExpensesPage: React.FC = () => {
     setSelectedEndDate(end);
   };
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'UNPAID' | 'PAID'>('ALL');
-  const [selectedEmployeeFilter, setSelectedEmployeeFilter] = useState<string>('ALL');
-  const [sortBy, setSortBy] = useState<'DATE_DESC' | 'DATE_ASC' | 'AMOUNT_DESC' | 'AMOUNT_ASC'>('DATE_DESC');
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedCategoryTab, setSelectedCategoryTab] = useState('ALL');
 
   const storeCtx = useStoreContext();
   const [selectedStoreFilter, setSelectedStoreFilter] = useState(() => {
@@ -319,7 +315,6 @@ export const ExpensesPage: React.FC = () => {
     setCustomCategories(updated);
     try { localStorage.setItem('custom_expense_categories', JSON.stringify(updated)); } catch {}
 
-    setSelectedCategoryTab(newCat.id);
     setCategory(newCat.id as ExpenseCategory);
     setIsAddCategoryModalOpen(false);
     setNewCategoryName('');
@@ -327,19 +322,6 @@ export const ExpensesPage: React.FC = () => {
   };
 
   const rate = Number(todayRate?.rate) || 0;
-
-  const activeEmployees = useMemo(() => {
-    return users.filter(u => u.isActive ?? u.active);
-  }, [users]);
-
-  const categoryCounts = useMemo(() => {
-    const map: Record<string, number> = {};
-    for (const exp of expenses) {
-      if (selectedStoreFilter !== 'ALL' && exp.storeId !== selectedStoreFilter) continue;
-      map[exp.category] = (map[exp.category] || 0) + 1;
-    }
-    return map;
-  }, [expenses, selectedStoreFilter]);
 
   const filteredExpenses = useMemo(() => {
     return expenses.filter(e => {
@@ -362,22 +344,6 @@ export const ExpensesPage: React.FC = () => {
       if (statusFilter === 'UNPAID' && e.status !== 'UNPAID') return false;
       if (statusFilter === 'PAID' && e.status === 'UNPAID') return false;
 
-      if (selectedEmployeeFilter === 'ANY_EMPLOYEE') {
-        if (!e.employeeId && e.category !== 'EMPLOYEE_ADVANCE' && e.category !== 'SALARY') return false;
-      } else if (selectedEmployeeFilter !== 'ALL') {
-        if (e.employeeId !== selectedEmployeeFilter) return false;
-      }
-
-      if (selectedCategoryTab !== 'ALL') {
-        const targetLabel = getCategoryLabel(selectedCategoryTab, customCategories).toLowerCase();
-        const expCat = (e.category || '').toLowerCase();
-        const expLabel = getCategoryLabel(e.category, customCategories).toLowerCase();
-
-        const matchesId = expCat === selectedCategoryTab.toLowerCase();
-        const matchesLabel = expLabel === targetLabel || expCat.includes(targetLabel) || targetLabel.includes(expCat);
-        if (!matchesId && !matchesLabel) return false;
-      }
-
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase().trim();
         const label = getCategoryLabel(e.category, customCategories).toLowerCase();
@@ -394,12 +360,7 @@ export const ExpensesPage: React.FC = () => {
       }
 
       return true;
-    }).sort((a, b) => {
-      if (sortBy === 'DATE_ASC') return new Date(a.date || 0).getTime() - new Date(b.date || 0).getTime();
-      if (sortBy === 'AMOUNT_DESC') return (b.amountTjs || 0) - (a.amountTjs || 0);
-      if (sortBy === 'AMOUNT_ASC') return (a.amountTjs || 0) - (b.amountTjs || 0);
-      return new Date(b.date || 0).getTime() - new Date(a.date || 0).getTime();
-    });
+    }).sort((a, b) => new Date(b.date || 0).getTime() - new Date(a.date || 0).getTime());
   }, [
     expenses,
     isStoreScoped,
@@ -410,12 +371,9 @@ export const ExpensesPage: React.FC = () => {
     selectedMonth,
     todayStr,
     statusFilter,
-    selectedEmployeeFilter,
     selectedStoreFilter,
-    selectedCategoryTab,
     searchQuery,
     customCategories,
-    sortBy
   ]);
 
   const totalExpensesTjs = useMemo(() => sumMoney(filteredExpenses.map((e) => e.amountTjs || 0)), [filteredExpenses]);
@@ -437,31 +395,14 @@ export const ExpensesPage: React.FC = () => {
   const allCategoryOptions = [...STANDARD_CATEGORIES, ...customCategories];
 
   const isPeriodCustomized = periodFilter !== 'MONTH' || selectedMonth !== thisMonthStr;
-  const isStoreFiltered = isAdmin && selectedStoreFilter !== 'ALL';
-  const isCategoryFiltered = selectedCategoryTab !== 'ALL';
   const isStatusFiltered = statusFilter !== 'ALL';
-  const isEmployeeFiltered = selectedEmployeeFilter !== 'ALL';
   const isSearchActive = Boolean(searchQuery.trim());
-  const isSortChanged = sortBy !== 'DATE_DESC';
 
-  const activeFiltersCount =
-    (isPeriodCustomized ? 1 : 0) +
-    (isStoreFiltered ? 1 : 0) +
-    (isCategoryFiltered ? 1 : 0) +
-    (isStatusFiltered ? 1 : 0) +
-    (isEmployeeFiltered ? 1 : 0) +
-    (isSearchActive ? 1 : 0) +
-    (isSortChanged ? 1 : 0);
-
-  const hasActiveFilters = activeFiltersCount > 0;
+  const hasActiveFilters = isPeriodCustomized || isStatusFiltered || isSearchActive;
 
   const handleResetFilters = () => {
     resetToCurrentMonth();
-    setSelectedStoreFilter(isPartner ? (currentUser?.storeId || '') : 'ALL');
-    setSelectedCategoryTab('ALL');
     setStatusFilter('ALL');
-    setSelectedEmployeeFilter('ALL');
-    setSortBy('DATE_DESC');
     setSearchQuery('');
   };
 
@@ -503,30 +444,9 @@ export const ExpensesPage: React.FC = () => {
         selectedEndDate={selectedEndDate}
         setSelectedEndDate={setSelectedEndDate}
         resetToCurrentMonth={resetToCurrentMonth}
-        filtersOpen={filtersOpen}
-        setFiltersOpen={setFiltersOpen}
-        activeFiltersCount={activeFiltersCount}
-        isAdmin={isAdmin}
-        isStoreModeCentral={storeCtx.mode === 'CENTRAL'}
-        selectedStoreFilter={selectedStoreFilter}
-        setSelectedStoreFilter={setSelectedStoreFilter}
-        stores={stores}
-        canAddCategory={canAddCategory}
-        onOpenAddCategoryModal={() => setIsAddCategoryModalOpen(true)}
-        selectedCategoryTab={selectedCategoryTab}
-        setSelectedCategoryTab={setSelectedCategoryTab}
-        allCategoryOptions={allCategoryOptions}
-        categoryCounts={categoryCounts}
-        selectedEmployeeFilter={selectedEmployeeFilter}
-        setSelectedEmployeeFilter={setSelectedEmployeeFilter}
-        activeEmployees={activeEmployees}
-        users={users}
-        sortBy={sortBy}
-        setSortBy={setSortBy}
-        customCategories={customCategories}
       />
 
-      <div className="flex-1 overflow-y-auto p-2.5 sm:p-4 lg:p-6">
+      <div className="flex-1 overflow-y-auto p-2 sm:p-3 lg:p-4">
         <div className="max-w-6xl xl:max-w-7xl mx-auto w-full">
           {isInitialLoading ? (
             <LoadingState label="Загрузка расходов…" />

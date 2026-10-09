@@ -65,27 +65,6 @@ export interface ExpensesHeaderBarProps {
   selectedEndDate: string;
   setSelectedEndDate: (val: string) => void;
   resetToCurrentMonth: () => void;
-  filtersOpen: boolean;
-  setFiltersOpen: React.Dispatch<React.SetStateAction<boolean>>;
-  activeFiltersCount: number;
-  isAdmin: boolean;
-  isStoreModeCentral: boolean;
-  selectedStoreFilter: string;
-  setSelectedStoreFilter: (val: string) => void;
-  stores: Store[];
-  canAddCategory: boolean;
-  onOpenAddCategoryModal: () => void;
-  selectedCategoryTab: string;
-  setSelectedCategoryTab: (val: string) => void;
-  allCategoryOptions: { id: string; label: string }[];
-  categoryCounts: Record<string, number>;
-  selectedEmployeeFilter: string;
-  setSelectedEmployeeFilter: (val: string) => void;
-  activeEmployees: User[];
-  users: User[];
-  sortBy: 'DATE_DESC' | 'DATE_ASC' | 'AMOUNT_DESC' | 'AMOUNT_ASC';
-  setSortBy: (val: 'DATE_DESC' | 'DATE_ASC' | 'AMOUNT_DESC' | 'AMOUNT_ASC') => void;
-  customCategories: CustomCategory[];
 }
 
 export interface ExpensesTableProps {

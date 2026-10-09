@@ -33,50 +33,60 @@ export const ExpensesCardsList: React.FC<ExpensesCardsListProps> = ({
         const costUsd = exp.amountUsd ?? +(exp.amountTjs / (exp.exchangeRate || rate)).toFixed(2);
         const storeCleanName = formatStoreName(exp.storeName);
 
+        const rawDesc = (exp.comment || exp.description || '').trim();
+        const isRedundant =
+          !rawDesc ||
+          rawDesc.toLowerCase() === 'операционный расход' ||
+          rawDesc.toLowerCase() === label.toLowerCase() ||
+          (exp.employeeName && rawDesc.toLowerCase() === `аванс: ${exp.employeeName}`.toLowerCase());
+        const expText = isRedundant ? null : rawDesc;
+
         return (
-          <div key={exp.id} className="p-2.5 sm:p-3 flex items-center justify-between gap-2.5 hover:bg-surface-raised/40 transition-colors">
-            <div className="flex items-center gap-2.5 min-w-0 flex-1">
-              <div className="w-8 h-8 rounded-lg bg-surface-raised border border-border/80 text-fg-subtle flex items-center justify-center shrink-0">
-                <Icon className="w-4 h-4" />
+          <div key={exp.id} className="p-2 sm:p-2.5 flex items-center justify-between gap-2 hover:bg-surface-raised/40 transition-colors">
+            <div className="flex items-center gap-2 min-w-0 flex-1">
+              <div className="w-7 h-7 rounded-lg bg-surface-raised border border-border/80 text-fg-subtle flex items-center justify-center shrink-0">
+                <Icon className="w-3.5 h-3.5" />
               </div>
 
               <div className="min-w-0 flex-1">
-                <div className="flex flex-wrap items-center gap-1.5">
-                  <span className="text-xs sm:text-sm font-bold text-fg truncate">{label}</span>
+                <div className="flex flex-wrap items-center gap-1">
+                  <span className="text-xs font-bold text-fg truncate">{label}</span>
                   {exp.status === 'UNPAID' ? (
-                    <span className="px-1.5 py-0.2 rounded-md text-[10px] font-bold bg-warning/15 text-warning border border-warning/30">
+                    <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-warning/15 text-warning border border-warning/30">
                       Не оплачено
                     </span>
                   ) : (
-                    <span className="px-1.5 py-0.2 rounded-md text-[10px] font-bold bg-accent/15 text-accent border border-accent/25">
+                    <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-accent/15 text-accent border border-accent/25">
                       Оплачено
                     </span>
                   )}
                   {exp.status === 'PAID' && exp.sourceAccount?.toLowerCase().includes('касса') && (
-                    <span className="px-1.5 py-0.2 rounded-md text-[10px] font-medium bg-surface-raised text-fg-muted border border-border/80">
+                    <span className="px-1.5 py-0.2 rounded text-[9px] font-medium bg-surface-raised text-fg-muted border border-border/80">
                       {exp.sourceAccount === 'Центральная касса' ? 'Центральная касса' : 'Из кассы'}
                     </span>
                   )}
                   {exp.employeeName && (
-                    <span className="px-1.5 py-0.2 rounded-md text-[10px] font-semibold bg-accent/10 text-accent border border-accent/20">
+                    <span className="px-1.5 py-0.2 rounded text-[9px] font-semibold bg-accent/10 text-accent border border-accent/20">
                       {exp.employeeName}
                     </span>
                   )}
                 </div>
 
-                <p className="text-[11px] sm:text-xs text-fg-muted mt-0.5 line-clamp-1">
-                  {exp.comment || exp.description || 'Операционный расход'}
-                </p>
+                {expText && (
+                  <p className="text-[11px] text-fg-muted line-clamp-1 mt-0.5">
+                    {expText}
+                  </p>
+                )}
 
                 <div className="flex flex-wrap items-center gap-1 text-[10px] text-fg-subtle mt-0.5">
                   {!isStoreScoped && storeCleanName && (
                     <>
-                      <StoreIcon className="w-2.5 h-2.5 opacity-70" />
+                      <StoreIcon className="w-2.5 h-2.5 opacity-70 shrink-0" />
                       <span>{storeCleanName}</span>
                       <span>•</span>
                     </>
                   )}
-                  <Calendar className="w-2.5 h-2.5 opacity-70" />
+                  <Calendar className="w-2.5 h-2.5 opacity-70 shrink-0" />
                   <span>{formattedDate}</span>
                   {exp.createdByName && (
                     <>
@@ -90,7 +100,7 @@ export const ExpensesCardsList: React.FC<ExpensesCardsListProps> = ({
 
             <div className="flex items-center gap-2 shrink-0">
               <div className="text-right">
-                <p className="text-xs sm:text-sm font-black text-danger font-mono tracking-tight">
+                <p className="text-xs sm:text-sm font-bold text-danger font-mono tracking-tight">
                   -{formatMoney(exp.amountTjs)} TJS
                 </p>
                 <p className="text-[10px] text-fg-subtle font-mono">
@@ -119,7 +129,7 @@ export const ExpensesCardsList: React.FC<ExpensesCardsListProps> = ({
       })}
 
       {filteredExpenses.length > 0 && (
-        <p className="text-center text-[10px] text-fg-subtle pt-2 pb-1">
+        <p className="text-center text-[10px] text-fg-subtle pt-1.5 pb-1">
           Показано {filteredExpenses.length} из {totalExpensesCount} записей
         </p>
       )}
