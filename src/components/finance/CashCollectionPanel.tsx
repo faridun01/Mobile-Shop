@@ -163,6 +163,13 @@ export const CashCollectionPanel: React.FC<CashCollectionPanelProps> = ({
 
   const confirmCollect = async () => {
     if (!collecting || busy) return;
+    if (collecting.isShiftClosed === false) {
+      setStatus({
+        tone: 'error',
+        text: `${collecting.unclosedReason || 'Кассовая смена не закрыта'}. Сначала выполните закрытие смены (Z-отчёт)`,
+      });
+      return;
+    }
     setBusy(true);
     try {
       const result = await apiClient<CashCollection>('/cash-collections', {
@@ -647,6 +654,7 @@ export const CashCollectionPanel: React.FC<CashCollectionPanelProps> = ({
         title="Инкассировать кассу?"
         confirmLabel="Инкассировать"
         loading={busy}
+        confirmDisabled={collecting?.isShiftClosed === false}
         onConfirm={confirmCollect}
         onCancel={() => {
           if (!busy) setCollecting(null);
@@ -655,6 +663,14 @@ export const CashCollectionPanel: React.FC<CashCollectionPanelProps> = ({
           collecting && (
             <div className="space-y-3 text-xs">
               <p className="text-fg-subtle">Касса «{collecting.storeName}»</p>
+
+              {collecting.isShiftClosed === false && (
+                <div className="p-2.5 rounded-lg bg-danger/10 border border-danger/25 text-danger text-xs flex items-center gap-2">
+                  <AlertTriangle className="w-4 h-4 shrink-0" />
+                  <span>{collecting.unclosedReason || 'Кассовая смена не закрыта'}. Сначала выполните закрытие смены (Z-отчёт).</span>
+                </div>
+              )}
+
               <div className="p-3 rounded-xl bg-surface-raised border border-border space-y-2">
                 <div className="flex justify-between items-center text-sm font-bold text-fg">
                   <span>Инкассируется всего:</span>

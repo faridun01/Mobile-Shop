@@ -6,6 +6,7 @@ import { Button } from '../ui/Button';
 import { EmptyState } from '../ui/EmptyState';
 import { DailyCashClosingModal } from './DailyCashClosingModal';
 import { useUIStore } from '../../stores/useUIStore';
+import { useAppFields } from '../../context/AppContext';
 import { AlertCircle, FileCheck2, Calendar, Store, UserCheck } from 'lucide-react';
 
 interface DailyCashClosingListPanelProps {
@@ -19,11 +20,19 @@ export const DailyCashClosingListPanel: React.FC<DailyCashClosingListPanelProps>
   storeId,
 }) => {
   const { setDailyClosingModalOpen } = useUIStore();
+  const { stores } = useAppFields('stores');
   const [closings, setClosings] = useState<DailyCashClosing[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [revision, setRevision] = useState(0);
   const [inspectClosing, setInspectClosing] = useState<DailyCashClosing | null>(null);
+
+  // Shift closing is strictly for retail stores, never for central cash desk/warehouse
+  const isRetailStore = Boolean(
+    storeId &&
+    storeId !== 'all' &&
+    stores.some((s) => s.id === storeId && !s.isMainWarehouse)
+  );
 
   const refresh = useCallback(() => setRevision((v) => v + 1), []);
 
@@ -74,12 +83,14 @@ export const DailyCashClosingListPanel: React.FC<DailyCashClosingListPanelProps>
             <span className="text-xs text-fg-subtle font-normal font-mono">({closings.length})</span>
           )}
         </h2>
-        <Button
-          leftIcon={FileCheck2}
-          onClick={() => setDailyClosingModalOpen(true, storeId && storeId !== 'all' ? storeId : undefined)}
-        >
-          Закрыть смену
-        </Button>
+        {isRetailStore && (
+          <Button
+            leftIcon={FileCheck2}
+            onClick={() => setDailyClosingModalOpen(true, storeId!)}
+          >
+            Закрыть смену
+          </Button>
+        )}
       </div>
 
       {loading && closings.length === 0 ? (

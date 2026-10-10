@@ -25,8 +25,8 @@ export const CashDeskPage: React.FC = () => {
       ? currentUser.storeId
       : (selectedStoreId || 'all');
 
-  const isCentral = effectiveStoreId === 'all';
   const currentStore = stores.find((s) => s.id === effectiveStoreId);
+  const isCentral = effectiveStoreId === 'all' || (currentStore?.isMainWarehouse === true);
 
   if (isSeller) {
     return (
@@ -43,29 +43,21 @@ export const CashDeskPage: React.FC = () => {
       {/* Sticky Controls Bar */}
       {isCentral ? (
         // Central Cash Desk Mode: pure financial overview without switching to stores
+        // Shifts are never closed in the central store/desk, only in retail stores
         isAdmin && (
           <div className="sticky top-0 z-20 px-3 sm:px-4 py-2 border-b border-border bg-surface/95 backdrop-blur-sm flex items-center justify-between gap-2 shadow-2xs">
             <div className="flex items-center gap-2 min-w-0">
               <div className="w-6 h-6 rounded-md bg-accent/15 text-accent flex items-center justify-center shrink-0">
                 <Landmark className="w-3.5 h-3.5" />
               </div>
-              <span className="text-xs font-bold text-fg truncate">Центральная касса (Все точки)</span>
+              <span className="text-xs font-bold text-fg truncate">
+                {currentStore?.isMainWarehouse ? 'Центральная касса (Главный склад)' : 'Центральная касса (Все точки)'}
+              </span>
             </div>
-
-            {/* Quick Z-Report Button for Central Mode */}
-            <button
-              type="button"
-              onClick={() => setDailyClosingModalOpen(true, undefined)}
-              className="h-8 px-2.5 rounded-lg bg-accent text-accent-fg text-xs font-semibold flex items-center gap-1.5 hover:opacity-90 active:scale-95 transition-all shadow-xs cursor-pointer shrink-0"
-              title="Закрыть смену / Z-отчёт"
-            >
-              <FileCheck2 className="w-3.5 h-3.5 shrink-0" />
-              <span>Z-отчёт</span>
-            </button>
           </div>
         )
       ) : (
-        // Store Mode (Admin or Partner entered a specific store):
+        // Store Mode (Admin or Partner entered a specific retail store):
         // STRICTLY show only this store's cash desk — NO choice of other stores!
         <div className="sticky top-0 z-20 px-3 sm:px-4 py-1.5 border-b border-border bg-surface/95 backdrop-blur-sm flex items-center justify-between gap-2 shadow-2xs">
           <div className="flex items-center gap-2 min-w-0">
@@ -75,16 +67,18 @@ export const CashDeskPage: React.FC = () => {
             </span>
           </div>
 
-          {/* Quick Z-Report Button for this store */}
-          <button
-            type="button"
-            onClick={() => setDailyClosingModalOpen(true, effectiveStoreId)}
-            className="h-8 px-2.5 rounded-lg bg-accent text-accent-fg text-xs font-semibold flex items-center gap-1.5 hover:opacity-90 active:scale-95 transition-all shadow-xs cursor-pointer shrink-0"
-            title="Закрыть смену / Z-отчёт"
-          >
-            <FileCheck2 className="w-3.5 h-3.5 shrink-0" />
-            <span>Z-отчёт</span>
-          </button>
+          {/* Quick Z-Report Button for this retail store only */}
+          {currentStore && !currentStore.isMainWarehouse && (
+            <button
+              type="button"
+              onClick={() => setDailyClosingModalOpen(true, effectiveStoreId)}
+              className="h-8 px-2.5 rounded-lg bg-accent text-accent-fg text-xs font-semibold flex items-center gap-1.5 hover:opacity-90 active:scale-95 transition-all shadow-xs cursor-pointer shrink-0"
+              title="Закрыть смену / Z-отчёт"
+            >
+              <FileCheck2 className="w-3.5 h-3.5 shrink-0" />
+              <span>Z-отчёт</span>
+            </button>
+          )}
         </div>
       )}
 

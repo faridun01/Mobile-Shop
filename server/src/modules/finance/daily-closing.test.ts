@@ -201,4 +201,20 @@ describe('DailyClosingService', () => {
       })
     ).rejects.toThrow('уже закрыта');
   });
+
+  it('rejects shift closing for central store / main warehouse', async () => {
+    db.store.findUnique.mockResolvedValue({ id: 'main-store', name: 'Главный склад', isMainWarehouse: true, active: true });
+
+    await expect(
+      DailyClosingService.getSummary('main-store', '2026-10-06')
+    ).rejects.toThrow('Центральная касса не имеет розничных смен');
+
+    await expect(
+      DailyClosingService.closeDay('u1', {
+        storeId: 'main-store',
+        businessDate: '2026-10-06',
+        actualCashTjs: 100,
+      })
+    ).rejects.toThrow('Центральная касса не имеет розничных смен');
+  });
 });

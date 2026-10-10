@@ -115,17 +115,29 @@ export const DailyCashClosingModal: React.FC<DailyCashClosingModalProps> = ({
 
   useEffect(() => {
     if (isOpen) {
-      const target = (explicitStoreId && explicitStoreId !== 'all' ? explicitStoreId : '') || detectedStoreId;
+      const explicitValid =
+        explicitStoreId &&
+        explicitStoreId !== 'all' &&
+        stores.some((s) => s.id === explicitStoreId && !s.isMainWarehouse)
+          ? explicitStoreId
+          : '';
+      const target = explicitValid || detectedStoreId;
       setSelectedStoreIdState(target);
       setSelectedDateState(explicitBusinessDate || '');
     }
-  }, [isOpen, explicitStoreId, detectedStoreId, explicitBusinessDate]);
+  }, [isOpen, explicitStoreId, detectedStoreId, explicitBusinessDate, stores]);
 
   const effectiveStoreId = useMemo(() => {
-    if (selectedStoreIdState && selectedStoreIdState !== 'all') return selectedStoreIdState;
-    if (explicitStoreId && explicitStoreId !== 'all') return explicitStoreId;
+    if (selectedStoreIdState && selectedStoreIdState !== 'all') {
+      const found = stores.find((s) => s.id === selectedStoreIdState && !s.isMainWarehouse);
+      if (found) return found.id;
+    }
+    if (explicitStoreId && explicitStoreId !== 'all') {
+      const found = stores.find((s) => s.id === explicitStoreId && !s.isMainWarehouse);
+      if (found) return found.id;
+    }
     return detectedStoreId || '';
-  }, [selectedStoreIdState, explicitStoreId, detectedStoreId]);
+  }, [selectedStoreIdState, explicitStoreId, detectedStoreId, stores]);
 
   const activeStore = useMemo(
     () => stores.find((s) => s.id === effectiveStoreId),
