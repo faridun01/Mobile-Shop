@@ -1,7 +1,24 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import webpush from 'web-push';
 import { PushNotificationService, isAllowedPushEndpoint } from './push.service';
 
 describe('PushNotificationService', () => {
+  const originalEnv = { ...process.env };
+
+  beforeEach(() => {
+    process.env = { ...originalEnv };
+    const testKeys = webpush.generateVAPIDKeys();
+    process.env.VAPID_PUBLIC_KEY = testKeys.publicKey;
+    process.env.VAPID_PRIVATE_KEY = testKeys.privateKey;
+    (PushNotificationService as any).configured = false;
+    (PushNotificationService as any).warnedMissingKeys = false;
+  });
+
+  afterEach(() => {
+    process.env = { ...originalEnv };
+    (PushNotificationService as any).configured = false;
+  });
+
   it('initializes successfully with valid VAPID details', () => {
     const isInit = PushNotificationService.init();
     expect(isInit).toBe(true);
@@ -12,6 +29,17 @@ describe('PushNotificationService', () => {
     const key = PushNotificationService.getPublicKey();
     expect(key).toBeTypeOf('string');
     expect(key?.length).toBeGreaterThan(20);
+  });
+
+  it('gracefully disables push notifications when VAPID keys are absent', () => {
+    delete process.env.VAPID_PUBLIC_KEY;
+    delete process.env.VAPID_PRIVATE_KEY;
+    (PushNotificationService as any).configured = false;
+    (PushNotificationService as any).warnedMissingKeys = false;
+
+    expect(PushNotificationService.init()).toBe(false);
+    expect(PushNotificationService.isEnabled()).toBe(false);
+    expect(PushNotificationService.getPublicKey()).toBeNull();
   });
 
   it('allows valid browser push service endpoints', () => {

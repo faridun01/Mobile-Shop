@@ -19,10 +19,6 @@ export interface ClientPushSubscription {
   keys: PushSubscriptionKeys;
 }
 
-const DEFAULT_VAPID_PUBLIC_KEY =
-  'BEzkY3CfaEoQmoLWIbq5pUu4VN46h2MbnnCjJwltp97g5yys2wWaQKQVm2SThiziKT93RG-pgkmTGs0qZQV-JsI';
-const DEFAULT_VAPID_PRIVATE_KEY =
-  'QG9LaQRIX7kK6aNYgPOnU_iXxNMOaXNgqE1ixKcNVWQ';
 const DEFAULT_SUBJECT = 'mailto:admin@mobileshop.tj';
 
 // The server POSTs to whatever endpoint a subscription names, so only real browser push
@@ -56,13 +52,14 @@ export class PushNotificationService {
   private static warnedMissingKeys = false;
 
   /**
-   * Configures VAPID from the environment with built-in default keys as a fallback.
-   * If VAPID_PUBLIC_KEY / VAPID_PRIVATE_KEY are provided in env, they take precedence.
+   * Configures VAPID from the environment. There is deliberately no built-in fallback key:
+   * a key pair committed to the repo would let anyone sign pushes as this server. Without
+   * VAPID_PUBLIC_KEY / VAPID_PRIVATE_KEY push is simply disabled.
    */
   public static init(): boolean {
     if (this.configured) return true;
-    const publicKey = process.env.VAPID_PUBLIC_KEY || DEFAULT_VAPID_PUBLIC_KEY;
-    const privateKey = process.env.VAPID_PRIVATE_KEY || DEFAULT_VAPID_PRIVATE_KEY;
+    const publicKey = process.env.VAPID_PUBLIC_KEY;
+    const privateKey = process.env.VAPID_PRIVATE_KEY;
     const subject = process.env.VAPID_SUBJECT || DEFAULT_SUBJECT;
     if (!publicKey || !privateKey) {
       if (!this.warnedMissingKeys) {
@@ -87,8 +84,7 @@ export class PushNotificationService {
   }
 
   public static getPublicKey(): string | null {
-    if (!this.init()) return null;
-    return process.env.VAPID_PUBLIC_KEY || DEFAULT_VAPID_PUBLIC_KEY;
+    return this.init() ? process.env.VAPID_PUBLIC_KEY! : null;
   }
 
   /**
