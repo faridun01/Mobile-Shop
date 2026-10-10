@@ -74,13 +74,13 @@ export const MobileBottomNav: React.FC = () => {
           }}
         />
         <NavItem
-          routePath="/cash"
-          label="Касса"
-          title="Центральная касса"
-          icon={Wallet}
+          routePath="/sales-history"
+          label="История"
+          title="История продаж"
+          icon={History}
           onSelect={() => {
-            setActivePage('CASH_DESK');
-            navigate('/cash');
+            setActivePage('SALES_HISTORY');
+            navigate('/sales-history');
           }}
         />
 
