@@ -51,8 +51,17 @@ export const Combobox: React.FC<ComboboxProps> = ({ value, onChange, options, pl
         required={required}
         autoFocus={autoFocus}
         value={value}
-        onChange={(e) => onChange(e.target.value)}
+        onChange={(e) => {
+          onChange(e.target.value);
+          setOpen(true);
+        }}
         onFocus={() => setOpen(true)}
+        onClick={() => setOpen(true)}
+        onKeyDown={(e) => {
+          if (e.key === 'Escape' || e.key === 'Enter') {
+            setOpen(false);
+          }
+        }}
         placeholder={placeholder}
         className={cn('w-full', className)}
         autoComplete="off"

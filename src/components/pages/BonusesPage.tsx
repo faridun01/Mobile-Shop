@@ -30,7 +30,7 @@ import {
 } from 'lucide-react';
 import { MonthPicker } from '../ui/MonthPicker';
 import { currentBusinessMonth } from '../../utils/businessDate';
-import { DEFAULT_PHONE_COLORS_RU, normalizePhoneColor, formatPhoneColor } from '../../utils/phoneSpecs';
+import { DEFAULT_PHONE_COLORS_EN, normalizePhoneColor, formatPhoneColor } from '../../utils/phoneSpecs';
 
 interface BonusAccountBalance {
   balanceUsd: string;
@@ -258,11 +258,11 @@ export const BonusesPage: React.FC = () => {
   }, [devices]);
 
   const colorOptions = useMemo(() => {
-    const set = new Set<string>(DEFAULT_PHONE_COLORS_RU);
+    const set = new Set<string>(DEFAULT_PHONE_COLORS_EN);
     (devices || []).forEach((d) => {
       if (d.color) {
         const translated = normalizePhoneColor(d.color);
-        if (translated && !/[a-zA-Z]/.test(translated)) {
+        if (translated) {
           set.add(translated);
         }
       }
@@ -349,7 +349,7 @@ export const BonusesPage: React.FC = () => {
                 model: bonusModel.trim(),
                 ram: bonusRam.trim(),
                 storage: bonusStorage.trim(),
-                color: normalizePhoneColor(bonusColor.trim()) || 'Черный',
+                color: normalizePhoneColor(bonusColor.trim()) || bonusColor.trim() || 'Black',
                 imei: bonusImei.trim(),
                 imei2: bonusImei2.trim() || undefined,
                 costBasisUsd: 0,
@@ -523,7 +523,7 @@ export const BonusesPage: React.FC = () => {
                 brand: editBrand.trim(),
                 model: editModel.trim(),
                 storage: editStorage.trim(),
-                color: normalizePhoneColor(editColor.trim()),
+                color: normalizePhoneColor(editColor.trim()) || editColor.trim(),
                 imei: editImei.trim(),
                 imei2: editImei2.trim() || undefined,
               }

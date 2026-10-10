@@ -1,260 +1,426 @@
-export const DEFAULT_PHONE_COLORS_RU: string[] = [
-  'Черный',
-  'Белый',
-  'Серый',
-  'Серебристый',
-  'Золотой',
-  'Синий',
-  'Голубой',
-  'Зеленый',
-  'Фиолетовый',
-  'Красный',
-  'Розовый',
-  'Желтый',
-  'Оранжевый',
-  'Графит',
-  'Натуральный титан',
-  'Черный титан',
-  'Белый титан',
-  'Пустынный титан',
-  'Синий титан',
-  'Темная ночь',
-  'Сияющая звезда',
-  'Серый космос',
-  'Черный космос',
-  'Розовое золото',
-  'Лавандовый',
-  'Мятный',
-  'Кремовый',
-  'Бирюзовый',
-  'Коралловый',
-  'Бордовый',
-  'Изумрудный',
-  'Бронзовый',
+export const DEFAULT_PHONE_COLORS_EN: string[] = [
+  'Black',
+  'White',
+  'Silver',
+  'Gold',
+  'Gray',
+  'Space Gray',
+  'Space Black',
+  'Graphite',
+  'Natural Titanium',
+  'Black Titanium',
+  'White Titanium',
+  'Desert Titanium',
+  'Blue Titanium',
+  'Midnight',
+  'Starlight',
+  'Deep Purple',
+  'Purple',
+  'Lavender',
+  'Blue',
+  'Light Blue',
+  'Sky Blue',
+  'Dark Blue',
+  'Sierra Blue',
+  'Pacific Blue',
+  'Green',
+  'Alpine Green',
+  'Midnight Green',
+  'Mint',
+  'Red',
+  'Pink',
+  'Rose Gold',
+  'Yellow',
+  'Orange',
+  'Coral',
+  'Cream',
+  'Beige',
+  'Burgundy',
+  'Emerald',
+  'Bronze',
+  'Teal',
+  'Turquoise',
+  'Ultramarine',
+  'Charcoal',
+  'Phantom Black',
+  'Phantom Silver',
+  'Phantom White',
 ];
 
-export const COLOR_TRANSLATIONS_EN_TO_RU: Record<string, string> = {
-  // Basic colors
-  black: 'Черный',
-  white: 'Белый',
-  gray: 'Серый',
-  grey: 'Серый',
-  silver: 'Серебристый',
-  gold: 'Золотой',
-  golden: 'Золотой',
-  blue: 'Синий',
-  'light blue': 'Голубой',
-  'dark blue': 'Темно-синий',
-  'sky blue': 'Небесно-голубой',
-  'ice blue': 'Ледяной синий',
-  'baby blue': 'Голубой',
-  'deep blue': 'Темно-синий',
-  navy: 'Темно-синий',
-  'navy blue': 'Темно-синий',
-  'ocean blue': 'Океанический синий',
-  'pacific blue': 'Тихоокеанский синий',
-  'sierra blue': 'Небесно-голубой',
-  'midnight blue': 'Темно-синий',
-  'storm blue': 'Штормовой синий',
+export const DEFAULT_PHONE_COLORS = DEFAULT_PHONE_COLORS_EN;
+export const DEFAULT_PHONE_COLORS_RU = DEFAULT_PHONE_COLORS_EN; // backward compatibility
 
-  // Greens
-  green: 'Зеленый',
-  'light green': 'Светло-зеленый',
-  'dark green': 'Темно-зеленый',
-  'forest green': 'Лесной зеленый',
-  'alpine green': 'Альпийский зеленый',
-  'midnight green': 'Темно-зеленый',
-  mint: 'Мятный',
-  'mint green': 'Мятный',
-  emerald: 'Изумрудный',
-  'emerald green': 'Изумрудный',
-  olive: 'Оливковый',
-  'olive green': 'Оливковый',
-  lime: 'Лаймовый',
-  'lime green': 'Лаймовый',
-  sage: 'Шалфей',
+export const COLOR_TRANSLATIONS_RU_TO_EN: Record<string, string> = {
+  // Базовые
+  черный: 'Black',
+  чёрный: 'Black',
+  черная: 'Black',
+  чёрная: 'Black',
+  черное: 'Black',
+  чёрное: 'Black',
+  черн: 'Black',
+  чёрн: 'Black',
+  белый: 'White',
+  белая: 'White',
+  белое: 'White',
+  бел: 'White',
+  серый: 'Gray',
+  серая: 'Gray',
+  серое: 'Gray',
+  серебристый: 'Silver',
+  серебристая: 'Silver',
+  серебристое: 'Silver',
+  серебро: 'Silver',
+  золотой: 'Gold',
+  золотая: 'Gold',
+  золотое: 'Gold',
+  золото: 'Gold',
+  синий: 'Blue',
+  синяя: 'Blue',
+  синее: 'Blue',
+  син: 'Blue',
+  голубой: 'Light Blue',
+  голубая: 'Light Blue',
+  голубое: 'Light Blue',
+  зеленый: 'Green',
+  зелёный: 'Green',
+  зеленая: 'Green',
+  зелёная: 'Green',
+  зеленое: 'Green',
+  зелёное: 'Green',
+  фиолетовый: 'Purple',
+  фиолетовая: 'Purple',
+  фиолетовое: 'Purple',
+  красный: 'Red',
+  красная: 'Red',
+  красное: 'Red',
+  розовый: 'Pink',
+  розовая: 'Pink',
+  розовое: 'Pink',
+  желтый: 'Yellow',
+  жёлтый: 'Yellow',
+  желтая: 'Yellow',
+  жёлтая: 'Yellow',
+  желтое: 'Yellow',
+  жёлтое: 'Yellow',
+  оранжевый: 'Orange',
+  оранжевая: 'Orange',
+  оранжевое: 'Orange',
+  графит: 'Graphite',
+  графитовый: 'Graphite',
+  графитовая: 'Graphite',
+  графитовое: 'Graphite',
 
-  // Purples & Pinks
-  purple: 'Фиолетовый',
-  'dark purple': 'Темно-фиолетовый',
-  'deep purple': 'Темно-фиолетовый',
-  'light purple': 'Светло-фиолетовый',
-  violet: 'Фиолетовый',
-  'bora purple': 'Пурпурный',
-  lavender: 'Лавандовый',
-  lilac: 'Сиреневый',
-  pink: 'Розовый',
-  'light pink': 'Светло-розовый',
-  'rose gold': 'Розовое золото',
-  rose: 'Розовый',
-  magenta: 'Пурпурный',
-  plum: 'Сливовый',
+  // Титановая серия (iPhone 15 Pro / 16 Pro)
+  титан: 'Titanium',
+  титановый: 'Titanium',
+  титановая: 'Titanium',
+  титановое: 'Titanium',
+  'натуральный титан': 'Natural Titanium',
+  'черный титан': 'Black Titanium',
+  'чёрный титан': 'Black Titanium',
+  'белый титан': 'White Titanium',
+  'пустынный титан': 'Desert Titanium',
+  'синий титан': 'Blue Titanium',
+  'серый титан': 'Gray Titanium',
+  'серебристый титан': 'Silver Titanium',
 
-  // Reds & Oranges & Yellows
-  red: 'Красный',
-  'dark red': 'Темно-красный',
-  crimson: 'Малиновый',
-  burgundy: 'Бордовый',
-  coral: 'Коралловый',
-  orange: 'Оранжевый',
-  peach: 'Персиковый',
-  yellow: 'Желтый',
-  lemon: 'Лимонный',
-  amber: 'Янтарный',
-  'amber yellow': 'Янтарный желтый',
+  // Фирменные цвета Apple
+  'темная ночь': 'Midnight',
+  'тёмная ночь': 'Midnight',
+  'сияющая звезда': 'Starlight',
+  'серый космос': 'Space Gray',
+  'черный космос': 'Space Black',
+  'чёрный космос': 'Space Black',
+  'глянцевый черный': 'Jet Black',
+  'глянцевый чёрный': 'Jet Black',
+  'матовый черный': 'Matte Black',
+  'матовый чёрный': 'Matte Black',
+  'розовое золото': 'Rose Gold',
+  'альпийский зеленый': 'Alpine Green',
+  'альпийский зелёный': 'Alpine Green',
+  'тихоокеанский синий': 'Pacific Blue',
+  'небесно-голубой': 'Sierra Blue',
+  'небесный': 'Sierra Blue',
+  'темно-синий': 'Dark Blue',
+  'тёмно-синий': 'Dark Blue',
+  'ледяной синий': 'Ice Blue',
+  'океанический синий': 'Ocean Blue',
+  'штормовой синий': 'Storm Blue',
+  'темно-зеленый': 'Midnight Green',
+  'тёмно-зелёный': 'Midnight Green',
+  'лесной зеленый': 'Forest Green',
+  'лесной зелёный': 'Forest Green',
+  'светло-зеленый': 'Light Green',
+  'светло-зелёный': 'Light Green',
+  'темно-фиолетовый': 'Deep Purple',
+  'тёмно-фиолетовый': 'Deep Purple',
+  'светло-фиолетовый': 'Light Purple',
+  'светло-розовый': 'Light Pink',
+  'темно-красный': 'Dark Red',
+  'тёмно-красный': 'Dark Red',
+  ультрамарин: 'Ultramarine',
 
-  // Grays, Blacks, Neutrals
-  graphite: 'Графит',
-  charcoal: 'Угольно-черный',
-  slate: 'Сланцевый',
-  'space gray': 'Серый космос',
-  'space grey': 'Серый космос',
-  'space black': 'Черный космос',
-  'jet black': 'Глянцевый черный',
-  'matte black': 'Матовый черный',
-  'cosmic black': 'Космический черный',
-  'cosmic gray': 'Космический серый',
-  'onyx black': 'Черный оникс',
-  onyx: 'Черный оникс',
-  'marble gray': 'Мраморный серый',
+  // Оттенки
+  лавандовый: 'Lavender',
+  лавандовая: 'Lavender',
+  лаванда: 'Lavender',
+  мятный: 'Mint',
+  мятная: 'Mint',
+  мята: 'Mint',
+  кремовый: 'Cream',
+  кремовая: 'Cream',
+  крем: 'Cream',
+  бежевый: 'Beige',
+  бежевая: 'Beige',
+  бирюзовый: 'Turquoise',
+  бирюзовая: 'Turquoise',
+  бирюза: 'Turquoise',
+  коралловый: 'Coral',
+  коралловая: 'Coral',
+  коралл: 'Coral',
+  бордовый: 'Burgundy',
+  бордовая: 'Burgundy',
+  бордо: 'Burgundy',
+  изумрудный: 'Emerald',
+  изумрудная: 'Emerald',
+  изумруд: 'Emerald',
+  бронзовый: 'Bronze',
+  бронзовая: 'Bronze',
+  бронза: 'Bronze',
+  медный: 'Copper',
+  медная: 'Copper',
+  медь: 'Copper',
+  аквамарин: 'Aquamarine',
+  лимонный: 'Lemon',
+  лимонная: 'Lemon',
+  лимон: 'Lemon',
+  персиковый: 'Peach',
+  персиковая: 'Peach',
+  персик: 'Peach',
+  малиновый: 'Crimson',
+  малиновая: 'Crimson',
+  сливовый: 'Plum',
+  сливовая: 'Plum',
+  сиреневый: 'Lilac',
+  сиреневая: 'Lilac',
+  пурпурный: 'Magenta',
+  пурпурная: 'Magenta',
+  песочный: 'Sand',
+  песочная: 'Sand',
+  янтарный: 'Amber',
+  янтарная: 'Amber',
+  янтарь: 'Amber',
+  жемчужный: 'Pearl',
+  жемчужная: 'Pearl',
+  жемчуг: 'Pearl',
+  'жемчужно-белый': 'Pearl White',
+  'угольно-черный': 'Charcoal',
+  'угольно-чёрный': 'Charcoal',
+  угольный: 'Charcoal',
+  'черный оникс': 'Onyx Black',
+  'чёрный оникс': 'Onyx Black',
+  оникс: 'Onyx',
+  сланцевый: 'Slate',
+  мраморный: 'Marble',
+  'мраморный серый': 'Marble Gray',
+  лаймовый: 'Lime',
+  лаймовая: 'Lime',
+  лайм: 'Lime',
+  оливковый: 'Olive',
+  оливковая: 'Olive',
+  оливка: 'Olive',
+  шалфей: 'Sage',
+  коричневый: 'Brown',
+  коричневая: 'Brown',
+  кобальтовый: 'Cobalt',
+  сапфировый: 'Sapphire',
+  сапфир: 'Sapphire',
+  'слоновая кость': 'Ivory',
 
-  // Titanium series
-  titanium: 'Титан',
-  'natural titanium': 'Натуральный титан',
-  'black titanium': 'Черный титан',
-  'white titanium': 'Белый титан',
-  'desert titanium': 'Пустынный титан',
-  'blue titanium': 'Синий титан',
-  'gray titanium': 'Серый титан',
-  'silver titanium': 'Серебристый титан',
-
-  // Special edition & manufacturer marketing names
-  midnight: 'Темная ночь',
-  starlight: 'Сияющая звезда',
-  pearl: 'Жемчужный',
-  'pearl white': 'Жемчужно-белый',
-  cream: 'Кремовый',
-  beige: 'Бежевый',
-  ivory: 'Слоновая кость',
-  bronze: 'Бронзовый',
-  copper: 'Медный',
-  turquoise: 'Бирюзовый',
-  teal: 'Бирюзовый',
-  aqua: 'Аквамарин',
-  cyan: 'Голубой',
-  brown: 'Коричневый',
-  sand: 'Песочный',
-  ultramarine: 'Ультрамарин',
-  'cobalt violet': 'Кобальтовый фиолетовый',
-
-  // Samsung Awesome series
-  'awesome navy': 'Темно-синий',
-  'awesome iceblue': 'Ледяной синий',
-  'awesome lemon': 'Лимонный',
-  'awesome lilac': 'Сиреневый',
-  'awesome violet': 'Фиолетовый',
-  'awesome black': 'Черный',
-  'awesome white': 'Белый',
-  'awesome blue': 'Синий',
-
-  // Phantom & Mystic series
-  'phantom black': 'Черный фантом',
-  'phantom silver': 'Серебристый фантом',
-  'phantom white': 'Белый фантом',
-  'phantom gray': 'Серый фантом',
-  'phantom violet': 'Фиолетовый фантом',
-  'mystic bronze': 'Мистический бронзовый',
-  'mystic black': 'Мистический черный',
-  'mystic white': 'Мистический белый',
-  'mystic blue': 'Мистический синий',
-  'mystic green': 'Мистический зеленый',
-
-  // Prism & Aura series
-  'prism black': 'Черный',
-  'prism white': 'Белый',
-  'prism blue': 'Синий',
-  'prism green': 'Зеленый',
-  'aura black': 'Черный',
-  'aura white': 'Белый',
-  'aura glow': 'Аура свечение',
-  'aura blue': 'Синий',
+  // Samsung
+  'черный фантом': 'Phantom Black',
+  'чёрный фантом': 'Phantom Black',
+  'серебристый фантом': 'Phantom Silver',
+  'белый фантом': 'Phantom White',
+  'серый фантом': 'Phantom Gray',
+  'фиолетовый фантом': 'Phantom Violet',
+  'мистический бронзовый': 'Mystic Bronze',
+  'мистическая бронза': 'Mystic Bronze',
+  'мистический черный': 'Mystic Black',
+  'мистический чёрный': 'Mystic Black',
+  'мистический белый': 'Mystic White',
+  'мистический синий': 'Mystic Blue',
+  'мистический зеленый': 'Mystic Green',
+  'мистический зелёный': 'Mystic Green',
+  'аура свечение': 'Aura Glow',
+  космос: 'Space',
+  фантом: 'Phantom',
+  тихоокеанский: 'Pacific',
 };
 
-const WORD_TRANSLATIONS: Record<string, string> = {
-  black: 'черный',
-  white: 'белый',
-  gray: 'серый',
-  grey: 'серый',
-  silver: 'серебристый',
-  gold: 'золотой',
-  golden: 'золотой',
-  blue: 'синий',
-  green: 'зеленый',
-  purple: 'фиолетовый',
-  violet: 'фиолетовый',
-  red: 'красный',
-  pink: 'розовый',
-  yellow: 'желтый',
-  orange: 'оранжевый',
-  brown: 'коричневый',
-  graphite: 'графит',
-  titanium: 'титан',
-  titan: 'титан',
-  natural: 'натуральный',
-  desert: 'пустынный',
-  midnight: 'темная ночь',
-  starlight: 'сияющая звезда',
-  space: 'космос',
-  cosmic: 'космический',
-  phantom: 'фантом',
-  sierra: 'небесный',
-  alpine: 'альпийский',
-  ice: 'ледяной',
-  mint: 'мятный',
-  coral: 'коралловый',
-  bronze: 'бронзовый',
-  copper: 'медный',
-  emerald: 'изумрудный',
-  lavender: 'лавандовый',
-  lilac: 'сиреневый',
-  cream: 'кремовый',
-  beige: 'бежевый',
-  burgundy: 'бордовый',
-  turquoise: 'бирюзовый',
-  teal: 'бирюзовый',
-  aqua: 'аквамарин',
-  charcoal: 'угольный',
-  olive: 'оливковый',
-  lime: 'лаймовый',
-  lemon: 'лимонный',
-  onyx: 'оникс',
-  marble: 'мраморный',
-  cobalt: 'кобальтовый',
-  amber: 'янтарный',
-  pearl: 'жемчужный',
-  mystic: 'мистический',
-  matte: 'матовый',
-  glossy: 'глянцевый',
-  jet: 'глянцевый',
-  rose: 'розовый',
-  dark: 'темный',
-  light: 'светлый',
-  deep: 'темный',
-  navy: 'темно-синий',
-  sky: 'небесно-голубой',
-  ocean: 'океанический',
-  aurora: 'северное сияние',
-  prism: 'призма',
-  crystal: 'кристальный',
-  diamond: 'алмазный',
-  ultramarine: 'ультрамарин',
-  standard: 'стандарт',
+const RU_WORD_TRANSLATIONS: Record<string, string> = {
+  черный: 'Black',
+  чёрный: 'Black',
+  черная: 'Black',
+  чёрная: 'Black',
+  черное: 'Black',
+  чёрное: 'Black',
+  черн: 'Black',
+  чёрн: 'Black',
+  белый: 'White',
+  белая: 'White',
+  белое: 'White',
+  бел: 'White',
+  серый: 'Gray',
+  серая: 'Gray',
+  серое: 'Gray',
+  серебристый: 'Silver',
+  серебристая: 'Silver',
+  серебристое: 'Silver',
+  серебро: 'Silver',
+  золотой: 'Gold',
+  золотая: 'Gold',
+  золотое: 'Gold',
+  золото: 'Gold',
+  синий: 'Blue',
+  синяя: 'Blue',
+  синее: 'Blue',
+  син: 'Blue',
+  голубой: 'Light Blue',
+  голубая: 'Light Blue',
+  голубое: 'Light Blue',
+  зеленый: 'Green',
+  зелёный: 'Green',
+  зеленая: 'Green',
+  зелёная: 'Green',
+  зеленое: 'Green',
+  зелёное: 'Green',
+  фиолетовый: 'Purple',
+  фиолетовая: 'Purple',
+  фиолетовое: 'Purple',
+  красный: 'Red',
+  красная: 'Red',
+  красное: 'Red',
+  розовый: 'Pink',
+  розовая: 'Pink',
+  розовое: 'Pink',
+  желтый: 'Yellow',
+  жёлтый: 'Yellow',
+  желтая: 'Yellow',
+  жёлтая: 'Yellow',
+  желтое: 'Yellow',
+  жёлтое: 'Yellow',
+  оранжевый: 'Orange',
+  оранжевая: 'Orange',
+  оранжевое: 'Orange',
+  коричневый: 'Brown',
+  коричневая: 'Brown',
+  графит: 'Graphite',
+  титан: 'Titanium',
+  титановый: 'Titanium',
+  титановая: 'Titanium',
+  титановое: 'Titanium',
+  натуральный: 'Natural',
+  натуральная: 'Natural',
+  натуральное: 'Natural',
+  пустынный: 'Desert',
+  пустынная: 'Desert',
+  пустынное: 'Desert',
+  темная: 'Midnight',
+  тёмная: 'Midnight',
+  ночь: 'Midnight',
+  сияющая: 'Starlight',
+  звезда: 'Starlight',
+  космос: 'Space',
+  космический: 'Cosmic',
+  фантом: 'Phantom',
+  небесный: 'Sierra',
+  небесная: 'Sierra',
+  альпийский: 'Alpine',
+  альпийская: 'Alpine',
+  ледяной: 'Ice',
+  ледяная: 'Ice',
+  мятный: 'Mint',
+  мятная: 'Mint',
+  мята: 'Mint',
+  коралловый: 'Coral',
+  коралловая: 'Coral',
+  бронзовый: 'Bronze',
+  бронзовая: 'Bronze',
+  бронза: 'Bronze',
+  медный: 'Copper',
+  медная: 'Copper',
+  медь: 'Copper',
+  изумрудный: 'Emerald',
+  изумрудная: 'Emerald',
+  изумруд: 'Emerald',
+  лавандовый: 'Lavender',
+  лавандовая: 'Lavender',
+  сиреневый: 'Lilac',
+  сиреневая: 'Lilac',
+  кремовый: 'Cream',
+  кремовая: 'Cream',
+  бежевый: 'Beige',
+  бежевая: 'Beige',
+  бордовый: 'Burgundy',
+  бордовая: 'Burgundy',
+  бирюзовый: 'Turquoise',
+  бирюзовая: 'Turquoise',
+  аквамарин: 'Aquamarine',
+  угольный: 'Charcoal',
+  угольная: 'Charcoal',
+  оливковый: 'Olive',
+  оливковая: 'Olive',
+  лаймовый: 'Lime',
+  лаймовая: 'Lime',
+  лимонный: 'Lemon',
+  лимонная: 'Lemon',
+  оникс: 'Onyx',
+  мраморный: 'Marble',
+  кобальтовый: 'Cobalt',
+  янтарный: 'Amber',
+  янтарная: 'Amber',
+  жемчужный: 'Pearl',
+  жемчужная: 'Pearl',
+  мистический: 'Mystic',
+  мистическая: 'Mystic',
+  матовый: 'Matte',
+  матовая: 'Matte',
+  глянцевый: 'Jet',
+  глянцевая: 'Jet',
+  темный: 'Dark',
+  тёмный: 'Dark',
+  темно: 'Dark',
+  тёмно: 'Dark',
+  светлый: 'Light',
+  светлая: 'Light',
+  светло: 'Light',
+  глубокий: 'Deep',
+  глубокая: 'Deep',
+  океанический: 'Ocean',
+  ультрамарин: 'Ultramarine',
+  стандарт: 'Standard',
 };
+
+function toTitleCase(str: string): string {
+  return str
+    .split(/([\s\-\/]+)/)
+    .map((word) => {
+      if (/^[a-zA-Z]/.test(word)) {
+        return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
+      }
+      return word;
+    })
+    .join('');
+}
 
 /**
- * Normalizes phone color so it is consistently stored and displayed in Russian.
- * Translates English color names to Russian, translates word-by-word if needed,
- * and strips/excludes untranslatable Latin text.
+ * Normalizes phone color to English and cleanly formats it.
+ * - Converts Russian color names into English (e.g. "Черный" -> "Black",
+ *   "Натуральный титан" -> "Natural Titanium", "Синий" -> "Blue").
+ * - If the user types a custom color in English or any other custom text,
+ *   it formats it to clean Title Case and PRESERVES it so manual custom colors work.
  */
 export function normalizePhoneColor(color?: string | null): string {
   if (!color) return '';
@@ -263,57 +429,35 @@ export function normalizePhoneColor(color?: string | null): string {
 
   const lower = trimmed.toLowerCase();
 
-  // 1. Direct dictionary lookup
-  if (COLOR_TRANSLATIONS_EN_TO_RU[lower]) {
-    return COLOR_TRANSLATIONS_EN_TO_RU[lower];
+  // 1. Direct dictionary match for Russian -> English
+  if (COLOR_TRANSLATIONS_RU_TO_EN[lower]) {
+    return COLOR_TRANSLATIONS_RU_TO_EN[lower];
   }
 
-  // 2. Check if already entirely in Cyrillic / Russian (allow spaces, hyphens, slashes)
-  if (/^[а-яёА-ЯЁ0-9\s\-\/\(\)]+$/.test(trimmed)) {
-    return trimmed.charAt(0).toUpperCase() + trimmed.slice(1);
-  }
-
-  // 3. Multi-word translation: attempt translating word-by-word
-  const words = trimmed.split(/([\s\-\/]+)/);
-  let translatedAny = false;
-  const translatedParts = words.map((part) => {
-    const pLower = part.toLowerCase();
-    if (WORD_TRANSLATIONS[pLower]) {
-      translatedAny = true;
-      return WORD_TRANSLATIONS[pLower];
-    }
-    return part;
-  });
-
-  if (translatedAny) {
-    const candidate = translatedParts.join('').trim();
-    // If the candidate now has Cyrillic, clean up any leftover English particles
-    if (/[а-яёА-ЯЁ]/.test(candidate)) {
-      // Remove standalone Latin words (e.g. brand names mistakenly attached)
-      const cleaned = candidate
-        .replace(/\b[a-zA-Z]+\b/g, '')
-        .replace(/\s{2,}/g, ' ')
-        .trim();
-      if (cleaned) {
-        return cleaned.charAt(0).toUpperCase() + cleaned.slice(1);
-      }
-    }
-  }
-
-  // 4. If string still contains English/Latin letters and couldn't be translated:
-  // If it has Russian letters, strip the Latin part:
+  // 2. If it contains Cyrillic letters, try word-by-word translation
   if (/[а-яёА-ЯЁ]/.test(trimmed)) {
-    const cleaned = trimmed
-      .replace(/[a-zA-Z]+/g, '')
-      .replace(/\s{2,}/g, ' ')
-      .trim();
-    if (cleaned) {
-      return cleaned.charAt(0).toUpperCase() + cleaned.slice(1);
+    const parts = trimmed.split(/([\s\-\/]+)/);
+    let translatedCount = 0;
+    const translatedParts = parts.map((part) => {
+      const pLower = part.toLowerCase();
+      if (COLOR_TRANSLATIONS_RU_TO_EN[pLower]) {
+        translatedCount++;
+        return COLOR_TRANSLATIONS_RU_TO_EN[pLower];
+      }
+      if (RU_WORD_TRANSLATIONS[pLower]) {
+        translatedCount++;
+        return RU_WORD_TRANSLATIONS[pLower];
+      }
+      return part;
+    });
+
+    if (translatedCount > 0) {
+      return toTitleCase(translatedParts.join(''));
     }
   }
 
-  // If purely Latin and completely untranslatable, return empty string so it gets filtered/removed
-  return '';
+  // 3. User entered an English or custom color: format to Title Case and preserve!
+  return toTitleCase(trimmed);
 }
 
 export function formatPhoneColor(color?: string | null): string {
@@ -328,14 +472,16 @@ export function getPhoneColorHex(color?: string): string | null {
   if (c.includes('white') || c.includes('бел') || c.includes('звезд') || c.includes('starlight') || c.includes('pearl')) return '#f8fafc';
   if (c.includes('gold') || c.includes('золот')) return '#eab308';
   if (c.includes('silver') || c.includes('серебр')) return '#cbd5e1';
+  if (c.includes('desert')) return '#d4b996';
   if (c.includes('gray') || c.includes('grey') || c.includes('серый') || c.includes('титан') || c.includes('titanium') || c.includes('graphite') || c.includes('графит') || c.includes('космос')) return '#64748b';
-  if (c.includes('blue') || c.includes('син') || c.includes('голуб')) return '#3b82f6';
-  if (c.includes('green') || c.includes('зелен') || c.includes('изумруд')) return '#22c55e';
-  if (c.includes('purple') || c.includes('фиолет') || c.includes('лаванд') || c.includes('violet')) return '#a855f7';
-  if (c.includes('red') || c.includes('красн')) return '#ef4444';
-  if (c.includes('pink') || c.includes('розов')) return '#ec4899';
-  if (c.includes('yellow') || c.includes('желт')) return '#eab308';
-  if (c.includes('orange') || c.includes('оранж')) return '#f97316';
+  if (c.includes('blue') || c.includes('син') || c.includes('голуб') || c.includes('sierra') || c.includes('pacific')) return '#3b82f6';
+  if (c.includes('green') || c.includes('зелен') || c.includes('изумруд') || c.includes('alpine') || c.includes('mint') || c.includes('мят')) return '#22c55e';
+  if (c.includes('purple') || c.includes('фиолет') || c.includes('лаванд') || c.includes('violet') || c.includes('lilac')) return '#a855f7';
+  if (c.includes('red') || c.includes('красн') || c.includes('burgundy') || c.includes('борд')) return '#ef4444';
+  if (c.includes('pink') || c.includes('розов') || c.includes('rose')) return '#ec4899';
+  if (c.includes('yellow') || c.includes('желт') || c.includes('lemon')) return '#eab308';
+  if (c.includes('orange') || c.includes('оранж') || c.includes('coral') || c.includes('корал')) return '#f97316';
+  if (c.includes('teal') || c.includes('turquoise') || c.includes('бирюз')) return '#14b8a6';
   return '#94a3b8';
 }
 

@@ -6,7 +6,7 @@ import { SupplierInvoice } from '../../types';
 import { soundEffects } from '../../utils/sound';
 import { getBusinessDateKey } from '../../utils/businessDate';
 import { useUnfinishedWork } from '../../utils/pwaUpdateSafety';
-import { DEFAULT_PHONE_COLORS_RU, normalizePhoneColor } from '../../utils/phoneSpecs';
+import { DEFAULT_PHONE_COLORS_EN, normalizePhoneColor } from '../../utils/phoneSpecs';
 
 import {
   PurchaseItemGroup,
@@ -193,11 +193,11 @@ export const PurchasePage: React.FC = () => {
   }, [devices]);
 
   const colorOptions = useMemo(() => {
-    const set = new Set<string>(DEFAULT_PHONE_COLORS_RU);
+    const set = new Set<string>(DEFAULT_PHONE_COLORS_EN);
     (devices || []).forEach((d) => {
       if (d.color) {
         const translated = normalizePhoneColor(d.color);
-        if (translated && !/[a-zA-Z]/.test(translated)) {
+        if (translated) {
           set.add(translated);
         }
       }
@@ -358,8 +358,7 @@ export const PurchasePage: React.FC = () => {
   const handleUpdateGroup = (idx: number, field: keyof Omit<PurchaseItemGroup, 'items'>, value: any) => {
     setGroups((prev) => {
       const next = [...prev];
-      const val = field === 'color' && typeof value === 'string' ? normalizePhoneColor(value) : value;
-      next[idx] = { ...next[idx], [field]: val };
+      next[idx] = { ...next[idx], [field]: value };
       return next;
     });
   };
@@ -496,7 +495,7 @@ export const PurchasePage: React.FC = () => {
           model: g.model.trim(),
           ram: ramStr,
           storage: storageStr,
-          color: normalizePhoneColor(g.color.trim()),
+          color: normalizePhoneColor(g.color.trim()) || g.color.trim(),
           purchasePriceUsd: g.purchasePriceUsd,
           items: validItems,
           imeis: validItems.map((i) => i.imei),
