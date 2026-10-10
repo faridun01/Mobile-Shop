@@ -81,21 +81,45 @@ export const SaleReceiptDialog: React.FC<SaleReceiptDialogProps> = ({
 
         {sale ? (
           <div className="rounded-lg border border-border bg-bg divide-y divide-border text-sm">
-            {sale.items.map((item) => (
-              <div key={item.deviceId} className="flex items-start justify-between gap-3 px-3 py-2">
-                <div className="min-w-0">
-                  <p className="font-medium text-fg-muted">{item.brand} {item.model}</p>
-                  <div className="flex items-center gap-1 text-xs text-fg-subtle">
-                    <span>IMEI: {item.imei}</span>
-                    <CopyImeiButton imei={item.imei} />
+            {sale.items.map((item) => {
+              const itemRate = sale.exchangeRate && sale.exchangeRate > 0 ? sale.exchangeRate : 0;
+              const itemUsd = item.salePriceUsd || (itemRate > 0 ? item.salePriceTjs / itemRate : 0);
+              return (
+                <div key={item.deviceId} className="flex items-start justify-between gap-3 px-3 py-2">
+                  <div className="min-w-0">
+                    <p className="font-medium text-fg-muted">{item.brand} {item.model}</p>
+                    <div className="flex items-center gap-1 text-xs text-fg-subtle">
+                      <span>IMEI: {item.imei}</span>
+                      <CopyImeiButton imei={item.imei} />
+                    </div>
+                  </div>
+                  <div className="text-right shrink-0">
+                    <span className="tabular-nums font-bold text-fg block font-mono">
+                      {itemUsd > 0 ? `$${formatMoney(itemUsd)}` : `${formatMoney(item.salePriceTjs)} TJS`}
+                    </span>
+                    <span className="text-[10px] tabular-nums text-fg-subtle block font-mono">
+                      ≈ {formatMoney(item.salePriceTjs)} TJS
+                    </span>
                   </div>
                 </div>
-                <span className="tabular-nums font-semibold text-fg-muted whitespace-nowrap">{formatMoney(item.salePriceTjs)} TJS</span>
-              </div>
-            ))}
+              );
+            })}
             <div className="flex items-center justify-between px-3 py-2.5">
-              <span className="text-fg-muted">Итого</span>
-              <strong className="text-base tabular-nums text-accent">{formatMoney(sale.totalTjs)} TJS</strong>
+              <span className="text-fg-muted font-medium">Итого</span>
+              {(() => {
+                const saleRate = sale.exchangeRate && sale.exchangeRate > 0 ? sale.exchangeRate : 0;
+                const totalUsd = saleRate > 0 ? sale.totalTjs / saleRate : (sale.totalUsd && sale.totalUsd > 0 ? sale.totalUsd : 0);
+                return (
+                  <div className="text-right">
+                    <strong className="text-base tabular-nums text-accent block font-mono">
+                      {totalUsd > 0 ? `$${formatMoney(totalUsd)}` : `${formatMoney(sale.totalTjs)} TJS`}
+                    </strong>
+                    <span className="text-xs tabular-nums text-fg-subtle block font-mono">
+                      ≈ {formatMoney(sale.totalTjs)} TJS {saleRate > 0 ? `(курс ${saleRate})` : ''}
+                    </span>
+                  </div>
+                );
+              })()}
             </div>
             <div className="px-3 py-2 text-xs text-fg-subtle space-y-0.5">
               <p>Оплата: <span className="text-fg-muted">{paymentSummary(sale)}</span></p>

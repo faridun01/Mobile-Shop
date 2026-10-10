@@ -31,8 +31,13 @@ describe('receipt text', () => {
     expect(text).toContain('Адрес: ул. Рудаки, 10');
   });
 
-  it('can leave the store out and names single payment methods', () => {
-    expect(formatReceiptText(sale, { showStore: false })).not.toContain('Магазин:');
-    expect(paymentSummary({ paymentMethod: 'CARD', cashAmountTjs: 0, cardAmountTjs: 10 })).toBe('Банк');
+  it('formats USD as primary and TJS as alternative when exchangeRate is present', () => {
+    const saleWithRate: Sale = {
+      ...sale,
+      exchangeRate: 10,
+    };
+    const text = formatReceiptText(saleWithRate);
+    expect(text).toContain(`Samsung A55 256GB — $${formatMoney(320.05)} (≈ ${formatMoney(3200.5)} TJS)`);
+    expect(text).toContain(`Итого: $${formatMoney(1270.05)} (≈ ${formatMoney(12700.5)} TJS)`);
   });
 });

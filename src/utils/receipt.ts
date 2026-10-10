@@ -29,10 +29,14 @@ export function formatReceiptText(
     ...(address ? [`Адрес: ${address}`] : []),
     ...(sale.sellerName ? [`Продавец: ${sale.sellerName}`] : []),
     '',
-    ...sale.items.map((item) =>
-      `${item.brand} ${item.model}${item.storage ? ` ${item.storage}` : ''} — ${formatMoney(item.salePriceTjs)} TJS\nIMEI: ${item.imei}`),
+    ...sale.items.map((item) => {
+      const priceStr = sale.exchangeRate && sale.exchangeRate > 0
+        ? `$${formatMoney(item.salePriceTjs / sale.exchangeRate)} (≈ ${formatMoney(item.salePriceTjs)} TJS)`
+        : `${formatMoney(item.salePriceTjs)} TJS`;
+      return `${item.brand} ${item.model}${item.storage ? ` ${item.storage}` : ''} — ${priceStr}\nIMEI: ${item.imei}`;
+    }),
     '',
-    `Итого: ${formatMoney(sale.totalTjs)} TJS`,
+    `Итого: ${sale.exchangeRate && sale.exchangeRate > 0 ? `$${formatMoney(sale.totalTjs / sale.exchangeRate)} (≈ ${formatMoney(sale.totalTjs)} TJS)` : `${formatMoney(sale.totalTjs)} TJS`}`,
     `Оплата: ${paymentSummary(sale)}`,
     ...(sale.customerName
       ? [`Покупатель: ${sale.customerName}${sale.customerPhone ? ` (${sale.customerPhone})` : ''}`]

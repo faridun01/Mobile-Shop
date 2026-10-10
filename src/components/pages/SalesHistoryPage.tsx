@@ -39,6 +39,29 @@ import { useStoreContext, formatStoreName } from '../../utils/storeContext';
 
 type DialogView = 'details' | 'refund' | 'pick-exchange' | 'pick-repair';
 
+export const getSaleRate = (sale: { exchangeRate?: number; totalUsd?: number; totalTjs?: number }, fallbackRate: number): number => {
+  return Number(sale.exchangeRate) > 0
+    ? Number(sale.exchangeRate)
+    : (fallbackRate > 0 ? fallbackRate : (Number(sale.totalUsd) > 0 && Number(sale.totalTjs) > 0 ? Number(sale.totalTjs) / Number(sale.totalUsd) : 0));
+};
+
+export const getSaleUsd = (sale: { exchangeRate?: number; totalUsd?: number; totalTjs?: number }, fallbackRate: number): number => {
+  const rate = getSaleRate(sale, fallbackRate);
+  if (rate > 0 && sale.totalTjs) {
+    return Math.round((Number(sale.totalTjs) / rate) * 100) / 100;
+  }
+  return Number(sale.totalUsd) || 0;
+};
+
+export const getRefundUsd = (sale: { exchangeRate?: number; totalUsd?: number; totalTjs?: number; actualRefundAmountTjs?: number }, fallbackRate: number): number => {
+  const refundTjs = sale.actualRefundAmountTjs ?? sale.totalTjs;
+  const rate = getSaleRate(sale, fallbackRate);
+  if (rate > 0 && refundTjs) {
+    return Math.round((Number(refundTjs) / rate) * 100) / 100;
+  }
+  return 0;
+};
+
 export const SalesHistoryPage: React.FC = () => {
   const dataRefreshRevision = useDataRefreshRevision();
   const navigate = useNavigate();
@@ -104,6 +127,10 @@ export const SalesHistoryPage: React.FC = () => {
   const [selectedSaleId, setSelectedSaleId] = useState<string | null>(null);
   const [dialogView, setDialogView] = useState<DialogView>('details');
   const selectedSale = sales.find((s) => s.id === selectedSaleId) || null;
+  const currentFallbackRate = Number(todayRate?.rate) || 0;
+  const selectedSaleRate = selectedSale ? getSaleRate(selectedSale, currentFallbackRate) : 0;
+  const selectedSaleUsd = selectedSale ? getSaleUsd(selectedSale, currentFallbackRate) : 0;
+  const selectedRefundUsd = selectedSale ? getRefundUsd(selectedSale, currentFallbackRate) : 0;
 
   const [refundReason, setRefundReason] = useState('');
   const [penaltyFeeTjs, setPenaltyFeeTjs] = useState<string>('0');
@@ -449,27 +476,50 @@ export const SalesHistoryPage: React.FC = () => {
             <span className="px-2 py-0.5 rounded-md bg-surface-raised border border-border text-fg-muted font-medium shrink-0">
               Чеков: <strong className="text-fg font-semibold">{periodSummary.receipts}</strong>
             </span>
-            <span className="px-2 py-0.5 rounded-md bg-accent/10 border border-accent/20 text-accent font-bold shrink-0">
-              {formatMoney(periodSummary.totalTjs)} TJS
-            </span>
-            {isAdmin && (
-              <span className={cn(
-                "px-2 py-0.5 rounded-md border font-bold shrink-0 font-mono flex items-center gap-1.5",
-                periodProfitSummary.profitUsd >= 0
-                  ? "bg-emerald-500/15 border-emerald-500/30 text-emerald-400"
-                  : "bg-danger/15 border-danger/30 text-danger"
-              )}>
-                <span className="text-[10px] text-fg-subtle font-sans font-semibold">Прибыль:</span>
-                <span>{periodProfitSummary.profitUsd >= 0 ? '+' : ''}${periodProfitSummary.profitUsd.toLocaleString()}</span>
-                <span className="opacity-80 font-normal text-[10px]">(~{formatMoney(periodProfitSummary.profitTjs)} TJS)</span>
-              </span>
-            )}
-            <span className="px-2 py-0.5 rounded-md bg-surface-raised border border-border shrink-0">
-              Нал: <strong className="text-fg-muted font-medium">{formatMoney(periodSummary.cashTjs)}</strong>
-            </span>
-            <span className="px-2 py-0.5 rounded-md bg-surface-raised border border-border shrink-0">
-              Банк: <strong className="text-fg-muted font-medium">{formatMoney(periodSummary.cardTjs)}</strong>
-            </span>
+            {(() => {
+              const currentRate = Number(todayRate?.rate) || 0;
+              const totalUsd = currentRate > 0 ? periodSummary.totalTjs / currentRate : 0;
+              const cashUsd = currentRate > 0 ? periodSummary.cashTjs / currentRate : 0;
+              const cardUsd = currentRate > 0 ? periodSummary.cardTjs / currentRate : 0;
+
+              return (
+                <>
+                  <span className="px-2 py-0.5 rounded-md bg-accent/10 border border-accent/20 text-accent font-bold shrink-0 font-mono">
+                    <span>${formatMoney(totalUsd)}</span>
+                    <span className="opacity-80 font-normal text-[10px] ml-1 font-sans">
+                      (≈ {formatMoney(periodSummary.totalTjs)} TJS)
+                    </span>
+                  </span>
+
+                  {isAdmin && (
+                    <span className={cn(
+                      "px-2 py-0.5 rounded-md border font-bold shrink-0 font-mono flex items-center gap-1.5",
+                      periodProfitSummary.profitUsd >= 0
+                        ? "bg-emerald-500/15 border-emerald-500/30 text-emerald-400"
+                        : "bg-danger/15 border-danger/30 text-danger"
+                    )}>
+                      <span className="text-[10px] text-fg-subtle font-sans font-semibold">Прибыль:</span>
+                      <span>{periodProfitSummary.profitUsd >= 0 ? '+' : ''}${periodProfitSummary.profitUsd.toLocaleString()}</span>
+                      <span className="opacity-80 font-normal text-[10px]">(~{formatMoney(periodProfitSummary.profitTjs)} TJS)</span>
+                    </span>
+                  )}
+
+                  <span className="px-2 py-0.5 rounded-md bg-surface-raised border border-border shrink-0 font-mono">
+                    Нал: <strong className="text-fg-muted font-medium">${formatMoney(cashUsd)}</strong>
+                    <span className="text-[10px] opacity-75 font-normal ml-1 font-sans">
+                      (≈{formatMoney(periodSummary.cashTjs)})
+                    </span>
+                  </span>
+
+                  <span className="px-2 py-0.5 rounded-md bg-surface-raised border border-border shrink-0 font-mono">
+                    Банк: <strong className="text-fg-muted font-medium">${formatMoney(cardUsd)}</strong>
+                    <span className="text-[10px] opacity-75 font-normal ml-1 font-sans">
+                      (≈{formatMoney(periodSummary.cardTjs)})
+                    </span>
+                  </span>
+                </>
+              );
+            })()}
             {periodSummary.refunded > 0 && (
               <span className="px-2 py-0.5 rounded-md bg-danger/10 border border-danger/20 text-danger font-medium shrink-0">
                 Возвратов: <strong>{periodSummary.refunded}</strong>
@@ -599,14 +649,34 @@ export const SalesHistoryPage: React.FC = () => {
                           </span>
                         </td>
                         <td className="py-1.5 px-2.5 text-right whitespace-nowrap font-mono">
-                          {sale.status === 'REFUNDED' ? (
-                            <div>
-                              <span className="line-through text-fg-subtle text-[11px] block">{formatMoney(sale.totalTjs)} TJS</span>
-                              <span className="text-danger font-bold text-xs block">Возврат: {formatMoney(sale.actualRefundAmountTjs ?? sale.totalTjs)} TJS</span>
-                            </div>
-                          ) : (
-                            <span className="font-bold text-fg text-xs">{formatMoney(sale.totalTjs)} TJS</span>
-                          )}
+                          {(() => {
+                            const currentRate = Number(todayRate?.rate) || 0;
+                            const saleUsd = getSaleUsd(sale, currentRate);
+                            const refundUsd = getRefundUsd(sale, currentRate);
+
+                            return sale.status === 'REFUNDED' ? (
+                              <div>
+                                <span className="line-through text-fg-subtle text-[10px] block">
+                                  ${formatMoney(saleUsd)} ({formatMoney(sale.totalTjs)} TJS)
+                                </span>
+                                <span className="text-danger font-bold text-xs block">
+                                  Возврат: -${formatMoney(refundUsd)}
+                                </span>
+                                <span className="text-[10px] text-fg-subtle block font-sans">
+                                  ≈ {formatMoney(sale.actualRefundAmountTjs ?? sale.totalTjs)} TJS
+                                </span>
+                              </div>
+                            ) : (
+                              <div>
+                                <span className="font-bold text-fg text-xs block">
+                                  ${formatMoney(saleUsd)}
+                                </span>
+                                <span className="text-[10px] text-fg-subtle block font-sans">
+                                  ≈ {formatMoney(sale.totalTjs)} TJS
+                                </span>
+                              </div>
+                            );
+                          })()}
                         </td>
                         {isAdmin && (() => {
                           const profit = computeSaleProfit(sale, Number(todayRate?.rate) || 0);
@@ -687,19 +757,39 @@ export const SalesHistoryPage: React.FC = () => {
                         )}
                       </div>
 
-                      <div className="flex items-center gap-1 shrink-0 text-right">
-                        {sale.status === 'REFUNDED' ? (
-                          <div className="flex items-baseline gap-1">
-                            <span className="text-[10px] line-through text-fg-subtle font-mono">{formatMoney(sale.totalTjs)}</span>
-                            <span className="text-xs font-extrabold text-danger font-mono">{formatMoney(sale.actualRefundAmountTjs ?? sale.totalTjs)} TJS</span>
+                      {(() => {
+                        const currentRate = Number(todayRate?.rate) || 0;
+                        const saleUsd = getSaleUsd(sale, currentRate);
+                        const refundUsd = getRefundUsd(sale, currentRate);
+
+                        return (
+                          <div className="flex items-center gap-1 shrink-0 text-right">
+                            {sale.status === 'REFUNDED' ? (
+                              <div className="text-right">
+                                <span className="text-[10px] line-through text-fg-subtle font-mono block">
+                                  ${formatMoney(saleUsd)}
+                                </span>
+                                <span className="text-xs font-extrabold text-danger font-mono block">
+                                  -${formatMoney(refundUsd)}
+                                </span>
+                                <span className="text-[9.5px] text-fg-subtle font-sans block">
+                                  ≈ {formatMoney(sale.actualRefundAmountTjs ?? sale.totalTjs)} TJS
+                                </span>
+                              </div>
+                            ) : (
+                              <div className="text-right">
+                                <span className="text-xs font-extrabold text-fg font-mono tracking-tight block">
+                                  ${formatMoney(saleUsd)}
+                                </span>
+                                <span className="text-[9.5px] text-fg-subtle font-sans block">
+                                  ≈ {formatMoney(sale.totalTjs)} TJS
+                                </span>
+                              </div>
+                            )}
+                            <ChevronRight className="w-3.5 h-3.5 text-fg-subtle shrink-0 group-hover:text-accent group-hover:translate-x-0.5 transition-all" />
                           </div>
-                        ) : (
-                          <span className="text-xs font-extrabold text-fg font-mono tracking-tight">
-                            {formatMoney(sale.totalTjs)} <span className="text-[10px] text-fg-subtle font-sans font-semibold">TJS</span>
-                          </span>
-                        )}
-                        <ChevronRight className="w-3.5 h-3.5 text-fg-subtle shrink-0 group-hover:text-accent group-hover:translate-x-0.5 transition-all" />
-                      </div>
+                        );
+                      })()}
                     </div>
 
                     {/* Row 2: Metadata (Date · Store · Seller · Customer) | Profit + Payment Method Badges */}
@@ -895,10 +985,10 @@ export const SalesHistoryPage: React.FC = () => {
 
                       <div className="text-right shrink-0">
                         <p className="text-sm sm:text-base font-extrabold text-fg font-mono leading-tight">
-                          {formatMoney(item.salePriceTjs)} TJS
+                          ${formatMoney(item.salePriceUsd || (selectedSaleRate > 0 ? item.salePriceTjs / selectedSaleRate : 0))}
                         </p>
                         <p className="text-[11px] text-fg-subtle font-mono mt-0.5 font-medium">
-                          ≈ ${formatMoney(item.salePriceUsd)}
+                          ≈ {formatMoney(item.salePriceTjs)} TJS
                         </p>
 
                         {isAdmin && (() => {
@@ -935,10 +1025,14 @@ export const SalesHistoryPage: React.FC = () => {
                   {selectedSale.exchangeEvents.map((ev, i) => (
                     <div key={i} className="border-b border-accent/20 pb-2 last:border-b-0 last:pb-0">
                       <p className="text-accent font-semibold text-xs">Обмен от {new Date(ev.date).toLocaleDateString('ru-RU')}</p>
-                      <p className="text-fg-subtle text-xs">Сдан: {ev.returnedModel} (IMEI {ev.returnedImei}) за {formatMoney(ev.exchangeInValueTjs)} TJS</p>
-                      <p className="text-fg-subtle text-xs">Выдан: {ev.replacementModel} (IMEI {ev.replacementImei}) за {formatMoney(ev.newPriceTjs)} TJS</p>
-                      <p className="text-accent text-xs font-semibold mt-0.5">
-                        Доплата: {ev.differenceTjs >= 0 ? `+${formatMoney(ev.differenceTjs)} TJS` : `${formatMoney(ev.differenceTjs)} TJS`}
+                      <p className="text-fg-subtle text-xs">
+                        Сдан: {ev.returnedModel} (IMEI {ev.returnedImei}) за ${formatMoney(selectedSaleRate > 0 ? ev.exchangeInValueTjs / selectedSaleRate : 0)} <span className="opacity-75 font-mono">(≈ {formatMoney(ev.exchangeInValueTjs)} TJS)</span>
+                      </p>
+                      <p className="text-fg-subtle text-xs">
+                        Выдан: {ev.replacementModel} (IMEI {ev.replacementImei}) за ${formatMoney(selectedSaleRate > 0 ? ev.newPriceTjs / selectedSaleRate : 0)} <span className="opacity-75 font-mono">(≈ {formatMoney(ev.newPriceTjs)} TJS)</span>
+                      </p>
+                      <p className="text-accent text-xs font-semibold mt-0.5 font-mono">
+                        Доплата: {ev.differenceTjs >= 0 ? `+$${formatMoney(selectedSaleRate > 0 ? ev.differenceTjs / selectedSaleRate : 0)}` : `-$${formatMoney(selectedSaleRate > 0 ? Math.abs(ev.differenceTjs) / selectedSaleRate : 0)}`} <span className="font-normal opacity-85 font-sans">(≈ {ev.differenceTjs >= 0 ? `+${formatMoney(ev.differenceTjs)}` : formatMoney(ev.differenceTjs)} TJS)</span>
                       </p>
                     </div>
                   ))}
@@ -980,7 +1074,9 @@ export const SalesHistoryPage: React.FC = () => {
                         <span className="text-fg-subtle">
                           {hasDebtHistory ? 'Наличными при покупке' : 'Наличными'}
                         </span>
-                        <span className="text-fg font-mono font-bold">{formatMoney(cashPaid)} TJS</span>
+                        <span className="text-fg font-mono font-bold">
+                          ${formatMoney(selectedSaleRate > 0 ? cashPaid / selectedSaleRate : 0)} <span className="text-fg-subtle font-normal font-sans text-[11px]">(≈ {formatMoney(cashPaid)} TJS)</span>
+                        </span>
                       </div>
                     )}
 
@@ -989,14 +1085,18 @@ export const SalesHistoryPage: React.FC = () => {
                         <span className="text-fg-subtle">
                           {hasDebtHistory ? 'Банк при покупке' : 'Банк'}
                         </span>
-                        <span className="text-fg font-mono font-bold">{formatMoney(cardPaid)} TJS</span>
+                        <span className="text-fg font-mono font-bold">
+                          ${formatMoney(selectedSaleRate > 0 ? cardPaid / selectedSaleRate : 0)} <span className="text-fg-subtle font-normal font-sans text-[11px]">(≈ {formatMoney(cardPaid)} TJS)</span>
+                        </span>
                       </div>
                     )}
 
                     {tradeInPaid > 0 && (
                       <div className="flex justify-between text-xs">
                         <span className="text-fg-subtle">Зачёт Trade-In</span>
-                        <span className="text-fg font-mono font-bold">{formatMoney(tradeInPaid)} TJS</span>
+                        <span className="text-fg font-mono font-bold">
+                          ${formatMoney(selectedSaleRate > 0 ? tradeInPaid / selectedSaleRate : 0)} <span className="text-fg-subtle font-normal font-sans text-[11px]">(≈ {formatMoney(tradeInPaid)} TJS)</span>
+                        </span>
                       </div>
                     )}
 
@@ -1006,7 +1106,7 @@ export const SalesHistoryPage: React.FC = () => {
                           Погашено по долгу позже
                         </span>
                         <span className="text-emerald-600 dark:text-emerald-400 font-mono font-bold">
-                          +{formatMoney(repaidLater)} TJS
+                          +${formatMoney(selectedSaleRate > 0 ? repaidLater / selectedSaleRate : 0)} <span className="font-normal font-sans text-[11px]">(≈ +{formatMoney(repaidLater)} TJS)</span>
                         </span>
                       </div>
                     )}
@@ -1014,19 +1114,23 @@ export const SalesHistoryPage: React.FC = () => {
                     {hasDebtHistory && (initialPaidAtSale > 0 || repaidLater > 0) && (
                       <div className="flex justify-between text-xs text-fg-subtle">
                         <span>Всего фактически оплачено</span>
-                        <span className="font-mono font-semibold text-fg">{formatMoney(totalPaidSoFar)} TJS</span>
+                        <span className="font-mono font-semibold text-fg">
+                          ${formatMoney(selectedSaleRate > 0 ? totalPaidSoFar / selectedSaleRate : 0)} <span className="text-[11px] font-normal">(≈ {formatMoney(totalPaidSoFar)} TJS)</span>
+                        </span>
                       </div>
                     )}
 
                     {currentDebt > 0 ? (
                       <div className="flex justify-between text-xs pt-1 border-t border-border/60">
                         <span className="text-danger font-semibold">Остаток долга</span>
-                        <span className="text-danger font-mono font-bold">{formatMoney(currentDebt)} TJS</span>
+                        <span className="text-danger font-mono font-bold">
+                          ${formatMoney(selectedSaleRate > 0 ? currentDebt / selectedSaleRate : 0)} <span className="font-normal font-sans text-[11px]">(≈ {formatMoney(currentDebt)} TJS)</span>
+                        </span>
                       </div>
                     ) : hasDebtHistory && initialDebt > 0 ? (
                       <div className="flex justify-between text-xs pt-1 border-t border-border/60">
                         <span className="text-emerald-600 dark:text-emerald-400 font-semibold">Долг полностью погашен</span>
-                        <span className="text-emerald-600 dark:text-emerald-400 font-mono font-bold">0.00 TJS</span>
+                        <span className="text-emerald-600 dark:text-emerald-400 font-mono font-bold">$0.00 (0.00 TJS)</span>
                       </div>
                     ) : null}
                   </>
@@ -1034,9 +1138,14 @@ export const SalesHistoryPage: React.FC = () => {
               })()}
               <div className="flex justify-between items-center pt-2 border-t border-border">
                 <span className="text-xs font-bold uppercase tracking-wider text-fg-subtle">Итого</span>
-                <span className="text-base sm:text-lg font-black font-mono text-accent">
-                  {formatMoney(selectedSale.totalTjs)} TJS
-                </span>
+                <div className="text-right">
+                  <span className="text-base sm:text-lg font-black font-mono text-accent block leading-tight">
+                    ${formatMoney(selectedSaleUsd)}
+                  </span>
+                  <span className="text-xs text-fg-subtle font-mono block">
+                    ≈ {formatMoney(selectedSale.totalTjs)} TJS {selectedSaleRate > 0 ? `(курс ${selectedSaleRate})` : ''}
+                  </span>
+                </div>
               </div>
 
               {isAdmin && (() => {
@@ -1096,14 +1205,21 @@ export const SalesHistoryPage: React.FC = () => {
                 {(selectedSale.penaltyFeeTjs ?? 0) > 0 && (
                   <div className="flex justify-between text-xs">
                     <span className="text-fg-subtle ">Штраф удержан</span>
-                    <span className="text-warning font-semibold">{formatMoney(selectedSale.penaltyFeeTjs ?? 0)} TJS</span>
+                    <span className="text-warning font-semibold font-mono">
+                      +${formatMoney(selectedSaleRate > 0 ? (selectedSale.penaltyFeeTjs ?? 0) / selectedSaleRate : 0)} <span className="font-normal font-sans text-[11px]">(+{formatMoney(selectedSale.penaltyFeeTjs ?? 0)} TJS)</span>
+                    </span>
                   </div>
                 )}
-                <div className="flex justify-between pt-1.5 border-t border-danger/20 font-semibold">
+                <div className="flex justify-between pt-1.5 border-t border-danger/20 font-semibold items-center">
                   <span className="text-fg-muted text-xs">Возвращено клиенту</span>
-                  <span className="text-danger text-base">
-                    {formatMoney(selectedSale.actualRefundAmountTjs ?? selectedSale.totalTjs)} TJS
-                  </span>
+                  <div className="text-right">
+                    <span className="text-danger text-base font-bold font-mono block">
+                      -${formatMoney(selectedRefundUsd)}
+                    </span>
+                    <span className="text-[11px] text-fg-subtle font-mono block">
+                      ≈ {formatMoney(selectedSale.actualRefundAmountTjs ?? selectedSale.totalTjs)} TJS
+                    </span>
+                  </div>
                 </div>
               </div>
             )}
@@ -1144,22 +1260,30 @@ export const SalesHistoryPage: React.FC = () => {
               <div className="p-3 rounded-lg bg-surface border border-border space-y-1 text-xs">
                 <div className="flex justify-between">
                   <span className="text-fg-subtle">Сумма в чеке</span>
-                  <span className="text-fg-muted">{formatMoney(selectedSale.totalTjs)} TJS</span>
+                  <span className="text-fg-muted font-mono font-medium">
+                    ${formatMoney(selectedSaleUsd)} <span className="opacity-75 font-sans">(≈ {formatMoney(selectedSale.totalTjs)} TJS)</span>
+                  </span>
                 </div>
                 {(selectedSale.debtAmountTjs ?? 0) > 0 && (
                   <div className="flex justify-between text-danger">
                     <span>Непогашенный долг (будет списан)</span>
-                    <span>{formatMoney(selectedSale.debtAmountTjs ?? 0)} TJS</span>
+                    <span className="font-mono font-medium">
+                      -${formatMoney(selectedSaleRate > 0 ? (selectedSale.debtAmountTjs ?? 0) / selectedSaleRate : 0)} <span className="opacity-80 font-sans">(≈ {formatMoney(selectedSale.debtAmountTjs ?? 0)} TJS)</span>
+                    </span>
                   </div>
                 )}
                 <div className="flex justify-between font-semibold">
                   <span className="text-fg-muted">Возврат покупателю</span>
-                  <span className="text-accent">{formatMoney(Math.max(0, refundCollectedTjs - penaltyVal))} TJS</span>
+                  <span className="text-accent font-mono font-bold">
+                    ${formatMoney(selectedSaleRate > 0 ? Math.max(0, refundCollectedTjs - penaltyVal) / selectedSaleRate : 0)} <span className="text-xs font-normal opacity-80 font-sans">(≈ {formatMoney(Math.max(0, refundCollectedTjs - penaltyVal))} TJS)</span>
+                  </span>
                 </div>
                 {penaltyVal > 0 && (
                   <div className="flex justify-between pt-1 border-t border-border font-semibold">
                     <span className="text-warning">Штраф за возврат</span>
-                    <span className="text-warning">+{formatMoney(penaltyVal)} TJS</span>
+                    <span className="text-warning font-mono">
+                      +${formatMoney(selectedSaleRate > 0 ? penaltyVal / selectedSaleRate : 0)} <span className="opacity-80 font-sans text-xs font-normal">(+{formatMoney(penaltyVal)} TJS)</span>
+                    </span>
                   </div>
                 )}
               </div>

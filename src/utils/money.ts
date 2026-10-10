@@ -63,6 +63,26 @@ export function formatUsd(value: Decimal | number | string | null | undefined): 
 }
 
 /**
+ * Converts an amount in TJS into approximate USD at given exchange rate (TJS / rate = USD).
+ * Example: 2500 TJS @ rate 10.95 -> 228.31 USD
+ */
+export function convertTjsToUsd(
+  tjs: Decimal | number | string | null | undefined,
+  exchangeRate: number | null | undefined
+): number {
+  if (tjs === null || tjs === undefined || tjs === '') return 0;
+  const numTjs = typeof tjs === 'number'
+    ? tjs
+    : typeof tjs === 'string'
+    ? Number(tjs.trim().replace(',', '.'))
+    : Number(tjs);
+  if (!Number.isFinite(numTjs) || numTjs === 0) return 0;
+  const rate = Number(exchangeRate) || 0;
+  if (rate <= 0) return 0;
+  return Math.round((numTjs / rate) * 100) / 100;
+}
+
+/**
  * Formats a rate or price for an input field with standard dot separator and 2 decimal places.
  * Example: 10.5 -> "10.50", "10,5" -> "10.50", 11 -> "11.00"
  */

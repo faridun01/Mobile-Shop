@@ -28,10 +28,11 @@ interface SaleVariantRowProps {
   showCosts: boolean;
   onSelect: (variant: SaleVariant) => void;
   onAddDevice: (device: Device) => void;
+  rate?: number;
 }
 
 /** A catalog row: tap adds the only unit, or expands the IMEI list when there are several. */
-export const SaleVariantRow: React.FC<SaleVariantRowProps> = ({ variant, expanded, showCosts, onSelect, onAddDevice }) => {
+export const SaleVariantRow: React.FC<SaleVariantRowProps> = ({ variant, expanded, showCosts, onSelect, onAddDevice, rate }) => {
   const costs = variant.devices.map((d) => d.purchaseCostUsd ?? d.costBasisUsd ?? 0);
   const maxCost = costs.length ? Math.max(...costs) : 0;
   const hasCostVariance = costs.length > 1 && maxCost > Math.min(...costs);
@@ -56,9 +57,22 @@ export const SaleVariantRow: React.FC<SaleVariantRowProps> = ({ variant, expande
         <div className="text-right shrink-0 flex items-center gap-2">
           <div className="flex flex-col items-end gap-0.5">
             {minRetail !== undefined && (
-              <span className="text-sm font-bold tabular-nums text-accent whitespace-nowrap">
-                {formatMoney(minRetail)}{maxRetail !== undefined && maxRetail > minRetail ? `–${formatMoney(maxRetail)}` : ''} TJS
-              </span>
+              <div className="text-right">
+                {rate && rate > 0 ? (
+                  <>
+                    <span className="text-sm font-bold tabular-nums text-accent whitespace-nowrap font-mono block">
+                      ${formatMoney(minRetail / rate)}{maxRetail !== undefined && maxRetail > minRetail ? `–$${formatMoney(maxRetail / rate)}` : ''}
+                    </span>
+                    <span className="text-[10px] text-fg-subtle tabular-nums font-mono block">
+                      ≈ {formatMoney(minRetail)}{maxRetail !== undefined && maxRetail > minRetail ? `–${formatMoney(maxRetail)}` : ''} TJS
+                    </span>
+                  </>
+                ) : (
+                  <span className="text-sm font-bold tabular-nums text-accent whitespace-nowrap">
+                    {formatMoney(minRetail)}{maxRetail !== undefined && maxRetail > minRetail ? `–${formatMoney(maxRetail)}` : ''} TJS
+                  </span>
+                )}
+              </div>
             )}
             <span className="text-xs text-fg-subtle tabular-nums">{variant.devices.length} шт.</span>
           </div>
@@ -105,7 +119,22 @@ export const SaleVariantRow: React.FC<SaleVariantRowProps> = ({ variant, expande
                   {showCosts && devCost > 0 && <p className="text-xs text-fg-subtle mt-0.5">Закупка: ${devCost}</p>}
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
-                  {price !== undefined && <span className="text-xs font-semibold tabular-nums text-fg-muted">{formatMoney(price)} TJS</span>}
+                  {price !== undefined && (
+                    <div className="text-right">
+                      {rate && rate > 0 ? (
+                        <>
+                          <span className="text-xs font-bold tabular-nums text-fg font-mono block">
+                            ${formatMoney(price / rate)}
+                          </span>
+                          <span className="text-[10px] tabular-nums text-fg-subtle font-mono block">
+                            ≈ {formatMoney(price)} TJS
+                          </span>
+                        </>
+                      ) : (
+                        <span className="text-xs font-semibold tabular-nums text-fg-muted">{formatMoney(price)} TJS</span>
+                      )}
+                    </div>
+                  )}
                   <Badge tone={isHighestCost ? 'warning' : 'accent'}>Выбрать</Badge>
                 </div>
               </div>
