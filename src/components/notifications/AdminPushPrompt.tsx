@@ -19,22 +19,38 @@ export const AdminPushPrompt: React.FC = () => {
     // 2. Must support Web Push
     if (!WebPushService.isSupported()) return;
 
-    // 3. Never show if already enabled and saved
+    // 3. If already marked as enabled in storage, NEVER show again
     if (localStorage.getItem(STORAGE_KEY) === 'true') return;
 
-    // 4. Do not show if deferred in this session
+    // 4. If browser permission is already 'granted', user already allowed it!
+    // Silently ensure subscription is active in background and permanently remember it
+    if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+      localStorage.setItem(STORAGE_KEY, 'true');
+      WebPushService.isSubscribed().then((subscribed) => {
+        if (!subscribed) {
+          WebPushService.subscribe().catch(() => {});
+        }
+      });
+      return;
+    }
+
+    // 5. If browser permission was explicitly denied, cannot ask again via popup
+    if (typeof Notification !== 'undefined' && Notification.permission === 'denied') {
+      return;
+    }
+
+    // 6. Do not show if deferred in this session
     if (sessionStorage.getItem(DEFERRED_KEY) === 'true') return;
 
-    // 5. Check actual browser subscription status
+    // 7. Check actual browser subscription status:
+    // Only show if permission is 'default' (not yet asked) and not already subscribed
     let cancelled = false;
     WebPushService.isSubscribed().then((subscribed) => {
       if (cancelled) return;
-      if (subscribed && Notification.permission === 'granted') {
-        // Already active on this device: mark as enabled and never show
+      if (subscribed) {
         localStorage.setItem(STORAGE_KEY, 'true');
         setVisible(false);
-      } else if (Notification.permission !== 'denied') {
-        // Not yet subscribed: show friendly 1-click prompt
+      } else {
         setVisible(true);
       }
     });
