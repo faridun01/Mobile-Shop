@@ -510,6 +510,7 @@ export const SalePage: React.FC = () => {
                       onSelect={handleSelectVariant}
                       onAddDevice={addDeviceToCart}
                       rate={Number(todayRate?.rate) || 0}
+                      showUsd={isAdmin}
                     />
                   ))}
               </>
@@ -525,12 +526,20 @@ export const SalePage: React.FC = () => {
                     {cart.length}
                   </div>
                   <div className="truncate">
-                    <span className="text-sm font-bold text-accent block truncate font-mono">
-                      {rateReady ? `$${formatMoney(totalUsd)}` : `${formatMoney(totalTjs)} TJS`}
-                    </span>
-                    <span className="text-xs text-fg-subtle block font-mono">
-                      {rateReady ? `≈ ${formatMoney(totalTjs)} TJS` : 'курс не задан'}
-                    </span>
+                    {isAdmin && rateReady ? (
+                      <>
+                        <span className="text-sm font-bold text-accent block truncate font-mono">
+                          ${formatMoney(totalUsd)}
+                        </span>
+                        <span className="text-xs text-fg-subtle block font-mono">
+                          {formatMoney(totalTjs)} TJS
+                        </span>
+                      </>
+                    ) : (
+                      <span className="text-sm font-bold text-accent block truncate font-mono">
+                        {formatMoney(totalTjs)} TJS
+                      </span>
+                    )}
                   </div>
                 </div>
 
@@ -668,7 +677,7 @@ export const SalePage: React.FC = () => {
                             TJS
                           </span>
                         </div>
-                        {rateReady && item.salePriceTjs !== undefined && item.salePriceTjs > 0 && (
+                        {isAdmin && rateReady && item.salePriceTjs !== undefined && item.salePriceTjs > 0 && (
                           <p className="mt-0.5 text-[10.5px] text-fg-subtle font-mono">
                             ≈ ${formatMoney(item.salePriceTjs / Number(todayRate!.rate))}
                           </p>
@@ -717,17 +726,23 @@ export const SalePage: React.FC = () => {
                 <div className="pt-2 border-t border-border flex items-center justify-between">
                   <div>
                     <span className="text-[10px] uppercase font-bold text-fg-subtle block">Итого к оплате</span>
-                    {rateReady && (
+                    {isAdmin && rateReady && (
                       <span className="text-[11px] text-fg-subtle font-mono">
-                        ≈ {formatMoney(totalTjs)} TJS
+                        {formatMoney(totalTjs)} TJS
                       </span>
                     )}
                   </div>
                   <div className="text-right">
-                    <span className="text-base sm:text-lg font-black font-mono text-accent block">
-                      {rateReady ? `$${formatMoney(totalUsd)}` : `${formatMoney(totalTjs)} TJS`}
-                    </span>
-                    {!rateReady && (
+                    {isAdmin && rateReady ? (
+                      <span className="text-base sm:text-lg font-black font-mono text-accent block">
+                        ${formatMoney(totalUsd)}
+                      </span>
+                    ) : (
+                      <span className="text-base sm:text-lg font-black font-mono text-accent block">
+                        {formatMoney(totalTjs)} TJS
+                      </span>
+                    )}
+                    {isAdmin && !rateReady && (
                       <span className="text-[11px] text-warning font-mono block">курс не задан</span>
                     )}
                   </div>
@@ -749,11 +764,11 @@ export const SalePage: React.FC = () => {
                     : hasEmptyPrice
                       ? 'Укажите цену'
                       : paymentMethod === 'DEBT'
-                        ? rateReady
-                          ? `Оформить в долг $${formatMoney(Math.max(0, totalTjs - (parseFloat(downpaymentInput) || 0)) / Number(todayRate!.rate))} (≈ ${formatMoney(Math.max(0, totalTjs - (parseFloat(downpaymentInput) || 0)))} TJS)`
+                        ? isAdmin && rateReady
+                          ? `Оформить в долг $${formatMoney(Math.max(0, totalTjs - (parseFloat(downpaymentInput) || 0)) / Number(todayRate!.rate))} (${formatMoney(Math.max(0, totalTjs - (parseFloat(downpaymentInput) || 0)))} TJS)`
                           : `Оформить в долг (${formatMoney(Math.max(0, totalTjs - (parseFloat(downpaymentInput) || 0)))} TJS)`
-                        : rateReady
-                          ? `Оплатить $${formatMoney(totalUsd)} (≈ ${formatMoney(totalTjs)} TJS)`
+                        : isAdmin && rateReady
+                          ? `Оплатить $${formatMoney(totalUsd)} (${formatMoney(totalTjs)} TJS)`
                           : `Оплатить ${formatMoney(totalTjs)} TJS`}
                 </Button>
               </div>
@@ -781,19 +796,19 @@ export const SalePage: React.FC = () => {
         open={isCartOpen}
         onClose={() => setIsCartOpen(false)}
         title={isStoreScoped ? 'Чек' : `Чек · ${activeStoreName}`}
-        subtitle={rateReady ? `$${formatMoney(totalUsd)} · ≈ ${formatMoney(totalTjs)} TJS` : `${formatMoney(totalTjs)} TJS (курс не задан)`}
+        subtitle={isAdmin && rateReady ? `$${formatMoney(totalUsd)} · ${formatMoney(totalTjs)} TJS` : `${formatMoney(totalTjs)} TJS`}
         maxWidth="lg"
         footer={
           <div className="w-full grid grid-cols-2 gap-2">
             <div className="col-span-2 flex items-center justify-between pb-2 text-sm">
               <div>
                 <span className="text-fg-muted block text-xs">К оплате</span>
-                {rateReady && (
-                  <span className="text-xs text-fg-subtle font-mono">≈ {formatMoney(totalTjs)} TJS</span>
+                {isAdmin && rateReady && (
+                  <span className="text-xs text-fg-subtle font-mono">{formatMoney(totalTjs)} TJS</span>
                 )}
               </div>
               <strong className="text-lg tabular-nums text-accent font-mono">
-                {rateReady ? `$${formatMoney(totalUsd)}` : `${formatMoney(totalTjs)} TJS`}
+                {isAdmin && rateReady ? `$${formatMoney(totalUsd)}` : `${formatMoney(totalTjs)} TJS`}
               </strong>
             </div>
             <Button
@@ -823,11 +838,11 @@ export const SalePage: React.FC = () => {
                 : hasEmptyPrice
                   ? 'Укажите цену'
                   : paymentMethod === 'DEBT'
-                    ? rateReady
-                      ? `Оформить в долг $${formatMoney(Math.max(0, totalTjs - (parseFloat(downpaymentInput) || 0)) / Number(todayRate!.rate))} (≈ ${formatMoney(Math.max(0, totalTjs - (parseFloat(downpaymentInput) || 0)))} TJS)`
+                    ? isAdmin && rateReady
+                      ? `Оформить в долг $${formatMoney(Math.max(0, totalTjs - (parseFloat(downpaymentInput) || 0)) / Number(todayRate!.rate))} (${formatMoney(Math.max(0, totalTjs - (parseFloat(downpaymentInput) || 0)))} TJS)`
                       : `Оформить в долг (${formatMoney(Math.max(0, totalTjs - (parseFloat(downpaymentInput) || 0)))} TJS)`
-                    : rateReady
-                      ? `Оплатить $${formatMoney(totalUsd)} (≈ ${formatMoney(totalTjs)} TJS)`
+                    : isAdmin && rateReady
+                      ? `Оплатить $${formatMoney(totalUsd)} (${formatMoney(totalTjs)} TJS)`
                       : `Оплатить ${formatMoney(totalTjs)} TJS`}
             </Button>
           </div>
@@ -878,7 +893,7 @@ export const SalePage: React.FC = () => {
                     />
                     <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-medium text-fg-subtle">TJS</span>
                   </div>
-                  {rateReady && item.salePriceTjs !== undefined && item.salePriceTjs > 0 && (
+                  {isAdmin && rateReady && item.salePriceTjs !== undefined && item.salePriceTjs > 0 && (
                     <p className="mt-1 text-xs text-fg-subtle font-mono">
                       ≈ ${formatMoney(item.salePriceTjs / Number(todayRate!.rate))}
                     </p>
@@ -932,6 +947,7 @@ export const SalePage: React.FC = () => {
         showStoreName={!isStoreScoped}
         storeNameFallback={activeStoreName}
         sellerNameFallback={currentUser?.name}
+        isAdmin={isAdmin}
         onClose={() => { setCompletedReceiptNumber(null); focusSearchForScanner(); }}
       />
     </div>

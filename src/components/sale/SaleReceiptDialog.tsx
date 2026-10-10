@@ -17,6 +17,7 @@ interface SaleReceiptDialogProps {
   showStoreName: boolean;
   storeNameFallback: string;
   sellerNameFallback?: string;
+  isAdmin?: boolean;
   /** Closing and «Новый чек» both end the receipt. */
   onClose: () => void;
 }
@@ -29,6 +30,7 @@ export const SaleReceiptDialog: React.FC<SaleReceiptDialogProps> = ({
   showStoreName,
   storeNameFallback,
   sellerNameFallback,
+  isAdmin,
   onClose,
 }) => {
   const [shareState, setShareState] = useState<'idle' | 'copied' | 'failed'>('idle');
@@ -36,7 +38,7 @@ export const SaleReceiptDialog: React.FC<SaleReceiptDialogProps> = ({
 
   const share = async () => {
     if (!sale) return;
-    const text = formatReceiptText(sale, { showStore: true, storeAddress });
+    const text = formatReceiptText(sale, { showStore: true, storeAddress, showUsd: Boolean(isAdmin) });
     try {
       if (navigator.share) {
         await navigator.share({ title: `Чек №${sale.receiptNumber}`, text });
@@ -94,12 +96,20 @@ export const SaleReceiptDialog: React.FC<SaleReceiptDialogProps> = ({
                     </div>
                   </div>
                   <div className="text-right shrink-0">
-                    <span className="tabular-nums font-bold text-fg block font-mono">
-                      {itemUsd > 0 ? `$${formatMoney(itemUsd)}` : `${formatMoney(item.salePriceTjs)} TJS`}
-                    </span>
-                    <span className="text-[10px] tabular-nums text-fg-subtle block font-mono">
-                      ≈ {formatMoney(item.salePriceTjs)} TJS
-                    </span>
+                    {isAdmin && itemUsd > 0 ? (
+                      <>
+                        <span className="tabular-nums font-bold text-fg block font-mono">
+                          ${formatMoney(itemUsd)}
+                        </span>
+                        <span className="text-[10px] tabular-nums text-fg-subtle block font-mono">
+                          {formatMoney(item.salePriceTjs)} TJS
+                        </span>
+                      </>
+                    ) : (
+                      <span className="tabular-nums font-semibold text-fg-muted whitespace-nowrap">
+                        {formatMoney(item.salePriceTjs)} TJS
+                      </span>
+                    )}
                   </div>
                 </div>
               );
@@ -111,12 +121,20 @@ export const SaleReceiptDialog: React.FC<SaleReceiptDialogProps> = ({
                 const totalUsd = saleRate > 0 ? sale.totalTjs / saleRate : (sale.totalUsd && sale.totalUsd > 0 ? sale.totalUsd : 0);
                 return (
                   <div className="text-right">
-                    <strong className="text-base tabular-nums text-accent block font-mono">
-                      {totalUsd > 0 ? `$${formatMoney(totalUsd)}` : `${formatMoney(sale.totalTjs)} TJS`}
-                    </strong>
-                    <span className="text-xs tabular-nums text-fg-subtle block font-mono">
-                      ≈ {formatMoney(sale.totalTjs)} TJS {saleRate > 0 ? `(курс ${saleRate})` : ''}
-                    </span>
+                    {isAdmin && totalUsd > 0 ? (
+                      <>
+                        <strong className="text-base tabular-nums text-accent block font-mono">
+                          ${formatMoney(totalUsd)}
+                        </strong>
+                        <span className="text-xs tabular-nums text-fg-subtle block font-mono">
+                          {formatMoney(sale.totalTjs)} TJS {saleRate > 0 ? `(курс ${saleRate})` : ''}
+                        </span>
+                      </>
+                    ) : (
+                      <strong className="text-base tabular-nums text-accent font-mono">
+                        {formatMoney(sale.totalTjs)} TJS
+                      </strong>
+                    )}
                   </div>
                 );
               })()}

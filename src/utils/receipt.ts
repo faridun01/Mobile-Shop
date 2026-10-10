@@ -19,9 +19,10 @@ export function paymentSummary(sale: Pick<Sale, 'paymentMethod' | 'cashAmountTjs
 /** Plain-text receipt for sharing with the customer (messenger, SMS) or copying. */
 export function formatReceiptText(
   sale: Sale,
-  opts: { showStore?: boolean; storeAddress?: string } = {},
+  opts: { showStore?: boolean; storeAddress?: string; showUsd?: boolean } = {},
 ): string {
   const address = opts.storeAddress?.trim();
+  const includeUsd = Boolean(opts.showUsd && sale.exchangeRate && sale.exchangeRate > 0);
   const lines = [
     `Чек №${sale.receiptNumber}`,
     new Date(sale.date).toLocaleString('ru-RU'),
@@ -30,13 +31,13 @@ export function formatReceiptText(
     ...(sale.sellerName ? [`Продавец: ${sale.sellerName}`] : []),
     '',
     ...sale.items.map((item) => {
-      const priceStr = sale.exchangeRate && sale.exchangeRate > 0
-        ? `$${formatMoney(item.salePriceTjs / sale.exchangeRate)} (≈ ${formatMoney(item.salePriceTjs)} TJS)`
+      const priceStr = includeUsd
+        ? `$${formatMoney(item.salePriceTjs / sale.exchangeRate!)} (${formatMoney(item.salePriceTjs)} TJS)`
         : `${formatMoney(item.salePriceTjs)} TJS`;
       return `${item.brand} ${item.model}${item.storage ? ` ${item.storage}` : ''} — ${priceStr}\nIMEI: ${item.imei}`;
     }),
     '',
-    `Итого: ${sale.exchangeRate && sale.exchangeRate > 0 ? `$${formatMoney(sale.totalTjs / sale.exchangeRate)} (≈ ${formatMoney(sale.totalTjs)} TJS)` : `${formatMoney(sale.totalTjs)} TJS`}`,
+    `Итого: ${includeUsd ? `$${formatMoney(sale.totalTjs / sale.exchangeRate!)} (${formatMoney(sale.totalTjs)} TJS)` : `${formatMoney(sale.totalTjs)} TJS`}`,
     `Оплата: ${paymentSummary(sale)}`,
     ...(sale.customerName
       ? [`Покупатель: ${sale.customerName}${sale.customerPhone ? ` (${sale.customerPhone})` : ''}`]
