@@ -498,3 +498,49 @@ export function formatStorage(storage?: string | null): string {
   if (!clean) return '';
   return clean.toUpperCase().includes('GB') || clean.toUpperCase().includes('TB') ? clean : `${clean} GB`;
 }
+
+/**
+ * Checks whether the storage string already incorporates the RAM specification
+ * (e.g. "4/64", "4+64 GB", "4GB/64GB", "64GB (4GB RAM)").
+ *
+ * CRITICAL FIX: Standard ROM-only capacities like "64 GB", "128 GB", "256 GB", "512 GB"
+ * contain digits ending with common RAM sizes (4, 8, 6, 2, 12). A naive `.includes()`
+ * check produces false positives ("64 GB".includes("4 GB") === true), which was hiding
+ * RAM on all 4/64, 8/128, 6/256 and 12/512 devices.
+ */
+export function isRamInStorage(storage?: string | null, ram?: string | null): boolean {
+  if (!storage || !ram) return false;
+  const s = storage.trim();
+  const r = ram.trim();
+  if (!s || !r) return false;
+
+  // If storage string has no dual-spec delimiter (/, +, \) and no explicit RAM / ОЗУ label,
+  // it is pure storage capacity (e.g. "64 GB", "128 GB", "256GB") and cannot contain RAM.
+  const hasDelimiter = /[/+\\]/.test(s);
+  const hasExplicitLabel = /(?:^|[^a-zа-яё0-9])(ram|озу)(?:[^a-zа-яё0-9]|$)/i.test(s);
+  if (!hasDelimiter && !hasExplicitLabel) {
+    return false;
+  }
+
+  // Extract clean RAM numeric component (e.g. "4" from "4 GB", "8" from "8GB", "4+4" -> "4")
+  const ramClean = r.toUpperCase().replace(/GB/gi, '').trim();
+  const ramDigitsMatch = ramClean.match(/^\d+/);
+  if (!ramDigitsMatch) return false;
+  const ramVal = ramDigitsMatch[0];
+
+  // Check if RAM appears as a separate token bounded by delimiters
+  // e.g. "4/64", "4 / 64", "4GB/64GB", "4+64", "4 + 64 GB"
+  const prefixPattern = new RegExp(`(?:^|\\D)${ramVal}(?:\\s*GB)?\\s*[/+\\\\]`, 'i');
+  // e.g. "64/4", "64 / 4", "64GB/4GB", "64+4"
+  const suffixPattern = new RegExp(`[/+\\\\]\\s*${ramVal}(?:\\s*GB)?(?:\\D|$)`, 'i');
+  // e.g. "64GB (4GB RAM)", "64GB 4GB ОЗУ"
+  const explicitPattern = new RegExp(`(?:^|\\D)${ramVal}(?:\\s*GB)?\\s*(?:RAM|ОЗУ)(?:[^a-zа-яё0-9]|$)`, 'i');
+  const explicitPattern2 = new RegExp(`(?:^|[^a-zа-яё0-9])(?:RAM|ОЗУ)\\s*:?\\s*${ramVal}(?:\\s*GB)?(?:\\D|$)`, 'i');
+
+  return (
+    prefixPattern.test(s) ||
+    suffixPattern.test(s) ||
+    explicitPattern.test(s) ||
+    explicitPattern2.test(s)
+  );
+}

@@ -21,7 +21,7 @@ import {
   FileText,
 } from 'lucide-react';
 import { formatStoreName } from '../../utils/storeContext';
-import { getPhoneColorHex, formatRam } from '../../utils/phoneSpecs';
+import { getPhoneColorHex, formatRam, isRamInStorage } from '../../utils/phoneSpecs';
 import { cn } from '../../utils/cn';
 import { TransferHistoryListProps } from './types';
 import { TransferRequest } from '../../types';
@@ -398,7 +398,7 @@ export const TransferHistoryList: React.FC<TransferHistoryListProps> = ({
                       const colorHex = getPhoneColorHex(color);
                       const storage = foundDevice?.storage;
                       const rawRam = formatRam(foundDevice?.ram);
-                      const ram = rawRam && storage && !storage.toLowerCase().includes(rawRam.toLowerCase()) ? rawRam : null;
+                      const ram = rawRam && !isRamInStorage(storage, foundDevice?.ram) ? rawRam : null;
 
                       return (
                         <div key={idx} className="p-1.5 sm:p-2 flex items-center justify-between gap-2 hover:bg-surface-raised/60 transition-colors">

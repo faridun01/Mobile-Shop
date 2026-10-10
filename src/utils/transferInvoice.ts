@@ -1,6 +1,6 @@
 import { TransferRequest, Device } from '../types';
 import { formatMoney } from './money';
-import { getPhoneColorHex, formatRam } from './phoneSpecs';
+import { getPhoneColorHex, formatRam, isRamInStorage } from './phoneSpecs';
 
 export interface TransferInvoiceItem {
   index: number;
@@ -44,7 +44,7 @@ export function getTransferInvoiceItems(
     const colorHex = getPhoneColorHex(color);
     const storage = foundDevice?.storage;
     const rawRam = formatRam(foundDevice?.ram);
-    const ram = rawRam && storage && !storage.toLowerCase().includes(rawRam.toLowerCase()) ? rawRam : undefined;
+    const ram = rawRam && !isRamInStorage(storage, foundDevice?.ram) ? rawRam : undefined;
     const costUsd = foundDevice?.costBasisUsd ?? foundDevice?.purchaseCostUsd ?? 0;
     const retailPriceTjs = foundDevice?.retailPriceTjs;
 

@@ -19,7 +19,7 @@ import { useNavigationLayout } from '../../hooks/useNavigationLayout';
 import { useVirtualRows } from '../../hooks/useVirtualRows';
 import { findDeviceByCode, looksLikeDeviceCode, normalizeScanCode } from '../../utils/scanLookup';
 import { useStoreContext, formatStoreName } from '../../utils/storeContext';
-import { IN_STOCK_STATUSES, InventoryViewMode, BrandGroupItem, STATUS_LABELS } from '../inventory/types';
+import { IN_STOCK_STATUSES, InventoryViewMode, BrandGroupItem, STATUS_LABELS, formatRam } from '../inventory/types';
 import { InventoryStatsBar } from '../inventory/InventoryStatsBar';
 import { InventoryFiltersBar } from '../inventory/InventoryFiltersBar';
 import { InventoryLocationsView } from '../inventory/InventoryLocationsView';
@@ -405,8 +405,9 @@ export const InventoryPage: React.FC = () => {
       sEntry.count++;
 
       // RAM breakdown
-      if (dev.ram && dev.ram.trim() && !mGroup.ramList.includes(dev.ram.trim())) {
-        mGroup.ramList.push(dev.ram.trim());
+      const rName = formatRam(dev.ram);
+      if (rName && !mGroup.ramList.includes(rName)) {
+        mGroup.ramList.push(rName);
       }
     }
 

@@ -9,7 +9,14 @@ import {
   Store,
 } from 'lucide-react';
 import { Badge } from '../ui/Badge';
-import { getPhoneColorHex, formatPhoneColor, STATUS_LABELS, STATUS_TONE } from './types';
+import {
+  getPhoneColorHex,
+  formatPhoneColor,
+  STATUS_LABELS,
+  STATUS_TONE,
+  formatRam,
+  isRamInStorage,
+} from './types';
 import { ImeiBadge } from '../common/CopyImeiButton';
 
 export interface DeviceRowProps {
@@ -27,25 +34,8 @@ export const DeviceRow = React.forwardRef<HTMLButtonElement, DeviceRowProps>(
     const isSpecialStatus = device.status !== 'STORE_STOCK' && device.status !== 'MAIN_WAREHOUSE';
     const showStatusBadge = isSpecialStatus || !storeName;
     const colorHex = getPhoneColorHex(device.color);
-    const formattedRam = device.ram
-      ? (device.ram.toUpperCase().includes('GB') ? device.ram : `${device.ram} GB`)
-      : null;
-
-    const storageStr = (device.storage || '').trim();
-    const ramClean = (device.ram || '').trim().toUpperCase().replace(/GB/gi, '').trim();
-    const isRamInStorage = Boolean(
-      formattedRam && storageStr && (
-        storageStr.toLowerCase().includes(formattedRam.toLowerCase()) ||
-        (ramClean && (
-          storageStr.toUpperCase().includes(`${ramClean} GB`) ||
-          storageStr.toUpperCase().includes(`${ramClean}GB`) ||
-          storageStr.toUpperCase().includes(`${ramClean}/`) ||
-          storageStr.toUpperCase().includes(`/${ramClean}`) ||
-          storageStr.toUpperCase().startsWith(`${ramClean} /`)
-        ))
-      )
-    );
-    const showRamBadge = Boolean(formattedRam && !isRamInStorage);
+    const formattedRam = formatRam(device.ram);
+    const showRamBadge = Boolean(formattedRam && !isRamInStorage(device.storage, device.ram));
 
     return (
       <button

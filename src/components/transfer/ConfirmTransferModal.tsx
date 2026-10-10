@@ -9,7 +9,7 @@ import {
   Check
 } from 'lucide-react';
 import { Dialog } from '../ui/Dialog';
-import { getPhoneColorHex, formatRam, formatPhoneColor } from '../../utils/phoneSpecs';
+import { getPhoneColorHex, formatRam, formatPhoneColor, isRamInStorage } from '../../utils/phoneSpecs';
 import { ConfirmTransferModalProps } from './types';
 import { CopyImeiButton } from '../common/CopyImeiButton';
 
@@ -154,7 +154,7 @@ export const ConfirmTransferModal: React.FC<ConfirmTransferModalProps> = ({
                             {dev.storage}
                           </span>
                         )}
-                        {formattedRam && !dev.storage.toLowerCase().includes(formattedRam.toLowerCase()) && (
+                        {formattedRam && !isRamInStorage(dev.storage, dev.ram) && (
                           <span className="px-1.5 py-0.2 rounded-md bg-accent/10 border border-accent/25 text-[10px] font-bold font-mono text-accent shrink-0">
                             ОЗУ {formattedRam}
                           </span>

@@ -16,7 +16,7 @@ import { formatMoney } from '../../utils/money';
 import { LoadingState } from '../ui/Skeleton';
 import { cn } from '../../utils/cn';
 import { TransferDeviceGridProps } from './types';
-import { getPhoneColorHex, formatRam, formatPhoneColor } from '../../utils/phoneSpecs';
+import { getPhoneColorHex, formatRam, formatPhoneColor, isRamInStorage } from '../../utils/phoneSpecs';
 import { Device } from '../../types';
 import { useVirtualRows } from '../../hooks/useVirtualRows';
 import { CopyImeiButton } from '../common/CopyImeiButton';
@@ -284,7 +284,7 @@ export const TransferDeviceGrid: React.FC<TransferDeviceGridProps> = ({
                           <span>IMEI: <strong className="text-fg font-semibold">{dev.imei}</strong></span>
                           <CopyImeiButton imei={dev.imei} />
                         </span>
-                        {formattedRam && !dev.storage.toLowerCase().includes(formattedRam.toLowerCase()) && (
+                        {formattedRam && !isRamInStorage(dev.storage, dev.ram) && (
                           <span className="hidden sm:inline font-mono font-semibold text-accent">
                             RAM {formattedRam}
                           </span>
@@ -731,7 +731,7 @@ export const TransferDeviceGrid: React.FC<TransferDeviceGridProps> = ({
                                     {dev.storage}
                                   </span>
                                 )}
-                                {formattedRam && !dev.storage.toLowerCase().includes(formattedRam.toLowerCase()) && (
+                                {formattedRam && !isRamInStorage(dev.storage, dev.ram) && (
                                   <span className="text-[10px] text-accent font-mono font-semibold">
                                     RAM {formattedRam}
                                   </span>

@@ -62,7 +62,13 @@ export function getBrandBadgeStyle(brand: string): { bg: string; text: string; b
   return { bg: 'bg-accent/15 text-accent border-accent/30', text: 'text-accent', border: 'border-accent/30' };
 }
 
-export { getPhoneColorHex, formatPhoneColor, normalizePhoneColor } from '../../utils/phoneSpecs';
+export {
+  getPhoneColorHex,
+  formatPhoneColor,
+  normalizePhoneColor,
+  formatRam,
+  isRamInStorage,
+} from '../../utils/phoneSpecs';
 
 export function getTimelineBadge(type: string) {
   const upper = (type || '').toUpperCase();

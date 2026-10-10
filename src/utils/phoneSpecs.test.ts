@@ -4,6 +4,7 @@ import {
   formatPhoneColor,
   getPhoneColorHex,
   DEFAULT_PHONE_COLORS_EN,
+  isRamInStorage,
 } from './phoneSpecs';
 
 describe('phoneSpecs colors', () => {
@@ -76,5 +77,62 @@ describe('phoneSpecs colors', () => {
     expect(getPhoneColorHex('White')).toBe('#f8fafc');
     expect(getPhoneColorHex('Gold')).toBe('#eab308');
     expect(getPhoneColorHex('Desert Titanium')).toBe('#d4b996');
+  });
+});
+
+describe('isRamInStorage', () => {
+  it('does NOT false-positive on standard storage capacities ending with RAM digits', () => {
+    // 4/64: "64 GB" ends with "4 GB", but is NOT a composite RAM/ROM spec
+    expect(isRamInStorage('64', '4')).toBe(false);
+    expect(isRamInStorage('64 GB', '4')).toBe(false);
+    expect(isRamInStorage('64 GB', '4 GB')).toBe(false);
+    expect(isRamInStorage('64GB', '4 GB')).toBe(false);
+
+    // 8/128: "128 GB" ends with "8 GB"
+    expect(isRamInStorage('128 GB', '8 GB')).toBe(false);
+    expect(isRamInStorage('128GB', '8')).toBe(false);
+
+    // 6/256: "256 GB" ends with "6 GB"
+    expect(isRamInStorage('256 GB', '6 GB')).toBe(false);
+    expect(isRamInStorage('256GB', '6')).toBe(false);
+
+    // 2/512 and 12/512: "512 GB" ends with "2 GB" and "12 GB"
+    expect(isRamInStorage('512 GB', '2 GB')).toBe(false);
+    expect(isRamInStorage('512 GB', '12 GB')).toBe(false);
+
+    // 6/16: "16 GB" ends with "6 GB"
+    expect(isRamInStorage('16 GB', '6 GB')).toBe(false);
+
+    // 2/32: "32 GB" ends with "2 GB"
+    expect(isRamInStorage('32 GB', '2 GB')).toBe(false);
+  });
+
+  it('correctly detects genuine composite RAM/Storage specifications', () => {
+    // Slash delimiter prefix
+    expect(isRamInStorage('4/64', '4')).toBe(true);
+    expect(isRamInStorage('4/64 GB', '4')).toBe(true);
+    expect(isRamInStorage('4/64 GB', '4 GB')).toBe(true);
+    expect(isRamInStorage('4GB/64GB', '4 GB')).toBe(true);
+    expect(isRamInStorage('4 / 64 GB', '4 GB')).toBe(true);
+
+    // Plus delimiter prefix
+    expect(isRamInStorage('4+64', '4')).toBe(true);
+    expect(isRamInStorage('4+64 GB', '4 GB')).toBe(true);
+    expect(isRamInStorage('8/128', '8')).toBe(true);
+    expect(isRamInStorage('8/128 GB', '8 GB')).toBe(true);
+
+    // Suffix format (ROM/RAM)
+    expect(isRamInStorage('64/4', '4')).toBe(true);
+
+    // Explicit label
+    expect(isRamInStorage('64GB (4GB RAM)', '4')).toBe(true);
+    expect(isRamInStorage('64GB 4GB ОЗУ', '4 GB')).toBe(true);
+  });
+
+  it('returns false for null, empty or non-matching composite values', () => {
+    expect(isRamInStorage(null, '4')).toBe(false);
+    expect(isRamInStorage('64 GB', null)).toBe(false);
+    expect(isRamInStorage('', '')).toBe(false);
+    expect(isRamInStorage('128/6', '8')).toBe(false);
   });
 });
