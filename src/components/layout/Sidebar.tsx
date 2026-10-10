@@ -110,6 +110,7 @@ export const Sidebar: React.FC = () => {
             { id: 'SALE', label: 'POS Терминал', icon: ShoppingBag, roles: ['PARTNER'] },
             { id: 'STORE_RECEIPT', label: 'Приход товара', icon: PackagePlus, roles: ['PARTNER'] },
             { id: 'CASH_DESK', label: 'Касса', icon: Wallet, roles: ['PARTNER'] },
+            { id: 'CUSTOMERS', label: 'База клиентов', icon: Users, roles: ['PARTNER'] },
             { id: 'SALES_HISTORY', label: 'История продаж', icon: History, roles: ['PARTNER'] },
           ],
         },

@@ -27,14 +27,14 @@ export function registerCustomerRoutes(app: Express) {
   });
 
   // List customers with search and debt filtering
-  // The customer base is an ADMIN (Central Cash) page. Store staff only get the POS lookup:
+  // The customer base is accessible to ADMIN and PARTNER. Sellers only get the POS lookup:
   // a search of at least 2 characters, at most 5 matches, name/phone/debt only.
   app.get('/api/customers', authenticateJwt, async (req: AuthenticatedRequest, res, next) => {
     try {
       const search = typeof req.query.search === 'string' ? req.query.search : undefined;
-      if (req.user!.role !== 'ADMIN') {
+      if (req.user!.role !== 'ADMIN' && req.user!.role !== 'PARTNER') {
         if (!search || search.trim().length < 2) {
-          res.status(403).json({ message: 'База клиентов доступна в Центральной кассе' });
+          res.status(403).json({ message: 'База клиентов доступна администраторам и партнёрам' });
           return;
         }
         const found = await CustomersService.list({ search, limit: 5, offset: 0 });
@@ -56,7 +56,7 @@ export function registerCustomerRoutes(app: Express) {
   });
 
   // Get customer by ID
-  app.get('/api/customers/:id', authenticateJwt, requireRoles('ADMIN'), async (req: AuthenticatedRequest, res, next) => {
+  app.get('/api/customers/:id', authenticateJwt, requireRoles('ADMIN', 'PARTNER'), async (req: AuthenticatedRequest, res, next) => {
     try {
       const customer = await CustomersService.getById(req.params.id);
       res.json(customer);
@@ -66,7 +66,7 @@ export function registerCustomerRoutes(app: Express) {
   });
 
   // Create customer
-  app.post('/api/customers', authenticateJwt, requireRoles('ADMIN'), async (req: AuthenticatedRequest, res, next) => {
+  app.post('/api/customers', authenticateJwt, requireRoles('ADMIN', 'PARTNER'), async (req: AuthenticatedRequest, res, next) => {
     try {
       const customer = await CustomersService.create(req.body || {});
       RealtimeSyncGateway.broadcast('CUSTOMERS_UPDATED', { customerId: customer.id });
@@ -77,7 +77,7 @@ export function registerCustomerRoutes(app: Express) {
   });
 
   // Update customer
-  app.patch('/api/customers/:id', authenticateJwt, requireRoles('ADMIN'), async (req: AuthenticatedRequest, res, next) => {
+  app.patch('/api/customers/:id', authenticateJwt, requireRoles('ADMIN', 'PARTNER'), async (req: AuthenticatedRequest, res, next) => {
     try {
       const customer = await CustomersService.update(req.params.id, req.body || {});
       RealtimeSyncGateway.broadcast('CUSTOMERS_UPDATED', { customerId: customer.id });
@@ -123,9 +123,8 @@ export function registerCustomerRoutes(app: Express) {
     }
   });
 
-  // Save push subscription for customer (ADMIN only: any user overwriting any customer's
-  // subscription would let them hijack that customer's notifications)
-  app.post('/api/customers/:id/subscribe-push', authenticateJwt, requireRoles('ADMIN'), async (req: AuthenticatedRequest, res, next) => {
+  // Save push subscription for customer
+  app.post('/api/customers/:id/subscribe-push', authenticateJwt, requireRoles('ADMIN', 'PARTNER'), async (req: AuthenticatedRequest, res, next) => {
     try {
       const { subscription } = req.body || {};
       const customer = await CustomersService.savePushSubscription(req.params.id, subscription);
@@ -136,8 +135,8 @@ export function registerCustomerRoutes(app: Express) {
     }
   });
 
-  // Send push notification to customers (ADMIN only)
-  app.post('/api/customers/send-push', authenticateJwt, requireRoles('ADMIN'), async (req: AuthenticatedRequest, res, next) => {
+  // Send push notification to customers
+  app.post('/api/customers/send-push', authenticateJwt, requireRoles('ADMIN', 'PARTNER'), async (req: AuthenticatedRequest, res, next) => {
     try {
       const { target, customerId, title, message, targetRoute } = req.body || {};
       const result = await CustomersService.sendPush({
