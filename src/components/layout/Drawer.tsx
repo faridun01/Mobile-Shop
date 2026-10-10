@@ -246,14 +246,11 @@ export const Drawer: React.FC = () => {
       ];
     }
 
-    const isPartnerOrSeller = isPartner || isSeller;
     // Items already in mobile bottom nav: do not duplicate in drawer menu
     const bottomNavIds = new Set<string>(
       isCentralCashMode
-        ? ['INVENTORY', 'SALES_HISTORY', 'TRANSFER', 'WELCOME']
-        : isPartnerOrSeller
-          ? ['INVENTORY', 'SALES_HISTORY', 'SALE', 'STORE_RECEIPT']
-          : ['INVENTORY', 'SALES_HISTORY', 'SALE', 'TRANSFER']
+        ? ['INVENTORY', 'SALES_HISTORY', 'PURCHASE', 'WELCOME']
+        : ['INVENTORY', 'SALES_HISTORY', 'SALE', 'STORE_RECEIPT']
     );
 
     return rawGroups

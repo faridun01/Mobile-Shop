@@ -8,7 +8,6 @@ import {
   Package,
   Menu,
   Home,
-  ArrowLeftRight,
   PackagePlus,
 } from 'lucide-react';
 
@@ -25,7 +24,6 @@ export const MobileBottomNav: React.FC = () => {
 
   const userRole = currentUser?.role || 'SELLER';
   const isAdmin = userRole === 'ADMIN';
-  const isPartnerOrSeller = userRole === 'PARTNER' || userRole === 'SELLER';
   const isCentralCashMode = isAdmin && (!selectedStoreId || selectedStoreId === 'all');
 
   const toggleDrawer = () => {
@@ -103,12 +101,13 @@ export const MobileBottomNav: React.FC = () => {
         </div>
 
         <NavItem
-          routePath="/transfer"
-          label="Перемещение"
-          icon={ArrowLeftRight}
+          routePath="/purchase"
+          label="Приход"
+          title="Приход товара"
+          icon={PackagePlus}
           onSelect={() => {
-            setActivePage('TRANSFER');
-            navigate('/transfer');
+            setActivePage('PURCHASE');
+            navigate('/purchase');
           }}
         />
 
@@ -168,29 +167,16 @@ export const MobileBottomNav: React.FC = () => {
         </button>
       </div>
 
-      {isPartnerOrSeller ? (
-        <NavItem
-          routePath="/receipts"
-          label="Приход"
-          title="Приход в магазин"
-          icon={PackagePlus}
-          onSelect={() => {
-            setActivePage('STORE_RECEIPT');
-            navigate('/receipts');
-          }}
-        />
-      ) : (
-        <NavItem
-          routePath="/transfer"
-          label="Перемещение"
-          title="Перемещение"
-          icon={ArrowLeftRight}
-          onSelect={() => {
-            setActivePage('TRANSFER');
-            navigate('/transfer');
-          }}
-        />
-      )}
+      <NavItem
+        routePath="/receipts"
+        label="Приход"
+        title="Приход товара"
+        icon={PackagePlus}
+        onSelect={() => {
+          setActivePage('STORE_RECEIPT');
+          navigate('/receipts');
+        }}
+      />
 
       <button
         onClick={toggleDrawer}
