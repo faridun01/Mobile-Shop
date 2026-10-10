@@ -1,9 +1,21 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
+  Banknote,
+  Users,
+  Truck,
+  Package,
+  HandCoins,
+  ArrowUpRight,
   ChevronLeft,
   ChevronRight,
   Calendar,
 } from 'lucide-react';
+import { apiClient } from '../../api/client';
+import { formatMoney } from '../../utils/money';
+import { formatStoreName } from '../../utils/storeContext';
+import { CashDeskSummary } from '../../types';
+import { useAppFields } from '../../context/AppContext';
 import { DailyCashClosingListPanel } from './DailyCashClosingListPanel';
 
 interface CashDeskPanelProps {
@@ -30,11 +42,38 @@ const getNextMonth = (ym: string): string => {
 };
 
 export const CashDeskPanel: React.FC<CashDeskPanelProps> = ({ storeId }) => {
+  const navigate = useNavigate();
+  const { stores, currentUser } = useAppFields('stores', 'currentUser');
+  const isAdmin = currentUser?.role === 'ADMIN';
+
+  const [summaryData, setSummaryData] = useState<CashDeskSummary | null>(null);
   const currentMonth = useMemo(() => getLocalCurrentMonth(), []);
   const [selectedMonth, setSelectedMonth] = useState(currentMonth);
 
   const selectedStoreId = storeId || 'all';
   const isCurrentMonth = selectedMonth >= currentMonth;
+  const isCentral = selectedStoreId === 'all';
+  const currentStore = stores.find((s) => s.id === selectedStoreId);
+
+  const loadSummary = useCallback(async () => {
+    try {
+      const url = `/cash-desk/summary${selectedStoreId !== 'all' ? `?storeId=${encodeURIComponent(selectedStoreId)}` : ''}`;
+      const res = await apiClient<CashDeskSummary>(url);
+      setSummaryData(res);
+    } catch {
+      // ignore
+    }
+  }, [selectedStoreId]);
+
+  useEffect(() => {
+    void loadSummary();
+  }, [loadSummary]);
+
+  useEffect(() => {
+    const handleUpdate = () => void loadSummary();
+    window.addEventListener('business-data-changed', handleUpdate);
+    return () => window.removeEventListener('business-data-changed', handleUpdate);
+  }, [loadSummary]);
 
   const monthLabel = useMemo(() => {
     try {
@@ -61,6 +100,147 @@ export const CashDeskPanel: React.FC<CashDeskPanelProps> = ({ storeId }) => {
 
   return (
     <div className="space-y-3.5 select-none">
+      {/* 1. 4 KPI КАРТОЧКИ: КАССА, СКЛАД, КЛИЕНТЫ, ПОСТАВЩИКИ (USD в основном, TJS альтернативно) */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3">
+        {/* КАРТОЧКА 1: ДЕНЬГИ В КАССЕ */}
+        <div className="p-3 rounded-xl bg-surface border border-border shadow-2xs flex flex-col justify-between gap-2 transition-shadow hover:shadow-xs">
+          <div className="flex items-start justify-between gap-1.5">
+            <div className="flex items-center gap-2 min-w-0">
+              <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-emerald-500/15 border border-emerald-500/25 flex items-center justify-center text-emerald-600 dark:text-emerald-400 shrink-0">
+                <Banknote className="w-4 h-4" />
+              </div>
+              <div className="min-w-0">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-fg-subtle block truncate">
+                  {isCentral ? 'В кассе (Всего)' : 'В кассе точки'}
+                </span>
+                <div className="text-base sm:text-lg font-black font-mono text-emerald-600 dark:text-emerald-400 leading-tight truncate">
+                  ${formatMoney(summaryData?.cash.totalUsd || 0)}
+                </div>
+              </div>
+            </div>
+            {isAdmin && isCentral && (
+              <button
+                type="button"
+                onClick={() => navigate('/cash-collection')}
+                className="p-1 rounded-lg bg-accent/10 border border-accent/20 text-accent hover:bg-accent/20 transition-colors cursor-pointer shrink-0"
+                title="Перейти к инкассации"
+              >
+                <HandCoins className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
+          <div className="text-[10px] text-fg-subtle flex items-center justify-between pt-1.5 border-t border-border/50">
+            <span className="font-mono font-medium">≈ {formatMoney(summaryData?.cash.totalTjs || 0)} TJS</span>
+            <span className="text-[9px] text-fg-subtle truncate max-w-28">
+              {isCentral ? 'Центральная + точки' : formatStoreName(currentStore?.name || 'Касса')}
+            </span>
+          </div>
+        </div>
+
+        {/* КАРТОЧКА 2: СКЛАД ТОВАРОВ */}
+        <div className="p-3 rounded-xl bg-surface border border-border shadow-2xs flex flex-col justify-between gap-2 transition-shadow hover:shadow-xs">
+          <div className="flex items-start justify-between gap-1.5">
+            <div className="flex items-center gap-2 min-w-0">
+              <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-indigo-500/15 border border-indigo-500/25 flex items-center justify-center text-indigo-600 dark:text-indigo-400 shrink-0">
+                <Package className="w-4 h-4" />
+              </div>
+              <div className="min-w-0">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-fg-subtle block truncate">
+                  Склад товаров
+                </span>
+                <div className="text-base sm:text-lg font-black font-mono text-indigo-600 dark:text-indigo-400 leading-tight truncate">
+                  ${formatMoney(summaryData?.inventory.totalCostUsd || 0)}
+                </div>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => navigate('/inventory')}
+              className="p-1 rounded-lg bg-surface-raised border border-border hover:bg-surface text-fg transition-colors cursor-pointer shrink-0"
+              title="Перейти на склад"
+            >
+              <ArrowUpRight className="w-3.5 h-3.5 text-accent" />
+            </button>
+          </div>
+          <div className="text-[10px] text-fg-subtle flex items-center justify-between pt-1.5 border-t border-border/50">
+            <span className="font-mono font-medium">≈ {formatMoney(summaryData?.inventory.totalCostTjs || 0)} TJS</span>
+            <span className="font-mono text-indigo-600 dark:text-indigo-400 font-bold">
+              {summaryData?.inventory.totalCount || 0} шт. (товары)
+            </span>
+          </div>
+        </div>
+
+        {/* КАРТОЧКА 3: ДОЛГИ КЛИЕНТОВ */}
+        <div className="p-3 rounded-xl bg-surface border border-border shadow-2xs flex flex-col justify-between gap-2 transition-shadow hover:shadow-xs">
+          <div className="flex items-start justify-between gap-1.5">
+            <div className="flex items-center gap-2 min-w-0">
+              <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-amber-500/15 border border-amber-500/25 flex items-center justify-center text-amber-600 dark:text-amber-400 shrink-0">
+                <Users className="w-4 h-4" />
+              </div>
+              <div className="min-w-0">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-fg-subtle block truncate">
+                  Долги клиентов
+                </span>
+                <div className="text-base sm:text-lg font-black font-mono text-amber-600 dark:text-amber-400 leading-tight truncate">
+                  ${formatMoney(summaryData?.customers.totalDebtUsd || 0)}
+                </div>
+              </div>
+            </div>
+            {(isAdmin || currentUser?.role === 'PARTNER') && (
+              <button
+                type="button"
+                onClick={() => navigate('/customers')}
+                className="p-1 rounded-lg bg-surface-raised border border-border hover:bg-surface text-fg transition-colors cursor-pointer shrink-0"
+                title="Перейти к клиентам"
+              >
+                <ArrowUpRight className="w-3.5 h-3.5 text-accent" />
+              </button>
+            )}
+          </div>
+          <div className="text-[10px] text-fg-subtle flex items-center justify-between pt-1.5 border-t border-border/50">
+            <span className="font-mono font-medium">≈ {formatMoney(summaryData?.customers.totalDebtTjs || 0)} TJS</span>
+            <span className="font-mono text-amber-600 dark:text-amber-400 font-bold">
+              {summaryData?.customers.debtorsCount || 0} чел.
+            </span>
+          </div>
+        </div>
+
+        {/* КАРТОЧКА 4: ДОЛГИ ПОСТАВЩИКАМ */}
+        <div className="p-3 rounded-xl bg-surface border border-border shadow-2xs flex flex-col justify-between gap-2 transition-shadow hover:shadow-xs">
+          <div className="flex items-start justify-between gap-1.5">
+            <div className="flex items-center gap-2 min-w-0">
+              <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-danger/15 border border-danger/25 flex items-center justify-center text-danger shrink-0">
+                <Truck className="w-4 h-4" />
+              </div>
+              <div className="min-w-0">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-fg-subtle block truncate">
+                  Поставщикам
+                </span>
+                <div className="text-base sm:text-lg font-black font-mono text-danger leading-tight truncate">
+                  ${formatMoney(summaryData?.suppliers.totalDebtUsd || 0)}
+                </div>
+              </div>
+            </div>
+            {isAdmin && (
+              <button
+                type="button"
+                onClick={() => navigate('/suppliers')}
+                className="p-1 rounded-lg bg-surface-raised border border-border hover:bg-surface text-fg transition-colors cursor-pointer shrink-0"
+                title="Перейти к поставщикам"
+              >
+                <ArrowUpRight className="w-3.5 h-3.5 text-accent" />
+              </button>
+            )}
+          </div>
+          <div className="text-[10px] text-fg-subtle flex items-center justify-between pt-1.5 border-t border-border/50">
+            <span className="font-mono font-medium">≈ {formatMoney(summaryData?.suppliers.totalDebtTjs || 0)} TJS</span>
+            <span className="font-mono text-danger font-bold">
+              {summaryData?.suppliers.debtorsCount || 0} пост.
+            </span>
+          </div>
+        </div>
+      </div>
+
       {/* Month Selector Bar */}
       <div className="flex items-center justify-between gap-2 flex-wrap bg-surface p-2 sm:p-2.5 rounded-xl border border-border shadow-2xs">
         <div className="flex items-center gap-2">
@@ -103,7 +283,7 @@ export const CashDeskPanel: React.FC<CashDeskPanelProps> = ({ storeId }) => {
         </div>
       </div>
 
-      {/* Closed Shifts List */}
+      {/* Closed Shifts List with Day Sorting and Filtering */}
       <DailyCashClosingListPanel
         month={selectedMonth}
         storeId={selectedStoreId}

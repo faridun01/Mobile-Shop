@@ -568,6 +568,7 @@ export interface DailyCashClosing {
   actualCashUsd: number | string;
   differenceTjs: number | string;
   differenceUsd: number | string;
+  exchangeRate?: number | string | null;
   comment?: string | null;
   createdAt: string;
   updatedAt: string;
