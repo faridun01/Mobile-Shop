@@ -8,7 +8,7 @@ import {
   ChevronDown,
   ArrowRight,
 } from 'lucide-react';
-import { approxTjs, IN_STOCK_STATUSES } from './types';
+import { IN_STOCK_STATUSES } from './types';
 
 interface InventoryLocationsViewProps {
   devices: Device[];
@@ -82,9 +82,6 @@ export const InventoryLocationsView: React.FC<InventoryLocationsViewProps> = ({
             <div className="p-2.5 rounded-xl bg-surface border border-border">
               <span className="text-[10px] text-fg-subtle uppercase font-semibold block">Себестоимость</span>
               <span className="font-bold text-fg text-sm sm:text-base mt-0.5 block">{formatUsd(stat.valueUsd)}</span>
-              {approxTjs(stat.valueUsd, rate) && (
-                <span className="text-[10px] text-fg-subtle block">{approxTjs(stat.valueUsd, rate)}</span>
-              )}
             </div>
           )}
           <div className="p-2.5 rounded-xl bg-surface border border-border">
@@ -210,7 +207,6 @@ export const InventoryLocationsView: React.FC<InventoryLocationsViewProps> = ({
                   {isAdmin && (
                     <span className="text-[10px] sm:text-[11px] text-fg-subtle block">
                       {formatUsd(stat.valueUsd)}
-                      {approxTjs(stat.valueUsd, rate) ? ` · ${approxTjs(stat.valueUsd, rate)}` : ''}
                     </span>
                   )}
                 </div>
@@ -307,7 +303,6 @@ export const InventoryLocationsView: React.FC<InventoryLocationsViewProps> = ({
                         {isAdmin && (
                           <span className="text-[10px] sm:text-[11px] text-fg-subtle block">
                             {formatUsd(stat.valueUsd)}
-                            {approxTjs(stat.valueUsd, rate) ? ` · ${approxTjs(stat.valueUsd, rate)}` : ''}
                           </span>
                         )}
                       </div>

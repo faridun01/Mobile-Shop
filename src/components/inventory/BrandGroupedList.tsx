@@ -3,7 +3,7 @@ import { Device, Store as StoreType } from '../../types';
 import { formatUsd } from '../../utils/money';
 import { Sparkles, ChevronDown, Smartphone, SlidersHorizontal } from 'lucide-react';
 import { DeviceRow } from './DeviceRow';
-import { approxTjs, BrandGroupItem } from './types';
+import { BrandGroupItem } from './types';
 
 interface BrandGroupedListProps {
   brandGroups: BrandGroupItem[];
@@ -114,9 +114,6 @@ export const BrandGroupedList: React.FC<BrandGroupedListProps> = ({
                   {isAdmin && (
                     <div className="text-[11px] text-fg-subtle font-mono mt-0.5">
                       <span className="font-bold text-fg-muted">{formatUsd(bGroup.totalValueUsd)}</span>
-                      {approxTjs(bGroup.totalValueUsd, rate) && (
-                        <span className="hidden sm:inline"> · {approxTjs(bGroup.totalValueUsd, rate)}</span>
-                      )}
                     </div>
                   )}
                 </div>

@@ -235,10 +235,6 @@ export const PurchaseHistoryList: React.FC<PurchaseHistoryListProps> = ({
                         <span className="text-[10px] text-danger font-mono font-bold">
                           долг ${inv.remainingAmountUsd.toLocaleString()}
                         </span>
-                      ) : inv.totalAmountUsd > 0 ? (
-                        <span className="text-[10px] text-fg-subtle font-mono">
-                          ~{Math.round((inv.totalAmountUsd || 0) * inv.exchangeRate).toLocaleString()} TJS
-                        </span>
                       ) : null}
                     </div>
                     <ChevronRight className="w-4 h-4 text-fg-subtle shrink-0" />

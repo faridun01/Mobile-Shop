@@ -162,9 +162,6 @@ export const CashDeskPanel: React.FC<CashDeskPanelProps> = ({ storeId }) => {
             </div>
           </div>
           <div className="pt-2 border-t border-border/50 text-[10.5px] text-fg-subtle flex flex-col gap-0.5">
-            <span className="font-mono font-medium text-fg-muted whitespace-nowrap">
-              ≈ {formatMoney(summaryData?.inventory.totalCostTjs || 0)} TJS
-            </span>
             <span className="font-mono text-indigo-600 dark:text-indigo-400 font-bold text-[10px] leading-tight">
               {summaryData?.inventory.totalCount || 0} шт. (товары)
             </span>

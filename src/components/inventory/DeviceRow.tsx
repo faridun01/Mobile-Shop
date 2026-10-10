@@ -1,6 +1,6 @@
 import React from 'react';
 import { Device } from '../../types';
-import { formatTjs, formatUsd } from '../../utils/money';
+import { formatUsd } from '../../utils/money';
 import {
   Smartphone,
   ChevronRight,
@@ -9,7 +9,7 @@ import {
   Store,
 } from 'lucide-react';
 import { Badge } from '../ui/Badge';
-import { approxTjs, getPhoneColorHex, formatPhoneColor, STATUS_LABELS, STATUS_TONE } from './types';
+import { getPhoneColorHex, formatPhoneColor, STATUS_LABELS, STATUS_TONE } from './types';
 import { ImeiBadge } from '../common/CopyImeiButton';
 
 export interface DeviceRowProps {
@@ -136,16 +136,7 @@ export const DeviceRow = React.forwardRef<HTMLButtonElement, DeviceRowProps>(
               <span className="text-xs sm:text-sm font-extrabold text-fg font-mono block leading-tight">
                 {formatUsd(device.purchaseCostUsd)}
               </span>
-              {approxTjs(device.purchaseCostUsd, rate) && (
-                <span className="text-[10px] text-fg-subtle font-mono block leading-none mt-0.5 font-medium">
-                  {approxTjs(device.purchaseCostUsd, rate)}
-                </span>
-              )}
             </div>
-          ) : !isAdmin && (device.retailPriceTjs ?? 0) > 0 ? (
-            <span className="text-xs sm:text-sm font-extrabold font-mono text-accent whitespace-nowrap">
-              {formatTjs(device.retailPriceTjs)}
-            </span>
           ) : null}
 
           <div className="w-6 h-6 rounded-lg bg-surface-raised flex items-center justify-center text-fg-subtle group-hover:text-accent group-hover:bg-accent/10 transition-colors">

@@ -21,7 +21,7 @@ import { Dialog } from '../ui/Dialog';
 import { Button } from '../ui/Button';
 import { Badge } from '../ui/Badge';
 import { cn } from '../../utils/cn';
-import { approxTjs, formatTimelineDate, getTimelineBadge, STATUS_LABELS, STATUS_TONE, formatPhoneColor } from './types';
+import { formatTimelineDate, getTimelineBadge, STATUS_LABELS, STATUS_TONE, formatPhoneColor } from './types';
 
 interface DeviceDetailsModalProps {
   device: Device | null;
@@ -385,12 +385,8 @@ export const DeviceDetailsModal: React.FC<DeviceDetailsModalProps> = ({
                 <DollarSign className="w-3 h-3 text-accent" />
                 Финансовый аудит
               </span>
-              {currentDevice.isBonus ? (
+              {currentDevice.isBonus && (
                 <Badge tone="accent">Бонус ($0)</Badge>
-              ) : (
-                <span className="text-[10px] text-fg-subtle font-mono">
-                  {rate ? `Курс: $1 = ${formatMoney(rate)} TJS` : 'Курс не задан'}
-                </span>
               )}
             </div>
 
@@ -415,22 +411,12 @@ export const DeviceDetailsModal: React.FC<DeviceDetailsModalProps> = ({
                 <span className="font-extrabold text-accent font-mono block mt-0.5 text-xs">
                   {formatUsd(currentDevice.purchaseCostUsd)}
                 </span>
-                {approxTjs(currentDevice.purchaseCostUsd, rate) && (
-                  <span className="text-[9px] text-fg-subtle block font-mono">
-                    {approxTjs(currentDevice.purchaseCostUsd, rate)}
-                  </span>
-                )}
               </div>
               <div className="p-1.5 sm:p-2 rounded-lg bg-surface border border-border">
                 <span className="text-[9px] text-fg-subtle uppercase block font-bold">Себестоимость</span>
                 <span className="font-extrabold text-fg font-mono block mt-0.5 text-xs">
                   {formatUsd(currentDevice.costBasisUsd)}
                 </span>
-                {approxTjs(currentDevice.costBasisUsd, rate) && (
-                  <span className="text-[9px] text-fg-subtle block font-mono">
-                    {approxTjs(currentDevice.costBasisUsd, rate)}
-                  </span>
-                )}
               </div>
             </div>
           </div>

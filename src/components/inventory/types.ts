@@ -31,11 +31,9 @@ export function formatTimelineDate(dateStr: string): string {
   }
 }
 
-/** «≈ 1,234 TJS» for a USD amount at today's rate, or nothing when today's rate is not set. */
-export function approxTjs(usd: number, rate?: number): string | null {
-  if (!rate) return null;
-  const tjsAmount = Math.round(decimal(usd).mul(rate).toNumber());
-  return `≈ ${formatMoney(tjsAmount, { minimumFractionDigits: 0, maximumFractionDigits: 0 })} TJS`;
+/** Warehouse goods are displayed strictly in USD without Somoni approximation. */
+export function approxTjs(_usd: number, _rate?: number): string | null {
+  return null;
 }
 
 export function getBrandBadgeStyle(brand: string): { bg: string; text: string; border: string } {

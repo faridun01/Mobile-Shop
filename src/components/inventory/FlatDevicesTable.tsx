@@ -5,7 +5,7 @@ import { Smartphone, Sparkles, Warehouse, Store } from 'lucide-react';
 import { Badge } from '../ui/Badge';
 import { useVirtualRows } from '../../hooks/useVirtualRows';
 import { DeviceRow } from './DeviceRow';
-import { approxTjs, STATUS_LABELS, STATUS_TONE } from './types';
+import { STATUS_LABELS, STATUS_TONE } from './types';
 import { CopyImeiButton } from '../common/CopyImeiButton';
 
 interface FlatDevicesTableProps {
@@ -159,16 +159,9 @@ export const FlatDevicesTable: React.FC<FlatDevicesTableProps> = ({
                     {dev.purchaseCostUsd === 0 || dev.isBonus ? (
                       <Badge tone="accent">Бонус</Badge>
                     ) : (
-                      <div>
-                        <span className="font-bold text-fg-muted block text-xs">
-                          {formatUsd(dev.purchaseCostUsd)}
-                        </span>
-                        {approxTjs(dev.purchaseCostUsd, rate) && (
-                          <span className="text-[10px] text-fg-subtle block">
-                            {approxTjs(dev.purchaseCostUsd, rate)}
-                          </span>
-                        )}
-                      </div>
+                      <span className="font-bold text-fg-muted block text-xs">
+                        {formatUsd(dev.purchaseCostUsd)}
+                      </span>
                     )}
                   </td>
                 )}
