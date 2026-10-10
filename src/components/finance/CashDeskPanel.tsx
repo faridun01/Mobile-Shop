@@ -288,6 +288,7 @@ export const CashDeskPanel: React.FC<CashDeskPanelProps> = ({ storeId }) => {
       <DailyCashClosingListPanel
         month={selectedMonth}
         storeId={selectedStoreId}
+        onMonthChange={setSelectedMonth}
       />
     </div>
   );

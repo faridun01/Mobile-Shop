@@ -18,11 +18,13 @@ import {
   ArrowUpDown,
   Filter,
   CheckCircle2,
+  Clock,
 } from 'lucide-react';
 
 interface DailyCashClosingListPanelProps {
   month: string;
   storeId?: string | null;
+  onMonthChange?: (month: string) => void;
 }
 
 const formatDayChip = (businessDate: string): string => {
@@ -53,25 +55,11 @@ const getClosingCardUsd = (c: DailyCashClosing): number => {
 export const DailyCashClosingListPanel: React.FC<DailyCashClosingListPanelProps> = ({
   month,
   storeId,
+  onMonthChange,
 }) => {
   const { setDailyClosingModalOpen } = useUIStore();
   const { stores, currentUser } = useAppFields('stores', 'currentUser');
   const isAdmin = currentUser?.role === 'ADMIN';
-
-  const [closings, setClosings] = useState<DailyCashClosing[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [revision, setRevision] = useState(0);
-  const [inspectClosing, setInspectClosing] = useState<DailyCashClosing | null>(null);
-
-  // Sorting & day filter
-  const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc');
-  const [selectedDay, setSelectedDay] = useState<string>('all');
-
-  // Reset selected day on month change
-  useEffect(() => {
-    setSelectedDay('all');
-  }, [month]);
 
   // Today date string (YYYY-MM-DD)
   const todayStr = useMemo(() => {
@@ -81,6 +69,43 @@ export const DailyCashClosingListPanel: React.FC<DailyCashClosingListPanelProps>
     const d = String(now.getDate()).padStart(2, '0');
     return `${y}-${m}-${d}`;
   }, []);
+
+  const currentMonthStr = useMemo(() => todayStr.slice(0, 7), [todayStr]);
+
+  const [closings, setClosings] = useState<DailyCashClosing[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [revision, setRevision] = useState(0);
+  const [inspectClosing, setInspectClosing] = useState<DailyCashClosing | null>(null);
+
+  // Sorting & day filter: defaults automatically to today when viewing the current month
+  const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc');
+  const [selectedDay, setSelectedDay] = useState<string>(() => {
+    const ym = month.length === 7 ? month : currentMonthStr;
+    return ym === currentMonthStr ? todayStr : 'all';
+  });
+
+  // When month changes: auto-select today if current month, otherwise show all
+  useEffect(() => {
+    if (month === currentMonthStr) {
+      setSelectedDay(todayStr);
+    } else {
+      setSelectedDay('all');
+    }
+  }, [month, currentMonthStr, todayStr]);
+
+  const handleDateSelect = (date: string) => {
+    if (!date) return;
+    const targetYm = date.slice(0, 7);
+    if (targetYm !== month && onMonthChange) {
+      onMonthChange(targetYm);
+    }
+    setSelectedDay(date);
+  };
+
+  const todayCount = useMemo(() => {
+    return closings.filter((c) => c.businessDate === todayStr).length;
+  }, [closings, todayStr]);
 
   // Shift closing is strictly for retail stores, never for central cash desk/warehouse
   const isRetailStore = Boolean(
@@ -275,57 +300,104 @@ export const DailyCashClosingListPanel: React.FC<DailyCashClosingListPanelProps>
         </div>
       </div>
 
-      {/* Sorting & Day Filter Bar */}
+      {/* Sorting & Day Filter Bar with Calendar Picker */}
       {closings.length > 0 && (
-        <div className="flex flex-col gap-2 bg-surface p-2.5 rounded-xl border border-border">
-          <div className="flex items-center justify-between gap-2">
-            <span className="text-xs font-semibold text-fg flex items-center gap-1.5">
-              <Filter className="w-3.5 h-3.5 text-accent" />
-              Фильтр по дням:
-            </span>
+        <div className="flex flex-col gap-2.5 bg-surface p-3 rounded-2xl border border-border shadow-2xs">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-xs font-bold text-fg flex items-center gap-1.5">
+                <Filter className="w-3.5 h-3.5 text-accent" />
+                Фильтр по дням:
+              </span>
+
+              {/* Date Input Calendar Selector */}
+              <div className="flex items-center gap-1.5 bg-surface-raised border border-border hover:border-accent focus-within:border-accent rounded-xl px-2.5 py-1 transition-all shadow-2xs">
+                <Calendar className="w-3.5 h-3.5 text-accent shrink-0" />
+                <input
+                  type="date"
+                  value={selectedDay === 'all' ? '' : selectedDay}
+                  max={todayStr}
+                  onChange={(e) => handleDateSelect(e.target.value)}
+                  className="bg-transparent text-xs font-bold font-mono text-fg focus:outline-hidden cursor-pointer"
+                  title="Выбрать конкретный день по календарю"
+                />
+              </div>
+
+              {/* "Сегодня" quick button */}
+              <button
+                type="button"
+                onClick={() => handleDateSelect(todayStr)}
+                className={`px-2.5 py-1 rounded-xl text-xs font-semibold transition-all cursor-pointer flex items-center gap-1 ${
+                  selectedDay === todayStr
+                    ? 'bg-accent text-accent-fg shadow-xs font-bold'
+                    : 'bg-surface-raised text-fg-subtle hover:text-fg border border-border hover:bg-surface'
+                }`}
+                title="Показать сегодняшний день"
+              >
+                <Clock className="w-3.5 h-3.5" />
+                <span>Сегодня</span>
+                {todayCount > 0 && (
+                  <span className="text-[10px] font-mono opacity-80">({todayCount})</span>
+                )}
+              </button>
+
+              {/* "Все дни" quick button */}
+              <button
+                type="button"
+                onClick={() => setSelectedDay('all')}
+                className={`px-2.5 py-1 rounded-xl text-xs font-semibold transition-all cursor-pointer flex items-center gap-1 ${
+                  selectedDay === 'all'
+                    ? 'bg-accent text-accent-fg shadow-xs font-bold'
+                    : 'bg-surface-raised text-fg-subtle hover:text-fg border border-border hover:bg-surface'
+                }`}
+                title="Показать все дни за месяц"
+              >
+                <span>Все дни</span>
+                <span className="text-[10px] font-mono opacity-80">({closings.length})</span>
+              </button>
+            </div>
+
+            {/* Sort order toggle */}
             <button
               type="button"
               onClick={() => setSortOrder((prev) => (prev === 'desc' ? 'asc' : 'desc'))}
-              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-surface-raised border border-border hover:bg-surface text-fg text-xs font-medium transition-colors cursor-pointer active:scale-95"
+              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-surface-raised border border-border hover:bg-surface text-fg text-xs font-medium transition-colors cursor-pointer active:scale-95 shrink-0 self-start sm:self-auto"
               title="Изменить порядок сортировки по дням"
             >
               <ArrowUpDown className="w-3.5 h-3.5 text-accent" />
-              <span>{sortOrder === 'desc' ? 'Сначала новые дни' : 'Сначала старые дни'}</span>
+              <span>{sortOrder === 'desc' ? 'Сначала новые' : 'Сначала старые'}</span>
             </button>
           </div>
 
-          {/* Horizontal scrollable Day Chips */}
-          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
-            <button
-              type="button"
-              onClick={() => setSelectedDay('all')}
-              className={`px-2.5 py-1 rounded-lg text-xs font-semibold shrink-0 transition-all cursor-pointer ${
-                selectedDay === 'all'
-                  ? 'bg-accent text-accent-fg shadow-xs'
-                  : 'bg-surface-raised text-fg-subtle hover:text-fg border border-border hover:bg-surface'
-              }`}
-            >
-              Все дни ({closings.length})
-            </button>
-            {uniqueDays.map(({ date, count }) => {
-              const isSelected = selectedDay === date;
-              return (
-                <button
-                  type="button"
-                  key={date}
-                  onClick={() => setSelectedDay(isSelected ? 'all' : date)}
-                  className={`px-2.5 py-1 rounded-lg text-xs font-semibold shrink-0 transition-all cursor-pointer flex items-center gap-1 ${
-                    isSelected
-                      ? 'bg-accent text-accent-fg shadow-xs'
-                      : 'bg-surface-raised text-fg-subtle hover:text-fg border border-border hover:bg-surface'
-                  }`}
-                >
-                  <span>{formatDayChip(date)}</span>
-                  <span className={`text-[10px] font-mono opacity-80`}>({count})</span>
-                </button>
-              );
-            })}
-          </div>
+          {/* Quick days chips for days that have closings */}
+          {uniqueDays.length > 0 && (
+            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none pt-1 border-t border-border/40">
+              <span className="text-[11px] text-fg-subtle shrink-0 font-medium mr-0.5">
+                Дни со сменами:
+              </span>
+              {uniqueDays.map(({ date, count }) => {
+                const isSelected = selectedDay === date;
+                const isTodayDate = date === todayStr;
+                return (
+                  <button
+                    type="button"
+                    key={date}
+                    onClick={() => setSelectedDay(isSelected ? 'all' : date)}
+                    className={`px-2 py-0.5 rounded-lg text-xs font-medium shrink-0 transition-all cursor-pointer flex items-center gap-1 ${
+                      isSelected
+                        ? 'bg-accent text-accent-fg shadow-2xs font-semibold'
+                        : isTodayDate
+                        ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 font-semibold'
+                        : 'bg-surface-raised text-fg-subtle hover:text-fg border border-border hover:bg-surface'
+                    }`}
+                  >
+                    <span>{isTodayDate ? 'Сегодня' : formatDayChip(date)}</span>
+                    <span className="text-[10px] font-mono opacity-80">({count})</span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
         </div>
       )}
 
@@ -341,6 +413,32 @@ export const DailyCashClosingListPanel: React.FC<DailyCashClosingListPanelProps>
         </div>
       ) : closings.length === 0 ? (
         <EmptyState icon={FileCheck2} title="Закрытых смен нет" description="За выбранный месяц смены не закрывались" />
+      ) : displayedClosings.length === 0 ? (
+        <div className="p-8 text-center bg-surface rounded-2xl border border-border space-y-3">
+          <div className="w-10 h-10 rounded-full bg-accent/10 text-accent flex items-center justify-center mx-auto">
+            <Calendar className="w-5 h-5" />
+          </div>
+          <div className="space-y-1">
+            <p className="text-sm font-bold text-fg">
+              {selectedDay === todayStr
+                ? 'Смена за сегодня ещё не закрыта'
+                : `За ${formatDayChip(selectedDay)} закрытых смен нет`}
+            </p>
+            <p className="text-xs text-fg-subtle max-w-sm mx-auto">
+              {selectedDay === todayStr
+                ? 'Смена будет зафиксирована после закрытия кассы в конце рабочего дня.'
+                : 'В выбранный день закрытие смены в этом магазине не производилось.'}
+            </p>
+          </div>
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => setSelectedDay('all')}
+            className="mt-2"
+          >
+            Показать все дни месяца ({closings.length})
+          </Button>
+        </div>
       ) : (
         <div className="space-y-2.5">
           {/* Phones */}
