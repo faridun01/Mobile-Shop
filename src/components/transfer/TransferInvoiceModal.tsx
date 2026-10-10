@@ -18,6 +18,7 @@ import { formatMoney } from '../../utils/money';
 import { getTransferInvoiceItems, formatTransferInvoiceText } from '../../utils/transferInvoice';
 import { formatPhoneColor } from '../../utils/phoneSpecs';
 import { isLocationWarehouse } from './types';
+import { CopyImeiButton } from '../common/CopyImeiButton';
 
 export interface TransferInvoiceModalProps {
   open: boolean;
@@ -374,8 +375,9 @@ export const TransferInvoiceModal: React.FC<TransferInvoiceModalProps> = ({
                         </div>
                       </td>
                       <td className="py-2.5 px-3">
-                        <span className="font-mono font-bold text-fg bg-surface px-2 py-0.5 rounded border border-border/70 text-[11px]">
-                          {it.imei}
+                        <span className="font-mono font-bold text-fg bg-surface px-2 py-0.5 rounded border border-border/70 text-[11px] inline-flex items-center gap-1">
+                          <span>{it.imei}</span>
+                          <CopyImeiButton imei={it.imei} className="print:hidden" />
                         </span>
                       </td>
                       <td className="py-2.5 px-3 text-center font-bold text-fg">

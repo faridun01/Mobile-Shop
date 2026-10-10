@@ -23,6 +23,7 @@ import { SearchBar } from '../ui/SearchBar';
 import { DateRangePicker } from '../ui/DateRangePicker';
 import { cn } from '../../utils/cn';
 import { Select } from '../ui/Input';
+import { ImeiBadge } from '../common/CopyImeiButton';
 import { Button } from '../ui/Button';
 import { Badge } from '../ui/Badge';
 import { EmptyState } from '../ui/EmptyState';
@@ -887,11 +888,7 @@ export const SalesHistoryPage: React.FC = () => {
                           </div>
 
                           <div className="mt-1.5">
-                            <span className="inline-flex items-center gap-1 font-mono text-[10px] sm:text-[11px] bg-surface-raised/80 px-2 py-0.5 rounded-md border border-border/60 text-fg-muted">
-                              <span className="text-[9px] font-bold text-fg-subtle uppercase tracking-wider">IMEI</span>
-                              <span className="font-semibold text-fg tracking-wide">{item.imei}</span>
-                              {item.imei2 && <span className="opacity-60 text-[10px]">/{item.imei2}</span>}
-                            </span>
+                            <ImeiBadge imei={item.imei} imei2={item.imei2} />
                           </div>
                         </div>
                       </div>

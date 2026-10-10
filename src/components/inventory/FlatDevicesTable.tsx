@@ -6,6 +6,7 @@ import { Badge } from '../ui/Badge';
 import { useVirtualRows } from '../../hooks/useVirtualRows';
 import { DeviceRow } from './DeviceRow';
 import { approxTjs, STATUS_LABELS, STATUS_TONE } from './types';
+import { CopyImeiButton } from '../common/CopyImeiButton';
 
 interface FlatDevicesTableProps {
   isMobileLayout: boolean;
@@ -126,13 +127,15 @@ export const FlatDevicesTable: React.FC<FlatDevicesTableProps> = ({
                   </div>
                 </td>
                 <td className="p-3">
-                  <span className="font-mono text-xs font-semibold text-fg-muted block select-all">
-                    {dev.imei}
-                  </span>
+                  <div className="flex items-center gap-1 font-mono text-xs font-semibold text-fg-muted">
+                    <span className="select-all">{dev.imei}</span>
+                    <CopyImeiButton imei={dev.imei} />
+                  </div>
                   {dev.imei2 && (
-                    <span className="font-mono text-[10px] text-fg-subtle block select-all">
-                      2: {dev.imei2}
-                    </span>
+                    <div className="flex items-center gap-1 font-mono text-[10px] text-fg-subtle mt-0.5">
+                      <span className="select-all">2: {dev.imei2}</span>
+                      <CopyImeiButton imei={dev.imei2} />
+                    </div>
                   )}
                 </td>
                 <td className="p-3">

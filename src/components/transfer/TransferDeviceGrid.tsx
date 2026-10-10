@@ -19,6 +19,7 @@ import { TransferDeviceGridProps } from './types';
 import { getPhoneColorHex, formatRam, formatPhoneColor } from '../../utils/phoneSpecs';
 import { Device } from '../../types';
 import { useVirtualRows } from '../../hooks/useVirtualRows';
+import { CopyImeiButton } from '../common/CopyImeiButton';
 
 // Same breakpoints as the card grid used to have: 1 / sm:2 / lg:3 / xl:4 columns.
 const COLUMN_QUERIES: Array<[string, number]> = [['(min-width: 1280px)', 4], ['(min-width: 1024px)', 3], ['(min-width: 640px)', 2]];
@@ -279,8 +280,9 @@ export const TransferDeviceGrid: React.FC<TransferDeviceGridProps> = ({
 
                       {/* Bottom line: IMEI tag + RAM + color fallback on mobile */}
                       <div className="flex items-center gap-1.5 text-[10px] text-fg-subtle pt-0.5 min-w-0">
-                        <span className="font-mono truncate bg-surface-raised/80 px-1 py-0.2 rounded border border-border/60">
-                          IMEI: <strong className="text-fg font-semibold">{dev.imei}</strong>
+                        <span className="font-mono truncate bg-surface-raised/80 px-1 py-0.2 rounded border border-border/60 inline-flex items-center gap-1">
+                          <span>IMEI: <strong className="text-fg font-semibold">{dev.imei}</strong></span>
+                          <CopyImeiButton imei={dev.imei} />
                         </span>
                         {formattedRam && !dev.storage.toLowerCase().includes(formattedRam.toLowerCase()) && (
                           <span className="hidden sm:inline font-mono font-semibold text-accent">
@@ -745,8 +747,9 @@ export const TransferDeviceGrid: React.FC<TransferDeviceGridProps> = ({
                                     <span>{formatPhoneColor(dev.color)}</span>
                                   </span>
                                 )}
-                                <span className="font-mono text-[10px] text-fg-subtle bg-surface px-1.5 py-0.2 rounded border border-border/50">
-                                  IMEI: <strong className="text-fg font-medium">{dev.imei}</strong>
+                                <span className="font-mono text-[10px] text-fg-subtle bg-surface px-1.5 py-0.2 rounded border border-border/50 inline-flex items-center gap-1">
+                                  <span>IMEI: <strong className="text-fg font-medium">{dev.imei}</strong></span>
+                                  <CopyImeiButton imei={dev.imei} />
                                 </span>
                               </div>
                             </div>

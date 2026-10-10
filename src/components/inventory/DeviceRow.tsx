@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import { Badge } from '../ui/Badge';
 import { approxTjs, getPhoneColorHex, formatPhoneColor, STATUS_LABELS, STATUS_TONE } from './types';
+import { ImeiBadge } from '../common/CopyImeiButton';
 
 export interface DeviceRowProps {
   device: Device;
@@ -102,11 +103,7 @@ export const DeviceRow = React.forwardRef<HTMLButtonElement, DeviceRowProps>(
 
             {/* Line 2: Monospace IMEI + Location + Special Status */}
             <div className="flex items-center gap-1.5 text-[11px] text-fg-subtle mt-1.5 flex-wrap">
-              <span className="inline-flex items-center gap-1 font-mono text-[10px] sm:text-[11px] bg-surface-raised/80 px-2 py-0.5 rounded-md border border-border/60 text-fg-muted">
-                <span className="text-[9px] font-bold text-fg-subtle uppercase tracking-wider">IMEI</span>
-                <span className="font-semibold text-fg tracking-wide">{device.imei}</span>
-                {device.imei2 && <span className="opacity-60 text-[10px]">/{device.imei2}</span>}
-              </span>
+              <ImeiBadge imei={device.imei} imei2={device.imei2} />
 
               {storeName && (
                 <span className={`inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-md border ${

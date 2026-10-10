@@ -11,6 +11,7 @@ import {
 import { Dialog } from '../ui/Dialog';
 import { getPhoneColorHex, formatRam, formatPhoneColor } from '../../utils/phoneSpecs';
 import { ConfirmTransferModalProps } from './types';
+import { CopyImeiButton } from '../common/CopyImeiButton';
 
 export const ConfirmTransferModal: React.FC<ConfirmTransferModalProps> = ({
   open,
@@ -171,12 +172,14 @@ export const ConfirmTransferModal: React.FC<ConfirmTransferModalProps> = ({
                         )}
                       </div>
                       <div className="flex items-center gap-2 text-[10px] text-fg-subtle mt-1 font-mono">
-                        <span className="bg-surface-raised px-1.5 py-0.2 rounded border border-border/60">
-                          IMEI: <span className="text-fg font-semibold">{dev.imei}</span>
+                        <span className="bg-surface-raised px-1.5 py-0.2 rounded border border-border/60 inline-flex items-center gap-1">
+                          <span>IMEI: <span className="text-fg font-semibold">{dev.imei}</span></span>
+                          <CopyImeiButton imei={dev.imei} />
                         </span>
                         {dev.imei2 && (
-                          <span className="opacity-70">
-                            / {dev.imei2}
+                          <span className="opacity-70 inline-flex items-center gap-1">
+                            <span>/ {dev.imei2}</span>
+                            <CopyImeiButton imei={dev.imei2} />
                           </span>
                         )}
                       </div>

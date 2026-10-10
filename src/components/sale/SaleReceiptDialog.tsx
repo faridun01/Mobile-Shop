@@ -5,6 +5,7 @@ import { formatMoney } from '../../utils/money';
 import { formatReceiptText, paymentSummary } from '../../utils/receipt';
 import { Button } from '../ui/Button';
 import { Dialog } from '../ui/Dialog';
+import { CopyImeiButton } from '../common/CopyImeiButton';
 
 interface SaleReceiptDialogProps {
   /** Receipt number of the sale just completed, or null when closed. */
@@ -84,7 +85,10 @@ export const SaleReceiptDialog: React.FC<SaleReceiptDialogProps> = ({
               <div key={item.deviceId} className="flex items-start justify-between gap-3 px-3 py-2">
                 <div className="min-w-0">
                   <p className="font-medium text-fg-muted">{item.brand} {item.model}</p>
-                  <p className="text-xs text-fg-subtle">IMEI: {item.imei}</p>
+                  <div className="flex items-center gap-1 text-xs text-fg-subtle">
+                    <span>IMEI: {item.imei}</span>
+                    <CopyImeiButton imei={item.imei} />
+                  </div>
                 </div>
                 <span className="tabular-nums font-semibold text-fg-muted whitespace-nowrap">{formatMoney(item.salePriceTjs)} TJS</span>
               </div>

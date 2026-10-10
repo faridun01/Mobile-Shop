@@ -4,6 +4,7 @@ import { PurchaseItemGroup, getImeiPair } from './types';
 import { Combobox } from '../ui/Combobox';
 import { normalizePhoneColor, formatPhoneColor } from '../../utils/phoneSpecs';
 import { cn } from '../../utils/cn';
+import { CopyImeiButton } from '../common/CopyImeiButton';
 import {
   ArrowLeft,
   Plus,
@@ -349,21 +350,28 @@ export const NewPurchaseForm: React.FC<NewPurchaseFormProps> = ({
                               className={cn(
                                 'w-full h-7 rounded-lg bg-surface border px-2 text-xs text-fg font-mono focus:outline-none shadow-2xs transition-colors',
                                 is1Incomplete
-                                  ? 'border-amber-500/80 dark:border-amber-400/80 bg-amber-50/15 dark:bg-amber-950/20 pr-16 text-amber-700 dark:text-amber-300'
+                                  ? 'border-amber-500/80 dark:border-amber-400/80 bg-amber-50/15 dark:bg-amber-950/20 pr-20 text-amber-700 dark:text-amber-300'
                                   : is1Valid
-                                    ? 'border-emerald-500/60 dark:border-emerald-400/60 pr-16 text-emerald-700 dark:text-emerald-300 font-bold'
+                                    ? 'border-emerald-500/60 dark:border-emerald-400/60 pr-20 text-emerald-700 dark:text-emerald-300 font-bold'
                                     : 'border-border focus:border-accent pr-7'
                               )}
                             />
                             {clean1.length > 0 && (
                               <span
                                 className={cn(
-                                  'absolute right-7 text-[10px] font-bold font-mono pointer-events-none select-none',
+                                  'absolute right-13 text-[10px] font-bold font-mono pointer-events-none select-none',
                                   is1Incomplete ? 'text-amber-600 dark:text-amber-400' : 'text-emerald-600 dark:text-emerald-400'
                                 )}
                               >
                                 {is1Valid ? '15 ✓' : `${clean1.length}/15`}
                               </span>
+                            )}
+                            {clean1.length > 0 && (
+                              <CopyImeiButton
+                                imei={clean1}
+                                className="absolute right-6 top-1/2 -translate-y-1/2"
+                                title="Скопировать IMEI 1"
+                              />
                             )}
                             <button
                               type="button"
@@ -393,21 +401,28 @@ export const NewPurchaseForm: React.FC<NewPurchaseFormProps> = ({
                               className={cn(
                                 'w-full h-7 rounded-lg bg-surface border px-2 text-xs text-fg font-mono focus:outline-none shadow-2xs transition-colors',
                                 is2Incomplete
-                                  ? 'border-amber-500/80 dark:border-amber-400/80 bg-amber-50/15 dark:bg-amber-950/20 pr-16 text-amber-700 dark:text-amber-300'
+                                  ? 'border-amber-500/80 dark:border-amber-400/80 bg-amber-50/15 dark:bg-amber-950/20 pr-20 text-amber-700 dark:text-amber-300'
                                   : is2Valid
-                                    ? 'border-emerald-500/60 dark:border-emerald-400/60 pr-16 text-emerald-700 dark:text-emerald-300 font-bold'
+                                    ? 'border-emerald-500/60 dark:border-emerald-400/60 pr-20 text-emerald-700 dark:text-emerald-300 font-bold'
                                     : 'border-border focus:border-accent pr-7'
                               )}
                             />
                             {clean2.length > 0 && (
                               <span
                                 className={cn(
-                                  'absolute right-7 text-[10px] font-bold font-mono pointer-events-none select-none',
+                                  'absolute right-13 text-[10px] font-bold font-mono pointer-events-none select-none',
                                   is2Incomplete ? 'text-amber-600 dark:text-amber-400' : 'text-emerald-600 dark:text-emerald-400'
                                 )}
                               >
                                 {is2Valid ? '15 ✓' : `${clean2.length}/15`}
                               </span>
+                            )}
+                            {clean2.length > 0 && (
+                              <CopyImeiButton
+                                imei={clean2}
+                                className="absolute right-6 top-1/2 -translate-y-1/2"
+                                title="Скопировать IMEI 2"
+                              />
                             )}
                             <button
                               type="button"

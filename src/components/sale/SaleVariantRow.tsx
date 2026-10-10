@@ -4,6 +4,7 @@ import { Device } from '../../types';
 import { formatMoney } from '../../utils/money';
 import { Badge } from '../ui/Badge';
 import { formatPhoneColor } from '../../utils/phoneSpecs';
+import { CopyImeiButton } from '../common/CopyImeiButton';
 
 /** One sellable variant in the POS catalog: same brand, model, RAM, storage and colour. */
 export interface SaleVariant {
@@ -74,24 +75,40 @@ export const SaleVariantRow: React.FC<SaleVariantRowProps> = ({ variant, expande
             const isHighestCost = showCosts && hasCostVariance && devCost === maxCost;
             const price = retailPriceOf(dev);
             return (
-              <button
+              <div
                 key={dev.id}
+                role="button"
+                tabIndex={0}
                 onClick={() => onAddDevice(dev)}
-                className={`w-full p-3 text-left rounded-lg flex items-center justify-between gap-2 border transition-colors cursor-pointer ${
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    onAddDevice(dev);
+                  }
+                }}
+                className={`w-full p-3 text-left rounded-lg flex items-center justify-between gap-2 border transition-colors cursor-pointer select-none ${
                   isHighestCost ? 'border-warning bg-warning/10' : 'border-border bg-surface hover:bg-surface-raised'
                 }`}
               >
                 <div className="min-w-0">
-                  <p className="text-xs font-semibold text-fg-muted font-mono">
-                    IMEI: {dev.imei}{dev.imei2 ? ` / ${dev.imei2}` : ''}
-                  </p>
+                  <div className="text-xs font-semibold text-fg-muted font-mono flex items-center gap-1 flex-wrap">
+                    <span>IMEI: {dev.imei}</span>
+                    <CopyImeiButton imei={dev.imei} />
+                    {dev.imei2 && (
+                      <>
+                        <span className="opacity-50">/</span>
+                        <span>{dev.imei2}</span>
+                        <CopyImeiButton imei={dev.imei2} />
+                      </>
+                    )}
+                  </div>
                   {showCosts && devCost > 0 && <p className="text-xs text-fg-subtle mt-0.5">Закупка: ${devCost}</p>}
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
                   {price !== undefined && <span className="text-xs font-semibold tabular-nums text-fg-muted">{formatMoney(price)} TJS</span>}
                   <Badge tone={isHighestCost ? 'warning' : 'accent'}>Выбрать</Badge>
                 </div>
-              </button>
+              </div>
             );
           })}
         </div>
