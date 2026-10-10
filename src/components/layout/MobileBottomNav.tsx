@@ -9,6 +9,7 @@ import {
   Menu,
   Home,
   PackagePlus,
+  Wallet,
 } from 'lucide-react';
 
 export const MobileBottomNav: React.FC = () => {
@@ -73,13 +74,13 @@ export const MobileBottomNav: React.FC = () => {
           }}
         />
         <NavItem
-          routePath="/sales-history"
-          label="История"
-          title="История продаж"
-          icon={History}
+          routePath="/cash"
+          label="Касса"
+          title="Центральная касса"
+          icon={Wallet}
           onSelect={() => {
-            setActivePage('SALES_HISTORY');
-            navigate('/sales-history');
+            setActivePage('CASH_DESK');
+            navigate('/cash');
           }}
         />
 

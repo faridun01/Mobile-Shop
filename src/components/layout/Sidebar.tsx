@@ -143,7 +143,6 @@ export const Sidebar: React.FC = () => {
             { id: 'PURCHASE', label: 'Приходы (партии)', icon: PlusCircle, roles: ['ADMIN'] },
             { id: 'REPORTS', label: 'Отчёты', icon: TrendingUp, roles: ['ADMIN'] },
             { id: 'CASH_DESK', label: 'Касса', icon: Wallet, roles: ['ADMIN'] },
-            { id: 'SALES_HISTORY', label: 'История продаж', icon: History, roles: ['ADMIN'] },
             { id: 'CASH_COLLECTION', label: 'Инкассация', icon: HandCoins, roles: ['ADMIN'] },
             { id: 'EXPENSES', label: 'Расходы кассы', icon: Wallet, roles: ['ADMIN'] },
             { id: 'BONUSES', label: 'Бонусы поставщиков', icon: Gift, roles: ['ADMIN'] },

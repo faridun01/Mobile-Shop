@@ -94,7 +94,6 @@ export const TabletNavRail: React.FC = () => {
         { id: 'PURCHASE' as PageId, label: 'Приход', icon: PlusCircle },
         { id: 'CASH_DESK' as PageId, label: 'Касса', icon: Wallet },
         { id: 'REPORTS' as PageId, label: 'Отчёты', icon: TrendingUp },
-        { id: 'SALES_HISTORY' as PageId, label: 'Продажи', icon: History },
         { id: 'CASH_COLLECTION' as PageId, label: 'Инкасс.', icon: HandCoins },
         { id: 'EXPENSES' as PageId, label: 'Расходы', icon: Wallet },
         { id: 'BONUSES' as PageId, label: 'Бонусы', icon: Gift },
