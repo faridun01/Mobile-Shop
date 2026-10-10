@@ -377,15 +377,16 @@ try {
 
   // ------------------------------------------------------------------ BLOCK 10
   block = 'Блок 10: клиенты';
-  await step('база клиентов только в Центральной кассе; на кассе — короткий поиск для продажи в долг', async () => {
+  await step('база клиентов доступна админу и партнёру; на кассе продавца — только короткий поиск', async () => {
     assert.equal((await call(seller, 'GET', '/customers')).status, 403);
-    assert.equal((await call(partner, 'GET', '/customers?debtorsOnly=true')).status, 403);
+    ok(await call(partner, 'GET', '/customers?debtorsOnly=true'));
     const anyCustomer = await db.customer.findFirstOrThrow();
     assert.equal((await call(seller, 'GET', `/customers/${anyCustomer.id}`)).status, 403);
     assert.equal((await call(seller, 'PATCH', `/customers/${anyCustomer.id}`, { name: 'X' })).status, 403);
     const lookup = ok(await call(seller, 'GET', '/customers?search=900000001'));
     assert.deepEqual(Object.keys(lookup.items[0]).sort(), ['id', 'name', 'phone', 'totalDebtTjs']);
     ok(await call(admin, 'GET', '/customers'));
+    ok(await call(partner, 'GET', '/customers'));
   });
   await step('поиск клиента по имени и по телефону', async () => {
     const byName = ok(await call(seller, 'GET', `/customers?search=${encodeURIComponent('Фарид')}`));
