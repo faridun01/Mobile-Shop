@@ -229,9 +229,13 @@ export class StockRevisionService {
           "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
           "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
           CONSTRAINT "stock_revisions_pkey" PRIMARY KEY ("id")
-        );
-        CREATE INDEX IF NOT EXISTS "stock_revisions_storeId_createdAt_idx" ON "stock_revisions"("storeId", "createdAt");
-        CREATE INDEX IF NOT EXISTS "stock_revisions_createdAt_idx" ON "stock_revisions"("createdAt");
+        )
+      `);
+      await prisma.$executeRawUnsafe(`
+        CREATE INDEX IF NOT EXISTS "stock_revisions_storeId_createdAt_idx" ON "stock_revisions"("storeId", "createdAt")
+      `);
+      await prisma.$executeRawUnsafe(`
+        CREATE INDEX IF NOT EXISTS "stock_revisions_createdAt_idx" ON "stock_revisions"("createdAt")
       `);
     } catch (err) {
       console.warn('[StockRevision] ensureTable error:', (err as any)?.message || err);
