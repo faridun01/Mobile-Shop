@@ -336,6 +336,32 @@ export const PurchasePage: React.FC = () => {
 
   // Form helpers
   const handleAddGroup = () => {
+    for (let gIdx = 0; gIdx < groups.length; gIdx++) {
+      const g = groups[gIdx];
+      for (let itIdx = 0; itIdx < g.items.length; itIdx++) {
+        const [imei1, imei2] = getImeiPair(g.items[itIdx].imei);
+        const clean1 = imei1.replace(/\D/g, '');
+        const clean2 = imei2.replace(/\D/g, '');
+        if (clean1.length > 0 && clean1.length < 15) {
+          setStatusMessage({
+            type: 'error',
+            text: `Позиция #${gIdx + 1}, устройство #${itIdx + 1}: IMEI 1 содержит только ${clean1.length} из 15 цифр. Введите ровно 15 цифр!`,
+          });
+          soundEffects.playError();
+          return;
+        }
+        if (clean2.length > 0 && clean2.length < 15) {
+          setStatusMessage({
+            type: 'error',
+            text: `Позиция #${gIdx + 1}, устройство #${itIdx + 1}: IMEI 2 содержит только ${clean2.length} из 15 цифр. Введите ровно 15 цифр!`,
+          });
+          soundEffects.playError();
+          return;
+        }
+      }
+    }
+
+    soundEffects.playAddToCartSuccess();
     setGroups((prev) => [
       ...prev,
       {
@@ -364,6 +390,40 @@ export const PurchasePage: React.FC = () => {
   };
 
   const handleAddImeiToGroup = (groupIdx: number) => {
+    const group = groups[groupIdx];
+    if (group) {
+      const items = group.items;
+      const last = items[items.length - 1];
+      if (last) {
+        const [p1, p2] = getImeiPair(last.imei);
+        const c1 = p1.replace(/\D/g, '');
+        const c2 = p2 ? p2.replace(/\D/g, '') : '';
+        if (c1.length === 0) {
+          setStatusMessage({
+            type: 'error',
+            text: `Позиция #${groupIdx + 1}, устройство #${items.length}: заполните 15 цифр IMEI перед добавлением следующего устройства!`,
+          });
+          soundEffects.playError();
+          return;
+        }
+        if (c1.length < 15) {
+          setStatusMessage({
+            type: 'error',
+            text: `Позиция #${groupIdx + 1}, устройство #${items.length}: IMEI 1 содержит только ${c1.length} цифр. Должно быть ровно 15 цифр!`,
+          });
+          soundEffects.playError();
+          return;
+        }
+        if (c2.length > 0 && c2.length < 15) {
+          setStatusMessage({
+            type: 'error',
+            text: `Позиция #${groupIdx + 1}, устройство #${items.length}: IMEI 2 содержит только ${c2.length} цифр. Должно быть ровно 15 цифр!`,
+          });
+          soundEffects.playError();
+          return;
+        }
+      }
+    }
     soundEffects.playAddToCartSuccess();
     setGroups((prev) => {
       const next = [...prev];
@@ -398,41 +458,109 @@ export const PurchasePage: React.FC = () => {
 
   const handleUpdateImei2 = (groupIdx: number, itemIdx: number, value: string) => {
     const [imei1] = getImeiPair(groups[groupIdx].items[itemIdx]?.imei || '');
-    const imei2 = value.trim();
-    handleUpdateImei(groupIdx, itemIdx, imei2 ? `${imei1} / ${imei2}` : imei1);
+    const clean1 = imei1.replace(/\D/g, '').slice(0, 15);
+    const clean2 = value.replace(/\D/g, '').slice(0, 15);
+    handleUpdateImei(groupIdx, itemIdx, clean2 ? `${clean1} / ${clean2}` : clean1);
   };
 
   const handleScanImei = (groupIdx: number, itemIdx: number) => {
     openScanner((scannedCode) => {
-      handleUpdateImei(groupIdx, itemIdx, scannedCode.trim());
+      const clean = scannedCode.replace(/\D/g, '').slice(0, 15);
+      if (clean.length !== 15) {
+        setStatusMessage({
+          type: 'error',
+          text: `Отсканированный код содержит ${clean.length} знаков. IMEI должен содержать ровно 15 цифр!`,
+        });
+        soundEffects.playError();
+        return;
+      }
+      const [_, imei2] = getImeiPair(groups[groupIdx].items[itemIdx]?.imei || '');
+      handleUpdateImei(groupIdx, itemIdx, imei2 ? `${clean} / ${imei2}` : clean);
     });
   };
 
   const handleBatchImeiPaste = (groupIdx: number, text: string) => {
-    const rawLines = text.match(/\d{15}\s*\/\s*\d{15}|[^\s,]+/g)?.map((s) => s.trim()) ?? [];
-    if (rawLines.length > 0) {
+    if (!text.trim()) return;
+    const tokens = text
+      .split(/[\r\n,;\s]+/)
+      .map((s) => s.trim())
+      .filter(Boolean);
+
+    const validNewItems: { imei: string }[] = [];
+    const invalidTokens: string[] = [];
+
+    tokens.forEach((token) => {
+      const [p1, p2] = getImeiPair(token);
+      const c1 = p1.replace(/\D/g, '').slice(0, 15);
+      const c2 = p2 ? p2.replace(/\D/g, '').slice(0, 15) : '';
+
+      if (c1.length === 15 && (!c2 || c2.length === 15)) {
+        validNewItems.push({ imei: c2 ? `${c1} / ${c2}` : c1 });
+      } else {
+        invalidTokens.push(token);
+      }
+    });
+
+    if (invalidTokens.length > 0) {
+      setStatusMessage({
+        type: 'error',
+        text: `Пропущены некорректные IMEI (должно быть ровно 15 цифр): ${invalidTokens.slice(0, 3).join(', ')}${invalidTokens.length > 3 ? '...' : ''}`,
+      });
+      soundEffects.playError();
+    }
+
+    if (validNewItems.length > 0) {
       soundEffects.playAddToCartSuccess();
       setGroups((prev) => {
         const next = [...prev];
-        const newItems = rawLines.map((imei) => ({ imei }));
-
+        const existing = next[groupIdx].items.filter((it) => {
+          const [p1] = getImeiPair(it.imei);
+          return p1.replace(/\D/g, '').length === 15;
+        });
         next[groupIdx] = {
           ...next[groupIdx],
-          items: newItems,
+          items: existing.length > 0 ? [...existing, ...validNewItems] : validNewItems,
         };
         return next;
       });
     }
   };
 
-  // Calculate totals for new intake form
-  const totalFormUnits = groups.reduce((acc, g) => acc + g.items.filter((i) => i.imei.trim().length > 0).length, 0);
+  // Calculate totals for new intake form (only valid 15-digit IMEIs count)
+  const totalFormUnits = groups.reduce((acc, g) => {
+    return (
+      acc +
+      g.items.filter((i) => {
+        const [p1] = getImeiPair(i.imei);
+        return p1.replace(/\D/g, '').length === 15;
+      }).length
+    );
+  }, 0);
+
   const totalFormUsd = moneyNumber(
     groups.reduce((acc, g) => {
-      const count = g.items.filter((i) => i.imei.trim().length > 0).length;
+      const count = g.items.filter((i) => {
+        const [p1] = getImeiPair(i.imei);
+        return p1.replace(/\D/g, '').length === 15;
+      }).length;
       return acc.plus(decimal(g.purchasePriceUsd || 0).mul(count));
     }, decimal(0))
   );
+
+  const hasIncompleteImeis = useMemo(() => {
+    return groups.some((g) =>
+      g.items.some((item) => {
+        const raw = item.imei.trim();
+        if (!raw) return false;
+        const [imei1, imei2] = getImeiPair(raw);
+        const c1 = imei1.replace(/\D/g, '');
+        const c2 = imei2.replace(/\D/g, '');
+        if (c1.length > 0 && c1.length < 15) return true;
+        if (c2.length > 0 && c2.length < 15) return true;
+        return false;
+      })
+    );
+  }, [groups]);
 
   const [previewInvoice, setPreviewInvoice] = useState<PurchasePreviewData | null>(null);
 
@@ -479,13 +607,98 @@ export const PurchasePage: React.FC = () => {
         setStatusMessage({ type: 'error', text: `Позиция #${i + 1}: укажите цвет` });
         return;
       }
+
+      // Check each item's IMEI: must be strictly 15 digits
+      const filledInGroup = g.items.filter((it) => it.imei.trim().length > 0);
+      if (filledInGroup.length === 0) {
+        setStatusMessage({
+          type: 'error',
+          text: `Позиция #${i + 1} (${g.brand} ${g.model}): заполните хотя бы один 15-значный IMEI`,
+        });
+        return;
+      }
+
+      for (let j = 0; j < g.items.length; j++) {
+        const raw = g.items[j].imei.trim();
+        if (!raw) {
+          if (g.items.length === 1) {
+            setStatusMessage({
+              type: 'error',
+              text: `Позиция #${i + 1} (${g.brand} ${g.model}): укажите 15-значный IMEI`,
+            });
+            return;
+          }
+          continue;
+        }
+
+        const [p1, p2] = getImeiPair(raw);
+        const c1 = p1.replace(/\D/g, '');
+        const c2 = p2 ? p2.replace(/\D/g, '') : '';
+
+        if (c1.length !== 15) {
+          setStatusMessage({
+            type: 'error',
+            text: `Позиция #${i + 1} (${g.brand} ${g.model}), устройство #${j + 1}: IMEI 1 содержит ${c1.length} цифр. IMEI должен содержать ровно 15 цифр!`,
+          });
+          return;
+        }
+
+        if (c2 && c2.length !== 15) {
+          setStatusMessage({
+            type: 'error',
+            text: `Позиция #${i + 1} (${g.brand} ${g.model}), устройство #${j + 1}: IMEI 2 содержит ${c2.length} цифр. Должно быть ровно 15 цифр!`,
+          });
+          return;
+        }
+      }
+    }
+
+    // Check for duplicate IMEIs across all positions
+    const allImeis = new Set<string>();
+    for (let i = 0; i < groups.length; i++) {
+      const g = groups[i];
+      for (let j = 0; j < g.items.length; j++) {
+        const raw = g.items[j].imei.trim();
+        if (!raw) continue;
+        const [p1, p2] = getImeiPair(raw);
+        const c1 = p1.replace(/\D/g, '');
+        const c2 = p2 ? p2.replace(/\D/g, '') : '';
+        if (c1.length === 15) {
+          if (allImeis.has(c1)) {
+            setStatusMessage({
+              type: 'error',
+              text: `Дубликат IMEI в партии: ${c1} (позиция #${i + 1}, устройство #${j + 1})`,
+            });
+            return;
+          }
+          allImeis.add(c1);
+        }
+        if (c2.length === 15) {
+          if (allImeis.has(c2)) {
+            setStatusMessage({
+              type: 'error',
+              text: `Дубликат IMEI 2 в партии: ${c2} (позиция #${i + 1}, устройство #${j + 1})`,
+            });
+            return;
+          }
+          allImeis.add(c2);
+        }
+      }
     }
 
     const cleanGroups: PurchasePreviewGroup[] = groups
       .map((g) => {
         const validItems = g.items
-          .filter((i) => i.imei.trim().length > 0)
-          .map((i) => ({ imei: i.imei.trim() }));
+          .filter((i) => {
+            const [p1] = getImeiPair(i.imei);
+            return p1.replace(/\D/g, '').length === 15;
+          })
+          .map((i) => {
+            const [p1, p2] = getImeiPair(i.imei);
+            const c1 = p1.replace(/\D/g, '');
+            const c2 = p2 ? p2.replace(/\D/g, '') : '';
+            return { imei: c2 ? `${c1} / ${c2}` : c1 };
+          });
 
         const ramStr = g.ram.trim();
         const storageStr = g.storage.trim();
@@ -504,7 +717,7 @@ export const PurchasePage: React.FC = () => {
       .filter((g) => g.items.length > 0);
 
     if (cleanGroups.length === 0) {
-      setStatusMessage({ type: 'error', text: 'Добавьте хотя бы одно устройство с заполненным IMEI' });
+      setStatusMessage({ type: 'error', text: 'Добавьте хотя бы одно устройство с заполненным 15-значным IMEI' });
       return;
     }
 
@@ -633,6 +846,7 @@ export const PurchasePage: React.FC = () => {
           colorOptions={colorOptions}
           totalFormUnits={totalFormUnits}
           totalFormUsd={totalFormUsd}
+          hasIncompleteImeis={hasIncompleteImeis}
           statusMessage={statusMessage}
           isSubmitting={isSubmitting}
           onBackToList={() => {

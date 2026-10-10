@@ -3,6 +3,7 @@ import { Supplier, Store, User } from '../../types';
 import { PurchaseItemGroup, getImeiPair } from './types';
 import { Combobox } from '../ui/Combobox';
 import { normalizePhoneColor, formatPhoneColor } from '../../utils/phoneSpecs';
+import { cn } from '../../utils/cn';
 import {
   ArrowLeft,
   Plus,
@@ -38,6 +39,7 @@ interface NewPurchaseFormProps {
   colorOptions: string[];
   totalFormUnits: number;
   totalFormUsd: number;
+  hasIncompleteImeis?: boolean;
   statusMessage: { type: 'success' | 'error'; text: string } | null;
   isSubmitting: boolean;
   onBackToList: () => void;
@@ -69,6 +71,7 @@ export const NewPurchaseForm: React.FC<NewPurchaseFormProps> = ({
   colorOptions,
   totalFormUnits,
   totalFormUsd,
+  hasIncompleteImeis = false,
   statusMessage,
   isSubmitting,
   onBackToList,
@@ -299,7 +302,7 @@ export const NewPurchaseForm: React.FC<NewPurchaseFormProps> = ({
                 <div>
                   <input
                     type="text"
-                    placeholder="Быстрая вставка списка IMEI (через пробел, запятую или Enter)..."
+                    placeholder="Быстрая вставка списка IMEI (по 15 цифр через пробел, запятую или Enter)..."
                     onKeyDown={(e) => {
                       if (e.key === 'Enter') {
                         e.preventDefault();
@@ -308,7 +311,7 @@ export const NewPurchaseForm: React.FC<NewPurchaseFormProps> = ({
                       }
                     }}
                     onBlur={(e) => {
-                      if (e.target.value.trim().length > 15) {
+                      if (e.target.value.trim().length >= 15) {
                         onBatchImeiPaste(groupIdx, e.target.value);
                         e.target.value = '';
                       }
@@ -320,18 +323,48 @@ export const NewPurchaseForm: React.FC<NewPurchaseFormProps> = ({
                 <div className="space-y-1 font-mono">
                   {group.items.map((item, itemIdx) => {
                     const [imei1, imei2] = getImeiPair(item.imei);
+                    const clean1 = imei1.replace(/\D/g, '').slice(0, 15);
+                    const clean2 = imei2.replace(/\D/g, '').slice(0, 15);
+                    const is1Incomplete = clean1.length > 0 && clean1.length < 15;
+                    const is1Valid = clean1.length === 15;
+                    const is2Incomplete = clean2.length > 0 && clean2.length < 15;
+                    const is2Valid = clean2.length === 15;
+
                     return (
                       <div key={itemIdx} className="grid grid-cols-1 sm:grid-cols-2 gap-1 p-1 rounded-lg bg-surface-raised/40 border border-border/50">
                         <div>
-                          <div className="relative">
+                          <div className="relative flex items-center">
                             <input
                               type="text"
+                              inputMode="numeric"
+                              pattern="\d{15}"
+                              maxLength={15}
                               required
-                              value={imei1}
-                              onChange={(e) => onUpdateImei(groupIdx, itemIdx, `${e.target.value} / ${imei2}`.replace(/ \/ $/, ''))}
-                              placeholder={`IMEI 1 #${itemIdx + 1}`}
-                              className="w-full h-7 rounded-lg bg-surface border border-border px-2 pr-7 text-xs text-fg font-mono focus:border-accent focus:outline-none shadow-2xs"
+                              value={clean1}
+                              onChange={(e) => {
+                                const digits = e.target.value.replace(/\D/g, '').slice(0, 15);
+                                onUpdateImei(groupIdx, itemIdx, clean2 ? `${digits} / ${clean2}` : digits);
+                              }}
+                              placeholder={`IMEI 1 #${itemIdx + 1} (15 цифр)`}
+                              className={cn(
+                                'w-full h-7 rounded-lg bg-surface border px-2 text-xs text-fg font-mono focus:outline-none shadow-2xs transition-colors',
+                                is1Incomplete
+                                  ? 'border-amber-500/80 dark:border-amber-400/80 bg-amber-50/15 dark:bg-amber-950/20 pr-16 text-amber-700 dark:text-amber-300'
+                                  : is1Valid
+                                    ? 'border-emerald-500/60 dark:border-emerald-400/60 pr-16 text-emerald-700 dark:text-emerald-300 font-bold'
+                                    : 'border-border focus:border-accent pr-7'
+                              )}
                             />
+                            {clean1.length > 0 && (
+                              <span
+                                className={cn(
+                                  'absolute right-7 text-[10px] font-bold font-mono pointer-events-none select-none',
+                                  is1Incomplete ? 'text-amber-600 dark:text-amber-400' : 'text-emerald-600 dark:text-emerald-400'
+                                )}
+                              >
+                                {is1Valid ? '15 ✓' : `${clean1.length}/15`}
+                              </span>
+                            )}
                             <button
                               type="button"
                               onClick={() => onScanImei(groupIdx, itemIdx)}
@@ -345,14 +378,37 @@ export const NewPurchaseForm: React.FC<NewPurchaseFormProps> = ({
                         </div>
 
                         <div className="flex items-center gap-1">
-                          <div className="relative flex-1">
+                          <div className="relative flex-1 flex items-center">
                             <input
                               type="text"
-                              value={imei2}
-                              onChange={(e) => onUpdateImei2(groupIdx, itemIdx, e.target.value)}
-                              placeholder="IMEI 2 (необязательно)"
-                              className="w-full h-7 rounded-lg bg-surface border border-border px-2 pr-7 text-xs text-fg font-mono focus:border-accent focus:outline-none shadow-2xs"
+                              inputMode="numeric"
+                              pattern="\d{15}"
+                              maxLength={15}
+                              value={clean2}
+                              onChange={(e) => {
+                                const digits = e.target.value.replace(/\D/g, '').slice(0, 15);
+                                onUpdateImei2(groupIdx, itemIdx, digits);
+                              }}
+                              placeholder="IMEI 2 (необязательно, 15 цифр)"
+                              className={cn(
+                                'w-full h-7 rounded-lg bg-surface border px-2 text-xs text-fg font-mono focus:outline-none shadow-2xs transition-colors',
+                                is2Incomplete
+                                  ? 'border-amber-500/80 dark:border-amber-400/80 bg-amber-50/15 dark:bg-amber-950/20 pr-16 text-amber-700 dark:text-amber-300'
+                                  : is2Valid
+                                    ? 'border-emerald-500/60 dark:border-emerald-400/60 pr-16 text-emerald-700 dark:text-emerald-300 font-bold'
+                                    : 'border-border focus:border-accent pr-7'
+                              )}
                             />
+                            {clean2.length > 0 && (
+                              <span
+                                className={cn(
+                                  'absolute right-7 text-[10px] font-bold font-mono pointer-events-none select-none',
+                                  is2Incomplete ? 'text-amber-600 dark:text-amber-400' : 'text-emerald-600 dark:text-emerald-400'
+                                )}
+                              >
+                                {is2Valid ? '15 ✓' : `${clean2.length}/15`}
+                              </span>
+                            )}
                             <button
                               type="button"
                               onClick={() => onOpenScannerForImei2(groupIdx, itemIdx)}
@@ -431,7 +487,8 @@ export const NewPurchaseForm: React.FC<NewPurchaseFormProps> = ({
 
             <button
               type="submit"
-              disabled={totalFormUnits === 0 || isSubmitting}
+              disabled={totalFormUnits === 0 || hasIncompleteImeis || isSubmitting}
+              title={hasIncompleteImeis ? 'Каждый указанный IMEI должен содержать ровно 15 цифр' : undefined}
               className="h-7.5 px-3.5 rounded-lg bg-accent hover:opacity-90 active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed text-xs font-bold text-accent-fg shadow-xs transition-all flex items-center gap-1.5 cursor-pointer"
             >
               <FileText className="w-3.5 h-3.5" />

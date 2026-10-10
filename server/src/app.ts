@@ -391,6 +391,15 @@ app.post('/api/purchases', authenticateJwt, requireRoles('ADMIN'), enforceBodySt
         throw new Error('Каждое устройство должно содержать IMEI, бренд, модель, RAM и память');
       }
 
+      for (const device of normalizedDevices) {
+        if (!device.imei || !/^\d{15}$/.test(device.imei)) {
+          throw new Error(`IMEI устройства (${device.brand} ${device.model}) должен содержать ровно 15 цифр (получено: "${device.imei}")`);
+        }
+        if (device.imei2 && !/^\d{15}$/.test(device.imei2)) {
+          throw new Error(`IMEI 2 устройства (${device.brand} ${device.model}) должен содержать ровно 15 цифр (получено: "${device.imei2}")`);
+        }
+      }
+
       const identifiers = normalizedDevices.flatMap((device) => [device.imei, device.imei2]).filter(Boolean);
       if (new Set(identifiers).size !== identifiers.length) throw new Error('В запросе обнаружены дублирующиеся IMEI');
       const existing = await transaction.device.findFirst({

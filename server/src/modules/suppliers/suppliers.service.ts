@@ -343,6 +343,11 @@ export class SuppliersService {
       });
 
       if (input.bonusType === 'FREE_DEVICES' && input.freeDevices?.length) {
+        for (const d of input.freeDevices) {
+          if (!d.imei || !/^\d{15}$/.test(d.imei)) {
+            throw new Error(`IMEI бонусного устройства (${d.brand} ${d.model}) должен содержать ровно 15 цифр (получено: "${d.imei}")`);
+          }
+        }
         const imeis = input.freeDevices.map((d) => d.imei);
         const existing = await tx.device.findFirst({ where: { OR: imeis.flatMap((imei) => [{ imei }, { imei2: imei }]) } });
         if (existing) throw new Error(`IMEI ${existing.imei} уже зарегистрирован`);
