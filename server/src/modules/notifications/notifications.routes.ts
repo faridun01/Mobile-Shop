@@ -1,5 +1,5 @@
 import type { Express } from 'express';
-import { authenticateJwt, type AuthenticatedRequest } from '../../auth/auth.middleware';
+import { authenticateJwt, requireRoles, type AuthenticatedRequest } from '../../auth/auth.middleware';
 import { prisma } from '../../prisma/prisma.service';
 import { RealtimeSyncGateway } from '../../websocket/websocket.gateway';
 import { PushNotificationService } from './push.service';
@@ -113,8 +113,8 @@ export function registerNotificationRoutes(app: Express) {
     res.json({ publicKey });
   });
 
-  // Save push subscription for the logged-in user
-  app.post('/api/push/subscribe', authenticateJwt, async (req: AuthenticatedRequest, res, next) => {
+  // Save push subscription for the logged-in user (ADMIN only)
+  app.post('/api/push/subscribe', authenticateJwt, requireRoles('ADMIN'), async (req: AuthenticatedRequest, res, next) => {
     try {
       const user = req.user!;
       const { subscription, userAgent } = req.body || {};
@@ -142,8 +142,8 @@ export function registerNotificationRoutes(app: Express) {
     }
   });
 
-  // Test push notification delivery to current user
-  app.post('/api/push/test', authenticateJwt, async (req: AuthenticatedRequest, res, next) => {
+  // Test push notification delivery to current user (ADMIN only)
+  app.post('/api/push/test', authenticateJwt, requireRoles('ADMIN'), async (req: AuthenticatedRequest, res, next) => {
     try {
       const user = req.user!;
       await PushNotificationService.sendPushToUser(user.userId, {

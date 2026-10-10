@@ -16,6 +16,7 @@ import { StoreSwitchModal } from '../components/common/StoreSwitchModal';
 import { DailyCashClosingModal } from '../components/finance/DailyCashClosingModal';
 import { StoreTransitionOverlay } from '../components/common/StoreTransitionOverlay';
 import { PWAInstallPrompt } from '../components/pwa/PWAInstallPrompt';
+import { AdminPushPrompt } from '../components/notifications/AdminPushPrompt';
 import { useUIStore } from '../stores/useUIStore';
 import { useAppFields } from '../context/AppContext';
 import { LoadingState } from '../components/ui/Skeleton';
@@ -231,6 +232,7 @@ export function MainLayout() {
       ) : (
         <PWAInstallPrompt />
       )}
+      <AdminPushPrompt />
     </div>
   );
 }
