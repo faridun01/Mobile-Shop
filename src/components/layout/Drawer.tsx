@@ -131,7 +131,6 @@ export const Drawer: React.FC = () => {
           title: 'Склад и касса',
           items: [
             { id: 'TRANSFER', label: 'Перемещение', icon: ArrowLeftRight, roles: ['SELLER'] },
-            { id: 'REVISION', label: 'Ревизия склада', icon: ClipboardCheck, roles: ['SELLER'] },
             { id: 'EXPENSES', label: 'Расходы кассы', icon: Wallet, roles: ['SELLER'] },
             { id: 'EXCHANGE', label: 'Обмен (Trade-In)', icon: RefreshCw, roles: ['SELLER'] },
             { id: 'REPAIR', label: 'Сервис и ремонт', icon: Wrench, roles: ['SELLER'] },
@@ -154,7 +153,6 @@ export const Drawer: React.FC = () => {
           items: [
             { id: 'INVENTORY', label: 'Склад магазина', icon: Package, roles: ['PARTNER'] },
             { id: 'TRANSFER', label: 'Перемещение', icon: ArrowLeftRight, roles: ['PARTNER'] },
-            { id: 'REVISION', label: 'Ревизия склада', icon: ClipboardCheck, roles: ['PARTNER'] },
           ],
         },
         {

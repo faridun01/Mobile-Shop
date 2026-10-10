@@ -168,7 +168,7 @@ export function MainLayout() {
               <Route path="/settings" element={<SettingsPage />} />
               <Route path="/notifications" element={currentUser?.role === 'ADMIN' ? <NotificationsPage /> : <Navigate to="/sale" replace />} />
               <Route path="/receipts" element={<StoreReceiptPage />} />
-              <Route path="/revision" element={<RevisionPage />} />
+              <Route path="/revision" element={currentUser?.role === 'ADMIN' ? <RevisionPage /> : <Navigate to="/sale" replace />} />
               <Route path="*" element={<Navigate to={currentUser?.role === 'ADMIN' ? "/" : "/sale"} replace />} />
             </Routes>
           </Suspense>

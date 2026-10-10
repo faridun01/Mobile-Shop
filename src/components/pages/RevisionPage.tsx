@@ -14,6 +14,7 @@ import { SearchBar } from '../ui/SearchBar';
 import { DEVICE_STATUS_LABELS, findDeviceByCode, normalizeScanCode } from '../../utils/scanLookup';
 import { formatPhoneColor } from '../../utils/phoneSpecs';
 import { RevisionHistoryPanel } from '../revision/RevisionHistoryPanel';
+import { RestrictedAccess } from '../ui/RestrictedAccess';
 import {
   CheckCircle2,
   RotateCcw,
@@ -58,8 +59,12 @@ export const RevisionPage: React.FC = () => {
     'openScanner'
   );
 
-  const isAdmin = currentUser?.role === 'ADMIN';
-  const isPartner = currentUser?.role === 'PARTNER';
+  if (currentUser?.role !== 'ADMIN') {
+    return <RestrictedAccess message="Раздел ревизии склада доступен только администраторам." />;
+  }
+
+  const isAdmin = true;
+  const isPartner = false;
 
   // Store resolution: Staff users audit their assigned store; Admins can choose store
   const defaultStoreId = stores.find((s) => !s.isMainWarehouse)?.id || stores[0]?.id || '';

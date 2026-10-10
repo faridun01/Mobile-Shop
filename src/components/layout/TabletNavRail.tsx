@@ -69,7 +69,6 @@ export const TabletNavRail: React.FC = () => {
         { id: 'REPAIR' as PageId, label: 'Ремонт', icon: Wrench },
         { id: 'INVENTORY' as PageId, label: 'Склад', icon: Package },
         { id: 'STORE_RECEIPT' as PageId, label: 'Приход', icon: PackagePlus },
-        { id: 'REVISION' as PageId, label: 'Ревизия', icon: ClipboardCheck },
         { id: 'TRANSFER' as PageId, label: 'Перемещ.', icon: ArrowLeftRight },
       ];
     }
@@ -83,7 +82,6 @@ export const TabletNavRail: React.FC = () => {
         { id: 'EXCHANGE' as PageId, label: 'Обмен', icon: RefreshCw },
         { id: 'REPAIR' as PageId, label: 'Ремонт', icon: Wrench },
         { id: 'INVENTORY' as PageId, label: 'Склад', icon: Package },
-        { id: 'REVISION' as PageId, label: 'Ревизия', icon: ClipboardCheck },
         { id: 'TRANSFER' as PageId, label: 'Перемещ.', icon: ArrowLeftRight },
         { id: 'EXPENSES' as PageId, label: 'Расходы', icon: Wallet },
         { id: 'SETTINGS' as PageId, label: 'Опции', icon: Settings },

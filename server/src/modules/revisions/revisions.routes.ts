@@ -1,10 +1,10 @@
 import type { Express } from 'express';
-import { authenticateJwt, type AuthenticatedRequest } from '../../auth/auth.middleware';
+import { authenticateJwt, requireRoles, type AuthenticatedRequest } from '../../auth/auth.middleware';
 import { StockRevisionService } from './revisions.service';
 
 export function registerStockRevisionRoutes(app: Express) {
-  // List revisions history
-  app.get('/api/revisions', authenticateJwt, async (req: AuthenticatedRequest, res, next) => {
+  // List revisions history (ADMIN only)
+  app.get('/api/revisions', authenticateJwt, requireRoles('ADMIN'), async (req: AuthenticatedRequest, res, next) => {
     try {
       const user = req.user!;
       const storeId = typeof req.query.storeId === 'string' ? req.query.storeId.trim() : undefined;
@@ -17,8 +17,8 @@ export function registerStockRevisionRoutes(app: Express) {
     }
   });
 
-  // Get revision details by ID
-  app.get('/api/revisions/:id', authenticateJwt, async (req: AuthenticatedRequest, res, next) => {
+  // Get revision details by ID (ADMIN only)
+  app.get('/api/revisions/:id', authenticateJwt, requireRoles('ADMIN'), async (req: AuthenticatedRequest, res, next) => {
     try {
       const user = req.user!;
       const item = await StockRevisionService.getById(user, req.params.id);
@@ -28,8 +28,8 @@ export function registerStockRevisionRoutes(app: Express) {
     }
   });
 
-  // Save completed revision
-  app.post('/api/revisions', authenticateJwt, async (req: AuthenticatedRequest, res, next) => {
+  // Save completed revision (ADMIN only)
+  app.post('/api/revisions', authenticateJwt, requireRoles('ADMIN'), async (req: AuthenticatedRequest, res, next) => {
     try {
       const user = req.user!;
       const body = req.body || {};
