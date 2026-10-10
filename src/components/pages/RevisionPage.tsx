@@ -64,16 +64,13 @@ export const RevisionPage: React.FC = () => {
   }
 
   const isAdmin = true;
-  const isPartner = false;
 
-  // Store resolution: Staff users audit their assigned store; Admins can choose store
+  // Store resolution: Admin can audit any store from selector or default store
   const defaultStoreId = stores.find((s) => !s.isMainWarehouse)?.id || stores[0]?.id || '';
   const effectiveStoreId =
-    (currentUser?.role === 'SELLER' || isPartner) && currentUser?.storeId
-      ? currentUser.storeId
-      : (selectedStoreId && selectedStoreId !== 'all' && stores.some((s) => s.id === selectedStoreId)
-          ? selectedStoreId
-          : defaultStoreId);
+    selectedStoreId && selectedStoreId !== 'all' && stores.some((s) => s.id === selectedStoreId)
+      ? selectedStoreId
+      : defaultStoreId;
 
   const currentStore = stores.find((s) => s.id === effectiveStoreId);
   const isMain = currentStore?.isMainWarehouse;
