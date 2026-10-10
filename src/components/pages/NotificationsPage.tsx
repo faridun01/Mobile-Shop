@@ -240,52 +240,43 @@ export const NotificationsPage: React.FC = () => {
 
   return (
     <div className="work-screen flex-1 flex flex-col h-full overflow-hidden bg-bg text-fg-muted">
-      {/* Sleek Compact Header & Controls Toolbar */}
-      <div className="px-2.5 sm:px-3 py-1.5 border-b border-border bg-surface/90 backdrop-blur-xs flex flex-wrap items-center justify-between gap-1.5 shrink-0 relative z-20">
-        {/* Left: Title + Filter Tabs */}
-        <div className="flex items-center gap-2 min-w-0">
-          <div className="flex items-center gap-1.5 shrink-0">
-            <div className="w-6 h-6 rounded-lg bg-accent/10 border border-accent/25 flex items-center justify-center text-accent">
-              <Bell className="w-3.5 h-3.5" />
-            </div>
-            <h1 className="text-xs font-bold text-fg hidden xs:inline">Уведомления</h1>
-          </div>
-
-          <div className="flex items-center p-0.5 rounded-lg bg-surface-raised border border-border/80 text-[11px] font-medium">
-            <button
-              type="button"
-              onClick={() => setView('UNREAD')}
-              className={`px-2 py-0.5 rounded-md transition-all cursor-pointer flex items-center gap-1 ${
-                view === 'UNREAD'
-                  ? 'bg-accent text-white font-semibold shadow-2xs'
-                  : 'text-fg-subtle hover:text-fg'
-              }`}
-            >
-              <span>Непрочитанные</span>
-              {unreadCount > 0 && (
-                <span className={`px-1 py-0.2 rounded-full text-[9px] font-bold ${
-                  view === 'UNREAD' ? 'bg-white/20 text-white' : 'bg-accent/15 text-accent'
-                }`}>
-                  {unreadCount}
-                </span>
-              )}
-            </button>
-            <button
-              type="button"
-              onClick={() => setView('ALL')}
-              className={`px-2 py-0.5 rounded-md transition-all cursor-pointer ${
-                view === 'ALL'
-                  ? 'bg-accent text-white font-semibold shadow-2xs'
-                  : 'text-fg-subtle hover:text-fg'
-              }`}
-            >
-              Все
-            </button>
-          </div>
+      {/* Sleek Compact Header & Controls Toolbar: single line, no wrapping */}
+      <div className="px-2 sm:px-3 py-1 border-b border-border bg-surface/95 backdrop-blur-xs flex items-center justify-between gap-1.5 shrink-0 relative z-20">
+        {/* Left: Filter Tabs */}
+        <div className="flex items-center p-0.5 rounded-lg bg-surface-raised border border-border/80 text-[11px] font-medium shrink-0">
+          <button
+            type="button"
+            onClick={() => setView('UNREAD')}
+            className={`px-2 py-0.5 rounded-md transition-all cursor-pointer flex items-center gap-1 ${
+              view === 'UNREAD'
+                ? 'bg-accent text-white font-semibold shadow-2xs'
+                : 'text-fg-subtle hover:text-fg'
+            }`}
+          >
+            <span>Новые</span>
+            {unreadCount > 0 && (
+              <span className={`px-1 py-0.2 rounded-full text-[9px] font-bold ${
+                view === 'UNREAD' ? 'bg-white/20 text-white' : 'bg-accent/15 text-accent'
+              }`}>
+                {unreadCount}
+              </span>
+            )}
+          </button>
+          <button
+            type="button"
+            onClick={() => setView('ALL')}
+            className={`px-2 py-0.5 rounded-md transition-all cursor-pointer ${
+              view === 'ALL'
+                ? 'bg-accent text-white font-semibold shadow-2xs'
+                : 'text-fg-subtle hover:text-fg'
+            }`}
+          >
+            Все
+          </button>
         </div>
 
         {/* Right: Store & Action filters + Mark All */}
-        <div className="flex items-center gap-1.5 ml-auto sm:ml-0">
+        <div className="flex items-center gap-1 ml-auto shrink-0">
           {storeCtx.mode === 'CENTRAL' && (
             <StoreSelector
               value={storeId}
@@ -299,22 +290,21 @@ export const NotificationsPage: React.FC = () => {
               align="right"
               variant="dropdown"
               title="Магазин"
-              triggerClassName="h-7 text-[11px] font-medium"
-              menuWidth="min-w-[210px]"
+              triggerClassName="h-6.5 min-h-[26px] py-0 px-2 text-[11px] font-medium max-w-[125px] sm:max-w-none"
+              menuWidth="min-w-[200px]"
             />
           )}
-
 
           {hasUnread && (
             <button
               type="button"
               onClick={markAll}
-              className="h-7 px-2 rounded-lg bg-surface-raised hover:bg-surface border border-border text-[11px] font-semibold text-fg-muted hover:text-accent transition-all active:scale-95 flex items-center gap-1 cursor-pointer shrink-0"
+              className="h-6.5 min-h-[26px] px-2 rounded-lg bg-surface-raised hover:bg-surface border border-border text-[11px] font-semibold text-fg-muted hover:text-accent transition-all active:scale-95 flex items-center gap-1 cursor-pointer shrink-0"
               title="Отметить все прочитанными"
             >
               <CheckCheck className="w-3.5 h-3.5 text-accent" />
-              <span className="hidden xs:inline">Прочитать все</span>
-              <span className="xs:hidden">Все</span>
+              <span className="hidden sm:inline">Прочитать все</span>
+              <span className="sm:hidden text-[10px]">Все</span>
             </button>
           )}
         </div>
@@ -335,7 +325,7 @@ export const NotificationsPage: React.FC = () => {
             description={view === 'UNREAD' ? 'Все события за 24 часа просмотрены' : 'За последние 24 часа новых событий не зафиксировано'}
           />
         ) : (
-          <div className="p-2 sm:p-2.5 space-y-1.5">
+          <div className="p-1.5 sm:p-2 space-y-1">
             {items.map((n) => {
               const unread = !n.read;
               const path = targetPath(n);
@@ -349,110 +339,114 @@ export const NotificationsPage: React.FC = () => {
                 <div
                   key={n.id}
                   onClick={() => open(n)}
-                  className={`group relative rounded-xl border transition-all text-left p-2 sm:p-2.5 cursor-pointer select-none active:scale-[0.995] ${
+                  className={`group relative rounded-lg border transition-all text-left p-2 cursor-pointer select-none active:scale-[0.995] flex items-start gap-2 ${
                     unread
                       ? 'bg-accent/[0.04] border-accent/30 hover:border-accent/50 shadow-2xs'
                       : 'bg-surface hover:bg-surface-raised/80 border-border/80 text-fg-muted'
                   }`}
                 >
-                  {/* Row 1: Icon + Title + Action Badge + Amounts + Date + Mark Read */}
-                  <div className="flex items-center justify-between gap-1.5 min-w-0">
-                    <div className="flex items-center gap-2 min-w-0 flex-1">
-                      <div className={`w-6 h-6 rounded-lg border flex items-center justify-center shrink-0 ${badgeStyle}`}>
-                        <EventIcon className="w-3 h-3" />
-                      </div>
-                      
-                      <span className={`text-xs truncate ${unread ? 'font-bold text-fg' : 'font-medium text-fg-muted'}`}>
-                        {n.title}
-                      </span>
-
-                      {unread && (
-                        <span className="w-1.5 h-1.5 rounded-full bg-accent shrink-0 animate-pulse" />
-                      )}
-
-                      {n.actionType && ACTION_LABELS[n.actionType] &&
-                       !n.title.toLowerCase().includes(ACTION_LABELS[n.actionType].toLowerCase()) && (
-                        <span className="hidden xs:inline-flex px-1.5 py-0.2 rounded text-[10px] font-medium bg-surface-raised border border-border/60 text-fg-subtle shrink-0">
-                          {ACTION_LABELS[n.actionType]}
-                        </span>
-                      )}
-                    </div>
-
-                    <div className="flex items-center gap-1.5 shrink-0">
-                      {amounts && (
-                        <span className="text-[11px] font-bold font-mono text-emerald-400 bg-emerald-500/10 px-1.5 py-0.2 rounded border border-emerald-500/20 shrink-0">
-                          {amounts}
-                        </span>
-                      )}
-                      <span className="text-[10px] font-mono text-fg-subtle whitespace-nowrap">
-                        {dateLabel}
-                      </span>
-                      {unread && (
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            void markRead(n);
-                          }}
-                          title="Отметить прочитанным"
-                          className="w-5 h-5 rounded hover:bg-accent/20 text-fg-subtle hover:text-accent flex items-center justify-center transition-colors cursor-pointer"
-                        >
-                          <Check className="w-3.5 h-3.5" />
-                        </button>
-                      )}
-                    </div>
+                  {/* Event Icon */}
+                  <div className={`w-5.5 h-5.5 rounded-md border flex items-center justify-center shrink-0 mt-0.5 ${badgeStyle}`}>
+                    <EventIcon className="w-3 h-3" />
                   </div>
 
-                  {/* Row 2: Message body (if present) */}
-                  {n.message && (
-                    <p className="text-[11px] text-fg-muted/90 mt-1 pl-8 leading-snug line-clamp-1 sm:line-clamp-2">
-                      {n.message}
-                    </p>
-                  )}
+                  {/* Body */}
+                  <div className="flex-1 min-w-0">
+                    {/* Line 1: Title + Action Tag + Amounts + Date + Mark Read */}
+                    <div className="flex items-center justify-between gap-1.5 min-w-0">
+                      <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                        <span className={`text-xs truncate ${unread ? 'font-bold text-fg' : 'font-medium text-fg-muted'}`}>
+                          {n.title}
+                        </span>
 
-                  {/* IMEI preview if any */}
-                  {imeis && imeis.length > 0 && (
-                    <div className="flex items-center gap-1 text-[10px] font-mono text-fg-subtle mt-1 pl-8">
-                      <span className="text-fg-subtle">IMEI:</span>
-                      <span className="bg-surface-raised px-1.5 py-0.2 rounded border border-border/40 truncate">
-                        {imeis.slice(0, 5).join(', ')}{imeis.length > 5 ? ` +${imeis.length - 5}` : ''}
-                      </span>
-                    </div>
-                  )}
+                        {unread && (
+                          <span className="w-1.5 h-1.5 rounded-full bg-accent shrink-0 animate-pulse" />
+                        )}
 
-                  {/* Row 3: Store, Actor, DocRef, and Link */}
-                  {(n.storeName || n.actorName || n.documentRef || path) && (
-                    <div className="flex items-center justify-between gap-2 mt-1.5 pt-1 border-t border-border/30 text-[10px] pl-8">
-                      <div className="flex items-center gap-1.5 flex-wrap text-fg-subtle">
-                        {n.storeName && (
-                          <span className="px-1.5 py-0.2 rounded bg-surface-raised border border-border/50 text-[10px] font-medium text-fg-muted">
-                            {n.storeName}
+                        {n.actionType && ACTION_LABELS[n.actionType] &&
+                         !n.title.toLowerCase().includes(ACTION_LABELS[n.actionType].toLowerCase()) && (
+                          <span className="hidden sm:inline-flex px-1.5 py-0.2 rounded text-[9px] font-medium bg-surface-raised border border-border/60 text-fg-subtle shrink-0">
+                            {ACTION_LABELS[n.actionType]}
                           </span>
-                        )}
-                        {n.actorName && (
-                          <span>{n.actorName}</span>
-                        )}
-                        {n.documentRef && (
-                          <span className="font-mono text-fg-subtle">{n.documentRef}</span>
                         )}
                       </div>
 
-                      {path && (
-                        <span className="inline-flex items-center gap-0.5 text-[10px] font-semibold text-accent group-hover:underline ml-auto shrink-0">
-                          Перейти
-                          <ChevronRight className="w-3 h-3 transition-transform group-hover:translate-x-0.5" />
+                      <div className="flex items-center gap-1 shrink-0">
+                        {amounts && (
+                          <span className="text-[10px] sm:text-[11px] font-bold font-mono text-emerald-400 bg-emerald-500/10 px-1 py-0.2 rounded border border-emerald-500/20 shrink-0">
+                            {amounts}
+                          </span>
+                        )}
+                        <span className="text-[10px] font-mono text-fg-subtle whitespace-nowrap">
+                          {dateLabel}
                         </span>
-                      )}
+                        {unread && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              void markRead(n);
+                            }}
+                            title="Отметить прочитанным"
+                            className="w-4.5 h-4.5 rounded hover:bg-accent/20 text-fg-subtle hover:text-accent flex items-center justify-center transition-colors cursor-pointer shrink-0 ml-0.5"
+                          >
+                            <Check className="w-3 h-3" />
+                          </button>
+                        )}
+                      </div>
                     </div>
-                  )}
+
+                    {/* Line 2: Message body (if present) */}
+                    {n.message && (
+                      <p className="text-[11px] text-fg-muted/90 mt-0.5 leading-snug line-clamp-1 sm:line-clamp-2">
+                        {n.message}
+                      </p>
+                    )}
+
+                    {/* IMEI preview if any */}
+                    {imeis && imeis.length > 0 && (
+                      <div className="flex items-center gap-1 text-[10px] font-mono text-fg-subtle mt-0.5">
+                        <span className="text-fg-subtle">IMEI:</span>
+                        <span className="bg-surface-raised px-1 py-0.2 rounded border border-border/40 truncate">
+                          {imeis.slice(0, 5).join(', ')}{imeis.length > 5 ? ` +${imeis.length - 5}` : ''}
+                        </span>
+                      </div>
+                    )}
+
+                    {/* Line 3: Store, Actor, DocRef, and Link */}
+                    {(n.storeName || n.actorName || n.documentRef || path) && (
+                      <div className="flex items-center justify-between gap-1.5 mt-0.5 text-[10px] text-fg-subtle">
+                        <div className="flex items-center gap-1.5 flex-wrap truncate">
+                          {n.storeName && (
+                            <span className="px-1 py-0.2 rounded bg-surface-raised border border-border/50 text-[9px] font-medium text-fg-muted">
+                              {n.storeName}
+                            </span>
+                          )}
+                          {n.actorName && (
+                            <span className="text-fg-subtle">{n.actorName}</span>
+                          )}
+                          {n.documentRef && (
+                            <span className="font-mono text-fg-subtle">{n.documentRef}</span>
+                          )}
+                        </div>
+
+                        {path && (
+                          <span className="inline-flex items-center gap-0.5 text-[10px] font-semibold text-accent group-hover:underline ml-auto shrink-0">
+                            Перейти
+                            <ChevronRight className="w-2.5 h-2.5 transition-transform group-hover:translate-x-0.5" />
+                          </span>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 </div>
               );
             })}
           </div>
         )}
         {nextCursor && (
-          <div className="p-3 flex justify-center">
-            <Button variant="secondary" loading={loadingMore} onClick={loadMore}>Показать ещё</Button>
+          <div className="p-2.5 flex justify-center">
+            <Button variant="secondary" size="sm" loading={loadingMore} onClick={loadMore}>Показать ещё</Button>
           </div>
         )}
       </div>
