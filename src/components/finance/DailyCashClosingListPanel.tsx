@@ -46,7 +46,9 @@ export const DailyCashClosingListPanel: React.FC<DailyCashClosingListPanelProps>
     setLoading(true);
     setError(null);
 
-    const yearMonth = month.length === 7 ? month : new Date().toISOString().slice(0, 7);
+    const now = new Date();
+    const defaultYm = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    const yearMonth = month.length === 7 ? month : defaultYm;
     const startDate = `${yearMonth}-01`;
     const [y, m] = yearMonth.split('-').map(Number);
     const lastDay = new Date(y, m, 0).getDate();

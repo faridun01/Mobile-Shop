@@ -10,10 +10,31 @@ interface CashDeskPanelProps {
   storeId?: string | null;
 }
 
+const getLocalCurrentMonth = (): string => {
+  const now = new Date();
+  const y = now.getFullYear();
+  const m = String(now.getMonth() + 1).padStart(2, '0');
+  return `${y}-${m}`;
+};
+
+const getPrevMonth = (ym: string): string => {
+  const [y, m] = ym.split('-').map(Number);
+  if (m <= 1) return `${y - 1}-12`;
+  return `${y}-${String(m - 1).padStart(2, '0')}`;
+};
+
+const getNextMonth = (ym: string): string => {
+  const [y, m] = ym.split('-').map(Number);
+  if (m >= 12) return `${y + 1}-01`;
+  return `${y}-${String(m + 1).padStart(2, '0')}`;
+};
+
 export const CashDeskPanel: React.FC<CashDeskPanelProps> = ({ storeId }) => {
-  const [selectedMonth, setSelectedMonth] = useState(() => new Date().toISOString().slice(0, 7));
+  const currentMonth = useMemo(() => getLocalCurrentMonth(), []);
+  const [selectedMonth, setSelectedMonth] = useState(currentMonth);
 
   const selectedStoreId = storeId || 'all';
+  const isCurrentMonth = selectedMonth >= currentMonth;
 
   const monthLabel = useMemo(() => {
     try {
@@ -26,19 +47,16 @@ export const CashDeskPanel: React.FC<CashDeskPanelProps> = ({ storeId }) => {
   }, [selectedMonth]);
 
   const handlePrevMonth = () => {
-    const [y, m] = selectedMonth.split('-').map(Number);
-    const prev = new Date(y, m - 2, 1);
-    setSelectedMonth(prev.toISOString().slice(0, 7));
+    setSelectedMonth((prev) => getPrevMonth(prev));
   };
 
   const handleNextMonth = () => {
-    const [y, m] = selectedMonth.split('-').map(Number);
-    const next = new Date(y, m, 1);
-    setSelectedMonth(next.toISOString().slice(0, 7));
+    if (isCurrentMonth) return;
+    setSelectedMonth((prev) => getNextMonth(prev));
   };
 
   const handleCurrentMonth = () => {
-    setSelectedMonth(new Date().toISOString().slice(0, 7));
+    setSelectedMonth(currentMonth);
   };
 
   return (
@@ -54,7 +72,7 @@ export const CashDeskPanel: React.FC<CashDeskPanelProps> = ({ storeId }) => {
           <button
             type="button"
             onClick={handlePrevMonth}
-            className="p-1 rounded-lg bg-surface-raised border border-border hover:bg-surface text-fg transition-colors cursor-pointer"
+            className="p-1 rounded-lg bg-surface-raised border border-border hover:bg-surface text-fg transition-colors cursor-pointer active:scale-95"
             title="Предыдущий месяц"
           >
             <ChevronLeft className="w-4 h-4" />
@@ -62,15 +80,23 @@ export const CashDeskPanel: React.FC<CashDeskPanelProps> = ({ storeId }) => {
           <button
             type="button"
             onClick={handleCurrentMonth}
-            className="px-2 py-1 rounded-lg bg-surface-raised border border-border hover:bg-surface text-[11px] font-semibold text-fg transition-colors cursor-pointer"
+            disabled={isCurrentMonth}
+            className={`px-2 py-1 rounded-lg border text-[11px] font-semibold transition-all ${
+              isCurrentMonth
+                ? 'bg-accent/10 border-accent/30 text-accent cursor-default'
+                : 'bg-surface-raised border-border hover:bg-surface text-fg cursor-pointer active:scale-95'
+            }`}
+            title={isCurrentMonth ? 'Выбран текущий месяц' : 'Вернуться на текущий месяц'}
           >
             Текущий месяц
           </button>
           <button
             type="button"
             onClick={handleNextMonth}
-            className="p-1 rounded-lg bg-surface-raised border border-border hover:bg-surface text-fg transition-colors cursor-pointer"
-            title="Следующий месяц"
+            disabled={isCurrentMonth}
+            className="p-1 rounded-lg bg-surface-raised border border-border text-fg transition-colors disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer hover:not-disabled:bg-surface active:not-disabled:scale-95"
+            title={isCurrentMonth ? 'Текущий месяц (будущие месяцы недоступны)' : 'Следующий месяц'}
+            aria-disabled={isCurrentMonth}
           >
             <ChevronRight className="w-4 h-4" />
           </button>
