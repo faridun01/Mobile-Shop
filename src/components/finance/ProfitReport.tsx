@@ -18,7 +18,9 @@ import {
   Package,
   Banknote,
   AlertTriangle,
+  Loader2,
 } from 'lucide-react';
+import { StoreSelector } from '../common/StoreSelector';
 import { EmptyState } from '../ui/EmptyState';
 import { LoadingState } from '../ui/Skeleton';
 import { Button } from '../ui/Button';
@@ -446,26 +448,39 @@ export const ProfitReport: React.FC<ProfitReportProps> = ({
 
   return (
     <div className="flex flex-col">
-      {/* Filter bar */}
-      <div className="px-3 py-2.5 border-b border-border bg-surface flex flex-wrap items-center gap-2">
-        {datePicker}
+      {/* Filter bar: single unified row with no wrapping, perfectly fitted */}
+      <div className="px-2.5 sm:px-4 py-2 sm:py-2.5 border-b border-border bg-surface flex items-center gap-1.5 sm:gap-2 overflow-x-auto scrollbar-none select-none">
+        <div className="shrink-0">{datePicker}</div>
         {view === 'summary' && storeCtx.mode === 'CENTRAL' && (
-          <select
-            value={selectedStore}
-            onChange={(e) => setSelectedStore(e.target.value)}
-            className="h-9 rounded-lg bg-surface-raised border border-border px-2.5 text-xs font-semibold text-fg-muted focus:outline-none focus:border-accent"
-          >
-            <option value="all">Все магазины</option>
-            {retailStores.map((s) => <option key={s.id} value={s.id}>{formatStoreName(s.name)}</option>)}
-          </select>
+          <div className="shrink-0">
+            <StoreSelector
+              value={selectedStore}
+              onChange={(val) => setSelectedStore(val)}
+              stores={retailStores}
+              retailOnly
+              showAllOption
+              allOptionLabel="Все магазины"
+              allOptionValue="all"
+              compact
+              title="Магазин"
+              variant="sheet"
+              triggerClassName="!h-9 text-xs font-semibold px-2.5 rounded-xl bg-surface-raised border-border text-fg shadow-xs"
+            />
+          </div>
         )}
         {view === 'summary' && (
           <button
             type="button"
             onClick={() => setSalesReportStoreId(selectedStore)}
-            className="h-9 ml-auto px-3 rounded-lg bg-accent hover:bg-accent-strong text-accent-fg font-semibold text-xs flex items-center gap-1.5 transition-colors"
+            disabled={reportDownloading}
+            className="h-9 px-2.5 sm:px-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white font-semibold text-xs flex items-center gap-1.5 transition-all shrink-0 cursor-pointer shadow-xs disabled:opacity-50 ml-auto"
+            title="Скачать финансовый отчёт в Excel"
           >
-            <Download className="w-3.5 h-3.5" />
+            {reportDownloading ? (
+              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+            ) : (
+              <Download className="w-3.5 h-3.5" />
+            )}
             <span>Excel</span>
           </button>
         )}

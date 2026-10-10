@@ -395,7 +395,7 @@ export class DailyClosingService {
         },
       });
       if (existing) {
-        throw Object.assign(new Error(`Кассовая смена магазина ${store.name} за ${businessDate} уже закрыта. Касса закрывается только один раз.`), { statusCode: 409 });
+        throw Object.assign(new Error(`Кассовая смена магазина ${store.name} за ${businessDate} уже закрыта.`), { statusCode: 409 });
       }
 
       const rate = (await rateForBusinessDate(tx, businessDate, true))!;

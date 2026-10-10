@@ -117,8 +117,8 @@ export const DailyCashClosingModal: React.FC<DailyCashClosingModalProps> = ({
     if (isOpen) {
       const explicitValid =
         explicitStoreId &&
-        explicitStoreId !== 'all' &&
-        stores.some((s) => s.id === explicitStoreId && !s.isMainWarehouse)
+          explicitStoreId !== 'all' &&
+          stores.some((s) => s.id === explicitStoreId && !s.isMainWarehouse)
           ? explicitStoreId
           : '';
       const target = explicitValid || detectedStoreId;
@@ -326,7 +326,7 @@ export const DailyCashClosingModal: React.FC<DailyCashClosingModalProps> = ({
                   <div className="space-y-0.5">
                     <p className="font-bold">Кассовая смена закрыта</p>
                     <p className="text-[11px] opacity-90">
-                      Смена за {summary.businessDate} успешно зафиксирована. Касса закрывается только один раз в день.
+                      Смена за {summary.businessDate} успешно зафиксирована.
                     </p>
                   </div>
                 </div>

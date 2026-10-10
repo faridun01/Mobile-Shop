@@ -54,7 +54,7 @@ export const StoreSelector: React.FC<StoreSelectorProps> = ({
         value: allOptionValue,
         label: allOptionLabel,
         icon: <Building2 className="w-3.5 h-3.5 text-accent shrink-0" />,
-        badge: 'Все',
+        badge: compact ? undefined : 'Все',
       });
     }
     filteredStores.forEach((s) => {
@@ -67,7 +67,7 @@ export const StoreSelector: React.FC<StoreSelectorProps> = ({
         ) : (
           <StoreIcon className="w-3.5 h-3.5 text-accent shrink-0" />
         ),
-        badge: isWarehouse ? 'Склад' : 'Магазин',
+        badge: compact ? undefined : (isWarehouse ? 'Склад' : 'Магазин'),
       });
     });
     return list;
