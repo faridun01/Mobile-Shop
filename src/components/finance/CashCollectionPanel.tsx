@@ -13,6 +13,7 @@ import {
   ChevronUp,
   CheckCircle2,
   FileCheck2,
+  Eye,
 } from 'lucide-react';
 import { apiClient } from '../../api/client';
 import { formatTjs, formatUsd } from '../../utils/money';
@@ -483,17 +484,17 @@ export const CashCollectionPanel: React.FC<CashCollectionPanelProps> = ({
                               const targetDate = store.unclosedDates?.[0];
                               setDailyClosingModalOpen(true, store.storeId, targetDate);
                             }}
-                            className="h-8 px-2.5 rounded-lg bg-surface-raised hover:bg-accent hover:text-accent-fg border border-border text-xs font-semibold text-fg transition-all shadow-2xs active:scale-95 cursor-pointer flex items-center gap-1.5 shrink-0"
-                            title="Закрыть смену / Z-отчёт"
+                            className="h-8 px-2.5 rounded-lg bg-surface-raised hover:bg-surface border border-border text-xs font-semibold text-fg transition-all shadow-2xs active:scale-95 cursor-pointer flex items-center gap-1.5 shrink-0"
+                            title="Посмотреть кассу магазина (закрытие смены выполняется в магазине)"
                           >
-                            <FileCheck2 className="w-3.5 h-3.5 text-accent" />
-                            <span>Z-отчёт</span>
+                            <Eye className="w-3.5 h-3.5 text-accent" />
+                            <span>Просмотр</span>
                           </button>
                           <button
                             type="button"
                             disabled
                             className="h-8 px-3 rounded-lg bg-surface-raised border border-border text-fg-subtle text-xs font-semibold flex items-center gap-1.5 opacity-50 cursor-not-allowed select-none"
-                            title={store.unclosedReason ? `${store.unclosedReason}. Сначала выполните Z-отчёт` : 'Инкассация невозможна: сначала закройте смену (Z-отчёт)'}
+                            title={store.unclosedReason ? `${store.unclosedReason}. Смену необходимо закрыть в магазине` : 'Инкассация невозможна: смену необходимо закрыть в магазине'}
                           >
                             <ArrowDownToLine className="w-3.5 h-3.5" />
                             <span>Инкассировать</span>

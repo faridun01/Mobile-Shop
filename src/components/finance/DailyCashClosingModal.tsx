@@ -17,6 +17,7 @@ import {
   UserCheck,
   Calendar,
   Store as StoreIcon,
+  Info,
 } from 'lucide-react';
 import { formatStoreName, formatStoreDisplayTitle, useStoreContext } from '../../utils/storeContext';
 import { useUIStore } from '../../stores/useUIStore';
@@ -72,7 +73,13 @@ export const DailyCashClosingModal: React.FC<DailyCashClosingModalProps> = ({
   readOnly,
   onClosed,
 }) => {
-  const { currentUser, stores, selectedStoreId } = useAppFields('currentUser', 'stores', 'selectedStoreId');
+  const { currentUser, stores, selectedStoreId, setSelectedStoreId } = useAppFields(
+    'currentUser',
+    'stores',
+    'selectedStoreId',
+    'setSelectedStoreId'
+  );
+  const { triggerStoreTransition } = useUIStore();
   const storeCtx = useStoreContext();
   const isAdmin = currentUser?.role === 'ADMIN';
 
@@ -159,10 +166,15 @@ export const DailyCashClosingModal: React.FC<DailyCashClosingModalProps> = ({
     storeCtx.mode === 'STORE' ||
     Boolean(selectedStoreId && selectedStoreId !== 'all');
 
+  const isInsideTargetStore = storeCtx.mode === 'STORE' && storeCtx.storeId === effectiveStoreId;
+
   const [loading, setLoading] = useState(false);
   const [summary, setSummary] = useState<DailyClosingSummary | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+
+  const canCloseShift = isInsideTargetStore && !readOnly && !summary?.alreadyClosed;
+  const isReadOnly = Boolean(readOnly || summary?.alreadyClosed || !isInsideTargetStore);
 
   const noRetailStores = retailStores.length === 0;
 
@@ -193,7 +205,7 @@ export const DailyCashClosingModal: React.FC<DailyCashClosingModalProps> = ({
 
   // The seller/partner/admin confirms the calculated day; no counted amount is sent.
   const handleCloseShift = async () => {
-    if (submitting || summary?.alreadyClosed) return;
+    if (submitting || summary?.alreadyClosed || !canCloseShift) return;
     const finalStoreId = effectiveStoreId || summary?.storeId;
     if (!finalStoreId || finalStoreId === 'all') {
       setError('Выберите магазин');
@@ -220,7 +232,6 @@ export const DailyCashClosingModal: React.FC<DailyCashClosingModalProps> = ({
 
   const closing = summary?.closing;
   const closedDifference = Number(closing?.differenceTjs ?? 0);
-  const isReadOnly = Boolean(readOnly || summary?.alreadyClosed);
 
   return (
     <>
@@ -232,13 +243,15 @@ export const DailyCashClosingModal: React.FC<DailyCashClosingModalProps> = ({
             ? 'Просмотр закрытой смены'
             : summary?.alreadyClosed
             ? 'Смена закрыта'
-            : 'Закрытие смены'
+            : isInsideTargetStore
+            ? 'Закрытие смены'
+            : 'Просмотр кассы'
         }
         subtitle={noRetailStores ? undefined : `${effectiveStoreName} · ${summary?.businessDate || explicitBusinessDate || 'Сегодня'}`}
         maxWidth="sm"
         footer={
           <div className="w-full flex flex-wrap items-center justify-end gap-2">
-            {!isReadOnly && summary && !noRetailStores ? (
+            {canCloseShift && summary && !noRetailStores ? (
               <>
                 <Button variant="secondary" onClick={onClose} disabled={submitting} className="flex-1 sm:flex-initial">
                   Отмена
@@ -288,7 +301,7 @@ export const DailyCashClosingModal: React.FC<DailyCashClosingModalProps> = ({
                 <span className="text-xs font-semibold text-fg-subtle">
                   Магазин:
                 </span>
-                {!isReadOnly && isAdmin && !isStoreScoped && retailStores.length > 1 ? (
+                {!isInsideTargetStore && isAdmin && retailStores.length > 1 ? (
                   <StoreSelector
                     value={effectiveStoreId}
                     onChange={setSelectedStoreIdState}
@@ -365,7 +378,35 @@ export const DailyCashClosingModal: React.FC<DailyCashClosingModalProps> = ({
                 )}
               </>
             ) : (
-              <DayTotals cashTjs={summary.expectedCashTjs} bankTjs={summary.salesCardTjs} />
+              <>
+                <DayTotals cashTjs={summary.expectedCashTjs} bankTjs={summary.salesCardTjs} />
+                {!isInsideTargetStore && (
+                  <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/25 text-amber-700 dark:text-amber-300 text-xs flex items-center justify-between gap-2.5">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <Info className="w-4 h-4 shrink-0 text-amber-600 dark:text-amber-400" />
+                      <span>Закрыть кассу можно только находясь в самом магазине. Из центральной кассы доступен только просмотр.</span>
+                    </div>
+                    {isAdmin && activeStore && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          onClose();
+                          triggerStoreTransition({
+                            storeName: formatStoreDisplayTitle(activeStore),
+                            storeId: activeStore.id,
+                            isCentral: false,
+                          });
+                          setSelectedStoreId(activeStore.id);
+                          useUIStore.getState().setSelectedStoreId(activeStore.id);
+                        }}
+                        className="px-2.5 py-1 rounded-lg bg-accent text-accent-fg font-semibold text-xs whitespace-nowrap active:scale-95 transition-all shadow-xs shrink-0 cursor-pointer"
+                      >
+                        Перейти в магазин
+                      </button>
+                    )}
+                  </div>
+                )}
+              </>
             )}
 
             {error && (

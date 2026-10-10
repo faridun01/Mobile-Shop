@@ -6,6 +6,7 @@ import {
   CalendarDays,
   CheckCircle2,
   FileCheck2,
+  Eye,
 } from 'lucide-react';
 import { apiClient } from '../../api/client';
 import { formatTjs, formatUsd, formatMoney } from '../../utils/money';
@@ -150,10 +151,18 @@ export const UncollectedDaysDetailSection: React.FC<UncollectedDaysDetailSection
                         </span>
                       )}
                       {day.hasClosing ? (
-                        <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setDailyClosingModalOpen(true, store.storeId, day.date);
+                          }}
+                          className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20 flex items-center gap-1 transition-all active:scale-95 cursor-pointer"
+                          title="Посмотреть закрытую смену"
+                        >
                           <CheckCircle2 className="w-3 h-3" />
                           <span>Z-отчёт закрыт</span>
-                        </span>
+                        </button>
                       ) : (
                         <button
                           type="button"
@@ -161,11 +170,11 @@ export const UncollectedDaysDetailSection: React.FC<UncollectedDaysDetailSection
                             e.stopPropagation();
                             setDailyClosingModalOpen(true, store.storeId, day.date);
                           }}
-                          className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/30 text-amber-700 dark:text-amber-300 flex items-center gap-1 transition-all active:scale-95 cursor-pointer"
-                          title={`Закрыть смену за ${day.date}`}
+                          className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-surface-raised hover:bg-surface border border-border text-fg-subtle hover:text-fg flex items-center gap-1 transition-all active:scale-95 cursor-pointer"
+                          title={`Посмотреть кассу за ${day.date}`}
                         >
-                          <FileCheck2 className="w-3 h-3" />
-                          <span>Закрыть смену</span>
+                          <Eye className="w-3 h-3 text-accent" />
+                          <span>Просмотр кассы</span>
                         </button>
                       )}
                     </div>
@@ -226,12 +235,12 @@ export const UncollectedDaysDetailSection: React.FC<UncollectedDaysDetailSection
             <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/25 text-amber-700 dark:text-amber-300 text-xs flex items-center justify-between flex-wrap gap-2 mt-3">
               <div className="flex items-center gap-2">
                 <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0" />
-                <span>{data?.balance?.unclosedReason || store.unclosedReason || 'Кассовая смена не закрыта'}. Перед проведением инкассации необходимо закрыть смену.</span>
+                <span>{data?.balance?.unclosedReason || store.unclosedReason || 'Кассовая смена не закрыта'}. Закрытие смены выполняется непосредственно в магазине.</span>
               </div>
               <Button
                 size="sm"
                 variant="secondary"
-                leftIcon={FileCheck2}
+                leftIcon={Eye}
                 onClick={() => {
                   const targetDate =
                     data?.balance?.unclosedDates?.[0] ||
@@ -241,7 +250,7 @@ export const UncollectedDaysDetailSection: React.FC<UncollectedDaysDetailSection
                 }}
                 className="shrink-0 font-semibold text-xs"
               >
-                Закрыть смену
+                Посмотреть кассу
               </Button>
             </div>
           )}

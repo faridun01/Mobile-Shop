@@ -12,6 +12,7 @@ import {
   Gift,
   Receipt,
   Search,
+  Eye,
   X,
 } from 'lucide-react';
 import { apiClient } from '../../api/client';
@@ -330,19 +331,19 @@ export const CashReconciliationModal: React.FC<CashReconciliationModalProps> = (
                 <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/25 text-amber-700 dark:text-amber-300 text-xs flex items-center justify-between flex-wrap gap-2">
                   <div className="flex items-center gap-2">
                     <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0" />
-                    <span>{data?.balance?.unclosedReason || store.unclosedReason || 'Кассовая смена не закрыта'}. Перед проведением инкассации необходимо закрыть смену (Z-отчёт).</span>
+                    <span>{data?.balance?.unclosedReason || store.unclosedReason || 'Кассовая смена не закрыта'}. Закрытие смены выполняется непосредственно в магазине.</span>
                   </div>
                   <Button
                     size="sm"
                     variant="secondary"
-                    leftIcon={FileCheck2}
+                    leftIcon={Eye}
                     onClick={() => {
                       const targetDate = data?.balance?.unclosedDates?.[0] || store.unclosedDates?.[0];
                       setDailyClosingModalOpen(true, store.storeId, targetDate);
                     }}
                     className="shrink-0 font-semibold text-xs"
                   >
-                    Закрыть смену
+                    Посмотреть кассу
                   </Button>
                 </div>
               )}
