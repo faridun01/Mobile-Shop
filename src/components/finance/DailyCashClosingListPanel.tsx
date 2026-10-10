@@ -196,6 +196,7 @@ export const DailyCashClosingListPanel: React.FC<DailyCashClosingListPanelProps>
           storeId={inspectClosing.storeId}
           storeName={inspectClosing.store?.name}
           businessDate={inspectClosing.businessDate}
+          readOnly={true}
         />
       )}
     </div>

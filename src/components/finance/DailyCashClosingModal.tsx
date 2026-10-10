@@ -27,8 +27,17 @@ interface DailyCashClosingModalProps {
   storeId?: string;
   storeName?: string;
   businessDate?: string;
+  readOnly?: boolean;
   onClosed?: (closing: DailyCashClosing) => void;
 }
+
+const getLocalCurrentDate = (): string => {
+  const now = new Date();
+  const y = now.getFullYear();
+  const m = String(now.getMonth() + 1).padStart(2, '0');
+  const d = String(now.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+};
 
 /** Cash and bank for the day, as two large figures. */
 const DayTotals: React.FC<{ cashTjs: number | string | undefined; bankTjs: number | string | undefined }> = ({ cashTjs, bankTjs }) => (
@@ -60,6 +69,7 @@ export const DailyCashClosingModal: React.FC<DailyCashClosingModalProps> = ({
   storeId: explicitStoreId,
   storeName: explicitStoreName,
   businessDate: explicitBusinessDate,
+  readOnly,
   onClosed,
 }) => {
   const { currentUser, stores, selectedStoreId } = useAppFields('currentUser', 'stores', 'selectedStoreId');
@@ -210,18 +220,25 @@ export const DailyCashClosingModal: React.FC<DailyCashClosingModalProps> = ({
 
   const closing = summary?.closing;
   const closedDifference = Number(closing?.differenceTjs ?? 0);
+  const isReadOnly = Boolean(readOnly || summary?.alreadyClosed);
 
   return (
     <>
       <Dialog
         open={isOpen}
         onClose={() => { if (!submitting) onClose(); }}
-        title={summary?.alreadyClosed ? 'Смена закрыта' : 'Закрытие смены'}
+        title={
+          readOnly
+            ? 'Просмотр закрытой смены'
+            : summary?.alreadyClosed
+            ? 'Смена закрыта'
+            : 'Закрытие смены'
+        }
         subtitle={noRetailStores ? undefined : `${effectiveStoreName} · ${summary?.businessDate || explicitBusinessDate || 'Сегодня'}`}
         maxWidth="sm"
         footer={
           <div className="w-full flex flex-wrap items-center justify-end gap-2">
-            {!summary?.alreadyClosed && summary && !noRetailStores ? (
+            {!isReadOnly && summary && !noRetailStores ? (
               <>
                 <Button variant="secondary" onClick={onClose} disabled={submitting} className="flex-1 sm:flex-initial">
                   Отмена
@@ -271,7 +288,7 @@ export const DailyCashClosingModal: React.FC<DailyCashClosingModalProps> = ({
                 <span className="text-xs font-semibold text-fg-subtle">
                   Магазин:
                 </span>
-                {isAdmin && !isStoreScoped && retailStores.length > 1 ? (
+                {!isReadOnly && isAdmin && !isStoreScoped && retailStores.length > 1 ? (
                   <StoreSelector
                     value={effectiveStoreId}
                     onChange={setSelectedStoreIdState}
@@ -294,17 +311,28 @@ export const DailyCashClosingModal: React.FC<DailyCashClosingModalProps> = ({
                 <Calendar className="w-3.5 h-3.5 text-accent shrink-0" />
                 Дата смены:
               </span>
-              <input
-                type="date"
-                value={selectedDateState || summary.businessDate}
-                onChange={(e) => {
-                  const newDate = e.target.value;
-                  if (newDate) {
-                    setSelectedDateState(newDate);
-                  }
-                }}
-                className="text-xs font-bold font-mono text-fg bg-surface px-2.5 py-1 rounded-lg border border-border focus:outline-hidden focus:border-accent cursor-pointer"
-              />
+              {isReadOnly ? (
+                <span className="text-xs font-bold font-mono text-fg bg-surface px-2.5 py-1 rounded-lg border border-border select-all">
+                  {selectedDateState || summary.businessDate || explicitBusinessDate}
+                </span>
+              ) : isAdmin ? (
+                <input
+                  type="date"
+                  value={selectedDateState || summary.businessDate}
+                  max={getLocalCurrentDate()}
+                  onChange={(e) => {
+                    const newDate = e.target.value;
+                    if (newDate) {
+                      setSelectedDateState(newDate);
+                    }
+                  }}
+                  className="text-xs font-bold font-mono text-fg bg-surface px-2.5 py-1 rounded-lg border border-border focus:outline-hidden focus:border-accent cursor-pointer"
+                />
+              ) : (
+                <span className="text-xs font-bold font-mono text-fg bg-surface px-2.5 py-1 rounded-lg border border-border">
+                  {summary.businessDate}
+                </span>
+              )}
             </div>
 
             {summary.alreadyClosed ? (
