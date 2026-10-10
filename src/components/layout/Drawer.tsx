@@ -32,6 +32,7 @@ import {
   Store,
   ArrowRight,
   HandCoins,
+  SlidersHorizontal,
 } from 'lucide-react';
 import { NAV_PAGE_ROUTES } from '../../router/navRoutes';
 import { recordNavVisit } from '../../utils/navUsage';
@@ -56,6 +57,7 @@ const ITEM_STYLES: Record<string, { bg: string; text: string }> = {
   REPAIR: { bg: 'bg-orange-500/10 dark:bg-orange-500/20', text: 'text-orange-600 dark:text-orange-400' },
   INVENTORY: { bg: 'bg-blue-500/10 dark:bg-blue-500/20', text: 'text-blue-600 dark:text-blue-400' },
   STORE_RECEIPT: { bg: 'bg-indigo-500/10 dark:bg-indigo-500/20', text: 'text-indigo-600 dark:text-indigo-400' },
+  STOCK_THRESHOLDS: { bg: 'bg-amber-500/10 dark:bg-amber-500/20', text: 'text-amber-600 dark:text-amber-400' },
   REVISION: { bg: 'bg-sky-500/10 dark:bg-sky-500/20', text: 'text-sky-600 dark:text-sky-400' },
   TRANSFER: { bg: 'bg-sky-500/10 dark:bg-sky-500/20', text: 'text-sky-600 dark:text-sky-400' },
   PURCHASE: { bg: 'bg-cyan-500/10 dark:bg-cyan-500/20', text: 'text-cyan-600 dark:text-cyan-400' },
@@ -130,6 +132,7 @@ export const Drawer: React.FC = () => {
         {
           title: 'Склад и касса',
           items: [
+            { id: 'STOCK_THRESHOLDS', label: 'Минимальные остатки', icon: SlidersHorizontal, roles: ['SELLER'] },
             { id: 'TRANSFER', label: 'Перемещение', icon: ArrowLeftRight, roles: ['SELLER'] },
             { id: 'EXPENSES', label: 'Расходы кассы', icon: Wallet, roles: ['SELLER'] },
             { id: 'EXCHANGE', label: 'Обмен (Trade-In)', icon: RefreshCw, roles: ['SELLER'] },
@@ -153,6 +156,7 @@ export const Drawer: React.FC = () => {
           title: 'Склад',
           items: [
             { id: 'INVENTORY', label: 'Склад магазина', icon: Package, roles: ['PARTNER'] },
+            { id: 'STOCK_THRESHOLDS', label: 'Минимальные остатки', icon: SlidersHorizontal, roles: ['PARTNER'] },
             { id: 'TRANSFER', label: 'Перемещение', icon: ArrowLeftRight, roles: ['PARTNER'] },
           ],
         },
@@ -185,6 +189,7 @@ export const Drawer: React.FC = () => {
           title: 'Склад и логистика',
           items: [
             { id: 'INVENTORY', label: 'Склад товаров', icon: Package, roles: ['ADMIN'] },
+            { id: 'STOCK_THRESHOLDS', label: 'Минимальные остатки', icon: SlidersHorizontal, roles: ['ADMIN'] },
             { id: 'TRANSFER', label: 'Перемещение', icon: ArrowLeftRight, roles: ['ADMIN'] },
             { id: 'REVISION', label: 'Ревизия склада', icon: ClipboardCheck, roles: ['ADMIN'] },
             { id: 'SUPPLIERS', label: 'Поставщики', icon: Truck, roles: ['ADMIN'] },
@@ -219,6 +224,7 @@ export const Drawer: React.FC = () => {
           title: 'Склад',
           items: [
             { id: 'INVENTORY', label: 'Склад магазина', icon: Package, roles: ['ADMIN'] },
+            { id: 'STOCK_THRESHOLDS', label: 'Минимальные остатки', icon: SlidersHorizontal, roles: ['ADMIN'] },
             { id: 'TRANSFER', label: 'Перемещение', icon: ArrowLeftRight, roles: ['ADMIN'] },
             { id: 'REVISION', label: 'Ревизия склада', icon: ClipboardCheck, roles: ['ADMIN'] },
           ],

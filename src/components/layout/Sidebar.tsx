@@ -31,6 +31,7 @@ import {
   ChevronDown,
   PanelLeftClose,
   PanelLeftOpen,
+  SlidersHorizontal,
 } from 'lucide-react';
 import { NAV_PAGE_ROUTES } from '../../router/navRoutes';
 import { recordNavVisit } from '../../utils/navUsage';
@@ -92,6 +93,7 @@ export const Sidebar: React.FC = () => {
         {
           title: 'Склад и касса',
           items: [
+            { id: 'STOCK_THRESHOLDS', label: 'Минимальные остатки', icon: SlidersHorizontal, roles: ['SELLER'] },
             { id: 'TRANSFER', label: 'Перемещение', icon: ArrowLeftRight, roles: ['SELLER'] },
             { id: 'EXPENSES', label: 'Расходы кассы', icon: Wallet, roles: ['SELLER'] },
             { id: 'EXCHANGE', label: 'Обмен (Trade-In)', icon: RefreshCw, roles: ['SELLER'] },
@@ -118,6 +120,7 @@ export const Sidebar: React.FC = () => {
           title: 'Склад',
           items: [
             { id: 'INVENTORY', label: 'Склад магазина', icon: Package, roles: ['PARTNER'] },
+            { id: 'STOCK_THRESHOLDS', label: 'Минимальные остатки', icon: SlidersHorizontal, roles: ['PARTNER'] },
             { id: 'TRANSFER', label: 'Перемещение', icon: ArrowLeftRight, roles: ['PARTNER'] },
           ],
         },
@@ -153,6 +156,7 @@ export const Sidebar: React.FC = () => {
           title: 'Склад и логистика',
           items: [
             { id: 'INVENTORY', label: 'Склад товаров', icon: Package, roles: ['ADMIN'] },
+            { id: 'STOCK_THRESHOLDS', label: 'Минимальные остатки', icon: SlidersHorizontal, roles: ['ADMIN'] },
             { id: 'TRANSFER', label: 'Перемещение', icon: ArrowLeftRight, roles: ['ADMIN'] },
             { id: 'REVISION', label: 'Ревизия склада', icon: ClipboardCheck, roles: ['ADMIN'] },
             { id: 'SUPPLIERS', label: 'Поставщики', icon: Truck, roles: ['ADMIN'] },
@@ -188,6 +192,7 @@ export const Sidebar: React.FC = () => {
         title: 'Склад',
         items: [
           { id: 'INVENTORY', label: 'Склад магазина', icon: Package, roles: ['ADMIN'] },
+          { id: 'STOCK_THRESHOLDS', label: 'Минимальные остатки', icon: SlidersHorizontal, roles: ['ADMIN'] },
           { id: 'TRANSFER', label: 'Перемещение', icon: ArrowLeftRight, roles: ['ADMIN'] },
           { id: 'REVISION', label: 'Ревизия склада', icon: ClipboardCheck, roles: ['ADMIN'] },
         ],

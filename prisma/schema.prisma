@@ -160,6 +160,7 @@ model Store {
   receiptsShipped       StoreReceipt[]         @relation("ReceiptSource")
   dailyCashClosings     DailyCashClosing[]
   stockRevisions        StockRevision[]
+  stockThresholds       StockThreshold[]
 
   @@map("stores")
 }
@@ -1217,3 +1218,21 @@ model DocumentSequence {
 
   @@map("document_sequences")
 }
+
+model StockThreshold {
+  id          String   @id @default(uuid())
+  storeId     String
+  brand       String
+  model       String
+  storage     String
+  minQuantity Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  store       Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  @@unique([storeId, brand, model, storage])
+  @@index([storeId])
+  @@map("stock_thresholds")
+}
+

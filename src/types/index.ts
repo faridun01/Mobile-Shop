@@ -67,7 +67,8 @@ export type PageId =
   | 'NOTIFICATIONS'
   | 'CASH_COLLECTION'
   | 'CASH_DESK'
-  | 'CUSTOMERS';
+  | 'CUSTOMERS'
+  | 'STOCK_THRESHOLDS';
 
 export interface User {
   id: string;
@@ -377,6 +378,17 @@ export interface StoreProfitShare {
   storeId: string;
   ownerId: string;
   sharePercent: number;
+}
+
+export interface StockThreshold {
+  id: string;
+  storeId: string;
+  brand: string;
+  model: string;
+  storage: string;
+  minQuantity: number;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface QuarterClosureOwnerSnapshot {

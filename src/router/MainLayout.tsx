@@ -53,6 +53,7 @@ const CashDeskPage = lazy(() => import('../components/pages/CashDeskPage').then(
 const CustomersPage = lazy(() => import('../components/pages/CustomersPage').then(m => ({ default: m.CustomersPage })));
 const StoreReceiptPage = lazy(() => import('../components/pages/StoreReceiptPage').then(m => ({ default: m.StoreReceiptPage })));
 const RevisionPage = lazy(() => import('../components/pages/RevisionPage').then(m => ({ default: m.RevisionPage })));
+const StockThresholdsPage = lazy(() => import('../components/pages/StockThresholdsPage').then(m => ({ default: m.StockThresholdsPage })));
 const WelcomePage = lazy(() => import('../components/pages/WelcomePage').then(m => ({ default: m.WelcomePage })));
 
 const PAGE_ROUTES: Record<string, string> = {
@@ -79,6 +80,7 @@ const PAGE_ROUTES: Record<string, string> = {
   CASH_COLLECTION: '/cash-collection',
   CASH_DESK: '/cash',
   CUSTOMERS: '/customers',
+  STOCK_THRESHOLDS: '/stock-thresholds',
 };
 
 function LoadingFallback() {
@@ -170,6 +172,7 @@ export function MainLayout() {
               <Route path="/notifications" element={currentUser?.role === 'ADMIN' ? <NotificationsPage /> : <Navigate to="/sale" replace />} />
               <Route path="/receipts" element={<StoreReceiptPage />} />
               <Route path="/revision" element={currentUser?.role === 'ADMIN' ? <RevisionPage /> : <Navigate to="/sale" replace />} />
+              <Route path="/stock-thresholds" element={<StockThresholdsPage />} />
               <Route path="*" element={<Navigate to={currentUser?.role === 'ADMIN' ? "/" : "/sale"} replace />} />
             </Routes>
           </Suspense>

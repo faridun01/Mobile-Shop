@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { decimal, moneyNumber, sumMoney } from '../../utils/money';
 import { useAppFields } from '../../context/AppContext';
 import { Device } from '../../types';
@@ -8,6 +9,7 @@ import {
   Smartphone,
   Warehouse,
   Store as StoreIcon,
+  SlidersHorizontal,
 } from 'lucide-react';
 import { useGroupedDevices } from '../../hooks/useGroupedDevices';
 import { EmptyState } from '../ui/EmptyState';
@@ -28,6 +30,7 @@ import { DeviceDetailsModal } from '../inventory/DeviceDetailsModal';
 import { CustomSelect, CustomSelectOption } from '../ui/CustomSelect';
 
 export const InventoryPage: React.FC = () => {
+  const navigate = useNavigate();
   const {
     currentUser,
     devices,
@@ -559,25 +562,37 @@ export const InventoryPage: React.FC = () => {
             </div>
           ) : null}
 
-          {/* Quick Location Dropdown Filter */}
-          {!isStoreScoped && storeCtx.mode === 'CENTRAL' && (
-            <div className="flex items-center gap-1.5 shrink-0 ml-auto">
-              <span className="text-xs text-fg-subtle font-medium hidden sm:inline">Локация:</span>
-              <CustomSelect
-                value={selectedLocationId}
-                onChange={(val) => {
-                  setSelectedLocationId(val);
-                  if (selectedStatusFilter === 'MAIN_WAREHOUSE' && val !== mainWarehouse?.id) {
-                    setSelectedStatusFilter('ALL');
-                  }
-                }}
-                options={locationOptions}
-                size="sm"
-                align="right"
-                className="w-auto min-w-[130px] sm:min-w-[160px]"
-              />
-            </div>
-          )}
+          {/* Action buttons & Location Selector */}
+          <div className="flex items-center gap-2 shrink-0 ml-auto">
+            <button
+              type="button"
+              onClick={() => navigate('/stock-thresholds')}
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-border bg-surface-raised hover:bg-surface-elevated text-xs font-semibold text-fg-muted hover:text-fg transition-colors cursor-pointer"
+              title="Настройка минимальных остатков товаров"
+            >
+              <SlidersHorizontal className="w-3.5 h-3.5 text-accent" />
+              <span className="hidden sm:inline">Мин. остатки</span>
+            </button>
+
+            {!isStoreScoped && storeCtx.mode === 'CENTRAL' && (
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs text-fg-subtle font-medium hidden sm:inline">Локация:</span>
+                <CustomSelect
+                  value={selectedLocationId}
+                  onChange={(val) => {
+                    setSelectedLocationId(val);
+                    if (selectedStatusFilter === 'MAIN_WAREHOUSE' && val !== mainWarehouse?.id) {
+                      setSelectedStatusFilter('ALL');
+                    }
+                  }}
+                  options={locationOptions}
+                  size="sm"
+                  align="right"
+                  className="w-auto min-w-[130px] sm:min-w-[160px]"
+                />
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Desktop & Mobile Summary Stats Cards */}

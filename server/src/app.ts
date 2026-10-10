@@ -27,6 +27,7 @@ import { registerDailyClosingRoutes } from './modules/finance/daily-closing.rout
 import { registerStoreReceiptRoutes } from './modules/store-receipts/store-receipts.routes';
 import { registerCustomerRoutes } from './modules/customers/customers.routes';
 import { registerStockRevisionRoutes } from './modules/revisions/revisions.routes';
+import { registerStockThresholdRoutes } from './modules/stock-thresholds/stock-thresholds.routes';
 import { decorateTransactions } from './prisma/prisma.service';
 import { withAuditNotifications } from './modules/notifications/audit-notifications';
 import { requireNonNegativeMoney, requirePositiveMoney, roundMoney } from './common/money';
@@ -621,6 +622,7 @@ registerDailyClosingRoutes(app);
 registerStoreReceiptRoutes(app);
 registerCustomerRoutes(app);
 registerStockRevisionRoutes(app);
+registerStockThresholdRoutes(app);
 // Every audited business event inside a transaction also notifies the admin (same transaction).
 decorateTransactions(withAuditNotifications);
 

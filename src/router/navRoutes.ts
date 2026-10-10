@@ -27,4 +27,5 @@ export const NAV_PAGE_ROUTES: Record<string, string> = {
   CASH_COLLECTION: '/cash-collection',
   CASH_DESK: '/cash',
   CUSTOMERS: '/customers',
+  STOCK_THRESHOLDS: '/stock-thresholds',
 };
