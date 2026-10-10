@@ -280,7 +280,7 @@ function safeFilePart(value: string): string {
     .slice(0, 60) || 'report';
 }
 
-async function downloadXlsx(content: ArrayBuffer, fileName: string): Promise<void> {
+export async function downloadXlsx(content: ArrayBuffer, fileName: string): Promise<void> {
   const blob = new Blob([content], {
     type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
   });

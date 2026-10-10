@@ -45,7 +45,7 @@ export function registerCustomerRoutes(app: Express) {
         return;
       }
       const debtorsOnly = req.query.debtorsOnly === 'true';
-      const limit = req.query.limit ? Math.min(Number(req.query.limit) || 50, 200) : 50;
+      const limit = req.query.limit ? Math.min(Number(req.query.limit) || 50, 10000) : 50;
       const offset = req.query.offset ? Math.max(Number(req.query.offset) || 0, 0) : 0;
 
       const result = await CustomersService.list({ search, debtorsOnly, limit, offset });

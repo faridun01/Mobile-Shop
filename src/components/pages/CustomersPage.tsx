@@ -10,11 +10,13 @@ import {
   MessageCircle,
   HandCoins,
   X,
+  FileSpreadsheet,
 } from 'lucide-react';
 import { apiClient } from '../../api/client';
 import { useAppFields } from '../../context/AppContext';
 import { Customer } from '../../types';
 import { formatMoney } from '../../utils/money';
+import { exportCustomersToExcel } from '../../utils/exportCustomers';
 import { Button } from '../ui/Button';
 import { ConfirmDialog } from '../ui/ConfirmDialog';
 import { StatusBanner, StatusMessage } from '../ui/StatusBanner';
@@ -52,6 +54,7 @@ export const CustomersPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<StatusMessage | null>(null);
+  const [isExporting, setIsExporting] = useState(false);
 
   const [search, setSearch] = useState('');
   const [activeTab, setActiveTab] = useState<CustomerTab>('ALL');
@@ -248,6 +251,71 @@ export const CustomersPage: React.FC = () => {
     });
   }, [customers, activeTab, search]);
 
+  const handleExportExcel = async () => {
+    try {
+      setIsExporting(true);
+      let exportList = displayedCustomers;
+
+      try {
+        const params = new URLSearchParams();
+        if (search.trim()) params.append('search', search.trim());
+        if (activeTab === 'DEBTORS') params.append('debtorsOnly', 'true');
+        params.append('limit', '10000');
+
+        const res = await apiClient<CustomerListResponse>(`/customers?${params.toString()}`);
+        if (res.items && res.items.length > 0) {
+          let items = res.items;
+          if (activeTab === 'WITH_PHONE') {
+            items = items.filter((c) => Boolean(c.phone?.trim()));
+          }
+          if (activeTab === 'PUSH') {
+            items = items.filter((c) => Boolean(c.hasPushSubscription));
+          }
+          exportList = items;
+        }
+      } catch (fetchErr) {
+        console.warn('Full fetch for customer export failed, using current display list:', fetchErr);
+      }
+
+      if (exportList.length === 0) {
+        setStatus({ tone: 'error', text: 'Нет данных клиентов для экспорта в Excel' });
+        return;
+      }
+
+      const filterLabel =
+        activeTab === 'DEBTORS'
+          ? 'Клиенты с задолженностью'
+          : activeTab === 'WITH_PHONE'
+          ? 'Клиенты с номерами телефонов'
+          : activeTab === 'PUSH'
+          ? 'Клиенты с push-уведомлениями'
+          : search.trim()
+          ? `Поиск: "${search.trim()}"`
+          : 'Все клиенты';
+
+      await exportCustomersToExcel({
+        customers: exportList,
+        filterLabel,
+        totalDebtTjs: activeTab === 'ALL' && !search.trim() ? summary.totalDebtTjs : undefined,
+        totalPaidTjs: activeTab === 'ALL' && !search.trim() ? summary.totalPaidTjs : undefined,
+        generatedBy: currentUser?.name || 'Mobile Shop',
+      });
+
+      setStatus({
+        tone: 'success',
+        text: `Excel-файл успешно скачан (${exportList.length} клиентов)`,
+      });
+    } catch (err: any) {
+      console.error('Customer export error:', err);
+      setStatus({
+        tone: 'error',
+        text: err?.message || 'Не удалось экспортировать базу клиентов в Excel',
+      });
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
   return (
     <div className="work-screen flex-1 flex flex-col h-full overflow-hidden bg-bg text-fg select-none">
       <StatusBanner message={status} onDismiss={() => setStatus(null)} />
@@ -347,6 +415,20 @@ export const CustomersPage: React.FC = () => {
               </button>
             )}
           </div>
+
+          <Button
+            variant="secondary"
+            size="sm"
+            leftIcon={FileSpreadsheet}
+            onClick={handleExportExcel}
+            loading={isExporting}
+            disabled={isExporting || (customers.length === 0 && !loading)}
+            className="h-7.5 px-2 sm:px-2.5 text-xs font-semibold cursor-pointer shadow-2xs shrink-0 whitespace-nowrap text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 hover:bg-emerald-500/10 border-emerald-500/30 active:scale-95 transition-all"
+            title="Скачать базу клиентов в Excel (.xlsx)"
+          >
+            <span className="hidden sm:inline">Excel</span>
+            <span className="sm:hidden">XLS</span>
+          </Button>
 
           <Button
             variant="primary"
