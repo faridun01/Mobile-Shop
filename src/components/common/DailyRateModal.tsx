@@ -14,12 +14,9 @@ interface DailyRateModalProps {
 
 export const DailyRateModal: React.FC<DailyRateModalProps> = ({ isOpen, onClose }) => {
   const { todayRate, setDailyRate, currentUser } = useAppFields('todayRate', 'setDailyRate', 'currentUser');
-  const isAdmin = currentUser?.role === 'ADMIN';
 
-  if (!isAdmin) return null;
+  if (!currentUser) return null;
 
-  const canSetRate = true;
-  const hasRate = !!(todayRate && Number(todayRate.rate) > 0);
   const isMandatory = !hasCurrentDailyRate(todayRate);
 
   const [rateInput, setRateInput] = useState<string>('');
@@ -61,32 +58,6 @@ export const DailyRateModal: React.FC<DailyRateModalProps> = ({ isOpen, onClose 
       setIsSaving(false);
     }
   };
-
-  if (!hasRate && !canSetRate) {
-    // A SELLER can't set the rate — show a dismissable notice instead of a dead-end modal.
-    return (
-      <Dialog
-        open={isOpen}
-        onClose={() => onClose?.()}
-        dismissable
-        title="Курс доллара ещё не задан"
-        subtitle="Первоначальная настройка"
-        maxWidth="sm"
-        footer={
-          onClose && (
-            <Button variant="primary" fullWidth onClick={onClose}>
-              Понятно
-            </Button>
-          )
-        }
-      >
-        <div className="flex items-start gap-3 text-sm text-fg-muted">
-          <Clock className="w-5 h-5 text-warning shrink-0 mt-0.5" />
-          <p>Администратор ещё не задал курс USD/TJS на сегодня.</p>
-        </div>
-      </Dialog>
-    );
-  }
 
   return (
     <Dialog

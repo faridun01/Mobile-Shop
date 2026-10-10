@@ -101,6 +101,7 @@ export function MainLayout() {
     isDailyClosingModalOpen,
     setDailyClosingModalOpen,
     dailyClosingStoreId,
+    dailyClosingBusinessDate,
   } = useUIStore();
   const { isRateModalOpen, closeDailyRateModal, activePage, setActivePage, selectedStoreId, stores, isScannerOpen } = useAppFields('isRateModalOpen', 'closeDailyRateModal', 'activePage', 'setActivePage', 'selectedStoreId', 'stores', 'isScannerOpen');
 
@@ -112,6 +113,13 @@ export function MainLayout() {
         setActivePage(pageId);
       }
       recordNavVisit(pageId);
+    }
+    // Safety cleanup: when navigating between routes, ensure lingering drawer/modal attributes are cleared
+    if (typeof document !== 'undefined') {
+      document.documentElement.removeAttribute('data-drawer-open');
+      if (!document.querySelector('.modal-layer, [role="dialog"]')) {
+        document.documentElement.removeAttribute('data-modal-open');
+      }
     }
   }, [location.pathname]);
 
@@ -193,15 +201,13 @@ export function MainLayout() {
         </footer>
       </div>
 
-      {currentUser?.role === 'ADMIN' && (
-        <DailyRateModal
-          isOpen={isDailyRateModalOpen || isRateModalOpen}
-          onClose={() => {
-            setDailyRateModalOpen(false);
-            closeDailyRateModal();
-          }}
-        />
-      )}
+      <DailyRateModal
+        isOpen={isDailyRateModalOpen || isRateModalOpen}
+        onClose={() => {
+          setDailyRateModalOpen(false);
+          closeDailyRateModal();
+        }}
+      />
       {currentUser?.role === 'ADMIN' && (
         <StoreSwitchModal
           isOpen={isStoreSwitchModalOpen}
@@ -212,6 +218,7 @@ export function MainLayout() {
         isOpen={isDailyClosingModalOpen}
         onClose={() => setDailyClosingModalOpen(false)}
         storeId={dailyClosingStoreId}
+        businessDate={dailyClosingBusinessDate}
       />
       <StoreTransitionOverlay />
       {!native && isScannerOpen && (

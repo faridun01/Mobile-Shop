@@ -97,8 +97,8 @@ export const TopBar: React.FC = () => {
 
       {/* Center/Right: Quick Actions & Profile on Desktop */}
       <div className="flex items-center gap-2 shrink-0">
-        {/* Live Daily Exchange Rate (desktop/tablet) - ADMIN only */}
-        {isAdmin && todayRate && (
+        {/* Live Daily Exchange Rate (desktop/tablet) */}
+        {todayRate && (
           <button
             type="button"
             onClick={() => setDailyRateModalOpen(true)}

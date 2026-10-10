@@ -129,6 +129,8 @@ export class StockRevisionService {
     const totalSurplus = surplusDevices.length;
     const status = totalMissing === 0 && totalSurplus === 0 ? 'MATCH' : 'DISCREPANCY';
 
+    await this.ensureTable();
+
     const revision = await prisma.$transaction(async (tx) => {
       const record = await tx.stockRevision.create({
         data: {
@@ -202,6 +204,41 @@ export class StockRevisionService {
   }
 
   /**
+   * Ensure stock_revisions table and indexes exist in the database.
+   */
+  static async ensureTable() {
+    if (typeof prisma.$executeRawUnsafe !== 'function') return;
+    try {
+      await prisma.$executeRawUnsafe(`
+        CREATE TABLE IF NOT EXISTS "stock_revisions" (
+          "id" TEXT NOT NULL,
+          "storeId" TEXT NOT NULL,
+          "storeName" TEXT NOT NULL,
+          "userId" TEXT NOT NULL,
+          "userName" TEXT NOT NULL,
+          "userRole" TEXT NOT NULL,
+          "totalExpected" INTEGER NOT NULL,
+          "totalChecked" INTEGER NOT NULL,
+          "totalMissing" INTEGER NOT NULL,
+          "totalSurplus" INTEGER NOT NULL,
+          "status" TEXT NOT NULL,
+          "missingDevices" JSONB,
+          "surplusDevices" JSONB,
+          "checkedImeis" JSONB,
+          "comment" TEXT,
+          "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          CONSTRAINT "stock_revisions_pkey" PRIMARY KEY ("id")
+        );
+        CREATE INDEX IF NOT EXISTS "stock_revisions_storeId_createdAt_idx" ON "stock_revisions"("storeId", "createdAt");
+        CREATE INDEX IF NOT EXISTS "stock_revisions_createdAt_idx" ON "stock_revisions"("createdAt");
+      `);
+    } catch (err) {
+      console.warn('[StockRevision] ensureTable error:', (err as any)?.message || err);
+    }
+  }
+
+  /**
    * Get past revisions history.
    */
   static async list(user: StaffUser, query: { storeId?: string; take?: string }) {
@@ -220,20 +257,37 @@ export class StockRevisionService {
 
     const take = Math.min(100, Math.max(1, parseInt(query.take || '50', 10) || 50));
 
-    return prisma.stockRevision.findMany({
-      where: storeId ? { storeId } : undefined,
-      orderBy: { createdAt: 'desc' },
-      take,
-    });
+    try {
+      return await prisma.stockRevision.findMany({
+        where: storeId ? { storeId } : undefined,
+        orderBy: { createdAt: 'desc' },
+        take,
+      });
+    } catch (err: any) {
+      if (err?.code === 'P2021' || err?.code === 'P2022' || (err?.code === 'P2010' && ['42P01', '42703'].includes(err?.meta?.code))) {
+        await this.ensureTable();
+        return [];
+      }
+      throw err;
+    }
   }
 
   /**
    * Get a single revision by ID.
    */
   static async getById(user: StaffUser, id: string) {
-    const revision = await prisma.stockRevision.findUnique({
-      where: { id },
-    });
+    let revision;
+    try {
+      revision = await prisma.stockRevision.findUnique({
+        where: { id },
+      });
+    } catch (err: any) {
+      if (err?.code === 'P2021' || err?.code === 'P2022' || (err?.code === 'P2010' && ['42P01', '42703'].includes(err?.meta?.code))) {
+        await this.ensureTable();
+        throw Object.assign(new Error('Запись сверки не найдена'), { status: 404 });
+      }
+      throw err;
+    }
 
     if (!revision) {
       throw Object.assign(new Error('Запись сверки не найдена'), { status: 404 });

@@ -1,12 +1,12 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { apiClient } from '../../api/client';
 import { DailyCashClosing } from '../../types';
-import { formatTjs, sumMoney } from '../../utils/money';
+import { formatTjs } from '../../utils/money';
 import { Button } from '../ui/Button';
 import { EmptyState } from '../ui/EmptyState';
 import { DailyCashClosingModal } from './DailyCashClosingModal';
 import { useUIStore } from '../../stores/useUIStore';
-import { AlertCircle, Banknote, CreditCard, FileCheck2, Calendar, Store, UserCheck } from 'lucide-react';
+import { AlertCircle, FileCheck2, Calendar, Store, UserCheck } from 'lucide-react';
 
 interface DailyCashClosingListPanelProps {
   month: string;
@@ -64,17 +64,15 @@ export const DailyCashClosingListPanel: React.FC<DailyCashClosingListPanelProps>
     };
   }, [month, storeId, revision]);
 
-  const totals = useMemo(() => ({
-    cashTjs: sumMoney(closings.map((c) => Number(c.actualCashTjs) || 0)),
-    bankTjs: sumMoney(closings.map((c) => Number(c.salesCardTjs) || 0)),
-  }), [closings]);
-
   return (
     <div className="space-y-4">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-surface p-3.5 rounded-2xl border border-border">
         <h2 className="text-sm font-bold text-fg flex items-center gap-2">
           <FileCheck2 className="w-4 h-4 text-accent" />
           Закрытые смены
+          {closings.length > 0 && (
+            <span className="text-xs text-fg-subtle font-normal font-mono">({closings.length})</span>
+          )}
         </h2>
         <Button
           leftIcon={FileCheck2}
@@ -82,21 +80,6 @@ export const DailyCashClosingListPanel: React.FC<DailyCashClosingListPanelProps>
         >
           Закрыть смену
         </Button>
-      </div>
-
-      <div className="grid grid-cols-3 gap-2.5">
-        <div className="p-3 rounded-xl bg-surface border border-border space-y-1">
-          <span className="text-[11px] text-fg-subtle">Смен</span>
-          <p className="text-xl font-bold font-mono text-fg">{closings.length}</p>
-        </div>
-        <div className="p-3 rounded-xl bg-surface border border-border space-y-1 min-w-0">
-          <span className="text-[11px] text-fg-subtle flex items-center gap-1"><Banknote className="w-3.5 h-3.5 text-success" />Наличные</span>
-          <p className="text-base sm:text-lg font-bold font-mono text-fg truncate">{formatTjs(totals.cashTjs)}</p>
-        </div>
-        <div className="p-3 rounded-xl bg-surface border border-border space-y-1 min-w-0">
-          <span className="text-[11px] text-fg-subtle flex items-center gap-1"><CreditCard className="w-3.5 h-3.5 text-info" />Банк</span>
-          <p className="text-base sm:text-lg font-bold font-mono text-fg truncate">{formatTjs(totals.bankTjs)}</p>
-        </div>
       </div>
 
       {loading && closings.length === 0 ? (

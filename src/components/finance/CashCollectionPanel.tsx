@@ -465,7 +465,8 @@ export const CashCollectionPanel: React.FC<CashCollectionPanelProps> = ({
                             type="button"
                             onClick={(e) => {
                               e.stopPropagation();
-                              setDailyClosingModalOpen(true, store.storeId);
+                              const targetDate = store.unclosedDates?.[0];
+                              setDailyClosingModalOpen(true, store.storeId, targetDate);
                             }}
                             className="h-8 px-2.5 rounded-lg bg-surface-raised hover:bg-accent hover:text-accent-fg border border-border text-xs font-semibold text-fg transition-all shadow-2xs active:scale-95 cursor-pointer flex items-center gap-1.5 shrink-0"
                             title="Закрыть смену / Z-отчёт"

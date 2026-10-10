@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { Supplier, SupplierInvoice } from '../../types';
 import { formatMoney } from '../../utils/money';
 import { formatDateStr } from './types';
@@ -35,6 +36,19 @@ export const SupplierDetailsPanel: React.FC<SupplierDetailsPanelProps> = ({
   onEditInvoice,
   onDeleteInvoice,
 }) => {
+  useEffect(() => {
+    if (!supplier) return;
+    document.documentElement.setAttribute('data-modal-open', '');
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.documentElement.removeAttribute('data-modal-open');
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [supplier, onClose]);
+
   return (
     <>
       {/* Desktop Column */}
@@ -185,47 +199,79 @@ export const SupplierDetailsPanel: React.FC<SupplierDetailsPanelProps> = ({
       </div>
 
       {/* MOBILE FULL-SCREEN MODAL */}
-      {supplier && (
-        <div className="app-safe-area lg:hidden fixed inset-0 z-40 bg-bg flex flex-col pb-[var(--sa-bottom)]">
+      {supplier && typeof document !== 'undefined' && createPortal(
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label={`Карточка поставщика: ${supplier.name}`}
+          className="app-safe-area lg:hidden fixed inset-0 z-50 bg-bg flex flex-col overflow-hidden animate-in fade-in duration-150"
+        >
           {/* Header */}
           <div className="border-b border-border bg-surface shrink-0">
             <div className="w-full shrink-0" style={{ height: 'var(--sa-top)' }} />
-            <div className="p-3.5 flex items-center justify-between">
-              <div className="flex items-center space-x-2">
-                <Truck className="w-4 h-4 text-accent" />
-                <h3 className="text-sm font-bold text-fg-muted truncate max-w-50">
-                  {supplier.name}
-                </h3>
+            <div className="px-3.5 py-3 flex items-center justify-between gap-2">
+              <div className="flex items-center space-x-2.5 min-w-0 flex-1">
+                <div className="w-8 h-8 rounded-xl bg-accent/15 border border-accent/30 text-accent flex items-center justify-center shrink-0">
+                  <Truck className="w-4 h-4" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <h3 className="text-sm font-bold text-fg truncate">
+                    {supplier.name}
+                  </h3>
+                  {supplier.phone && (
+                    <p className="text-[11px] font-mono text-fg-subtle truncate">
+                      {supplier.phone}
+                    </p>
+                  )}
+                </div>
               </div>
 
-              <button
-                type="button"
-                onClick={onClose}
-                className="p-1.5 rounded-lg bg-surface-raised text-fg-muted hover:text-fg-muted hover:bg-surface transition-colors flex items-center justify-center border border-border cursor-pointer"
-                title="Закрыть окно"
-              >
-                <X className="w-5 h-5" />
-              </button>
+              <div className="flex items-center space-x-1.5 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => onEditSupplier(supplier)}
+                  className="p-2 rounded-xl bg-surface-raised hover:bg-surface text-fg-subtle hover:text-fg border border-border transition-colors cursor-pointer"
+                  title="Редактировать"
+                >
+                  <Edit className="w-4 h-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onDeleteSupplier(supplier)}
+                  className="p-2 rounded-xl bg-surface-raised hover:bg-danger/15 text-fg-subtle hover:text-danger border border-border transition-colors cursor-pointer"
+                  title="Удалить"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="p-2 rounded-xl bg-surface-raised hover:bg-surface text-fg-subtle hover:text-fg border border-border transition-colors cursor-pointer"
+                  title="Закрыть"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
             </div>
           </div>
 
           {/* Metrics */}
-          <div className="p-3.5 bg-surface-raised border-b border-border grid grid-cols-3 gap-2 text-center text-xs">
-            <div className="bg-surface p-2 rounded-lg border border-border">
-              <span className="block text-[10px] text-fg-subtle">Закуплено</span>
-              <strong className="text-fg-muted text-xs">
+          <div className="p-3 bg-surface-raised/50 border-b border-border grid grid-cols-3 gap-2 text-center">
+            <div className="bg-surface p-2.5 rounded-xl border border-border">
+              <span className="block text-[10px] uppercase font-bold text-fg-subtle tracking-wider">Закуплено</span>
+              <strong className="text-fg font-mono font-black text-xs sm:text-sm mt-0.5 block">
                 ${formatMoney(supplier.totalPurchasedUsd)}
               </strong>
             </div>
-            <div className="bg-surface p-2 rounded-lg border border-border">
-              <span className="block text-[10px] text-fg-subtle">Выплачено</span>
-              <strong className="text-accent text-xs">
+            <div className="bg-surface p-2.5 rounded-xl border border-border">
+              <span className="block text-[10px] uppercase font-bold text-fg-subtle tracking-wider">Выплачено</span>
+              <strong className="text-accent font-mono font-black text-xs sm:text-sm mt-0.5 block">
                 ${formatMoney(supplier.totalPaidUsd)}
               </strong>
             </div>
-            <div className="bg-surface p-2 rounded-lg border border-border">
-              <span className="block text-[10px] text-fg-subtle">Долг</span>
-              <strong className="text-danger text-xs">
+            <div className="bg-surface p-2.5 rounded-xl border border-border">
+              <span className="block text-[10px] uppercase font-bold text-fg-subtle tracking-wider">Долг</span>
+              <strong className="text-danger font-mono font-black text-xs sm:text-sm mt-0.5 block">
                 ${formatMoney(supplier.totalDebtUsd)}
               </strong>
             </div>
@@ -237,7 +283,7 @@ export const SupplierDetailsPanel: React.FC<SupplierDetailsPanelProps> = ({
               type="button"
               onClick={() => onOpenPay(supplier)}
               disabled={supplier.totalDebtUsd <= 0}
-              className="w-full py-2.5 rounded-xl bg-accent hover:bg-accent-strong disabled:opacity-40 disabled:cursor-not-allowed text-xs font-semibold text-accent-fg shadow-xs flex items-center justify-center space-x-1.5 transition-colors cursor-pointer"
+              className="w-full h-11 rounded-xl bg-accent hover:bg-accent-strong disabled:opacity-40 disabled:cursor-not-allowed text-xs font-bold text-accent-fg shadow-xs flex items-center justify-center space-x-2 transition-all active:scale-98 cursor-pointer"
             >
               <DollarSign className="w-4 h-4" />
               <span>Погасить долг</span>
@@ -245,78 +291,85 @@ export const SupplierDetailsPanel: React.FC<SupplierDetailsPanelProps> = ({
           </div>
 
           {/* Invoices List */}
-          <div className="p-2.5 bg-surface-raised border-b border-border text-xs font-semibold text-fg-muted flex items-center justify-between">
+          <div className="p-2.5 px-3 bg-surface-raised border-b border-border text-xs font-semibold text-fg flex items-center justify-between">
             <span>Накладные поставщика</span>
-            <span className="text-[11px] text-fg-subtle">{invoices.length} шт.</span>
+            <span className="text-[11px] font-mono text-fg-subtle">{invoices.length} шт.</span>
           </div>
 
-          <div className="flex-1 overflow-y-auto divide-y divide-border bg-bg p-1">
-            {invoices.map((inv) => {
-              const isPaid = inv.status === 'PAID';
-              const isPartial = inv.status === 'PARTIALLY_PAID';
+          <div className="flex-1 overflow-y-auto bg-bg p-2 space-y-1.5">
+            {invoices.length === 0 ? (
+              <div className="p-8 text-center text-fg-subtle text-xs">
+                <FileText className="w-8 h-8 mx-auto mb-2 opacity-30" />
+                <p>Накладных для этого поставщика пока нет</p>
+              </div>
+            ) : (
+              invoices.map((inv) => {
+                const isPaid = inv.status === 'PAID';
+                const isPartial = inv.status === 'PARTIALLY_PAID';
 
-              return (
-                <div
-                  key={inv.id}
-                  onClick={() => onSelectInvoice(inv.id)}
-                  className="p-3 hover:bg-surface-raised active:bg-surface cursor-pointer transition-colors flex items-center justify-between group border-b border-border"
-                >
-                  <div>
-                    <div className="flex items-center space-x-2">
-                      <span className="text-xs font-bold text-fg-muted group-hover:text-accent transition-colors">
-                        {inv.invoiceNumber}
-                      </span>
-                      <span
-                        className={`text-[10px] px-2 py-0.5 rounded-md font-medium ${
-                          isPaid
-                            ? 'bg-accent/15 text-accent border border-accent/30'
-                            : isPartial
-                            ? 'bg-warning/15 text-warning border border-warning/30'
-                            : 'bg-danger/15 text-danger border border-danger/30'
-                        }`}
-                      >
-                        {isPaid ? 'Оплачена' : isPartial ? 'Частично' : 'Не оплачена'}
-                      </span>
-                    </div>
-                    <p className="text-[11px] text-fg-subtle mt-0.5">
-                      {formatDateStr(inv.date)} • {inv.devicesCount ?? 0} устройств
-                    </p>
-                  </div>
-
-                  <div className="flex items-center space-x-3">
-                    <div className="text-right">
-                      <p className="text-xs font-bold text-fg-muted">
-                        ${formatMoney(inv.totalAmountUsd)}
-                      </p>
-                      <p className="text-[11px] text-danger">
-                        Долг: ${formatMoney(inv.remainingAmountUsd)}
+                return (
+                  <div
+                    key={inv.id}
+                    onClick={() => onSelectInvoice(inv.id)}
+                    className="p-3 rounded-xl bg-surface hover:bg-surface-raised active:scale-[0.99] cursor-pointer transition-all flex items-center justify-between group border border-border shadow-2xs"
+                  >
+                    <div>
+                      <div className="flex items-center space-x-2">
+                        <span className="text-xs font-bold text-fg group-hover:text-accent transition-colors font-mono">
+                          {inv.invoiceNumber}
+                        </span>
+                        <span
+                          className={`text-[10px] px-2 py-0.5 rounded-md font-semibold ${
+                            isPaid
+                              ? 'bg-accent/15 text-accent border border-accent/30'
+                              : isPartial
+                              ? 'bg-warning/15 text-warning border border-warning/30'
+                              : 'bg-danger/15 text-danger border border-danger/30'
+                          }`}
+                        >
+                          {isPaid ? 'Оплачена' : isPartial ? 'Частично' : 'Не оплачена'}
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-fg-subtle mt-0.5">
+                        {formatDateStr(inv.date)} • {inv.devicesCount ?? 0} устройств
                       </p>
                     </div>
-                    <button
-                      type="button"
-                      className="p-1 rounded-lg bg-surface-raised text-fg-subtle group-hover:text-fg-muted border border-border"
-                      title="Детали накладной"
-                    >
-                      <ChevronRight className="w-4 h-4" />
-                    </button>
+
+                    <div className="flex items-center space-x-3">
+                      <div className="text-right">
+                        <p className="text-xs font-black font-mono text-fg">
+                          ${formatMoney(inv.totalAmountUsd)}
+                        </p>
+                        <p className="text-[11px] font-mono text-danger font-bold">
+                          Долг: ${formatMoney(inv.remainingAmountUsd)}
+                        </p>
+                      </div>
+                      <div className="p-1 rounded-lg bg-surface-raised text-fg-subtle group-hover:text-fg border border-border">
+                        <ChevronRight className="w-4 h-4" />
+                      </div>
+                    </div>
                   </div>
-                </div>
-              );
-            })}
+                );
+              })
+            )}
           </div>
 
           {/* Mobile Footer */}
-          <div className="p-3 border-t border-border bg-surface shrink-0">
+          <div
+            className="p-3 border-t border-border bg-surface shrink-0"
+            style={{ paddingBottom: 'max(0.75rem, var(--sa-bottom))' }}
+          >
             <button
               type="button"
               onClick={onClose}
-              className="w-full py-2 rounded-lg bg-surface-raised hover:bg-surface text-xs font-bold text-fg-muted flex items-center justify-center space-x-1.5 transition-colors border border-border cursor-pointer"
+              className="w-full h-11 rounded-xl bg-surface-raised hover:bg-surface active:scale-98 text-xs font-bold text-fg flex items-center justify-center space-x-2 transition-all border border-border cursor-pointer shadow-2xs"
             >
-              <X className="w-4 h-4" />
-              <span>ЗАКРЫТЬ КАРТОЧКУ ПОСТАВЩИКА</span>
+              <X className="w-4 h-4 text-fg-subtle" />
+              <span>Закрыть карточку поставщика</span>
             </button>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </>
   );

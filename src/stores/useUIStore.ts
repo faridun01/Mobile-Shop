@@ -20,6 +20,7 @@ interface UIState {
   isStoreSwitchModalOpen: boolean;
   isDailyClosingModalOpen: boolean;
   dailyClosingStoreId?: string;
+  dailyClosingBusinessDate?: string;
   storeTransition: StoreTransitionState | null;
 
   setTheme: (theme: ThemeMode) => void;
@@ -32,7 +33,7 @@ interface UIState {
   openScanner: (callback: (code: string) => void) => void;
   closeScanner: () => void;
   setStoreSwitchModalOpen: (open: boolean) => void;
-  setDailyClosingModalOpen: (open: boolean, storeId?: string) => void;
+  setDailyClosingModalOpen: (open: boolean, storeId?: string, businessDate?: string) => void;
   triggerStoreTransition: (opts: { storeName: string; storeId?: string; isCentral?: boolean; durationMs?: number }) => void;
   clearStoreTransition: () => void;
 }
@@ -62,6 +63,7 @@ export const useUIStore = create<UIState>((set) => ({
   isStoreSwitchModalOpen: false,
   isDailyClosingModalOpen: false,
   dailyClosingStoreId: undefined,
+  dailyClosingBusinessDate: undefined,
   storeTransition: null,
 
   setTheme: (theme) => {
@@ -103,8 +105,8 @@ export const useUIStore = create<UIState>((set) => ({
   openScanner: (scannerCallback) => set({ isScannerOpen: true, scannerCallback }),
   closeScanner: () => set({ isScannerOpen: false, scannerCallback: null }),
   setStoreSwitchModalOpen: (isStoreSwitchModalOpen) => set({ isStoreSwitchModalOpen }),
-  setDailyClosingModalOpen: (isDailyClosingModalOpen, dailyClosingStoreId) =>
-    set({ isDailyClosingModalOpen, dailyClosingStoreId }),
+  setDailyClosingModalOpen: (isDailyClosingModalOpen, dailyClosingStoreId, dailyClosingBusinessDate) =>
+    set({ isDailyClosingModalOpen, dailyClosingStoreId, dailyClosingBusinessDate }),
   triggerStoreTransition: (opts) =>
     set({
       storeTransition: {

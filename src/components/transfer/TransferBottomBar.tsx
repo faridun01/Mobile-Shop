@@ -14,7 +14,7 @@ export const TransferBottomBar: React.FC<TransferBottomBarProps> = ({
   if (selectedCount === 0) return null;
 
   return (
-    <div className="fixed bottom-3 inset-x-3 sm:inset-x-auto sm:left-1/2 sm:-translate-x-1/2 sm:w-full sm:max-w-2xl z-30 pointer-events-none">
+    <div className="fixed bottom-[calc(3.25rem+var(--sa-bottom)+0.75rem)] md:bottom-4 inset-x-3 sm:inset-x-auto sm:left-1/2 sm:-translate-x-1/2 sm:w-full sm:max-w-2xl z-40 pointer-events-none">
       <div className={cn(
         'pointer-events-auto p-2.5 sm:p-3 rounded-2xl bg-surface/95 border shadow-2xl flex items-center justify-between gap-2.5 backdrop-blur-md transition-all',
         !toLocationId ? 'border-warning/60 shadow-warning/5' : 'border-accent/40'

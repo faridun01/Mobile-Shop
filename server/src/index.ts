@@ -1,15 +1,20 @@
-import 'dotenv/config';
+import dotenv from 'dotenv';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import express from 'express';
+
+const currentFile = fileURLToPath(import.meta.url);
+const currentDirectory = path.dirname(currentFile);
+const projectRoot = path.resolve(currentDirectory, '../..');
+
+dotenv.config({ path: path.join(projectRoot, '.env') });
+dotenv.config();
+
 import { app } from './app';
 import { prisma } from './prisma/prisma.service';
 import { RealtimeSyncGateway } from './websocket/websocket.gateway';
 
 const port = Number(process.env.PORT || 3001);
-const currentFile = fileURLToPath(import.meta.url);
-const currentDirectory = path.dirname(currentFile);
-const projectRoot = path.resolve(currentDirectory, '../..');
 
 // Vite hashes every filename under /assets (content changes -> new filename), so those
 // are safe to cache forever; everything else (index.html, sw.js, manifest) must stay
@@ -32,11 +37,16 @@ app.get('*', (_req, res) => {
   res.sendFile(path.join(projectRoot, 'dist', 'index.html'));
 });
 
+import { StockRevisionService } from './modules/revisions/revisions.service';
+
 const server = app.listen(port, '0.0.0.0', () => {
   console.log(`Mobile Shop API listening on port ${port}`);
 });
 
 RealtimeSyncGateway.init(server);
+void StockRevisionService.ensureTable().catch((err) => {
+  console.warn('[Startup] StockRevisionService.ensureTable non-fatal error:', err);
+});
 
 // Stop accepting connections, close realtime sockets (they would otherwise keep server.close
 // waiting forever), let in-flight requests finish, then exit. Docker sends SIGKILL 10s after

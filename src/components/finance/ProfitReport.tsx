@@ -471,7 +471,7 @@ export const ProfitReport: React.FC<ProfitReportProps> = ({
         )}
       </div>
 
-      <div className={`p-3 sm:p-4 space-y-4 transition-opacity ${summaryLoading ? 'opacity-60' : ''}`}>
+      <div className={`p-3 sm:p-4 pb-12 sm:pb-8 space-y-4 transition-opacity ${summaryLoading ? 'opacity-60' : ''}`}>
         {view === 'summary' ? (
           <>
             <div>
@@ -552,25 +552,25 @@ export const ProfitReport: React.FC<ProfitReportProps> = ({
                   <Smartphone className="w-3.5 h-3.5 text-accent" />
                   <span>Самые прибыльные модели</span>
                 </h4>
-                <div className="overflow-x-auto">
+                <div className="overflow-x-auto -mx-1 px-1">
                   <table className="w-full text-left text-xs">
                     <thead>
                       <tr className="border-b border-border text-[10px] text-fg-subtle uppercase">
-                        <th className="py-2 px-3">Модель</th>
-                        <th className="py-2 px-3 text-center">Шт</th>
-                        <th className="py-2 px-3 text-right">Выручка</th>
-                        <th className="py-2 px-3 text-right">Себестоимость</th>
-                        <th className="py-2 px-3 text-right">Прибыль</th>
+                        <th className="py-2 px-2 sm:px-3">Модель</th>
+                        <th className="py-2 px-1.5 sm:px-3 text-center whitespace-nowrap">Шт</th>
+                        <th className="py-2 px-2 sm:px-3 text-right whitespace-nowrap">Выручка</th>
+                        <th className="py-2 px-2 sm:px-3 text-right whitespace-nowrap">Себестоимость</th>
+                        <th className="py-2 px-2 sm:px-3 text-right whitespace-nowrap">Прибыль</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-border">
                       {data.modelCounts.slice(0, 10).map((m) => (
                         <tr key={m.name}>
-                          <td className="py-2 px-3 font-bold text-fg-muted">{m.name}</td>
-                          <td className="py-2 px-3 text-center text-fg-muted font-bold">{m.count}</td>
-                          <td className="py-2 px-3 text-right text-fg-muted">{usd(m.revenueUsd)}</td>
-                          <td className="py-2 px-3 text-right text-fg-subtle">{usd(m.cogsUsd)}</td>
-                          <td className={`py-2 px-3 text-right font-bold ${m.profitUsd >= 0 ? 'text-accent' : 'text-danger'}`}>{signedUsd(m.profitUsd)}</td>
+                          <td className="py-2 px-2 sm:px-3 font-bold text-fg-muted max-w-[130px] sm:max-w-none truncate">{m.name}</td>
+                          <td className="py-2 px-1.5 sm:px-3 text-center text-fg font-mono font-bold">{m.count}</td>
+                          <td className="py-2 px-2 sm:px-3 text-right text-fg-muted font-mono whitespace-nowrap">{usd(m.revenueUsd)}</td>
+                          <td className="py-2 px-2 sm:px-3 text-right text-fg-subtle font-mono whitespace-nowrap">{usd(m.cogsUsd)}</td>
+                          <td className={`py-2 px-2 sm:px-3 text-right font-mono font-bold whitespace-nowrap ${m.profitUsd >= 0 ? 'text-accent' : 'text-danger'}`}>{signedUsd(m.profitUsd)}</td>
                         </tr>
                       ))}
                     </tbody>

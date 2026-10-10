@@ -377,8 +377,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     // A background refresh must neither reopen today's prompt nor close an editor
     // deliberately opened from Settings.
     if (manualRateEdit.current) return;
-    const role = useAuthStore.getState().currentUser?.role;
-    const shouldOpen = role === 'ADMIN' && confirmedRateDay.current !== today;
+    const user = useAuthStore.getState().currentUser;
+    const shouldOpen = Boolean(user) && confirmedRateDay.current !== today;
     setIsRateModalOpen(shouldOpen);
     useUIStore.getState().setDailyRateModalOpen(shouldOpen);
   }, []);
@@ -909,6 +909,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const setActivePage = (page: PageId, _navTargetId?: string) => {
     setActivePageState(page);
     setDrawerOpen(false);
+    useUIStore.getState().setDrawerOpen(false);
+    if (typeof document !== 'undefined') {
+      document.documentElement.removeAttribute('data-drawer-open');
+    }
   };
 
   const setSelectedStoreId = (storeId: string) => {

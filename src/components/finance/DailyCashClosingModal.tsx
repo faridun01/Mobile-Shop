@@ -15,6 +15,7 @@ import {
   CreditCard,
   Clock,
   UserCheck,
+  Calendar,
   Store as StoreIcon,
 } from 'lucide-react';
 import { formatStoreName, formatStoreDisplayTitle, useStoreContext } from '../../utils/storeContext';
@@ -110,13 +111,15 @@ export const DailyCashClosingModal: React.FC<DailyCashClosingModalProps> = ({
   }, [explicitStoreId, currentUser?.role, currentUser?.storeId, storeCtx, selectedStoreId, stores, retailStores]);
 
   const [selectedStoreIdState, setSelectedStoreIdState] = useState<string>('');
+  const [selectedDateState, setSelectedDateState] = useState<string>('');
 
   useEffect(() => {
     if (isOpen) {
       const target = (explicitStoreId && explicitStoreId !== 'all' ? explicitStoreId : '') || detectedStoreId;
       setSelectedStoreIdState(target);
+      setSelectedDateState(explicitBusinessDate || '');
     }
-  }, [isOpen, explicitStoreId, detectedStoreId]);
+  }, [isOpen, explicitStoreId, detectedStoreId, explicitBusinessDate]);
 
   const effectiveStoreId = useMemo(() => {
     if (selectedStoreIdState && selectedStoreIdState !== 'all') return selectedStoreIdState;
@@ -141,15 +144,16 @@ export const DailyCashClosingModal: React.FC<DailyCashClosingModalProps> = ({
 
   const noRetailStores = retailStores.length === 0;
 
-  const fetchSummary = async () => {
+  const fetchSummary = async (dateOverride?: string) => {
     const targetStoreId = effectiveStoreId || explicitStoreId || selectedStoreIdState;
     if (!targetStoreId) return;
+    const targetDate = dateOverride ?? (selectedDateState || explicitBusinessDate);
     setLoading(true);
     setError(null);
     try {
       let url = `/daily-closings/summary?storeId=${encodeURIComponent(targetStoreId)}`;
-      if (explicitBusinessDate) {
-        url += `&businessDate=${encodeURIComponent(explicitBusinessDate)}`;
+      if (targetDate) {
+        url += `&businessDate=${encodeURIComponent(targetDate)}`;
       }
       setSummary(await apiClient<DailyClosingSummary>(url));
     } catch (err: any) {
@@ -161,9 +165,9 @@ export const DailyCashClosingModal: React.FC<DailyCashClosingModalProps> = ({
 
   useEffect(() => {
     if (isOpen && effectiveStoreId) {
-      void fetchSummary();
+      void fetchSummary(selectedDateState || explicitBusinessDate);
     }
-  }, [isOpen, effectiveStoreId, explicitBusinessDate]);
+  }, [isOpen, effectiveStoreId, selectedDateState, explicitBusinessDate]);
 
   // The seller/partner/admin confirms the calculated day; no counted amount is sent.
   const handleCloseShift = async () => {
@@ -176,14 +180,15 @@ export const DailyCashClosingModal: React.FC<DailyCashClosingModalProps> = ({
     setError(null);
     setSubmitting(true);
     try {
+      const closingDate = selectedDateState || explicitBusinessDate || summary?.businessDate;
       const result = await apiClient<DailyCashClosing>('/daily-closings', {
         method: 'POST',
-        body: JSON.stringify({ storeId: finalStoreId, businessDate: explicitBusinessDate || summary?.businessDate }),
+        body: JSON.stringify({ storeId: finalStoreId, businessDate: closingDate }),
       });
       soundEffects.playAddToCartSuccess();
       window.dispatchEvent(new CustomEvent('business-data-changed'));
       onClosed?.(result);
-      await fetchSummary();
+      await fetchSummary(closingDate);
     } catch (err: any) {
       setError(err?.message || 'Не удалось закрыть смену');
     } finally {
@@ -242,7 +247,7 @@ export const DailyCashClosingModal: React.FC<DailyCashClosingModalProps> = ({
             <AlertTriangle className="w-5 h-5 shrink-0 mt-0.5" />
             <div className="flex-1">
               <p className="font-semibold">{error}</p>
-              <Button variant="secondary" onClick={fetchSummary} className="mt-3">
+              <Button variant="secondary" onClick={() => void fetchSummary()} className="mt-3">
                 Повторить
               </Button>
             </div>
@@ -271,6 +276,24 @@ export const DailyCashClosingModal: React.FC<DailyCashClosingModalProps> = ({
                 )}
               </div>
             )}
+
+            <div className="flex items-center justify-between gap-2 p-2 px-2.5 rounded-xl bg-surface-raised border border-border">
+              <span className="text-xs font-semibold text-fg-subtle flex items-center gap-1.5">
+                <Calendar className="w-3.5 h-3.5 text-accent shrink-0" />
+                Дата смены:
+              </span>
+              <input
+                type="date"
+                value={selectedDateState || summary.businessDate}
+                onChange={(e) => {
+                  const newDate = e.target.value;
+                  if (newDate) {
+                    setSelectedDateState(newDate);
+                  }
+                }}
+                className="text-xs font-bold font-mono text-fg bg-surface px-2.5 py-1 rounded-lg border border-border focus:outline-hidden focus:border-accent cursor-pointer"
+              />
+            </div>
 
             {summary.alreadyClosed ? (
               <>

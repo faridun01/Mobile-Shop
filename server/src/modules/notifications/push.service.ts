@@ -19,6 +19,10 @@ export interface ClientPushSubscription {
   keys: PushSubscriptionKeys;
 }
 
+const DEFAULT_VAPID_PUBLIC_KEY =
+  'BEzkY3CfaEoQmoLWIbq5pUu4VN46h2MbnnCjJwltp97g5yys2wWaQKQVm2SThiziKT93RG-pgkmTGs0qZQV-JsI';
+const DEFAULT_VAPID_PRIVATE_KEY =
+  'QG9LaQRIX7kK6aNYgPOnU_iXxNMOaXNgqE1ixKcNVWQ';
 const DEFAULT_SUBJECT = 'mailto:admin@mobileshop.tj';
 
 // The server POSTs to whatever endpoint a subscription names, so only real browser push
@@ -42,7 +46,9 @@ export function isAllowedPushEndpoint(endpoint: unknown): endpoint is string {
   }
   if (url.protocol !== 'https:' || (url.port && url.port !== '443') || url.username || url.password) return false;
   const host = url.hostname.toLowerCase();
-  return PUSH_SERVICE_HOSTS.some((allowed) => (allowed.startsWith('.') ? host.endsWith(allowed) : host === allowed));
+  return PUSH_SERVICE_HOSTS.some((allowed) =>
+    allowed.startsWith('.') ? host === allowed.slice(1) || host.endsWith(allowed) : host === allowed
+  );
 }
 
 export class PushNotificationService {
@@ -50,14 +56,13 @@ export class PushNotificationService {
   private static warnedMissingKeys = false;
 
   /**
-   * Configures VAPID from the environment. There is deliberately no built-in fallback key:
-   * a key pair committed to the repo would let anyone sign pushes as this server. Without
-   * VAPID_PUBLIC_KEY / VAPID_PRIVATE_KEY push is simply disabled.
+   * Configures VAPID from the environment with built-in default keys as a fallback.
+   * If VAPID_PUBLIC_KEY / VAPID_PRIVATE_KEY are provided in env, they take precedence.
    */
   public static init(): boolean {
     if (this.configured) return true;
-    const publicKey = process.env.VAPID_PUBLIC_KEY;
-    const privateKey = process.env.VAPID_PRIVATE_KEY;
+    const publicKey = process.env.VAPID_PUBLIC_KEY || DEFAULT_VAPID_PUBLIC_KEY;
+    const privateKey = process.env.VAPID_PRIVATE_KEY || DEFAULT_VAPID_PRIVATE_KEY;
     const subject = process.env.VAPID_SUBJECT || DEFAULT_SUBJECT;
     if (!publicKey || !privateKey) {
       if (!this.warnedMissingKeys) {
@@ -82,7 +87,8 @@ export class PushNotificationService {
   }
 
   public static getPublicKey(): string | null {
-    return this.init() ? process.env.VAPID_PUBLIC_KEY! : null;
+    if (!this.init()) return null;
+    return process.env.VAPID_PUBLIC_KEY || DEFAULT_VAPID_PUBLIC_KEY;
   }
 
   /**
@@ -180,7 +186,7 @@ export class PushNotificationService {
    * Send push to all active subscriptions of a user.
    */
   public static async sendPushToUser(userId: string, payload: PushPayload) {
-    if (!this.init()) return;
+    if (!this.init() || !prisma.pushSubscription) return;
     const subscriptions = await prisma.pushSubscription.findMany({
       where: { userId },
       select: { id: true, endpoint: true, p256dh: true, auth: true },
@@ -197,7 +203,7 @@ export class PushNotificationService {
    * Send push notification to all users with a specific role (e.g. ADMIN).
    */
   public static async sendPushToRole(role: 'ADMIN' | 'PARTNER' | 'SELLER', payload: PushPayload) {
-    if (!this.init()) return;
+    if (!this.init() || !prisma.pushSubscription) return;
     const subscriptions = await prisma.pushSubscription.findMany({
       where: {
         user: {

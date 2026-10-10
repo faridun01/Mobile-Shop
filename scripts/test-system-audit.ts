@@ -117,9 +117,9 @@ try {
       assert(ws.events.some((e) => e.type === 'EXCHANGE_RATE_UPDATED'), `${who} did not get EXCHANGE_RATE_UPDATED`);
     }
   });
-  await step('партнёр и продавец не могут менять курс', async () => {
-    assert.equal((await call(partner, 'POST', '/exchange-rate/today', { rate: 1 })).status, 403);
-    assert.equal((await call(seller, 'POST', '/exchange-rate/today', { rate: 1 })).status, 403);
+  await step('партнёр и продавец могут задавать курс', async () => {
+    ok(await call(partner, 'POST', '/exchange-rate/today', { rate: 9.5 }));
+    ok(await call(seller, 'POST', '/exchange-rate/today', { rate: 9.5 }));
   });
   const RATE = D(9.5);
 

@@ -52,19 +52,19 @@ export const MobileBottomNav: React.FC = () => {
       <button
         onClick={onSelect}
         title={title || label}
-        className={`flex-1 pt-2 pb-1 flex flex-col items-center justify-start gap-1 transition-colors ${
+        className={`flex-1 min-w-0 pt-2 pb-1 flex flex-col items-center justify-start gap-1 transition-colors ${
           isActive ? 'text-accent' : 'text-fg-subtle active:text-fg'
         }`}
       >
-        <Icon className="w-5 h-5" strokeWidth={isActive ? 2.5 : 2} />
-        <span className={`text-[10px] leading-none ${isActive ? 'font-semibold' : 'font-medium'}`}>{label}</span>
+        <Icon className="w-5 h-5 shrink-0" strokeWidth={isActive ? 2.5 : 2} />
+        <span className={`text-[9.5px] sm:text-[10px] leading-tight truncate max-w-full px-0.5 tracking-tight ${isActive ? 'font-semibold' : 'font-medium'}`}>{label}</span>
       </button>
     );
   };
 
   if (isCentralCashMode) {
     return (
-      <nav className="app-bottom-nav md:hidden shrink-0 w-full bg-surface border-t border-border flex items-stretch justify-around select-none">
+      <nav className="app-bottom-nav md:hidden shrink-0 w-full bg-surface border-t border-border flex items-stretch justify-around select-none relative z-20">
         <NavItem
           routePath="/inventory"
           label="Склад"
@@ -114,14 +114,14 @@ export const MobileBottomNav: React.FC = () => {
 
         <button
           onClick={toggleDrawer}
-          className={`flex-1 pt-2 pb-1 flex flex-col items-center justify-start gap-1 transition-colors ${
+          className={`flex-1 min-w-0 pt-2 pb-1 flex flex-col items-center justify-start gap-1 transition-colors ${
             drawerOpen ? 'text-accent' : 'text-fg-subtle active:text-fg'
           }`}
         >
           <div className="relative">
-            <Menu className="w-5 h-5" strokeWidth={drawerOpen ? 2.5 : 2} />
+            <Menu className="w-5 h-5 shrink-0" strokeWidth={drawerOpen ? 2.5 : 2} />
           </div>
-          <span className={`text-[10px] leading-none ${drawerOpen ? 'font-semibold' : 'font-medium'}`}>Меню</span>
+          <span className={`text-[9.5px] sm:text-[10px] leading-tight truncate max-w-full px-0.5 tracking-tight ${drawerOpen ? 'font-semibold' : 'font-medium'}`}>Меню</span>
         </button>
       </nav>
     );
@@ -131,7 +131,7 @@ export const MobileBottomNav: React.FC = () => {
   const isSaleActive = location.pathname === '/sale' || location.pathname === '/';
 
   return (
-    <nav className="app-bottom-nav md:hidden shrink-0 w-full bg-surface border-t border-border flex items-stretch justify-around select-none">
+    <nav className="app-bottom-nav md:hidden shrink-0 w-full bg-surface border-t border-border flex items-stretch justify-around select-none relative z-20">
       <NavItem
         routePath="/inventory"
         label="Склад"
@@ -194,14 +194,14 @@ export const MobileBottomNav: React.FC = () => {
 
       <button
         onClick={toggleDrawer}
-        className={`flex-1 pt-2 pb-1 flex flex-col items-center justify-start gap-1 transition-colors ${
+        className={`flex-1 min-w-0 pt-2 pb-1 flex flex-col items-center justify-start gap-1 transition-colors ${
           drawerOpen ? 'text-accent' : 'text-fg-subtle active:text-fg'
         }`}
       >
         <div className="relative">
-          <Menu className="w-5 h-5" strokeWidth={drawerOpen ? 2.5 : 2} />
+          <Menu className="w-5 h-5 shrink-0" strokeWidth={drawerOpen ? 2.5 : 2} />
         </div>
-        <span className={`text-[10px] leading-none ${drawerOpen ? 'font-semibold' : 'font-medium'}`}>Меню</span>
+        <span className={`text-[9.5px] sm:text-[10px] leading-tight truncate max-w-full px-0.5 tracking-tight ${drawerOpen ? 'font-semibold' : 'font-medium'}`}>Меню</span>
       </button>
     </nav>
   );

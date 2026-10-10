@@ -41,7 +41,8 @@ export class WebPushService {
   public static async isSubscribed(): Promise<boolean> {
     if (!this.isSupported()) return false;
     try {
-      const reg = await navigator.serviceWorker.ready;
+      const reg = await navigator.serviceWorker.getRegistration();
+      if (!reg) return false;
       const sub = await reg.pushManager.getSubscription();
       return !!sub;
     } catch (err) {
@@ -74,18 +75,58 @@ export class WebPushService {
       // 2. Fetch VAPID public key from backend
       const { publicKey } = await apiClient<{ publicKey: string }>('/push/public-key');
       if (!publicKey) {
-        throw new Error('Public key not provided by server');
+        throw new Error('Ключ push-уведомлений не получен от сервера');
       }
 
-      // 3. Register push subscription with browser pushManager
-      const reg = await navigator.serviceWorker.ready;
-      let subscription = await reg.pushManager.getSubscription();
+      // 3. Ensure service worker is registered
+      let reg = await navigator.serviceWorker.getRegistration();
+      if (!reg) {
+        try {
+          reg = await navigator.serviceWorker.register('/sw.js');
+        } catch {
+          reg = await navigator.serviceWorker.register('/sw-push.js');
+        }
+      }
+
+      // Wait for service worker to become ready (with 8s safety timeout)
+      const readyPromise = navigator.serviceWorker.ready;
+      const timeoutPromise = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error('Время ожидания Service Worker истекло. Обновите страницу.')), 8000)
+      );
+      const activeReg = await Promise.race([readyPromise, timeoutPromise]);
+
+      const serverKey = urlB64ToUint8Array(publicKey);
+      let subscription = await activeReg.pushManager.getSubscription();
 
       if (!subscription) {
-        subscription = await reg.pushManager.subscribe({
+        subscription = await activeReg.pushManager.subscribe({
           userVisibleOnly: true,
-          applicationServerKey: urlB64ToUint8Array(publicKey),
+          applicationServerKey: serverKey,
         });
+      } else {
+        // If subscription already exists, ensure applicationServerKey matches
+        try {
+          const rawKey = subscription.options.applicationServerKey;
+          if (rawKey) {
+            const currentKeyArray = new Uint8Array(rawKey);
+            const matches =
+              currentKeyArray.length === serverKey.length &&
+              currentKeyArray.every((byte, idx) => byte === serverKey[idx]);
+            if (!matches) {
+              await subscription.unsubscribe();
+              subscription = await activeReg.pushManager.subscribe({
+                userVisibleOnly: true,
+                applicationServerKey: serverKey,
+              });
+            }
+          }
+        } catch {
+          await subscription.unsubscribe().catch(() => {});
+          subscription = await activeReg.pushManager.subscribe({
+            userVisibleOnly: true,
+            applicationServerKey: serverKey,
+          });
+        }
       }
 
       // 4. Send subscription to server
@@ -114,7 +155,8 @@ export class WebPushService {
   public static async unsubscribe(): Promise<{ success: boolean }> {
     if (!this.isSupported()) return { success: false };
     try {
-      const reg = await navigator.serviceWorker.ready;
+      const reg = await navigator.serviceWorker.getRegistration();
+      if (!reg) return { success: true };
       const subscription = await reg.pushManager.getSubscription();
       if (subscription) {
         await apiClient('/push/unsubscribe', {

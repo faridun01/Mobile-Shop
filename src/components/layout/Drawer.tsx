@@ -290,7 +290,11 @@ export const Drawer: React.FC = () => {
   }, [saveScroll, setDrawerOpen, setUiDrawerOpen]);
 
   React.useEffect(() => {
-    if (!isEffectiveDrawerOpen) return;
+    if (!isEffectiveDrawerOpen) {
+      document.documentElement.removeAttribute('data-drawer-open');
+      document.body.style.overflow = '';
+      return;
+    }
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') closeDrawer();
     };
@@ -303,7 +307,7 @@ export const Drawer: React.FC = () => {
       document.body.style.overflow = prevOverflow;
       document.documentElement.removeAttribute('data-drawer-open');
     };
-  }, [drawerOpen, closeDrawer]);
+  }, [isEffectiveDrawerOpen, closeDrawer]);
 
   // Restore scroll position when drawer opens: opens from the exact same place!
   React.useLayoutEffect(() => {
@@ -574,13 +578,11 @@ export const Drawer: React.FC = () => {
                           key={item.id}
                           data-active-nav={isActive ? 'true' : undefined}
                           onClick={() => {
-                            saveScroll();
                             lastActiveRouteRef.current = routePath;
                             recordNavVisit(item.id);
                             setActivePage(item.id);
                             navigate(routePath);
-                            setDrawerOpen(false);
-                            setUiDrawerOpen(false);
+                            closeDrawer();
                           }}
                           className={`w-full flex items-center justify-between px-3.5 py-2.5 text-left transition-colors active:bg-surface-raised cursor-pointer ${
                             isActive

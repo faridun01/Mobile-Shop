@@ -148,10 +148,18 @@ export const UncollectedDaysDetailSection: React.FC<UncollectedDaysDetailSection
                           <span>Z-отчёт закрыт</span>
                         </span>
                       ) : (
-                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-500/10 border border-amber-500/30 text-amber-600 dark:text-amber-400 flex items-center gap-1">
-                          <AlertTriangle className="w-3 h-3" />
-                          <span>Смена не закрыта</span>
-                        </span>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setDailyClosingModalOpen(true, store.storeId, day.date);
+                          }}
+                          className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/30 text-amber-700 dark:text-amber-300 flex items-center gap-1 transition-all active:scale-95 cursor-pointer"
+                          title={`Закрыть смену за ${day.date}`}
+                        >
+                          <FileCheck2 className="w-3 h-3" />
+                          <span>Закрыть смену</span>
+                        </button>
                       )}
                     </div>
                   </div>
@@ -196,7 +204,13 @@ export const UncollectedDaysDetailSection: React.FC<UncollectedDaysDetailSection
                 size="sm"
                 variant="secondary"
                 leftIcon={FileCheck2}
-                onClick={() => setDailyClosingModalOpen(true, store.storeId)}
+                onClick={() => {
+                  const targetDate =
+                    data?.balance?.unclosedDates?.[0] ||
+                    store.unclosedDates?.[0] ||
+                    daysList.find((d) => !d.hasClosing)?.date;
+                  setDailyClosingModalOpen(true, store.storeId, targetDate);
+                }}
                 className="shrink-0 font-semibold text-xs"
               >
                 Закрыть смену

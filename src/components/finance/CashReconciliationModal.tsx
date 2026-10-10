@@ -8,6 +8,7 @@ import {
   Clock,
   CreditCard,
   FileSpreadsheet,
+  FileCheck2,
   Gift,
   Receipt,
   Search,
@@ -17,6 +18,7 @@ import { apiClient } from '../../api/client';
 import { formatTjs, formatUsd } from '../../utils/money';
 import { Button } from '../ui/Button';
 import { LoadingState } from '../ui/Skeleton';
+import { useUIStore } from '../../stores/useUIStore';
 
 export interface RegisterBalance {
   storeId: string;
@@ -34,6 +36,7 @@ export interface RegisterBalance {
   lastCollectedAt?: string | null;
   daysWithoutCollection?: number;
   isShiftClosed?: boolean;
+  unclosedDates?: string[];
   unclosedReason?: string | null;
 }
 
@@ -194,6 +197,7 @@ export const CashReconciliationModal: React.FC<CashReconciliationModalProps> = (
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [selectedDate, setSelectedDate] = useState<string>(initialDate || 'ALL');
+  const setDailyClosingModalOpen = useUIStore((s) => s.setDailyClosingModalOpen);
 
   useEffect(() => {
     if (!open || !store) {
@@ -323,11 +327,23 @@ export const CashReconciliationModal: React.FC<CashReconciliationModalProps> = (
             <>
               {/* Unclosed shift warning banner */}
               {(data?.balance?.isShiftClosed === false || store.isShiftClosed === false) && (
-                <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/25 text-amber-700 dark:text-amber-300 text-xs flex items-center justify-between gap-2">
+                <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/25 text-amber-700 dark:text-amber-300 text-xs flex items-center justify-between flex-wrap gap-2">
                   <div className="flex items-center gap-2">
                     <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0" />
                     <span>{data?.balance?.unclosedReason || store.unclosedReason || 'Кассовая смена не закрыта'}. Перед проведением инкассации необходимо закрыть смену (Z-отчёт).</span>
                   </div>
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    leftIcon={FileCheck2}
+                    onClick={() => {
+                      const targetDate = data?.balance?.unclosedDates?.[0] || store.unclosedDates?.[0];
+                      setDailyClosingModalOpen(true, store.storeId, targetDate);
+                    }}
+                    className="shrink-0 font-semibold text-xs"
+                  >
+                    Закрыть смену
+                  </Button>
                 </div>
               )}
 

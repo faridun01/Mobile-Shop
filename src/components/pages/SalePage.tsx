@@ -39,7 +39,7 @@ interface CartItem {
 
 
 export const SalePage: React.FC = () => {
-  const { setStoreSwitchModalOpen } = useUIStore();
+  const { setStoreSwitchModalOpen, setDailyRateModalOpen } = useUIStore();
   const {
     currentUser,
     devices,
@@ -270,6 +270,12 @@ export const SalePage: React.FC = () => {
   // requires the rate on the server anyway).
   const usdLabel = rateReady ? `≈ $${formatMoney(totalUsd)}` : 'курс на сегодня не задан';
 
+  React.useEffect(() => {
+    if (!rateReady && !isCentralCashMode && currentUser) {
+      setDailyRateModalOpen(true);
+    }
+  }, [rateReady, isCentralCashMode, currentUser, setDailyRateModalOpen]);
+
   const isItemBelowCost = (item: CartItem) => {
     if (!todayRate || item.salePriceTjs === undefined || isNaN(item.salePriceTjs)) return false;
     return decimal(item.salePriceTjs).lt(decimal(item.device.costBasisUsd).mul(todayRate.rate));
@@ -398,9 +404,18 @@ export const SalePage: React.FC = () => {
       <StatusBanner message={paymentStatus} onDismiss={() => setPaymentStatus(null)} />
 
       {!rateReady && !isCentralCashMode && (
-        <div className="p-3 bg-warning/15 border-b border-warning/30 text-warning text-xs font-semibold flex items-center gap-2 shrink-0" role="alert">
-          <AlertTriangle className="w-4 h-4 shrink-0" />
-          <span>Курс USD/TJS на сегодня не задан — продажа будет доступна после того, как администратор задаст курс.</span>
+        <div className="p-2.5 sm:p-3 bg-warning/15 border-b border-warning/30 text-warning text-xs font-semibold flex items-center justify-between gap-2 shrink-0 select-none" role="alert">
+          <div className="flex items-center gap-2 min-w-0">
+            <AlertTriangle className="w-4 h-4 shrink-0" />
+            <span className="truncate">Курс USD/TJS на сегодня не задан. Для начала продаж задайте курс.</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setDailyRateModalOpen(true)}
+            className="px-2.5 py-1 rounded-lg bg-warning text-black font-bold text-xs hover:bg-warning/90 transition-all shrink-0 cursor-pointer shadow-xs active:scale-95"
+          >
+            Задать курс
+          </button>
         </div>
       )}
 
