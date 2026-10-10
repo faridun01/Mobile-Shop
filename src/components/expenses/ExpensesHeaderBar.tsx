@@ -1,6 +1,5 @@
 import React from 'react';
 import {
-  TrendingDown,
   RotateCcw,
   Plus,
   AlertCircle,
@@ -43,30 +42,10 @@ export const ExpensesHeaderBar: React.FC<ExpensesHeaderBarProps> = ({
   return (
     <div className="border-b border-border bg-surface shrink-0 p-2 sm:p-2.5">
       <div className="max-w-6xl xl:max-w-7xl mx-auto w-full space-y-1.5 sm:space-y-2">
-        {/* Row 1: KPI Summary (Left) + Status Tabs & Action Button (Right) */}
-        <div className="flex items-center justify-between gap-1.5 sm:gap-2 flex-wrap">
-          {/* Summary KPI Badge */}
-          <div className="flex items-center gap-1.5 min-w-0">
-            <div className="w-6 h-6 rounded-lg bg-danger/10 text-danger flex items-center justify-center shrink-0">
-              <TrendingDown className="w-3.5 h-3.5" />
-            </div>
-            <div className="flex items-baseline gap-1.5 flex-wrap min-w-0">
-              <span className="text-xs sm:text-sm font-bold text-danger font-mono tracking-tight whitespace-nowrap">
-                -{formatMoney(totalExpensesTjs)} TJS
-              </span>
-              <span className="text-[10px] sm:text-[11px] text-fg-subtle font-mono hidden xs:inline whitespace-nowrap">
-                ≈ -${formatMoney(totalExpensesUsd)}
-              </span>
-              <span className="text-[9px] sm:text-[10px] text-fg-subtle px-1.5 py-0.2 rounded-md bg-surface-raised border border-border/80 shrink-0">
-                {filteredExpensesCount} из {totalExpensesCount}
-              </span>
-            </div>
-          </div>
-
-          {/* Right: Status Segmented Control & Add Button */}
-          <div className="flex items-center gap-1 sm:gap-1.5 shrink-0 ml-auto">
-            {/* Status pills */}
-            <div className="inline-flex items-center bg-surface-raised p-0.5 rounded-lg border border-border/80 text-[11px] shrink-0">
+        {/* Row 1: Status Tabs (Left) & Add Button (Right) */}
+        <div className="flex items-center justify-between gap-1.5 sm:gap-2">
+          {/* Status pills */}
+          <div className="inline-flex items-center bg-surface-raised p-0.5 rounded-lg border border-border/80 text-[11px] shrink-0">
               <button
                 type="button"
                 onClick={() => setStatusFilter('ALL')}
@@ -125,7 +104,6 @@ export const ExpensesHeaderBar: React.FC<ExpensesHeaderBarProps> = ({
               <span className="sm:hidden">Расход</span>
               <span className="hidden sm:inline">Добавить расход</span>
             </Button>
-          </div>
         </div>
 
         {/* Unpaid Warning Notice (compact banner, only when unpaid exists) */}
