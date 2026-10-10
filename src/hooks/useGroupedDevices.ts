@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { Device } from '../types';
-import { formatPhoneColor } from '../utils/phoneSpecs';
+import { formatPhoneColor, formatStorage } from '../utils/phoneSpecs';
 
 interface ColorGroup {
   key: string;
@@ -41,9 +41,10 @@ export function useGroupedDevices(devices: Device[]): DeviceGroup[] {
       }
       group.count++;
 
-      let storageGroup = group.storageGroups.find((s) => s.storage === device.storage);
+      const normStorage = formatStorage(device.storage) || device.storage;
+      let storageGroup = group.storageGroups.find((s) => s.storage === normStorage);
       if (!storageGroup) {
-        storageGroup = { key: `${groupKey}__${device.storage}`, storage: device.storage, colorGroups: [], count: 0 };
+        storageGroup = { key: `${groupKey}__${normStorage}`, storage: normStorage, colorGroups: [], count: 0 };
         group.storageGroups.push(storageGroup);
       }
       storageGroup.count++;

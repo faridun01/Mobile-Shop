@@ -5,7 +5,7 @@ import { Smartphone, Sparkles, Warehouse, Store } from 'lucide-react';
 import { Badge } from '../ui/Badge';
 import { useVirtualRows } from '../../hooks/useVirtualRows';
 import { DeviceRow } from './DeviceRow';
-import { STATUS_LABELS, STATUS_TONE } from './types';
+import { STATUS_LABELS, STATUS_TONE, formatRam, formatStorage, formatPhoneColor } from './types';
 import { CopyImeiButton } from '../common/CopyImeiButton';
 
 interface FlatDevicesTableProps {
@@ -119,11 +119,11 @@ export const FlatDevicesTable: React.FC<FlatDevicesTableProps> = ({
                   <div className="flex items-center gap-1.5 flex-wrap">
                     {dev.ram && (
                       <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-accent/15 text-accent border border-accent/30 font-mono">
-                        {dev.ram.toUpperCase().includes('GB') ? dev.ram : `${dev.ram} GB`}
+                        ОЗУ {formatRam(dev.ram)}
                       </span>
                     )}
-                    <Badge tone="neutral">{dev.storage}</Badge>
-                    <Badge tone="neutral">{dev.color}</Badge>
+                    <Badge tone="neutral">{formatStorage(dev.storage) || dev.storage}</Badge>
+                    <Badge tone="neutral">{formatPhoneColor(dev.color) || dev.color}</Badge>
                   </div>
                 </td>
                 <td className="p-3">

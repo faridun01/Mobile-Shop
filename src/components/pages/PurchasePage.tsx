@@ -6,7 +6,7 @@ import { SupplierInvoice } from '../../types';
 import { soundEffects } from '../../utils/sound';
 import { getBusinessDateKey } from '../../utils/businessDate';
 import { useUnfinishedWork } from '../../utils/pwaUpdateSafety';
-import { DEFAULT_PHONE_COLORS_EN, normalizePhoneColor } from '../../utils/phoneSpecs';
+import { DEFAULT_PHONE_COLORS_EN, normalizePhoneColor, formatRam, formatStorage } from '../../utils/phoneSpecs';
 
 import {
   PurchaseItemGroup,
@@ -179,7 +179,8 @@ export const PurchasePage: React.FC = () => {
   const ramOptions = useMemo(() => {
     const set = new Set<string>(['4 GB', '6 GB', '8 GB', '12 GB', '16 GB', '24 GB']);
     (devices || []).forEach((d) => {
-      if (d.ram) set.add(d.ram.trim());
+      const formatted = formatRam(d.ram);
+      if (formatted) set.add(formatted);
     });
     return Array.from(set).sort();
   }, [devices]);
@@ -187,7 +188,8 @@ export const PurchasePage: React.FC = () => {
   const storageOptions = useMemo(() => {
     const set = new Set<string>(['64 GB', '128 GB', '256 GB', '512 GB', '1 TB']);
     (devices || []).forEach((d) => {
-      if (d.storage) set.add(d.storage.trim());
+      const formatted = formatStorage(d.storage);
+      if (formatted) set.add(formatted);
     });
     return Array.from(set).sort();
   }, [devices]);
@@ -700,8 +702,8 @@ export const PurchasePage: React.FC = () => {
             return { imei: c2 ? `${c1} / ${c2}` : c1 };
           });
 
-        const ramStr = g.ram.trim();
-        const storageStr = g.storage.trim();
+        const ramStr = formatRam(g.ram) || g.ram.trim();
+        const storageStr = formatStorage(g.storage) || g.storage.trim();
 
         return {
           brand: g.brand.trim(),

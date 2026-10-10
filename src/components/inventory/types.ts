@@ -67,6 +67,7 @@ export {
   formatPhoneColor,
   normalizePhoneColor,
   formatRam,
+  formatStorage,
   isRamInStorage,
 } from '../../utils/phoneSpecs';
 

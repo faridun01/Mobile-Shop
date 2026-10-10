@@ -30,7 +30,7 @@ import {
 } from 'lucide-react';
 import { MonthPicker } from '../ui/MonthPicker';
 import { currentBusinessMonth } from '../../utils/businessDate';
-import { DEFAULT_PHONE_COLORS_EN, normalizePhoneColor, formatPhoneColor } from '../../utils/phoneSpecs';
+import { DEFAULT_PHONE_COLORS_EN, normalizePhoneColor, formatPhoneColor, formatRam, formatStorage } from '../../utils/phoneSpecs';
 
 interface BonusAccountBalance {
   balanceUsd: string;
@@ -347,8 +347,8 @@ export const BonusesPage: React.FC = () => {
               {
                 brand: bonusBrand.trim(),
                 model: bonusModel.trim(),
-                ram: bonusRam.trim(),
-                storage: bonusStorage.trim(),
+                ram: formatRam(bonusRam.trim()) || bonusRam.trim(),
+                storage: formatStorage(bonusStorage.trim()) || bonusStorage.trim(),
                 color: normalizePhoneColor(bonusColor.trim()) || bonusColor.trim() || 'Black',
                 imei: bonusImei.trim(),
                 imei2: bonusImei2.trim() || undefined,

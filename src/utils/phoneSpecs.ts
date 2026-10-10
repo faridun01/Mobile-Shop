@@ -489,14 +489,22 @@ export function formatRam(ram?: string | null): string | null {
   if (!ram) return null;
   const clean = ram.trim();
   if (!clean) return null;
-  return clean.toUpperCase().includes('GB') ? clean : `${clean} GB`;
+  if (/^\d+$/.test(clean)) return `${clean} GB`;
+  if (/^(\d+)\s*gb$/i.test(clean)) {
+    return clean.replace(/^(\d+)\s*gb$/i, (_, num) => `${num} GB`);
+  }
+  return clean;
 }
 
 export function formatStorage(storage?: string | null): string {
   if (!storage) return '';
   const clean = storage.trim();
   if (!clean) return '';
-  return clean.toUpperCase().includes('GB') || clean.toUpperCase().includes('TB') ? clean : `${clean} GB`;
+  if (/^\d+$/.test(clean)) return `${clean} GB`;
+  if (/^(\d+)\s*(gb|tb)$/i.test(clean)) {
+    return clean.replace(/^(\d+)\s*(gb|tb)$/i, (_, num, unit) => `${num} ${unit.toUpperCase()}`);
+  }
+  return clean;
 }
 
 /**

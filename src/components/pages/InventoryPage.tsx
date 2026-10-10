@@ -19,7 +19,7 @@ import { useNavigationLayout } from '../../hooks/useNavigationLayout';
 import { useVirtualRows } from '../../hooks/useVirtualRows';
 import { findDeviceByCode, looksLikeDeviceCode, normalizeScanCode } from '../../utils/scanLookup';
 import { useStoreContext, formatStoreName } from '../../utils/storeContext';
-import { IN_STOCK_STATUSES, InventoryViewMode, BrandGroupItem, STATUS_LABELS, formatRam } from '../inventory/types';
+import { IN_STOCK_STATUSES, InventoryViewMode, BrandGroupItem, STATUS_LABELS, formatRam, formatStorage } from '../inventory/types';
 import { InventoryStatsBar } from '../inventory/InventoryStatsBar';
 import { InventoryFiltersBar } from '../inventory/InventoryFiltersBar';
 import { InventoryLocationsView } from '../inventory/InventoryLocationsView';
@@ -218,8 +218,9 @@ export const InventoryPage: React.FC = () => {
   const availableStorages = useMemo(() => {
     const set = new Set<string>();
     devicesInActiveLocation.forEach(d => {
-      if (d.storage && d.storage.trim()) {
-        set.add(d.storage.trim());
+      const formatted = formatStorage(d.storage);
+      if (formatted) {
+        set.add(formatted);
       }
     });
     return Array.from(set).sort((a, b) => {
@@ -265,7 +266,10 @@ export const InventoryPage: React.FC = () => {
       }
 
       // Storage filter
-      if (selectedStorage !== 'ALL' && d.storage.trim() !== selectedStorage.trim()) return false;
+      if (selectedStorage !== 'ALL') {
+        const normDevStorage = formatStorage(d.storage) || d.storage.trim();
+        if (normDevStorage !== selectedStorage) return false;
+      }
 
       // Status / Type filter
       if (selectedStatusFilter === 'MAIN_WAREHOUSE') {
@@ -396,7 +400,7 @@ export const InventoryPage: React.FC = () => {
       mGroup.devices.push(dev);
 
       // Storage breakdown
-      const sName = dev.storage.trim() || 'Стандарт';
+      const sName = formatStorage(dev.storage) || dev.storage.trim() || 'Стандарт';
       let sEntry = mGroup.storageList.find(s => s.storage === sName);
       if (!sEntry) {
         sEntry = { storage: sName, count: 0 };

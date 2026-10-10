@@ -15,6 +15,7 @@ import {
   STATUS_LABELS,
   STATUS_TONE,
   formatRam,
+  formatStorage,
   isRamInStorage,
 } from './types';
 import { ImeiBadge } from '../common/CopyImeiButton';
@@ -35,7 +36,7 @@ export const DeviceRow = React.forwardRef<HTMLButtonElement, DeviceRowProps>(
     const showStatusBadge = isSpecialStatus || !storeName;
     const colorHex = getPhoneColorHex(device.color);
     const formattedRam = formatRam(device.ram);
-    const showRamBadge = Boolean(formattedRam && !isRamInStorage(device.storage, device.ram));
+    const showRamBadge = Boolean(formattedRam);
 
     return (
       <button
@@ -61,7 +62,7 @@ export const DeviceRow = React.forwardRef<HTMLButtonElement, DeviceRowProps>(
 
               {device.storage && (
                 <span className="px-2 py-0.5 rounded-md bg-surface-raised border border-border text-xs font-black font-mono text-fg shadow-2xs shrink-0">
-                  {device.storage}
+                  {formatStorage(device.storage)}
                 </span>
               )}
 

@@ -362,7 +362,7 @@ export class OwnersService {
             });
             if (guard.count !== 1) throw new Error('Прибыль изменилась во время закрытия периода. Обновите данные и повторите');
             // Same records a manual REINVEST produces: owner history, journal and audit amounts.
-            const note = `Автоматическое реинвестирование остатка при закрытии периода ${cleanQuarterName}`;
+            const note = `Автоматическое реинвестирование ${cleanQuarterName}`;
             await tx.ownerTransaction.create({
               data: {
                 ownerId: owner.id,

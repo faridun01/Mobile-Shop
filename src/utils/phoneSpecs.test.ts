@@ -5,6 +5,8 @@ import {
   getPhoneColorHex,
   DEFAULT_PHONE_COLORS_EN,
   isRamInStorage,
+  formatRam,
+  formatStorage,
 } from './phoneSpecs';
 
 describe('phoneSpecs colors', () => {
@@ -134,5 +136,35 @@ describe('isRamInStorage', () => {
     expect(isRamInStorage('64 GB', null)).toBe(false);
     expect(isRamInStorage('', '')).toBe(false);
     expect(isRamInStorage('128/6', '8')).toBe(false);
+  });
+});
+
+describe('formatRam', () => {
+  it('standardizes RAM to uppercase GB with space', () => {
+    expect(formatRam('4')).toBe('4 GB');
+    expect(formatRam('4GB')).toBe('4 GB');
+    expect(formatRam('4 GB')).toBe('4 GB');
+    expect(formatRam('8')).toBe('8 GB');
+    expect(formatRam('8GB')).toBe('8 GB');
+    expect(formatRam('8 gb')).toBe('8 GB');
+    expect(formatRam('4+4 GB')).toBe('4+4 GB');
+    expect(formatRam(null)).toBe(null);
+    expect(formatRam('')).toBe(null);
+  });
+});
+
+describe('formatStorage', () => {
+  it('standardizes ROM to uppercase GB/TB with space', () => {
+    expect(formatStorage('64')).toBe('64 GB');
+    expect(formatStorage('64GB')).toBe('64 GB');
+    expect(formatStorage('64 gb')).toBe('64 GB');
+    expect(formatStorage('64 GB')).toBe('64 GB');
+    expect(formatStorage('128')).toBe('128 GB');
+    expect(formatStorage('128GB')).toBe('128 GB');
+    expect(formatStorage('1TB')).toBe('1 TB');
+    expect(formatStorage('1 TB')).toBe('1 TB');
+    expect(formatStorage('4/64')).toBe('4/64');
+    expect(formatStorage(null)).toBe('');
+    expect(formatStorage('')).toBe('');
   });
 });

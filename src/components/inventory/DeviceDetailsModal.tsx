@@ -21,7 +21,7 @@ import { Dialog } from '../ui/Dialog';
 import { Button } from '../ui/Button';
 import { Badge } from '../ui/Badge';
 import { cn } from '../../utils/cn';
-import { formatTimelineDate, getTimelineBadge, STATUS_LABELS, STATUS_TONE, formatPhoneColor } from './types';
+import { formatTimelineDate, getTimelineBadge, STATUS_LABELS, STATUS_TONE, formatPhoneColor, formatRam, formatStorage } from './types';
 
 interface DeviceDetailsModalProps {
   device: Device | null;
@@ -94,9 +94,8 @@ export const DeviceDetailsModal: React.FC<DeviceDetailsModalProps> = ({
 
   const store = stores.find(s => s.id === currentDevice.locationId);
   const isWh = store?.isMainWarehouse || currentDevice.status === 'MAIN_WAREHOUSE';
-  const formattedRam = currentDevice.ram
-    ? (currentDevice.ram.toUpperCase().includes('GB') ? currentDevice.ram : `${currentDevice.ram} GB`)
-    : null;
+  const formattedRam = formatRam(currentDevice.ram);
+  const formattedStorage = formatStorage(currentDevice.storage) || currentDevice.storage;
 
   return (
     <Dialog
@@ -208,7 +207,7 @@ export const DeviceDetailsModal: React.FC<DeviceDetailsModalProps> = ({
               </div>
               <div className="mt-1">
                 <span className="text-xs sm:text-sm font-extrabold text-fg font-mono block">
-                  {currentDevice.storage || '—'}
+                  {formattedStorage || '—'}
                 </span>
               </div>
             </div>
