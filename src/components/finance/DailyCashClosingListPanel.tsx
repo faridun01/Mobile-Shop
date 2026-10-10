@@ -200,34 +200,38 @@ export const DailyCashClosingListPanel: React.FC<DailyCashClosingListPanelProps>
       </div>
 
       {/* Summary KPI Cards: Смен, Наличные ($ USD / ≈ TJS), Банк ($ USD / ≈ TJS) */}
-      <div className="grid grid-cols-3 gap-2.5">
-        <div className="p-3 rounded-xl bg-surface border border-border space-y-1">
-          <span className="text-[11px] text-fg-subtle">Смен</span>
-          <p className="text-xl font-bold font-mono text-fg">{totals.count}</p>
+      <div className="grid grid-cols-3 gap-2 sm:gap-2.5">
+        <div className="p-2.5 sm:p-3 rounded-xl bg-surface border border-border flex flex-col justify-between">
+          <span className="text-[11px] font-semibold text-fg-subtle">Смен</span>
+          <p className="text-lg sm:text-xl font-black font-mono text-fg mt-1 tabular-nums">{totals.count}</p>
         </div>
-        <div className="p-3 rounded-xl bg-surface border border-border space-y-1 min-w-0">
-          <span className="text-[11px] text-fg-subtle flex items-center gap-1">
-            <Banknote className="w-3.5 h-3.5 text-success" />
-            Наличные
+        <div className="p-2.5 sm:p-3 rounded-xl bg-surface border border-border flex flex-col justify-between min-w-0">
+          <span className="text-[11px] font-semibold text-fg-subtle flex items-center gap-1 leading-tight">
+            <Banknote className="w-3.5 h-3.5 text-success shrink-0" />
+            <span>Наличные</span>
           </span>
-          <p className="text-base sm:text-lg font-bold font-mono text-emerald-600 dark:text-emerald-400 truncate">
-            ${formatMoney(totals.cashUsd)}
-          </p>
-          <span className="text-[10px] text-fg-subtle block font-mono">
-            ≈ {formatTjs(totals.cashTjs)}
-          </span>
+          <div className="mt-1 space-y-0.5">
+            <p className="text-sm sm:text-base md:text-lg font-black font-mono text-emerald-600 dark:text-emerald-400 tabular-nums leading-snug">
+              ${formatMoney(totals.cashUsd)}
+            </p>
+            <span className="text-[9.5px] sm:text-[10px] text-fg-subtle block font-mono whitespace-nowrap">
+              ≈ {formatTjs(totals.cashTjs)}
+            </span>
+          </div>
         </div>
-        <div className="p-3 rounded-xl bg-surface border border-border space-y-1 min-w-0">
-          <span className="text-[11px] text-fg-subtle flex items-center gap-1">
-            <CreditCard className="w-3.5 h-3.5 text-info" />
-            Банк
+        <div className="p-2.5 sm:p-3 rounded-xl bg-surface border border-border flex flex-col justify-between min-w-0">
+          <span className="text-[11px] font-semibold text-fg-subtle flex items-center gap-1 leading-tight">
+            <CreditCard className="w-3.5 h-3.5 text-info shrink-0" />
+            <span>Банк</span>
           </span>
-          <p className="text-base sm:text-lg font-bold font-mono text-info truncate">
-            ${formatMoney(totals.bankUsd)}
-          </p>
-          <span className="text-[10px] text-fg-subtle block font-mono">
-            ≈ {formatTjs(totals.bankTjs)}
-          </span>
+          <div className="mt-1 space-y-0.5">
+            <p className="text-sm sm:text-base md:text-lg font-black font-mono text-info tabular-nums leading-snug">
+              ${formatMoney(totals.bankUsd)}
+            </p>
+            <span className="text-[9.5px] sm:text-[10px] text-fg-subtle block font-mono whitespace-nowrap">
+              ≈ {formatTjs(totals.bankTjs)}
+            </span>
+          </div>
         </div>
       </div>
 
