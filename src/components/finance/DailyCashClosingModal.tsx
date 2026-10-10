@@ -7,6 +7,7 @@ import { useAppFields } from '../../context/AppContext';
 import { DailyClosingSummary, DailyCashClosing } from '../../types';
 import { formatTjs } from '../../utils/money';
 import { soundEffects } from '../../utils/sound';
+import { ConfirmDialog } from '../ui/ConfirmDialog';
 import {
   CheckCircle2,
   AlertTriangle,
@@ -18,6 +19,9 @@ import {
   Calendar,
   Store as StoreIcon,
   Info,
+  RotateCcw,
+  Lock,
+  ShieldCheck,
 } from 'lucide-react';
 import { formatStoreName, formatStoreDisplayTitle, useStoreContext } from '../../utils/storeContext';
 import { useUIStore } from '../../stores/useUIStore';
@@ -30,6 +34,7 @@ interface DailyCashClosingModalProps {
   businessDate?: string;
   readOnly?: boolean;
   onClosed?: (closing: DailyCashClosing) => void;
+  onReopened?: () => void;
 }
 
 const getLocalCurrentDate = (): string => {
@@ -72,6 +77,7 @@ export const DailyCashClosingModal: React.FC<DailyCashClosingModalProps> = ({
   businessDate: explicitBusinessDate,
   readOnly,
   onClosed,
+  onReopened,
 }) => {
   const { currentUser, stores, selectedStoreId, setSelectedStoreId } = useAppFields(
     'currentUser',
@@ -82,6 +88,9 @@ export const DailyCashClosingModal: React.FC<DailyCashClosingModalProps> = ({
   const { triggerStoreTransition } = useUIStore();
   const storeCtx = useStoreContext();
   const isAdmin = currentUser?.role === 'ADMIN';
+
+  const [isConfirmReopenOpen, setIsConfirmReopenOpen] = useState(false);
+  const [reopening, setReopening] = useState(false);
 
   const retailStores = useMemo(
     () => stores.filter((s) => !s.isMainWarehouse && s.active),
@@ -230,6 +239,25 @@ export const DailyCashClosingModal: React.FC<DailyCashClosingModalProps> = ({
     }
   };
 
+  const handleReopenClosing = async () => {
+    if (!closing?.id || reopening) return;
+    setReopening(true);
+    setError(null);
+    try {
+      await apiClient(`/daily-closings/${closing.id}`, { method: 'DELETE' });
+      soundEffects.playAddToCartSuccess();
+      window.dispatchEvent(new CustomEvent('business-data-changed'));
+      setIsConfirmReopenOpen(false);
+      onReopened?.();
+      const targetDate = selectedDateState || explicitBusinessDate || summary?.businessDate;
+      await fetchSummary(targetDate);
+    } catch (err: any) {
+      setError(err?.message || 'Не удалось отменить закрытие смены');
+    } finally {
+      setReopening(false);
+    }
+  };
+
   const closing = summary?.closing;
   const closedDifference = Number(closing?.differenceTjs ?? 0);
 
@@ -237,7 +265,7 @@ export const DailyCashClosingModal: React.FC<DailyCashClosingModalProps> = ({
     <>
       <Dialog
         open={isOpen}
-        onClose={() => { if (!submitting) onClose(); }}
+        onClose={() => { if (!submitting && !reopening) onClose(); }}
         title={
           readOnly
             ? 'Просмотр закрытой смены'
@@ -250,25 +278,45 @@ export const DailyCashClosingModal: React.FC<DailyCashClosingModalProps> = ({
         subtitle={noRetailStores ? undefined : `${effectiveStoreName} · ${summary?.businessDate || explicitBusinessDate || 'Сегодня'}`}
         maxWidth="sm"
         footer={
-          <div className="w-full flex flex-wrap items-center justify-end gap-2">
-            {canCloseShift && summary && !noRetailStores ? (
-              <>
-                <Button variant="secondary" onClick={onClose} disabled={submitting} className="flex-1 sm:flex-initial">
-                  Отмена
-                </Button>
+          <div className="w-full flex flex-wrap items-center justify-between gap-2">
+            <div>
+              {isAdmin && summary?.alreadyClosed && closing?.id && (
                 <Button
-                  onClick={handleCloseShift}
-                  loading={submitting}
-                  disabled={loading || submitting}
-                  leftIcon={CheckCircle2}
-                  className="flex-1 sm:flex-initial font-bold"
+                  type="button"
+                  variant="danger"
+                  size="sm"
+                  leftIcon={RotateCcw}
+                  onClick={() => setIsConfirmReopenOpen(true)}
+                  disabled={submitting || reopening}
+                  loading={reopening}
+                  className="font-medium"
                 >
-                  Закрыть смену
+                  Отменить закрытие
                 </Button>
-              </>
-            ) : (
-              <Button onClick={onClose} className="w-full sm:w-auto">Закрыть</Button>
-            )}
+              )}
+            </div>
+            <div className="flex items-center gap-2">
+              {canCloseShift && summary && !noRetailStores ? (
+                <>
+                  <Button variant="secondary" onClick={onClose} disabled={submitting || reopening} className="flex-1 sm:flex-initial">
+                    Отмена
+                  </Button>
+                  <Button
+                    onClick={handleCloseShift}
+                    loading={submitting}
+                    disabled={loading || submitting || reopening}
+                    leftIcon={CheckCircle2}
+                    className="flex-1 sm:flex-initial font-bold"
+                  >
+                    Закрыть смену
+                  </Button>
+                </>
+              ) : (
+                <Button onClick={onClose} disabled={reopening} className="w-full sm:w-auto">
+                  Закрыть
+                </Button>
+              )}
+            </div>
           </div>
         }
       >
@@ -364,13 +412,36 @@ export const DailyCashClosingModal: React.FC<DailyCashClosingModalProps> = ({
                 </p>
                 <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/25 text-emerald-600 dark:text-emerald-400 text-xs font-medium flex items-start gap-2.5">
                   <CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5" />
-                  <div className="space-y-0.5">
+                  <div className="space-y-0.5 flex-1">
                     <p className="font-bold">Кассовая смена закрыта</p>
-                    <p className="text-[11px] opacity-90">
-                      Смена за {summary.businessDate} успешно зафиксирована.
+                    <p className="text-[11px] opacity-90 leading-relaxed">
+                      Смена за {summary.businessDate} успешно зафиксирована. Повторное закрытие кассы заблокировано.
                     </p>
                   </div>
                 </div>
+
+                {isAdmin ? (
+                  <div className="p-3 rounded-xl bg-accent/10 border border-accent/25 text-fg text-xs flex items-start gap-2.5">
+                    <ShieldCheck className="w-4 h-4 shrink-0 text-accent mt-0.5" />
+                    <div className="space-y-0.5 flex-1">
+                      <p className="font-bold text-accent">Управление сменой (Администратор)</p>
+                      <p className="text-[11px] text-fg-subtle leading-relaxed">
+                        Повторное закрытие заблокировано для сотрудников. Если необходимо внести исправления или пересчитать кассу, нажмите кнопку «Отменить закрытие» внизу.
+                      </p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/25 text-amber-700 dark:text-amber-300 text-xs flex items-start gap-2.5">
+                    <Lock className="w-4 h-4 shrink-0 text-amber-600 dark:text-amber-400 mt-0.5" />
+                    <div className="space-y-0.5 flex-1">
+                      <p className="font-bold">Повторное закрытие заблокировано</p>
+                      <p className="text-[11px] opacity-90 leading-relaxed">
+                        Касса на сегодня уже закрыта. Повторное закрытие недоступно. Только администратор может отменить закрытие и переоткрыть смену.
+                      </p>
+                    </div>
+                  </div>
+                )}
+
                 {closedDifference !== 0 && (
                   <p className={`text-xs font-semibold ${closedDifference < 0 ? 'text-danger' : 'text-info'}`}>
                     {closedDifference < 0 ? 'Недостача' : 'Излишек'}: {closedDifference > 0 ? '+' : ''}{formatTjs(closedDifference)}
@@ -418,6 +489,27 @@ export const DailyCashClosingModal: React.FC<DailyCashClosingModalProps> = ({
           </div>
         ) : null}
       </Dialog>
+
+      <ConfirmDialog
+        open={isConfirmReopenOpen}
+        title="Отменить закрытие кассы?"
+        message={
+          <div className="space-y-2 text-xs text-fg-subtle">
+            <p>
+              Вы собираетесь отменить закрытие смены за <strong className="text-fg">{summary?.businessDate || explicitBusinessDate}</strong> магазина <strong className="text-fg">{effectiveStoreName}</strong>.
+            </p>
+            <p>
+              Смена снова станет открытой. Запись закрытия будет удалена, а сотрудники смогут продолжить кассовые операции или закрыть смену заново.
+            </p>
+          </div>
+        }
+        confirmLabel="Да, отменить закрытие"
+        cancelLabel="Назад"
+        tone="danger"
+        loading={reopening}
+        onConfirm={handleReopenClosing}
+        onCancel={() => { if (!reopening) setIsConfirmReopenOpen(false); }}
+      />
     </>
   );
 };

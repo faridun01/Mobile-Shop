@@ -17,6 +17,7 @@ import {
   CreditCard,
   ArrowUpDown,
   Filter,
+  CheckCircle2,
 } from 'lucide-react';
 
 interface DailyCashClosingListPanelProps {
@@ -54,7 +55,9 @@ export const DailyCashClosingListPanel: React.FC<DailyCashClosingListPanelProps>
   storeId,
 }) => {
   const { setDailyClosingModalOpen } = useUIStore();
-  const { stores } = useAppFields('stores');
+  const { stores, currentUser } = useAppFields('stores', 'currentUser');
+  const isAdmin = currentUser?.role === 'ADMIN';
+
   const [closings, setClosings] = useState<DailyCashClosing[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -70,12 +73,27 @@ export const DailyCashClosingListPanel: React.FC<DailyCashClosingListPanelProps>
     setSelectedDay('all');
   }, [month]);
 
+  // Today date string (YYYY-MM-DD)
+  const todayStr = useMemo(() => {
+    const now = new Date();
+    const y = now.getFullYear();
+    const m = String(now.getMonth() + 1).padStart(2, '0');
+    const d = String(now.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  }, []);
+
   // Shift closing is strictly for retail stores, never for central cash desk/warehouse
   const isRetailStore = Boolean(
     storeId &&
     storeId !== 'all' &&
     stores.some((s) => s.id === storeId && !s.isMainWarehouse)
   );
+
+  // Check if today's shift is already closed for the active store
+  const isTodayClosed = useMemo(() => {
+    if (!storeId || storeId === 'all') return false;
+    return closings.some((c) => c.businessDate === todayStr && c.storeId === storeId);
+  }, [closings, todayStr, storeId]);
 
   const refresh = useCallback(() => setRevision((v) => v + 1), []);
 
@@ -189,13 +207,35 @@ export const DailyCashClosingListPanel: React.FC<DailyCashClosingListPanelProps>
           )}
         </h2>
         {isRetailStore && (
-          <Button
-            leftIcon={FileCheck2}
-            onClick={() => setDailyClosingModalOpen(true, storeId!)}
-            className="w-full sm:w-auto"
-          >
-            Закрыть смену
-          </Button>
+          isTodayClosed ? (
+            isAdmin ? (
+              <Button
+                variant="secondary"
+                leftIcon={CheckCircle2}
+                onClick={() => setDailyClosingModalOpen(true, storeId!)}
+                className="w-full sm:w-auto border-emerald-500/30 text-emerald-600 dark:text-emerald-400 bg-emerald-500/5 hover:bg-emerald-500/10 font-medium"
+                title="Смена на сегодня уже закрыта. Нажмите для просмотра или отмены закрытия"
+              >
+                Смена закрыта · Управление
+              </Button>
+            ) : (
+              <div
+                className="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-500/10 border border-emerald-500/25 text-emerald-600 dark:text-emerald-400 text-xs font-semibold select-none shadow-2xs"
+                title="Смена на сегодня уже закрыта. Повторное закрытие недоступно. Только администратор может отменить закрытие"
+              >
+                <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-500" />
+                <span>Смена на сегодня закрыта</span>
+              </div>
+            )
+          ) : (
+            <Button
+              leftIcon={FileCheck2}
+              onClick={() => setDailyClosingModalOpen(true, storeId!)}
+              className="w-full sm:w-auto"
+            >
+              Закрыть смену
+            </Button>
+          )
         )}
       </div>
 
@@ -423,6 +463,10 @@ export const DailyCashClosingListPanel: React.FC<DailyCashClosingListPanelProps>
           storeName={inspectClosing.store?.name}
           businessDate={inspectClosing.businessDate}
           readOnly={true}
+          onReopened={() => {
+            setInspectClosing(null);
+            refresh();
+          }}
         />
       )}
     </div>
