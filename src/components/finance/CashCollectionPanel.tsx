@@ -179,7 +179,7 @@ export const CashCollectionPanel: React.FC<CashCollectionPanelProps> = ({
       const bonusText = result.bonusAmountUsd && result.bonusAmountUsd > 0
         ? ` (${formatUsd(result.regularAmountUsd ?? 0)} в Центр. кассу, ${formatUsd(result.bonusAmountUsd)} на Бонусный счёт)`
         : ' переданы в Центральную кассу';
-      setStatus({ tone: 'success', text: `Инкассация ${result.transactionNumber}: ${formatTjs(result.amountTjs)} (${formatUsd(result.amountUsd)})${bonusText}` });
+      setStatus({ tone: 'success', text: `Инкассация ${result.transactionNumber}: ${formatUsd(result.amountUsd)} (≈ ${formatTjs(result.amountTjs)})${bonusText}` });
       setCollecting(null);
     } catch (e) {
       setStatus({ tone: 'error', text: e instanceof Error ? e.message : 'Инкассация не выполнена' });
@@ -248,10 +248,10 @@ export const CashCollectionPanel: React.FC<CashCollectionPanelProps> = ({
                 </p>
                 <div className="flex items-baseline gap-2 mt-0.5">
                   <p className="text-base sm:text-lg font-black font-mono text-fg tabular-nums truncate">
-                    {formatTjs(balances.central.cashTjs)}
+                    {formatUsd(balances.central.cashUsd)}
                   </p>
                   <span className="text-xs font-medium text-fg-subtle tabular-nums truncate">
-                    ≈ {formatUsd(balances.central.cashUsd)}
+                    ≈ {formatTjs(balances.central.cashTjs)}
                   </span>
                 </div>
               </div>
@@ -274,10 +274,10 @@ export const CashCollectionPanel: React.FC<CashCollectionPanelProps> = ({
                 </p>
                 <div className="flex items-baseline gap-2 mt-0.5">
                   <p className="text-base sm:text-lg font-black font-mono text-amber-500 dark:text-amber-400 tabular-nums truncate">
-                    {formatTjs(balances.bonusAccount.balanceTjs)}
+                    {formatUsd(balances.bonusAccount.balanceUsd)}
                   </p>
                   <span className="text-xs font-medium text-fg-subtle tabular-nums truncate">
-                    ≈ {formatUsd(balances.bonusAccount.balanceUsd)}
+                    ≈ {formatTjs(balances.bonusAccount.balanceTjs)}
                   </span>
                 </div>
               </div>
@@ -338,6 +338,14 @@ export const CashCollectionPanel: React.FC<CashCollectionPanelProps> = ({
                 const unreconciled = !isZero(store.unreconciledUsd);
                 const hasBonus = Number(store.bonusCashUsd || 0) > 0;
                 const isSelected = effectiveStoreId === store.storeId;
+
+                const totalStoreTjs = Number(store.cashTjs) || 0;
+                const totalStoreUsd = Number(store.cashUsd) || 0;
+                const storeRate = totalStoreTjs > 0 ? totalStoreUsd / totalStoreTjs : 0;
+                const cashOnlyTjsNum = Number(store.cashOnlyTjs ?? store.cashTjs) || 0;
+                const cardOnlyTjsNum = Number(store.cardOnlyTjs || 0);
+                const storeCashOnlyUsd = totalStoreTjs > 0 && cardOnlyTjsNum === 0 ? totalStoreUsd : cashOnlyTjsNum * storeRate;
+                const storeCardOnlyUsd = cardOnlyTjsNum * storeRate;
 
                 return (
                   <div
@@ -414,10 +422,10 @@ export const CashCollectionPanel: React.FC<CashCollectionPanelProps> = ({
 
                         <div className="flex items-baseline gap-2">
                           <span className="text-base sm:text-lg font-black font-mono text-fg tabular-nums">
-                            {formatTjs(store.cashTjs)}
+                            {formatUsd(store.cashUsd)}
                           </span>
                           <span className="text-xs sm:text-sm font-medium text-fg-subtle tabular-nums">
-                            ≈ {formatUsd(store.cashUsd)}
+                            ≈ {formatTjs(store.cashTjs)}
                           </span>
                         </div>
 
@@ -425,12 +433,12 @@ export const CashCollectionPanel: React.FC<CashCollectionPanelProps> = ({
                           <div className="flex items-center gap-2 pt-0.5 flex-wrap">
                             <span className="inline-flex items-center gap-1 text-[11px] text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-md font-mono font-medium">
                               <Banknote className="w-3 h-3 shrink-0" />
-                              <span>Наличные: {formatTjs(store.cashOnlyTjs ?? store.cashTjs)}</span>
+                              <span>Наличные: {formatUsd(storeCashOnlyUsd)} (≈ {formatTjs(store.cashOnlyTjs ?? store.cashTjs)})</span>
                             </span>
-                            {Number(store.cardOnlyTjs || 0) > 0 && (
+                            {cardOnlyTjsNum > 0 && (
                               <span className="inline-flex items-center gap-1 text-[11px] text-blue-600 dark:text-blue-400 bg-blue-500/10 border border-blue-500/20 px-2 py-0.5 rounded-md font-mono font-medium">
                                 <CreditCard className="w-3 h-3 shrink-0" />
-                                <span>Банк: {formatTjs(store.cardOnlyTjs)}</span>
+                                <span>Банк: {formatUsd(storeCardOnlyUsd)} (≈ {formatTjs(store.cardOnlyTjs)})</span>
                               </span>
                             )}
                           </div>
@@ -621,9 +629,9 @@ export const CashCollectionPanel: React.FC<CashCollectionPanelProps> = ({
                               isCancelled ? 'line-through text-fg-subtle' : 'text-fg'
                             }`}
                           >
-                            {formatTjs(item.amountTjs)}
+                            {formatUsd(item.amountUsd)}
                           </p>
-                          <p className="text-[11px] text-fg-subtle">{formatUsd(item.amountUsd)}</p>
+                          <p className="text-[11px] text-fg-subtle">≈ {formatTjs(item.amountTjs)}</p>
                         </div>
                         {item.status === 'POSTED' && (
                           <button
@@ -671,58 +679,70 @@ export const CashCollectionPanel: React.FC<CashCollectionPanelProps> = ({
                 </div>
               )}
 
-              <div className="p-3 rounded-xl bg-surface-raised border border-border space-y-2">
-                <div className="flex justify-between items-center text-sm font-bold text-fg">
-                  <span>Инкассируется всего:</span>
-                  <span className="tabular-nums">
-                    {formatTjs(collecting.cashTjs)} · {formatUsd(collecting.cashUsd)}
-                  </span>
-                </div>
-                <div className="pt-2 border-t border-border/60 space-y-1.5 text-xs">
-                  <div className="flex justify-between items-center text-emerald-600 dark:text-emerald-400">
-                    <span className="flex items-center gap-1.5 font-medium">
-                      <Banknote className="w-3.5 h-3.5 shrink-0" />
-                      Наличными в кассе:
-                    </span>
-                    <span className="font-semibold tabular-nums font-mono">
-                      {formatTjs(collecting.cashOnlyTjs ?? collecting.cashTjs)}
-                    </span>
+              {(() => {
+                const totalColTjs = Number(collecting.cashTjs) || 0;
+                const totalColUsd = Number(collecting.cashUsd) || 0;
+                const colRate = totalColTjs > 0 ? totalColUsd / totalColTjs : 0;
+                const colCashTjs = Number(collecting.cashOnlyTjs ?? collecting.cashTjs) || 0;
+                const colCardTjs = Number(collecting.cardOnlyTjs || 0);
+                const colCashUsd = totalColTjs > 0 && colCardTjs === 0 ? totalColUsd : colCashTjs * colRate;
+                const colCardUsd = colCardTjs * colRate;
+
+                return (
+                  <div className="p-3 rounded-xl bg-surface-raised border border-border space-y-2">
+                    <div className="flex justify-between items-center text-sm font-bold text-fg">
+                      <span>Инкассируется всего:</span>
+                      <span className="tabular-nums">
+                        {formatUsd(collecting.cashUsd)} (≈ {formatTjs(collecting.cashTjs)})
+                      </span>
+                    </div>
+                    <div className="pt-2 border-t border-border/60 space-y-1.5 text-xs">
+                      <div className="flex justify-between items-center text-emerald-600 dark:text-emerald-400">
+                        <span className="flex items-center gap-1.5 font-medium">
+                          <Banknote className="w-3.5 h-3.5 shrink-0" />
+                          Наличными в кассе:
+                        </span>
+                        <span className="font-semibold tabular-nums font-mono">
+                          {formatUsd(colCashUsd)} (≈ {formatTjs(collecting.cashOnlyTjs ?? collecting.cashTjs)})
+                        </span>
+                      </div>
+                      {colCardTjs > 0 && (
+                        <div className="flex justify-between items-center text-blue-600 dark:text-blue-400">
+                          <span className="flex items-center gap-1.5 font-medium">
+                            <CreditCard className="w-3.5 h-3.5 shrink-0" />
+                            Банк:
+                          </span>
+                          <span className="font-semibold tabular-nums font-mono">
+                            {formatUsd(colCardUsd)} (≈ {formatTjs(collecting.cardOnlyTjs)})
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                    {Number(collecting.bonusCashUsd || 0) > 0 ? (
+                      <div className="pt-2 border-t border-border/60 space-y-1.5 text-fg-subtle">
+                        <div className="flex justify-between items-center">
+                          <span className="flex items-center gap-1.5">
+                            <Landmark className="w-3.5 h-3.5 text-accent" />
+                            В Центральную кассу:
+                          </span>
+                          <span className="font-semibold text-fg tabular-nums">
+                            {formatUsd(collecting.regularCashUsd || 0)} (≈ {formatTjs(collecting.regularCashTjs || 0)})
+                          </span>
+                        </div>
+                        <div className="flex justify-between items-center text-amber-500 dark:text-amber-400">
+                          <span className="flex items-center gap-1.5">
+                            <Gift className="w-3.5 h-3.5" />
+                            На Бонусный счёт ({collecting.bonusCount || 0} шт.):
+                          </span>
+                          <span className="font-semibold tabular-nums">
+                            {formatUsd(collecting.bonusCashUsd || 0)} (≈ {formatTjs(collecting.bonusCashTjs || 0)})
+                          </span>
+                        </div>
+                      </div>
+                    ) : null}
                   </div>
-                  {Number(collecting.cardOnlyTjs || 0) > 0 && (
-                    <div className="flex justify-between items-center text-blue-600 dark:text-blue-400">
-                      <span className="flex items-center gap-1.5 font-medium">
-                        <CreditCard className="w-3.5 h-3.5 shrink-0" />
-                        Банк:
-                      </span>
-                      <span className="font-semibold tabular-nums font-mono">
-                        {formatTjs(collecting.cardOnlyTjs)}
-                      </span>
-                    </div>
-                  )}
-                </div>
-                {Number(collecting.bonusCashUsd || 0) > 0 ? (
-                  <div className="pt-2 border-t border-border/60 space-y-1.5 text-fg-subtle">
-                    <div className="flex justify-between items-center">
-                      <span className="flex items-center gap-1.5">
-                        <Landmark className="w-3.5 h-3.5 text-accent" />
-                        В Центральную кассу:
-                      </span>
-                      <span className="font-semibold text-fg tabular-nums">
-                        {formatTjs(collecting.regularCashTjs || 0)} · {formatUsd(collecting.regularCashUsd || 0)}
-                      </span>
-                    </div>
-                    <div className="flex justify-between items-center text-amber-500 dark:text-amber-400">
-                      <span className="flex items-center gap-1.5">
-                        <Gift className="w-3.5 h-3.5" />
-                        На Бонусный счёт ({collecting.bonusCount || 0} шт.):
-                      </span>
-                      <span className="font-semibold tabular-nums">
-                        {formatTjs(collecting.bonusCashTjs || 0)} · {formatUsd(collecting.bonusCashUsd || 0)}
-                      </span>
-                    </div>
-                  </div>
-                ) : null}
-              </div>
+                );
+              })()}
             </div>
           )
         }
@@ -742,7 +762,7 @@ export const CashCollectionPanel: React.FC<CashCollectionPanelProps> = ({
           cancelling && (
             <div className="space-y-2.5 text-xs">
               <p>
-                {formatTjs(cancelling.amountTjs)} ({formatUsd(cancelling.amountUsd)}) вернутся в кассу «
+                {formatUsd(cancelling.amountUsd)} (≈ {formatTjs(cancelling.amountTjs)}) вернутся в кассу «
                 {cancelling.storeName}».
               </p>
               {cancelling.bonusAmountUsd !== undefined && cancelling.bonusAmountUsd > 0 ? (

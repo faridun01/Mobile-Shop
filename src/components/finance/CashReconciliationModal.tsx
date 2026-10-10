@@ -382,11 +382,11 @@ export const CashReconciliationModal: React.FC<CashReconciliationModalProps> = (
                           <span>В кассе (нал)</span>
                         </span>
                         <span className="text-[10px] text-fg-subtle font-mono font-normal">
-                          ≈ {formatUsd(data.summary.currentCashUsd)}
+                          ≈ {formatTjs(data.summary.cashOnlyTjs ?? data.summary.currentCashTjs)}
                         </span>
                       </div>
                       <p className="text-base sm:text-lg font-bold font-mono text-fg tabular-nums pt-0.5">
-                        {formatTjs(data.summary.cashOnlyTjs ?? data.summary.currentCashTjs)}
+                        {formatUsd(data.summary.currentCashUsd)}
                       </p>
                       <p className="text-[10px] text-fg-subtle truncate">
                         к инкассации
@@ -742,7 +742,7 @@ export const CashReconciliationModal: React.FC<CashReconciliationModalProps> = (
               title={(data?.balance?.isShiftClosed ?? store.isShiftClosed) === false ? 'Инкассация невозможна: сначала закройте смену (Z-отчёт)' : undefined}
             >
               <ArrowDownToLine className="w-4 h-4" />
-              <span>Инкассировать {formatTjs(store.cashTjs)}</span>
+              <span>Инкассировать {formatUsd(store.cashUsd)} (≈ {formatTjs(store.cashTjs)})</span>
             </Button>
           )}
         </div>

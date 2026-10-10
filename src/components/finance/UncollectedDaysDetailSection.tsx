@@ -8,7 +8,7 @@ import {
   FileCheck2,
 } from 'lucide-react';
 import { apiClient } from '../../api/client';
-import { formatTjs } from '../../utils/money';
+import { formatTjs, formatUsd, formatMoney } from '../../utils/money';
 import { Button } from '../ui/Button';
 import { LoadingState } from '../ui/Skeleton';
 import type { RegisterBalance, StoreBreakdown, BreakdownDailyItem } from './CashReconciliationModal';
@@ -40,6 +40,13 @@ const formatDayAmount = (amount: number): string => {
   if (rounded === 0) return formatTjs(0);
   if (rounded > 0) return `+${formatTjs(rounded)}`;
   return `-${formatTjs(Math.abs(rounded))}`;
+};
+
+const formatDayUsd = (val: number): string => {
+  const rounded = Math.round(val * 100) / 100;
+  if (rounded === 0) return '$0.00';
+  if (rounded > 0) return `+$${formatMoney(rounded)}`;
+  return `-$${formatMoney(Math.abs(rounded))}`;
 };
 
 export const UncollectedDaysDetailSection: React.FC<UncollectedDaysDetailSectionProps> = ({
@@ -165,17 +172,33 @@ export const UncollectedDaysDetailSection: React.FC<UncollectedDaysDetailSection
                   </div>
 
                   {/* Right: Amount */}
-                  <span
-                    className={`text-sm sm:text-base font-bold font-mono tabular-nums shrink-0 ${
-                      isNegative
-                        ? 'text-rose-600 dark:text-rose-400'
-                        : isPositive
-                        ? 'text-emerald-600 dark:text-emerald-400'
-                        : 'text-fg-subtle'
-                    }`}
-                  >
-                    {formatDayAmount(day.netCashTjs)}
-                  </span>
+                  {(() => {
+                    const totalStoreTjs = Number(store.cashTjs) || 0;
+                    const totalStoreUsd = Number(store.cashUsd) || 0;
+                    const storeRate = totalStoreTjs > 0 ? totalStoreUsd / totalStoreTjs : 0;
+                    const dayUsd = day.netCashTjs * storeRate;
+
+                    return (
+                      <div className="text-right tabular-nums shrink-0">
+                        <span
+                          className={`text-sm sm:text-base font-bold font-mono block ${
+                            isNegative
+                              ? 'text-rose-600 dark:text-rose-400'
+                              : isPositive
+                              ? 'text-emerald-600 dark:text-emerald-400'
+                              : 'text-fg-subtle'
+                          }`}
+                        >
+                          {storeRate > 0 ? formatDayUsd(dayUsd) : formatDayAmount(day.netCashTjs)}
+                        </span>
+                        {storeRate > 0 && (
+                          <span className="text-[11px] text-fg-subtle block">
+                            ≈ {formatDayAmount(day.netCashTjs)}
+                          </span>
+                        )}
+                      </div>
+                    );
+                  })()}
                 </div>
               );
             })
@@ -187,9 +210,14 @@ export const UncollectedDaysDetailSection: React.FC<UncollectedDaysDetailSection
                 </div>
                 <span className="text-sm font-bold text-fg">Текущий остаток кассы</span>
               </div>
-              <span className="text-base font-bold font-mono text-emerald-600 dark:text-emerald-400 tabular-nums">
-                {formatTjs(store.cashTjs)}
-              </span>
+              <div className="flex items-baseline gap-1.5">
+                <span className="text-base font-bold font-mono text-emerald-600 dark:text-emerald-400 tabular-nums">
+                  {formatUsd(store.cashUsd)}
+                </span>
+                <span className="text-xs font-medium text-fg-subtle tabular-nums">
+                  ≈ {formatTjs(store.cashTjs)}
+                </span>
+              </div>
             </div>
           )}
 
@@ -225,7 +253,10 @@ export const UncollectedDaysDetailSection: React.FC<UncollectedDaysDetailSection
               </p>
               <div className="flex items-baseline gap-2 mt-0.5">
                 <span className="text-base sm:text-lg font-black font-mono text-fg tabular-nums">
-                  {formatTjs(store.cashTjs)}
+                  {formatUsd(store.cashUsd)}
+                </span>
+                <span className="text-xs sm:text-sm font-medium text-fg-subtle tabular-nums">
+                  ≈ {formatTjs(store.cashTjs)}
                 </span>
               </div>
             </div>
