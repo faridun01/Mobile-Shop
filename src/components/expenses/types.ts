@@ -114,6 +114,8 @@ export interface AddExpenseModalProps {
   paidFromCashRegister: boolean;
   setPaidFromCashRegister: (val: boolean) => void;
   isAdmin: boolean;
+  /** A partner pays a store expense from their own store's register (or records it unpaid). */
+  isPartner: boolean;
   rate: number;
   centralCashStore: Store | null;
   onSubmit: (e: React.FormEvent) => void;

@@ -10,8 +10,8 @@ import { allocateOwnerProfit } from '../sales/profit';
 import { findAdminOwner } from '../finance/owner-allocations';
 
 /**
- * A PARTNER may move only their own capital, and only through their own store's register
- * or Central Cash. ADMIN calls pass no restriction.
+ * A PARTNER may move only their own capital. ADMIN calls pass no restriction. Capital moves in
+ * and out of Central Cash only: a store register holds that store's sales money until collection.
  */
 export interface OwnerTxRestriction {
   userId: string;
@@ -50,12 +50,12 @@ export class OwnersService {
     targetStore: { id: string; isMainWarehouse: boolean },
     restriction?: OwnerTxRestriction,
   ) {
+    if (!targetStore.isMainWarehouse) {
+      throw forbidden('Вклады и изъятия капитала проводятся только через Центральную кассу');
+    }
     if (!restriction) return;
     if (!owner.userId || owner.userId !== restriction.userId) {
       throw forbidden('Партнёр может проводить операции только со своим капиталом');
-    }
-    if (!targetStore.isMainWarehouse && targetStore.id !== restriction.storeId) {
-      throw forbidden('Партнёр может использовать только кассу своего магазина или Центральную кассу');
     }
   }
 

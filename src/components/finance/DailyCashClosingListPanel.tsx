@@ -38,6 +38,8 @@ const formatDayChip = (businessDate: string): string => {
 };
 
 const getClosingCardUsd = (c: DailyCashClosing): number => {
+  // Day-total closings keep the bank takings in dollars as the register booked them.
+  if (c.salesCardUsd !== null && c.salesCardUsd !== undefined) return Number(c.salesCardUsd) || 0;
   const cardTjs = Number(c.salesCardTjs) || 0;
   if (cardTjs <= 0) return 0;
   if (c.exchangeRate && Number(c.exchangeRate) > 0) {
@@ -49,6 +51,24 @@ const getClosingCardUsd = (c: DailyCashClosing): number => {
     return cardTjs / (cashTjs / cashUsd);
   }
   return 0;
+};
+
+/**
+ * Cash and bank of a closed day. A day-total closing's actual amount is cash and bank together;
+ * a closing made before those rules held cash only.
+ */
+const closingSplit = (c: DailyCashClosing) => {
+  const dayTotal = c.salesCardUsd !== null && c.salesCardUsd !== undefined;
+  const bankTjs = Number(c.salesCardTjs) || 0;
+  const bankUsd = getClosingCardUsd(c);
+  const actualTjs = Number(c.actualCashTjs) || 0;
+  const actualUsd = Number(c.actualCashUsd) || 0;
+  return {
+    cashTjs: dayTotal ? actualTjs - bankTjs : actualTjs,
+    cashUsd: dayTotal ? actualUsd - bankUsd : actualUsd,
+    bankTjs,
+    bankUsd,
+  };
 };
 
 /** Closed shifts for the month: cash and bank per day, day sorting, and day filtering. */
@@ -198,10 +218,11 @@ export const DailyCashClosingListPanel: React.FC<DailyCashClosingListPanelProps>
     let bankUsd = 0;
 
     for (const c of displayedClosings) {
-      const cTjs = Number(c.actualCashTjs) || 0;
-      const cUsd = Number(c.actualCashUsd) || 0;
-      const bTjs = Number(c.salesCardTjs) || 0;
-      const bUsd = getClosingCardUsd(c);
+      const split = closingSplit(c);
+      const cTjs = split.cashTjs;
+      const cUsd = split.cashUsd;
+      const bTjs = split.bankTjs;
+      const bUsd = split.bankUsd;
 
       cashTjs += cTjs;
       cashUsd += cUsd;
@@ -444,7 +465,8 @@ export const DailyCashClosingListPanel: React.FC<DailyCashClosingListPanelProps>
           {/* Phones */}
           <div className="md:hidden space-y-2">
             {displayedClosings.map((c) => {
-              const cardUsd = getClosingCardUsd(c);
+              const split = closingSplit(c);
+                    const cardUsd = split.bankUsd;
               return (
                 <button
                   type="button"
@@ -463,10 +485,10 @@ export const DailyCashClosingListPanel: React.FC<DailyCashClosingListPanelProps>
                     <div>
                       <span className="text-[10px] text-fg-subtle block">Наличные</span>
                       <span className="font-bold font-mono text-sm text-emerald-600 dark:text-emerald-400 block">
-                        ${formatMoney(c.actualCashUsd)}
+                        ${formatMoney(split.cashUsd)}
                       </span>
                       <span className="text-[10px] text-fg-subtle font-mono block">
-                        ≈ {formatTjs(c.actualCashTjs)}
+                        ≈ {formatTjs(split.cashTjs)}
                       </span>
                     </div>
                     <div className="text-right">
@@ -499,7 +521,8 @@ export const DailyCashClosingListPanel: React.FC<DailyCashClosingListPanelProps>
                 </thead>
                 <tbody className="divide-y divide-border/60">
                   {displayedClosings.map((c) => {
-                    const cardUsd = getClosingCardUsd(c);
+                    const split = closingSplit(c);
+                    const cardUsd = split.bankUsd;
                     return (
                       <tr
                         key={c.id}
@@ -529,10 +552,10 @@ export const DailyCashClosingListPanel: React.FC<DailyCashClosingListPanelProps>
                         </td>
                         <td className="py-3 px-4 text-right whitespace-nowrap font-mono font-bold">
                           <div className="text-emerald-600 dark:text-emerald-400">
-                            ${formatMoney(c.actualCashUsd)}
+                            ${formatMoney(split.cashUsd)}
                           </div>
                           <div className="text-[10px] text-fg-subtle font-normal">
-                            ≈ {formatTjs(c.actualCashTjs)}
+                            ≈ {formatTjs(split.cashTjs)}
                           </div>
                         </td>
                         <td className="py-3 px-4 text-right whitespace-nowrap font-mono font-bold">

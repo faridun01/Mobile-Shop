@@ -56,7 +56,7 @@ beforeEach(() => {
   db.supplier.aggregate.mockResolvedValue({ _sum: { totalDebtUsd: 123.45 } });
   db.supplier.findMany.mockResolvedValue([{ id: 'supplier', name: 'Supplier', totalPurchasedUsd: 200, totalPaidUsd: 76.55, totalDebtUsd: 123.45 }]);
   db.store.findFirst.mockResolvedValue({ id: 'warehouse', cashBalanceUsd: 34.57 });
-  db.store.findMany.mockImplementation(async ({ where }) => stores.filter((store) => !where.id || store.id === where.id));
+  db.store.findMany.mockImplementation(async ({ where } = {} as any) => stores.filter((store) => !where?.id || store.id === where.id));
   db.device.findMany.mockImplementation(async ({ where }) => where.storeId === 'warehouse'
     ? [{ costBasisUsd: 0, purchasePriceUsd: 200 }, { costBasisUsd: 100.01, purchasePriceUsd: 90 }]
     : stores.filter((store) => where.storeId.in.includes(store.id)).map((store) => ({ storeId: store.id, costBasisUsd: 99.99, purchasePriceUsd: 80 })));
@@ -75,8 +75,8 @@ describe('financial report query optimization preserves all totals', () => {
   });
 });
 
-describe('TJS of past records never uses the current rate', () => {
-  it('values a refund FX result at the rate of the refund day when its log has no rate', async () => {
+describe('a refund is reported by fact, on its own day', () => {
+  it('reverses the dollars actually handed back, not the dollars the sale booked', async () => {
     const refundDay = new Date('2026-09-10T08:00:00Z');
     rates.byDay.set('2026-09-10', 11);
     rates.fallback = 12; // "today"
@@ -90,9 +90,16 @@ describe('TJS of past records never uses the current rate', () => {
         : [];
       return rows.map((row) => project(row, select));
     });
-    const summary = await computeReportsSummary({ period: 'SPECIFIC_MONTH', month: '2026-09' });
-    expect(Number(summary.periodRefundFxUsd)).toBe(18.18);
-    expect(Number(summary.periodRefundFxTjs)).toBe(199.98);
+    const summary = await computeReportsSummary({ period: 'SPECIFIC_MONTH', month: '2026-09', includeEvents: true });
+    // 2000 TJS sold at 10 ($200), handed back at 11: $181.82 left the register.
+    expect(Number(summary.refundsRevenueUsd)).toBe(181.82);
+    expect(Number(summary.revenueUsd)).toBe(-181.82);
+    expect(Number(summary.revenueTjs)).toBe(-2000);
+    expect('periodRefundFxUsd' in summary).toBe(false);
+    expect(summary.events).toHaveLength(1);
+    expect(summary.events![0]).toMatchObject({ kind: 'REFUND', saleId: 'refunded-1', storeName: 'Store 0' });
+    expect(Number(summary.events![0].amountUsd)).toBe(-181.82);
+    expect(Number(summary.events![0].amountTjs)).toBe(-2000);
   });
 });
 

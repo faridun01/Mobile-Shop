@@ -1,33 +1,50 @@
-import { Sale, Expense } from '../types';
+import { Expense } from '../types';
 
+/**
+ * One dated row behind the report totals, as the server returns it (/reports/summary?events=1):
+ * a sale, an exchange or a refund, each in its own day's TJS, rate and USD — never restated
+ * when the rate changes later.
+ */
+export interface ReportEventRow {
+  kind: 'SALE' | 'EXCHANGE' | 'REFUND';
+  date: string;
+  saleId: string;
+  receiptNumber: number | null;
+  storeId: string;
+  storeName: string;
+  rate: number;
+  amountTjs: number;
+  amountUsd: number;
+  costUsd: number;
+  /** Owners' profit (bonus-phone profit excluded, shown in bonusUsd). */
+  profitUsd: number;
+  bonusUsd: number;
+  penaltyTjs: number;
+  penaltyUsd: number;
+}
+
+/** Report totals in USD, as the server computed them for the same period and store. */
 export interface ComprehensiveReportSummary {
   periodLabel: string;
   storeName: string;
-  exchangeRate: number;
   unitsSold: number;
-  revenueTjs: number;
   revenueUsd: number;
-  cogsTjs: number;
   cogsUsd: number;
-  grossProfitTjs: number;
-  grossProfitUsd: number;
-  refundPenaltiesTjs: number;
   refundPenaltiesUsd: number;
+  /** Difference when a customer repays a TJS debt at another day's rate. */
+  debtFxUsd: number;
   /** Profit of sold free bonus phones: nobody's income, shown for reference and left out of profit. */
-  bonusDeviceProfitTjs: number;
   bonusDeviceProfitUsd: number;
-  profitTjs: number;
   profitUsd: number;
-  cashBonusesTjs: number;
   cashBonusesUsd: number;
-  expensesTjs: number;
   expensesUsd: number;
-  netProfitTjs: number;
+  /** Difference when an unpaid expense is paid later at another day's rate. */
+  expenseFxUsd: number;
   netProfitUsd: number;
 }
 
 export interface ComprehensiveReportInput {
-  sales: Sale[];
+  events: ReportEventRow[];
   expenses: Expense[];
   summary: ComprehensiveReportSummary;
   generatedBy?: string;
@@ -43,6 +60,12 @@ const EXPENSE_CATEGORY_LABELS: Record<string, string> = {
   TAXES: 'Налоги и сборы',
   SUPPLIES: 'Расходные материалы',
   OTHER: 'Прочие расходы',
+};
+
+const EVENT_LABELS: Record<ReportEventRow['kind'], string> = {
+  SALE: 'Продажа',
+  EXCHANGE: 'Обмен',
+  REFUND: 'Возврат',
 };
 
 export interface ReportTable {
@@ -93,7 +116,7 @@ async function downloadBlob(blob: Blob, fileName: string): Promise<void> {
 }
 
 function downloadCsv(content: string, fileName: string) {
-  const blob = new Blob(['\ufeff' + content], { type: 'text/csv;charset=utf-8;' });
+  const blob = new Blob(['﻿' + content], { type: 'text/csv;charset=utf-8;' });
   void downloadBlob(blob, fileName);
 }
 
@@ -103,135 +126,66 @@ function escapeCsvField(field: any): string {
   return `"${str.replace(/"/g, '""')}"`;
 }
 
+/** Cent-exact sum of money amounts (each already rounded to cents). */
+function sumCents(values: number[]): number {
+  return values.reduce((acc, value) => acc + Math.round((Number(value) || 0) * 100), 0) / 100;
+}
+
 /**
- * Builds the sales report table (headers/rows/totals) shown in the on-screen
- * report preview.
+ * The on-screen preview of the report rows: every sale, exchange and refund of the period on
+ * its own day, in TJS, that day's rate and USD. Its totals are the report's totals.
  */
-export function buildSalesReportTable(sales: Sale[], rate: number, cashBonusesUsd: number = 0): ReportTable {
+export function buildEventsReportTable(events: ReportEventRow[], cashBonusesUsd: number = 0): ReportTable {
   const headers = [
-    '№ Чека',
     'Дата и время',
+    'Операция',
+    '№ чека',
     'Магазин',
-    'Кассир',
-    'Товар',
-    'Количество (шт)',
+    'Курс',
+    'Сумма (TJS)',
+    'Сумма ($)',
     'Себестоимость ($)',
-    'Цена продажи ($)',
-    'Сумма продажи (TJS)',
-    'Курс на момент продажи',
     'Прибыль ($)',
-    'Способ оплаты',
-    'Статус'
+    'Удержание ($)',
   ];
 
-  const rows: (string | number)[][] = [];
-  let totalUnits = 0;
-  let totalCostBasisUsd = 0;
-  let totalRevenueUsd = 0;
-  let totalRevenueTjs = 0;
-  let totalProfitUsd = 0;
-
-  sales.forEach((sale) => {
-    const isRefunded = sale.status === 'REFUNDED';
-    const dateFormatted = new Date(sale.date).toLocaleString('ru-RU');
-    const operationRate = sale.exchangeRate || rate;
-    let saleNaiveProfitUsd = 0;
-
-    sale.items.forEach((item) => {
-      totalUnits += 1;
-      const costUsd = item.costBasisUsd || 0;
-      const priceUsd = item.salePriceUsd || +(item.salePriceTjs / operationRate).toFixed(2);
-      const priceTjs = item.salePriceTjs || +(item.salePriceUsd * operationRate).toFixed(2);
-      // A refunded sale's original margin is void — it never counts toward totals, and
-      // showing the stale pre-refund number here would misleadingly suggest it still does.
-      const profitUsd = isRefunded ? 0 : +(priceUsd - costUsd).toFixed(2);
-      saleNaiveProfitUsd += profitUsd;
-
-      if (!isRefunded) {
-        totalCostBasisUsd += costUsd;
-        totalRevenueUsd += priceUsd;
-        totalRevenueTjs += priceTjs;
-      }
-
-      rows.push([
-        sale.receiptNumber,
-        dateFormatted,
-        sale.storeName,
-        sale.sellerName,
-        `${item.brand} ${item.model} ${item.storage || ''} ${item.color || ''}`.trim(),
-        1,
-        costUsd.toFixed(2),
-        priceUsd.toFixed(2),
-        priceTjs.toFixed(2),
-        operationRate.toFixed(2),
-        profitUsd.toFixed(2),
-        sale.paymentMethod === 'CASH' ? 'Наличные' : sale.paymentMethod === 'CARD' ? 'Банк' : 'Раздельная',
-        isRefunded ? 'ВОЗВРАТ' : 'ЗАВЕРШЕНА'
-      ]);
-    });
-
-    // Recognized profit is a sale-level figure (accounts for below-cost sign-off and
-    // exchange corrections that don't split cleanly across items), so the total is summed
-    // once per sale from it — not from the naive per-item price-minus-cost rows above —
-    // to match every other recognized-profit figure in Reports (see reports.service.ts).
-    // Falls back to the naive sum only for older sales with no recognizedProfitUsd on record.
-    if (!isRefunded) {
-      totalProfitUsd += sale.recognizedProfitUsd ?? saleNaiveProfitUsd;
-    }
-
-    // The only profit a refunded sale actually leaves behind is the withheld penalty —
-    // recorded as its own line so it shows up in the history and counts toward the total,
-    // instead of silently vanishing along with the reversed original sale.
-    if (isRefunded && (sale.penaltyFeeUsd ?? 0) > 0) {
-      const penaltyUsd = sale.penaltyFeeUsd ?? 0;
-      const penaltyTjs = sale.penaltyFeeTjs ?? 0;
-      totalProfitUsd += penaltyUsd;
-
-      rows.push([
-        sale.receiptNumber,
-        dateFormatted,
-        sale.storeName,
-        sale.sellerName,
-        'Штраф за возврат (прибыль)',
-        '',
-        '',
-        '',
-        penaltyTjs.toFixed(2),
-        // The penalty is converted at the refund's own rate, not this sale's original rate —
-        // back the implied rate out of the two amounts already shown instead of reusing
-        // operationRate, which would silently misstate it whenever the two days' rates differ.
-        penaltyUsd > 0 ? (penaltyTjs / penaltyUsd).toFixed(2) : '',
-        penaltyUsd.toFixed(2),
-        sale.paymentMethod === 'CASH' ? 'Наличные' : sale.paymentMethod === 'CARD' ? 'Банк' : 'Раздельная',
-        'ВОЗВРАТ (ШТРАФ)'
-      ]);
-    }
-  });
+  const rows: (string | number)[][] = events.map((event) => [
+    new Date(event.date).toLocaleString('ru-RU'),
+    EVENT_LABELS[event.kind],
+    event.receiptNumber ?? '',
+    event.storeName,
+    Number(event.rate).toFixed(4),
+    Number(event.amountTjs).toFixed(2),
+    Number(event.amountUsd).toFixed(2),
+    Number(event.costUsd).toFixed(2),
+    Number(event.profitUsd).toFixed(2),
+    Number(event.penaltyUsd).toFixed(2),
+  ]);
 
   // Supplier cash bonuses are nobody's income: shown once for reference, never added to profit.
   if (cashBonusesUsd !== 0) {
-    rows.push([
-      '', '', '', '',
-      'Бонусы поставщиков за период — справочно, не входят в прибыль',
-      '', '', '', '', '',
-      cashBonusesUsd.toFixed(2),
-      '', 'БОНУС'
-    ]);
+    rows.push(['', 'Бонусы поставщиков за период — справочно, не входят в прибыль', '', '', '', '', '', '', cashBonusesUsd.toFixed(2), '']);
   }
 
   const totalsRow = [
-    'ИТОГО:', '', '', '',
-    `Всего позиций: ${rows.length}`,
-    totalUnits,
-    totalCostBasisUsd.toFixed(2),
-    totalRevenueUsd.toFixed(2),
-    totalRevenueTjs.toFixed(2),
-    '',
-    totalProfitUsd.toFixed(2),
-    '', ''
+    'ИТОГО:',
+    `Операций: ${events.length}`,
+    '', '', '',
+    sumCents(events.map((e) => e.amountTjs)).toFixed(2),
+    sumCents(events.map((e) => e.amountUsd)).toFixed(2),
+    sumCents(events.map((e) => e.costUsd)).toFixed(2),
+    sumCents(events.map((e) => e.profitUsd)).toFixed(2),
+    sumCents(events.map((e) => e.penaltyUsd)).toFixed(2),
   ];
 
   return { headers, rows, totalsRow };
+}
+
+/** An expense in the dollars it was registered at, on its own day (a later payment never restates it). */
+export function expenseRegisteredUsd(expense: Expense): number {
+  const rate = Number(expense.exchangeRate) || 0;
+  const usd = expense.amountUsd ?? (rate > 0 ? (expense.amountTjs || 0) / rate : 0);
+  return Math.round(((usd || 0) + (Number(expense.paymentFxUsd) || 0)) * 100) / 100;
 }
 
 const XLSX_GREEN = 'FF16A34A';
@@ -242,19 +196,6 @@ const XLSX_BORDER = 'FFE2E8F0';
 const XLSX_WHITE = 'FFFFFFFF';
 const XLSX_RED = 'FFDC2626';
 const XLSX_MONEY_FORMAT = '#,##0.00;[Red](#,##0.00);-';
-
-function paymentMethodLabel(method: Sale['paymentMethod']): string {
-  if (method === 'CASH') return 'Наличные';
-  if (method === 'CARD') return 'Банк';
-  if (method === 'DEBT') return 'В долг';
-  return 'Раздельная оплата';
-}
-
-function saleStatusLabel(status: Sale['status']): string {
-  if (status === 'REFUNDED') return 'Возврат';
-  if (status === 'EXCHANGED') return 'Обмен';
-  return 'Завершена';
-}
 
 function safeWorksheetText(value: string | undefined | null, fallback = '-'): string {
   const text = value?.trim();
@@ -288,12 +229,13 @@ export async function downloadXlsx(content: ArrayBuffer, fileName: string): Prom
 }
 
 /**
- * Downloads one management workbook with three auditable sheets. The Summary sheet
- * references totals from Sales and Expenses, while the supplied server summary is used
- * as the reconciliation source for exchanges, refunds and historical rounding.
+ * One management workbook with three sheets. «Операции» lists every sale, exchange and refund
+ * of the period on its own day (TJS, that day's rate, USD); «Расходы» lists the expenses at the
+ * dollars they were registered at; «Итого» builds the result in USD from the two sheets' sums,
+ * with a control row against the server's total that must be 0.
  */
 export async function buildComprehensiveReportWorkbook({
-  sales,
+  events,
   expenses,
   summary,
   generatedBy,
@@ -316,7 +258,7 @@ export async function buildComprehensiveReportWorkbook({
   });
 
   // Create every sheet before writing cross-sheet formulas.
-  const salesSheet = workbook.addWorksheet('Продажи', {
+  const eventsSheet = workbook.addWorksheet('Операции', {
     views: [{ state: 'frozen', ySplit: 4, showGridLines: false }],
     properties: { tabColor: { argb: XLSX_GREEN } },
   });
@@ -340,7 +282,7 @@ export async function buildComprehensiveReportWorkbook({
 
     sheet.mergeCells(`A2:${endColumn}2`);
     const subtitleCell = sheet.getCell('A2');
-    subtitleCell.value = `Период: ${summary.periodLabel}  •  Магазин: ${summary.storeName}  •  Курс: 1 USD = ${summary.exchangeRate.toFixed(4)} TJS`;
+    subtitleCell.value = `Период: ${summary.periodLabel}  •  Магазин: ${summary.storeName}  •  Каждая строка — по курсу своего дня, итоги в USD`;
     subtitleCell.font = { name: 'Calibri', size: 10, color: { argb: XLSX_MUTED } };
     subtitleCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: XLSX_LIGHT } };
     subtitleCell.alignment = { vertical: 'middle', horizontal: 'left' };
@@ -366,179 +308,63 @@ export async function buildComprehensiveReportWorkbook({
     });
   };
 
-  // SALES
-  styleTitle(salesSheet, 'V', 'Отчёт по продажам и прибыли');
-  salesSheet.columns = [
-    { key: 'receipt', width: 12 },
-    { key: 'date', width: 19 },
-    { key: 'store', width: 18 },
-    { key: 'seller', width: 18 },
-    { key: 'customer', width: 18 },
-    { key: 'products', width: 34 },
-    { key: 'imei', width: 21 },
-    { key: 'quantity', width: 10 },
-    { key: 'status', width: 13 },
-    { key: 'payment', width: 17 },
-    { key: 'rate', width: 12 },
-    { key: 'originalTjs', width: 17 },
-    { key: 'originalUsd', width: 17 },
-    { key: 'revenueTjs', width: 18 },
-    { key: 'revenueUsd', width: 18 },
-    { key: 'cogsTjs', width: 20 },
-    { key: 'cogsUsd', width: 20 },
-    { key: 'profitTjs', width: 17 },
-    { key: 'profitUsd', width: 17 },
-    { key: 'penaltyTjs', width: 20 },
-    { key: 'penaltyUsd', width: 20 },
-    { key: 'note', width: 31 },
+  // OPERATIONS: sales, exchanges and refunds, each a fact of its own day.
+  styleTitle(eventsSheet, 'L', 'Продажи, обмены и возвраты');
+  eventsSheet.columns = [
+    { width: 19 }, { width: 12 }, { width: 10 }, { width: 20 }, { width: 11 }, { width: 17 },
+    { width: 16 }, { width: 18 }, { width: 16 }, { width: 20 }, { width: 17 }, { width: 16 },
   ];
-
-  const salesHeader = salesSheet.getRow(4);
-  salesHeader.values = [
-    '№ чека', 'Дата и время', 'Магазин', 'Кассир', 'Покупатель', 'Товары', 'IMEI', 'Кол-во',
-    'Статус', 'Оплата', 'Курс', 'Сумма чека (TJS)', 'Сумма чека ($)', 'Учтённая выручка (TJS)',
-    'Учтённая выручка ($)', 'Себестоимость (TJS)', 'Себестоимость ($)', 'Прибыль (TJS)',
-    'Прибыль ($)', 'Штраф при возврате (TJS)', 'Штраф при возврате ($)', 'Примечание',
+  const eventsHeader = eventsSheet.getRow(4);
+  eventsHeader.values = [
+    'Дата и время', 'Операция', '№ чека', 'Магазин', 'Курс', 'Сумма (TJS)', 'Сумма ($)',
+    'Себестоимость ($)', 'Прибыль ($)', 'Прибыль бонусных телефонов ($)', 'Удержание (TJS)', 'Удержание ($)',
   ];
-  styleHeader(salesHeader);
+  styleHeader(eventsHeader);
 
-  let salesDataRevenueTjs = 0;
-  let salesDataRevenueUsd = 0;
-  let salesDataCogsTjs = 0;
-  let salesDataCogsUsd = 0;
-  let salesDataProfitTjs = 0;
-  let salesDataProfitUsd = 0;
-
-  for (const sale of sales) {
-    const refunded = sale.status === 'REFUNDED';
-    const operationRate = sale.exchangeRate || summary.exchangeRate;
-    const revenueTjs = refunded ? 0 : sale.totalTjs || 0;
-    const revenueUsd = refunded ? 0 : sale.totalUsd || +(revenueTjs / operationRate).toFixed(2);
-    const fallbackCostUsd = sale.items.reduce((total, item) => total + (item.costBasisUsd || item.purchaseCostUsd || 0), 0);
-    const recognizedProfitUsd = refunded ? 0 : (sale.recognizedProfitUsd ?? +(revenueUsd - fallbackCostUsd).toFixed(2));
-    const cogsUsd = refunded ? 0 : +(revenueUsd - recognizedProfitUsd).toFixed(2);
-    const cogsTjs = refunded ? 0 : +(cogsUsd * operationRate).toFixed(2);
-    const recognizedProfitTjs = refunded ? 0 : +(revenueTjs - cogsTjs).toFixed(2);
-
-    salesDataRevenueTjs += revenueTjs;
-    salesDataRevenueUsd += revenueUsd;
-    salesDataCogsTjs += cogsTjs;
-    salesDataCogsUsd += cogsUsd;
-    salesDataProfitTjs += recognizedProfitTjs;
-    salesDataProfitUsd += recognizedProfitUsd;
-
-    const row = salesSheet.addRow([
-      sale.receiptNumber,
-      new Date(sale.date),
-      safeWorksheetText(sale.storeName),
-      safeWorksheetText(sale.sellerName),
-      safeWorksheetText(sale.customerName),
-      sale.items.map((item) => `${item.brand} ${item.model} ${item.storage || ''} ${item.color || ''}`.trim()).join('\n') || '-',
-      sale.items.map((item) => [item.imei, item.imei2].filter(Boolean).join(' / ')).join('\n') || '-',
-      sale.items.length,
-      saleStatusLabel(sale.status),
-      paymentMethodLabel(sale.paymentMethod),
-      operationRate,
-      sale.totalTjs || 0,
-      sale.totalUsd || 0,
-      revenueTjs,
-      revenueUsd,
-      cogsTjs,
-      cogsUsd,
-      recognizedProfitTjs,
-      recognizedProfitUsd,
-      sale.penaltyFeeTjs || 0,
-      sale.penaltyFeeUsd || 0,
-      refunded
-        ? `Возврат: ${safeWorksheetText(sale.refundReason, 'причина не указана')}`
-        : sale.hasBelowCostItem
-          ? 'Продажа ниже себестоимости'
-          : '',
+  for (const event of events) {
+    const row = eventsSheet.addRow([
+      new Date(event.date),
+      EVENT_LABELS[event.kind],
+      event.receiptNumber ?? '',
+      safeWorksheetText(event.storeName),
+      Number(event.rate),
+      Number(event.amountTjs),
+      Number(event.amountUsd),
+      Number(event.costUsd),
+      Number(event.profitUsd),
+      Number(event.bonusUsd),
+      Number(event.penaltyTjs),
+      Number(event.penaltyUsd),
     ]);
-    row.height = Math.max(20, sale.items.length * 15);
     row.eachCell((cell, columnNumber) => {
       cell.font = { name: 'Calibri', size: 10, color: { argb: XLSX_DARK } };
-      cell.alignment = {
-        vertical: 'middle',
-        horizontal: columnNumber >= 11 && columnNumber <= 21 ? 'right' : 'left',
-        wrapText: columnNumber === 6 || columnNumber === 7 || columnNumber === 22,
-      };
+      cell.alignment = { vertical: 'middle', horizontal: columnNumber >= 5 ? 'right' : 'left' };
       cell.border = { bottom: { style: 'hair', color: { argb: XLSX_BORDER } } };
     });
-    row.getCell(2).numFmt = 'dd.mm.yyyy hh:mm';
-    row.getCell(11).numFmt = '0.0000';
-    for (let column = 12; column <= 21; column += 1) row.getCell(column).numFmt = XLSX_MONEY_FORMAT;
-    if (recognizedProfitUsd < 0) {
-      row.getCell(18).font = { name: 'Calibri', size: 10, bold: true, color: { argb: XLSX_RED } };
-      row.getCell(19).font = { name: 'Calibri', size: 10, bold: true, color: { argb: XLSX_RED } };
-    }
+    row.getCell(1).numFmt = 'dd.mm.yyyy hh:mm';
+    row.getCell(5).numFmt = '0.0000';
+    for (let column = 6; column <= 12; column += 1) row.getCell(column).numFmt = XLSX_MONEY_FORMAT;
+    if (event.kind === 'REFUND') row.getCell(2).font = { name: 'Calibri', size: 10, bold: true, color: { argb: XLSX_RED } };
   }
+  eventsSheet.autoFilter = { from: 'A4', to: 'L4' };
 
-  salesSheet.autoFilter = { from: 'A4', to: 'V4' };
-  const firstSalesRow = 5;
-  const lastSalesRow = Math.max(firstSalesRow, firstSalesRow + sales.length - 1);
-  const salesRawTotalRow = salesSheet.addRow(['ИТОГО ПО СТРОКАМ:']);
-  const salesRawTotalNumber = salesRawTotalRow.number;
-  const salesSum = (column: string, result: number) =>
-    cellFormula(sales.length ? `SUM(${column}${firstSalesRow}:${column}${lastSalesRow})` : '0', +result.toFixed(2));
-  salesRawTotalRow.getCell(14).value = salesSum('N', salesDataRevenueTjs);
-  salesRawTotalRow.getCell(15).value = salesSum('O', salesDataRevenueUsd);
-  salesRawTotalRow.getCell(16).value = salesSum('P', salesDataCogsTjs);
-  salesRawTotalRow.getCell(17).value = salesSum('Q', salesDataCogsUsd);
-  salesRawTotalRow.getCell(18).value = salesSum('R', salesDataProfitTjs);
-  salesRawTotalRow.getCell(19).value = salesSum('S', salesDataProfitUsd);
-  styleTotalRow(salesRawTotalRow, XLSX_MUTED);
+  const firstEventRow = 5;
+  const lastEventRow = Math.max(firstEventRow, firstEventRow + events.length - 1);
+  const eventsTotalRow = eventsSheet.addRow(['ИТОГО:']);
+  const eventsTotalNumber = eventsTotalRow.number;
+  const eventSum = (column: string, values: number[]) =>
+    cellFormula(events.length ? `SUM(${column}${firstEventRow}:${column}${lastEventRow})` : '0', sumCents(values));
+  eventsTotalRow.getCell(6).value = eventSum('F', events.map((e) => e.amountTjs));
+  eventsTotalRow.getCell(7).value = eventSum('G', events.map((e) => e.amountUsd));
+  eventsTotalRow.getCell(8).value = eventSum('H', events.map((e) => e.costUsd));
+  eventsTotalRow.getCell(9).value = eventSum('I', events.map((e) => e.profitUsd));
+  eventsTotalRow.getCell(10).value = eventSum('J', events.map((e) => e.bonusUsd));
+  eventsTotalRow.getCell(11).value = eventSum('K', events.map((e) => e.penaltyTjs));
+  eventsTotalRow.getCell(12).value = eventSum('L', events.map((e) => e.penaltyUsd));
+  styleTotalRow(eventsTotalRow);
+  for (let column = 6; column <= 12; column += 1) eventsTotalRow.getCell(column).numFmt = XLSX_MONEY_FORMAT;
 
-  const reconciliationRow = salesSheet.addRow(['СВЕРКА С СЕРВЕРОМ (обмены и округления):']);
-  reconciliationRow.getCell(14).value = +(summary.revenueTjs - salesDataRevenueTjs).toFixed(2);
-  reconciliationRow.getCell(15).value = +(summary.revenueUsd - salesDataRevenueUsd).toFixed(2);
-  reconciliationRow.getCell(16).value = +(summary.cogsTjs - salesDataCogsTjs).toFixed(2);
-  reconciliationRow.getCell(17).value = +(summary.cogsUsd - salesDataCogsUsd).toFixed(2);
-  reconciliationRow.getCell(18).value = +(summary.grossProfitTjs - salesDataProfitTjs).toFixed(2);
-  reconciliationRow.getCell(19).value = +(summary.grossProfitUsd - salesDataProfitUsd).toFixed(2);
-  reconciliationRow.font = { italic: true, color: { argb: XLSX_MUTED } };
-
-  const recognizedRow = salesSheet.addRow(['ПРИЗНАННАЯ ПРИБЫЛЬ ОТ ПРОДАЖ:']);
-  const recognizedRowNumber = recognizedRow.number;
-  for (const [column, serverValue] of [
-    [14, summary.revenueTjs], [15, summary.revenueUsd], [16, summary.cogsTjs], [17, summary.cogsUsd],
-    [18, summary.grossProfitTjs], [19, summary.grossProfitUsd],
-  ] as const) {
-    const letter = salesSheet.getColumn(column).letter;
-    recognizedRow.getCell(column).value = cellFormula(`${letter}${salesRawTotalNumber}+${letter}${reconciliationRow.number}`, serverValue);
-  }
-  styleTotalRow(recognizedRow);
-
-  const penaltyRow = salesSheet.addRow(['ШТРАФЫ ЗА ВОЗВРАТЫ ЗА ПЕРИОД:']);
-  const penaltyRowNumber = penaltyRow.number;
-  penaltyRow.getCell(18).value = summary.refundPenaltiesTjs;
-  penaltyRow.getCell(19).value = summary.refundPenaltiesUsd;
-  penaltyRow.font = { bold: true, color: { argb: XLSX_DARK } };
-
-  // Bonus phones ($0 cost) are in the sales above, but their profit is nobody's income.
-  const bonusDeviceRow = salesSheet.addRow(['МИНУС ПРИБЫЛЬ БОНУСНЫХ ТЕЛЕФОНОВ (не доход):']);
-  const bonusDeviceRowNumber = bonusDeviceRow.number;
-  bonusDeviceRow.getCell(18).value = summary.bonusDeviceProfitTjs;
-  bonusDeviceRow.getCell(19).value = summary.bonusDeviceProfitUsd;
-  bonusDeviceRow.font = { bold: true, color: { argb: XLSX_MUTED } };
-
-  const profitAfterReturnsRow = salesSheet.addRow(['ПРИБЫЛЬ С УЧЁТОМ ВОЗВРАТОВ:']);
-  const profitAfterReturnsRowNumber = profitAfterReturnsRow.number;
-  profitAfterReturnsRow.getCell(18).value = cellFormula(`R${recognizedRowNumber}+R${penaltyRowNumber}-R${bonusDeviceRowNumber}`, summary.profitTjs);
-  profitAfterReturnsRow.getCell(19).value = cellFormula(`S${recognizedRowNumber}+S${penaltyRowNumber}-S${bonusDeviceRowNumber}`, summary.profitUsd);
-  styleTotalRow(profitAfterReturnsRow, XLSX_GREEN);
-
-  const bonusRow = salesSheet.addRow(['БОНУСЫ ПОСТАВЩИКОВ (справочно, не входят в прибыль):']);
-  const bonusRowNumber = bonusRow.number;
-  bonusRow.getCell(18).value = summary.cashBonusesTjs;
-  bonusRow.getCell(19).value = summary.cashBonusesUsd;
-  bonusRow.font = { bold: true, color: { argb: XLSX_MUTED } };
-
-  for (let rowNumber = salesRawTotalNumber; rowNumber <= bonusRowNumber; rowNumber += 1) {
-    for (let column = 12; column <= 21; column += 1) salesSheet.getRow(rowNumber).getCell(column).numFmt = XLSX_MONEY_FORMAT;
-  }
-
-  // EXPENSES
+  // EXPENSES: each at the dollars it was registered at on its own day.
   styleTitle(expensesSheet, 'K', 'Отчёт по расходам');
   expensesSheet.columns = [
     { width: 19 }, { width: 28 }, { width: 16 }, { width: 19 }, { width: 20 }, { width: 20 },
@@ -551,13 +377,9 @@ export async function buildComprehensiveReportWorkbook({
   ];
   styleHeader(expensesHeader);
 
-  let expenseRowsTjs = 0;
-  let expenseRowsUsd = 0;
-  for (const expense of expenses) {
-    const operationRate = expense.exchangeRate || summary.exchangeRate;
-    const amountUsd = expense.amountUsd ?? +((expense.amountTjs || 0) / operationRate).toFixed(2);
-    expenseRowsTjs += expense.amountTjs || 0;
-    expenseRowsUsd += amountUsd;
+  const expenseUsd = expenses.map(expenseRegisteredUsd);
+  expenses.forEach((expense, index) => {
+    const amountUsd = expenseUsd[index];
     const row = expensesSheet.addRow([
       new Date(expense.date),
       EXPENSE_CATEGORY_LABELS[expense.category] || expense.category,
@@ -568,7 +390,8 @@ export async function buildComprehensiveReportWorkbook({
       safeWorksheetText(expense.createdByName),
       safeWorksheetText(expense.comment || expense.description),
       expense.amountTjs || 0,
-      operationRate,
+      // The rate of the day the expense was registered: its TJS over its registered dollars.
+      amountUsd ? (expense.amountTjs || 0) / amountUsd : Number(expense.exchangeRate) || 0,
       amountUsd,
     ]);
     row.eachCell((cell, columnNumber) => {
@@ -580,91 +403,94 @@ export async function buildComprehensiveReportWorkbook({
     row.getCell(9).numFmt = XLSX_MONEY_FORMAT;
     row.getCell(10).numFmt = '0.0000';
     row.getCell(11).numFmt = XLSX_MONEY_FORMAT;
-  }
+  });
   expensesSheet.autoFilter = { from: 'A4', to: 'K4' };
 
   const firstExpenseRow = 5;
   const lastExpenseRow = Math.max(firstExpenseRow, firstExpenseRow + expenses.length - 1);
-  const rawExpenseTotalRow = expensesSheet.addRow(['ИТОГО ПО СТРОКАМ:']);
-  rawExpenseTotalRow.getCell(9).value = cellFormula(
-    expenses.length ? `SUM(I${firstExpenseRow}:I${lastExpenseRow})` : '0',
-    +expenseRowsTjs.toFixed(2)
-  );
-  rawExpenseTotalRow.getCell(11).value = cellFormula(
-    expenses.length ? `SUM(K${firstExpenseRow}:K${lastExpenseRow})` : '0',
-    +expenseRowsUsd.toFixed(2)
-  );
-  styleTotalRow(rawExpenseTotalRow, XLSX_MUTED);
-
-  const expenseReconciliationRow = expensesSheet.addRow(['СВЕРКА С СЕРВЕРОМ:']);
-  expenseReconciliationRow.getCell(9).value = +(summary.expensesTjs - expenseRowsTjs).toFixed(2);
-  expenseReconciliationRow.getCell(11).value = +(summary.expensesUsd - expenseRowsUsd).toFixed(2);
-  expenseReconciliationRow.font = { italic: true, color: { argb: XLSX_MUTED } };
-
   const expenseTotalRow = expensesSheet.addRow(['ИТОГО РАСХОДОВ:']);
   const expenseTotalRowNumber = expenseTotalRow.number;
-  expenseTotalRow.getCell(9).value = cellFormula(`I${rawExpenseTotalRow.number}+I${expenseReconciliationRow.number}`, summary.expensesTjs);
-  expenseTotalRow.getCell(11).value = cellFormula(`K${rawExpenseTotalRow.number}+K${expenseReconciliationRow.number}`, summary.expensesUsd);
+  expenseTotalRow.getCell(9).value = cellFormula(
+    expenses.length ? `SUM(I${firstExpenseRow}:I${lastExpenseRow})` : '0',
+    sumCents(expenses.map((e) => e.amountTjs || 0)),
+  );
+  expenseTotalRow.getCell(11).value = cellFormula(
+    expenses.length ? `SUM(K${firstExpenseRow}:K${lastExpenseRow})` : '0',
+    sumCents(expenseUsd),
+  );
   styleTotalRow(expenseTotalRow, 'FFF59E0B');
-  for (let rowNumber = rawExpenseTotalRow.number; rowNumber <= expenseTotalRowNumber; rowNumber += 1) {
-    expensesSheet.getRow(rowNumber).getCell(9).numFmt = XLSX_MONEY_FORMAT;
-    expensesSheet.getRow(rowNumber).getCell(11).numFmt = XLSX_MONEY_FORMAT;
-  }
+  expenseTotalRow.getCell(9).numFmt = XLSX_MONEY_FORMAT;
+  expenseTotalRow.getCell(11).numFmt = XLSX_MONEY_FORMAT;
 
-  // SUMMARY
-  styleTitle(summarySheet, 'C', 'Итоговый финансовый отчёт');
-  summarySheet.columns = [{ width: 43 }, { width: 22 }, { width: 22 }];
+  // SUMMARY (USD)
+  styleTitle(summarySheet, 'B', 'Итоговый финансовый отчёт (USD)');
+  summarySheet.columns = [{ width: 52 }, { width: 22 }];
   summarySheet.getCell('A3').value = `Сформирован: ${new Date().toLocaleString('ru-RU')}${generatedBy ? `  •  Пользователь: ${generatedBy}` : ''}`;
-  summarySheet.mergeCells('A3:C3');
+  summarySheet.mergeCells('A3:B3');
   summarySheet.getCell('A3').font = { italic: true, size: 9, color: { argb: XLSX_MUTED } };
 
   const summaryHeader = summarySheet.getRow(5);
-  summaryHeader.values = ['Показатель', 'TJS', 'USD'];
+  summaryHeader.values = ['Показатель', 'USD'];
   styleHeader(summaryHeader);
 
-  const summaryRows = [
-    ['Количество проданных устройств', summary.unitsSold, ''],
-    ['Выручка', cellFormula(`'Продажи'!N${recognizedRowNumber}`, summary.revenueTjs), cellFormula(`'Продажи'!O${recognizedRowNumber}`, summary.revenueUsd)],
-    ['Себестоимость', cellFormula(`'Продажи'!P${recognizedRowNumber}`, summary.cogsTjs), cellFormula(`'Продажи'!Q${recognizedRowNumber}`, summary.cogsUsd)],
-    ['Прибыль от продаж', cellFormula(`'Продажи'!R${recognizedRowNumber}`, summary.grossProfitTjs), cellFormula(`'Продажи'!S${recognizedRowNumber}`, summary.grossProfitUsd)],
-    ['Штрафы, удержанные при возвратах', cellFormula(`'Продажи'!R${penaltyRowNumber}`, summary.refundPenaltiesTjs), cellFormula(`'Продажи'!S${penaltyRowNumber}`, summary.refundPenaltiesUsd)],
-    ['Прибыль с учётом возвратов', cellFormula(`'Продажи'!R${profitAfterReturnsRowNumber}`, summary.profitTjs), cellFormula(`'Продажи'!S${profitAfterReturnsRowNumber}`, summary.profitUsd)],
-    ['Денежные бонусы поставщиков (справочно)', cellFormula(`'Продажи'!R${bonusRowNumber}`, summary.cashBonusesTjs), cellFormula(`'Продажи'!S${bonusRowNumber}`, summary.cashBonusesUsd)],
-    ['Расходы', cellFormula(`'Расходы'!I${expenseTotalRowNumber}`, summary.expensesTjs), cellFormula(`'Расходы'!K${expenseTotalRowNumber}`, summary.expensesUsd)],
-    ['Прибыль бонусных телефонов (справочно)', cellFormula(`'Продажи'!R${bonusDeviceRowNumber}`, summary.bonusDeviceProfitTjs), cellFormula(`'Продажи'!S${bonusDeviceRowNumber}`, summary.bonusDeviceProfitUsd)],
+  const ops = (column: string) => `'Операции'!${column}${eventsTotalNumber}`;
+  const salesProfitUsd = sumCents(events.map((e) => e.profitUsd));
+  const penaltiesUsd = sumCents(events.map((e) => e.penaltyUsd));
+  const profitAfterReturns = Math.round((salesProfitUsd + penaltiesUsd + summary.debtFxUsd) * 100) / 100;
+  const expensesUsd = sumCents(expenseUsd);
+  const netUsd = Math.round((profitAfterReturns - expensesUsd + summary.expenseFxUsd) * 100) / 100;
+
+  // Rows 6..: the result is built from the sheets above; references below use these row numbers.
+  const rows: [string, number | ReturnType<typeof cellFormula>][] = [
+    ['Количество проданных устройств', summary.unitsSold],                                             // 6
+    ['Выручка: продажи и обмены за вычетом возвратов', cellFormula(ops('G'), sumCents(events.map((e) => e.amountUsd)))], // 7
+    ['Себестоимость', cellFormula(ops('H'), sumCents(events.map((e) => e.costUsd)))],                   // 8
+    ['Прибыль от продаж (без бонусных телефонов)', cellFormula(ops('I'), salesProfitUsd)],             // 9
+    ['Удержано при возвратах', cellFormula(ops('L'), penaltiesUsd)],                                    // 10
+    ['Разница при погашении долгов (TJS по курсу дня оплаты)', summary.debtFxUsd],                     // 11
+    ['Прибыль с учётом возвратов', cellFormula('B9+B10+B11', profitAfterReturns)],                      // 12
+    ['Расходы (по курсу дня регистрации)', cellFormula(`'Расходы'!K${expenseTotalRowNumber}`, expensesUsd)], // 13
+    ['Разница при оплате расходов позже', summary.expenseFxUsd],                                        // 14
   ];
-  for (const values of summaryRows) summarySheet.addRow(values);
+  for (const values of rows) summarySheet.addRow(values);
 
-  const netProfitRow = summarySheet.addRow(['ЧИСТАЯ ПРИБЫЛЬ ПОСЛЕ РАСХОДОВ']);
+  const netProfitRow = summarySheet.addRow(['ЧИСТАЯ ПРИБЫЛЬ']);                                          // 15
   const netProfitRowNumber = netProfitRow.number;
-  // Bonuses (rows 12 and 14) are for reference only: net profit = profit after returns − expenses.
-  netProfitRow.getCell(2).value = cellFormula(`B11-B13`, summary.netProfitTjs);
-  netProfitRow.getCell(3).value = cellFormula(`C11-C13`, summary.netProfitUsd);
-  styleTotalRow(netProfitRow, summary.netProfitUsd >= 0 ? XLSX_GREEN : XLSX_RED);
+  netProfitRow.getCell(2).value = cellFormula('B12-B13+B14', netUsd);
+  styleTotalRow(netProfitRow, netUsd >= 0 ? XLSX_GREEN : XLSX_RED);
 
-  const checkRow = summarySheet.addRow(['Контроль расхождения с серверным итогом']);
-  checkRow.getCell(2).value = cellFormula(`B${netProfitRowNumber}-${summary.netProfitTjs}`, 0);
-  checkRow.getCell(3).value = cellFormula(`C${netProfitRowNumber}-${summary.netProfitUsd}`, 0);
+  const checkRow = summarySheet.addRow(['Контроль: расхождение с итогом программы (должно быть 0)']);
+  checkRow.getCell(2).value = cellFormula(`ROUND(B${netProfitRowNumber}-(${summary.netProfitUsd}),2)`, Math.round((netUsd - summary.netProfitUsd) * 100) / 100 || 0);
   checkRow.font = { italic: true, color: { argb: XLSX_MUTED } };
+
+  summarySheet.addRow([]);
+  const reference = [
+    summarySheet.addRow(['Прибыль бонусных телефонов (справочно, не доход)', cellFormula(ops('J'), sumCents(events.map((e) => e.bonusUsd)))]),
+    summarySheet.addRow(['Денежные бонусы поставщиков (справочно, не доход)', summary.cashBonusesUsd]),
+  ];
 
   for (let rowNumber = 6; rowNumber <= checkRow.number; rowNumber += 1) {
     const row = summarySheet.getRow(rowNumber);
     row.height = 23;
     row.getCell(1).alignment = { vertical: 'middle', horizontal: 'left' };
     row.getCell(2).alignment = { vertical: 'middle', horizontal: 'right' };
-    row.getCell(3).alignment = { vertical: 'middle', horizontal: 'right' };
     row.getCell(2).numFmt = rowNumber === 6 ? '#,##0' : XLSX_MONEY_FORMAT;
-    row.getCell(3).numFmt = rowNumber === 6 ? '#,##0' : XLSX_MONEY_FORMAT;
     if (rowNumber !== netProfitRowNumber) {
       row.eachCell((cell) => {
         cell.border = { bottom: { style: 'hair', color: { argb: XLSX_BORDER } } };
       });
     }
   }
-  const noteRowNumber = checkRow.number + 2;
-  summarySheet.getCell(`A${noteRowNumber}`).value = 'Формула: прибыль с учётом возвратов − расходы. Бонусы поставщиков и прибыль бонусных телефонов — справочно: это не доход, их деньги хранятся на Бонусном счёте, счётчики обнуляются при закрытии периода бонусов.';
-  summarySheet.mergeCells(`A${noteRowNumber}:C${noteRowNumber}`);
+  for (const row of reference) {
+    row.getCell(2).numFmt = XLSX_MONEY_FORMAT;
+    row.font = { color: { argb: XLSX_MUTED } };
+  }
+  const noteRowNumber = reference[reference.length - 1].number + 2;
+  summarySheet.getCell(`A${noteRowNumber}`).value = 'Каждая операция записана по курсу своего дня и не пересчитывается. Возврат отражён в день возврата отдельной строкой. Чистая прибыль = прибыль с учётом возвратов − расходы. Бонусы — справочно: это не доход, их деньги хранятся на Бонусном счёте.';
+  summarySheet.mergeCells(`A${noteRowNumber}:B${noteRowNumber}`);
   summarySheet.getCell(`A${noteRowNumber}`).font = { italic: true, size: 9, color: { argb: XLSX_MUTED } };
+  summarySheet.getCell(`A${noteRowNumber}`).alignment = { wrapText: true, vertical: 'top' };
+  summarySheet.getRow(noteRowNumber).height = 48;
 
   return workbook;
 }

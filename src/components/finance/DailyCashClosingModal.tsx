@@ -5,7 +5,7 @@ import { StoreSelector } from '../common/StoreSelector';
 import { apiClient } from '../../api/client';
 import { useAppFields } from '../../context/AppContext';
 import { DailyClosingSummary, DailyCashClosing } from '../../types';
-import { formatTjs } from '../../utils/money';
+import { formatTjs, formatUsd } from '../../utils/money';
 import { soundEffects } from '../../utils/sound';
 import { ConfirmDialog } from '../ui/ConfirmDialog';
 import {
@@ -45,7 +45,66 @@ const getLocalCurrentDate = (): string => {
   return `${y}-${m}-${d}`;
 };
 
-/** Cash and bank for the day, as two large figures. */
+type DayFigures = {
+  cashTjs: number; cashUsd: number;
+  bankTjs: number; bankUsd: number;
+  otherTjs: number; otherUsd: number;
+  refundsTjs: number; refundsUsd: number;
+  expensesTjs: number; expensesUsd: number;
+  totalTjs: number; totalUsd: number;
+};
+
+const num = (value: number | string | null | undefined) => Number(value) || 0;
+
+/** A day-total closing (or an open day's summary) as figures; null for closings made before the day-total rules. */
+const dayFigures = (source: (DailyClosingSummary | DailyCashClosing) | undefined, total: 'expected' | 'actual'): DayFigures | null => {
+  if (!source || source.salesCardUsd === null || source.salesCardUsd === undefined) return null;
+  return {
+    cashTjs: num(source.salesCashTjs), cashUsd: num(source.salesCashUsd),
+    bankTjs: num(source.salesCardTjs), bankUsd: num(source.salesCardUsd),
+    otherTjs: num(source.otherCashTjs), otherUsd: num(source.otherCashUsd),
+    refundsTjs: num(source.refundsCashTjs), refundsUsd: num(source.refundsCashUsd),
+    expensesTjs: num(source.expensesCashTjs), expensesUsd: num(source.expensesCashUsd),
+    totalTjs: num(total === 'actual' ? (source as DailyCashClosing).actualCashTjs : source.expectedCashTjs),
+    totalUsd: num(total === 'actual' ? (source as DailyCashClosing).actualCashUsd : source.expectedCashUsd),
+  };
+};
+
+/**
+ * The day on its own: cash and bank taken, debt repayments, refunds and the store's paid
+ * expenses, and the day's total that goes to collection. The admin sees dollars first.
+ */
+const DayBreakdown: React.FC<{ figures: DayFigures; showUsd: boolean }> = ({ figures, showUsd }) => {
+  const rows: { label: string; tjs: number; usd: number; sign: '' | '−' }[] = [
+    { label: 'Наличные', tjs: figures.cashTjs, usd: figures.cashUsd, sign: '' },
+    { label: 'Банк', tjs: figures.bankTjs, usd: figures.bankUsd, sign: '' },
+    ...(figures.otherTjs || figures.otherUsd ? [{ label: 'Погашения долгов и прочее', tjs: figures.otherTjs, usd: figures.otherUsd, sign: '' as const }] : []),
+    ...(figures.refundsTjs ? [{ label: 'Возвраты', tjs: figures.refundsTjs, usd: figures.refundsUsd, sign: '−' as const }] : []),
+    ...(figures.expensesTjs ? [{ label: 'Расходы магазина', tjs: figures.expensesTjs, usd: figures.expensesUsd, sign: '−' as const }] : []),
+  ];
+  return (
+    <div className="rounded-2xl bg-surface-raised border border-border p-3.5 space-y-1.5 text-sm">
+      {rows.map((row) => (
+        <div key={row.label} className="flex items-center justify-between gap-3 text-fg-muted">
+          <span>{row.label}</span>
+          <span className="font-mono font-semibold text-right">
+            {showUsd ? `${row.sign}${formatUsd(row.usd)}` : `${row.sign}${formatTjs(row.tjs)}`}
+            {showUsd && <span className="block text-[11px] font-normal text-fg-subtle">{row.sign}{formatTjs(row.tjs)}</span>}
+          </span>
+        </div>
+      ))}
+      <div className="flex items-center justify-between gap-3 pt-2 border-t border-border font-bold text-fg">
+        <span>Итог дня</span>
+        <span className="font-mono text-right text-lg">
+          {showUsd ? formatUsd(figures.totalUsd) : formatTjs(figures.totalTjs)}
+          {showUsd && <span className="block text-[11px] font-normal text-fg-subtle">{formatTjs(figures.totalTjs)}</span>}
+        </span>
+      </div>
+    </div>
+  );
+};
+
+/** Cash and bank for the day, as two large figures (closings made before the day-total rules). */
 const DayTotals: React.FC<{ cashTjs: number | string | undefined; bankTjs: number | string | undefined }> = ({ cashTjs, bankTjs }) => (
   <div className="grid grid-cols-2 gap-2.5">
     <div className="p-3.5 rounded-2xl bg-surface-raised border border-border">
@@ -398,7 +457,9 @@ export const DailyCashClosingModal: React.FC<DailyCashClosingModalProps> = ({
 
             {summary.alreadyClosed ? (
               <>
-                <DayTotals cashTjs={closing?.actualCashTjs} bankTjs={closing?.salesCardTjs} />
+                {dayFigures(closing, 'actual')
+                  ? <DayBreakdown figures={dayFigures(closing, 'actual')!} showUsd={isAdmin} />
+                  : <DayTotals cashTjs={closing?.actualCashTjs} bankTjs={closing?.salesCardTjs} />}
                 <p className="text-xs text-fg-subtle flex items-center gap-1.5 flex-wrap">
                   <UserCheck className="w-3.5 h-3.5 text-success" />
                   <span>{closing?.closedByName}</span>
@@ -450,7 +511,9 @@ export const DailyCashClosingModal: React.FC<DailyCashClosingModalProps> = ({
               </>
             ) : (
               <>
-                <DayTotals cashTjs={summary.expectedCashTjs} bankTjs={summary.salesCardTjs} />
+                {dayFigures(summary, 'expected')
+                  ? <DayBreakdown figures={dayFigures(summary, 'expected')!} showUsd={isAdmin} />
+                  : <DayTotals cashTjs={summary.expectedCashTjs} bankTjs={summary.salesCardTjs} />}
                 {!isInsideTargetStore && (
                   <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/25 text-amber-700 dark:text-amber-300 text-xs flex items-center justify-between gap-2.5">
                     <div className="flex items-center gap-2 min-w-0">

@@ -72,11 +72,12 @@ try {
   pass('CASH, CARD and SPLIT receipts each raise the store register by their whole amount; the method is kept on the sale')
   const expense = await call(admin, 'POST', '/expenses', { category: 'Аренда', amountTjs: 120, storeId: 'store-siyoma', paidFromCashRegister: true, comment: 'Хозтовары' });
   assert.equal(expense.status, 201, JSON.stringify(expense));    // −120 TJS / −$10
-  const refund = await call(admin, 'POST', `/sales/${firstSale.id}/refund`, { reason: 'Брак', refundAmountTjs: 1000, penaltyFeeTjs: 0, paymentMethod: 'CASH' });
-  assert.equal(refund.status, 200, JSON.stringify(refund));       // −1000 TJS at today's 12 → −$83.33
+  const refund = await call(admin, 'POST', `/sales/${firstSale.id}/refund`, { reason: 'Брак', refundAmountTjs: 900, penaltyFeeTjs: 100, paymentMethod: 'CASH' });
+  assert.equal(refund.status, 200, JSON.stringify(refund));       // −900 TJS at today's 12 → −($83.33 − $8.33) = −$75
 
-  const expectedTjs = D(1000).plus(1100).plus(2200).plus(1650).plus(1200).minus(120).minus(1000);                       // 6030
-  const expectedUsd = D(100).plus(100).plus(200).plus(150).plus(100).minus(10).minus(D(1000).div(12).toDecimalPlaces(2)); // 556.67
+  const expectedTjs = D(1000).plus(1100).plus(2200).plus(1650).plus(1200).minus(120).minus(900);                        // 6130
+  const expectedUsd = D(100).plus(100).plus(200).plus(150).plus(100).minus(10)
+    .minus(D(1000).div(12).toDecimalPlaces(2).minus(D(100).div(12).toDecimalPlaces(2)));                                  // 565
   const register = async (id: string) => D((await db.store.findUniqueOrThrow({ where: { id } })).cashBalanceUsd);
   assert.equal((await register('store-siyoma')).toString(), expectedUsd.toString(), 'register USD before collection');
   pass(`store register after sales/expense/refund: ${expectedTjs} TJS = $${expectedUsd} (all payment methods, each at its own rate)`);

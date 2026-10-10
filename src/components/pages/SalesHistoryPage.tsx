@@ -45,15 +45,19 @@ export const getSaleRate = (sale: { exchangeRate?: number; totalUsd?: number; to
     : (fallbackRate > 0 ? fallbackRate : (Number(sale.totalUsd) > 0 && Number(sale.totalTjs) > 0 ? Number(sale.totalTjs) / Number(sale.totalUsd) : 0));
 };
 
+/** The dollars the receipt was booked at (its own day's rate); recomputed only for old records without them. */
 export const getSaleUsd = (sale: { exchangeRate?: number; totalUsd?: number; totalTjs?: number }, fallbackRate: number): number => {
+  if (sale.totalUsd !== undefined && sale.totalUsd !== null && Number.isFinite(Number(sale.totalUsd))) return Number(sale.totalUsd);
   const rate = getSaleRate(sale, fallbackRate);
   if (rate > 0 && sale.totalTjs) {
     return Math.round((Number(sale.totalTjs) / rate) * 100) / 100;
   }
-  return Number(sale.totalUsd) || 0;
+  return 0;
 };
 
-export const getRefundUsd = (sale: { exchangeRate?: number; totalUsd?: number; totalTjs?: number; actualRefundAmountTjs?: number }, fallbackRate: number): number => {
+/** The dollars handed back on the refund (the refund day's rate), as recorded then. */
+export const getRefundUsd = (sale: { exchangeRate?: number; totalUsd?: number; totalTjs?: number; actualRefundAmountTjs?: number; actualRefundUsd?: number }, fallbackRate: number): number => {
+  if (sale.actualRefundUsd !== undefined && sale.actualRefundUsd !== null) return Number(sale.actualRefundUsd);
   const refundTjs = sale.actualRefundAmountTjs ?? sale.totalTjs;
   const rate = getSaleRate(sale, fallbackRate);
   if (rate > 0 && refundTjs) {
@@ -133,7 +137,7 @@ export const SalesHistoryPage: React.FC = () => {
   const selectedRefundUsd = selectedSale ? getRefundUsd(selectedSale, currentFallbackRate) : 0;
 
   const [refundReason, setRefundReason] = useState('');
-  const [penaltyFeeTjs, setPenaltyFeeTjs] = useState<string>('0');
+  const [penaltyFeeTjs, setPenaltyFeeTjs] = useState<string>('');
   const [refundMethod, setRefundMethod] = useState<'CASH' | 'CARD'>('CASH');
   const [status, setStatus] = useState<StatusMessage | null>(null);
   const [isSubmittingRefund, setIsSubmittingRefund] = useState(false);
@@ -340,14 +344,21 @@ export const SalesHistoryPage: React.FC = () => {
   // What the customer actually paid (an unpaid debt is written off, not returned) and the penalty.
   const refundCollectedTjs = selectedSale ? Math.max(0, selectedSale.totalTjs - (selectedSale.debtAmountTjs ?? 0)) : 0;
   const penaltyVal = Math.max(0, parseFloat(penaltyFeeTjs.replace(',', '.')) || 0);
+  // Every refund withholds a penalty; only a receipt with nothing paid has nothing to withhold.
+  const penaltyRequired = refundCollectedTjs > 0;
   const penaltyError = penaltyVal > refundCollectedTjs + 0.001
     ? `Штраф не может быть больше оплаченной суммы (${formatMoney(refundCollectedTjs)} TJS)`
     : null;
+  const penaltyMissing = penaltyRequired && penaltyVal <= 0;
 
   const handleExecuteRefund = async () => {
     if (!selectedSale || isSubmittingRefund || penaltyError) return;
     if (!refundReason.trim()) {
       setStatus({ tone: 'error', text: 'Укажите причину возврата' });
+      return;
+    }
+    if (penaltyMissing) {
+      setStatus({ tone: 'error', text: 'Укажите штраф за возврат' });
       return;
     }
 
@@ -366,7 +377,7 @@ export const SalesHistoryPage: React.FC = () => {
       if (res.success) {
         setSelectedSaleId(null);
         setRefundReason('');
-        setPenaltyFeeTjs('0');
+        setPenaltyFeeTjs('');
         setStatus({ tone: 'success', text: `Возврат по чеку #${selectedSale.receiptNumber} оформлен` });
       } else {
         setStatus({ tone: 'error', text: res.message || 'Ошибка возврата' });
@@ -477,10 +488,8 @@ export const SalesHistoryPage: React.FC = () => {
               Чеков: <strong className="text-fg font-semibold">{periodSummary.receipts}</strong>
             </span>
             {(() => {
-              const currentRate = Number(todayRate?.rate) || 0;
-              const totalUsd = currentRate > 0 ? periodSummary.totalTjs / currentRate : 0;
-              const cashUsd = currentRate > 0 ? periodSummary.cashTjs / currentRate : 0;
-              const cardUsd = currentRate > 0 ? periodSummary.cardTjs / currentRate : 0;
+              // Each receipt at its own day's dollars, as booked — never the period's TJS over today's rate.
+              const { totalUsd, cashUsd, cardUsd } = periodSummary;
 
               return isAdmin ? (
                 <>
@@ -939,7 +948,7 @@ export const SalesHistoryPage: React.FC = () => {
                   onClick={() => {
                     setStatus(null);
                     setRefundReason('');
-                    setPenaltyFeeTjs('0');
+                    setPenaltyFeeTjs('');
                     setDialogView('refund');
                   }}
                 >
@@ -950,7 +959,7 @@ export const SalesHistoryPage: React.FC = () => {
           ) : dialogView === 'refund' ? (
             <>
               <Button variant="secondary" fullWidth disabled={isSubmittingRefund} onClick={() => setDialogView('details')}>Отмена</Button>
-              <Button variant="danger" fullWidth loading={isSubmittingRefund} disabled={Boolean(penaltyError)} onClick={handleExecuteRefund}>Подтвердить возврат</Button>
+              <Button variant="danger" fullWidth loading={isSubmittingRefund} disabled={Boolean(penaltyError) || penaltyMissing} onClick={handleExecuteRefund}>Подтвердить возврат</Button>
             </>
           ) : (
             <Button variant="secondary" fullWidth leftIcon={ArrowLeft} onClick={() => setDialogView('details')}>Назад</Button>
@@ -1326,7 +1335,7 @@ export const SalesHistoryPage: React.FC = () => {
                     <span className="text-warning font-semibold font-mono">
                       {isAdmin ? (
                         <>
-                          +${formatMoney(selectedSaleRate > 0 ? (selectedSale.penaltyFeeTjs ?? 0) / selectedSaleRate : 0)} <span className="font-normal font-sans text-[11px]">(+{formatMoney(selectedSale.penaltyFeeTjs ?? 0)} TJS)</span>
+                          +${formatMoney(selectedSale.penaltyFeeUsd ?? (selectedSaleRate > 0 ? (selectedSale.penaltyFeeTjs ?? 0) / selectedSaleRate : 0))} <span className="font-normal font-sans text-[11px]">(+{formatMoney(selectedSale.penaltyFeeTjs ?? 0)} TJS)</span>
                         </>
                       ) : (
                         <>+{formatMoney(selectedSale.penaltyFeeTjs ?? 0)} TJS</>
@@ -1373,7 +1382,7 @@ export const SalesHistoryPage: React.FC = () => {
 
             <div>
               <label className="flex items-center justify-between text-xs font-medium text-fg-muted mb-1">
-                <span>Удержать штраф за возврат (TJS)</span>
+                <span>Штраф за возврат (TJS) {penaltyRequired && <span className="text-danger">*</span>}</span>
                 <span className="text-warning font-normal">100% в чистую прибыль</span>
               </label>
               <div className="mb-2">
@@ -1421,7 +1430,7 @@ export const SalesHistoryPage: React.FC = () => {
                   <span className="text-accent font-mono font-bold">
                     {isAdmin ? (
                       <>
-                        ${formatMoney(selectedSaleRate > 0 ? Math.max(0, refundCollectedTjs - penaltyVal) / selectedSaleRate : 0)} <span className="text-xs font-normal opacity-80 font-sans">({formatMoney(Math.max(0, refundCollectedTjs - penaltyVal))} TJS)</span>
+                        ${formatMoney(currentFallbackRate > 0 ? Math.max(0, refundCollectedTjs - penaltyVal) / currentFallbackRate : 0)} <span className="text-xs font-normal opacity-80 font-sans">({formatMoney(Math.max(0, refundCollectedTjs - penaltyVal))} TJS)</span>
                       </>
                     ) : (
                       <>{formatMoney(Math.max(0, refundCollectedTjs - penaltyVal))} TJS</>
@@ -1434,7 +1443,7 @@ export const SalesHistoryPage: React.FC = () => {
                     <span className="text-warning font-mono">
                       {isAdmin ? (
                         <>
-                          +${formatMoney(selectedSaleRate > 0 ? penaltyVal / selectedSaleRate : 0)} <span className="opacity-80 font-sans text-xs font-normal">(+{formatMoney(penaltyVal)} TJS)</span>
+                          +${formatMoney(currentFallbackRate > 0 ? penaltyVal / currentFallbackRate : 0)} <span className="opacity-80 font-sans text-xs font-normal">(+{formatMoney(penaltyVal)} TJS)</span>
                         </>
                       ) : (
                         <>+{formatMoney(penaltyVal)} TJS</>

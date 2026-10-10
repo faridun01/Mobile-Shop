@@ -263,9 +263,10 @@ await withSchema('main', async (c) => {
   const bonusSale = await c.sell('store-a', 1500, { bonus: true });
   await collectAndCheck(c, 'store-a', { regularUsd: '0', regularTjs: '0', bonusUsd: '150', bonusTjs: '1500' });
   await c.sell('store-a', 2000, { cost: 100 });
-  const refund = await c.call('POST', `/sales/${bonusSale.id}/refund`, { reason: 'Брак', refundAmountTjs: 1500, penaltyFeeTjs: 0, paymentMethod: 'CASH' });
+  const refund = await c.call('POST', `/sales/${bonusSale.id}/refund`, { reason: 'Брак', refundAmountTjs: 1400, penaltyFeeTjs: 100, paymentMethod: 'CASH' });
   assert.equal(refund.status, 200, JSON.stringify(refund));
-  await collectAndCheck(c, 'store-a', { regularUsd: '50', regularTjs: '500', bonusUsd: '0', bonusTjs: '0' });
+  // $200 sale − $140 refunded (1500 TJS less the 100 TJS penalty) = $60 left in the register.
+  await collectAndCheck(c, 'store-a', { regularUsd: '60', regularTjs: '600', bonusUsd: '0', bonusTjs: '0' });
   await c.sell('store-a', 1500, { bonus: true });
   await collectAndCheck(c, 'store-a', { regularUsd: '150', regularTjs: '1500', bonusUsd: '0', bonusTjs: '0' });
   await c.sell('store-a', 1500, { bonus: true });

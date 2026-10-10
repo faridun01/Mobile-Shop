@@ -75,7 +75,7 @@ export function registerRefundRoutes(app: Express) {
       const saleIds = sales.map((sale) => sale.id);
       const profitLogs = saleIds.length
         ? await prisma.auditLog.findMany({
-            where: { targetId: { in: saleIds }, action: { in: ['SALE', 'SALE_BELOW_COST', 'EXCHANGE'] } },
+            where: { targetId: { in: saleIds }, action: { in: ['SALE', 'SALE_BELOW_COST', 'EXCHANGE', 'REFUND'] } },
             select: { targetId: true, action: true, financialDetails: true },
           })
         : [];
@@ -86,8 +86,12 @@ export function registerRefundRoutes(app: Express) {
       const showCost = req.user!.role === 'ADMIN';
       res.json(sales.map((sale) => {
         const fallbackCost = sale.saleItems.reduce((sum, item) => D(sum).plus(item.costBasisUsd), D(0));
+        // The dollars that left the register on the refund (its own day's rate), as recorded then.
+        const refundDetails = (profits.get(sale.id) ?? []).find((log) => log.action === 'REFUND')?.financialDetails as Record<string, unknown> | undefined;
+        const actualRefundUsd = typeof refundDetails?.amountUsd === 'number' ? refundDetails.amountUsd : undefined;
         return {
           ...sale,
+          actualRefundUsd,
           saleItems: sale.saleItems.map((item: any) => ({
             ...item,
             ...(showCost ? {} : { costBasisUsd: 0 }),
@@ -115,6 +119,16 @@ export function registerRefundRoutes(app: Express) {
       const { reason, refundAmountTjs, penaltyFeeTjs, paymentMethod } = req.body ?? {};
       if (!reason || refundAmountTjs == null || !paymentMethod) {
         res.status(400).json({ message: 'reason, refundAmountTjs и paymentMethod обязательны' });
+        return;
+      }
+      // Every refund withholds a penalty, entered by hand in TJS. Only a receipt with nothing
+      // paid (a debt sale with no first payment) has nothing to withhold.
+      const receipt = await prisma.sale.findUnique({ where: { id: req.params.id }, select: { totalTjs: true, debtAmountTjs: true } });
+      const collectedTjs = receipt ? D(receipt.totalTjs).minus(receipt.debtAmountTjs) : D(0);
+      const penaltyEntered = penaltyFeeTjs !== undefined && penaltyFeeTjs !== null && penaltyFeeTjs !== ''
+        && Number.isFinite(Number(penaltyFeeTjs)) && D(penaltyFeeTjs).gt(0);
+      if (collectedTjs.gt(0) && !penaltyEntered) {
+        res.status(400).json({ message: 'Штраф за возврат обязателен: укажите сумму больше 0' });
         return;
       }
 

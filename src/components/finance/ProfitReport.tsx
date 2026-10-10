@@ -29,8 +29,9 @@ import { currentBusinessMonth, getBusinessDateKey, wholeMonthOf } from '../../ut
 import { StatCard } from '../ui/StatCard';
 import {
   exportComprehensiveReport,
-  buildSalesReportTable,
+  buildEventsReportTable,
   type ComprehensiveReportSummary,
+  type ReportEventRow,
 } from '../../utils/exportReports';
 import { expenseCategoryLabel } from '../../utils/expenseCategories';
 import { ReportPreviewModal } from '../common/ReportPreviewModal';
@@ -76,9 +77,8 @@ interface ReportsSummary {
   expensesUsd: number;
   periodRefundPenaltiesUsd: number;
   periodRefundPenaltiesTjs: number;
-  /** Exchange-rate results already inside profit/net profit: refunds, customer debt repaid, and
-   *  expenses paid at another rate than they were booked at. */
-  periodRefundFxUsd?: number;
+  /** Differences already inside profit/net profit: a TJS debt repaid, or an unpaid expense paid,
+   *  at another day's rate. A refund is reported by the dollars actually handed back. */
   periodDebtFxUsd?: number;
   periodExpenseFxUsd?: number;
   netProfitUsd: number;
@@ -102,6 +102,8 @@ interface ReportsSummary {
   topSuppliersByDebt: { id: string; name: string; totalPurchasedUsd: number; totalPaidUsd: number; totalDebtUsd: number }[];
   storeBreakdown: StoreBreakdown[];
   modelCounts: { name: string; count: number; revenueUsd: number; cogsUsd: number; profitUsd: number }[];
+  /** Only with events=1: the dated sale/exchange/refund rows the totals are built from. */
+  events?: ReportEventRow[];
 }
 
 const EMPTY_EXPENSES: ExpenseBreakdown = { expensesUsd: 0, expensesTjs: 0, unpaidExpensesTjs: 0, expensesByCategory: [] };
@@ -264,9 +266,10 @@ export const ProfitReport: React.FC<ProfitReportProps> = ({
     return () => { cancelled = true; controller.abort(); };
   }, [month, startDate, endDate, scopeStoreId, revision]);
 
-  // The itemized sales/expenses list is only needed for the Excel preview, so it's fetched
-  // only once that preview is opened, scoped to just the one store being previewed.
-  const [reportSales, setReportSales] = useState<Sale[]>([]);
+  // The itemized rows are only needed for the Excel preview, so they're fetched only once that
+  // preview is opened, scoped to the one store being previewed. They come from the same server
+  // computation as the totals (events=1), so the rows always add up to the report.
+  const [reportData, setReportData] = useState<ReportsSummary | null>(null);
   const [reportExpenses, setReportExpenses] = useState<Expense[]>([]);
   const [reportDataLoading, setReportDataLoading] = useState(false);
   const [reportDataError, setReportDataError] = useState<string | null>(null);
@@ -292,27 +295,32 @@ export const ProfitReport: React.FC<ProfitReportProps> = ({
     const query = params.toString();
 
     Promise.all([
-      apiClient<any[]>(`/sales?${query}`, { signal: controller.signal }),
+      apiClient<ReportsSummary>(`/reports/summary?${query}&events=1`, { signal: controller.signal }),
       apiClient<any[]>(`/expenses?${query}`, { signal: controller.signal }),
     ])
-      .then(([rawSales, rawExpenses]) => {
+      .then(([summaryWithEvents, rawExpenses]) => {
         if (cancelled) return;
-        setReportSales(rawSales.map((s) => mapSale(s, namesLookup)));
-        setReportExpenses(rawExpenses.map((expense) => mapExpense(expense, namesLookup)));
+        setReportData(summaryWithEvents);
+        // The report's expenses are the ones registered in the period; the main warehouse's
+        // own bookings belong to no retail store.
+        const mainWarehouseId = stores.find((st) => st.isMainWarehouse)?.id;
+        setReportExpenses(rawExpenses
+          .map((expense) => mapExpense(expense, namesLookup))
+          .filter((expense) => salesReportStoreId === 'all' || expense.storeId !== mainWarehouseId));
       })
       .catch((error) => {
         if (cancelled) return;
         setReportDataError(error.message || 'Не удалось загрузить строки отчёта');
-        setReportSales([]);
+        setReportData(null);
         setReportExpenses([]);
       })
       .finally(() => { if (!cancelled) setReportDataLoading(false); });
 
     return () => { cancelled = true; controller.abort(); };
-  }, [salesReportStoreId, month, startDate, endDate, namesLookup, revision]);
+  }, [salesReportStoreId, month, startDate, endDate, namesLookup, revision, stores]);
 
   const data: ReportsSummary = summary ?? EMPTY_SUMMARY;
-  const fxResultUsd = sumMoney([data.periodRefundFxUsd ?? 0, data.periodDebtFxUsd ?? 0, data.periodExpenseFxUsd ?? 0]);
+  const fxResultUsd = sumMoney([data.periodDebtFxUsd ?? 0, data.periodExpenseFxUsd ?? 0]);
 
   const totalStockCostUsd = useMemo(() => {
     if (selectedStore !== 'all') {
@@ -339,68 +347,39 @@ export const ProfitReport: React.FC<ProfitReportProps> = ({
   }, [data, selectedStore]);
 
   const salesReportTable = useMemo(() => {
-    if (!salesReportStoreId || reportDataLoading) return null;
+    if (!salesReportStoreId || reportDataLoading || !reportData) return null;
     // Supplier cash bonuses aren't tied to a retail store — only the combined report shows them.
-    return buildSalesReportTable(reportSales, rate, salesReportStoreId === 'all' ? data.periodCashBonusesUsd : 0);
-  }, [salesReportStoreId, reportSales, reportDataLoading, rate, data.periodCashBonusesUsd]);
+    return buildEventsReportTable(reportData.events ?? [], salesReportStoreId === 'all' ? reportData.periodCashBonusesUsd : 0);
+  }, [salesReportStoreId, reportData, reportDataLoading]);
 
   const salesReportStoreName = salesReportStoreId === 'all'
     ? 'Все магазины'
     : formatStoreName(retailStores.find((s) => s.id === salesReportStoreId)?.name || '');
 
   const downloadFinancialReport = async () => {
-    if (!salesReportStoreId || !summary || reportDownloading || reportDataLoading || reportDataError) return;
+    if (!salesReportStoreId || !reportData || reportDownloading || reportDataLoading || reportDataError) return;
 
-    let reportSummary: ComprehensiveReportSummary;
-    const breakdown = data.storeBreakdown.find((item) => item.storeId === salesReportStoreId);
-    if (salesReportStoreId === 'all') {
-      reportSummary = {
-        periodLabel, storeName: salesReportStoreName, exchangeRate: rate,
-        unitsSold: data.unitsSold,
-        revenueTjs: data.revenueTjs, revenueUsd: data.revenueUsd,
-        cogsTjs: data.cogsTjs, cogsUsd: data.cogsUsd,
-        grossProfitTjs: data.grossProfitTjs, grossProfitUsd: data.grossProfitUsd,
-        refundPenaltiesTjs: data.periodRefundPenaltiesTjs, refundPenaltiesUsd: data.periodRefundPenaltiesUsd,
-        bonusDeviceProfitTjs: data.bonusDeviceProfitTjs ?? 0, bonusDeviceProfitUsd: data.bonusDeviceProfitUsd ?? 0,
-        profitTjs: data.profitTjs, profitUsd: data.profitUsd,
-        cashBonusesTjs: data.periodCashBonusesTjs, cashBonusesUsd: data.periodCashBonusesUsd,
-        expensesTjs: data.expensesTjs, expensesUsd: data.expensesUsd,
-        netProfitTjs: data.netProfitTjs, netProfitUsd: data.netProfitUsd,
-      };
-    } else {
-      const expensesTjs = breakdown?.expensesTjs ?? sumMoney(reportExpenses.map((expense) => expense.amountTjs || 0));
-      const expensesUsd = breakdown?.expensesUsd ?? sumMoney(reportExpenses.map((expense) => expense.amountUsd ?? moneyNumber((expense.amountTjs || 0) / (expense.exchangeRate || rate))));
-      const revenueTjs = breakdown?.revenueTjs ?? 0;
-      const revenueUsd = breakdown?.revenueUsd ?? 0;
-      const cogsTjs = breakdown?.cogsTjs ?? 0;
-      const cogsUsd = breakdown?.cogsUsd ?? 0;
-      const grossProfitTjs = revenueTjs - cogsTjs;
-      const grossProfitUsd = revenueUsd - cogsUsd;
-      const profitTjs = breakdown?.profitTjs ?? grossProfitTjs;
-      const profitUsd = breakdown?.profitUsd ?? grossProfitUsd;
-      const bonusDeviceProfitTjs = breakdown?.bonusDeviceProfitTjs ?? 0;
-      const bonusDeviceProfitUsd = breakdown?.bonusDeviceProfitUsd ?? 0;
-
-      reportSummary = {
-        periodLabel, storeName: salesReportStoreName, exchangeRate: rate,
-        unitsSold: breakdown?.unitsSold ?? 0,
-        revenueTjs, revenueUsd, cogsTjs, cogsUsd, grossProfitTjs, grossProfitUsd,
-        // profit = gross − bonus-phone profit + retained penalties
-        refundPenaltiesTjs: profitTjs - grossProfitTjs + bonusDeviceProfitTjs,
-        refundPenaltiesUsd: profitUsd - grossProfitUsd + bonusDeviceProfitUsd,
-        bonusDeviceProfitTjs, bonusDeviceProfitUsd,
-        profitTjs, profitUsd,
-        cashBonusesTjs: 0, cashBonusesUsd: 0,
-        expensesTjs: +expensesTjs.toFixed(2),
-        expensesUsd: +expensesUsd.toFixed(2),
-        netProfitTjs: breakdown?.netProfitTjs ?? +(profitTjs - expensesTjs).toFixed(2),
-        netProfitUsd: breakdown?.netProfitUsd ?? moneyNumber(decimal(profitUsd).minus(expensesUsd)),
-      };
-    }
+    // Every figure comes from the server report for exactly this period and store; the rows
+    // (events and expenses) add up to it, and the workbook's control row checks that.
+    const reportSummary: ComprehensiveReportSummary = {
+      periodLabel,
+      storeName: salesReportStoreName,
+      unitsSold: reportData.unitsSold,
+      revenueUsd: reportData.revenueUsd,
+      cogsUsd: reportData.cogsUsd,
+      refundPenaltiesUsd: reportData.periodRefundPenaltiesUsd,
+      debtFxUsd: reportData.periodDebtFxUsd ?? 0,
+      bonusDeviceProfitUsd: reportData.bonusDeviceProfitUsd ?? 0,
+      profitUsd: reportData.profitUsd,
+      cashBonusesUsd: salesReportStoreId === 'all' ? reportData.periodCashBonusesUsd : 0,
+      expensesUsd: reportData.expensesUsd,
+      expenseFxUsd: reportData.periodExpenseFxUsd ?? 0,
+      netProfitUsd: reportData.netProfitUsd,
+    };
 
     setReportDownloading(true);
     try {
-      await exportComprehensiveReport({ sales: reportSales, expenses: reportExpenses, summary: reportSummary, generatedBy: currentUser?.name });
+      await exportComprehensiveReport({ events: reportData.events ?? [], expenses: reportExpenses, summary: reportSummary, generatedBy: currentUser?.name });
       setSalesReportStoreId(null);
     } catch (error) {
       console.error('Failed to create financial report', error);

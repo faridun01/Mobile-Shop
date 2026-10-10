@@ -268,7 +268,7 @@ export const ExpensesPage: React.FC = () => {
     }
 
     const selectedEmp = selectedEmployeeId ? users.find(u => u.id === selectedEmployeeId) : undefined;
-    const isPaid = isAdmin ? paidFromCashRegister : false;
+    const isPaid = (isAdmin || isPartner) && paidFromCashRegister;
 
     setIsSubmitting(true);
     try {
@@ -276,7 +276,7 @@ export const ExpensesPage: React.FC = () => {
         category,
         amountTjs: val,
         storeId: isStoreScoped ? (currentUser?.storeId || '') : storeId,
-        sourceAccount: isPaid ? 'Центральная касса' : undefined,
+        sourceAccount: isAdmin && isPaid ? 'Центральная касса' : undefined,
         description: description.trim(),
         paidFromCashRegister: isPaid,
         employeeId: selectedEmployeeId || undefined,
@@ -289,7 +289,9 @@ export const ExpensesPage: React.FC = () => {
         setAmountTjs('');
         setDescription('');
         setSelectedEmployeeId('');
-        const paidNote = isPaid ? 'оплачен из Центральной кассы' : 'зафиксирован как долг (ожидает оплаты администратором)';
+        const paidNote = !isPaid
+          ? 'зафиксирован как долг (ожидает оплаты администратором)'
+          : isAdmin ? 'оплачен из Центральной кассы' : 'оплачен из кассы магазина';
         setStatus({ tone: 'success', text: `Расход на сумму ${val} TJS ${paidNote}${selectedEmp ? ` (зачислен сотруднику ${selectedEmp.name})` : ''}` });
       } else {
         setStatus({ tone: 'error', text: res.message || 'Ошибка проведения расхода' });
@@ -558,6 +560,7 @@ export const ExpensesPage: React.FC = () => {
         paidFromCashRegister={paidFromCashRegister}
         setPaidFromCashRegister={setPaidFromCashRegister}
         isAdmin={isAdmin}
+        isPartner={isPartner}
         rate={rate}
         centralCashStore={centralCashStore}
         onSubmit={handleAddExpense}

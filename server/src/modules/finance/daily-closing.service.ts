@@ -12,7 +12,7 @@ type Db = TransactionClient;
 type Money = ReturnType<typeof D>;
 
 // Ledger sources that move the store register's cash and are not already covered by the
-// sales / refunds / expenses / collections / customer-payment queries below.
+// sales / refunds / expenses / customer-payment queries below.
 const OTHER_LEDGER_SOURCES = ['OWNER_TRANSACTION', 'SUPPLIER_PAYMENT'];
 
 export interface DailyClosingSummary {
@@ -26,6 +26,8 @@ export interface DailyClosingSummary {
   salesCashTjs: string;
   salesCashUsd: string;
   salesCardTjs: string;
+  /** Bank takings in dollars. Set on closings made under the day-total rules; null on older ones. */
+  salesCardUsd: string | null;
   salesCount: number;
   expensesCashTjs: string;
   expensesCashUsd: string;
@@ -50,7 +52,6 @@ export interface CreateDailyClosingInput {
   // counted amount, and any difference is recorded and reported to the admin.
   actualCashTjs?: MoneyInput | null;
   comment?: string;
-  initialOpeningCashTjs?: MoneyInput;
 }
 
 /** USD equivalent of a TJS amount at the record's own snapshotted rate. */
@@ -59,9 +60,8 @@ function usdAt(tjs: Money, rate: MoneyInput | null | undefined): Money {
 }
 
 /**
- * The drawer holds somoni only. Every USD figure on a closing is the book equivalent of a TJS
- * amount: flows use each record's own rate, the opening carries over from the previous
- * closing, and the counted discrepancy is valued at the closing day's rate.
+ * Every USD figure on a closing is the dollar amount the register booked for that record, at
+ * the record's own day's rate. A counted discrepancy is valued at the closing day's rate.
  */
 async function rateForBusinessDate(db: Db, businessDate: string, strict: boolean): Promise<Money | null> {
   const exact = await db.exchangeRate.findUnique({ where: { date: businessDate } });
@@ -91,7 +91,6 @@ export class DailyClosingService {
   public static async getSummary(
     storeId: string,
     businessDateInput?: string,
-    initialOpening?: { tjs?: MoneyInput },
     db: Db = prisma,
     closingRate?: Money,
   ): Promise<DailyClosingSummary> {
@@ -126,6 +125,7 @@ export class DailyClosingService {
         salesCashTjs: existing.salesCashTjs.toString(),
         salesCashUsd: existing.salesCashUsd.toString(),
         salesCardTjs: existing.salesCardTjs.toString(),
+        salesCardUsd: existing.salesCardUsd?.toString() ?? null,
         salesCount: 0,
         expensesCashTjs: existing.expensesCashTjs.toString(),
         expensesCashUsd: existing.expensesCashUsd.toString(),
@@ -144,37 +144,19 @@ export class DailyClosingService {
       };
     }
 
-    // 2. Opening Balance from previous closing (or fallback to initial)
-    const prevClosing = await db.dailyCashClosing.findFirst({
-      where: {
-        storeId,
-        businessDate: { lt: businessDate },
-      },
-      orderBy: { businessDate: 'desc' },
-    });
-
-    let openingTjs: Money;
-    let openingUsd: Money;
-    if (prevClosing) {
-      openingTjs = D(prevClosing.actualCashTjs);
-      openingUsd = D(prevClosing.actualCashUsd);
-    } else {
-      openingTjs = initialOpening?.tjs !== undefined && initialOpening.tjs !== '' ? D(initialOpening.tjs) : D(0);
-      openingUsd = usdAt(openingTjs, closingRate ?? (await rateForBusinessDate(db, businessDate, false)));
-    }
-
-    // 3. Transactions on this businessDate
+    // 2. A day stands on its own: it starts from 0, and its total is the money the register took
+    // in that day — sales (cash and bank), exchange settlements and debt repayments, less refunds
+    // and expenses paid from this register. Collections are not part of a day: they gather the
+    // totals of closed days. Every USD figure is the dollar amount the register itself booked.
     const dateRange = dateRangeForCustomDates(businessDate, businessDate);
+    const dayRate = closingRate ?? (await rateForBusinessDate(db, businessDate, false));
 
-    // 3a. Sales rung up today, whatever their status now: a sale refunded later the same day
-    // still brought its cash in, and the refund below takes it out again. An exchange adds its
-    // settlement to the sale's cash/card columns, so that part is taken back out here and
-    // counted on the day the exchange actually happened (3b).
+    // 2a. Sales rung up today, whatever their status now: a sale refunded later still brought its
+    // money in that day, and the refund is counted on its own day. An exchange adds its settlement
+    // to the sale's cash/card columns, so that part is taken back out here and counted on the day
+    // the exchange happened (2b).
     const sales = await db.sale.findMany({
-      where: {
-        storeId,
-        createdAt: dateRange,
-      },
+      where: { storeId, createdAt: dateRange },
       select: {
         id: true,
         cashAmountTjs: true,
@@ -187,53 +169,57 @@ export class DailyClosingService {
     let salesCashTjs = D(0);
     let salesCardTjs = D(0);
     let salesCashUsd = D(0);
+    let salesCardUsd = D(0);
     for (const s of sales) {
       const cashTjs = s.exchangeEvents.reduce((sum, ev) => sum.minus(exchangeCash(ev)), D(s.cashAmountTjs || 0));
       const cardTjs = s.exchangeEvents.reduce((sum, ev) => sum.minus(exchangeCard(ev)), D(s.cardAmountTjs || 0));
+      // The register booked the paid part as one amount at the sale's rate; cash is converted on
+      // its own and bank is the rest, so the two add up to exactly what the register received.
+      const paidUsd = roundMoney(usdAt(cashTjs.plus(cardTjs), s.exchangeRate));
+      const cashUsd = roundMoney(usdAt(cashTjs, s.exchangeRate));
       salesCashTjs = salesCashTjs.plus(cashTjs);
       salesCardTjs = salesCardTjs.plus(cardTjs);
-      salesCashUsd = salesCashUsd.plus(usdAt(cashTjs, s.exchangeRate));
+      salesCashUsd = salesCashUsd.plus(cashUsd);
+      salesCardUsd = salesCardUsd.plus(paidUsd.minus(cashUsd));
     }
 
-    // 3b. Exchange settlements made today (signed: negative when the customer was paid out).
+    // 2b. Exchange settlements made today (negative when the customer was paid out). The register
+    // moved by the new price minus the trade-in credit, each in dollars at the exchange's rate.
     const exchanges = await db.exchangeEvent.findMany({
       where: { date: dateRange, sale: { storeId } },
-      select: { cashAmountTjs: true, cardAmountTjs: true, paymentMethod: true, differenceTjs: true, exchangeRate: true },
+      select: { cashAmountTjs: true, cardAmountTjs: true, paymentMethod: true, differenceTjs: true, newPriceUsd: true, exchangeInValueUsd: true },
     });
     for (const ev of exchanges) {
       const cashTjs = exchangeCash(ev);
+      const cardTjs = exchangeCard(ev);
+      const diffTjs = D(ev.differenceTjs);
+      const diffUsd = diffTjs.isZero() ? D(0) : D(ev.newPriceUsd).minus(ev.exchangeInValueUsd);
+      const cashUsd = diffTjs.isZero() ? D(0) : roundMoney(diffUsd.mul(cashTjs).div(diffTjs));
       salesCashTjs = salesCashTjs.plus(cashTjs);
-      salesCardTjs = salesCardTjs.plus(exchangeCard(ev));
-      salesCashUsd = salesCashUsd.plus(usdAt(cashTjs, ev.exchangeRate));
+      salesCardTjs = salesCardTjs.plus(cardTjs);
+      salesCashUsd = salesCashUsd.plus(cashUsd);
+      salesCardUsd = salesCardUsd.plus(diffUsd.minus(cashUsd));
     }
 
-    // 3c. Refunds
+    // 2c. Refunds made today: the customer gets back the somoni they paid, less the penalty; in
+    // dollars that is the refund day's rate (the penalty is booked in dollars at the same rate).
     const refunds = await db.sale.findMany({
-      where: {
-        storeId,
-        refundedAt: dateRange,
-        status: 'REFUNDED',
-      },
-      select: {
-        id: true,
-        cashAmountTjs: true,
-        actualRefundAmountTjs: true,
-        exchangeRate: true,
-      },
+      where: { storeId, refundedAt: dateRange, status: 'REFUNDED' },
+      select: { id: true, actualRefundAmountTjs: true, penaltyFeeTjs: true, penaltyFeeUsd: true },
     });
-
     let refundsCashTjs = D(0);
     let refundsCashUsd = D(0);
     for (const r of refunds) {
-      const refTjs = D(r.actualRefundAmountTjs ?? r.cashAmountTjs ?? 0);
-      refundsCashTjs = refundsCashTjs.plus(refTjs);
-      refundsCashUsd = refundsCashUsd.plus(usdAt(refTjs, r.exchangeRate));
+      const refundTjs = D(r.actualRefundAmountTjs ?? 0);
+      if (refundTjs.isZero()) continue;
+      const collectedTjs = refundTjs.plus(r.penaltyFeeTjs ?? 0);
+      refundsCashTjs = refundsCashTjs.plus(refundTjs);
+      refundsCashUsd = refundsCashUsd.plus(roundMoney(usdAt(collectedTjs, dayRate)).minus(r.penaltyFeeUsd ?? 0));
     }
 
-    // 3d. Expenses that actually left THIS register. Read from the register's own ledger, not
-    // from Expense.storeId: salaries, advances and repair costs are charged to a store but paid
-    // from Central Cash, and an expense paid later or edited moves money on that day, not on
-    // the day it was created. A cancellation posts its own reversal (IN), which offsets.
+    // 2d. Expenses that actually left THIS register (a partner's paid store expense, or one the
+    // admin paid from it). Read from the register's own ledger, not from Expense.storeId: unpaid
+    // expenses and salaries are paid from Central Cash. A cancellation posts its own reversal (IN).
     const cashAccount = await db.financialAccount.findUnique({ where: { storeId }, select: { id: true } });
     const expenseRows = cashAccount
       ? await db.financialTransaction.findMany({
@@ -241,7 +227,6 @@ export class DailyClosingService {
           select: { direction: true, amountTjs: true, amountUsd: true },
         })
       : [];
-
     let expensesCashTjs = D(0);
     let expensesCashUsd = D(0);
     for (const row of expenseRows) {
@@ -251,57 +236,18 @@ export class DailyClosingService {
     }
     const expensesCount = expenseRows.filter((row) => row.direction !== 'IN').length;
 
-    // 3e. Cash collections (инкассация)
-    // Any collections on this businessDate, or collections performed between the previous
-    // closing and this business day, are accounted for so money handed over to Central Cash
-    // is never falsely expected in the retail store's drawer.
-    const collectionsWhere: Prisma.CashHandoverWhereInput = {
-      storeId,
-      cancelledAt: null,
-    };
-    if (prevClosing) {
-      collectionsWhere.OR = [
-        { businessDate },
-        {
-          createdAt: { gt: prevClosing.createdAt },
-          businessDate: { lte: businessDate },
-        },
-      ];
-    } else {
-      collectionsWhere.businessDate = businessDate;
-    }
-
-    const collections = await db.cashHandover.findMany({
-      where: collectionsWhere,
-      select: {
-        id: true,
-        amountTjs: true,
-        amountUsd: true,
-      },
-    });
-
-    let collectionsCashTjs = D(0);
-    let collectionsCashUsd = D(0);
-    for (const c of collections) {
-      collectionsCashTjs = collectionsCashTjs.plus(D(c.amountTjs || 0));
-      collectionsCashUsd = collectionsCashUsd.plus(D(c.amountUsd || 0));
-    }
-
-    // 3f. Other register cash moves: customer debt repaid in cash, owner deposits and
-    // withdrawals, supplier payments from the register. Ledger rows count on their own date,
-    // cancelled originals included, because a cancellation posts its own reversal row.
+    // 2e. Customer debt repaid at this register today, plus older register moves (supplier
+    // payments, capital moves made before they went to Central Cash) on their own date.
     let otherCashTjs = D(0);
     let otherCashUsd = D(0);
-
     const customerPayments = await db.customerPayment.findMany({
       where: { storeId, createdAt: dateRange, sourceAccount: 'STORE_CASH' },
       select: { amountTjs: true, exchangeRate: true },
     });
     for (const p of customerPayments) {
       otherCashTjs = otherCashTjs.plus(p.amountTjs);
-      otherCashUsd = otherCashUsd.plus(usdAt(D(p.amountTjs), p.exchangeRate));
+      otherCashUsd = otherCashUsd.plus(roundMoney(usdAt(D(p.amountTjs), p.exchangeRate)));
     }
-
     const ledgerRows = cashAccount
       ? await db.financialTransaction.findMany({
           where: {
@@ -320,25 +266,21 @@ export class DailyClosingService {
       otherCashUsd = otherCashUsd.plus(D(row.amountUsd).mul(sign));
     }
 
-    // 4. Expected Cash Calculation. Never floored at 0: a negative expectation means the books
-    // show more money leaving than the drawer could hold, and that has to stay visible.
-    const expectedCashTjs = roundMoney(
-      openingTjs.plus(salesCashTjs).minus(refundsCashTjs).minus(expensesCashTjs).minus(collectionsCashTjs).plus(otherCashTjs),
-    );
-    const expectedCashUsd = roundMoney(
-      openingUsd.plus(salesCashUsd).minus(refundsCashUsd).minus(expensesCashUsd).minus(collectionsCashUsd).plus(otherCashUsd),
-    );
+    // 3. The day's total: everything the register took in that day, cash and bank together.
+    const expectedCashTjs = roundMoney(salesCashTjs.plus(salesCardTjs).plus(otherCashTjs).minus(refundsCashTjs).minus(expensesCashTjs));
+    const expectedCashUsd = roundMoney(salesCashUsd.plus(salesCardUsd).plus(otherCashUsd).minus(refundsCashUsd).minus(expensesCashUsd));
 
     return {
       storeId: store.id,
       storeName: store.name,
       businessDate,
       alreadyClosed: false,
-      openingCashTjs: roundMoney(openingTjs).toString(),
-      openingCashUsd: roundMoney(openingUsd).toString(),
+      openingCashTjs: '0',
+      openingCashUsd: '0',
       salesCashTjs: roundMoney(salesCashTjs).toString(),
       salesCashUsd: roundMoney(salesCashUsd).toString(),
       salesCardTjs: roundMoney(salesCardTjs).toString(),
+      salesCardUsd: roundMoney(salesCardUsd).toString(),
       salesCount: sales.length,
       expensesCashTjs: roundMoney(expensesCashTjs).toString(),
       expensesCashUsd: roundMoney(expensesCashUsd).toString(),
@@ -346,9 +288,9 @@ export class DailyClosingService {
       refundsCashTjs: roundMoney(refundsCashTjs).toString(),
       refundsCashUsd: roundMoney(refundsCashUsd).toString(),
       refundsCount: refunds.length,
-      collectionsCashTjs: roundMoney(collectionsCashTjs).toString(),
-      collectionsCashUsd: roundMoney(collectionsCashUsd).toString(),
-      collectionsCount: collections.length,
+      collectionsCashTjs: '0',
+      collectionsCashUsd: '0',
+      collectionsCount: 0,
       otherCashTjs: roundMoney(otherCashTjs).toString(),
       otherCashUsd: roundMoney(otherCashUsd).toString(),
       otherCount: customerPayments.length + ledgerRows.length,
@@ -399,7 +341,7 @@ export class DailyClosingService {
       }
 
       const rate = (await rateForBusinessDate(tx, businessDate, true))!;
-      const summary = await DailyClosingService.getSummary(store.id, businessDate, { tjs: input.initialOpeningCashTjs }, tx, rate);
+      const summary = await DailyClosingService.getSummary(store.id, businessDate, tx, rate);
 
       const actualTjs = counted ?? roundMoney(D(summary.expectedCashTjs));
       const differenceTjs = roundMoney(actualTjs.minus(D(summary.expectedCashTjs)));
@@ -419,6 +361,7 @@ export class DailyClosingService {
           salesCashTjs: summary.salesCashTjs,
           salesCashUsd: summary.salesCashUsd,
           salesCardTjs: summary.salesCardTjs,
+          salesCardUsd: summary.salesCardUsd,
           expensesCashTjs: summary.expensesCashTjs,
           expensesCashUsd: summary.expensesCashUsd,
           refundsCashTjs: summary.refundsCashTjs,

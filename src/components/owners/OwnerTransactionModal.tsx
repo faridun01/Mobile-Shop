@@ -4,6 +4,7 @@ import { CustomSelect } from '../ui/CustomSelect';
 import { decimal, formatMoney, moneyNumber } from '../../utils/money';
 import { formatStoreName } from '../../utils/storeContext';
 import { Store as StoreType, Owner } from '../../types';
+import { useAuthStore } from '../../stores/useAuthStore';
 
 interface OwnerTransactionModalProps {
   open: boolean;
@@ -42,10 +43,12 @@ export const OwnerTransactionModal: React.FC<OwnerTransactionModalProps> = ({
 }) => {
   const centralStore = mainWarehouse || stores.find(s => s.isMainWarehouse) || stores[0];
   const [selectedOwnerId, setSelectedOwnerId] = useState(initialOwnerId || displayOwners[0]?.id || '');
-  const [selectedStoreId, setSelectedStoreId] = useState(centralStore?.id || stores[0]?.id || '');
+  const [selectedStoreId, setSelectedStoreId] = useState(centralStore?.id || '');
   const [txType, setTxType] = useState<'INVESTMENT' | 'WITHDRAWAL'>(initialTxType);
   const [amountUsd, setAmountUsd] = useState('');
   const [note, setNote] = useState('');
+  // Central Cash's balance is ADMIN-only; for a partner the server checks it.
+  const knowsCentralCash = useAuthStore((state) => state.currentUser?.role === 'ADMIN');
 
   useEffect(() => {
     if (open) {
@@ -65,7 +68,7 @@ export const OwnerTransactionModal: React.FC<OwnerTransactionModalProps> = ({
     setSelectedOwnerId(id);
   };
 
-  const selectedStore = stores.find(s => s.id === selectedStoreId) || centralStore || stores[0];
+  const selectedStore = centralStore ?? stores.find(s => s.id === selectedStoreId);
   const selectedOwner = displayOwners.find(o => o.id === selectedOwnerId);
   const storeCash = selectedStore?.cashBalanceUsd ?? 0;
   // Profit owed back (negative available profit) can't be withdrawn — the server enforces the same.
@@ -89,12 +92,12 @@ export const OwnerTransactionModal: React.FC<OwnerTransactionModalProps> = ({
 
   const val = parseFloat(amountUsd.replace(',', '.')) || 0;
 
-  const isStoreCashInsufficient = txType === 'WITHDRAWAL' && val > 0 && val > storeCash;
+  const isStoreCashInsufficient = knowsCentralCash && txType === 'WITHDRAWAL' && val > 0 && val > storeCash;
   const isCapitalInsufficient = txType === 'WITHDRAWAL' && val > 0 && val > ownerCapital;
   const hasError = isStoreCashInsufficient || isCapitalInsufficient;
   const isSubmitDisabled = isSubmitting || val <= 0 || !selectedStore?.id || !selectedOwnerId || hasError;
 
-  const maxWithdrawable = txType === 'WITHDRAWAL' ? Math.max(0, Math.min(storeCash, ownerCapital)) : null;
+  const maxWithdrawable = txType === 'WITHDRAWAL' ? Math.max(0, knowsCentralCash ? Math.min(storeCash, ownerCapital) : ownerCapital) : null;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -180,22 +183,13 @@ export const OwnerTransactionModal: React.FC<OwnerTransactionModalProps> = ({
             )}
           </div>
 
-          {/* Cash Register Selection */}
+          {/* Capital always moves through Central Cash */}
           <div>
-            <label className="block text-fg-subtle text-[11px] uppercase mb-1 font-semibold">Касса / Магазин *</label>
-            <CustomSelect
-              value={selectedStore?.id || ''}
-              onChange={(id) => setSelectedStoreId(id)}
-              options={stores.map((s) => ({
-                value: s.id,
-                label: s.isMainWarehouse ? `Центральная касса (${s.name})` : s.name,
-                sublabel: `В кассе: $${formatMoney(s.cashBalanceUsd ?? 0)}`,
-                icon: s.isMainWarehouse ? <Landmark className="w-3.5 h-3.5 text-accent" /> : <Store className="w-3.5 h-3.5 text-fg-subtle" />,
-              }))}
-              title="Выберите кассу"
-              className="w-full"
-              triggerClassName="w-full justify-between"
-            />
+            <label className="block text-fg-subtle text-[11px] uppercase mb-1 font-semibold">Касса</label>
+            <div className="flex items-center justify-between gap-2 h-10 px-3 rounded-lg bg-surface-raised border border-border text-sm">
+              <span className="flex items-center gap-2 text-fg"><Landmark className="w-3.5 h-3.5 text-accent" /> Центральная касса</span>
+              {knowsCentralCash && <span className="text-xs text-fg-subtle font-mono">В кассе: ${formatMoney(centralStore?.cashBalanceUsd ?? 0)}</span>}
+            </div>
           </div>
 
           <div>

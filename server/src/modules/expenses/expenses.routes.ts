@@ -69,11 +69,17 @@ export function registerExpenseRoutes(app: Express) {
         return;
       }
 
-      // Partner expenses are always recorded as UNPAID (debt)
-      // and cannot directly deduct from cash balances. Admin pays them later.
+      // A partner records an expense of their own store either as paid — it leaves that store's
+      // register and is subtracted in that day's shift closing — or as unpaid, which the admin
+      // pays later from Central Cash. Salaries and advances are paid by the admin only.
       const isAdmin = req.user!.role === 'ADMIN';
-      const effectivePaidFromCash = isAdmin ? Boolean(paidFromCashRegister) : false;
+      const effectivePaidFromCash = Boolean(paidFromCashRegister);
       const effectiveSource = isAdmin ? sourceAccount : undefined;
+      const isPayroll = ['SALARY', 'Зарплата', 'EMPLOYEE_ADVANCE', 'Аванс сотрудника'].includes(category) || Boolean(employeeId) || Boolean(isEmployeeAdvance);
+      if (!isAdmin && effectivePaidFromCash && isPayroll) {
+        res.status(400).json({ message: 'Зарплату и авансы выдаёт администратор из Центральной кассы' });
+        return;
+      }
 
       const expense = await createExpenseStandalone({
         category,

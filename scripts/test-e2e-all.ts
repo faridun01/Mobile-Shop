@@ -286,7 +286,8 @@ async function runE2ETests() {
           headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${adminToken}` },
           body: JSON.stringify({
             reason: 'Тестовый возврат при аудите',
-            refundAmountTjs: D(10500),
+            refundAmountTjs: D(10400),
+            penaltyFeeTjs: D(100),
             paymentMethod: 'CASH'
           })
         });

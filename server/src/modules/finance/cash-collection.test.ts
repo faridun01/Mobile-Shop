@@ -103,6 +103,7 @@ describe('CashCollectionService validation and safety', () => {
     db.sale.findMany.mockResolvedValue([{ createdAt: new Date() }]);
     db.expense.findMany.mockResolvedValue([]);
     db.customerPayment.findMany.mockResolvedValue([]);
+    db.financialTransaction.findMany.mockResolvedValue([]);
     db.dailyCashClosing.findMany.mockResolvedValue([]);
 
     await expect(
@@ -124,6 +125,7 @@ describe('CashCollectionService validation and safety', () => {
     ]);
     db.expense.findMany.mockResolvedValue([]);
     db.customerPayment.findMany.mockResolvedValue([]);
+    db.financialAccount.findUnique.mockResolvedValue(null);
     db.dailyCashClosing.findMany.mockResolvedValue([
       { businessDate: '2026-10-07' },
     ]);
@@ -142,5 +144,21 @@ describe('CashCollectionService validation and safety', () => {
     expect(resClosed.isShiftClosed).toBe(true);
     expect(resClosed.unclosedDates).toEqual([]);
     expect(resClosed.unclosedReason).toBeNull();
+  });
+
+  it('checkStoreShiftStatus also requires a day with only a refund (or any other register move) to be closed', async () => {
+    const { checkStoreShiftStatus } = await import('./cash-collection.service');
+    db.sale.findMany.mockResolvedValue([{ createdAt: new Date('2026-10-07T12:00:00Z') }]);
+    db.expense.findMany.mockResolvedValue([]);
+    db.customerPayment.findMany.mockResolvedValue([]);
+    db.financialAccount.findUnique.mockResolvedValue({ id: 'fa-1' });
+    // A refund on the 9th moved the register; nothing else happened that day.
+    db.financialTransaction.findMany.mockResolvedValue([{ transactionDate: new Date('2026-10-09T10:00:00Z') }]);
+    db.dailyCashClosing.findMany.mockResolvedValue([{ businessDate: '2026-10-07' }]);
+
+    const res = await checkStoreShiftStatus(db as any, 'store-1', null);
+    expect(res.unclosedDates).toEqual(['2026-10-09']);
+    // Collections and admin corrections are not days.
+    expect(db.financialTransaction.findMany.mock.calls[0][0].where.sourceType).toEqual({ notIn: ['CASH_COLLECTION', 'CASH_COLLECTION_BONUS', 'STORE_ADJUSTMENT', 'STORE_MERGE'] });
   });
 });

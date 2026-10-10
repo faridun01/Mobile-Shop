@@ -260,6 +260,8 @@ model DailyCashClosing {
   salesCashTjs       Decimal  @db.Decimal(14, 2)
   salesCashUsd       Decimal  @db.Decimal(14, 2)
   salesCardTjs       Decimal  @db.Decimal(14, 2)
+  // Bank takings in USD; set on day-total closings (null on closings made before them).
+  salesCardUsd       Decimal? @db.Decimal(14, 2)
   expensesCashTjs    Decimal  @db.Decimal(14, 2)
   expensesCashUsd    Decimal  @db.Decimal(14, 2)
   refundsCashTjs     Decimal  @db.Decimal(14, 2)

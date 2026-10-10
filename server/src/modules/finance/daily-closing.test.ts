@@ -45,7 +45,6 @@ vi.mock('../../websocket/websocket.gateway', () => ({
 const db = prisma as any;
 
 function openDay({
-  prev = { actualCashTjs: 500, actualCashUsd: 50 },
   sales = [] as any[],
   refunds = [] as any[],
   exchanges = [] as any[],
@@ -53,10 +52,10 @@ function openDay({
   collections = [] as any[],
   customerPayments = [] as any[],
   ledger = [] as any[],
+  rate = 10,
 } = {}) {
   db.store.findUnique.mockResolvedValue({ id: 'store-1', name: 'Сиёма', isMainWarehouse: false, active: true });
   db.dailyCashClosing.findUnique.mockResolvedValue(null);
-  db.dailyCashClosing.findFirst.mockResolvedValue(prev && { ...prev, businessDate: '2026-10-05', createdAt: new Date('2026-10-05T15:00:00Z') });
   db.sale.findMany.mockResolvedValueOnce(sales).mockResolvedValueOnce(refunds);
   db.exchangeEvent.findMany.mockResolvedValue(exchanges);
   db.cashHandover.findMany.mockResolvedValue(collections);
@@ -65,7 +64,7 @@ function openDay({
   // Expenses are read from the register ledger (OUT rows); other moves come from the same table.
   const expenseRows = expenses.map((e: any) => ({ direction: 'OUT', amountTjs: e.amountTjs, amountUsd: e.amountUsd }));
   db.financialTransaction.findMany.mockImplementation(async ({ where }: any) => (where.sourceType === 'EXPENSE' ? expenseRows : ledger));
-  db.exchangeRate.findUnique.mockResolvedValue({ rate: 10 });
+  db.exchangeRate.findUnique.mockResolvedValue({ rate });
   db.dailyCashClosing.create.mockImplementation(({ data }: any) => ({ id: 'dc-1', ...data }));
 }
 
@@ -77,7 +76,7 @@ describe('DailyClosingService', () => {
     vi.mocked(resolveActor).mockResolvedValue({ id: 'u1', name: 'Alisher', role: 'SELLER' } as any);
   });
 
-  it('correctly calculates expected cash when day is open', async () => {
+  it('a day starts from 0 and totals cash and bank less the store expenses paid that day', async () => {
     openDay({
       sales: [{ id: 's1', cashAmountTjs: 1000, cardAmountTjs: 400, exchangeRate: 10, exchangeEvents: [] }],
       expenses: [{ id: 'e1', amountTjs: 100, amountUsd: 10 }],
@@ -86,52 +85,81 @@ describe('DailyClosingService', () => {
     const summary = await DailyClosingService.getSummary('store-1', '2026-10-06');
 
     expect(summary.alreadyClosed).toBe(false);
-    expect(summary.openingCashTjs).toBe('500');
-    expect(summary.openingCashUsd).toBe('50');
+    expect(summary.openingCashTjs).toBe('0');
+    expect(summary.openingCashUsd).toBe('0');
     expect(summary.salesCashTjs).toBe('1000');
     expect(summary.salesCashUsd).toBe('100');
     expect(summary.salesCardTjs).toBe('400');
+    expect(summary.salesCardUsd).toBe('40');
     expect(summary.expensesCashTjs).toBe('100');
-    // Expected TJS = 500 + 1000 - 100 = 1400; USD equivalent = 50 + 100 - 10 = 140
-    expect(summary.expectedCashTjs).toBe('1400');
-    expect(summary.expectedCashUsd).toBe('140');
+    // 1000 cash + 400 bank − 100 expense = 1300 TJS; $100 + $40 − $10 = $130
+    expect(summary.expectedCashTjs).toBe('1300');
+    expect(summary.expectedCashUsd).toBe('130');
   });
 
-  it('nets out a sale that was made and refunded on the same day', async () => {
-    const sale = { id: 's1', cashAmountTjs: 1000, cardAmountTjs: 0, actualRefundAmountTjs: 1000, exchangeRate: 10, exchangeEvents: [] };
-    openDay({ sales: [sale], refunds: [sale] });
+  it('splits a sale into cash and bank dollars that add up to what the register booked', async () => {
+    // 1000 TJS at 9.3: the register booked $107.53 for the whole receipt.
+    openDay({ sales: [{ id: 's1', cashAmountTjs: 333, cardAmountTjs: 667, exchangeRate: 9.3, exchangeEvents: [] }], rate: 9.3 });
 
     const summary = await DailyClosingService.getSummary('store-1', '2026-10-06');
 
-    // The refunded sale is still counted as cash in, so the refund does not push expected below the opening.
-    expect(db.sale.findMany.mock.calls[0][0].where.status).toBeUndefined();
-    expect(summary.expectedCashTjs).toBe('500');
+    expect(summary.salesCashUsd).toBe('35.81');
+    expect(summary.salesCardUsd).toBe('71.72');
+    expect(summary.expectedCashUsd).toBe('107.53');
   });
 
-  it('counts exchange cash on the day of the exchange, not on the original sale day', async () => {
+  it('nets out a sale that was made and refunded on the same day, keeping the penalty', async () => {
+    const sale = { id: 's1', cashAmountTjs: 1000, cardAmountTjs: 0, exchangeRate: 10, exchangeEvents: [] };
+    const refund = { id: 's1', actualRefundAmountTjs: 900, penaltyFeeTjs: 100, penaltyFeeUsd: 10 };
+    openDay({ sales: [sale], refunds: [refund] });
+
+    const summary = await DailyClosingService.getSummary('store-1', '2026-10-06');
+
+    // The refunded sale is still counted as money in that day; the refund takes its part back out.
+    expect(db.sale.findMany.mock.calls[0][0].where.status).toBeUndefined();
+    expect(summary.refundsCashUsd).toBe('90');
+    expect(summary.expectedCashTjs).toBe('100');
+    expect(summary.expectedCashUsd).toBe('10');
+  });
+
+  it('a refund hands back the somoni paid, booked in dollars at the refund day rate', async () => {
+    // Sold for 9200 TJS at 9.20 ($1000) on an earlier day; refunded today at 9.50 with a 100 TJS penalty.
+    openDay({ refunds: [{ id: 's1', actualRefundAmountTjs: 9100, penaltyFeeTjs: 100, penaltyFeeUsd: 10.53 }], rate: 9.5 });
+
+    const summary = await DailyClosingService.getSummary('store-1', '2026-10-06');
+
+    // 9200 TJS at 9.50 = $968.42, less the $10.53 penalty = $957.89 out of the register.
+    expect(summary.refundsCashTjs).toBe('9100');
+    expect(summary.refundsCashUsd).toBe('957.89');
+    expect(summary.expectedCashTjs).toBe('-9100');
+    expect(summary.expectedCashUsd).toBe('-957.89');
+  });
+
+  it('counts exchange settlements on the day of the exchange, in the dollars the register moved', async () => {
     openDay({
       // Sale made today, exchanged today with +200 cash: sale row already includes the 200.
       sales: [{ id: 's1', cashAmountTjs: 1200, cardAmountTjs: 0, exchangeRate: 10, exchangeEvents: [{ cashAmountTjs: 200, cardAmountTjs: 0, paymentMethod: 'CASH', differenceTjs: 200 }] }],
       // Today's exchange events: that one, plus a payout of 300 on an older sale.
       exchanges: [
-        { cashAmountTjs: 200, cardAmountTjs: 0, paymentMethod: 'CASH', differenceTjs: 200, exchangeRate: 10 },
-        { cashAmountTjs: -300, cardAmountTjs: 0, paymentMethod: 'CASH', differenceTjs: -300, exchangeRate: 10 },
+        { cashAmountTjs: 200, cardAmountTjs: 0, paymentMethod: 'CASH', differenceTjs: 200, newPriceUsd: 120, exchangeInValueUsd: 100 },
+        { cashAmountTjs: -300, cardAmountTjs: 0, paymentMethod: 'CASH', differenceTjs: -300, newPriceUsd: 50, exchangeInValueUsd: 80 },
       ],
     });
 
     const summary = await DailyClosingService.getSummary('store-1', '2026-10-06');
 
-    // 1000 at checkout + 200 surcharge - 300 payout
+    // 1000 at checkout + 200 surcharge − 300 payout; $100 + $20 − $30
     expect(summary.salesCashTjs).toBe('900');
-    expect(summary.expectedCashTjs).toBe('1400');
+    expect(summary.salesCashUsd).toBe('90');
+    expect(summary.expectedCashTjs).toBe('900');
   });
 
-  it('includes customer cash repayments and owner/supplier register moves', async () => {
+  it('includes customer debt repayments and other register moves', async () => {
     openDay({
       customerPayments: [{ amountTjs: 500, exchangeRate: 10 }],
       ledger: [
-        { destinationAccountId: null, direction: 'OUT', amountTjs: 1000, amountUsd: 100 }, // owner withdrawal
-        { destinationAccountId: null, direction: 'IN', amountTjs: 200, amountUsd: 20 }, // owner deposit
+        { destinationAccountId: null, direction: 'OUT', amountTjs: 1000, amountUsd: 100 }, // supplier payment
+        { destinationAccountId: null, direction: 'IN', amountTjs: 200, amountUsd: 20 },
       ],
     });
 
@@ -140,19 +168,25 @@ describe('DailyClosingService', () => {
     expect(summary.otherCashTjs).toBe('-300');
     expect(summary.otherCashUsd).toBe('-30');
     expect(summary.otherCount).toBe(3);
-    expect(summary.expectedCashTjs).toBe('200');
-  });
-
-  it('does not floor a negative expectation at zero', async () => {
-    openDay({ collections: [{ id: 'c1', amountTjs: 800, amountUsd: 80 }] });
-
-    const summary = await DailyClosingService.getSummary('store-1', '2026-10-06');
-
     expect(summary.expectedCashTjs).toBe('-300');
   });
 
+  it('a collection is not part of the day: it gathers the totals of closed days', async () => {
+    openDay({
+      sales: [{ id: 's1', cashAmountTjs: 500, cardAmountTjs: 1000, exchangeRate: 10, exchangeEvents: [] }],
+      collections: [{ id: 'c1', amountTjs: 1500, amountUsd: 150 }],
+    });
+
+    const summary = await DailyClosingService.getSummary('store-1', '2026-10-06');
+
+    expect(db.cashHandover.findMany).not.toHaveBeenCalled();
+    expect(summary.collectionsCashUsd).toBe('0');
+    expect(summary.expectedCashTjs).toBe('1500');
+    expect(summary.expectedCashUsd).toBe('150');
+  });
+
   it('values the discrepancy at the closing day rate instead of asking for a dollar count', async () => {
-    openDay({ prev: { actualCashTjs: 200, actualCashUsd: 20 } });
+    openDay({ sales: [{ id: 's1', cashAmountTjs: 200, cardAmountTjs: 0, exchangeRate: 10, exchangeEvents: [] }] });
 
     const result = await DailyClosingService.closeDay('u1', {
       storeId: 'store-1',
@@ -170,14 +204,15 @@ describe('DailyClosingService', () => {
     expect(db.$transaction).toHaveBeenCalled();
   });
 
-  it('confirms the day as calculated when no counted amount is sent', async () => {
-    openDay({ prev: { actualCashTjs: 200, actualCashUsd: 20 } });
+  it('confirms the day as calculated and stores the bank takings in dollars', async () => {
+    openDay({ sales: [{ id: 's1', cashAmountTjs: 200, cardAmountTjs: 300, exchangeRate: 10, exchangeEvents: [] }] });
 
     const result = await DailyClosingService.closeDay('u1', { storeId: 'store-1', businessDate: '2026-10-06' });
 
-    expect(result.actualCashTjs).toBe('200');
+    expect(result.actualCashTjs).toBe('500');
+    expect(result.actualCashUsd).toBe('50');
+    expect(result.salesCardUsd).toBe('30');
     expect(result.differenceTjs).toBe('0');
-    expect(result.actualCashUsd).toBe('20');
   });
 
   it('refuses to close without a rate for the business day', async () => {

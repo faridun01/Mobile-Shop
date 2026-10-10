@@ -5,7 +5,8 @@ import { lockCashRegister, lockCentralCashRegister, findBonusAccount, lockBonusA
 import { cancelTransaction, postTransaction } from './financial-transaction.service';
 import { getBusinessDateKey } from '../../common/business-date';
 import { resolveActor } from '../../common/actor';
-import { requireNonNegativeMoney } from '../../common/money';
+import { requireNonNegativeMoney, roundMoney } from '../../common/money';
+import { DailyClosingService } from './daily-closing.service';
 import { dateRangeForPeriod, dateRangeForCustomDates, type ReportPeriod } from '../reports/reports.service';
 import { cashBalanceFromLedger, loadCashLedger, registerLedgerBalance } from './cash-balance';
 import { notifyAdmins } from '../notifications/notification.service';
@@ -149,6 +150,25 @@ async function paymentBreakdown(db: Db, storeId: string, totalCashTjs: Money): P
  * must have a corresponding DailyCashClosing record (Z-отчёт). If there have been no
  * new transactions since the last collection, the current business date's shift must be closed.
  */
+// Register moves that are not part of any business day: collections gather closed days, and
+// adjustments/merges are admin corrections.
+const NON_DAY_SOURCES = ['CASH_COLLECTION', 'CASH_COLLECTION_BONUS', 'STORE_ADJUSTMENT', 'STORE_MERGE'];
+
+/** Business days on which the store register moved money (refunds, exchanges, expenses included). */
+async function registerActivityDates(db: Db | TransactionClient, storeId: string, cutoff: Date | null): Promise<string[]> {
+  const account = await db.financialAccount.findUnique({ where: { storeId }, select: { id: true } });
+  if (!account) return [];
+  const rows = await db.financialTransaction.findMany({
+    where: {
+      accountId: account.id,
+      sourceType: { notIn: NON_DAY_SOURCES },
+      ...(cutoff ? { transactionDate: { gt: cutoff } } : {}),
+    },
+    select: { transactionDate: true },
+  });
+  return [...new Set(rows.map((row: { transactionDate: Date }) => getBusinessDateKey(row.transactionDate)))];
+}
+
 export async function checkStoreShiftStatus(
   db: Db | TransactionClient,
   storeId: string,
@@ -156,11 +176,11 @@ export async function checkStoreShiftStatus(
 ): Promise<{ isShiftClosed: boolean; unclosedDates: string[]; unclosedReason: string | null }> {
   const businessDate = getBusinessDateKey(new Date());
 
-  const [sales, expenses, customerPayments] = await Promise.all([
+  const [sales, expenses, customerPayments, registerDays] = await Promise.all([
+    // A sale refunded later still moved money on the day it was made.
     db.sale.findMany({
       where: {
         storeId,
-        status: { not: 'REFUNDED' },
         ...(cutoff ? { createdAt: { gt: cutoff } } : {}),
       },
       select: { createdAt: true },
@@ -183,9 +203,10 @@ export async function checkStoreShiftStatus(
       },
       select: { createdAt: true },
     }),
+    registerActivityDates(db, storeId, cutoff),
   ]);
 
-  const activeDates = new Set<string>();
+  const activeDates = new Set<string>(registerDays);
   for (const s of sales) activeDates.add(getBusinessDateKey(s.createdAt));
   for (const e of expenses) activeDates.add(getBusinessDateKey(e.createdAt));
   for (const cp of customerPayments) activeDates.add(getBusinessDateKey(cp.createdAt));
@@ -326,6 +347,10 @@ export interface CashCollectionDailyItem {
   expensesCount: number;
   expensesTotalTjs: number;
   netCashTjs: number;
+  /** The day's own total (cash and bank, less refunds and store expenses): from its closing when
+   *  closed, otherwise calculated the same way the closing will be. */
+  dayTotalTjs: number;
+  dayTotalUsd: number;
   hasClosing: boolean;
   closing?: {
     id: string;
@@ -335,6 +360,7 @@ export interface CashCollectionDailyItem {
     openingCashTjs: number;
     expectedCashTjs: number;
     actualCashTjs: number;
+    actualCashUsd: number;
     differenceTjs: number;
     comment?: string | null;
   } | null;
@@ -384,6 +410,11 @@ export interface CashCollectionBreakdown {
     customerPaymentsTotalTjs: string;
     refundedCount: number;
     refundedTotalTjs: string;
+    /** Sum of the listed days' totals; equals the register when every move belongs to a day. */
+    daysTotalTjs: string;
+    daysTotalUsd: string;
+    /** Register balance not covered by the listed days (admin corrections, moves after a closing). */
+    otherUsd: string;
   };
   days: CashCollectionDailyItem[];
   sales: CashCollectionBreakdownSale[];
@@ -555,10 +586,33 @@ export class CashCollectionService {
     // a UTC date would put the first hours of a local day under the previous day.
     const saleDay = new Map(sales.map((s) => [s.id, getBusinessDateKey(s.createdAt)]));
     const expenseDay = new Map(expenses.map((e) => [e.id, getBusinessDateKey(e.createdAt)]));
-    const datesSet = new Set<string>([...saleDay.values(), ...expenseDay.values()]);
+    const datesSet = new Set<string>([...saleDay.values(), ...expenseDay.values(), ...await registerActivityDates(db, store.id, cutoff)]);
     for (const c of dailyClosings) {
       datesSet.add(c.businessDate);
     }
+
+    // Each day's total in TJS and USD: a closed day keeps the figures its closing froze; an open
+    // day is calculated exactly as its closing will be.
+    const dayTotals = new Map<string, { tjs: Money; usd: Money }>();
+    for (const dateStr of datesSet) {
+      const closing = closingMap.get(dateStr);
+      if (closing) {
+        // Closings made before the day-total rules kept cash only; their bank takings are added.
+        const legacy = closing.salesCardUsd === null;
+        const legacyCardUsd = legacy && closing.exchangeRate && D(closing.exchangeRate).gt(0)
+          ? roundMoney(D(closing.salesCardTjs).div(closing.exchangeRate))
+          : D(0);
+        dayTotals.set(dateStr, {
+          tjs: legacy ? D(closing.actualCashTjs).plus(closing.salesCardTjs) : D(closing.actualCashTjs),
+          usd: legacy ? D(closing.actualCashUsd).plus(legacyCardUsd) : D(closing.actualCashUsd),
+        });
+      } else if (!store.isMainWarehouse) {
+        const live = await DailyClosingService.getSummary(store.id, dateStr);
+        dayTotals.set(dateStr, { tjs: D(live.expectedCashTjs), usd: D(live.expectedCashUsd) });
+      }
+    }
+    const daysTotalTjs = roundMoney([...dayTotals.values()].reduce((acc, t) => acc.plus(t.tjs), D(0)));
+    const daysTotalUsd = roundMoney([...dayTotals.values()].reduce((acc, t) => acc.plus(t.usd), D(0)));
 
     const sortedDates = Array.from(datesSet).sort((a, b) => b.localeCompare(a));
     const todayStr = getBusinessDateKey(now);
@@ -600,6 +654,8 @@ export class CashCollectionService {
         expensesCount: dayExpenses.length,
         expensesTotalTjs: dayExpensesTotalTjs,
         netCashTjs,
+        dayTotalTjs: Number(dayTotals.get(dateStr)?.tjs ?? 0),
+        dayTotalUsd: Number(dayTotals.get(dateStr)?.usd ?? 0),
         hasClosing: !!closing,
         closing: closing
           ? {
@@ -610,6 +666,7 @@ export class CashCollectionService {
               openingCashTjs: Number(closing.openingCashTjs),
               expectedCashTjs: Number(closing.expectedCashTjs),
               actualCashTjs: Number(closing.actualCashTjs),
+              actualCashUsd: Number(closing.actualCashUsd),
               differenceTjs: Number(closing.differenceTjs),
               comment: closing.comment,
             }
@@ -667,6 +724,9 @@ export class CashCollectionService {
         customerPaymentsTotalTjs: customerPaymentsTotalTjs.toString(),
         refundedCount,
         refundedTotalTjs: refundedTjs.toString(),
+        daysTotalTjs: daysTotalTjs.toString(),
+        daysTotalUsd: daysTotalUsd.toString(),
+        otherUsd: roundMoney(D(balance.cashUsd).minus(daysTotalUsd)).toString(),
       },
       days,
       sales: mappedSales,

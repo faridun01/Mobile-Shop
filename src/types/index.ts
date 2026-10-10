@@ -200,6 +200,8 @@ export interface Sale {
   penaltyFeeTjs?: number;
   penaltyFeeUsd?: number;
   actualRefundAmountTjs?: number;
+  /** Dollars handed back on the refund, at the refund day's rate. */
+  actualRefundUsd?: number;
 }
 
 export interface TransferRequest {
@@ -342,6 +344,8 @@ export interface Expense {
   amountTjs: number;
   exchangeRate?: number;
   amountUsd?: number;
+  /** Registered minus paid dollars when an unpaid expense is paid later at another rate. */
+  paymentFxUsd?: number;
   targetType?: 'STORE' | 'BUSINESS';
   storeId?: string;
   storeName?: string;
@@ -565,6 +569,8 @@ export interface DailyCashClosing {
   salesCashTjs: number | string;
   salesCashUsd: number | string;
   salesCardTjs: number | string;
+  /** Bank takings in USD. Set on day-total closings (actual = cash + bank of that day); null on older ones. */
+  salesCardUsd?: number | string | null;
   expensesCashTjs: number | string;
   expensesCashUsd: number | string;
   refundsCashTjs: number | string;
@@ -601,6 +607,7 @@ export interface DailyClosingSummary {
   salesCashTjs: string;
   salesCashUsd: string;
   salesCardTjs: string;
+  salesCardUsd: string | null;
   salesCount: number;
   expensesCashTjs: string;
   expensesCashUsd: string;
@@ -614,7 +621,7 @@ export interface DailyClosingSummary {
   otherCashTjs: string;
   otherCashUsd: string;
   otherCount: number;
-  // USD figures are book equivalents of the TJS drawer, not a separate dollar drawer.
+  // The day's own total: cash and bank, plus debt repayments, less refunds and store expenses.
   expectedCashTjs: string;
   expectedCashUsd: string;
 }

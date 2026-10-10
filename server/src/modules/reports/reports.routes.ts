@@ -22,7 +22,9 @@ export function registerReportRoutes(app: Express) {
         res.status(400).json({ message: 'month обязателен для периода SPECIFIC_MONTH' });
         return;
       }
-      const summary = await computeReportsSummary({ period, month, startDate, endDate, storeId });
+      // events=1 adds the dated sale/exchange/refund rows behind the totals (the Excel export).
+      const includeEvents = req.query.events === '1' || req.query.events === 'true';
+      const summary = await computeReportsSummary({ period, month, startDate, endDate, storeId, includeEvents });
       res.json(summary);
     } catch (error) {
       next(error);

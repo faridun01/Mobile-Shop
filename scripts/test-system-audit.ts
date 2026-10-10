@@ -361,10 +361,10 @@ try {
   await step('возврат: телефон в STORE_STOCK, касса −сумма, чек REFUNDED', async () => {
     const before = await storeCash('store-siyoma');
     const saleItem = await db.saleItem.findFirstOrThrow({ where: { saleId: sales.below.id } });
-    ok(await call(partner, 'POST', `/sales/${sales.below.id}/refund`, { reason: 'Брак', refundAmountTjs: 100, penaltyFeeTjs: 0, paymentMethod: 'CASH' }));
+    ok(await call(partner, 'POST', `/sales/${sales.below.id}/refund`, { reason: 'Брак', refundAmountTjs: 90, penaltyFeeTjs: 10, paymentMethod: 'CASH' }));
     assert.equal((await db.sale.findUniqueOrThrow({ where: { id: sales.below.id } })).status, 'REFUNDED');
     assert.equal((await db.device.findUniqueOrThrow({ where: { id: saleItem.deviceId } })).status, 'STORE_STOCK');
-    assert.equal(money(before.minus(await storeCash('store-siyoma'))), money(D(100).div(RATE)));
+    assert.equal(money(before.minus(await storeCash('store-siyoma'))), money(D(100).div(RATE).toDecimalPlaces(2).minus(D(10).div(RATE).toDecimalPlaces(2))));
     await reconciled('store-siyoma');
   });
   await step('штраф больше оплаченной суммы отклоняется', async () => {
@@ -422,12 +422,24 @@ try {
     assert.equal(money(await storeCash('store-siyoma')), money(siyoma));
     await reconciled('main-warehouse');
   });
-  await step('партнёр: расход своего магазина создаётся неоплаченным, касса не меняется', async () => {
+  await step('партнёр: неоплаченный расход не трогает кассу, оплаченный списывается из кассы своего магазина', async () => {
     const before = await storeCash('store-siyoma');
-    const e = ok(await call(partner, 'POST', '/expenses', { category: 'SUPPLIES', amountTjs: 200, storeId: storeB.id, paidFromCashRegister: true }));
-    assert.equal(e.storeId, 'store-siyoma', 'partner expense is pinned to the partner store');
-    assert.equal(e.status, 'UNPAID');
+    const unpaid = ok(await call(partner, 'POST', '/expenses', { category: 'SUPPLIES', amountTjs: 200, storeId: storeB.id, paidFromCashRegister: false }));
+    assert.equal(unpaid.storeId, 'store-siyoma', 'partner expense is pinned to the partner store');
+    assert.equal(unpaid.status, 'UNPAID');
     assert.equal(money(await storeCash('store-siyoma')), money(before));
+
+    const paid = ok(await call(partner, 'POST', '/expenses', { category: 'SUPPLIES', amountTjs: 200, storeId: storeB.id, paidFromCashRegister: true }));
+    assert.equal(paid.storeId, 'store-siyoma');
+    assert.equal(paid.status, 'PAID');
+    assert.equal(money(before.minus(await storeCash('store-siyoma'))), money(D(200).div(RATE)));
+    await reconciled('store-siyoma');
+    // Cancelling the paid expense puts the money back into the same register.
+    ok(await call(partner, 'DELETE', `/expenses/${paid.id}`));
+    assert.equal(money(await storeCash('store-siyoma')), money(before));
+
+    const salary = await call(partner, 'POST', '/expenses', { category: 'SALARY', amountTjs: 100, paidFromCashRegister: true });
+    assert.equal(salary.status, 400, 'a partner cannot pay salaries from the store register');
   });
   await step('аванс, затем зарплата за месяц: аванс удерживается', async () => {
     const month = new Date().toISOString().slice(0, 7);
@@ -471,13 +483,16 @@ try {
   block = 'Блок 7: касса, закрытие дня, инкассация';
   await step('касса точки: выручка за день с разделением наличные/банк', async () => {
     const summary = ok(await call(seller, 'GET', '/daily-closings/summary'));
-    // cash: 9500 + 4000(split) + 1000(debt down) + 100(below, refunded same day) − 100 refund
+    // cash: 9500 + 4000(split) + 1000(debt down) + 100(below, refunded same day) − 90 refund (10 withheld)
     //       + exchanges 2000 − 2000 + customer payment 2000 − rent 950
     assert.equal(money(summary.salesCardTjs), '11000.00', 'card = 8000 + 3000');
     assert.equal(money(summary.salesCashTjs), '14600.00', 'cash sales incl. exchanges');
     assert.equal(money(summary.otherCashTjs), '2000.00', 'customer debt repayment');
     assert.equal(money(summary.expensesCashTjs), '950.00', 'only expenses paid from this register');
-    assert.equal(money(summary.refundsCashTjs), '100.00');
+    assert.equal(money(summary.refundsCashTjs), '90.00', 'the customer got back 100 TJS less the 10 TJS penalty');
+    // A day starts from 0 and its total is cash and bank together.
+    assert.equal(money(summary.openingCashTjs), '0.00');
+    assert.equal(money(summary.expectedCashTjs), money(D(summary.salesCashTjs).plus(summary.salesCardTjs).plus(summary.otherCashTjs).minus(summary.refundsCashTjs).minus(summary.expensesCashTjs)));
   });
   await step('закрытие смены продавцом — подтверждение факта: наличные и банк в отчёте', async () => {
     const summary = ok(await call(seller, 'GET', '/daily-closings/summary'));
@@ -507,7 +522,7 @@ try {
     const shares = ok(await call(admin, 'GET', '/store-profit-shares')) as any[];
     assert(shares.some((s) => s.storeId === 'store-siyoma' && s.ownerId === 'owner-partner' && Number(s.sharePercent) === 40));
   });
-  await step('ввод и частичный вывод капитала партнёром (своя касса или Центральная)', async () => {
+  await step('ввод и частичный вывод капитала партнёром (только через Центральную кассу)', async () => {
     const owner = () => db.owner.findUniqueOrThrow({ where: { id: 'owner-partner' } });
     const before = D((await owner()).capitalBalanceUsd);
     ok(await call(partner, 'POST', '/owners/owner-partner/investment', { amountUsd: 1000 }));

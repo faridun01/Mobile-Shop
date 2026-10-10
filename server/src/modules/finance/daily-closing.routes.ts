@@ -33,11 +33,7 @@ export function registerDailyClosingRoutes(app: Express) {
       }
 
       const businessDate = typeof req.query.businessDate === 'string' ? req.query.businessDate : undefined;
-      const initialOpeningTjs = typeof req.query.initialOpeningTjs === 'string' ? req.query.initialOpeningTjs : undefined;
-
-      const summary = await DailyClosingService.getSummary(storeId, businessDate, {
-        tjs: initialOpeningTjs,
-      });
+      const summary = await DailyClosingService.getSummary(storeId, businessDate);
 
       res.json(summary);
     } catch (error) {
@@ -77,7 +73,6 @@ export function registerDailyClosingRoutes(app: Express) {
         businessDate: req.body?.businessDate,
         actualCashTjs: req.body?.actualCashTjs,
         comment: req.body?.comment,
-        initialOpeningCashTjs: req.body?.initialOpeningCashTjs,
       });
 
       res.status(201).json(closing);

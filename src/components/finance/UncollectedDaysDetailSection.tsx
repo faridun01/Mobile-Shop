@@ -118,8 +118,10 @@ export const UncollectedDaysDetailSection: React.FC<UncollectedDaysDetailSection
           {/* Days list: Purely date and amount */}
           {daysList.length > 0 ? (
             daysList.map((day: BreakdownDailyItem) => {
-              const isNegative = day.netCashTjs < 0;
-              const isPositive = day.netCashTjs > 0;
+              const dayUsd = day.dayTotalUsd ?? 0;
+              const dayTjs = day.dayTotalTjs ?? 0;
+              const isNegative = dayUsd < 0;
+              const isPositive = dayUsd > 0;
 
               return (
                 <div
@@ -180,34 +182,23 @@ export const UncollectedDaysDetailSection: React.FC<UncollectedDaysDetailSection
                     </div>
                   </div>
 
-                  {/* Right: Amount */}
-                  {(() => {
-                    const totalStoreTjs = Number(store.cashTjs) || 0;
-                    const totalStoreUsd = Number(store.cashUsd) || 0;
-                    const storeRate = totalStoreTjs > 0 ? totalStoreUsd / totalStoreTjs : 0;
-                    const dayUsd = day.netCashTjs * storeRate;
-
-                    return (
-                      <div className="text-right tabular-nums shrink-0">
-                        <span
-                          className={`text-sm sm:text-base font-bold font-mono block ${
-                            isNegative
-                              ? 'text-rose-600 dark:text-rose-400'
-                              : isPositive
-                              ? 'text-emerald-600 dark:text-emerald-400'
-                              : 'text-fg-subtle'
-                          }`}
-                        >
-                          {storeRate > 0 ? formatDayUsd(dayUsd) : formatDayAmount(day.netCashTjs)}
-                        </span>
-                        {storeRate > 0 && (
-                          <span className="text-[11px] text-fg-subtle block">
-                            ≈ {formatDayAmount(day.netCashTjs)}
-                          </span>
-                        )}
-                      </div>
-                    );
-                  })()}
+                  {/* Right: the day's total, in the dollars the register booked */}
+                  <div className="text-right tabular-nums shrink-0">
+                    <span
+                      className={`text-sm sm:text-base font-bold font-mono block ${
+                        isNegative
+                          ? 'text-rose-600 dark:text-rose-400'
+                          : isPositive
+                          ? 'text-emerald-600 dark:text-emerald-400'
+                          : 'text-fg-subtle'
+                      }`}
+                    >
+                      {formatDayUsd(dayUsd)}
+                    </span>
+                    <span className="text-[11px] text-fg-subtle block">
+                      {formatDayAmount(dayTjs)}
+                    </span>
+                  </div>
                 </div>
               );
             })
@@ -252,6 +243,22 @@ export const UncollectedDaysDetailSection: React.FC<UncollectedDaysDetailSection
               >
                 Посмотреть кассу
               </Button>
+            </div>
+          )}
+
+          {daysList.length > 1 && data?.summary?.daysTotalUsd !== undefined && (
+            <div className="px-3.5 py-2 rounded-xl border border-border bg-surface flex items-center justify-between gap-3 text-xs">
+              <span className="font-semibold text-fg-subtle">Итого по дням ({daysList.length})</span>
+              <span className="font-mono font-bold text-fg tabular-nums">
+                {formatUsd(data.summary.daysTotalUsd)}
+                <span className="font-normal text-fg-subtle ml-1.5">{formatTjs(data.summary.daysTotalTjs ?? 0)}</span>
+              </span>
+            </div>
+          )}
+          {data?.summary?.otherUsd !== undefined && Math.abs(Number(data.summary.otherUsd)) >= 0.01 && (
+            <div className="px-3.5 py-2 rounded-xl border border-amber-500/25 bg-amber-500/10 text-amber-700 dark:text-amber-300 flex items-center justify-between gap-3 text-xs">
+              <span>Не вошло в смены (корректировки кассы)</span>
+              <span className="font-mono font-bold tabular-nums">{formatDayUsd(Number(data.summary.otherUsd))}</span>
             </div>
           )}
 

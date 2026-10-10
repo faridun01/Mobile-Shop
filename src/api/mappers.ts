@@ -120,6 +120,7 @@ export function mapSale(s: any, names: NameLookup): Sale {
     penaltyFeeTjs: s.penaltyFeeTjs ?? undefined,
     penaltyFeeUsd: s.penaltyFeeUsd ?? undefined,
     actualRefundAmountTjs: s.actualRefundAmountTjs ?? undefined,
+    actualRefundUsd: s.actualRefundUsd ?? undefined,
   };
 }
 
@@ -272,6 +273,7 @@ export function mapExpense(e: any, names: NameLookup): Expense {
     amountTjs: e.amountTjs,
     exchangeRate: e.exchangeRate ?? undefined,
     amountUsd: e.amountUsd ?? undefined,
+    paymentFxUsd: e.paymentFxUsd ?? undefined,
     targetType: e.targetType,
     storeId: e.storeId ?? undefined,
     storeName: e.store?.name ?? undefined,

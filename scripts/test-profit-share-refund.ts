@@ -252,18 +252,19 @@ try {
   assert.equal(await siyomaAccount(), await siyomaCash());
   console.log('PASS: 2000 TJS cash sale at 10 adds exactly $200 to the USD register and its ledger account');
 
-  // Refund at a later rate: 2000 TJS at 11 costs $181.82 of the register; the $18.18 difference
-  // to the $200 booked is an exchange-rate gain for the owners (50/50), reported in the period.
+  // Refund at a later rate: the customer gets back the same 2000 TJS, which at 11 costs $181.82 of
+  // the register. The report reverses those $181.82 on the refund day; the $18.18 left over from
+  // the $200 booked stays with the owners (50/50).
   const reportsModule = await import('../server/src/modules/reports/reports.service');
-  const fxBefore = D((await reportsModule.computeReportsSummary({ period: 'MONTH' })).periodRefundFxUsd);
+  const refundsBefore = D((await reportsModule.computeReportsSummary({ period: 'MONTH' })).refundsRevenueUsd);
   await setTodayRate(11, 'user-admin');
   const cashBeforeFxRefund = await siyomaCash();
   assert.deepEqual(await change(() => refund(usdSale.sale.id)), [{ accrued: -40.91, available: -40.91 }, { accrued: -40.91, available: -40.91 }]);
   assert.equal((await siyomaCash()).minus(cashBeforeFxRefund), -181.82);
   assert.equal(await siyomaAccount(), await siyomaCash());
-  assert.equal(D((await reportsModule.computeReportsSummary({ period: 'MONTH' })).periodRefundFxUsd).minus(fxBefore), 18.18);
+  assert.equal(D((await reportsModule.computeReportsSummary({ period: 'MONTH' })).refundsRevenueUsd).minus(refundsBefore), 181.82);
   await setTodayRate(10, 'user-admin');
-  console.log('PASS: refund at 11 pays out $181.82; $18.18 FX gain booked to owners and the report');
+  console.log('PASS: refund at 11 pays out $181.82 and the report reverses exactly that; owners keep the $18.18');
 
   // Expenses leave the register in USD at the day's rate: 105 TJS at 10 = $10.50.
   const { createExpenseStandalone } = await import('../server/src/modules/expenses/expenses.service');

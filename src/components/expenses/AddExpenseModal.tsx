@@ -33,11 +33,15 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
   paidFromCashRegister,
   setPaidFromCashRegister,
   isAdmin,
+  isPartner,
   rate,
   centralCashStore,
   onSubmit,
 }) => {
-  const isInsufficientFunds = isAdmin && paidFromCashRegister && (parseFloat(amountTjs) || 0) / rate > (centralCashStore?.cashBalanceUsd ?? 0);
+  // The admin pays from Central Cash; a partner pays from their own store's register.
+  const payingStore = isAdmin ? centralCashStore : retailStores.find((s) => s.id === storeId) ?? null;
+  const canPay = isAdmin || isPartner;
+  const isInsufficientFunds = canPay && paidFromCashRegister && rate > 0 && (parseFloat(amountTjs) || 0) / rate > (payingStore?.cashBalanceUsd ?? 0);
 
   return (
     <Dialog
@@ -59,7 +63,7 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
             loading={isSubmitting}
             disabled={isInsufficientFunds}
           >
-            {isAdmin && paidFromCashRegister ? 'Сохранить расход' : 'Зафиксировать расход (долг)'}
+            {canPay && paidFromCashRegister ? 'Сохранить расход' : 'Зафиксировать расход (долг)'}
           </Button>
         </>
       }
@@ -151,8 +155,8 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
           />
         </FormField>
 
-        {/* Unified Central Cash Card & Payment Status */}
-        {isAdmin ? (
+        {/* Payment status: Central Cash for the admin, the store's own register for a partner */}
+        {canPay ? (
           <div className={cn(
             "rounded-xl border p-2.5 transition-all select-none",
             paidFromCashRegister
@@ -171,15 +175,15 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
                 </div>
                 <div className="min-w-0">
                   <div className="flex items-center gap-1.5 flex-wrap">
-                    <span className="text-xs font-bold text-fg">Списать из Центральной кассы</span>
+                    <span className="text-xs font-bold text-fg">{isAdmin ? 'Списать из Центральной кассы' : 'Оплачено из кассы магазина'}</span>
                     <Badge tone={paidFromCashRegister ? "success" : "warning"} className="!text-[10px] !px-1.5 !py-0">
                       {paidFromCashRegister ? "Оплачено" : "Долг"}
                     </Badge>
                   </div>
                   <p className="text-[11px] text-fg-subtle truncate">
                     {paidFromCashRegister
-                      ? `Остаток в кассе: $${formatMoney(centralCashStore?.cashBalanceUsd)}`
-                      : "Расход зафиксируется как долг компании"}
+                      ? `Остаток в кассе: $${formatMoney(payingStore?.cashBalanceUsd)}`
+                      : "Расход зафиксируется как долг (оплатит администратор)"}
                   </p>
                 </div>
               </div>
@@ -207,7 +211,7 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
             {isInsufficientFunds && (
               <div className="mt-2 p-2 rounded-lg bg-danger/10 border border-danger/30 text-[11px] text-danger font-medium flex items-center gap-1.5">
                 <AlertCircle className="w-3.5 h-3.5 shrink-0" />
-                <span>Недостаточно средств (остаток ${formatMoney(centralCashStore?.cashBalanceUsd)}, требуется ≈$${formatMoney((parseFloat(amountTjs) || 0) / rate)} = {formatMoney(parseFloat(amountTjs) || 0)} TJS)</span>
+                <span>Недостаточно средств (остаток ${formatMoney(payingStore?.cashBalanceUsd)}, требуется ≈$${formatMoney((parseFloat(amountTjs) || 0) / rate)} = {formatMoney(parseFloat(amountTjs) || 0)} TJS)</span>
               </div>
             )}
           </div>

@@ -91,6 +91,9 @@ export interface BreakdownDailyItem {
   expensesCount: number;
   expensesTotalTjs: number;
   netCashTjs: number;
+  /** The day's own total (cash and bank, less refunds and store expenses), exact in USD. */
+  dayTotalTjs?: number;
+  dayTotalUsd?: number;
   hasClosing: boolean;
   closing?: {
     id: string;
@@ -100,6 +103,7 @@ export interface BreakdownDailyItem {
     openingCashTjs: number;
     expectedCashTjs: number;
     actualCashTjs: number;
+    actualCashUsd?: number;
     differenceTjs: number;
     comment?: string | null;
   } | null;
@@ -149,6 +153,10 @@ export interface StoreBreakdown {
     customerPaymentsTotalTjs?: string;
     refundedCount: number;
     refundedTotalTjs: string;
+    daysTotalTjs?: string;
+    daysTotalUsd?: string;
+    /** Register balance not covered by the listed days. */
+    otherUsd?: string;
   };
   days?: BreakdownDailyItem[];
   sales: BreakdownSale[];
