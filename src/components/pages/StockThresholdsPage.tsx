@@ -335,11 +335,6 @@ export const StockThresholdsPage: React.FC = () => {
             </div>
             <div>
               <h1 className="text-lg sm:text-xl font-black text-fg tracking-tight">Минимальные остатки</h1>
-              <p className="text-xs text-fg-subtle">
-                {isAdmin
-                  ? 'Минимум задаётся отдельно для главного склада (Центральная касса) и для каждого магазина'
-                  : 'Минимальный запас товаров вашего магазина'}
-              </p>
             </div>
           </div>
         </div>
@@ -726,7 +721,6 @@ export const StockThresholdsPage: React.FC = () => {
         onClose={() => setIsAddOpen(false)}
         storeId={selectedStoreId}
         storeName={currentStore?.isMainWarehouse ? 'Главный склад' : currentStore?.name || 'Магазин'}
-        devices={devices}
         onSaved={fetchThresholds}
       />
     </div>
