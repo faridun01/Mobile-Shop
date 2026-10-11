@@ -7,6 +7,25 @@ export interface CatalogPhone {
   /** Last RAM / storage chosen for this model: a suggestion, they vary per phone. */
   ram?: string | null;
   storage?: string | null;
+  color?: string | null;
+  lastPurchasePriceUsd?: number | null;
+}
+
+export interface CatalogSpecsModel {
+  brand: string;
+  model: string;
+  rams: string[];
+  storages: string[];
+  colors: string[];
+  lastPrice?: number | null;
+}
+
+export interface CatalogSpecs {
+  brands: string[];
+  models: CatalogSpecsModel[];
+  rams: string[];
+  storages: string[];
+  colors: string[];
 }
 
 export function imeiTac(imei: string): string | null {
@@ -24,7 +43,18 @@ export function lookupPhoneByImei(imei: string): Promise<CatalogPhone | null> {
   let lookup = lookups.get(tac);
   if (!lookup) {
     lookup = apiClient<{ found: boolean } & Partial<CatalogPhone>>(`/phone-catalog/${tac}`)
-      .then((r) => (r.found && r.brand && r.model ? { brand: r.brand, model: r.model, ram: r.ram, storage: r.storage } : null))
+      .then((r) =>
+        r.found && r.brand && r.model
+          ? {
+              brand: r.brand,
+              model: r.model,
+              ram: r.ram ?? null,
+              storage: r.storage ?? null,
+              color: r.color ?? null,
+              lastPurchasePriceUsd: r.lastPurchasePriceUsd ?? null,
+            }
+          : null
+      )
       .catch(() => {
         lookups.delete(tac);
         return null;
@@ -32,6 +62,15 @@ export function lookupPhoneByImei(imei: string): Promise<CatalogPhone | null> {
     lookups.set(tac, lookup);
   }
   return lookup;
+}
+
+/** Fetches full catalog of brands, models, and specs from the database. */
+export async function fetchCatalogSpecs(): Promise<CatalogSpecs | null> {
+  try {
+    return await apiClient<CatalogSpecs>('/phone-catalog/specs');
+  } catch {
+    return null;
+  }
 }
 
 /** After a receipt the catalog has learned new models; forget cached "not found" answers. */
@@ -45,3 +84,4 @@ const sameName = (a: string, b: string) => a.trim().toLowerCase() === b.trim().t
 export function matchesCatalog(phone: CatalogPhone, brand: string, model: string): boolean {
   return sameName(phone.brand, brand) && sameName(phone.model, model);
 }
+

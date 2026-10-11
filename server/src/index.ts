@@ -38,6 +38,7 @@ app.get('*', (_req, res) => {
 });
 
 import { StockRevisionService } from './modules/revisions/revisions.service';
+import { backfillCatalogFromDevices } from './modules/phone-catalog/phone-catalog.service';
 
 const server = app.listen(port, '0.0.0.0', () => {
   console.log(`Mobile Shop API listening on port ${port}`);
@@ -46,6 +47,9 @@ const server = app.listen(port, '0.0.0.0', () => {
 RealtimeSyncGateway.init(server);
 void StockRevisionService.ensureTable().catch((err) => {
   console.warn('[Startup] StockRevisionService.ensureTable non-fatal error:', err);
+});
+void backfillCatalogFromDevices().catch((err) => {
+  console.warn('[Startup] backfillCatalogFromDevices non-fatal error:', err);
 });
 
 // Stop accepting connections, close realtime sockets (they would otherwise keep server.close

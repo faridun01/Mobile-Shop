@@ -7,7 +7,7 @@ import { soundEffects } from '../../utils/sound';
 import { getBusinessDateKey } from '../../utils/businessDate';
 import { useUnfinishedWork } from '../../utils/pwaUpdateSafety';
 import { DEFAULT_PHONE_COLORS_EN, normalizePhoneColor, formatRam, formatStorage } from '../../utils/phoneSpecs';
-import { lookupPhoneByImei, clearPhoneCatalogCache, matchesCatalog } from '../../services/phoneCatalog';
+import { lookupPhoneByImei, clearPhoneCatalogCache, matchesCatalog, fetchCatalogSpecs, type CatalogSpecs } from '../../services/phoneCatalog';
 
 import {
   PurchaseItemGroup,
@@ -157,59 +157,98 @@ export const PurchasePage: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [justSavedInvoice, setJustSavedInvoice] = useState<string | null>(null);
 
-  // Autocomplete suggestion lists derived from database devices and standard presets
+  // Full catalog of brands, models, and specs stored in database (all historical & current stock)
+  const [catalogSpecs, setCatalogSpecs] = useState<CatalogSpecs | null>(null);
+
+  const loadSpecs = useCallback(async () => {
+    const specs = await fetchCatalogSpecs();
+    if (specs) setCatalogSpecs(specs);
+  }, []);
+
+  useEffect(() => {
+    void loadSpecs();
+  }, [loadSpecs, dataRefreshRevision]);
+
+  // Autocomplete suggestion lists derived from database devices, phone catalog, and standard presets
   const brandOptions = useMemo(() => {
-    const set = new Set<string>(['Apple', 'Samsung', 'Xiaomi', 'Google', 'OnePlus', 'Honor', 'Realme', 'Huawei', 'Nothing']);
+    const set = new Set<string>(['Apple', 'Samsung', 'Xiaomi', 'Honor', 'Huawei', 'Realme', 'Tecno', 'Infinix', 'OnePlus', 'Google', 'Novey', 'itel', 'Nothing']);
+    (catalogSpecs?.brands || []).forEach((b) => {
+      if (b.trim()) set.add(b.trim());
+    });
     (devices || []).forEach((d) => {
       if (d.brand) set.add(d.brand.trim());
     });
-    return Array.from(set).sort();
-  }, [devices]);
+    return Array.from(set).sort((a, b) => a.localeCompare(b, 'ru', { sensitivity: 'base' }));
+  }, [catalogSpecs?.brands, devices]);
 
   const getModelOptions = useCallback(
     (selectedBrand: string) => {
       const set = new Set<string>();
       const brandLower = (selectedBrand || '').trim().toLowerCase();
+      // Models from database catalog
+      (catalogSpecs?.models || []).forEach((m) => {
+        if (m.model && (!brandLower || (m.brand && m.brand.toLowerCase() === brandLower))) {
+          set.add(m.model.trim());
+        }
+      });
+      // Models from active devices
       (devices || []).forEach((d) => {
         if (d.model && (!brandLower || (d.brand && d.brand.toLowerCase() === brandLower))) {
           set.add(d.model.trim());
         }
       });
-      return Array.from(set).sort();
+      return Array.from(set).sort((a, b) => a.localeCompare(b, 'ru', { sensitivity: 'base' }));
     },
-    [devices]
+    [catalogSpecs?.models, devices]
   );
 
   const ramOptions = useMemo(() => {
     const set = new Set<string>(['4 GB', '6 GB', '8 GB', '12 GB', '16 GB', '24 GB']);
+    (catalogSpecs?.rams || []).forEach((r) => {
+      const formatted = formatRam(r);
+      if (formatted) set.add(formatted);
+    });
     (devices || []).forEach((d) => {
       const formatted = formatRam(d.ram);
       if (formatted) set.add(formatted);
     });
-    return Array.from(set).sort();
-  }, [devices]);
+    return Array.from(set).sort((a, b) => {
+      const numA = parseInt(a, 10) || 0;
+      const numB = parseInt(b, 10) || 0;
+      return numA - numB;
+    });
+  }, [catalogSpecs?.rams, devices]);
 
   const storageOptions = useMemo(() => {
-    const set = new Set<string>(['64 GB', '128 GB', '256 GB', '512 GB', '1 TB']);
+    const set = new Set<string>(['32 GB', '64 GB', '128 GB', '256 GB', '512 GB', '1 TB']);
+    (catalogSpecs?.storages || []).forEach((s) => {
+      const formatted = formatStorage(s);
+      if (formatted) set.add(formatted);
+    });
     (devices || []).forEach((d) => {
       const formatted = formatStorage(d.storage);
       if (formatted) set.add(formatted);
     });
-    return Array.from(set).sort();
-  }, [devices]);
+    const order: Record<string, number> = { '32 GB': 32, '64 GB': 64, '128 GB': 128, '256 GB': 256, '512 GB': 512, '1 TB': 1024, '2 TB': 2048 };
+    return Array.from(set).sort((a, b) => (order[a] ?? 9999) - (order[b] ?? 9999));
+  }, [catalogSpecs?.storages, devices]);
 
   const colorOptions = useMemo(() => {
     const set = new Set<string>(DEFAULT_PHONE_COLORS_EN);
+    (catalogSpecs?.colors || []).forEach((c) => {
+      const translated = normalizePhoneColor(c);
+      if (translated) set.add(translated);
+      else if (c.trim()) set.add(c.trim());
+    });
     (devices || []).forEach((d) => {
       if (d.color) {
         const translated = normalizePhoneColor(d.color);
-        if (translated) {
-          set.add(translated);
-        }
+        if (translated) set.add(translated);
+        else if (d.color.trim()) set.add(d.color.trim());
       }
     });
     return Array.from(set);
-  }, [devices]);
+  }, [catalogSpecs?.colors, devices]);
 
   // Filtered list of purchase invoices
   const filteredInvoices = useMemo(() => {
@@ -390,7 +429,38 @@ export const PurchasePage: React.FC = () => {
   const handleUpdateGroup = (idx: number, field: keyof Omit<PurchaseItemGroup, 'items'>, value: any) => {
     setGroups((prev) => {
       const next = [...prev];
-      next[idx] = { ...next[idx], [field]: value };
+      const current = { ...next[idx], [field]: value };
+
+      // When user selects or types a model, autofill RAM, storage, color, and price from known database specs
+      if (field === 'model' && typeof value === 'string' && value.trim()) {
+        const modelTrim = value.trim().toLowerCase();
+        const matchedCatalog = (catalogSpecs?.models || []).find(
+          (m) => m.model.toLowerCase() === modelTrim && (!current.brand.trim() || m.brand.toLowerCase() === current.brand.trim().toLowerCase())
+        );
+        const matchedDevice = (devices || []).find(
+          (d) => d.model.toLowerCase() === modelTrim && (!current.brand.trim() || d.brand.toLowerCase() === current.brand.trim().toLowerCase())
+        );
+
+        if (matchedCatalog) {
+          if (!current.brand.trim()) current.brand = matchedCatalog.brand;
+          if (!current.ram.trim() && matchedCatalog.rams.length > 0) current.ram = formatRam(matchedCatalog.rams[0]) || matchedCatalog.rams[0];
+          if (!current.storage.trim() && matchedCatalog.storages.length > 0) current.storage = formatStorage(matchedCatalog.storages[0]) || matchedCatalog.storages[0];
+          if (!current.color.trim() && matchedCatalog.colors.length > 0) current.color = matchedCatalog.colors[0];
+          if ((!current.purchasePriceUsd || current.purchasePriceUsd === 0) && matchedCatalog.lastPrice) {
+            current.purchasePriceUsd = matchedCatalog.lastPrice;
+          }
+        } else if (matchedDevice) {
+          if (!current.brand.trim()) current.brand = matchedDevice.brand;
+          if (!current.ram.trim() && matchedDevice.ram) current.ram = formatRam(matchedDevice.ram) || matchedDevice.ram;
+          if (!current.storage.trim() && matchedDevice.storage) current.storage = formatStorage(matchedDevice.storage) || matchedDevice.storage;
+          if (!current.color.trim() && matchedDevice.color) current.color = matchedDevice.color;
+          if ((!current.purchasePriceUsd || current.purchasePriceUsd === 0) && matchedDevice.costBasisUsd) {
+            current.purchasePriceUsd = Number(matchedDevice.costBasisUsd);
+          }
+        }
+      }
+
+      next[idx] = current;
       return next;
     });
   };
@@ -453,14 +523,24 @@ export const PurchasePage: React.FC = () => {
   };
 
   // IMEI autofill: the phone catalog knows the model behind an IMEI's first 8 digits. An empty
-  // position takes brand, model and the last RAM/storage chosen for that model; a filled one is
-  // only checked, so a phone of another model in the position is caught before saving. A model
-  // the catalog doesn't know yet is entered by hand and remembered when the receipt is saved.
+  // position takes brand, model, RAM, storage, color, and price; a filled one fills missing fields
+  // and validates the model matches.
   const fillGroupFromImei = useCallback(async (groupIdx: number, imei: string) => {
     const phone = await lookupPhoneByImei(imei);
     const group = groupsRef.current[groupIdx];
     if (!phone || !group) return;
     const sameBrand = !group.brand.trim() || group.brand.trim().toLowerCase() === phone.brand.toLowerCase();
+
+    // Look up model in catalogSpecs to get any additional specs
+    const foundInCatalog = (catalogSpecs?.models || []).find(
+      (m) => m.model.toLowerCase() === phone.model.toLowerCase() && m.brand.toLowerCase() === phone.brand.toLowerCase()
+    );
+
+    const suggestedRam = phone.ram ? (formatRam(phone.ram) || phone.ram) : (foundInCatalog?.rams?.[0] ? (formatRam(foundInCatalog.rams[0]) || foundInCatalog.rams[0]) : '');
+    const suggestedStorage = phone.storage ? (formatStorage(phone.storage) || phone.storage) : (foundInCatalog?.storages?.[0] ? (formatStorage(foundInCatalog.storages[0]) || foundInCatalog.storages[0]) : '');
+    const suggestedColor = phone.color || foundInCatalog?.colors?.[0] || '';
+    const suggestedPrice = (phone.lastPurchasePriceUsd && phone.lastPurchasePriceUsd > 0) ? phone.lastPurchasePriceUsd : (foundInCatalog?.lastPrice || 0);
+
     if (!group.model.trim() && sameBrand) {
       setGroups((prev) => {
         const next = [...prev];
@@ -470,14 +550,38 @@ export const PurchasePage: React.FC = () => {
           ...current,
           brand: current.brand.trim() || phone.brand,
           model: phone.model,
-          ram: current.ram.trim() || phone.ram || '',
-          storage: current.storage.trim() || phone.storage || '',
+          ram: current.ram.trim() || suggestedRam,
+          storage: current.storage.trim() || suggestedStorage,
+          color: current.color.trim() || suggestedColor,
+          purchasePriceUsd: (current.purchasePriceUsd && current.purchasePriceUsd > 0) ? current.purchasePriceUsd : suggestedPrice,
         };
         return next;
       });
-      setStatusMessage({ type: 'success', text: `Модель определена по IMEI: ${phone.brand} ${phone.model}` });
+      setStatusMessage({
+        type: 'success',
+        text: `Модель определена по IMEI: ${phone.brand} ${phone.model}${suggestedStorage ? ` (${suggestedStorage})` : ''}`,
+      });
       return;
     }
+
+    // Model was already set and matches: autofill remaining blank fields
+    if (sameBrand && group.model.trim().toLowerCase() === phone.model.toLowerCase()) {
+      setGroups((prev) => {
+        const next = [...prev];
+        const current = next[groupIdx];
+        if (!current) return prev;
+        next[groupIdx] = {
+          ...current,
+          ram: current.ram.trim() || suggestedRam,
+          storage: current.storage.trim() || suggestedStorage,
+          color: current.color.trim() || suggestedColor,
+          purchasePriceUsd: (current.purchasePriceUsd && current.purchasePriceUsd > 0) ? current.purchasePriceUsd : suggestedPrice,
+        };
+        return next;
+      });
+      return;
+    }
+
     if (!matchesCatalog(phone, group.brand || phone.brand, group.model || phone.model)) {
       setStatusMessage({
         type: 'error',
@@ -485,7 +589,7 @@ export const PurchasePage: React.FC = () => {
       });
       soundEffects.playError();
     }
-  }, []);
+  }, [catalogSpecs?.models]);
 
   const handleUpdateImei = (groupIdx: number, itemIdx: number, val: string) => {
     setGroups((prev) => {
@@ -791,6 +895,7 @@ export const PurchasePage: React.FC = () => {
         setJustSavedInvoice(savedNum);
         // The receipt taught the catalog its models: no cached "not found" may hide them.
         clearPhoneCatalogCache();
+        void loadSpecs();
 
         setGroups([
           {

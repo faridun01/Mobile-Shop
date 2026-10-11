@@ -77,3 +77,36 @@ describe('rememberPhones', () => {
     expect(db.phoneCatalog.upsert).not.toHaveBeenCalled();
   });
 });
+
+describe('findPhoneByImei', () => {
+  it('falls back to Device table if not found in PhoneCatalog', async () => {
+    const { findPhoneByImei } = await import('./phone-catalog.service');
+    const { prisma } = await import('../../prisma/prisma.service');
+    (prisma as any).phoneCatalog = {
+      findUnique: vi.fn().mockResolvedValue(null),
+      create: vi.fn().mockResolvedValue({ tac: '35982437' }),
+    };
+    (prisma as any).device = {
+      findFirst: vi.fn().mockResolvedValue({
+        brand: 'Apple',
+        model: 'iPhone 15 Pro',
+        ram: '8 GB',
+        storage: '256 GB',
+        color: 'Natural Titanium',
+        costBasisUsd: '950.00',
+      }),
+    };
+
+    const result = await findPhoneByImei('359824370000001');
+    expect(result).toEqual({
+      brand: 'Apple',
+      model: 'iPhone 15 Pro',
+      ram: '8 GB',
+      storage: '256 GB',
+      color: 'Natural Titanium',
+      lastPurchasePriceUsd: 950,
+    });
+    expect((prisma as any).phoneCatalog.create).toHaveBeenCalled();
+  });
+});
+
