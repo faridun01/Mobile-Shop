@@ -181,17 +181,7 @@ export const DailyCashClosingListPanel: React.FC<DailyCashClosingListPanelProps>
     };
   }, [month, storeId, revision]);
 
-  // Unique days in the dataset
-  const uniqueDays = useMemo(() => {
-    const map = new Map<string, number>();
-    for (const c of closings) {
-      map.set(c.businessDate, (map.get(c.businessDate) || 0) + 1);
-    }
-    const days = Array.from(map.keys()).sort((a, b) =>
-      sortOrder === 'desc' ? b.localeCompare(a) : a.localeCompare(b)
-    );
-    return days.map((date) => ({ date, count: map.get(date)! }));
-  }, [closings, sortOrder]);
+
 
   // Filtered and sorted closings
   const displayedClosings = useMemo(() => {
@@ -323,102 +313,65 @@ export const DailyCashClosingListPanel: React.FC<DailyCashClosingListPanelProps>
 
       {/* Sorting & Day Filter Bar with Calendar Picker */}
       {closings.length > 0 && (
-        <div className="flex flex-col gap-2.5 bg-surface p-3 rounded-2xl border border-border shadow-2xs">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-xs font-bold text-fg flex items-center gap-1.5">
-                <Filter className="w-3.5 h-3.5 text-accent" />
-                Фильтр по дням:
-              </span>
-
-              {/* Date Input Calendar Selector */}
-              <div className="flex items-center gap-1.5 bg-surface-raised border border-border hover:border-accent focus-within:border-accent rounded-xl px-2.5 py-1 transition-all shadow-2xs">
-                <Calendar className="w-3.5 h-3.5 text-accent shrink-0" />
-                <input
-                  type="date"
-                  value={selectedDay === 'all' ? '' : selectedDay}
-                  max={todayStr}
-                  onChange={(e) => handleDateSelect(e.target.value)}
-                  className="bg-transparent text-xs font-bold font-mono text-fg focus:outline-hidden cursor-pointer"
-                  title="Выбрать конкретный день по календарю"
-                />
-              </div>
-
-              {/* "Сегодня" quick button */}
-              <button
-                type="button"
-                onClick={() => handleDateSelect(todayStr)}
-                className={`px-2.5 py-1 rounded-xl text-xs font-semibold transition-all cursor-pointer flex items-center gap-1 ${
-                  selectedDay === todayStr
-                    ? 'bg-accent text-accent-fg shadow-xs font-bold'
-                    : 'bg-surface-raised text-fg-subtle hover:text-fg border border-border hover:bg-surface'
-                }`}
-                title="Показать сегодняшний день"
-              >
-                <Clock className="w-3.5 h-3.5" />
-                <span>Сегодня</span>
-                {todayCount > 0 && (
-                  <span className="text-[10px] font-mono opacity-80">({todayCount})</span>
-                )}
-              </button>
-
-              {/* "Все дни" quick button */}
-              <button
-                type="button"
-                onClick={() => setSelectedDay('all')}
-                className={`px-2.5 py-1 rounded-xl text-xs font-semibold transition-all cursor-pointer flex items-center gap-1 ${
-                  selectedDay === 'all'
-                    ? 'bg-accent text-accent-fg shadow-xs font-bold'
-                    : 'bg-surface-raised text-fg-subtle hover:text-fg border border-border hover:bg-surface'
-                }`}
-                title="Показать все дни за месяц"
-              >
-                <span>Все дни</span>
-                <span className="text-[10px] font-mono opacity-80">({closings.length})</span>
-              </button>
+        <div className="flex flex-wrap items-center justify-between gap-2 bg-surface p-2 sm:p-2.5 rounded-xl border border-border shadow-2xs">
+          <div className="flex items-center gap-1.5 flex-wrap">
+            {/* Date Input Calendar Selector */}
+            <div className="flex items-center gap-1.5 bg-surface-raised border border-border hover:border-accent focus-within:border-accent rounded-lg px-2 py-1 transition-all">
+              <Calendar className="w-3.5 h-3.5 text-accent shrink-0" />
+              <input
+                type="date"
+                value={selectedDay === 'all' ? '' : selectedDay}
+                max={todayStr}
+                onChange={(e) => handleDateSelect(e.target.value)}
+                className="bg-transparent text-xs font-bold font-mono text-fg focus:outline-hidden cursor-pointer"
+                title="Выбрать конкретный день по календарю"
+              />
             </div>
 
-            {/* Sort order toggle */}
+            {/* "Сегодня" quick button */}
             <button
               type="button"
-              onClick={() => setSortOrder((prev) => (prev === 'desc' ? 'asc' : 'desc'))}
-              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-surface-raised border border-border hover:bg-surface text-fg text-xs font-medium transition-colors cursor-pointer active:scale-95 shrink-0 self-start sm:self-auto"
-              title="Изменить порядок сортировки по дням"
+              onClick={() => handleDateSelect(todayStr)}
+              className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer flex items-center gap-1 ${
+                selectedDay === todayStr
+                  ? 'bg-accent text-accent-fg shadow-2xs font-bold'
+                  : 'bg-surface-raised text-fg-subtle hover:text-fg border border-border hover:bg-surface'
+              }`}
+              title="Показать сегодняшний день"
             >
-              <ArrowUpDown className="w-3.5 h-3.5 text-accent" />
-              <span>{sortOrder === 'desc' ? 'Сначала новые' : 'Сначала старые'}</span>
+              <Clock className="w-3.5 h-3.5" />
+              <span>Сегодня</span>
+              {todayCount > 0 && (
+                <span className="text-[10px] font-mono opacity-80">({todayCount})</span>
+              )}
+            </button>
+
+            {/* "Все дни" quick button */}
+            <button
+              type="button"
+              onClick={() => setSelectedDay('all')}
+              className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer flex items-center gap-1 ${
+                selectedDay === 'all'
+                  ? 'bg-accent text-accent-fg shadow-2xs font-bold'
+                  : 'bg-surface-raised text-fg-subtle hover:text-fg border border-border hover:bg-surface'
+              }`}
+              title="Показать все дни за месяц"
+            >
+              <span>Все дни</span>
+              <span className="text-[10px] font-mono opacity-80">({closings.length})</span>
             </button>
           </div>
 
-          {/* Quick days chips for days that have closings */}
-          {uniqueDays.length > 0 && (
-            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none pt-1 border-t border-border/40">
-              <span className="text-[11px] text-fg-subtle shrink-0 font-medium mr-0.5">
-                Дни со сменами:
-              </span>
-              {uniqueDays.map(({ date, count }) => {
-                const isSelected = selectedDay === date;
-                const isTodayDate = date === todayStr;
-                return (
-                  <button
-                    type="button"
-                    key={date}
-                    onClick={() => setSelectedDay(isSelected ? 'all' : date)}
-                    className={`px-2 py-0.5 rounded-lg text-xs font-medium shrink-0 transition-all cursor-pointer flex items-center gap-1 ${
-                      isSelected
-                        ? 'bg-accent text-accent-fg shadow-2xs font-semibold'
-                        : isTodayDate
-                        ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 font-semibold'
-                        : 'bg-surface-raised text-fg-subtle hover:text-fg border border-border hover:bg-surface'
-                    }`}
-                  >
-                    <span>{isTodayDate ? 'Сегодня' : formatDayChip(date)}</span>
-                    <span className="text-[10px] font-mono opacity-80">({count})</span>
-                  </button>
-                );
-              })}
-            </div>
-          )}
+          {/* Sort order toggle */}
+          <button
+            type="button"
+            onClick={() => setSortOrder((prev) => (prev === 'desc' ? 'asc' : 'desc'))}
+            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-surface-raised border border-border hover:bg-surface text-fg text-xs font-medium transition-colors cursor-pointer active:scale-95 shrink-0"
+            title="Изменить порядок сортировки по дням"
+          >
+            <ArrowUpDown className="w-3.5 h-3.5 text-accent" />
+            <span>{sortOrder === 'desc' ? 'Сначала новые' : 'Сначала старые'}</span>
+          </button>
         </div>
       )}
 
@@ -435,17 +388,17 @@ export const DailyCashClosingListPanel: React.FC<DailyCashClosingListPanelProps>
       ) : closings.length === 0 ? (
         <EmptyState icon={FileCheck2} title="Закрытых смен нет" description="За выбранный месяц смены не закрывались" />
       ) : displayedClosings.length === 0 ? (
-        <div className="p-8 text-center bg-surface rounded-2xl border border-border space-y-3">
-          <div className="w-10 h-10 rounded-full bg-accent/10 text-accent flex items-center justify-center mx-auto">
-            <Calendar className="w-5 h-5" />
+        <div className="py-5 px-4 text-center bg-surface rounded-xl border border-border space-y-2">
+          <div className="w-8 h-8 rounded-full bg-accent/10 text-accent flex items-center justify-center mx-auto">
+            <Calendar className="w-4 h-4" />
           </div>
-          <div className="space-y-1">
-            <p className="text-sm font-bold text-fg">
+          <div className="space-y-0.5">
+            <p className="text-xs sm:text-sm font-bold text-fg">
               {selectedDay === todayStr
                 ? 'Смена за сегодня ещё не закрыта'
                 : `За ${formatDayChip(selectedDay)} закрытых смен нет`}
             </p>
-            <p className="text-xs text-fg-subtle max-w-sm mx-auto">
+            <p className="text-[11px] text-fg-subtle max-w-sm mx-auto">
               {selectedDay === todayStr
                 ? 'Смена будет зафиксирована после закрытия кассы в конце рабочего дня.'
                 : 'В выбранный день закрытие смены в этом магазине не производилось.'}
@@ -455,7 +408,7 @@ export const DailyCashClosingListPanel: React.FC<DailyCashClosingListPanelProps>
             variant="secondary"
             size="sm"
             onClick={() => setSelectedDay('all')}
-            className="mt-2"
+            className="mt-1"
           >
             Показать все дни месяца ({closings.length})
           </Button>

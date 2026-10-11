@@ -28,7 +28,8 @@ async function upsertOne(tx: TransactionClient, storeId: string, item: { brand: 
   if (!brand || !model) throw new Error('Укажите бренд и модель');
   const storage = String(item.storage ?? '').trim() || ALL_STORAGE;
   const minQuantity = requireMinQuantity(item.minQuantity);
-  // Minimums are for the shop's own phones only: a model (and capacity) that has been in stock.
+  
+  // Minimums are for the shop's own phones: a model and capacity that has been in stock or catalog.
   const cleanStorage = storage.replace(/\s+/g, '');
   const known = await tx.device.findFirst({
     where: {
@@ -46,7 +47,18 @@ async function upsertOne(tx: TransactionClient, storeId: string, item: { brand: 
     },
     select: { id: true },
   });
-  if (!known) throw new Error(`Модели «${brand} ${model}${storage === ALL_STORAGE ? '' : ` ${storage}`}» нет в базе склада: минимум задаётся только для телефонов, которые были в наличии`);
+
+  const alreadyExists =
+    known ||
+    (await tx.stockThreshold.findFirst({
+      where: { brand: insensitive(brand), model: insensitive(model) },
+      select: { id: true },
+    }));
+
+  if (!alreadyExists) {
+    throw new Error(`Модели «${brand} ${model}${storage === ALL_STORAGE ? '' : ` ${storage}`}» нет в базе склада: минимум задаётся только для телефонов, которые были в наличии`);
+  }
+
   return tx.stockThreshold.upsert({
     where: { storeId_brand_model_storage: { storeId, brand, model, storage } },
     update: { minQuantity },

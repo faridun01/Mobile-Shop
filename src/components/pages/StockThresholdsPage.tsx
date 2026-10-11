@@ -104,7 +104,7 @@ const ThresholdController: React.FC<{
       <div className="flex items-center rounded-xl bg-surface-raised border border-border shadow-2xs overflow-hidden focus-within:border-accent focus-within:ring-1 focus-within:ring-accent transition-all">
         <button
           type="button"
-          disabled={isSaving || (parseInt(val, 10) || 0) <= 0}
+          disabled={(parseInt(val, 10) || 0) <= 0}
           onClick={() => handleStep(-1)}
           className="p-1.5 sm:p-2 text-fg-subtle hover:text-fg hover:bg-surface active:bg-surface transition-colors disabled:opacity-30 cursor-pointer"
           title="Уменьшить минимум на 1"
@@ -142,7 +142,6 @@ const ThresholdController: React.FC<{
 
         <button
           type="button"
-          disabled={isSaving}
           onClick={() => handleStep(1)}
           className="p-1.5 sm:p-2 text-fg-subtle hover:text-fg hover:bg-surface active:bg-surface transition-colors cursor-pointer"
           title="Увеличить минимум на 1"
