@@ -61,8 +61,8 @@ async function upsertOne(tx: TransactionClient, storeId: string, item: { brand: 
 
   return tx.stockThreshold.upsert({
     where: { storeId_brand_model_storage: { storeId, brand, model, storage } },
-    update: { minQuantity },
-    create: { storeId, brand, model, storage, minQuantity },
+    update: { minQuantity, belowMinimum: false },
+    create: { storeId, brand, model, storage, minQuantity, belowMinimum: false },
   });
 }
 
@@ -91,14 +91,13 @@ export class StockThresholdsService {
   }
 
   /**
-   * Sets the minimum for one model (one capacity, or every capacity together). The current
-   * stock is checked right away to record whether the minimum is already reached; the
-   * notification itself comes from the next sale or transfer that reaches it.
+   * Sets the minimum for one model (one capacity, or every capacity together). If current
+   * stock is already at or below the minimum, an alert is sent right away.
    */
   static async upsertThreshold(input: UpsertThresholdInput) {
     return prisma.$transaction(async (tx) => {
       const threshold = await upsertOne(tx, input.storeId, input);
-      await syncStockAlerts(tx, [input.storeId], { notify: false });
+      await syncStockAlerts(tx, [input.storeId]);
       return tx.stockThreshold.findUniqueOrThrow({ where: { id: threshold.id } });
     });
   }
@@ -107,7 +106,7 @@ export class StockThresholdsService {
     return prisma.$transaction(async (tx) => {
       const ids: string[] = [];
       for (const item of items) ids.push((await upsertOne(tx, storeId, item)).id);
-      await syncStockAlerts(tx, [storeId], { notify: false });
+      await syncStockAlerts(tx, [storeId]);
       return tx.stockThreshold.findMany({ where: { id: { in: ids } } });
     });
   }

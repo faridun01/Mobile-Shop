@@ -17,6 +17,7 @@ import {
   Wrench,
   Users,
   ClipboardCheck,
+  AlertTriangle,
 } from 'lucide-react';
 import { useAppFields } from '../../context/AppContext';
 import { useNotifications } from '../../context/NotificationsContext';
@@ -64,6 +65,7 @@ export const ACTION_LABELS: Record<string, string> = {
   REINVEST: 'Капитализация прибыли',
   QUARTER_CLOSE: 'Закрытие периода',
   STOCK_REVISION: 'Сверка остатков',
+  STOCK_MINIMUM: 'Минимальный остаток',
 };
 
 function formatNotificationDate(rawDate?: string | number | Date): string {
@@ -86,6 +88,8 @@ function getEventIconConfig(actionType?: string): { icon: React.ElementType; ton
   switch (actionType) {
     case 'STOCK_REVISION':
       return { icon: ClipboardCheck, tone: 'accent' };
+    case 'STOCK_MINIMUM':
+      return { icon: AlertTriangle, tone: 'warning' };
     case 'SALE':
     case 'SALE_BELOW_COST':
       return { icon: ShoppingBag, tone: 'accent' };

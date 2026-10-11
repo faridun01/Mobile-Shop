@@ -74,7 +74,7 @@ describe('StockThresholdsService', () => {
     });
   });
 
-  it('sets a minimum for any model and records the current state without notifying', async () => {
+  it('sets a minimum for any model and records the current state with alerts enabled', async () => {
     db.stockThreshold.upsert.mockResolvedValue({ id: 'st-1' });
     db.stockThreshold.findUniqueOrThrow.mockResolvedValue({ id: 'st-1', belowMinimum: true });
 
@@ -82,10 +82,10 @@ describe('StockThresholdsService', () => {
 
     expect(db.stockThreshold.upsert).toHaveBeenCalledWith({
       where: { storeId_brand_model_storage: { storeId: 'store-1', brand: 'Apple', model: 'iPhone 17', storage: 'ALL' } },
-      update: { minQuantity: 3 },
-      create: { storeId: 'store-1', brand: 'Apple', model: 'iPhone 17', storage: 'ALL', minQuantity: 3 },
+      update: { minQuantity: 3, belowMinimum: false },
+      create: { storeId: 'store-1', brand: 'Apple', model: 'iPhone 17', storage: 'ALL', minQuantity: 3, belowMinimum: false },
     });
-    expect(syncStockAlerts).toHaveBeenCalledWith(db, ['store-1'], { notify: false });
+    expect(syncStockAlerts).toHaveBeenCalledWith(db, ['store-1']);
     expect(result).toEqual({ id: 'st-1', belowMinimum: true });
   });
 
