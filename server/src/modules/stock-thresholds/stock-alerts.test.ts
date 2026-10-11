@@ -2,7 +2,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { syncStockAlerts } from './stock-alerts';
 
 const notifyAdmins = vi.hoisted(() => vi.fn());
-vi.mock('../notifications/notification.service', () => ({ notifyAdmins }));
+const notifyStorePartners = vi.hoisted(() => vi.fn());
+vi.mock('../notifications/notification.service', () => ({ notifyAdmins, notifyStorePartners }));
 
 function tx(thresholds: any[], devices: Array<{ storeId: string; brand: string; model: string; storage: string; n: number }>) {
   return {
@@ -27,6 +28,8 @@ describe('syncStockAlerts', () => {
 
     expect(db.stockThreshold.update).toHaveBeenCalledWith({ where: { id: 'st-1' }, data: { belowMinimum: true, alertedAt: expect.any(Date) } });
     expect(notifyAdmins).toHaveBeenCalledTimes(1);
+    // The store's partners get the same alert.
+    expect(notifyStorePartners).toHaveBeenCalledWith(db, 'store-1', notifyAdmins.mock.calls[0][1]);
     expect(notifyAdmins.mock.calls[0][1]).toMatchObject({
       actionType: 'STOCK_MINIMUM',
       title: 'Минимальный остаток: Apple iPhone 15 128 GB',
@@ -68,6 +71,7 @@ describe('syncStockAlerts', () => {
     await syncStockAlerts(db, ['store-1'], { notify: false });
     expect(db.stockThreshold.update).toHaveBeenCalled();
     expect(notifyAdmins).not.toHaveBeenCalled();
+    expect(notifyStorePartners).not.toHaveBeenCalled();
   });
 
   it('counts only devices available for sale', async () => {

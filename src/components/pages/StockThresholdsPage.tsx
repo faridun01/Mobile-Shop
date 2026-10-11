@@ -328,16 +328,7 @@ export const StockThresholdsPage: React.FC = () => {
     <div className="p-3 sm:p-5 max-w-7xl mx-auto space-y-4">
       {/* 1. Header & Location Selector */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 bg-surface border border-border rounded-2xl p-4 sm:p-5 shadow-2xs">
-        <div>
-          <div className="flex items-center gap-2">
-            <div className="w-9 h-9 rounded-xl bg-accent/10 border border-accent/25 flex items-center justify-center text-accent">
-              <SlidersHorizontal className="w-5 h-5" />
-            </div>
-            <div>
-              <h1 className="text-lg sm:text-xl font-black text-fg tracking-tight">Минимальные остатки</h1>
-            </div>
-          </div>
-        </div>
+
 
         {/* Store Selector (Admin can switch between Main Warehouse & Retail Stores) */}
         {isAdmin && (

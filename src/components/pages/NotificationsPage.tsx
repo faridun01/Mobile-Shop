@@ -189,7 +189,7 @@ export const NotificationsPage: React.FC = () => {
     return () => { cancelled = true; };
   }, [query, bellKey]);
 
-  if (currentUser?.role !== 'ADMIN') return <Navigate to="/sale" replace />;
+  if (currentUser?.role !== 'ADMIN' && currentUser?.role !== 'PARTNER') return <Navigate to="/sale" replace />;
 
   const loadMore = async () => {
     if (!nextCursor || loadingMore) return;

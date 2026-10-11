@@ -25,6 +25,51 @@ export interface AdminNotificationInput {
   details?: unknown;
 }
 
+function notificationData(input: AdminNotificationInput) {
+  return {
+    title: input.title,
+    message: input.message,
+    targetType: input.targetType ?? input.actionType,
+    targetId: input.targetId,
+    targetRoute: input.targetRoute,
+    actionType: input.actionType,
+    storeId: input.store?.id,
+    storeName: input.store?.name,
+    actorUserId: input.actor?.id,
+    actorName: input.actor?.name,
+    amountTjs: input.amountTjs ?? undefined,
+    amountUsd: input.amountUsd ?? undefined,
+    documentRef: input.documentRef ?? undefined,
+    details: input.details === undefined ? undefined : (moneyJson(input.details) as Prisma.InputJsonValue),
+  };
+}
+
+/**
+ * Also tells the partners of a store about an event of that store (e.g. its stock reaching a
+ * minimum): one notification addressed to each active partner, in the same transaction. A
+ * partner only ever sees notifications addressed to them.
+ */
+export async function notifyStorePartners(tx: TransactionClient, storeId: string, input: AdminNotificationInput) {
+  const partners = await tx.user.findMany({ where: { role: 'PARTNER', storeId, active: true }, select: { id: true } });
+  for (const partner of partners) {
+    const dedupeKey = `${input.dedupeKey}:user:${partner.id}`;
+    if (await tx.notification.findUnique({ where: { dedupeKey } })) continue;
+    await tx.notification.create({ data: { ...notificationData(input), targetRole: 'PARTNER', targetUserId: partner.id, dedupeKey } });
+  }
+  if (partners.length === 0) return;
+  onCommit(() => {
+    RealtimeSyncGateway.broadcast('NOTIFICATION_CREATED', { storeId }, { roles: ['PARTNER'], storeIds: [storeId] });
+    for (const partner of partners) {
+      PushNotificationService.sendPushToUser(partner.id, {
+        title: input.title,
+        message: input.message,
+        targetRoute: input.targetRoute || '/notifications',
+        dedupeKey: `${input.dedupeKey}:user:${partner.id}`,
+      }).catch((err) => console.error('[Push] Failed to send push to a partner:', err));
+    }
+  });
+}
+
 /**
  * Records an ADMIN notification for a completed business event, inside the same database
  * transaction as the event (so both commit or neither does). A retry of the same event finds
@@ -35,21 +80,8 @@ export async function notifyAdmins(tx: TransactionClient, input: AdminNotificati
   if (existing) return existing;
   const notification = await tx.notification.create({
     data: {
-      title: input.title,
-      message: input.message,
+      ...notificationData(input),
       targetRole: 'ADMIN',
-      targetType: input.targetType ?? input.actionType,
-      targetId: input.targetId,
-      targetRoute: input.targetRoute,
-      actionType: input.actionType,
-      storeId: input.store?.id,
-      storeName: input.store?.name,
-      actorUserId: input.actor?.id,
-      actorName: input.actor?.name,
-      amountTjs: input.amountTjs ?? undefined,
-      amountUsd: input.amountUsd ?? undefined,
-      documentRef: input.documentRef ?? undefined,
-      details: input.details === undefined ? undefined : (moneyJson(input.details) as Prisma.InputJsonValue),
       dedupeKey: input.dedupeKey,
     },
   });

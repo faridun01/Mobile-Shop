@@ -20,12 +20,24 @@ export function requireMinQuantity(value: unknown): number {
   return n;
 }
 
+const insensitive = (value: string) => ({ equals: value, mode: 'insensitive' as const });
+
 async function upsertOne(tx: TransactionClient, storeId: string, item: { brand: string; model: string; storage?: string; minQuantity: unknown }) {
   const brand = String(item.brand ?? '').trim();
   const model = String(item.model ?? '').trim();
   if (!brand || !model) throw new Error('Укажите бренд и модель');
   const storage = String(item.storage ?? '').trim() || ALL_STORAGE;
   const minQuantity = requireMinQuantity(item.minQuantity);
+  // Minimums are for the shop's own phones only: a model (and capacity) that has been in stock.
+  const known = await tx.device.findFirst({
+    where: {
+      brand: insensitive(brand),
+      model: insensitive(model),
+      ...(storage === ALL_STORAGE ? {} : { storage: insensitive(storage === '—' ? '' : storage) }),
+    },
+    select: { id: true },
+  });
+  if (!known) throw new Error(`Модели «${brand} ${model}${storage === ALL_STORAGE ? '' : ` ${storage}`}» нет в базе склада: минимум задаётся только для телефонов, которые были в наличии`);
   return tx.stockThreshold.upsert({
     where: { storeId_brand_model_storage: { storeId, brand, model, storage } },
     update: { minQuantity },
@@ -34,6 +46,17 @@ async function upsertOne(tx: TransactionClient, storeId: string, item: { brand: 
 }
 
 export class StockThresholdsService {
+  /** Every brand / model / capacity the shop has had in stock (sold-out ones included), for the picker. */
+  static async listStockModels() {
+    const rows = await prisma.device.groupBy({
+      by: ['brand', 'model', 'storage'],
+      orderBy: [{ brand: 'asc' }, { model: 'asc' }, { storage: 'asc' }],
+    });
+    return rows
+      .filter((r) => r.brand.trim() && r.model.trim())
+      .map((r) => ({ brand: r.brand.trim(), model: r.model.trim(), storage: r.storage.trim() || '—' }));
+  }
+
   static async getThresholds(storeId?: string) {
     if (storeId) {
       return prisma.stockThreshold.findMany({

@@ -163,8 +163,8 @@ export const TopBar: React.FC = () => {
           </div>
         )}
 
-        {/* Notifications (ADMIN only: the notification centre is an admin page) */}
-        {currentUser?.role === 'ADMIN' && (
+        {/* Notifications: the admin's notification centre; a partner sees their store's alerts */}
+        {(currentUser?.role === 'ADMIN' || currentUser?.role === 'PARTNER') && (
           <button
             onClick={() => {
               if (activePage === 'NOTIFICATIONS') {

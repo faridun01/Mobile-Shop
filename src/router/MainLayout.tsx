@@ -169,7 +169,7 @@ export function MainLayout() {
               <Route path="/finance" element={<Navigate to="/reports" replace />} />
               <Route path="/audit-log" element={currentUser?.role === 'ADMIN' ? <AuditLogPage /> : <Navigate to="/sale" replace />} />
               <Route path="/settings" element={<SettingsPage />} />
-              <Route path="/notifications" element={currentUser?.role === 'ADMIN' ? <NotificationsPage /> : <Navigate to="/sale" replace />} />
+              <Route path="/notifications" element={currentUser?.role === 'ADMIN' || currentUser?.role === 'PARTNER' ? <NotificationsPage /> : <Navigate to="/sale" replace />} />
               <Route path="/receipts" element={<StoreReceiptPage />} />
               <Route path="/revision" element={currentUser?.role === 'ADMIN' ? <RevisionPage /> : <Navigate to="/sale" replace />} />
               <Route path="/stock-thresholds" element={<StockThresholdsPage />} />

@@ -28,6 +28,15 @@ export function registerStockThresholdRoutes(app: Express) {
     }
   });
 
+  // GET /api/stock-thresholds/models — the shop's own models to pick a minimum for.
+  app.get('/api/stock-thresholds/models', authenticateJwt, requireRoles('ADMIN', 'PARTNER'), async (_req, res, next) => {
+    try {
+      res.json(await StockThresholdsService.listStockModels());
+    } catch (error) {
+      next(error);
+    }
+  });
+
   // POST /api/stock-thresholds
   app.post(
     '/api/stock-thresholds',

@@ -14,22 +14,21 @@ const notificationScope = (user: NonNullable<AuthenticatedRequest['user']>) => (
 export function registerNotificationRoutes(app: Express) {
   app.get('/api/notifications', authenticateJwt, async (req: AuthenticatedRequest, res, next) => {
     try {
-      if (req.user!.role === 'PARTNER') {
-        res.json([]);
-        return;
-      }
       const user = req.user!;
       const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+      // A partner sees only notifications addressed to them (their store's minimum-stock alerts);
+      // admin notifications never reach store staff.
+      const scope = user.role === 'PARTNER' ? { targetUserId: user.userId } : notificationScope(user);
 
-      // Notification Center history (ADMIN): only notifications from the last 24 hours to keep the list compact.
-      if (req.query.view === 'history' && user.role === 'ADMIN') {
+      // Notification Center history (ADMIN, PARTNER): only notifications from the last 24 hours to keep the list compact.
+      if (req.query.view === 'history' && (user.role === 'ADMIN' || user.role === 'PARTNER')) {
         const limit = Math.min(Math.max(Number(req.query.limit) || 50, 1), 100);
         const cursor = typeof req.query.cursor === 'string' ? req.query.cursor : undefined;
         const filters = [
-          notificationScope(user),
+          scope,
           { createdAt: { gte: oneDayAgo } },
           ...(req.query.unread === '1' ? [{ read: false }] : []),
-          ...(typeof req.query.storeId === 'string' && req.query.storeId ? [{ storeId: req.query.storeId }] : []),
+          ...(user.role === 'ADMIN' && typeof req.query.storeId === 'string' && req.query.storeId ? [{ storeId: req.query.storeId }] : []),
           ...(typeof req.query.actionType === 'string' && req.query.actionType ? [{ actionType: req.query.actionType }] : []),
         ];
         const rows = await prisma.notification.findMany({
@@ -46,7 +45,7 @@ export function registerNotificationRoutes(app: Express) {
       const notifications = await prisma.notification.findMany({
         where: {
           AND: [
-            notificationScope(user),
+            scope,
             { createdAt: { gte: oneDayAgo } },
           ],
         },

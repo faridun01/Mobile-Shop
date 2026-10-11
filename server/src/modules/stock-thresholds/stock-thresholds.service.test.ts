@@ -12,7 +12,7 @@ const db = vi.hoisted(() => {
     create: vi.fn(),
     delete: vi.fn(),
   });
-  return { stockThreshold: model() };
+  return { stockThreshold: model(), device: { findFirst: vi.fn(), groupBy: vi.fn() } };
 });
 
 vi.mock('../../prisma/prisma.service', () => ({
@@ -28,6 +28,39 @@ vi.mock('./stock-alerts', () => ({ ALL_STORAGE: 'ALL', syncStockAlerts }));
 describe('StockThresholdsService', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    db.device.findFirst.mockResolvedValue({ id: 'device-1' });
+  });
+
+  it('offers the models the shop has had in stock, sold-out ones included', async () => {
+    db.device.groupBy.mockResolvedValue([
+      { brand: 'Apple', model: 'iPhone 15', storage: '128 GB' },
+      { brand: 'Apple', model: 'iPhone 15', storage: '' },
+      { brand: ' ', model: 'x', storage: '1' },
+    ]);
+    expect(await StockThresholdsService.listStockModels()).toEqual([
+      { brand: 'Apple', model: 'iPhone 15', storage: '128 GB' },
+      { brand: 'Apple', model: 'iPhone 15', storage: '—' },
+    ]);
+    // Grouped over every device (any status), so a sold-out model stays pickable.
+    expect(db.device.groupBy.mock.calls[0][0].where).toBeUndefined();
+  });
+
+  it('refuses a minimum for a model that has never been in stock', async () => {
+    db.device.findFirst.mockResolvedValue(null);
+    await expect(StockThresholdsService.upsertThreshold({ storeId: 'store-1', brand: 'Nokia', model: '3310', storage: '', minQuantity: 2 }))
+      .rejects.toThrow('нет в базе склада');
+    expect(db.stockThreshold.upsert).not.toHaveBeenCalled();
+  });
+
+  it('matches the model and capacity in stock regardless of letter case', async () => {
+    db.stockThreshold.upsert.mockResolvedValue({ id: 'st-1' });
+    db.stockThreshold.findUniqueOrThrow.mockResolvedValue({ id: 'st-1' });
+    await StockThresholdsService.upsertThreshold({ storeId: 'store-1', brand: 'apple', model: 'iphone 15', storage: '128 GB', minQuantity: 2 });
+    expect(db.device.findFirst.mock.calls[0][0].where).toEqual({
+      brand: { equals: 'apple', mode: 'insensitive' },
+      model: { equals: 'iphone 15', mode: 'insensitive' },
+      storage: { equals: '128 GB', mode: 'insensitive' },
+    });
   });
 
   it('fetches thresholds for a store', async () => {

@@ -121,6 +121,7 @@ export const Sidebar: React.FC = () => {
           items: [
             { id: 'INVENTORY', label: 'Склад магазина', icon: Package, roles: ['PARTNER'] },
             { id: 'STOCK_THRESHOLDS', label: 'Минимальные остатки', icon: SlidersHorizontal, roles: ['PARTNER'] },
+            { id: 'NOTIFICATIONS', label: 'Уведомления', icon: Bell, roles: ['PARTNER'] },
             { id: 'TRANSFER', label: 'Перемещение', icon: ArrowLeftRight, roles: ['PARTNER'] },
           ],
         },

@@ -1,5 +1,5 @@
 import type { TransactionClient } from '../../prisma/prisma.service';
-import { notifyAdmins } from '../notifications/notification.service';
+import { notifyAdmins, notifyStorePartners } from '../notifications/notification.service';
 
 /** Devices a store can sell or ship right now (in transfer or repair they are not available). */
 const AVAILABLE_STATUSES = ['STORE_STOCK', 'MAIN_WAREHOUSE', 'IN_STOCK_AFTER_EXCHANGE'] as const;
@@ -52,7 +52,7 @@ export async function syncStockAlerts(tx: TransactionClient, storeIds: Array<str
     const store = stores.get(threshold.storeId);
     const capacity = storage === ALL_STORAGE.toLowerCase() || storage === '—' ? '' : ` ${threshold.storage}`;
     const name = `${threshold.brand} ${threshold.model}${capacity}`;
-    await notifyAdmins(tx, {
+    const alert = {
       actionType: 'STOCK_MINIMUM',
       dedupeKey: `STOCK_MINIMUM:${threshold.id}:${Date.now()}`,
       title: count === 0 ? `Закончился товар: ${name}` : `Минимальный остаток: ${name}`,
@@ -62,6 +62,9 @@ export async function syncStockAlerts(tx: TransactionClient, storeIds: Array<str
       targetId: threshold.id,
       targetRoute: '/stock-thresholds',
       details: { brand: threshold.brand, model: threshold.model, storage: threshold.storage, count, minQuantity: threshold.minQuantity },
-    });
+    };
+    // The admin, and the partners of that store.
+    await notifyAdmins(tx, alert);
+    await notifyStorePartners(tx, threshold.storeId, alert);
   }
 }
