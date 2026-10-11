@@ -28,6 +28,7 @@ import { StatCard } from '../ui/StatCard';
 import { LoadingState } from '../ui/Skeleton';
 import { EmptyState } from '../ui/EmptyState';
 import { Button } from '../ui/Button';
+import { useStoreContext } from '../../utils/storeContext';
 import { AddThresholdDialog } from '../stock/AddThresholdDialog';
 
 /** A minimum set for every capacity of a model together (the server's ALL_STORAGE). */
@@ -58,14 +59,21 @@ export const StockThresholdsPage: React.FC = () => {
   const activeStores = useMemo(() => stores.filter((s) => s.active), [stores]);
   const mainWarehouse = useMemo(() => activeStores.find((s) => s.isMainWarehouse) || activeStores[0], [activeStores]);
 
+  // The admin opens the store they are working in, or the main warehouse from Central Cash;
+  // each location keeps its own minimums. Store staff only ever see their own store.
+  const storeCtx = useStoreContext();
   const defaultStoreId = useMemo(() => {
     if (isAdmin) {
-      return mainWarehouse?.id || activeStores[0]?.id || '';
+      return (storeCtx.mode === 'STORE' ? storeCtx.storeId : null) || mainWarehouse?.id || activeStores[0]?.id || '';
     }
-    return currentUser?.storeId || activeStores[0]?.id || '';
-  }, [isAdmin, mainWarehouse, activeStores, currentUser?.storeId]);
+    return currentUser?.storeId || '';
+  }, [isAdmin, storeCtx, mainWarehouse, activeStores, currentUser?.storeId]);
 
   const [selectedStoreId, setSelectedStoreId] = useState<string>(defaultStoreId);
+  // Switching between Central Cash and a store moves the page with it.
+  useEffect(() => {
+    if (isAdmin && defaultStoreId) setSelectedStoreId(defaultStoreId);
+  }, [isAdmin, defaultStoreId]);
 
   // If currentUser has restricted store
   useEffect(() => {
@@ -78,7 +86,8 @@ export const StockThresholdsPage: React.FC = () => {
     return activeStores.find((s) => s.id === selectedStoreId) || mainWarehouse;
   }, [activeStores, selectedStoreId, mainWarehouse]);
 
-  const canEdit = isAdmin || (isPartner && (!currentUser?.storeId || currentUser.storeId === selectedStoreId));
+  // The admin sets minimums everywhere; a partner for their own store only (the server checks it too).
+  const canEdit = isAdmin || (isPartner && Boolean(currentUser?.storeId) && currentUser?.storeId === selectedStoreId);
 
   // 2. Thresholds Data
   const [thresholds, setThresholds] = useState<StockThreshold[]>([]);
@@ -327,7 +336,9 @@ export const StockThresholdsPage: React.FC = () => {
             <div>
               <h1 className="text-lg sm:text-xl font-black text-fg tracking-tight">Минимальные остатки</h1>
               <p className="text-xs text-fg-subtle">
-                Контроль неснижаемого запаса товаров по точкам продаж и центральному складу
+                {isAdmin
+                  ? 'Минимум задаётся отдельно для главного склада (Центральная касса) и для каждого магазина'
+                  : 'Минимальный запас товаров вашего магазина'}
               </p>
             </div>
           </div>

@@ -15,6 +15,7 @@ import {
   FileText,
   X,
   Truck,
+  Sparkles,
 } from 'lucide-react';
 
 interface NewPurchaseFormProps {
@@ -184,101 +185,12 @@ export const NewPurchaseForm: React.FC<NewPurchaseFormProps> = ({
                 )}
               </div>
 
-              {/* Group Specs Form */}
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-1.5 text-xs">
-                <div>
-                  <label className="block text-[10px] font-bold text-fg-subtle uppercase tracking-wider mb-0.5 truncate">
-                    Бренд
-                  </label>
-                  <Combobox
-                    required
-                    options={brandOptions}
-                    value={group.brand}
-                    onChange={(v) => onUpdateGroup(groupIdx, 'brand', v)}
-                    className="h-7.5 rounded-lg bg-surface-raised border border-border px-2 text-xs text-fg font-medium focus:border-accent focus:bg-surface focus:outline-none transition-all shadow-2xs"
-                    placeholder="Apple"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-[10px] font-bold text-fg-subtle uppercase tracking-wider mb-0.5 truncate">
-                    Модель
-                  </label>
-                  <Combobox
-                    required
-                    options={getModelOptions(group.brand)}
-                    value={group.model}
-                    onChange={(v) => onUpdateGroup(groupIdx, 'model', v)}
-                    className="h-7.5 rounded-lg bg-surface-raised border border-border px-2 text-xs text-fg font-medium focus:border-accent focus:bg-surface focus:outline-none transition-all shadow-2xs"
-                    placeholder="iPhone 16 Pro"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-[10px] font-bold text-fg-subtle uppercase tracking-wider mb-0.5 truncate">
-                    ОЗУ (RAM) <span className="text-danger">*</span>
-                  </label>
-                  <Combobox
-                    required
-                    options={ramOptions}
-                    value={group.ram || ''}
-                    onChange={(v) => onUpdateGroup(groupIdx, 'ram', v)}
-                    className="h-7.5 rounded-lg bg-surface-raised border border-border px-2 text-xs text-fg font-medium focus:border-accent focus:bg-surface focus:outline-none transition-all shadow-2xs"
-                    placeholder="8 GB"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-[10px] font-bold text-fg-subtle uppercase tracking-wider mb-0.5 truncate">
-                    Память
-                  </label>
-                  <Combobox
-                    options={storageOptions}
-                    value={group.storage}
-                    onChange={(v) => onUpdateGroup(groupIdx, 'storage', v)}
-                    className="h-7.5 rounded-lg bg-surface-raised border border-border px-2 text-xs text-fg font-medium focus:border-accent focus:bg-surface focus:outline-none transition-all shadow-2xs"
-                    placeholder="256 GB"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-[10px] font-bold text-fg-subtle uppercase tracking-wider mb-0.5 truncate">
-                    Цвет
-                  </label>
-                  <Combobox
-                    options={colorOptions}
-                    value={group.color}
-                    onChange={(v) => onUpdateGroup(groupIdx, 'color', v)}
-                    className="h-7.5 rounded-lg bg-surface-raised border border-border px-2 text-xs text-fg font-medium focus:border-accent focus:bg-surface focus:outline-none transition-all shadow-2xs"
-                    placeholder="Black"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-[10px] font-bold text-fg-subtle uppercase tracking-wider mb-0.5 truncate">
-                    Цена закупки ($)
-                  </label>
-                  <div className="relative">
-                    <span className="absolute left-2 top-1/2 -translate-y-1/2 text-xs font-mono font-bold text-emerald-600 dark:text-emerald-400 pointer-events-none">$</span>
-                    <input
-                      type="number"
-                      required
-                      min="0.01"
-                      step="0.01"
-                      value={group.purchasePriceUsd || ''}
-                      onChange={(e) => onUpdateGroup(groupIdx, 'purchasePriceUsd', parseFloat(e.target.value) || 0)}
-                      className="w-full h-7.5 rounded-lg bg-surface-raised border border-border pl-5 pr-2 text-xs text-emerald-600 dark:text-emerald-400 font-bold font-mono focus:border-accent focus:bg-surface focus:outline-none transition-all shadow-2xs"
-                      placeholder="0"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* IMEI Input List with Batch Paste */}
-              <div className="pt-1.5 border-t border-border space-y-1.5">
+              {/* 1. IMEI Input List with Batch Paste (placed FIRST for instant autofill) */}
+              <div className="space-y-1.5">
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex items-center gap-1.5 text-xs font-mono">
-                    <span className="font-bold text-fg text-[11px]">
+                    <span className="font-bold text-fg text-[11px] flex items-center gap-1">
+                      <Scan className="w-3.5 h-3.5 text-accent" />
                       IMEI устройств:
                     </span>
                     <span className="px-1.5 py-0.2 rounded-full bg-accent/10 text-accent font-bold text-[10px] font-mono">
@@ -450,6 +362,110 @@ export const NewPurchaseForm: React.FC<NewPurchaseFormProps> = ({
                       </div>
                     );
                   })}
+                </div>
+              </div>
+
+              {/* 2. Group Specs Form (Placed BELOW IMEI - auto-filled from scanned IMEI) */}
+              <div className="pt-2 border-t border-border space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-bold text-fg-subtle uppercase tracking-wider">
+                    Спецификации и цена
+                  </span>
+                  {(group.brand || group.model) && (
+                    <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold flex items-center gap-1">
+                      <Sparkles className="w-3 h-3" />
+                      Автозаполнение по IMEI
+                    </span>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-1.5 text-xs">
+                  <div>
+                    <label className="block text-[10px] font-bold text-fg-subtle uppercase tracking-wider mb-0.5 truncate">
+                      Бренд
+                    </label>
+                    <Combobox
+                      required
+                      options={brandOptions}
+                      value={group.brand}
+                      onChange={(v) => onUpdateGroup(groupIdx, 'brand', v)}
+                      className="h-7.5 rounded-lg bg-surface-raised border border-border px-2 text-xs text-fg font-medium focus:border-accent focus:bg-surface focus:outline-none transition-all shadow-2xs"
+                      placeholder="Apple"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] font-bold text-fg-subtle uppercase tracking-wider mb-0.5 truncate">
+                      Модель
+                    </label>
+                    <Combobox
+                      required
+                      options={getModelOptions(group.brand)}
+                      value={group.model}
+                      onChange={(v) => onUpdateGroup(groupIdx, 'model', v)}
+                      className="h-7.5 rounded-lg bg-surface-raised border border-border px-2 text-xs text-fg font-medium focus:border-accent focus:bg-surface focus:outline-none transition-all shadow-2xs"
+                      placeholder="iPhone 16 Pro"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] font-bold text-fg-subtle uppercase tracking-wider mb-0.5 truncate">
+                      ОЗУ (RAM) <span className="text-danger">*</span>
+                    </label>
+                    <Combobox
+                      required
+                      options={ramOptions}
+                      value={group.ram || ''}
+                      onChange={(v) => onUpdateGroup(groupIdx, 'ram', v)}
+                      className="h-7.5 rounded-lg bg-surface-raised border border-border px-2 text-xs text-fg font-medium focus:border-accent focus:bg-surface focus:outline-none transition-all shadow-2xs"
+                      placeholder="8 GB"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] font-bold text-fg-subtle uppercase tracking-wider mb-0.5 truncate">
+                      Память
+                    </label>
+                    <Combobox
+                      options={storageOptions}
+                      value={group.storage}
+                      onChange={(v) => onUpdateGroup(groupIdx, 'storage', v)}
+                      className="h-7.5 rounded-lg bg-surface-raised border border-border px-2 text-xs text-fg font-medium focus:border-accent focus:bg-surface focus:outline-none transition-all shadow-2xs"
+                      placeholder="256 GB"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] font-bold text-fg-subtle uppercase tracking-wider mb-0.5 truncate">
+                      Цвет
+                    </label>
+                    <Combobox
+                      options={colorOptions}
+                      value={group.color}
+                      onChange={(v) => onUpdateGroup(groupIdx, 'color', v)}
+                      className="h-7.5 rounded-lg bg-surface-raised border border-border px-2 text-xs text-fg font-medium focus:border-accent focus:bg-surface focus:outline-none transition-all shadow-2xs"
+                      placeholder="Black"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] font-bold text-fg-subtle uppercase tracking-wider mb-0.5 truncate">
+                      Цена закупки ($)
+                    </label>
+                    <div className="relative">
+                      <span className="absolute left-2 top-1/2 -translate-y-1/2 text-xs font-mono font-bold text-emerald-600 dark:text-emerald-400 pointer-events-none">$</span>
+                      <input
+                        type="number"
+                        required
+                        min="0.01"
+                        step="0.01"
+                        value={group.purchasePriceUsd || ''}
+                        onChange={(e) => onUpdateGroup(groupIdx, 'purchasePriceUsd', parseFloat(e.target.value) || 0)}
+                        className="w-full h-7.5 rounded-lg bg-surface-raised border border-border pl-5 pr-2 text-xs text-emerald-600 dark:text-emerald-400 font-bold font-mono focus:border-accent focus:bg-surface focus:outline-none transition-all shadow-2xs"
+                        placeholder="0"
+                      />
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>

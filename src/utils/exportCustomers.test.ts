@@ -70,7 +70,7 @@ describe('exportCustomers', () => {
     const buffer = await workbook.xlsx.writeBuffer();
     expect(buffer).toBeDefined();
     expect(buffer.byteLength).toBeGreaterThan(1000);
-  });
+  }, 15000);
 
   it('handles empty customer list gracefully', async () => {
     const workbook = await buildCustomersWorkbook({

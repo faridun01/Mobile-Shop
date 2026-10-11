@@ -10,12 +10,15 @@ export function registerStockThresholdRoutes(app: Express) {
       const user = req.user!;
       const requestedStoreId = typeof req.query.storeId === 'string' ? req.query.storeId : undefined;
 
-      // Sellers and partners are restricted to their assigned store if not admin
+      // Sellers and partners see their own store's minimums only (the admin sets the main
+      // warehouse's and every store's separately); staff without a store see none.
       let effectiveStoreId = requestedStoreId;
       if (user.role === 'SELLER' || user.role === 'PARTNER') {
-        if (user.storeId) {
-          effectiveStoreId = user.storeId;
+        if (!user.storeId) {
+          res.json([]);
+          return;
         }
+        effectiveStoreId = user.storeId;
       }
 
       const thresholds = await StockThresholdsService.getThresholds(effectiveStoreId);
