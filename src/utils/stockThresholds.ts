@@ -21,7 +21,8 @@ export function computeStockStatus(currentCount: number, minQuantity: number): S
 }
 
 export function buildThresholdKey(brand: string, model: string, storage: string): string {
-  return `${brand.trim().toLowerCase()}__${model.trim().toLowerCase()}__${storage.trim().toLowerCase()}`;
+  const cleanStorage = (storage || '').trim().replace(/\s+/g, '').toLowerCase();
+  return `${(brand || '').trim().toLowerCase()}__${(model || '').trim().toLowerCase()}__${cleanStorage}`;
 }
 
 export function mapThresholdsToMap(thresholds: StockThreshold[]): Map<string, StockThreshold> {

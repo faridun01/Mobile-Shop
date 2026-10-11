@@ -17,6 +17,7 @@ describe('stockThresholds utils', () => {
 
   it('builds normalized threshold key', () => {
     expect(buildThresholdKey(' Apple ', ' iPhone 15 ', ' 128GB ')).toBe('apple__iphone 15__128gb');
+    expect(buildThresholdKey(' Apple ', ' iPhone 15 ', ' 128 GB ')).toBe('apple__iphone 15__128gb');
   });
 
   it('maps thresholds array to normalized map', () => {

@@ -48,6 +48,172 @@ interface ModelRowData {
   thresholdId?: string;
 }
 
+const ThresholdController: React.FC<{
+  row: ModelRowData;
+  canEdit: boolean;
+  isSaving: boolean;
+  isSaved: boolean;
+  onSave: (row: ModelRowData, newMin: number) => Promise<void>;
+}> = ({ row, canEdit, isSaving, isSaved, onSave }) => {
+  const [val, setVal] = useState<string>(String(row.minQuantity));
+  const [isEditing, setIsEditing] = useState(false);
+
+  // Sync when row.minQuantity changes from external update (only when user is not actively editing)
+  useEffect(() => {
+    if (!isEditing) {
+      setVal(String(row.minQuantity));
+    }
+  }, [row.minQuantity, isEditing]);
+
+  const commitValue = (valueStr: string) => {
+    setIsEditing(false);
+    const parsed = parseInt(valueStr, 10);
+    const sanitized = isNaN(parsed) ? 0 : Math.max(0, Math.floor(parsed));
+    setVal(String(sanitized));
+    if (sanitized !== row.minQuantity) {
+      void onSave(row, sanitized);
+    }
+  };
+
+  const handleStep = (delta: number) => {
+    const current = Math.max(0, parseInt(val, 10) || 0);
+    const next = Math.max(0, current + delta);
+    setVal(String(next));
+    void onSave(row, next);
+  };
+
+  const handlePreset = (preset: number) => {
+    setVal(String(preset));
+    void onSave(row, preset);
+  };
+
+  if (!canEdit) {
+    return (
+      <div className="flex items-center gap-1.5">
+        <span className="text-xs text-fg-subtle md:hidden font-semibold">Минимум:</span>
+        <span className="font-extrabold font-mono text-xs text-fg bg-surface-raised px-2.5 py-1 rounded-lg border border-border">
+          {row.minQuantity > 0 ? `${row.minQuantity} шт.` : 'Не задан'}
+        </span>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex items-center gap-1.5">
+      {/* Stepper Controller */}
+      <div className="flex items-center rounded-xl bg-surface-raised border border-border shadow-2xs overflow-hidden focus-within:border-accent focus-within:ring-1 focus-within:ring-accent transition-all">
+        <button
+          type="button"
+          disabled={isSaving || (parseInt(val, 10) || 0) <= 0}
+          onClick={() => handleStep(-1)}
+          className="p-1.5 sm:p-2 text-fg-subtle hover:text-fg hover:bg-surface active:bg-surface transition-colors disabled:opacity-30 cursor-pointer"
+          title="Уменьшить минимум на 1"
+          aria-label="Уменьшить минимум на 1"
+        >
+          <Minus className="w-3.5 h-3.5" />
+        </button>
+
+        <input
+          type="text"
+          inputMode="numeric"
+          pattern="[0-9]*"
+          value={val}
+          onFocus={(e) => {
+            setIsEditing(true);
+            e.target.select();
+          }}
+          onChange={(e) => {
+            const clean = e.target.value.replace(/\D/g, '').slice(0, 4);
+            setVal(clean);
+          }}
+          onBlur={(e) => commitValue(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              e.currentTarget.blur();
+            } else if (e.key === 'Escape') {
+              setVal(String(row.minQuantity));
+              setIsEditing(false);
+              e.currentTarget.blur();
+            }
+          }}
+          className="w-12 text-center text-xs sm:text-sm font-extrabold font-mono text-fg bg-transparent focus:outline-none"
+          title="Нажмите, чтобы ввести число вручную"
+        />
+
+        <button
+          type="button"
+          disabled={isSaving}
+          onClick={() => handleStep(1)}
+          className="p-1.5 sm:p-2 text-fg-subtle hover:text-fg hover:bg-surface active:bg-surface transition-colors cursor-pointer"
+          title="Увеличить минимум на 1"
+          aria-label="Увеличить минимум на 1"
+        >
+          <Plus className="w-3.5 h-3.5" />
+        </button>
+      </div>
+
+      {/* Quick Preset Buttons */}
+      <div className="flex items-center gap-1">
+        <button
+          type="button"
+          onClick={() => handlePreset(5)}
+          className={`px-1.5 py-1 rounded-md text-[10px] font-bold border transition-colors cursor-pointer ${
+            row.minQuantity === 5
+              ? 'bg-danger/20 text-danger border-danger/40'
+              : 'bg-surface border-border text-fg-subtle hover:text-fg'
+          }`}
+          title="Хит (минимум 5 шт.)"
+        >
+          Хит 5
+        </button>
+        <button
+          type="button"
+          onClick={() => handlePreset(2)}
+          className={`px-1.5 py-1 rounded-md text-[10px] font-bold border transition-colors cursor-pointer ${
+            row.minQuantity === 2
+              ? 'bg-accent/20 text-accent border-accent/40'
+              : 'bg-surface border-border text-fg-subtle hover:text-fg'
+          }`}
+          title="Ходовой (минимум 2 шт.)"
+        >
+          Ход 2
+        </button>
+        <button
+          type="button"
+          onClick={() => handlePreset(1)}
+          className={`px-1.5 py-1 rounded-md text-[10px] font-bold border transition-colors cursor-pointer ${
+            row.minQuantity === 1
+              ? 'bg-surface-raised text-fg border-border'
+              : 'bg-surface border-border text-fg-subtle hover:text-fg'
+          }`}
+          title="Редкий (минимум 1 шт.)"
+        >
+          1
+        </button>
+        {row.minQuantity > 0 && (
+          <button
+            type="button"
+            onClick={() => handlePreset(0)}
+            className="px-1.5 py-1 rounded-md text-[10px] font-medium text-fg-subtle hover:text-danger border border-border/50 hover:border-danger/30 transition-colors cursor-pointer"
+            title="Сбросить лимит (0)"
+          >
+            0
+          </button>
+        )}
+      </div>
+
+      {/* Status feedback icon */}
+      <div className="w-4 flex items-center justify-center shrink-0">
+        {isSaving ? (
+          <Loader2 className="w-3.5 h-3.5 animate-spin text-accent" />
+        ) : isSaved ? (
+          <Check className="w-3.5 h-3.5 text-emerald-500 animate-in zoom-in-50" />
+        ) : null}
+      </div>
+    </div>
+  );
+};
+
 export const StockThresholdsPage: React.FC = () => {
   const { currentUser, stores, devices } = useAppFields('currentUser', 'stores', 'devices');
 
@@ -99,27 +265,27 @@ export const StockThresholdsPage: React.FC = () => {
   const [isAddOpen, setIsAddOpen] = useState(false);
 
   // Fetch thresholds for selected store
-  const fetchThresholds = useCallback(async () => {
+  const fetchThresholds = useCallback(async (isInitial = false) => {
     if (!selectedStoreId) return;
     try {
-      setLoading(true);
+      if (isInitial) setLoading(true);
       const data = await apiClient<StockThreshold[]>(`/stock-thresholds?storeId=${selectedStoreId}`);
       setThresholds(data || []);
     } catch (err) {
       console.error('Failed to load stock thresholds', err);
     } finally {
-      setLoading(false);
+      if (isInitial) setLoading(false);
     }
   }, [selectedStoreId]);
 
   useEffect(() => {
-    fetchThresholds();
+    fetchThresholds(true);
   }, [fetchThresholds]);
 
-  // Listen to realtime updates or changes
+  // Listen to realtime updates or changes (background update without full page loading skeleton)
   useEffect(() => {
     const handleUpdate = () => {
-      fetchThresholds();
+      fetchThresholds(false);
     };
     window.addEventListener('business-data-changed', handleUpdate);
     return () => window.removeEventListener('business-data-changed', handleUpdate);
@@ -575,108 +741,13 @@ export const StockThresholdsPage: React.FC = () => {
 
                   {/* Col 3: Minimum Threshold Controller */}
                   <div className="md:col-span-3 flex flex-col md:items-center gap-1.5">
-                    {canEdit ? (
-                      <div className="flex items-center gap-1.5">
-                        {/* Stepper Controller */}
-                        <div className="flex items-center rounded-xl bg-surface-raised border border-border shadow-2xs overflow-hidden">
-                          <button
-                            type="button"
-                            disabled={isSaving || row.minQuantity <= 0}
-                            onClick={() => handleSetThreshold(row, row.minQuantity - 1)}
-                            className="p-1.5 sm:p-2 text-fg-subtle hover:text-fg hover:bg-surface active:bg-surface transition-colors disabled:opacity-30 cursor-pointer"
-                            title="Уменьшить минимум на 1"
-                          >
-                            <Minus className="w-3.5 h-3.5" />
-                          </button>
-
-                          <input
-                            type="number"
-                            min="0"
-                            max="999"
-                            value={row.minQuantity}
-                            onChange={(e) => {
-                              const val = parseInt(e.target.value, 10);
-                              handleSetThreshold(row, isNaN(val) ? 0 : val);
-                            }}
-                            className="w-12 text-center text-xs sm:text-sm font-extrabold font-mono text-fg bg-transparent focus:outline-none"
-                          />
-
-                          <button
-                            type="button"
-                            disabled={isSaving}
-                            onClick={() => handleSetThreshold(row, row.minQuantity + 1)}
-                            className="p-1.5 sm:p-2 text-fg-subtle hover:text-fg hover:bg-surface active:bg-surface transition-colors cursor-pointer"
-                            title="Увеличить минимум на 1"
-                          >
-                            <Plus className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-
-                        {/* Quick Preset Buttons */}
-                        <div className="flex items-center gap-1">
-                          <button
-                            type="button"
-                            onClick={() => handleSetThreshold(row, 5)}
-                            className={`px-1.5 py-1 rounded-md text-[10px] font-bold border transition-colors cursor-pointer ${
-                              row.minQuantity === 5
-                                ? 'bg-danger/20 text-danger border-danger/40'
-                                : 'bg-surface border-border text-fg-subtle hover:text-fg'
-                            }`}
-                            title="Хит (5 шт.)"
-                          >
-                            Хит 5
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleSetThreshold(row, 2)}
-                            className={`px-1.5 py-1 rounded-md text-[10px] font-bold border transition-colors cursor-pointer ${
-                              row.minQuantity === 2
-                                ? 'bg-accent/20 text-accent border-accent/40'
-                                : 'bg-surface border-border text-fg-subtle hover:text-fg'
-                            }`}
-                            title="Ходовой (2 шт.)"
-                          >
-                            Ход 2
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleSetThreshold(row, 1)}
-                            className={`px-1.5 py-1 rounded-md text-[10px] font-bold border transition-colors cursor-pointer ${
-                              row.minQuantity === 1
-                                ? 'bg-surface-raised text-fg border-border'
-                                : 'bg-surface border-border text-fg-subtle hover:text-fg'
-                            }`}
-                            title="Редкий (1 шт.)"
-                          >
-                            1
-                          </button>
-                          {row.minQuantity > 0 && (
-                            <button
-                              type="button"
-                              onClick={() => handleSetThreshold(row, 0)}
-                              className="px-1.5 py-1 rounded-md text-[10px] font-medium text-fg-subtle hover:text-danger border border-border/50 hover:border-danger/30 transition-colors cursor-pointer"
-                              title="Сбросить лимит"
-                            >
-                              0
-                            </button>
-                          )}
-                        </div>
-
-                        {/* Status feedback icon */}
-                        {isSaving ? (
-                          <Loader2 className="w-3.5 h-3.5 animate-spin text-accent shrink-0" />
-                        ) : isSaved ? (
-                          <Check className="w-3.5 h-3.5 text-accent shrink-0 animate-in zoom-in-50" />
-                        ) : null}
-                      </div>
-                    ) : (
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-xs text-fg-subtle md:hidden font-semibold">Минимум:</span>
-                        <span className="font-extrabold font-mono text-xs text-fg bg-surface-raised px-2.5 py-1 rounded-lg border border-border">
-                          {row.minQuantity > 0 ? `${row.minQuantity} шт.` : 'Не задан'}
-                        </span>
-                      </div>
-                    )}
+                    <ThresholdController
+                      row={row}
+                      canEdit={canEdit}
+                      isSaving={Boolean(isSaving)}
+                      isSaved={Boolean(isSaved)}
+                      onSave={handleSetThreshold}
+                    />
                   </div>
 
                   {/* Col 4: Status Badge */}

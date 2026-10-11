@@ -29,11 +29,20 @@ async function upsertOne(tx: TransactionClient, storeId: string, item: { brand: 
   const storage = String(item.storage ?? '').trim() || ALL_STORAGE;
   const minQuantity = requireMinQuantity(item.minQuantity);
   // Minimums are for the shop's own phones only: a model (and capacity) that has been in stock.
+  const cleanStorage = storage.replace(/\s+/g, '');
   const known = await tx.device.findFirst({
     where: {
       brand: insensitive(brand),
       model: insensitive(model),
-      ...(storage === ALL_STORAGE ? {} : { storage: insensitive(storage === '—' ? '' : storage) }),
+      ...(storage === ALL_STORAGE
+        ? {}
+        : {
+            OR: [
+              { storage: insensitive(storage === '—' ? '' : storage) },
+              { storage: insensitive(cleanStorage) },
+              { storage: insensitive(cleanStorage.replace(/gb$/i, ' GB')) },
+            ],
+          }),
     },
     select: { id: true },
   });
