@@ -53,38 +53,64 @@ const ThresholdController: React.FC<{
   isSaving: boolean;
   isSaved: boolean;
   onSave: (row: ModelRowData, newMin: number) => Promise<void>;
-}> = ({ row, canEdit, isSaving, isSaved, onSave }) => {
+  onOptimisticChange?: (row: ModelRowData, newMin: number) => void;
+}> = ({ row, canEdit, isSaving, isSaved, onSave, onOptimisticChange }) => {
   const [val, setVal] = useState<string>(String(row.minQuantity));
   const [isEditing, setIsEditing] = useState(false);
-  const valRef = useRef(val);
-  valRef.current = val;
+  const pendingValueRef = useRef<number | null>(null);
+  const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Sync when row.minQuantity changes from external update (only when user is not actively editing)
+  // Sync when row.minQuantity changes from external update (only when user is not actively editing or waiting for pending save)
   useEffect(() => {
-    if (!isEditing) {
+    if (!isEditing && pendingValueRef.current === null) {
       setVal(String(row.minQuantity));
-      valRef.current = String(row.minQuantity);
     }
   }, [row.minQuantity, isEditing]);
+
+  useEffect(() => {
+    return () => {
+      if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+    };
+  }, []);
+
+  const triggerSave = (targetNum: number) => {
+    pendingValueRef.current = targetNum;
+    onOptimisticChange?.(row, targetNum);
+
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+    }
+
+    debounceTimerRef.current = setTimeout(async () => {
+      debounceTimerRef.current = null;
+      try {
+        await onSave(row, targetNum);
+      } finally {
+        if (pendingValueRef.current === targetNum) {
+          pendingValueRef.current = null;
+        }
+      }
+    }, 350);
+  };
 
   const commitValue = (valueStr: string) => {
     setIsEditing(false);
     const parsed = parseInt(valueStr, 10);
     const sanitized = isNaN(parsed) ? 0 : Math.max(0, Math.floor(parsed));
     setVal(String(sanitized));
-    valRef.current = String(sanitized);
     if (sanitized !== row.minQuantity) {
-      void onSave(row, sanitized);
+      triggerSave(sanitized);
     }
   };
 
   const handleStep = (delta: number) => {
-    const current = Math.max(0, parseInt(valRef.current, 10) || 0);
-    const next = Math.max(0, current + delta);
-    valRef.current = String(next);
+    const base = pendingValueRef.current !== null ? pendingValueRef.current : (parseInt(val, 10) || 0);
+    const next = Math.max(0, base + delta);
     setVal(String(next));
-    void onSave(row, next);
+    triggerSave(next);
   };
+
+  const currentDisplayNumber = pendingValueRef.current !== null ? pendingValueRef.current : (parseInt(val, 10) || 0);
 
   if (!canEdit) {
     return (
@@ -103,9 +129,9 @@ const ThresholdController: React.FC<{
       <div className="flex items-center rounded-xl bg-surface-raised border border-border shadow-2xs overflow-hidden focus-within:border-accent focus-within:ring-1 focus-within:ring-accent transition-all">
         <button
           type="button"
-          disabled={(parseInt(val, 10) || 0) <= 0}
+          disabled={currentDisplayNumber <= 0}
           onClick={() => handleStep(-1)}
-          className="p-1.5 sm:p-2 text-fg-subtle hover:text-fg hover:bg-surface active:bg-surface transition-colors disabled:opacity-30 cursor-pointer"
+          className="p-1.5 sm:p-2 text-fg-subtle hover:text-fg hover:bg-surface active:bg-surface active:scale-95 transition-all disabled:opacity-30 cursor-pointer select-none touch-manipulation"
           title="Уменьшить минимум на 1"
           aria-label="Уменьшить минимум на 1"
         >
@@ -124,7 +150,6 @@ const ThresholdController: React.FC<{
           onChange={(e) => {
             const clean = e.target.value.replace(/\D/g, '').slice(0, 4);
             setVal(clean);
-            valRef.current = clean;
           }}
           onBlur={(e) => commitValue(e.target.value)}
           onKeyDown={(e) => {
@@ -132,19 +157,20 @@ const ThresholdController: React.FC<{
               e.currentTarget.blur();
             } else if (e.key === 'Escape') {
               setVal(String(row.minQuantity));
-              valRef.current = String(row.minQuantity);
+              pendingValueRef.current = null;
+              if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
               setIsEditing(false);
               e.currentTarget.blur();
             }
           }}
-          className="w-12 text-center text-xs sm:text-sm font-extrabold font-mono text-fg bg-transparent focus:outline-none"
+          className="w-12 text-center text-xs sm:text-sm font-extrabold font-mono text-fg bg-transparent focus:outline-none select-all"
           title="Нажмите, чтобы ввести число вручную"
         />
 
         <button
           type="button"
           onClick={() => handleStep(1)}
-          className="p-1.5 sm:p-2 text-fg-subtle hover:text-fg hover:bg-surface active:bg-surface transition-colors cursor-pointer"
+          className="p-1.5 sm:p-2 text-fg-subtle hover:text-fg hover:bg-surface active:bg-surface active:scale-95 transition-all cursor-pointer select-none touch-manipulation"
           title="Увеличить минимум на 1"
           aria-label="Увеличить минимум на 1"
         >
@@ -212,6 +238,7 @@ export const StockThresholdsPage: React.FC = () => {
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'DEFICIT' | 'AT_RISK' | 'NORMAL' | 'NONE'>('ALL');
   const [savingKeys, setSavingKeys] = useState<Record<string, boolean>>({});
   const [savedSuccessKeys, setSavedSuccessKeys] = useState<Record<string, boolean>>({});
+  const latestTargetMinRef = useRef<Map<string, number>>(new Map());
 
   // Fetch thresholds for selected store
   const fetchThresholds = useCallback(async (isInitial = false) => {
@@ -370,16 +397,15 @@ export const StockThresholdsPage: React.FC = () => {
     });
   }, [allModelRows, statusFilter, searchQuery]);
 
-  // Update threshold handler
-  const handleSetThreshold = async (row: ModelRowData, newMin: number) => {
-    if (!canEdit || !selectedStoreId) return;
+  const handleOptimisticChange = useCallback((row: ModelRowData, newMin: number) => {
     const sanitizedMin = Math.max(0, Math.floor(newMin));
     const rowKey = row.key;
+    latestTargetMinRef.current.set(rowKey, sanitizedMin);
 
-    // Optimistic local update
     setThresholds((prev) => {
       const idx = prev.findIndex((t) => buildThresholdKey(t.brand, t.model, t.storage) === rowKey);
       if (idx >= 0) {
+        if (prev[idx].minQuantity === sanitizedMin) return prev;
         const copy = [...prev];
         copy[idx] = { ...copy[idx], minQuantity: sanitizedMin };
         return copy;
@@ -396,6 +422,17 @@ export const StockThresholdsPage: React.FC = () => {
         },
       ];
     });
+  }, [selectedStoreId]);
+
+  // Update threshold handler
+  const handleSetThreshold = useCallback(async (row: ModelRowData, newMin: number) => {
+    if (!canEdit || !selectedStoreId) return;
+    const sanitizedMin = Math.max(0, Math.floor(newMin));
+    const rowKey = row.key;
+    latestTargetMinRef.current.set(rowKey, sanitizedMin);
+
+    // Optimistic local update
+    handleOptimisticChange(row, sanitizedMin);
 
     try {
       setSavingKeys((prev) => ({ ...prev, [rowKey]: true }));
@@ -409,6 +446,11 @@ export const StockThresholdsPage: React.FC = () => {
           minQuantity: sanitizedMin,
         }),
       });
+
+      // If a newer save was triggered for this row while this request was in flight, ignore older response
+      if (latestTargetMinRef.current.get(rowKey) !== sanitizedMin) {
+        return;
+      }
 
       // Update state with actual DB record
       setThresholds((prev) => {
@@ -427,8 +469,10 @@ export const StockThresholdsPage: React.FC = () => {
       }, 1500);
     } catch (err) {
       console.error('Failed to update threshold', err);
-      // Rollback on failure
-      fetchThresholds();
+      // Rollback on failure only if no newer target was requested
+      if (latestTargetMinRef.current.get(rowKey) === sanitizedMin) {
+        fetchThresholds();
+      }
     } finally {
       setSavingKeys((prev) => {
         const next = { ...prev };
@@ -436,7 +480,7 @@ export const StockThresholdsPage: React.FC = () => {
         return next;
       });
     }
-  };
+  }, [canEdit, selectedStoreId, handleOptimisticChange, fetchThresholds]);
 
   return (
     <div className="p-3 sm:p-5 max-w-7xl mx-auto space-y-4">
@@ -691,6 +735,7 @@ export const StockThresholdsPage: React.FC = () => {
                       isSaving={Boolean(isSaving)}
                       isSaved={Boolean(isSaved)}
                       onSave={handleSetThreshold}
+                      onOptimisticChange={handleOptimisticChange}
                     />
                   </div>
 
