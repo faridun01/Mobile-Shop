@@ -37,6 +37,7 @@
     "fix:unbacked-payments": "tsx scripts/fix-unbacked-customer-payments.ts",
     "fix:unbacked-payments:apply": "tsx scripts/fix-unbacked-customer-payments.ts --apply",
     "db:clean": "tsx scripts/clear-data-keep-users.ts",
+    "phones:import": "tsx prisma/import-tac.ts",
     "server": "tsx watch server/src/index.ts"
   },
   "dependencies": {

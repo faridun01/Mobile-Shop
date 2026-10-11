@@ -29,6 +29,8 @@ import { registerStoreReceiptRoutes } from './modules/store-receipts/store-recei
 import { registerCustomerRoutes } from './modules/customers/customers.routes';
 import { registerStockRevisionRoutes } from './modules/revisions/revisions.routes';
 import { registerStockThresholdRoutes } from './modules/stock-thresholds/stock-thresholds.routes';
+import { registerPhoneCatalogRoutes } from './modules/phone-catalog/phone-catalog.routes';
+import { rememberPhones } from './modules/phone-catalog/phone-catalog.service';
 import { decorateTransactions } from './prisma/prisma.service';
 import { withAuditNotifications } from './modules/notifications/audit-notifications';
 import { requireNonNegativeMoney, requirePositiveMoney, roundMoney } from './common/money';
@@ -314,6 +316,8 @@ app.patch('/api/devices/:id', authenticateJwt, requireRoles('ADMIN', 'PARTNER'),
       },
       include: { store: true, timeline: { orderBy: { date: 'asc' as const } } },
     });
+    // A corrected model name is what autofill suggests from now on.
+    await rememberPhones(prisma, [updated]);
 
     RealtimeSyncGateway.broadcast('INVENTORY_UPDATE', {});
     res.json(updated);
@@ -485,6 +489,8 @@ app.post('/api/purchases', authenticateJwt, requireRoles('ADMIN'), enforceBodySt
           purchaseInvoiceId: invoice.id,
         })),
       });
+      // Every phone received teaches the catalog its model, so the next one fills in by itself.
+      await rememberPhones(transaction, normalizedDevices);
 
       const unpaidAmountUsd = D(totalAmountUsd).minus(paidAmountUsd);
       await transaction.supplier.update({
@@ -625,6 +631,7 @@ registerStoreReceiptRoutes(app);
 registerCustomerRoutes(app);
 registerStockRevisionRoutes(app);
 registerStockThresholdRoutes(app);
+registerPhoneCatalogRoutes(app);
 // Every audited business event inside a transaction also notifies the admin (same transaction).
 decorateTransactions(withAuditNotifications);
 

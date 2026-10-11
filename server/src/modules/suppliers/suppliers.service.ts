@@ -9,6 +9,7 @@ import { readOwnerAllocations, replaceOwnerAllocations } from '../finance/owner-
 import type { OwnerProfitAllocation } from '../sales/profit';
 import { cancelTransaction, postTransaction } from '../finance/financial-transaction.service';
 import { allocateMoney } from '../../common/allocation';
+import { rememberPhones } from '../phone-catalog/phone-catalog.service';
 
 /** True if any of these devices has a sale, transfer, or repair record referencing it (hard FK, no cascade). */
 async function deviceHasTransactionHistory(tx: TransactionClient, deviceIds: string[]): Promise<boolean> {
@@ -392,6 +393,7 @@ export class SuppliersService {
           await tx.supplierBonusDevice.create({
             data: { bonusId: bonus.id, deviceId: created.id, brand: device.brand, model: device.model, storage: device.storage, color: device.color, imei: device.imei, costBasisUsd },
           });
+          await rememberPhones(tx, [created]);
         }
       }
       // A cash bonus is no owner profit and never passes through a store register: it is

@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
+import { lookupPhoneByImei } from '../../services/phoneCatalog';
 import { useLocation } from 'react-router-dom';
 import { useDataRefreshRevision } from '../../hooks/useDataRefreshRevision';
 import { sumMoney, formatMoney } from '../../utils/money';
@@ -161,6 +162,22 @@ export const RepairPage: React.FC = () => {
       window.history.replaceState({}, document.title);
     }
   }, [navigatedState]);
+
+  // IMEI autofill: a customer's phone that is not ours gets its brand and model from the phone
+  // catalog (by the IMEI's first 8 digits) as soon as a full IMEI is typed or scanned.
+  useEffect(() => {
+    const digits = imei.replace(/\D/g, '');
+    if (digits.length !== 15 || deviceModel.trim()) return;
+    let cancelled = false;
+    void lookupPhoneByImei(digits).then((phone) => {
+      if (cancelled || !phone) return;
+      setDeviceModel((current) => (current.trim() ? current : `${phone.brand} ${phone.model}`));
+      setStatusBanner({ tone: 'success', text: `Модель определена по IMEI: ${phone.brand} ${phone.model}` });
+    });
+    return () => { cancelled = true; };
+    // Only a new IMEI triggers the lookup; the model field is read for its current emptiness.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [imei]);
 
   const effectiveStoreId = isStoreScoped ? (currentUser?.storeId || retailStores[0]?.id || '') : selectedStoreId;
 

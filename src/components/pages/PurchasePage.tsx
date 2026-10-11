@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback, useEffect } from 'react';
+import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { useDataRefreshRevision } from '../../hooks/useDataRefreshRevision';
 import { decimal, moneyNumber } from '../../utils/money';
 import { useAppFields } from '../../context/AppContext';
@@ -7,6 +7,7 @@ import { soundEffects } from '../../utils/sound';
 import { getBusinessDateKey } from '../../utils/businessDate';
 import { useUnfinishedWork } from '../../utils/pwaUpdateSafety';
 import { DEFAULT_PHONE_COLORS_EN, normalizePhoneColor, formatRam, formatStorage } from '../../utils/phoneSpecs';
+import { lookupPhoneByImei, clearPhoneCatalogCache, matchesCatalog } from '../../services/phoneCatalog';
 
 import {
   PurchaseItemGroup,
@@ -148,6 +149,9 @@ export const PurchasePage: React.FC = () => {
       items: [{ imei: '' }],
     },
   ]);
+  // Latest groups for the IMEI autofill, which resolves after the scan's own render.
+  const groupsRef = useRef(groups);
+  groupsRef.current = groups;
 
   const [statusMessage, setStatusMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -448,6 +452,41 @@ export const PurchasePage: React.FC = () => {
     });
   };
 
+  // IMEI autofill: the phone catalog knows the model behind an IMEI's first 8 digits. An empty
+  // position takes brand, model and the last RAM/storage chosen for that model; a filled one is
+  // only checked, so a phone of another model in the position is caught before saving. A model
+  // the catalog doesn't know yet is entered by hand and remembered when the receipt is saved.
+  const fillGroupFromImei = useCallback(async (groupIdx: number, imei: string) => {
+    const phone = await lookupPhoneByImei(imei);
+    const group = groupsRef.current[groupIdx];
+    if (!phone || !group) return;
+    const sameBrand = !group.brand.trim() || group.brand.trim().toLowerCase() === phone.brand.toLowerCase();
+    if (!group.model.trim() && sameBrand) {
+      setGroups((prev) => {
+        const next = [...prev];
+        const current = next[groupIdx];
+        if (!current || current.model.trim()) return prev;
+        next[groupIdx] = {
+          ...current,
+          brand: current.brand.trim() || phone.brand,
+          model: phone.model,
+          ram: current.ram.trim() || phone.ram || '',
+          storage: current.storage.trim() || phone.storage || '',
+        };
+        return next;
+      });
+      setStatusMessage({ type: 'success', text: `Модель определена по IMEI: ${phone.brand} ${phone.model}` });
+      return;
+    }
+    if (!matchesCatalog(phone, group.brand || phone.brand, group.model || phone.model)) {
+      setStatusMessage({
+        type: 'error',
+        text: `IMEI ${imei} — это ${phone.brand} ${phone.model}, а в позиции #${groupIdx + 1} указано ${`${group.brand} ${group.model}`.trim()}. Проверьте позицию.`,
+      });
+      soundEffects.playError();
+    }
+  }, []);
+
   const handleUpdateImei = (groupIdx: number, itemIdx: number, val: string) => {
     setGroups((prev) => {
       const next = [...prev];
@@ -456,6 +495,9 @@ export const PurchasePage: React.FC = () => {
       next[groupIdx] = { ...next[groupIdx], items };
       return next;
     });
+    const [imei1] = getImeiPair(val);
+    const clean1 = imei1.replace(/\D/g, '');
+    if (clean1.length === 15) void fillGroupFromImei(groupIdx, clean1);
   };
 
   const handleUpdateImei2 = (groupIdx: number, itemIdx: number, value: string) => {
@@ -512,6 +554,8 @@ export const PurchasePage: React.FC = () => {
     }
 
     if (validNewItems.length > 0) {
+      const [firstImei] = getImeiPair(validNewItems[0].imei);
+      void fillGroupFromImei(groupIdx, firstImei.replace(/\D/g, ''));
       soundEffects.playAddToCartSuccess();
       setGroups((prev) => {
         const next = [...prev];
@@ -745,6 +789,8 @@ export const PurchasePage: React.FC = () => {
       if (res.success) {
         const savedNum = previewInvoice.invoiceNumber;
         setJustSavedInvoice(savedNum);
+        // The receipt taught the catalog its models: no cached "not found" may hide them.
+        clearPhoneCatalogCache();
 
         setGroups([
           {

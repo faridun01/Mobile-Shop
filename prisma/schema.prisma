@@ -1238,3 +1238,18 @@ model StockThreshold {
   @@map("stock_thresholds")
 }
 
+// The phone catalog behind IMEI autofill: TAC (the first 8 digits of an IMEI, which identify the
+// model) → brand and model. Loaded from the public TAC database (prisma/import-tac.ts) and
+// updated by every phone received, so the next phone of a model fills in by itself. RAM and
+// storage are the last ones chosen for that model: a suggestion, since they vary per phone.
+model PhoneCatalog {
+  tac       String   @id
+  brand     String
+  model     String
+  ram       String?
+  storage   String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("phone_catalog")
+}

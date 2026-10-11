@@ -30,6 +30,7 @@ Database (local Postgres from `docker-compose.yml` listens on **port 5435**; `do
 npx prisma migrate dev --name <change>   # create a migration after editing prisma/schema.prisma
 npx prisma migrate deploy                # apply migrations
 npx prisma db seed                       # prisma/seed.ts
+npm run phones:import                    # load the public TAC database into the phone catalog (IMEI autofill); safe to re-run
 ```
 
 `npm install` runs `prisma generate` automatically (postinstall). Seeding with `SEED_TEST_DATA=true` creates test users (`admin`/`admin123`, etc.). Without it, new seed users need `SEED_PASSWORD_<LOGIN>` env vars of at least 16 characters.
