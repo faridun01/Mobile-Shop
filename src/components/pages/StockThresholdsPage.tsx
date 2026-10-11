@@ -58,12 +58,14 @@ const ThresholdController: React.FC<{
   const [val, setVal] = useState<string>(String(row.minQuantity));
   const [isEditing, setIsEditing] = useState(false);
   const pendingValueRef = useRef<number | null>(null);
+  const localTargetRef = useRef<number>(row.minQuantity);
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Sync when row.minQuantity changes from external update (only when user is not actively editing or waiting for pending save)
   useEffect(() => {
     if (!isEditing && pendingValueRef.current === null) {
       setVal(String(row.minQuantity));
+      localTargetRef.current = row.minQuantity;
     }
   }, [row.minQuantity, isEditing]);
 
@@ -75,6 +77,7 @@ const ThresholdController: React.FC<{
 
   const triggerSave = (targetNum: number) => {
     pendingValueRef.current = targetNum;
+    localTargetRef.current = targetNum;
     onOptimisticChange?.(row, targetNum);
 
     if (debounceTimerRef.current) {
@@ -98,19 +101,21 @@ const ThresholdController: React.FC<{
     const parsed = parseInt(valueStr, 10);
     const sanitized = isNaN(parsed) ? 0 : Math.max(0, Math.floor(parsed));
     setVal(String(sanitized));
+    localTargetRef.current = sanitized;
     if (sanitized !== row.minQuantity) {
       triggerSave(sanitized);
     }
   };
 
   const handleStep = (delta: number) => {
-    const base = pendingValueRef.current !== null ? pendingValueRef.current : (parseInt(val, 10) || 0);
+    const base = localTargetRef.current;
     const next = Math.max(0, base + delta);
+    localTargetRef.current = next;
     setVal(String(next));
     triggerSave(next);
   };
 
-  const currentDisplayNumber = pendingValueRef.current !== null ? pendingValueRef.current : (parseInt(val, 10) || 0);
+  const currentDisplayNumber = localTargetRef.current;
 
   if (!canEdit) {
     return (
@@ -157,6 +162,7 @@ const ThresholdController: React.FC<{
               e.currentTarget.blur();
             } else if (e.key === 'Escape') {
               setVal(String(row.minQuantity));
+              localTargetRef.current = row.minQuantity;
               pendingValueRef.current = null;
               if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
               setIsEditing(false);
@@ -246,7 +252,22 @@ export const StockThresholdsPage: React.FC = () => {
     try {
       if (isInitial) setLoading(true);
       const data = await apiClient<StockThreshold[]>(`/stock-thresholds?storeId=${selectedStoreId}`);
-      setThresholds(data || []);
+      if (!data) return;
+
+      setThresholds((prev) => {
+        // If there are pending optimistic updates, do not overwrite them with older server data
+        if (latestTargetMinRef.current.size === 0) {
+          return data;
+        }
+        return data.map((item) => {
+          const key = buildThresholdKey(item.brand, item.model, item.storage);
+          const pending = latestTargetMinRef.current.get(key);
+          if (pending !== undefined) {
+            return { ...item, minQuantity: pending };
+          }
+          return item;
+        });
+      });
     } catch (err) {
       console.error('Failed to load stock thresholds', err);
     } finally {
@@ -258,13 +279,22 @@ export const StockThresholdsPage: React.FC = () => {
     fetchThresholds(true);
   }, [fetchThresholds]);
 
-  // Listen to realtime updates or changes (background update without full page loading skeleton)
+  // Listen to realtime updates or changes (debounced, and ignored if local saves are in flight)
   useEffect(() => {
+    let timer: ReturnType<typeof setTimeout> | null = null;
     const handleUpdate = () => {
-      fetchThresholds(false);
+      // Don't refetch if we are currently saving thresholds locally
+      if (latestTargetMinRef.current.size > 0) return;
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => {
+        fetchThresholds(false);
+      }, 500);
     };
     window.addEventListener('business-data-changed', handleUpdate);
-    return () => window.removeEventListener('business-data-changed', handleUpdate);
+    return () => {
+      if (timer) clearTimeout(timer);
+      window.removeEventListener('business-data-changed', handleUpdate);
+    };
   }, [fetchThresholds]);
 
   // Threshold Map for rapid lookup
@@ -466,6 +496,9 @@ export const StockThresholdsPage: React.FC = () => {
           delete next[rowKey];
           return next;
         });
+        if (latestTargetMinRef.current.get(rowKey) === sanitizedMin) {
+          latestTargetMinRef.current.delete(rowKey);
+        }
       }, 1500);
     } catch (err) {
       console.error('Failed to update threshold', err);
