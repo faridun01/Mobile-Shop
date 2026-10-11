@@ -29,7 +29,6 @@ import { LoadingState } from '../ui/Skeleton';
 import { EmptyState } from '../ui/EmptyState';
 import { Button } from '../ui/Button';
 import { useStoreContext } from '../../utils/storeContext';
-import { AddThresholdDialog } from '../stock/AddThresholdDialog';
 
 /** A minimum set for every capacity of a model together (the server's ALL_STORAGE). */
 const ALL_STORAGE = 'ALL';
@@ -76,15 +75,12 @@ const ThresholdController: React.FC<{
   };
 
   const handleStep = (delta: number) => {
-    const current = Math.max(0, parseInt(val, 10) || 0);
-    const next = Math.max(0, current + delta);
-    setVal(String(next));
-    void onSave(row, next);
-  };
-
-  const handlePreset = (preset: number) => {
-    setVal(String(preset));
-    void onSave(row, preset);
+    setVal((prevStr) => {
+      const current = Math.max(0, parseInt(prevStr, 10) || 0);
+      const next = Math.max(0, current + delta);
+      void onSave(row, next);
+      return String(next);
+    });
   };
 
   if (!canEdit) {
@@ -99,7 +95,7 @@ const ThresholdController: React.FC<{
   }
 
   return (
-    <div className="flex items-center gap-1.5">
+    <div className="flex items-center gap-2">
       {/* Stepper Controller */}
       <div className="flex items-center rounded-xl bg-surface-raised border border-border shadow-2xs overflow-hidden focus-within:border-accent focus-within:ring-1 focus-within:ring-accent transition-all">
         <button
@@ -149,56 +145,6 @@ const ThresholdController: React.FC<{
         >
           <Plus className="w-3.5 h-3.5" />
         </button>
-      </div>
-
-      {/* Quick Preset Buttons */}
-      <div className="flex items-center gap-1">
-        <button
-          type="button"
-          onClick={() => handlePreset(5)}
-          className={`px-1.5 py-1 rounded-md text-[10px] font-bold border transition-colors cursor-pointer ${
-            row.minQuantity === 5
-              ? 'bg-danger/20 text-danger border-danger/40'
-              : 'bg-surface border-border text-fg-subtle hover:text-fg'
-          }`}
-          title="Хит (минимум 5 шт.)"
-        >
-          Хит 5
-        </button>
-        <button
-          type="button"
-          onClick={() => handlePreset(2)}
-          className={`px-1.5 py-1 rounded-md text-[10px] font-bold border transition-colors cursor-pointer ${
-            row.minQuantity === 2
-              ? 'bg-accent/20 text-accent border-accent/40'
-              : 'bg-surface border-border text-fg-subtle hover:text-fg'
-          }`}
-          title="Ходовой (минимум 2 шт.)"
-        >
-          Ход 2
-        </button>
-        <button
-          type="button"
-          onClick={() => handlePreset(1)}
-          className={`px-1.5 py-1 rounded-md text-[10px] font-bold border transition-colors cursor-pointer ${
-            row.minQuantity === 1
-              ? 'bg-surface-raised text-fg border-border'
-              : 'bg-surface border-border text-fg-subtle hover:text-fg'
-          }`}
-          title="Редкий (минимум 1 шт.)"
-        >
-          1
-        </button>
-        {row.minQuantity > 0 && (
-          <button
-            type="button"
-            onClick={() => handlePreset(0)}
-            className="px-1.5 py-1 rounded-md text-[10px] font-medium text-fg-subtle hover:text-danger border border-border/50 hover:border-danger/30 transition-colors cursor-pointer"
-            title="Сбросить лимит (0)"
-          >
-            0
-          </button>
-        )}
       </div>
 
       {/* Status feedback icon */}
@@ -261,7 +207,6 @@ export const StockThresholdsPage: React.FC = () => {
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'DEFICIT' | 'AT_RISK' | 'NORMAL' | 'NONE'>('ALL');
   const [savingKeys, setSavingKeys] = useState<Record<string, boolean>>({});
   const [savedSuccessKeys, setSavedSuccessKeys] = useState<Record<string, boolean>>({});
-  const [isAddOpen, setIsAddOpen] = useState(false);
 
   // Fetch thresholds for selected store
   const fetchThresholds = useCallback(async (isInitial = false) => {
@@ -522,11 +467,7 @@ export const StockThresholdsPage: React.FC = () => {
           </div>
         )}
 
-        {canEdit && (
-          <Button variant="primary" size="sm" leftIcon={Plus} onClick={() => setIsAddOpen(true)} className="self-start md:self-auto shrink-0">
-            Добавить модель
-          </Button>
-        )}
+
 
         {!isAdmin && (
           <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-surface-raised border border-border text-xs font-bold text-fg self-start md:self-auto">
@@ -777,13 +718,7 @@ export const StockThresholdsPage: React.FC = () => {
         </div>
       )}
 
-      <AddThresholdDialog
-        open={isAddOpen}
-        onClose={() => setIsAddOpen(false)}
-        storeId={selectedStoreId}
-        storeName={currentStore?.isMainWarehouse ? 'Главный склад' : currentStore?.name || 'Магазин'}
-        onSaved={fetchThresholds}
-      />
+
     </div>
   );
 };
