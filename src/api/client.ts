@@ -49,7 +49,7 @@ export async function apiClient<T>(endpoint: string, options: RequestInit = {}):
     try { if (storageKey) sessionStorage.setItem(storageKey, key); } catch { /* In-memory deduplication remains active. */ }
     headers.set('Idempotency-Key', key);
     try {
-      const result = await request<T>(endpoint, { ...options, headers: Object.fromEntries(headers.entries()) });
+      const result = await request<T>(endpoint, { ...options, headers });
       pendingKeys.delete(identity);
       try { if (storageKey) sessionStorage.removeItem(storageKey); } catch { /* No storage. */ }
       window.dispatchEvent(new Event('business-data-changed'));
@@ -71,11 +71,13 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
   if (Capacitor.isNativePlatform()) requireNativeUrl(import.meta.env.VITE_API_URL, 'https:', 'VITE_API_URL');
   const token = useAuthStore.getState().token;
 
-  const headers: HeadersInit = {
-    'Content-Type': 'application/json',
-    ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    ...options.headers,
-  };
+  const headers = new Headers(options.headers);
+  if (!headers.has('Content-Type')) {
+    headers.set('Content-Type', 'application/json');
+  }
+  if (token && !headers.has('Authorization')) {
+    headers.set('Authorization', `Bearer ${token}`);
+  }
 
   const url = apiUrl(endpoint);
   const mutation = ['POST', 'PUT', 'PATCH', 'DELETE'].includes((options.method || 'GET').toUpperCase()) && !endpoint.startsWith('/auth/');

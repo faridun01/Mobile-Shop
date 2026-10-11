@@ -100,6 +100,16 @@ app.use((req, res, next) => {
   next();
 });
 
+// Normalize content-type: if proxies or clients send duplicated or comma-separated
+// 'application/json, application/json', normalize it so express.json always parses req.body.
+app.use((req, _res, next) => {
+  const ct = req.headers['content-type'];
+  if (typeof ct === 'string' && ct.includes('application/json')) {
+    req.headers['content-type'] = 'application/json';
+  }
+  next();
+});
+
 app.use(express.json({ limit: '1mb' }));
 app.use(operationContext);
 

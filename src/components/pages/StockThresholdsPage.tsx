@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useAppFields } from '../../context/AppContext';
 import { apiClient } from '../../api/client';
 import { StockThreshold, Device } from '../../types';
@@ -56,11 +56,14 @@ const ThresholdController: React.FC<{
 }> = ({ row, canEdit, isSaving, isSaved, onSave }) => {
   const [val, setVal] = useState<string>(String(row.minQuantity));
   const [isEditing, setIsEditing] = useState(false);
+  const valRef = useRef(val);
+  valRef.current = val;
 
   // Sync when row.minQuantity changes from external update (only when user is not actively editing)
   useEffect(() => {
     if (!isEditing) {
       setVal(String(row.minQuantity));
+      valRef.current = String(row.minQuantity);
     }
   }, [row.minQuantity, isEditing]);
 
@@ -69,18 +72,18 @@ const ThresholdController: React.FC<{
     const parsed = parseInt(valueStr, 10);
     const sanitized = isNaN(parsed) ? 0 : Math.max(0, Math.floor(parsed));
     setVal(String(sanitized));
+    valRef.current = String(sanitized);
     if (sanitized !== row.minQuantity) {
       void onSave(row, sanitized);
     }
   };
 
   const handleStep = (delta: number) => {
-    setVal((prevStr) => {
-      const current = Math.max(0, parseInt(prevStr, 10) || 0);
-      const next = Math.max(0, current + delta);
-      void onSave(row, next);
-      return String(next);
-    });
+    const current = Math.max(0, parseInt(valRef.current, 10) || 0);
+    const next = Math.max(0, current + delta);
+    valRef.current = String(next);
+    setVal(String(next));
+    void onSave(row, next);
   };
 
   if (!canEdit) {
@@ -396,7 +399,6 @@ export const StockThresholdsPage: React.FC = () => {
       setSavingKeys((prev) => ({ ...prev, [rowKey]: true }));
       const updated = await apiClient<StockThreshold>('/stock-thresholds', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           storeId: selectedStoreId,
           brand: row.brand,
