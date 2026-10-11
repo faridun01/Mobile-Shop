@@ -5,11 +5,11 @@ import { resolveActor } from '../../common/actor';
 
 vi.mock('../../prisma/prisma.service', () => {
   const store = { findUnique: vi.fn() };
-  const dailyCashClosing = { findUnique: vi.fn(), findFirst: vi.fn(), findMany: vi.fn(), create: vi.fn() };
+  const dailyCashClosing = { findUnique: vi.fn(), findFirst: vi.fn(), findMany: vi.fn(), create: vi.fn(), delete: vi.fn() };
   const sale = { findMany: vi.fn() };
   const exchangeEvent = { findMany: vi.fn() };
   const expense = { findMany: vi.fn() };
-  const cashHandover = { findMany: vi.fn() };
+  const cashHandover = { findMany: vi.fn(), findFirst: vi.fn() };
   const customerPayment = { findMany: vi.fn() };
   const financialAccount = { findUnique: vi.fn() };
   const financialTransaction = { findMany: vi.fn() };
@@ -21,6 +21,7 @@ vi.mock('../../prisma/prisma.service', () => {
   const tx = {
     store, dailyCashClosing, sale, exchangeEvent, expense, cashHandover, customerPayment,
     financialAccount, financialTransaction, exchangeRate, auditLog, notification, user,
+    $queryRaw: vi.fn(),
   };
 
   return {
@@ -213,6 +214,31 @@ describe('DailyClosingService', () => {
     expect(result.actualCashUsd).toBe('50');
     expect(result.salesCardUsd).toBe('30');
     expect(result.differenceTjs).toBe('0');
+  });
+
+  it('locks the store row before counting the day, the same lock every register operation takes', async () => {
+    openDay();
+    await DailyClosingService.closeDay('u1', { storeId: 'store-1', businessDate: '2026-10-06' });
+    expect(db.$queryRaw).toHaveBeenCalled();
+    expect(db.$queryRaw.mock.invocationCallOrder[0]).toBeLessThan(db.sale.findMany.mock.invocationCallOrder[0]);
+  });
+
+  it('refuses to reopen a shift whose day was already collected', async () => {
+    db.dailyCashClosing.findUnique.mockResolvedValue({ id: 'dc-1', storeId: 'store-1', businessDate: '2026-10-06', createdAt: new Date('2026-10-06T15:00:00Z'), store: { id: 'store-1', name: 'Сиёма' } });
+    db.cashHandover.findFirst.mockResolvedValue({ id: 'h-1', createdAt: new Date('2026-10-06T16:00:00Z') });
+
+    await expect(DailyClosingService.delete('dc-1', 'u1')).rejects.toThrow('проведена инкассация');
+    expect(db.dailyCashClosing.delete).not.toHaveBeenCalled();
+    // Only collections made after this closing, and not cancelled, count.
+    expect(db.cashHandover.findFirst.mock.calls[0][0].where).toMatchObject({ storeId: 'store-1', cancelledAt: null, createdAt: { gt: new Date('2026-10-06T15:00:00Z') } });
+  });
+
+  it('reopens a shift that was not collected', async () => {
+    db.dailyCashClosing.findUnique.mockResolvedValue({ id: 'dc-1', storeId: 'store-1', businessDate: '2026-10-06', createdAt: new Date('2026-10-06T15:00:00Z'), actualCashTjs: 500, store: { id: 'store-1', name: 'Сиёма' } });
+    db.cashHandover.findFirst.mockResolvedValue(null);
+
+    await DailyClosingService.delete('dc-1', 'u1');
+    expect(db.dailyCashClosing.delete).toHaveBeenCalledWith({ where: { id: 'dc-1' } });
   });
 
   it('refuses to close without a rate for the business day', async () => {

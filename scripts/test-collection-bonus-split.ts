@@ -120,7 +120,11 @@ function makeCtx(db: PrismaClient, base: string) {
   const closeShift = (storeId: string) => call('POST', '/daily-closings', { storeId });
   const collect = async (storeId: string, expectedCashUsd: Prisma.Decimal.Value, key?: string) => {
     await closeShift(storeId);
-    return call('POST', '/cash-collections', { storeId, expectedCashUsd: D(expectedCashUsd).toString() }, key);
+    const result = await call('POST', '/cash-collections', { storeId, expectedCashUsd: D(expectedCashUsd).toString() }, key);
+    // The test packs many business days into one real day; a closed shift takes no more sales,
+    // so the next sale starts a new "day" with no closing yet.
+    await db.dailyCashClosing.deleteMany({ where: { storeId } });
+    return result;
   };
   return { db, call, login, setRate, store, device, sell, reg, bonus, ledger, bonusAccounts, assertReconciled, collect, closeShift };
 }

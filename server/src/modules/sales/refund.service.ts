@@ -8,6 +8,7 @@ import { exchangeCostRestorations, refundOwnerProfit } from './profit';
 import { getOwnersForStore } from '../finance/owner-allocations';
 import { getStoreCashAccount } from '../finance/account.service';
 import { postTransaction } from '../finance/financial-transaction.service';
+import { assertShiftOpen } from '../finance/shift-guard';
 
 interface RefundInput {
   saleId: string;
@@ -89,6 +90,8 @@ export class RefundService {
       if (restockResult.count !== deviceIds.length) {
         throw new Error('Не удалось вернуть устройства на склад — состояние изменилось');
       }
+      // The refund's money leaves today's register, which must still be open.
+      await assertShiftOpen(tx, sale.storeId);
 
       // Undo every trade-in on this sale: a device still on hand gets its pre-exchange cost
       // basis back. One that was already resold had its profit booked against the trade-in

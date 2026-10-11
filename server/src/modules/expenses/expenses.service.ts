@@ -6,6 +6,7 @@ import { requireTodayRate, getBusinessDateKey } from '../exchange-rate/exchange-
 import { requirePositiveMoney, roundMoney } from '../../common/money';
 import { getStoreCashAccount } from '../finance/account.service';
 import { postTransaction, cancelTransaction } from '../finance/financial-transaction.service';
+import { assertShiftOpen } from '../finance/shift-guard';
 import { currentOwnerAllocations, readOwnerAllocations, replaceOwnerAllocations } from '../finance/owner-allocations';
 import type { OwnerProfitAllocation } from '../sales/profit';
 
@@ -140,6 +141,8 @@ export async function createExpense(tx: TransactionClient, input: CreateExpenseI
 
   if (writesOffCash) {
     if (!cashStore) throw new Error('Касса для списания расхода не найдена');
+    // A store register's closed day takes no more expenses (Central Cash has no shifts).
+    await assertShiftOpen(tx, cashStore.id);
     const cashGuard = await tx.store.updateMany({
       where: { id: cashStore.id, cashBalanceUsd: { gte: amountUsd } },
       data: { cashBalanceUsd: { decrement: amountUsd } },
@@ -367,6 +370,8 @@ export async function updateExpense(
       const isOldCentral = existing.sourceAccount === 'Центральная касса' || isOldSalaryOrAdvance || !existing.storeId;
       const oldCashStoreId = paidFromStoreId ?? (isOldCentral ? centralStore?.id : existing.storeId);
       if (oldCashStoreId) {
+        // Editing a paid expense moves money in the registers today.
+        await assertShiftOpen(tx, oldCashStoreId);
         await tx.store.update({
           where: { id: oldCashStoreId },
           data: { cashBalanceUsd: { increment: existing.amountUsd ?? roundMoney(D(existing.amountTjs).div(rate)) } },
@@ -385,6 +390,7 @@ export async function updateExpense(
         ? await tx.store.findUnique({ where: { id: paidFromStoreId } })
         : isCentral ? (centralStore || newStore) : (newStore || centralStore);
       if (!targetStore) throw new Error('Касса для списания расхода не найдена');
+      await assertShiftOpen(tx, targetStore.id);
       const cashGuard = await tx.store.updateMany({
         where: { id: targetStore.id, cashBalanceUsd: { gte: newAmountUsd } },
         data: { cashBalanceUsd: { decrement: newAmountUsd } },
@@ -508,6 +514,8 @@ export async function deleteExpense(id: string, actorId: string) {
       const isCentral = existing.sourceAccount === 'Центральная касса' || isSalaryOrAdvance || !existing.storeId;
       const targetStoreId = (await paidExpenseStoreId(tx, id)) ?? (isCentral ? centralStore?.id : existing.storeId);
       if (targetStoreId) {
+        // Cancelling a paid expense returns its money to that register today.
+        await assertShiftOpen(tx, targetStoreId);
         await tx.store.update({
           where: { id: targetStoreId },
           data: { cashBalanceUsd: { increment: existing.amountUsd ?? roundMoney(D(existing.amountTjs).div(existing.exchangeRate || (await requireTodayRate(tx)))) } },

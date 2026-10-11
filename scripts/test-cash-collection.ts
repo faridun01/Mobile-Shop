@@ -173,7 +173,11 @@ try {
   // ---------- repeated / concurrent collections ----------
   const empty = await call(admin, 'POST', '/cash-collections', { storeId: 'store-siyoma', expectedCashUsd: '0' });
   assert.equal(empty.status, 400, JSON.stringify(empty));
+  // A closed shift takes no more sales: the next sale belongs to a new business day (simulated
+  // here by dropping today's closing), which is closed again before it is collected.
+  await db.dailyCashClosing.deleteMany({ where: { storeId: 'store-siyoma' } });
   await sell(330, 'CASH', 330, 0);                                 // +330 TJS at 12 → $27.50
+  assert.equal((await call(seller, 'POST', '/daily-closings', {})).status, 201);
   const two = await Promise.all([1, 2].map(() => call(admin, 'POST', '/cash-collections', { storeId: 'store-siyoma', expectedCashUsd: '27.5' })));
   assert.equal(two.filter((r) => r.status === 201).length, 1, JSON.stringify(two));
   assert(two.every((r) => [201, 400, 409].includes(r.status)), JSON.stringify(two));

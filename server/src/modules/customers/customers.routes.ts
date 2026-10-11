@@ -11,11 +11,19 @@ export function registerCustomerRoutes(app: Express) {
       const storeId = typeof req.query.storeId === 'string' && req.query.storeId !== 'all' ? req.query.storeId : undefined;
       const summary = await CustomersService.getCashDeskSummary(storeId);
       // Supplier debt and the Central Cash balance are business-wide data, ADMIN-only like
-      // /api/suppliers and /api/cash-collections.
+      // /api/suppliers and /api/cash-collections; so is the stock's purchase cost (store staff
+      // see what is in stock, not what it cost).
       if (req.user!.role !== 'ADMIN') {
         res.json({
           ...summary,
           cash: { ...summary.cash, central: undefined },
+          inventory: {
+            ...summary.inventory,
+            totalCostUsd: 0,
+            totalCostTjs: 0,
+            models: summary.inventory.models.map((m) => ({ ...m, avgCostUsd: 0, totalCostUsd: 0, totalCostTjs: 0 })),
+            items: summary.inventory.items.map((item) => ({ ...item, costBasisUsd: 0, costBasisTjs: 0 })),
+          },
           suppliers: { totalDebtUsd: 0, totalDebtTjs: 0, debtorsCount: 0, suppliers: [] },
         });
         return;

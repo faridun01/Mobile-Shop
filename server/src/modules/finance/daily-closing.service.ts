@@ -318,6 +318,9 @@ export class DailyClosingService {
     }
 
     return prisma.$transaction(async (tx: TransactionClient) => {
+      // Same store-row lock every register operation takes (assertShiftOpen): an operation either
+      // commits before the closing counts the day, or sees the closing and is refused.
+      await tx.$queryRaw`SELECT id FROM stores WHERE id = ${input.storeId} FOR UPDATE`;
       const actor = await resolveActor(tx, userId);
       const store = await tx.store.findUnique({
         where: { id: input.storeId },
@@ -492,6 +495,21 @@ export class DailyClosingService {
       });
       if (!closing) {
         throw Object.assign(new Error('Запись закрытия смены не найдена'), { statusCode: 404 });
+      }
+
+      // A collected day stays closed: its money already went to Central Cash, and closing it again
+      // would put it into the next collection a second time. Cancelling that collection first
+      // (which returns the money to the store) makes the day reopenable again.
+      await tx.$queryRaw`SELECT id FROM stores WHERE id = ${closing.storeId} FOR UPDATE`;
+      const collected = await tx.cashHandover.findFirst({
+        where: { storeId: closing.storeId, cancelledAt: null, createdAt: { gt: closing.createdAt } },
+        select: { id: true, createdAt: true },
+      });
+      if (collected) {
+        throw Object.assign(
+          new Error(`Смену за ${closing.businessDate} нельзя переоткрыть: по ней уже проведена инкассация. Сначала отмените инкассацию, затем переоткройте смену.`),
+          { statusCode: 409 },
+        );
       }
 
       await tx.dailyCashClosing.delete({ where: { id } });

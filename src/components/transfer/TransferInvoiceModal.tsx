@@ -53,6 +53,8 @@ export const TransferInvoiceModal: React.FC<TransferInvoiceModalProps> = ({
 
   const items = getTransferInvoiceItems(transfer, devicesById, devicesByImei);
   const totalCostUsd = items.reduce((sum, item) => sum + item.costUsd, 0);
+  // Purchase cost is ADMIN-only; store staff get the transfer note without it.
+  const showCost = currentUser?.role === 'ADMIN';
 
   const formattedDate = new Date(transfer.requestedAt).toLocaleDateString('ru-RU', {
     day: '2-digit',
@@ -336,8 +338,8 @@ export const TransferInvoiceModal: React.FC<TransferInvoiceModalProps> = ({
                     <th className="py-2.5 px-3">Наименование</th>
                     <th className="py-2.5 px-3">IMEI</th>
                     <th className="py-2.5 px-3 w-16 text-center">Кол-во</th>
-                    <th className="py-2.5 px-3 w-28 text-right">Оценка ($)</th>
-                    <th className="py-2.5 px-3 w-28 text-right">Сумма ($)</th>
+                    {showCost && <th className="py-2.5 px-3 w-28 text-right">Оценка ($)</th>}
+                    {showCost && <th className="py-2.5 px-3 w-28 text-right">Сумма ($)</th>}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border/60 print-border-black">
@@ -383,12 +385,16 @@ export const TransferInvoiceModal: React.FC<TransferInvoiceModalProps> = ({
                       <td className="py-2.5 px-3 text-center font-bold text-fg">
                         1 шт.
                       </td>
-                      <td className="py-2.5 px-3 text-right font-mono text-fg-muted">
-                        {it.costUsd > 0 ? `$${formatMoney(it.costUsd)}` : '—'}
-                      </td>
-                      <td className="py-2.5 px-3 text-right font-mono font-bold text-fg">
-                        {it.costUsd > 0 ? `$${formatMoney(it.costUsd)}` : '—'}
-                      </td>
+                      {showCost && (
+                        <td className="py-2.5 px-3 text-right font-mono text-fg-muted">
+                          {it.costUsd > 0 ? `$${formatMoney(it.costUsd)}` : '—'}
+                        </td>
+                      )}
+                      {showCost && (
+                        <td className="py-2.5 px-3 text-right font-mono font-bold text-fg">
+                          {it.costUsd > 0 ? `$${formatMoney(it.costUsd)}` : '—'}
+                        </td>
+                      )}
                     </tr>
                   ))}
                 </tbody>
@@ -400,12 +406,16 @@ export const TransferInvoiceModal: React.FC<TransferInvoiceModalProps> = ({
                     <td className="py-2.5 px-3 text-center font-mono text-accent">
                       {items.length} шт.
                     </td>
-                    <td className="py-2.5 px-3 text-right text-fg-subtle text-[11px]">
-                      Всего:
-                    </td>
-                    <td className="py-2.5 px-3 text-right font-mono text-sm text-accent font-black">
-                      ${formatMoney(totalCostUsd)}
-                    </td>
+                    {showCost && (
+                      <td className="py-2.5 px-3 text-right text-fg-subtle text-[11px]">
+                        Всего:
+                      </td>
+                    )}
+                    {showCost && (
+                      <td className="py-2.5 px-3 text-right font-mono text-sm text-accent font-black">
+                        ${formatMoney(totalCostUsd)}
+                      </td>
+                    )}
                   </tr>
                 </tfoot>
               </table>

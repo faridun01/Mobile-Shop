@@ -4,6 +4,7 @@ import { requireTodayRate, getRateForDate } from '../exchange-rate/exchange-rate
 import { requirePositiveMoney, roundMoney } from '../../common/money';
 import { getStoreCashAccount } from '../finance/account.service';
 import { postTransaction } from '../finance/financial-transaction.service';
+import { assertShiftOpen } from '../finance/shift-guard';
 import { currentOwnerAllocations, replaceOwnerAllocations } from '../finance/owner-allocations';
 import type { OwnerProfitAllocation } from '../sales/profit';
 import { allocateMoney } from '../../common/allocation';
@@ -230,6 +231,8 @@ export class CustomersService {
     const amountTjs = requirePositiveMoney(input.amountTjs, 'Сумма оплаты');
 
     return await prisma.$transaction(async (tx: TransactionClient) => {
+      // The repayment goes into today's register of that store, which must still be open.
+      if (input.storeId) await assertShiftOpen(tx, input.storeId);
       const customer = await tx.customer.findUnique({ where: { id: input.customerId } });
       if (!customer) throw new Error('Клиент не найден');
       if (D(customer.totalDebtTjs).lte(0)) {
@@ -262,6 +265,7 @@ export class CustomersService {
         storeId = defaultStore?.id;
       }
       if (!storeId) throw new Error('Не удалось определить магазин для внесения оплаты в кассу');
+      if (!input.storeId) await assertShiftOpen(tx, storeId);
 
       const store = await tx.store.findUnique({ where: { id: storeId } });
       if (!store) throw new Error('Магазин не найден');

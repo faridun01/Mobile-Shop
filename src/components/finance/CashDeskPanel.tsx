@@ -158,7 +158,7 @@ export const CashDeskPanel: React.FC<CashDeskPanelProps> = ({ storeId }) => {
               Склад товаров
             </span>
             <div className="text-lg sm:text-xl font-black font-mono text-indigo-600 dark:text-indigo-400 leading-tight tabular-nums">
-              ${formatMoney(summaryData?.inventory.totalCostUsd || 0)}
+              {isAdmin ? `$${formatMoney(summaryData?.inventory.totalCostUsd || 0)}` : `${summaryData?.inventory.totalCount || 0} шт.`}
             </div>
           </div>
           <div className="pt-2 border-t border-border/50 text-[10.5px] text-fg-subtle flex flex-col gap-0.5">

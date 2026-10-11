@@ -9,6 +9,7 @@ const db = vi.hoisted(() => {
     supplier: model(), supplierInvoice: model(), supplierPayment: model(), supplierPaymentAllocation: model(),
     store: model(), ledgerEntry: model(), auditLog: model(), sale: model(), owner: model(), device: model(), deviceTimelineEvent: model(),
     financialAccount: model(), financialTransaction: model(), financialCategory: model(), bonusPoolEntry: model(),
+    dailyCashClosing: model(),
     storeProfitShare: { ...model(), count: vi.fn() },
     $queryRaw: vi.fn(),
   };

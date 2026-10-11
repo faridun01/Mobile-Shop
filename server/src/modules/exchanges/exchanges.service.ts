@@ -7,6 +7,7 @@ import { allocateOwnerProfit } from '../sales/profit';
 import { getOwnersForStore } from '../finance/owner-allocations';
 import { getStoreCashAccount } from '../finance/account.service';
 import { postTransaction } from '../finance/financial-transaction.service';
+import { assertShiftOpen } from '../finance/shift-guard';
 
 interface ExchangeInput {
   saleId: string;
@@ -100,6 +101,8 @@ export class ExchangesService {
       if (soldResult.count !== 1) {
         throw new Error('Телефон на замену был продан параллельно, повторите попытку');
       }
+      // The settlement is money of today's register, which must still be open.
+      await assertShiftOpen(tx, sale.storeId);
       await tx.deviceTimelineEvent.create({
         data: {
           deviceId: replacementDevice.id,

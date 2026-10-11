@@ -6,6 +6,7 @@ import { prisma } from '../../prisma/prisma.service';
 import { RefundService } from './refund.service';
 import { RealtimeSyncGateway } from '../../websocket/websocket.gateway';
 import { calculateRecognizedProfit } from './profit';
+import { hideSaleCosts } from './sale-visibility';
 import { dateRangeForPeriod, dateRangeForCustomDates, type ReportPeriod } from '../reports/reports.service';
 
 const VALID_PERIODS: ReportPeriod[] = ['TODAY', 'MONTH', 'SPECIFIC_MONTH', 'ALL'];
@@ -89,18 +90,17 @@ export function registerRefundRoutes(app: Express) {
         // The dollars that left the register on the refund (its own day's rate), as recorded then.
         const refundDetails = (profits.get(sale.id) ?? []).find((log) => log.action === 'REFUND')?.financialDetails as Record<string, unknown> | undefined;
         const actualRefundUsd = typeof refundDetails?.amountUsd === 'number' ? refundDetails.amountUsd : undefined;
-        return {
+        return hideSaleCosts({
           ...sale,
           actualRefundUsd,
           saleItems: sale.saleItems.map((item: any) => ({
             ...item,
-            ...(showCost ? {} : { costBasisUsd: 0 }),
             ram: item.device?.ram || item.ram || undefined,
           })),
           recognizedProfitUsd: showCost
             ? calculateRecognizedProfit(profits.get(sale.id) ?? [], D(sale.totalUsd).minus(fallbackCost))
             : undefined,
-        };
+        }, req.user!.role);
       }));
     } catch (error) {
       next(error);

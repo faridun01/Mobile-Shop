@@ -7,6 +7,7 @@ import type { Prisma } from '@prisma/client';
 import { AuthService } from './auth/auth.service';
 import { authenticateJwt, type AuthenticatedRequest, enforceBodyStoreScope, requireRoles } from './auth/auth.middleware';
 import { SalesService } from './modules/sales/sales.service';
+import { hideSaleCosts } from './modules/sales/sale-visibility';
 import { RealtimeSyncGateway } from './websocket/websocket.gateway';
 import { registerTransferRoutes } from './modules/transfers/transfers.routes';
 import { registerRepairRoutes } from './modules/repairs/repairs.routes';
@@ -597,7 +598,8 @@ app.post('/api/sales', authenticateJwt, enforceBodyStoreScope, async (req: Authe
   try {
     const sale = await SalesService.executeSale({ ...req.body, userId: req.user!.userId });
     RealtimeSyncGateway.broadcast('SALE_COMPLETED', { saleId: sale.id, storeId: sale.storeId }, { storeIds: [sale.storeId] });
-    res.status(201).json(sale);
+    // The cashier gets the receipt without the phones' purchase cost.
+    res.status(201).json(hideSaleCosts(sale, req.user!.role));
   } catch (error) {
     next(error);
   }

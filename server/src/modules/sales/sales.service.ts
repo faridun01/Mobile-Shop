@@ -9,6 +9,7 @@ import { allocateOwnerProfit } from './profit';
 import { getOwnersForStore } from '../finance/owner-allocations';
 import { getStoreCashAccount } from '../finance/account.service';
 import { postTransaction } from '../finance/financial-transaction.service';
+import { assertShiftOpen } from '../finance/shift-guard';
 
 interface CreateSaleInput {
   storeId: string;
@@ -94,6 +95,8 @@ export class SalesService {
       if (devices.length !== deviceIds.length) {
         throw new Error('Одно или несколько выбранных устройств недоступны для продажи (уже продано, в ремонте или перемещается)');
       }
+      // No sale on a closed shift: it would belong to no shift.
+      await assertShiftOpen(tx, input.storeId);
       const deviceById = new Map(devices.map((d) => [d.id, d]));
 
       const totalUsd = roundMoney(D(totalTjs).div(rate));

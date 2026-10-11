@@ -48,6 +48,8 @@ await withDisposableApi('merge', async ({ db, env, call }) => {
   await call('POST', '/daily-closings', { storeId: 'store-x' });
   const collected = await call('POST', '/cash-collections', { storeId: 'store-x', expectedCashUsd: '150' });
   assert.equal(collected.status, 201, JSON.stringify(collected));
+  // A closed shift takes no more sales: simulate the next business day by dropping the closing.
+  await db.dailyCashClosing.deleteMany({ where: { storeId: 'store-x' } });
   await setRate(11);
   await sell('store-x', 2200, 100);               // $200
   const expense = await call('POST', '/expenses', { category: 'Аренда', amountTjs: 110, storeId: 'store-x', paidFromCashRegister: true, comment: 'test' });
