@@ -124,6 +124,7 @@ const ThresholdController: React.FC<{
           onChange={(e) => {
             const clean = e.target.value.replace(/\D/g, '').slice(0, 4);
             setVal(clean);
+            valRef.current = clean;
           }}
           onBlur={(e) => commitValue(e.target.value)}
           onKeyDown={(e) => {
@@ -131,6 +132,7 @@ const ThresholdController: React.FC<{
               e.currentTarget.blur();
             } else if (e.key === 'Escape') {
               setVal(String(row.minQuantity));
+              valRef.current = String(row.minQuantity);
               setIsEditing(false);
               e.currentTarget.blur();
             }
