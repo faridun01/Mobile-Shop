@@ -9,6 +9,7 @@ import { getOwnersForStore } from '../finance/owner-allocations';
 import { getStoreCashAccount } from '../finance/account.service';
 import { postTransaction } from '../finance/financial-transaction.service';
 import { assertShiftOpen } from '../finance/shift-guard';
+import { syncStockAlerts } from '../stock-thresholds/stock-alerts';
 
 interface RefundInput {
   saleId: string;
@@ -92,6 +93,7 @@ export class RefundService {
       }
       // The refund's money leaves today's register, which must still be open.
       await assertShiftOpen(tx, sale.storeId);
+      await syncStockAlerts(tx, [sale.storeId]);
 
       // Undo every trade-in on this sale: a device still on hand gets its pre-exchange cost
       // basis back. One that was already resold had its profit booked against the trade-in

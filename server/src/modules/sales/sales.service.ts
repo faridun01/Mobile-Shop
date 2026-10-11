@@ -10,6 +10,7 @@ import { getOwnersForStore } from '../finance/owner-allocations';
 import { getStoreCashAccount } from '../finance/account.service';
 import { postTransaction } from '../finance/financial-transaction.service';
 import { assertShiftOpen } from '../finance/shift-guard';
+import { syncStockAlerts } from '../stock-thresholds/stock-alerts';
 
 interface CreateSaleInput {
   storeId: string;
@@ -283,6 +284,7 @@ export class SalesService {
       if (updateResult.count !== deviceIds.length) {
         throw new Error('Одно или несколько устройств были проданы параллельно. Обновите данные и повторите продажу');
       }
+      await syncStockAlerts(tx, [input.storeId]);
 
       await tx.deviceTimelineEvent.createMany({
         data: saleItemsData.map((item) => ({

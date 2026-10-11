@@ -3,6 +3,7 @@ import { notifyAdmins } from '../notifications/notification.service';
 import { onCommit } from '../../common/after-commit';
 import { RealtimeSyncGateway } from '../../websocket/websocket.gateway';
 import { resolveActor } from '../../common/actor';
+import { syncStockAlerts } from '../stock-thresholds/stock-alerts';
 import crypto from 'node:crypto';
 
 function nextTransferNumber(): string {
@@ -73,6 +74,8 @@ export class TransfersService {
       if (holdResult.count !== input.deviceIds.length) {
         throw new Error('Одно или несколько устройств стали недоступны во время перемещения');
       }
+      // Devices held for a transfer are no longer available at the source.
+      await syncStockAlerts(tx, [input.fromStoreId]);
 
       await tx.deviceTimelineEvent.createMany({
         data: devices.map((device) => ({
@@ -168,6 +171,7 @@ export class TransfersService {
       if (moveResult.count !== input.deviceIds.length) {
         throw new Error('Одно или несколько устройств стали недоступны во время перемещения');
       }
+      await syncStockAlerts(tx, [input.fromStoreId, input.toStoreId]);
 
       await tx.deviceTimelineEvent.createMany({
         data: devices.map((device) => ({
@@ -223,6 +227,7 @@ export class TransfersService {
       if (moveResult.count !== deviceIds.length) {
         throw new Error('Состояние устройств изменилось, подтверждение невозможно');
       }
+      await syncStockAlerts(tx, [transfer.fromStoreId, transfer.toStoreId]);
 
       const updated = await tx.transferRequest.update({
         where: { id: transferId },
@@ -292,6 +297,7 @@ export class TransfersService {
       if (revertResult.count !== deviceIds.length) {
         throw new Error('Состояние устройств изменилось, отклонение невозможно');
       }
+      await syncStockAlerts(tx, [transfer.fromStoreId]);
 
       const updated = await tx.transferRequest.update({
         where: { id: transferId },

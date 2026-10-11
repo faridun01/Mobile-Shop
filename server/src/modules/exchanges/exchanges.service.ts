@@ -8,6 +8,7 @@ import { getOwnersForStore } from '../finance/owner-allocations';
 import { getStoreCashAccount } from '../finance/account.service';
 import { postTransaction } from '../finance/financial-transaction.service';
 import { assertShiftOpen } from '../finance/shift-guard';
+import { syncStockAlerts } from '../stock-thresholds/stock-alerts';
 
 interface ExchangeInput {
   saleId: string;
@@ -103,6 +104,7 @@ export class ExchangesService {
       }
       // The settlement is money of today's register, which must still be open.
       await assertShiftOpen(tx, sale.storeId);
+      await syncStockAlerts(tx, [sale.storeId]);
       await tx.deviceTimelineEvent.create({
         data: {
           deviceId: replacementDevice.id,

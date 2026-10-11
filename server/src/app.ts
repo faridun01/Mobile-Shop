@@ -31,6 +31,7 @@ import { registerStockRevisionRoutes } from './modules/revisions/revisions.route
 import { registerStockThresholdRoutes } from './modules/stock-thresholds/stock-thresholds.routes';
 import { registerPhoneCatalogRoutes } from './modules/phone-catalog/phone-catalog.routes';
 import { rememberPhones } from './modules/phone-catalog/phone-catalog.service';
+import { syncStockAlerts } from './modules/stock-thresholds/stock-alerts';
 import { decorateTransactions } from './prisma/prisma.service';
 import { withAuditNotifications } from './modules/notifications/audit-notifications';
 import { requireNonNegativeMoney, requirePositiveMoney, roundMoney } from './common/money';
@@ -318,6 +319,8 @@ app.patch('/api/devices/:id', authenticateJwt, requireRoles('ADMIN', 'PARTNER'),
     });
     // A corrected model name is what autofill suggests from now on.
     await rememberPhones(prisma, [updated]);
+    // A renamed model or capacity counts toward another minimum now.
+    await syncStockAlerts(prisma, [updated.storeId]);
 
     RealtimeSyncGateway.broadcast('INVENTORY_UPDATE', {});
     res.json(updated);
@@ -491,6 +494,7 @@ app.post('/api/purchases', authenticateJwt, requireRoles('ADMIN'), enforceBodySt
       });
       // Every phone received teaches the catalog its model, so the next one fills in by itself.
       await rememberPhones(transaction, normalizedDevices);
+      await syncStockAlerts(transaction, [targetStoreId]);
 
       const unpaidAmountUsd = D(totalAmountUsd).minus(paidAmountUsd);
       await transaction.supplier.update({

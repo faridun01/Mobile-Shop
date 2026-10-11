@@ -1,9 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { StockThresholdsService } from './stock-thresholds.service';
+import { StockThresholdsService, requireMinQuantity } from './stock-thresholds.service';
 
 const db = vi.hoisted(() => {
   const model = () => ({
     findUnique: vi.fn(),
+    findUniqueOrThrow: vi.fn(),
     findFirst: vi.fn(),
     findMany: vi.fn(),
     update: vi.fn(),
@@ -11,9 +12,7 @@ const db = vi.hoisted(() => {
     create: vi.fn(),
     delete: vi.fn(),
   });
-  return {
-    stockThreshold: model(),
-  };
+  return { stockThreshold: model() };
 });
 
 vi.mock('../../prisma/prisma.service', () => ({
@@ -23,81 +22,64 @@ vi.mock('../../prisma/prisma.service', () => ({
   },
 }));
 
+const syncStockAlerts = vi.hoisted(() => vi.fn());
+vi.mock('./stock-alerts', () => ({ ALL_STORAGE: 'ALL', syncStockAlerts }));
+
 describe('StockThresholdsService', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
   it('fetches thresholds for a store', async () => {
-    db.stockThreshold.findMany.mockResolvedValue([
-      { id: 'st-1', storeId: 'store-1', brand: 'Apple', model: 'iPhone 15', storage: '128GB', minQuantity: 5 },
-    ]);
-
-    const result = await StockThresholdsService.getThresholds('store-1');
+    db.stockThreshold.findMany.mockResolvedValue([{ id: 'st-1' }]);
+    await StockThresholdsService.getThresholds('store-1');
     expect(db.stockThreshold.findMany).toHaveBeenCalledWith({
       where: { storeId: 'store-1' },
       orderBy: [{ brand: 'asc' }, { model: 'asc' }, { storage: 'asc' }],
     });
-    expect(result).toHaveLength(1);
-    expect(result[0].minQuantity).toBe(5);
   });
 
-  it('upserts a threshold with sanitized values', async () => {
-    db.stockThreshold.upsert.mockResolvedValue({
-      id: 'st-1',
-      storeId: 'store-1',
-      brand: 'Apple',
-      model: 'iPhone 15',
-      storage: '128GB',
-      minQuantity: 6,
-    });
+  it('sets a minimum for any model and records the current state without notifying', async () => {
+    db.stockThreshold.upsert.mockResolvedValue({ id: 'st-1' });
+    db.stockThreshold.findUniqueOrThrow.mockResolvedValue({ id: 'st-1', belowMinimum: true });
 
-    const result = await StockThresholdsService.upsertThreshold({
-      storeId: 'store-1',
-      brand: '  Apple ',
-      model: ' iPhone 15 ',
-      storage: ' 128GB ',
-      minQuantity: 6.7,
-    });
+    const result = await StockThresholdsService.upsertThreshold({ storeId: 'store-1', brand: ' Apple ', model: ' iPhone 17 ', storage: '', minQuantity: 3 });
 
     expect(db.stockThreshold.upsert).toHaveBeenCalledWith({
-      where: {
-        storeId_brand_model_storage: {
-          storeId: 'store-1',
-          brand: 'Apple',
-          model: 'iPhone 15',
-          storage: '128GB',
-        },
-      },
-      update: { minQuantity: 6 },
-      create: {
-        storeId: 'store-1',
-        brand: 'Apple',
-        model: 'iPhone 15',
-        storage: '128GB',
-        minQuantity: 6,
-      },
+      where: { storeId_brand_model_storage: { storeId: 'store-1', brand: 'Apple', model: 'iPhone 17', storage: 'ALL' } },
+      update: { minQuantity: 3 },
+      create: { storeId: 'store-1', brand: 'Apple', model: 'iPhone 17', storage: 'ALL', minQuantity: 3 },
     });
-    expect(result.minQuantity).toBe(6);
+    expect(syncStockAlerts).toHaveBeenCalledWith(db, ['store-1'], { notify: false });
+    expect(result).toEqual({ id: 'st-1', belowMinimum: true });
   });
 
-  it('handles batch upsert in a transaction', async () => {
-    db.stockThreshold.upsert.mockImplementation((args: any) => Promise.resolve({ id: 'id-1', ...args.create }));
-
-    const items = [
-      { brand: 'Apple', model: 'iPhone 15', storage: '128GB', minQuantity: 5 },
-      { brand: 'Samsung', model: 'S24', storage: '256GB', minQuantity: 3 },
-    ];
-
-    const results = await StockThresholdsService.batchUpsertThresholds('store-1', items);
-    expect(results).toHaveLength(2);
+  it('saves a batch in one transaction', async () => {
+    db.stockThreshold.upsert.mockResolvedValueOnce({ id: 'a' }).mockResolvedValueOnce({ id: 'b' });
+    db.stockThreshold.findMany.mockResolvedValue([{ id: 'a' }, { id: 'b' }]);
+    await StockThresholdsService.batchUpsertThresholds('store-1', [
+      { brand: 'Apple', model: 'iPhone 15', storage: '128 GB', minQuantity: 2 },
+      { brand: 'Samsung', model: 'Galaxy S25', storage: 'ALL', minQuantity: '4' },
+    ]);
     expect(db.stockThreshold.upsert).toHaveBeenCalledTimes(2);
+    expect(syncStockAlerts).toHaveBeenCalledTimes(1);
   });
 
-  it('deletes a threshold by id', async () => {
-    db.stockThreshold.delete.mockResolvedValue({ id: 'st-1' });
-    const result = await StockThresholdsService.deleteThreshold('st-1');
-    expect(db.stockThreshold.delete).toHaveBeenCalledWith({ where: { id: 'st-1' } });
-    expect(result.id).toBe('st-1');
+  it('rejects a minimum that is not a whole non-negative number', () => {
+    expect(requireMinQuantity(5)).toBe(5);
+    expect(requireMinQuantity('7')).toBe(7);
+    expect(() => requireMinQuantity(-1)).toThrow('целым числом');
+    expect(() => requireMinQuantity(2.5)).toThrow('целым числом');
+    expect(() => requireMinQuantity('abc')).toThrow('целым числом');
+  });
+
+  it('lets a partner delete only a minimum of their own store', async () => {
+    db.stockThreshold.findUnique.mockResolvedValue({ storeId: 'store-2' });
+    await expect(StockThresholdsService.deleteThreshold('st-1', { role: 'PARTNER', storeId: 'store-1' })).rejects.toMatchObject({ statusCode: 403 });
+    expect(db.stockThreshold.delete).not.toHaveBeenCalled();
+
+    await StockThresholdsService.deleteThreshold('st-1', { role: 'PARTNER', storeId: 'store-2' });
+    await StockThresholdsService.deleteThreshold('st-1', { role: 'ADMIN' });
+    expect(db.stockThreshold.delete).toHaveBeenCalledTimes(2);
   });
 });

@@ -40,7 +40,7 @@ export function registerStockThresholdRoutes(app: Express) {
           return;
         }
 
-        if (user.role === 'PARTNER' && user.storeId && user.storeId !== storeId) {
+        if (user.role === 'PARTNER' && user.storeId !== storeId) {
           res.status(403).json({ message: 'Вы можете настраивать лимиты только для своего магазина' });
           return;
         }
@@ -50,7 +50,7 @@ export function registerStockThresholdRoutes(app: Express) {
           brand,
           model,
           storage: storage || 'ALL',
-          minQuantity: Number(minQuantity) || 0,
+          minQuantity,
         });
 
         RealtimeSyncGateway.broadcast('STOCK_THRESHOLD_UPDATED', {
@@ -80,7 +80,7 @@ export function registerStockThresholdRoutes(app: Express) {
           return;
         }
 
-        if (user.role === 'PARTNER' && user.storeId && user.storeId !== storeId) {
+        if (user.role === 'PARTNER' && user.storeId !== storeId) {
           res.status(403).json({ message: 'Вы можете настраивать лимиты только для своего магазина' });
           return;
         }
@@ -107,7 +107,7 @@ export function registerStockThresholdRoutes(app: Express) {
     async (req: AuthenticatedRequest, res, next) => {
       try {
         const { id } = req.params;
-        await StockThresholdsService.deleteThreshold(id);
+        await StockThresholdsService.deleteThreshold(id, req.user!);
         RealtimeSyncGateway.broadcast('STOCK_THRESHOLD_UPDATED', { deletedId: id });
         res.json({ success: true });
       } catch (error) {

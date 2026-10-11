@@ -25,6 +25,22 @@ export async function findPhoneByImei(imei: string): Promise<CatalogPhone | null
   return entry ? { brand: entry.brand, model: entry.model, ram: entry.ram, storage: entry.storage } : null;
 }
 
+/** Model names for a picker (e.g. setting a minimum for a model not in stock yet). */
+export async function searchCatalogModels(query: string, brand?: string): Promise<Array<{ brand: string; model: string }>> {
+  const q = query.trim();
+  if (q.length < 2) return [];
+  return prisma.phoneCatalog.findMany({
+    where: {
+      model: { contains: q, mode: 'insensitive' },
+      ...(brand?.trim() ? { brand: { equals: brand.trim(), mode: 'insensitive' } } : {}),
+    },
+    distinct: ['brand', 'model'],
+    select: { brand: true, model: true },
+    orderBy: [{ brand: 'asc' }, { model: 'asc' }],
+    take: 20,
+  });
+}
+
 const filled = (value: string | null | undefined) => (typeof value === 'string' && value.trim() ? value.trim() : undefined);
 
 /**

@@ -10,6 +10,7 @@ const db = vi.hoisted(() => {
     store: model(), ledgerEntry: model(), auditLog: model(), sale: model(), owner: model(), device: model(), deviceTimelineEvent: model(),
     financialAccount: model(), financialTransaction: model(), financialCategory: model(), bonusPoolEntry: model(),
     dailyCashClosing: model(),
+    stockThreshold: model(),
     storeProfitShare: { ...model(), count: vi.fn() },
     $queryRaw: vi.fn(),
   };
@@ -22,6 +23,8 @@ import { RefundService } from './sales/refund.service';
 
 beforeEach(() => {
   vi.resetAllMocks();
+  // No minimum-stock thresholds set: the stock-alert check after a sale or refund has nothing to do.
+  db.stockThreshold.findMany.mockResolvedValue([]);
   db.supplier.findUnique.mockResolvedValue({ id: 'supplier', name: 'Supplier', totalDebtUsd: 200 });
   db.supplierInvoice.findMany.mockResolvedValue([{ id: 'invoice', invoiceNumber: '1', totalAmountUsd: 100, paidAmountUsd: 0 }]);
   db.supplierInvoice.findUnique.mockResolvedValue({ id: 'invoice', supplierId: 'supplier', totalAmountUsd: 100, paidAmountUsd: 50 });

@@ -27,6 +27,13 @@ import { Badge } from '../ui/Badge';
 import { StatCard } from '../ui/StatCard';
 import { LoadingState } from '../ui/Skeleton';
 import { EmptyState } from '../ui/EmptyState';
+import { Button } from '../ui/Button';
+import { AddThresholdDialog } from '../stock/AddThresholdDialog';
+
+/** A minimum set for every capacity of a model together (the server's ALL_STORAGE). */
+const ALL_STORAGE = 'ALL';
+const isAllStorage = (storage: string) => storage.trim().toUpperCase() === ALL_STORAGE;
+const storageLabel = (storage: string) => (isAllStorage(storage) ? 'Все объёмы' : storage);
 
 interface ModelRowData {
   key: string;
@@ -80,6 +87,7 @@ export const StockThresholdsPage: React.FC = () => {
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'DEFICIT' | 'AT_RISK' | 'NORMAL' | 'NONE'>('ALL');
   const [savingKeys, setSavingKeys] = useState<Record<string, boolean>>({});
   const [savedSuccessKeys, setSavedSuccessKeys] = useState<Record<string, boolean>>({});
+  const [isAddOpen, setIsAddOpen] = useState(false);
 
   // Fetch thresholds for selected store
   const fetchThresholds = useCallback(async () => {
@@ -123,6 +131,8 @@ export const StockThresholdsPage: React.FC = () => {
 
     // Distinct models across whole catalog or existing thresholds
     const rowMap = new Map<string, { brand: string; model: string; storage: string; currentCount: number }>();
+    // Stock of each model over all its capacities, for "all capacities" minimums.
+    const modelTotals = new Map<string, number>();
 
     // Step A: Catalog variants from devices
     for (const d of devices) {
@@ -140,10 +150,13 @@ export const StockThresholdsPage: React.FC = () => {
       // Check if device is in stock at the chosen store
       if (d.locationId === selectedStoreId && IN_STOCK_STATUSES.includes(d.status)) {
         row.currentCount++;
+        const modelKey = buildThresholdKey(brand, model, ALL_STORAGE);
+        modelTotals.set(modelKey, (modelTotals.get(modelKey) ?? 0) + 1);
       }
     }
 
-    // Step B: Ensure existing configured thresholds appear even if 0 currently in stock
+    // Step B: Ensure existing configured thresholds appear even if 0 currently in stock; an
+    // "all capacities" minimum counts the model's whole stock.
     for (const t of thresholds) {
       const key = buildThresholdKey(t.brand, t.model, t.storage);
       if (!rowMap.has(key)) {
@@ -151,7 +164,7 @@ export const StockThresholdsPage: React.FC = () => {
           brand: t.brand,
           model: t.model,
           storage: t.storage,
-          currentCount: 0,
+          currentCount: isAllStorage(t.storage) ? modelTotals.get(buildThresholdKey(t.brand, t.model, ALL_STORAGE)) ?? 0 : 0,
         });
       }
     }
@@ -347,6 +360,12 @@ export const StockThresholdsPage: React.FC = () => {
           </div>
         )}
 
+        {canEdit && (
+          <Button variant="primary" size="sm" leftIcon={Plus} onClick={() => setIsAddOpen(true)} className="self-start md:self-auto shrink-0">
+            Добавить модель
+          </Button>
+        )}
+
         {!isAdmin && (
           <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-surface-raised border border-border text-xs font-bold text-fg self-start md:self-auto">
             {currentStore?.isMainWarehouse ? <Warehouse className="w-4 h-4 text-amber-500" /> : <StoreIcon className="w-4 h-4 text-accent" />}
@@ -529,7 +548,7 @@ export const StockThresholdsPage: React.FC = () => {
                           {row.model}
                         </span>
                         <span className="px-1.5 py-0.5 rounded text-[10px] font-bold font-mono bg-surface-raised border border-border text-fg-muted shrink-0">
-                          {row.storage}
+                          {storageLabel(row.storage)}
                         </span>
                       </div>
                       <span className="text-[11px] text-fg-subtle block">
@@ -690,6 +709,15 @@ export const StockThresholdsPage: React.FC = () => {
           })}
         </div>
       )}
+
+      <AddThresholdDialog
+        open={isAddOpen}
+        onClose={() => setIsAddOpen(false)}
+        storeId={selectedStoreId}
+        storeName={currentStore?.isMainWarehouse ? 'Главный склад' : currentStore?.name || 'Магазин'}
+        devices={devices}
+        onSaved={fetchThresholds}
+      />
     </div>
   );
 };

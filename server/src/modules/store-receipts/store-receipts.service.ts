@@ -1,6 +1,7 @@
 import crypto from 'node:crypto';
 import { prisma, type TransactionClient } from '../../prisma/prisma.service';
 import { resolveActor } from '../../common/actor';
+import { syncStockAlerts } from '../stock-thresholds/stock-alerts';
 import { onCommit } from '../../common/after-commit';
 import { notifyAdmins } from '../notifications/notification.service';
 import { receiptNotificationText } from '../notifications/notification-text';
@@ -104,6 +105,7 @@ export class StoreReceiptsService {
         data: { storeId: store.id, status: 'STORE_STOCK' },
       });
       if (moved.count !== chosen.length) throw fail('Часть телефонов уже перемещена. Обновите список и повторите', 409);
+      await syncStockAlerts(tx, [warehouse.id, store.id]);
 
       const receiptNumber = nextReceiptNumber();
       const receipt = await tx.storeReceipt.create({

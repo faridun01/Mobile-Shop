@@ -10,6 +10,7 @@ import type { OwnerProfitAllocation } from '../sales/profit';
 import { cancelTransaction, postTransaction } from '../finance/financial-transaction.service';
 import { allocateMoney } from '../../common/allocation';
 import { rememberPhones } from '../phone-catalog/phone-catalog.service';
+import { syncStockAlerts } from '../stock-thresholds/stock-alerts';
 
 /** True if any of these devices has a sale, transfer, or repair record referencing it (hard FK, no cascade). */
 async function deviceHasTransactionHistory(tx: TransactionClient, deviceIds: string[]): Promise<boolean> {
@@ -394,6 +395,7 @@ export class SuppliersService {
             data: { bonusId: bonus.id, deviceId: created.id, brand: device.brand, model: device.model, storage: device.storage, color: device.color, imei: device.imei, costBasisUsd },
           });
           await rememberPhones(tx, [created]);
+          await syncStockAlerts(tx, [storeId]);
         }
       }
       // A cash bonus is no owner profit and never passes through a store register: it is
@@ -705,6 +707,7 @@ export class SuppliersService {
       if (invoiceDeviceIds.length > 0) {
         await tx.deviceTimelineEvent.deleteMany({ where: { deviceId: { in: invoiceDeviceIds } } });
         await tx.device.deleteMany({ where: { id: { in: invoiceDeviceIds } } });
+        await syncStockAlerts(tx, [invoice.storeId]);
       }
 
       // Atomic guarded decrement, not a read-then-write — matches create's atomic
