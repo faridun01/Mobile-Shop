@@ -4,13 +4,15 @@ import { cn } from '../../utils/cn';
 import { IconButton } from './IconButton';
 import { ModalLayer } from './ModalLayer';
 
-type MaxWidth = 'sm' | 'md' | 'lg' | 'xl';
+type MaxWidth = 'sm' | 'md' | 'lg' | 'xl' | '2xl' | '3xl';
 
 const MAX_WIDTH_CLASSES: Record<MaxWidth, string> = {
   sm: 'md:max-w-sm',
   md: 'md:max-w-md',
   lg: 'md:max-w-lg',
   xl: 'md:max-w-2xl',
+  '2xl': 'md:max-w-3xl',
+  '3xl': 'md:max-w-4xl',
 };
 
 interface DialogProps {

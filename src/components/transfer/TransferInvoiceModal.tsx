@@ -135,23 +135,25 @@ export const TransferInvoiceModal: React.FC<TransferInvoiceModalProps> = ({
         onClose={onClose}
         title={`Накладная на перемещение №${transfer.transferNumber || transfer.id.slice(-6)}`}
         subtitle={`${transfer.fromLocationName} ➔ ${transfer.toLocationName} · ${formattedDate} ${formattedTime}`}
-        maxWidth="xl"
+        maxWidth="3xl"
+        compact
+        contentClassName="p-2 sm:p-3"
         footer={
-          <div className="flex flex-wrap items-center justify-between gap-2.5 w-full">
-            <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center justify-between gap-2 w-full">
+            <div className="flex items-center gap-1.5">
               <button
                 type="button"
                 onClick={handlePrint}
-                className="px-3.5 py-2 rounded-xl bg-surface-raised hover:bg-surface border border-border text-xs font-bold text-fg transition-all flex items-center gap-2 cursor-pointer shadow-xs"
+                className="px-3 py-1.5 rounded-lg bg-surface-raised hover:bg-surface border border-border text-xs font-semibold text-fg transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs"
               >
                 <Printer className="w-3.5 h-3.5 text-accent" />
-                <span>Печать накладной</span>
+                <span>Печать</span>
               </button>
 
               <button
                 type="button"
                 onClick={handleCopy}
-                className="px-3.5 py-2 rounded-xl bg-surface-raised hover:bg-surface border border-border text-xs font-semibold text-fg-muted hover:text-fg transition-all flex items-center gap-2 cursor-pointer shadow-xs"
+                className="px-3 py-1.5 rounded-lg bg-surface-raised hover:bg-surface border border-border text-xs font-medium text-fg-muted hover:text-fg transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs"
               >
                 {copied ? (
                   <>
@@ -161,13 +163,13 @@ export const TransferInvoiceModal: React.FC<TransferInvoiceModalProps> = ({
                 ) : (
                   <>
                     <Copy className="w-3.5 h-3.5" />
-                    <span>Скопировать текст</span>
+                    <span>Скопировать</span>
                   </>
                 )}
               </button>
             </div>
 
-            <div className="flex items-center gap-2 ml-auto">
+            <div className="flex items-center gap-1.5 ml-auto">
               {canApprove && (
                 <>
                   {onRequestReject && (
@@ -178,7 +180,7 @@ export const TransferInvoiceModal: React.FC<TransferInvoiceModalProps> = ({
                         onRequestReject(transfer);
                       }}
                       disabled={processingTransferId === transfer.id}
-                      className="px-3 py-2 rounded-xl bg-danger/10 hover:bg-danger/15 text-danger border border-danger/30 text-xs font-bold transition-all cursor-pointer disabled:opacity-50 flex items-center gap-1.5"
+                      className="px-3 py-1.5 rounded-lg bg-danger/10 hover:bg-danger/15 text-danger border border-danger/30 text-xs font-bold transition-all cursor-pointer disabled:opacity-50 flex items-center gap-1.5"
                     >
                       <XCircle className="w-3.5 h-3.5" />
                       <span>Отклонить</span>
@@ -189,7 +191,7 @@ export const TransferInvoiceModal: React.FC<TransferInvoiceModalProps> = ({
                       type="button"
                       onClick={() => onApprove(transfer.id)}
                       disabled={processingTransferId === transfer.id}
-                      className="px-4 py-2 rounded-xl bg-accent hover:bg-accent-strong text-accent-fg text-xs font-bold shadow-xs transition-all cursor-pointer disabled:opacity-60 flex items-center gap-2"
+                      className="px-3.5 py-1.5 rounded-lg bg-accent hover:bg-accent-strong text-accent-fg text-xs font-bold shadow-2xs transition-all cursor-pointer disabled:opacity-60 flex items-center gap-1.5"
                     >
                       {processingTransferId === transfer.id ? (
                         <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -205,7 +207,7 @@ export const TransferInvoiceModal: React.FC<TransferInvoiceModalProps> = ({
               <button
                 type="button"
                 onClick={onClose}
-                className="px-4 py-2 rounded-xl bg-surface-raised hover:bg-surface border border-border text-xs font-semibold text-fg-muted hover:text-fg transition-colors cursor-pointer"
+                className="px-3.5 py-1.5 rounded-lg bg-surface-raised hover:bg-surface border border-border text-xs font-semibold text-fg-muted hover:text-fg transition-colors cursor-pointer"
               >
                 Закрыть
               </button>
@@ -216,40 +218,44 @@ export const TransferInvoiceModal: React.FC<TransferInvoiceModalProps> = ({
         {/* Printable Document Container */}
         <div
           id="transfer-invoice-sheet"
-          className="space-y-5 bg-surface text-fg rounded-xl p-4 sm:p-6 border border-border/80 shadow-2xs font-sans print-border-black print-bg-gray print-text-black"
+          className="space-y-2.5 bg-surface text-fg rounded-xl p-3 sm:p-4 border border-border/80 shadow-2xs font-sans print-border-black print-bg-gray print-text-black"
         >
           {/* Header Block */}
-          <div className="border-b border-border/80 pb-4 space-y-3 print-border-black">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <div>
-                <div className="text-[10px] sm:text-[11px] font-bold tracking-wider uppercase text-fg-subtle">
+          <div className="border-b border-border/80 pb-2.5 print-border-black">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="min-w-0">
+                <div className="text-[10px] font-bold tracking-wider uppercase text-fg-subtle">
                   MOBILE SHOP · СИСТЕМА СКЛАДСКОГО УЧЁТА
                 </div>
-                <h1 className="text-base sm:text-lg font-black text-fg tracking-tight flex items-center gap-2 mt-0.5">
-                  <FileText className="w-5 h-5 text-accent no-print" />
-                  <span>НАКЛАДНАЯ НА ПЕРЕМЕЩЕНИЕ</span>
-                  <span className="font-mono text-accent">№{transfer.transferNumber || transfer.id.slice(-6)}</span>
-                </h1>
-                <p className="text-xs text-fg-subtle mt-0.5">
-                  Дата формирования: <strong>{formattedDate} в {formattedTime}</strong>
-                </p>
+                <div className="flex items-center gap-2 flex-wrap mt-0.5">
+                  <h1 className="text-sm sm:text-base font-black text-fg tracking-tight flex items-center gap-1.5">
+                    <FileText className="w-4 h-4 text-accent no-print shrink-0" />
+                    <span>НАКЛАДНАЯ НА ПЕРЕМЕЩЕНИЕ</span>
+                  </h1>
+                  <span className="font-mono font-bold text-accent text-xs sm:text-sm whitespace-nowrap">
+                    №{transfer.transferNumber || transfer.id.slice(-6)}
+                  </span>
+                </div>
+                <div className="text-[11px] text-fg-subtle mt-0.5">
+                  Дата формирования: <strong className="text-fg">{formattedDate} в {formattedTime}</strong>
+                </div>
               </div>
 
               {/* Status Stamp / Badge */}
-              <div className="self-start sm:self-auto">
+              <div className="shrink-0 self-start sm:self-center">
                 {transfer.status === 'APPROVED' ? (
-                  <div className="px-3 py-1.5 rounded-xl bg-accent/15 border border-accent/40 text-accent font-bold text-xs flex items-center gap-1.5 shadow-2xs">
-                    <CheckCircle2 className="w-4 h-4" />
+                  <div className="px-2.5 py-1 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 font-bold text-[11px] flex items-center gap-1.5 shadow-2xs">
+                    <CheckCircle2 className="w-3.5 h-3.5" />
                     <span>ВЫПОЛНЕНО (ПРИНЯТО)</span>
                   </div>
                 ) : transfer.status === 'PENDING_APPROVAL' ? (
-                  <div className="px-3 py-1.5 rounded-xl bg-warning/15 border border-warning/40 text-warning font-bold text-xs flex items-center gap-1.5 shadow-2xs">
-                    <Clock className="w-4 h-4 animate-pulse" />
-                    <span>ОЖИДАЕТ ПРИЁМКИ (В ПУТИ)</span>
+                  <div className="px-2.5 py-1 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-600 dark:text-amber-400 font-bold text-[11px] flex items-center gap-1.5 shadow-2xs">
+                    <Clock className="w-3.5 h-3.5 animate-pulse" />
+                    <span>ОЖИДАЕТ ПРИЁМКИ</span>
                   </div>
                 ) : (
-                  <div className="px-3 py-1.5 rounded-xl bg-danger/15 border border-danger/40 text-danger font-bold text-xs flex items-center gap-1.5 shadow-2xs">
-                    <XCircle className="w-4 h-4" />
+                  <div className="px-2.5 py-1 rounded-lg bg-danger/10 border border-danger/30 text-danger font-bold text-[11px] flex items-center gap-1.5 shadow-2xs">
+                    <XCircle className="w-3.5 h-3.5" />
                     <span>ОТКЛОНЕНО</span>
                   </div>
                 )}
@@ -258,113 +264,107 @@ export const TransferInvoiceModal: React.FC<TransferInvoiceModalProps> = ({
           </div>
 
           {/* Requisites Block: Sender & Receiver */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 print-border-black">
             {/* Sender */}
-            <div className="p-3 sm:p-3.5 rounded-xl bg-surface-raised/70 border border-border/80 space-y-1.5 print-border-black">
-              <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-wider text-fg-subtle">
-                {isLocationWarehouse(stores, mainWarehouse, transfer.fromLocationId, transfer.fromLocationName) ? (
-                  <Warehouse className="w-3.5 h-3.5 text-accent" />
-                ) : (
-                  <StoreIcon className="w-3.5 h-3.5 text-accent" />
-                )}
-                <span>Отправитель (Сдал)</span>
+            <div className="px-3 py-2 rounded-lg bg-surface-raised/70 border border-border/80 print-border-black">
+              <div className="flex items-center justify-between gap-1 text-[10px] font-bold uppercase tracking-wider text-fg-subtle">
+                <span className="flex items-center gap-1.5">
+                  {isLocationWarehouse(stores, mainWarehouse, transfer.fromLocationId, transfer.fromLocationName) ? (
+                    <Warehouse className="w-3.5 h-3.5 text-accent" />
+                  ) : (
+                    <StoreIcon className="w-3.5 h-3.5 text-accent" />
+                  )}
+                  Отправитель (Сдал)
+                </span>
+                <span className="font-mono text-fg-subtle font-normal lowercase">{formattedDate} {formattedTime}</span>
               </div>
-              <div className="font-bold text-sm text-fg">
+              <div className="font-bold text-xs sm:text-sm text-fg mt-0.5 truncate">
                 {transfer.fromLocationName || '—'}
               </div>
-              <div className="text-xs text-fg-muted space-y-0.5 pt-0.5 border-t border-border/50 print-border-black">
-                <div>
-                  Ответственное лицо: <strong className="text-fg">{transfer.requestedBy || '—'}</strong>
-                </div>
-                <div>
-                  Дата отправки: <span className="font-mono text-fg-subtle">{formattedDate} {formattedTime}</span>
-                </div>
+              <div className="text-[11px] text-fg-muted mt-0.5 flex items-center gap-1">
+                <span>Ответственный:</span>
+                <strong className="text-fg">{transfer.requestedBy || '—'}</strong>
               </div>
             </div>
 
             {/* Receiver */}
-            <div className="p-3 sm:p-3.5 rounded-xl bg-surface-raised/70 border border-border/80 space-y-1.5 print-border-black">
-              <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-wider text-fg-subtle">
-                {isLocationWarehouse(stores, mainWarehouse, transfer.toLocationId, transfer.toLocationName) ? (
-                  <Warehouse className="w-3.5 h-3.5 text-accent" />
-                ) : (
-                  <StoreIcon className="w-3.5 h-3.5 text-accent" />
-                )}
-                <span>Получатель (Принял)</span>
+            <div className="px-3 py-2 rounded-lg bg-surface-raised/70 border border-border/80 print-border-black">
+              <div className="flex items-center justify-between gap-1 text-[10px] font-bold uppercase tracking-wider text-fg-subtle">
+                <span className="flex items-center gap-1.5">
+                  {isLocationWarehouse(stores, mainWarehouse, transfer.toLocationId, transfer.toLocationName) ? (
+                    <Warehouse className="w-3.5 h-3.5 text-accent" />
+                  ) : (
+                    <StoreIcon className="w-3.5 h-3.5 text-accent" />
+                  )}
+                  Получатель (Принял)
+                </span>
+                <span className="font-mono text-fg-subtle font-normal">
+                  {transfer.approvedAt ? new Date(transfer.approvedAt).toLocaleDateString('ru-RU') : '—'}
+                </span>
               </div>
-              <div className="font-bold text-sm text-fg">
+              <div className="font-bold text-xs sm:text-sm text-fg mt-0.5 truncate">
                 {transfer.toLocationName || '—'}
               </div>
-              <div className="text-xs text-fg-muted space-y-0.5 pt-0.5 border-t border-border/50 print-border-black">
-                <div>
-                  Ответственное лицо:{' '}
-                  <strong className="text-fg">
-                    {transfer.approvedBy || (transfer.status === 'PENDING_APPROVAL' ? 'Ожидает приёмки' : '—')}
-                  </strong>
-                </div>
-                <div>
-                  Дата приёмки:{' '}
-                  <span className="font-mono text-fg-subtle">
-                    {transfer.approvedAt ? new Date(transfer.approvedAt).toLocaleString('ru-RU') : '—'}
-                  </span>
-                </div>
+              <div className="text-[11px] text-fg-muted mt-0.5 flex items-center gap-1">
+                <span>Ответственный:</span>
+                <strong className="text-fg">
+                  {transfer.approvedBy || (transfer.status === 'PENDING_APPROVAL' ? 'Ожидает приёмки' : '—')}
+                </strong>
               </div>
             </div>
           </div>
 
           {/* Rejection Banner if rejected */}
           {transfer.status === 'REJECTED' && transfer.rejectedReason && (
-            <div className="p-3 rounded-xl bg-danger/10 border border-danger/30 text-danger text-xs flex items-start gap-2.5">
+            <div className="p-2.5 rounded-lg bg-danger/10 border border-danger/30 text-danger text-xs flex items-start gap-2">
               <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
               <div>
-                <strong className="block font-bold">Причина отклонения перемещения:</strong>
+                <strong className="block font-bold">Причина отклонения:</strong>
                 <span className="text-[11px] text-danger/90">{transfer.rejectedReason}</span>
               </div>
             </div>
           )}
 
           {/* Table of Transfer Items */}
-          <div className="space-y-2">
+          <div className="space-y-1.5">
             <div className="flex items-center justify-between text-xs font-bold text-fg">
               <span>Список передаваемых товаров</span>
               <span className="font-mono text-accent">Всего: {items.length} шт.</span>
             </div>
 
-            <div className="overflow-x-auto rounded-xl border border-border/80 print-border-black">
+            <div className="overflow-x-auto rounded-lg border border-border/80 print-border-black">
               <table className="w-full text-left text-xs border-collapse">
                 <thead>
-                  <tr className="bg-surface-raised border-b border-border/80 text-[11px] font-bold text-fg-subtle uppercase tracking-wider print-border-black">
-                    <th className="py-2.5 px-3 w-10 text-center">№</th>
-                    <th className="py-2.5 px-3">Наименование</th>
-                    <th className="py-2.5 px-3">IMEI</th>
-                    <th className="py-2.5 px-3 w-16 text-center">Кол-во</th>
-                    {showCost && <th className="py-2.5 px-3 w-28 text-right">Оценка ($)</th>}
-                    {showCost && <th className="py-2.5 px-3 w-28 text-right">Сумма ($)</th>}
+                  <tr className="bg-surface-raised border-b border-border/80 text-[10px] font-bold text-fg-subtle uppercase tracking-wider print-border-black">
+                    <th className="py-1.5 px-2.5 w-9 text-center">№</th>
+                    <th className="py-1.5 px-2.5">Наименование</th>
+                    <th className="py-1.5 px-2.5 w-44">IMEI</th>
+                    <th className="py-1.5 px-2.5 w-16 text-center">Кол-во</th>
+                    {showCost && <th className="py-1.5 px-2.5 w-24 text-right">Оценка ($)</th>}
+                    {showCost && <th className="py-1.5 px-2.5 w-24 text-right">Сумма ($)</th>}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border/60 print-border-black">
                   {items.map((it) => (
                     <tr key={it.index} className="hover:bg-surface-raised/40 transition-colors">
-                      <td className="py-2.5 px-3 text-center font-mono text-fg-subtle">
+                      <td className="py-1.5 px-2.5 text-center font-mono text-fg-subtle text-[11px]">
                         {it.index}
                       </td>
-                      <td className="py-2.5 px-3">
-                        <div className="font-bold text-fg">
-                          {it.fullName}
-                        </div>
-                        <div className="flex items-center gap-1.5 flex-wrap mt-0.5 text-[10px]">
+                      <td className="py-1.5 px-2.5">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="font-bold text-fg">{it.fullName}</span>
                           {it.storage && (
-                            <span className="px-1.5 py-0.2 rounded bg-surface border border-border font-mono font-bold text-fg">
+                            <span className="px-1.5 py-0.2 rounded bg-surface border border-border font-mono font-bold text-[10px] text-fg">
                               {it.storage}
                             </span>
                           )}
                           {it.ram && (
-                            <span className="px-1.5 py-0.2 rounded bg-accent/10 border border-accent/20 font-mono font-bold text-accent">
+                            <span className="px-1.5 py-0.2 rounded bg-accent/10 border border-accent/20 font-mono font-bold text-[10px] text-accent">
                               ОЗУ {it.ram}
                             </span>
                           )}
                           {it.color && (
-                            <span className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded bg-surface border border-border/60 text-fg-muted">
+                            <span className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded bg-surface border border-border/60 text-fg-muted text-[10px]">
                               {it.colorHex && (
                                 <span
                                   className="w-2 h-2 rounded-full border border-black/20 shrink-0"
@@ -376,22 +376,22 @@ export const TransferInvoiceModal: React.FC<TransferInvoiceModalProps> = ({
                           )}
                         </div>
                       </td>
-                      <td className="py-2.5 px-3">
-                        <span className="font-mono font-bold text-fg bg-surface px-2 py-0.5 rounded border border-border/70 text-[11px] inline-flex items-center gap-1">
+                      <td className="py-1.5 px-2.5 whitespace-nowrap">
+                        <span className="font-mono font-bold text-fg bg-surface px-1.5 py-0.5 rounded border border-border/70 text-[11px] inline-flex items-center gap-1">
                           <span>{it.imei}</span>
                           <CopyImeiButton imei={it.imei} className="print:hidden" />
                         </span>
                       </td>
-                      <td className="py-2.5 px-3 text-center font-bold text-fg">
+                      <td className="py-1.5 px-2.5 text-center font-bold text-fg whitespace-nowrap">
                         1 шт.
                       </td>
                       {showCost && (
-                        <td className="py-2.5 px-3 text-right font-mono text-fg-muted">
+                        <td className="py-1.5 px-2.5 text-right font-mono text-fg-muted whitespace-nowrap">
                           {it.costUsd > 0 ? `$${formatMoney(it.costUsd)}` : '—'}
                         </td>
                       )}
                       {showCost && (
-                        <td className="py-2.5 px-3 text-right font-mono font-bold text-fg">
+                        <td className="py-1.5 px-2.5 text-right font-mono font-bold text-fg whitespace-nowrap">
                           {it.costUsd > 0 ? `$${formatMoney(it.costUsd)}` : '—'}
                         </td>
                       )}
@@ -400,19 +400,19 @@ export const TransferInvoiceModal: React.FC<TransferInvoiceModalProps> = ({
                 </tbody>
                 <tfoot>
                   <tr className="bg-surface-raised/80 font-bold border-t-2 border-border print-border-black">
-                    <td colSpan={3} className="py-2.5 px-3 text-fg uppercase text-[11px] tracking-wider">
+                    <td colSpan={3} className="py-1.5 px-2.5 text-fg uppercase text-[10px] tracking-wider">
                       Итого по накладной
                     </td>
-                    <td className="py-2.5 px-3 text-center font-mono text-accent">
+                    <td className="py-1.5 px-2.5 text-center font-mono text-accent">
                       {items.length} шт.
                     </td>
                     {showCost && (
-                      <td className="py-2.5 px-3 text-right text-fg-subtle text-[11px]">
+                      <td className="py-1.5 px-2.5 text-right text-fg-subtle text-[10px]">
                         Всего:
                       </td>
                     )}
                     {showCost && (
-                      <td className="py-2.5 px-3 text-right font-mono text-sm text-accent font-black">
+                      <td className="py-1.5 px-2.5 text-right font-mono text-xs text-accent font-black">
                         ${formatMoney(totalCostUsd)}
                       </td>
                     )}
@@ -423,34 +423,34 @@ export const TransferInvoiceModal: React.FC<TransferInvoiceModalProps> = ({
           </div>
 
           {/* Signatures & Disclaimers Block */}
-          <div className="pt-4 border-t border-border/80 space-y-4 print-border-black">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 sm:gap-10 pt-2">
+          <div className="pt-2.5 border-t border-border/80 space-y-2 print-border-black">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-8 pt-1">
               {/* Sender Signature */}
-              <div className="space-y-4">
-                <div className="text-xs font-bold text-fg uppercase tracking-wider">
+              <div className="space-y-2">
+                <div className="text-[11px] font-bold text-fg uppercase tracking-wider">
                   Отпустил (Сдал):
                 </div>
-                <div className="pt-6 border-b border-fg-muted/60 flex items-center justify-between text-xs text-fg-subtle">
+                <div className="pt-4 border-b border-fg-muted/50 flex items-center justify-between text-[11px] text-fg-subtle">
                   <span>Подпись</span>
                   <span className="font-bold text-fg">{transfer.requestedBy || '________________'}</span>
                 </div>
-                <div className="text-[10px] text-fg-subtle">
+                <div className="text-[9px] text-fg-subtle">
                   М.П. / Дата: {formattedDate}
                 </div>
               </div>
 
               {/* Receiver Signature */}
-              <div className="space-y-4">
-                <div className="text-xs font-bold text-fg uppercase tracking-wider">
+              <div className="space-y-2">
+                <div className="text-[11px] font-bold text-fg uppercase tracking-wider">
                   Принял (Получил):
                 </div>
-                <div className="pt-6 border-b border-fg-muted/60 flex items-center justify-between text-xs text-fg-subtle">
+                <div className="pt-4 border-b border-fg-muted/50 flex items-center justify-between text-[11px] text-fg-subtle">
                   <span>Подпись</span>
                   <span className="font-bold text-fg">
                     {transfer.approvedBy || (transfer.status === 'PENDING_APPROVAL' ? '________________' : '—')}
                   </span>
                 </div>
-                <div className="text-[10px] text-fg-subtle">
+                <div className="text-[9px] text-fg-subtle">
                   М.П. / Дата:{' '}
                   {transfer.approvedAt
                     ? new Date(transfer.approvedAt).toLocaleDateString('ru-RU')
@@ -459,7 +459,7 @@ export const TransferInvoiceModal: React.FC<TransferInvoiceModalProps> = ({
               </div>
             </div>
 
-            <p className="text-[10px] text-fg-subtle leading-relaxed italic pt-2">
+            <p className="text-[9px] text-fg-subtle leading-tight italic pt-0.5">
               Товары переданы в полной комплектации, исправном техническом состоянии и без внешних механических повреждений.
               Принимающая сторона подтверждает совпадение всех указанных в накладной идентификаторов (IMEI).
             </p>

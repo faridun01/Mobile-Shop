@@ -74,6 +74,15 @@ describe('syncStockAlerts', () => {
     expect(notifyStorePartners).not.toHaveBeenCalled();
   });
 
+  it('counts a capacity written with or without a space as the same capacity', async () => {
+    const db = tx([threshold({ storage: '128 GB', minQuantity: 1 })], [
+      { storeId: 'store-1', brand: 'Apple', model: 'iPhone 15', storage: '128GB', n: 3 },
+    ]);
+    await syncStockAlerts(db, ['store-1']);
+    // 3 in stock is above the minimum of 1: no false "sold out".
+    expect(notifyAdmins).not.toHaveBeenCalled();
+  });
+
   it('counts only devices available for sale', async () => {
     const db = tx([threshold()], []);
     await syncStockAlerts(db, ['store-1', null, 'store-1']);

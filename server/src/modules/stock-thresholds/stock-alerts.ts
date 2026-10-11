@@ -8,7 +8,9 @@ const AVAILABLE_STATUSES = ['STORE_STOCK', 'MAIN_WAREHOUSE', 'IN_STOCK_AFTER_EXC
 export const ALL_STORAGE = 'ALL';
 
 const norm = (value: string | null | undefined) => (value ?? '').trim().toLowerCase();
-const storageKey = (storage: string | null | undefined) => norm(storage) || '—';
+// Capacities written with or without a space ("128 GB", "128GB") are the same capacity, the same
+// way a minimum is matched to the stock when it is set.
+const storageKey = (storage: string | null | undefined) => norm(storage).replace(/\s+/g, '') || '—';
 
 /**
  * Compares the stock of the given stores with their minimums, inside the caller's transaction

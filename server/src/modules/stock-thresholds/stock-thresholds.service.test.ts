@@ -52,14 +52,16 @@ describe('StockThresholdsService', () => {
     expect(db.stockThreshold.upsert).not.toHaveBeenCalled();
   });
 
-  it('matches the model and capacity in stock regardless of letter case', async () => {
+  it('matches the model and capacity in stock regardless of letter case and spacing', async () => {
     db.stockThreshold.upsert.mockResolvedValue({ id: 'st-1' });
     db.stockThreshold.findUniqueOrThrow.mockResolvedValue({ id: 'st-1' });
     await StockThresholdsService.upsertThreshold({ storeId: 'store-1', brand: 'apple', model: 'iphone 15', storage: '128 GB', minQuantity: 2 });
+    const insensitive = (equals: string) => ({ equals, mode: 'insensitive' });
     expect(db.device.findFirst.mock.calls[0][0].where).toEqual({
-      brand: { equals: 'apple', mode: 'insensitive' },
-      model: { equals: 'iphone 15', mode: 'insensitive' },
-      storage: { equals: '128 GB', mode: 'insensitive' },
+      brand: insensitive('apple'),
+      model: insensitive('iphone 15'),
+      // "128 GB" and "128GB" are the same capacity.
+      OR: [{ storage: insensitive('128 GB') }, { storage: insensitive('128GB') }, { storage: insensitive('128 GB') }],
     });
   });
 
