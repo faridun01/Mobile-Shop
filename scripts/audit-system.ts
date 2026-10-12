@@ -8,7 +8,13 @@ async function main() {
   const [stores, devices, sales, suppliers, invoices, owners, transfers, expenses, ledger, todayRate] = await Promise.all([
     prisma.store.findMany({ select: { id: true, isMainWarehouse: true, cashBalanceUsd: true, active: true } }),
     prisma.device.findMany({ select: { id: true, storeId: true, status: true } }),
-    prisma.sale.findMany({ include: { saleItems: { select: { deviceId: true, salePriceTjs: true, costBasisUsd: true } }, exchangeEvents: { select: { id: true } } } }),
+    prisma.sale.findMany({
+      include: {
+        saleItems: { select: { deviceId: true, salePriceTjs: true, costBasisUsd: true } },
+        exchangeEvents: { select: { id: true } },
+        paymentAllocations: { select: { allocatedAmountTjs: true } },
+      },
+    }),
     prisma.supplier.findMany({ select: { id: true, totalPurchasedUsd: true, totalPaidUsd: true, totalDebtUsd: true } }),
     prisma.supplierInvoice.findMany({ select: { id: true, supplierId: true, totalAmountUsd: true, paidAmountUsd: true } }),
     prisma.owner.findMany({ select: { id: true, profitSharePercent: true } }),
@@ -31,7 +37,15 @@ async function main() {
       ((device.status === 'STORE_STOCK' || device.status === 'IN_STOCK_AFTER_EXCHANGE') && store.isMainWarehouse);
   }).map((device) => device.id));
 
-  add('SALE_PAYMENT_TOTAL_MISMATCH', sales.filter((sale) => sale.status !== 'REFUNDED' && !close(D(sale.cashAmountTjs).plus(sale.cardAmountTjs), sale.totalTjs)).map((sale) => sale.id));
+  add('SALE_PAYMENT_TOTAL_MISMATCH', sales.filter((sale) => {
+    if (sale.status === 'REFUNDED') return false;
+    const paidOrDebt = D(sale.cashAmountTjs)
+      .plus(sale.cardAmountTjs)
+      .plus(sale.debtAmountTjs ?? 0)
+      .plus(sale.exchangeTradeInCreditTjs ?? 0)
+      .plus((sale.paymentAllocations || []).reduce((sum, a) => D(sum).plus(a.allocatedAmountTjs), D(0)));
+    return !close(paidOrDebt, sale.totalTjs);
+  }).map((sale) => sale.id));
   add('COMPLETED_SALE_ITEM_TOTAL_MISMATCH', sales.filter((sale) => (sale.status === 'COMPLETED' || sale.status === 'EXCHANGED') && !close(sale.saleItems.reduce((sum, item) => D(sum).plus(item.salePriceTjs), D(0)), sale.totalTjs)).map((sale) => sale.id));
   add('REFUND_TOTAL_MISMATCH', sales.filter((sale) => sale.status === 'REFUNDED' && !close(D((sale.actualRefundAmountTjs ?? 0)).plus((sale.penaltyFeeTjs ?? 0)), sale.totalTjs)).map((sale) => sale.id));
   add('ACTIVE_SALE_DEVICE_NOT_SOLD', sales.filter((sale) => sale.status !== 'REFUNDED' && sale.saleItems.some((item) => deviceById.get(item.deviceId)?.status !== 'SOLD')).map((sale) => sale.id));

@@ -317,6 +317,7 @@ model StockRevision {
 
   @@index([storeId, createdAt])
   @@index([createdAt])
+  @@index([userId])
   @@map("stock_revisions")
 }
 
@@ -356,6 +357,7 @@ model AuthSession {
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
+  @@index([expiresAt])
   @@map("auth_sessions")
 }
 
@@ -435,6 +437,7 @@ model OperationRequest {
   fingerprint String
   result Json
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+  @@index([createdAt])
   @@map("operation_requests")
 }
 
@@ -546,6 +549,8 @@ model ExchangeEvent {
 
   sale Sale @relation(fields: [saleId], references: [id], onDelete: Cascade)
 
+  @@index([saleId])
+  @@index([date])
   @@map("exchange_events")
 }
 
@@ -622,6 +627,7 @@ model SupplierPayment {
   supplier    Supplier                    @relation(fields: [supplierId], references: [id])
   allocations SupplierPaymentAllocation[]
 
+  @@index([supplierId])
   @@map("supplier_payments")
 }
 
@@ -634,6 +640,8 @@ model SupplierPaymentAllocation {
   payment SupplierPayment @relation(fields: [paymentId], references: [id], onDelete: Cascade)
   invoice SupplierInvoice @relation(fields: [invoiceId], references: [id])
 
+  @@index([paymentId])
+  @@index([invoiceId])
   @@map("supplier_payment_allocations")
 }
 
@@ -715,6 +723,7 @@ model SupplierBonus {
   supplier    Supplier              @relation(fields: [supplierId], references: [id])
   freeDevices SupplierBonusDevice[]
 
+  @@index([supplierId])
   @@map("supplier_bonuses")
 }
 
@@ -731,6 +740,7 @@ model SupplierBonusDevice {
 
   bonus SupplierBonus @relation(fields: [bonusId], references: [id], onDelete: Cascade)
 
+  @@index([bonusId])
   @@map("supplier_bonus_devices")
 }
 
@@ -767,6 +777,8 @@ model BonusPoolEntry {
 
   @@index([status])
   @@index([createdAt])
+  @@index([saleId])
+  @@index([deviceId])
   @@map("bonus_pool_entries")
 }
 
@@ -864,6 +876,8 @@ model RepairTicket {
 
   @@index([storeId, status])
   @@index([storeId, createdAt])
+  @@index([deviceId])
+  @@index([userId])
   @@map("repair_tickets")
 }
 
@@ -877,6 +891,7 @@ model RepairStatusHistory {
 
   ticket RepairTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
 
+  @@index([ticketId])
   @@map("repair_status_history")
 }
 
@@ -1203,6 +1218,7 @@ model FinancialTransaction {
 
   @@index([transactionDate])
   @@index([accountId])
+  @@index([destinationAccountId])
   @@index([shopId])
   @@index([sourceType, sourceId])
   @@index([categoryId])

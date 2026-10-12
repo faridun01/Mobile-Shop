@@ -79,7 +79,7 @@ export function convertTjsToUsd(
   if (!Number.isFinite(numTjs) || numTjs === 0) return 0;
   const rate = Number(exchangeRate) || 0;
   if (rate <= 0) return 0;
-  return Math.round((numTjs / rate) * 100) / 100;
+  return new Decimal(numTjs).div(rate).toDecimalPlaces(2).toNumber();
 }
 
 /**

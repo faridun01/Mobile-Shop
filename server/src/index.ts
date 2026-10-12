@@ -37,7 +37,7 @@ app.get('*', (_req, res) => {
   res.sendFile(path.join(projectRoot, 'dist', 'index.html'));
 });
 
-import { StockRevisionService } from './modules/revisions/revisions.service';
+import { RetentionService } from './modules/maintenance/retention.service';
 import { backfillCatalogFromDevices } from './modules/phone-catalog/phone-catalog.service';
 
 const server = app.listen(port, '0.0.0.0', () => {
@@ -45,11 +45,25 @@ const server = app.listen(port, '0.0.0.0', () => {
 });
 
 RealtimeSyncGateway.init(server);
-void StockRevisionService.ensureTable().catch((err) => {
-  console.warn('[Startup] StockRevisionService.ensureTable non-fatal error:', err);
-});
+
+// Retention cleanup on startup and hourly schedule (unref'd so it doesn't block shutdown)
+void RetentionService.cleanupOldRecords();
+const retentionInterval = setInterval(() => {
+  void RetentionService.cleanupOldRecords();
+}, 60 * 60 * 1000);
+retentionInterval.unref();
+
 void backfillCatalogFromDevices().catch((err) => {
   console.warn('[Startup] backfillCatalogFromDevices non-fatal error:', err);
+});
+
+// Global error handlers to prevent unlogged silent exits or unexpected node crashes
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('[Process] Unhandled Rejection at:', promise, 'reason:', reason);
+});
+
+process.on('uncaughtException', (err) => {
+  console.error('[Process] Uncaught Exception:', err);
 });
 
 // Stop accepting connections, close realtime sockets (they would otherwise keep server.close
@@ -73,4 +87,4 @@ const shutdown = (signal: string) => {
 };
 
 process.on('SIGINT', () => shutdown('SIGINT'));
-process.on('SIGTERM', () => shutdown('SIGTERM'));
+process.on('SIGTERM', () => shutdown('SIGTERM'));

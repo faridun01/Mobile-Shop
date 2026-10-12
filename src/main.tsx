@@ -13,7 +13,13 @@ if (import.meta.hot) import.meta.hot.dispose(disposeViewport);
 // shortcuts, the context menu, dragging, and long-press selection on touch devices.
 const preventContentCopy = (event: Event) => {
   const target = event.target instanceof Element ? event.target : document.activeElement;
-  if (target?.closest('input, textarea, [contenteditable="true"]')) return;
+  if (
+    target?.closest(
+      'input, textarea, [contenteditable="true"], [data-allow-copy="true"], .allow-copy, .selectable-text, [data-copyable="true"]'
+    )
+  ) {
+    return;
+  }
   event.preventDefault();
 };
 

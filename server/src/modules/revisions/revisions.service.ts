@@ -129,8 +129,6 @@ export class StockRevisionService {
     const totalSurplus = surplusDevices.length;
     const status = totalMissing === 0 && totalSurplus === 0 ? 'MATCH' : 'DISCREPANCY';
 
-    await this.ensureTable();
-
     const revision = await prisma.$transaction(async (tx) => {
       const record = await tx.stockRevision.create({
         data: {
