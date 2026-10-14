@@ -102,7 +102,8 @@ export const CashDeskPanel: React.FC<CashDeskPanelProps> = ({ storeId }) => {
     <div className="space-y-3.5 select-none">
       {/* 1. 4 KPI КАРТОЧКИ: КАССА, СКЛАД, КЛИЕНТЫ, ПОСТАВЩИКИ (USD в основном, TJS альтернативно) */}
       {/* 1. 4 KPI КАРТОЧКИ: КАССА, СКЛАД, КЛИЕНТЫ, ПОСТАВЩИКИ (USD в основном, TJS альтернативно) */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3">
+      {/* Supplier debt is the admin's business: partners and sellers get three cards. */}
+      <div className={`grid grid-cols-2 ${isAdmin ? 'lg:grid-cols-4' : 'lg:grid-cols-3'} gap-2.5 sm:gap-3`}>
         {/* КАРТОЧКА 1: ДЕНЬГИ В КАССЕ */}
         <div className="p-3 sm:p-3.5 rounded-xl bg-surface border border-border shadow-2xs flex flex-col justify-between gap-2.5 transition-shadow hover:shadow-xs">
           <div className="flex items-center justify-between gap-1.5 w-full">
@@ -203,22 +204,21 @@ export const CashDeskPanel: React.FC<CashDeskPanelProps> = ({ storeId }) => {
           </div>
         </div>
 
-        {/* КАРТОЧКА 4: ДОЛГИ ПОСТАВЩИКАМ */}
+        {/* КАРТОЧКА 4: ДОЛГИ ПОСТАВЩИКАМ — только администратору */}
+        {isAdmin && (
         <div className="p-3 sm:p-3.5 rounded-xl bg-surface border border-border shadow-2xs flex flex-col justify-between gap-2.5 transition-shadow hover:shadow-xs">
           <div className="flex items-center justify-between gap-1.5 w-full">
             <div className="w-8 h-8 rounded-lg bg-danger/15 border border-danger/25 flex items-center justify-center text-danger shrink-0">
               <Truck className="w-4 h-4" />
             </div>
-            {isAdmin && (
-              <button
-                type="button"
-                onClick={() => navigate('/suppliers')}
-                className="p-1.5 rounded-lg bg-surface-raised border border-border hover:bg-surface text-fg transition-colors cursor-pointer shrink-0"
-                title="Перейти к поставщикам"
-              >
-                <ArrowUpRight className="w-3.5 h-3.5 text-accent" />
-              </button>
-            )}
+            <button
+              type="button"
+              onClick={() => navigate('/suppliers')}
+              className="p-1.5 rounded-lg bg-surface-raised border border-border hover:bg-surface text-fg transition-colors cursor-pointer shrink-0"
+              title="Перейти к поставщикам"
+            >
+              <ArrowUpRight className="w-3.5 h-3.5 text-accent" />
+            </button>
           </div>
           <div className="space-y-1">
             <span className="text-[11px] font-bold uppercase tracking-wider text-fg-subtle block leading-tight">
@@ -237,6 +237,7 @@ export const CashDeskPanel: React.FC<CashDeskPanelProps> = ({ storeId }) => {
             </span>
           </div>
         </div>
+        )}
       </div>
 
       {/* Month Selector Bar */}
