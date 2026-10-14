@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { useDataRefreshRevision } from '../../hooks/useDataRefreshRevision';
+import { apiClient } from '../../api/client';
 import { decimal, moneyNumber } from '../../utils/money';
 import { useAppFields } from '../../context/AppContext';
 import { SupplierInvoice } from '../../types';
@@ -731,12 +732,121 @@ export const PurchasePage: React.FC = () => {
     );
   }, [groups]);
 
+  // Collect all 15-digit IMEIs currently typed/pasted in groups
+  const allFormImeis = useMemo(() => {
+    const list: string[] = [];
+    for (const g of groups) {
+      for (const it of g.items) {
+        const [p1, p2] = getImeiPair(it.imei);
+        const c1 = p1.replace(/\D/g, '').slice(0, 15);
+        const c2 = p2 ? p2.replace(/\D/g, '').slice(0, 15) : '';
+        if (c1.length === 15) list.push(c1);
+        if (c2.length === 15) list.push(c2);
+      }
+    }
+    return list;
+  }, [groups]);
+
+  // Fast in-memory lookup against all loaded devices
+  const inMemoryExistingMap = useMemo(() => {
+    const map = new Map<string, { brand?: string; model?: string; status?: string; locationName?: string }>();
+    for (const d of devices) {
+      if (d.imei) {
+        map.set(d.imei, { brand: d.brand, model: d.model, status: d.status, locationName: d.locationName });
+      }
+      if (d.imei2) {
+        map.set(d.imei2, { brand: d.brand, model: d.model, status: d.status, locationName: d.locationName });
+      }
+    }
+    return map;
+  }, [devices]);
+
+  // Server-verified existing IMEIs (catches sold/historical devices too)
+  const [serverExistingImeis, setServerExistingImeis] = useState<
+    Map<string, { brand?: string; model?: string; status?: string; locationName?: string }>
+  >(new Map());
+
+  // Debounced server batch check for entered 15-digit IMEIs
+  useEffect(() => {
+    if (viewMode !== 'form') return;
+    const imeisToCheck = allFormImeis.filter((imei) => !serverExistingImeis.has(imei));
+    if (imeisToCheck.length === 0) return;
+
+    const timer = setTimeout(async () => {
+      try {
+        const res = await apiClient<{
+          existing: Array<{ imei: string; brand: string; model: string; status: string; storeName?: string }>;
+        }>('/devices/check-imeis', {
+          method: 'POST',
+          body: JSON.stringify({ imeis: imeisToCheck }),
+        });
+        if (res?.existing && res.existing.length > 0) {
+          setServerExistingImeis((prev) => {
+            const next = new Map(prev);
+            for (const item of res.existing) {
+              next.set(item.imei, item);
+            }
+            return next;
+          });
+        }
+      } catch (err) {
+        console.error('Failed to check IMEIs:', err);
+      }
+    }, 250);
+
+    return () => clearTimeout(timer);
+  }, [allFormImeis, serverExistingImeis, viewMode]);
+
+  // Count occurrences within the form to detect intra-form duplicates
+  const formImeiCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const imei of allFormImeis) {
+      counts.set(imei, (counts.get(imei) || 0) + 1);
+    }
+    return counts;
+  }, [allFormImeis]);
+
+  // Map of imei -> user-friendly error message
+  const imeiErrorsMap = useMemo(() => {
+    const errors: Record<string, string> = {};
+    for (const imei of allFormImeis) {
+      if ((formImeiCounts.get(imei) || 0) > 1) {
+        errors[imei] = 'дублируется в текущей партии';
+        continue;
+      }
+      const inMem = inMemoryExistingMap.get(imei);
+      if (inMem) {
+        errors[imei] = `уже зарегистрирован${inMem.model ? ` (${inMem.brand || ''} ${inMem.model})` : ''}`;
+        continue;
+      }
+      const onServer = serverExistingImeis.get(imei);
+      if (onServer) {
+        errors[imei] = `уже зарегистрирован${onServer.model ? ` (${onServer.brand || ''} ${onServer.model})` : ''}`;
+        continue;
+      }
+    }
+    return errors;
+  }, [allFormImeis, formImeiCounts, inMemoryExistingMap, serverExistingImeis]);
+
+  const hasExistingImeis = Object.keys(imeiErrorsMap).length > 0;
+  const firstExistingImei = Object.keys(imeiErrorsMap)[0] || '';
+
   const [previewInvoice, setPreviewInvoice] = useState<PurchasePreviewData | null>(null);
 
-  const handleSubmitPurchase = (e: React.FormEvent) => {
+  const handleSubmitPurchase = async (e: React.FormEvent) => {
     e.preventDefault();
     if (isSubmitting) return;
     setStatusMessage(null);
+
+    // Check if any IMEI already exists in database or duplicates in form
+    if (hasExistingImeis) {
+      setStatusMessage({
+        type: 'error',
+        text: `IMEI ${firstExistingImei} ${imeiErrorsMap[firstExistingImei] || 'уже зарегистрирован'}! Замените или удалите дублирующийся IMEI перед просмотром чека.`,
+      });
+      soundEffects.playError();
+      return;
+    }
 
     if (!selectedSupplierId) {
       setStatusMessage({ type: 'error', text: 'Пожалуйста, выберите поставщика из списка (выбор поставщика обязателен)' });
@@ -890,6 +1000,36 @@ export const PurchasePage: React.FC = () => {
       return;
     }
 
+    // Final pre-flight verification against server database
+    if (allFormImeis.length > 0) {
+      try {
+        const checkRes = await apiClient<{
+          existing: Array<{ imei: string; brand: string; model: string; status: string; storeName?: string }>;
+        }>('/devices/check-imeis', {
+          method: 'POST',
+          body: JSON.stringify({ imeis: allFormImeis }),
+        });
+        if (checkRes?.existing && checkRes.existing.length > 0) {
+          const found = checkRes.existing[0];
+          setServerExistingImeis((prev) => {
+            const next = new Map(prev);
+            for (const item of checkRes.existing) {
+              next.set(item.imei, item);
+            }
+            return next;
+          });
+          setStatusMessage({
+            type: 'error',
+            text: `IMEI ${found.imei} уже зарегистрирован (${found.brand} ${found.model})! Просмотр чека заблокирован.`,
+          });
+          soundEffects.playError();
+          return;
+        }
+      } catch (err) {
+        console.error('Pre-submit IMEI check error:', err);
+      }
+    }
+
     setPreviewInvoice({
       supplierId: selectedSupplierId,
       invoiceNumber: invoiceNumber.trim(),
@@ -1021,6 +1161,9 @@ export const PurchasePage: React.FC = () => {
           totalFormUnits={totalFormUnits}
           totalFormUsd={totalFormUsd}
           hasIncompleteImeis={hasIncompleteImeis}
+          imeiErrorsMap={imeiErrorsMap}
+          hasExistingImeis={hasExistingImeis}
+          firstExistingImei={firstExistingImei}
           statusMessage={statusMessage}
           isSubmitting={isSubmitting}
           onBackToList={() => {

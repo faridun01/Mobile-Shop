@@ -81,12 +81,17 @@ export class ExchangesService {
 
       // This flow swaps one item within an existing sale for another — the "returned"
       // device is the very device already sold in this sale (matchedItem.deviceId), not
-      // some unrelated personal phone the customer brings in. It comes back into stock
-      // at a new cost basis (the agreed trade-in value); its purchase history is untouched.
+      // some unrelated personal phone the customer brings in. An exchange is a return of
+      // that item plus a sale of the replacement: the device comes back into stock at its
+      // own cost, its sale profit is reversed and the part of its price not credited back
+      // (sale price − trade-in value) is kept, like a refund penalty. A bonus device keeps
+      // the old treatment (back at the trade-in value, its profit stays in the bonus pool).
       const returnedDevice = await tx.device.findUniqueOrThrow({ where: { id: matchedItem.deviceId } });
+      const returnedWasBonus = matchedItem.isBonus;
+      const returnedCostBasisAfterUsd = returnedWasBonus ? exchangeInValueUsd : returnedDevice.costBasisUsd;
       const returnDeviceGuard = await tx.device.updateMany({
         where: { id: matchedItem.deviceId, status: 'SOLD' },
-        data: { status: 'IN_STOCK_AFTER_EXCHANGE', costBasisUsd: exchangeInValueUsd },
+        data: { status: 'IN_STOCK_AFTER_EXCHANGE', costBasisUsd: returnedCostBasisAfterUsd },
       });
       if (returnDeviceGuard.count !== 1) {
         throw new Error('Возвращаемое устройство уже было обработано параллельно, повторите попытку');
@@ -122,7 +127,12 @@ export class ExchangesService {
       // Same rule as a sale: a replacement that cost nothing is a bonus device, so its price
       // goes to the bonus pool instead of straight to the owners.
       const isBonusReplacement = Boolean((replacementDevice.isBonus || replacementDevice.bonusCampaign) && D(replacementDevice.costBasisUsd).eq(0));
-      const exchangeProfitUsd = isBonusReplacement ? D(0) : roundMoney(D(newPriceUsd).minus(replacementDevice.costBasisUsd));
+      const replacementProfitUsd = isBonusReplacement ? D(0) : roundMoney(D(newPriceUsd).minus(replacementDevice.costBasisUsd));
+      // Returned item: its booked profit (price − cost) is reversed and the withheld part of
+      // its price (price − trade-in) is kept, which nets to cost − trade-in value.
+      const returnedItemProfitUsd = returnedWasBonus ? D(0) : roundMoney(D(matchedItem.salePriceUsd).minus(matchedItem.costBasisUsd));
+      const withheldUsd = returnedWasBonus ? D(0) : roundMoney(D(matchedItem.salePriceUsd).minus(exchangeInValueUsd));
+      const exchangeProfitUsd = roundMoney(D(replacementProfitUsd).minus(returnedItemProfitUsd).plus(withheldUsd));
       const bonusProfitUsd = isBonusReplacement ? newPriceUsd : D(0);
 
       await tx.saleItem.update({
@@ -227,9 +237,9 @@ export class ExchangesService {
         });
       }
 
-      // Incremental exchange profit is the new device's selling price minus its cost.
-      // The original sale profit remains booked; the returned device comes back as an
-      // asset at the agreed trade-in value, which offsets the customer's trade-in credit.
+      // Exchange profit = replacement margin − returned item's booked margin + withheld amount,
+      // so the receipt ends up earning what the customer paid in total minus the cost of the
+      // device they left with.
       const owners = await getOwnersForStore(tx, sale.storeId);
       const ownerProfitAllocations = allocateOwnerProfit(exchangeProfitUsd, owners);
       await Promise.all(ownerProfitAllocations.filter(({ amountUsd }) => !D(amountUsd).isZero()).map(({ ownerId, amountUsd: delta }) => {
@@ -260,9 +270,9 @@ export class ExchangesService {
           userRole: actor.role,
           action: 'EXCHANGE',
           details: `Чек #${sale.receiptNumber}: обмен ${returnedDevice.model} (IMEI ${returnedDevice.imei}) на ${replacementDevice.model} (IMEI ${replacementDevice.imei}). Расчет: ${D(diffTjs).gte(0) ? '+' : ''}${diffTjs} TJS`,
-          // returnedDeviceId/returnedCostBasisUsd let a later refund of this sale restore the
-          // traded-in device's original cost basis (see exchangeCostRestorations).
-          financialDetails: moneyJson({ returnedDeviceId: returnedDevice.id, returnedCostBasisUsd: returnedDevice.costBasisUsd, exchangeInValueTjs, exchangeInValueUsd, newPriceTjs, newPriceUsd, differenceTjs: diffTjs, exchangeProfitUsd, bonusProfitUsd, ownerProfitAllocations: moneyJson(ownerProfitAllocations) }),
+          // returnedDeviceId/returnedCostBasisUsd/returnedCostBasisAfterUsd let a later refund of
+          // this sale restore the traded-in device's original cost basis (see exchangeCostRestorations).
+          financialDetails: moneyJson({ returnedDeviceId: returnedDevice.id, returnedCostBasisUsd: returnedDevice.costBasisUsd, returnedCostBasisAfterUsd, exchangeRate: rate, exchangeInValueTjs, exchangeInValueUsd, newPriceTjs, newPriceUsd, differenceTjs: diffTjs, replacementProfitUsd, returnedItemProfitUsd, withheldUsd, exchangeProfitUsd, bonusProfitUsd, ownerProfitAllocations: moneyJson(ownerProfitAllocations) }),
           receiptNumber: sale.receiptNumber,
           targetId: sale.id,
         },

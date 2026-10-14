@@ -96,10 +96,13 @@ export function exchangeCostRestorations(logs: ProfitAuditRecord[]): ExchangeCos
     if (log.action !== 'EXCHANGE') continue;
     const details = log.financialDetails as Record<string, unknown> | null;
     const deviceId = details?.returnedDeviceId;
-    const tradeIn = details?.exchangeInValueUsd;
+    // Exchanges since the return-and-sale model record the cost the device came back at; it
+    // equals the original cost unless the device was a bonus one. Older ones used the trade-in value.
+    const tradeIn = details?.returnedCostBasisAfterUsd ?? details?.exchangeInValueUsd;
     const original = details?.returnedCostBasisUsd;
     if (typeof deviceId !== 'string' || typeof tradeIn !== 'number' || typeof original !== 'number' ||
         !Number.isFinite(tradeIn) || !Number.isFinite(original)) continue;
+    if (roundMoney(tradeIn).eq(roundMoney(original))) continue;
     restorations.push({ deviceId, tradeInCostUsd: roundMoney(tradeIn), originalCostUsd: roundMoney(original) });
   }
   return restorations;

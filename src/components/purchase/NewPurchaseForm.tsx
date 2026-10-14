@@ -45,6 +45,9 @@ interface NewPurchaseFormProps {
   totalFormUnits: number;
   totalFormUsd: number;
   hasIncompleteImeis?: boolean;
+  imeiErrorsMap?: Record<string, string>;
+  hasExistingImeis?: boolean;
+  firstExistingImei?: string;
   statusMessage: { type: 'success' | 'error'; text: string } | null;
   isSubmitting: boolean;
   onBackToList: () => void;
@@ -79,6 +82,9 @@ export const NewPurchaseForm: React.FC<NewPurchaseFormProps> = ({
   totalFormUnits,
   totalFormUsd,
   hasIncompleteImeis = false,
+  imeiErrorsMap = {},
+  hasExistingImeis = false,
+  firstExistingImei = '',
   statusMessage,
   isSubmitting,
   onBackToList,
@@ -260,8 +266,22 @@ export const NewPurchaseForm: React.FC<NewPurchaseFormProps> = ({
                     const is2Incomplete = clean2.length > 0 && clean2.length < 15;
                     const is2Valid = clean2.length === 15;
 
+                    const error1 = clean1.length === 15 ? imeiErrorsMap[clean1] : undefined;
+                    const is1Error = Boolean(error1);
+                    const error2 = clean2.length === 15 ? imeiErrorsMap[clean2] : undefined;
+                    const is2Error = Boolean(error2);
+                    const hasRowError = is1Error || is2Error;
+
                     return (
-                      <div key={itemIdx} className="grid grid-cols-1 sm:grid-cols-2 gap-1 p-1 rounded-lg bg-surface-raised/40 border border-border/50">
+                      <div
+                        key={itemIdx}
+                        className={cn(
+                          'grid grid-cols-1 sm:grid-cols-2 gap-1 p-1 rounded-lg border transition-all',
+                          hasRowError
+                            ? 'bg-danger/5 border-danger/40 ring-1 ring-danger/20'
+                            : 'bg-surface-raised/40 border-border/50'
+                        )}
+                      >
                         <div>
                           <div className="relative flex items-center">
                             <input
@@ -277,22 +297,28 @@ export const NewPurchaseForm: React.FC<NewPurchaseFormProps> = ({
                               }}
                               placeholder={`IMEI 1 #${itemIdx + 1} (15 цифр)`}
                               className={cn(
-                                'w-full h-7 rounded-lg bg-surface border px-2 text-xs text-fg font-mono focus:outline-none shadow-2xs transition-colors',
-                                is1Incomplete
-                                  ? 'border-amber-500/80 dark:border-amber-400/80 bg-amber-50/15 dark:bg-amber-950/20 pr-24 text-amber-700 dark:text-amber-300'
-                                  : is1Valid
-                                    ? 'border-emerald-500/60 dark:border-emerald-400/60 pr-24 text-emerald-700 dark:text-emerald-300 font-bold'
-                                    : 'border-border focus:border-accent pr-7'
+                                'w-full h-7 rounded-lg bg-surface border px-2 text-xs font-mono focus:outline-none shadow-2xs transition-colors',
+                                is1Error
+                                  ? 'border-danger focus:border-danger bg-danger/10 text-danger font-bold pr-24'
+                                  : is1Incomplete
+                                    ? 'border-amber-500/80 dark:border-amber-400/80 bg-amber-50/15 dark:bg-amber-950/20 pr-24 text-amber-700 dark:text-amber-300'
+                                    : is1Valid
+                                      ? 'border-emerald-500/60 dark:border-emerald-400/60 pr-24 text-emerald-700 dark:text-emerald-300 font-bold'
+                                      : 'border-border text-fg focus:border-accent pr-7'
                               )}
                             />
                             {clean1.length > 0 && (
                               <span
                                 className={cn(
                                   'absolute right-17 text-[10px] font-bold font-mono pointer-events-none select-none',
-                                  is1Incomplete ? 'text-amber-600 dark:text-amber-400' : 'text-emerald-600 dark:text-emerald-400'
+                                  is1Error
+                                    ? 'text-danger'
+                                    : is1Incomplete
+                                      ? 'text-amber-600 dark:text-amber-400'
+                                      : 'text-emerald-600 dark:text-emerald-400'
                                 )}
                               >
-                                {is1Valid ? '15 ✓' : `${clean1.length}/15`}
+                                {is1Error ? '(!) В базе' : is1Valid ? '15 ✓' : `${clean1.length}/15`}
                               </span>
                             )}
                             {clean1.length > 0 && (
@@ -323,79 +349,99 @@ export const NewPurchaseForm: React.FC<NewPurchaseFormProps> = ({
                               <Scan className="w-3.5 h-3.5" />
                             </button>
                           </div>
+                          {is1Error && (
+                            <div className="flex items-center gap-1 text-[11px] text-danger font-bold mt-1 px-0.5 animate-in fade-in">
+                              <AlertCircle className="w-3.5 h-3.5 shrink-0 text-danger" />
+                              <span className="truncate">IMEI {clean1} {error1}</span>
+                            </div>
+                          )}
                         </div>
 
-                        <div className="flex items-center gap-1">
-                          <div className="relative flex-1 flex items-center">
-                            <input
-                              type="text"
-                              inputMode="numeric"
-                              pattern="\d{15}"
-                              maxLength={15}
-                              value={clean2}
-                              onChange={(e) => {
-                                const digits = e.target.value.replace(/\D/g, '').slice(0, 15);
-                                onUpdateImei2(groupIdx, itemIdx, digits);
-                              }}
-                              placeholder="IMEI 2 (необязательно, 15 цифр)"
-                              className={cn(
-                                'w-full h-7 rounded-lg bg-surface border px-2 text-xs text-fg font-mono focus:outline-none shadow-2xs transition-colors',
-                                is2Incomplete
-                                  ? 'border-amber-500/80 dark:border-amber-400/80 bg-amber-50/15 dark:bg-amber-950/20 pr-24 text-amber-700 dark:text-amber-300'
-                                  : is2Valid
-                                    ? 'border-emerald-500/60 dark:border-emerald-400/60 pr-24 text-emerald-700 dark:text-emerald-300 font-bold'
-                                    : 'border-border focus:border-accent pr-7'
-                              )}
-                            />
-                            {clean2.length > 0 && (
-                              <span
+                        <div className="flex flex-col">
+                          <div className="flex items-center gap-1">
+                            <div className="relative flex-1 flex items-center">
+                              <input
+                                type="text"
+                                inputMode="numeric"
+                                pattern="\d{15}"
+                                maxLength={15}
+                                value={clean2}
+                                onChange={(e) => {
+                                  const digits = e.target.value.replace(/\D/g, '').slice(0, 15);
+                                  onUpdateImei2(groupIdx, itemIdx, digits);
+                                }}
+                                placeholder="IMEI 2 (необязательно, 15 цифр)"
                                 className={cn(
-                                  'absolute right-17 text-[10px] font-bold font-mono pointer-events-none select-none',
-                                  is2Incomplete ? 'text-amber-600 dark:text-amber-400' : 'text-emerald-600 dark:text-emerald-400'
+                                  'w-full h-7 rounded-lg bg-surface border px-2 text-xs font-mono focus:outline-none shadow-2xs transition-colors',
+                                  is2Error
+                                    ? 'border-danger focus:border-danger bg-danger/10 text-danger font-bold pr-24'
+                                    : is2Incomplete
+                                      ? 'border-amber-500/80 dark:border-amber-400/80 bg-amber-50/15 dark:bg-amber-950/20 pr-24 text-amber-700 dark:text-amber-300'
+                                      : is2Valid
+                                        ? 'border-emerald-500/60 dark:border-emerald-400/60 pr-24 text-emerald-700 dark:text-emerald-300 font-bold'
+                                        : 'border-border text-fg focus:border-accent pr-7'
                                 )}
-                              >
-                                {is2Valid ? '15 ✓' : `${clean2.length}/15`}
-                              </span>
-                            )}
-                            {clean2.length > 0 && (
+                              />
+                              {clean2.length > 0 && (
+                                <span
+                                  className={cn(
+                                    'absolute right-17 text-[10px] font-bold font-mono pointer-events-none select-none',
+                                    is2Error
+                                      ? 'text-danger'
+                                      : is2Incomplete
+                                        ? 'text-amber-600 dark:text-amber-400'
+                                        : 'text-emerald-600 dark:text-emerald-400'
+                                  )}
+                                >
+                                  {is2Error ? '(!) В базе' : is2Valid ? '15 ✓' : `${clean2.length}/15`}
+                                </span>
+                              )}
+                              {clean2.length > 0 && (
+                                <button
+                                  type="button"
+                                  onClick={() => onUpdateImei2(groupIdx, itemIdx, '')}
+                                  className="absolute right-11 top-1/2 -translate-y-1/2 text-fg-subtle hover:text-danger p-0.5 cursor-pointer rounded transition-colors"
+                                  title="Очистить IMEI 2"
+                                  aria-label="Очистить IMEI 2"
+                                >
+                                  <X className="w-3.5 h-3.5" />
+                                </button>
+                              )}
+                              {clean2.length > 0 && (
+                                <CopyImeiButton
+                                  imei={clean2}
+                                  className="absolute right-6 top-1/2 -translate-y-1/2"
+                                  title="Скопировать IMEI 2"
+                                />
+                              )}
                               <button
                                 type="button"
-                                onClick={() => onUpdateImei2(groupIdx, itemIdx, '')}
-                                className="absolute right-11 top-1/2 -translate-y-1/2 text-fg-subtle hover:text-danger p-0.5 cursor-pointer rounded transition-colors"
-                                title="Очистить IMEI 2"
-                                aria-label="Очистить IMEI 2"
+                                onClick={() => onOpenScannerForImei2(groupIdx, itemIdx)}
+                                className="absolute right-1 top-1/2 -translate-y-1/2 text-fg-subtle hover:text-accent p-0.5 cursor-pointer"
+                                title="Сканировать IMEI 2"
+                                aria-label="Сканировать IMEI 2"
                               >
-                                <X className="w-3.5 h-3.5" />
+                                <Scan className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+
+                            {group.items.length > 1 && (
+                              <button
+                                type="button"
+                                onClick={() => onRemoveImeiFromGroup(groupIdx, itemIdx)}
+                                className="w-7 h-7 flex items-center justify-center rounded-lg text-fg-subtle hover:text-danger hover:bg-danger/10 transition-colors cursor-pointer shrink-0"
+                                title="Удалить устройство"
+                                aria-label="Удалить устройство"
+                              >
+                                <X className="w-3 h-3" />
                               </button>
                             )}
-                            {clean2.length > 0 && (
-                              <CopyImeiButton
-                                imei={clean2}
-                                className="absolute right-6 top-1/2 -translate-y-1/2"
-                                title="Скопировать IMEI 2"
-                              />
-                            )}
-                            <button
-                              type="button"
-                              onClick={() => onOpenScannerForImei2(groupIdx, itemIdx)}
-                              className="absolute right-1 top-1/2 -translate-y-1/2 text-fg-subtle hover:text-accent p-0.5 cursor-pointer"
-                              title="Сканировать IMEI 2"
-                              aria-label="Сканировать IMEI 2"
-                            >
-                              <Scan className="w-3.5 h-3.5" />
-                            </button>
                           </div>
-
-                          {group.items.length > 1 && (
-                            <button
-                              type="button"
-                              onClick={() => onRemoveImeiFromGroup(groupIdx, itemIdx)}
-                              className="w-7 h-7 flex items-center justify-center rounded-lg text-fg-subtle hover:text-danger hover:bg-danger/10 transition-colors cursor-pointer shrink-0"
-                              title="Удалить устройство"
-                              aria-label="Удалить устройство"
-                            >
-                              <X className="w-3 h-3" />
-                            </button>
+                          {is2Error && (
+                            <div className="flex items-center gap-1 text-[11px] text-danger font-bold mt-1 px-0.5 animate-in fade-in">
+                              <AlertCircle className="w-3.5 h-3.5 shrink-0 text-danger" />
+                              <span className="truncate">IMEI 2 {clean2} {error2}</span>
+                            </div>
                           )}
                         </div>
                       </div>
@@ -548,7 +594,12 @@ export const NewPurchaseForm: React.FC<NewPurchaseFormProps> = ({
 
         {/* Bottom Actions & Total Bar (Sticky at bottom) */}
         <div className="sticky bottom-0 z-20 px-2.5 sm:px-4 py-1.5 border-t border-border bg-surface/95 backdrop-blur-md flex flex-wrap items-center justify-between gap-2 shrink-0 shadow-lg font-mono text-xs">
-          {statusMessage ? (
+          {hasExistingImeis ? (
+            <div className="flex items-center gap-1.5 text-xs text-danger font-bold bg-danger/10 border border-danger/30 px-2.5 py-1 rounded-lg animate-pulse">
+              <AlertCircle className="w-4 h-4 shrink-0 text-danger" />
+              <span>IMEI {firstExistingImei} уже зарегистрирован</span>
+            </div>
+          ) : statusMessage ? (
             <div className={`flex items-center space-x-2 text-xs ${
               statusMessage.type === 'success' ? 'text-accent' : 'text-danger'
             }`}>
@@ -582,8 +633,14 @@ export const NewPurchaseForm: React.FC<NewPurchaseFormProps> = ({
 
             <button
               type="submit"
-              disabled={totalFormUnits === 0 || hasIncompleteImeis || isSubmitting}
-              title={hasIncompleteImeis ? 'Каждый указанный IMEI должен содержать ровно 15 цифр' : undefined}
+              disabled={totalFormUnits === 0 || hasIncompleteImeis || hasExistingImeis || isSubmitting}
+              title={
+                hasExistingImeis
+                  ? `Невозможно просмотреть чек: IMEI ${firstExistingImei} уже зарегистрирован`
+                  : hasIncompleteImeis
+                    ? 'Каждый указанный IMEI должен содержать ровно 15 цифр'
+                    : undefined
+              }
               className="h-7.5 px-3.5 rounded-lg bg-accent hover:opacity-90 active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed text-xs font-bold text-accent-fg shadow-xs transition-all flex items-center gap-1.5 cursor-pointer"
             >
               <FileText className="w-3.5 h-3.5" />

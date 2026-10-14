@@ -29,8 +29,11 @@ interface DeviceDetailsModalProps {
   rate?: number;
   isAdmin?: boolean;
   isAdminOrPartner?: boolean;
+  allDevices?: Device[];
   onClose: () => void;
   onUpdateRam: (deviceId: string, ram: string) => Promise<{ success: boolean; device?: Device; message?: string }>;
+  onUpdateDevice?: (deviceId: string, updates: { model?: string; brand?: string; ram?: string | null; storage?: string; color?: string }) => Promise<{ success: boolean; device?: Device; message?: string }>;
+  onBatchRenameModel?: (params: { deviceIds: string[]; newModel: string; newBrand?: string }) => Promise<{ success: boolean; count?: number; message?: string }>;
   onNotify?: (msg: { tone: 'info' | 'warning' | 'error' | 'success'; text: string }) => void;
 }
 
@@ -40,14 +43,24 @@ export const DeviceDetailsModal: React.FC<DeviceDetailsModalProps> = ({
   rate,
   isAdmin,
   isAdminOrPartner,
+  allDevices,
   onClose,
   onUpdateRam,
+  onUpdateDevice,
+  onBatchRenameModel,
   onNotify,
 }) => {
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
   const [isEditingRam, setIsEditingRam] = useState(false);
   const [editRamValue, setEditRamValue] = useState('');
   const [isSavingRam, setIsSavingRam] = useState(false);
+
+  const [isEditingModel, setIsEditingModel] = useState(false);
+  const [editModelValue, setEditModelValue] = useState('');
+  const [editBrandValue, setEditBrandValue] = useState('');
+  const [applyToAllMatching, setApplyToAllMatching] = useState(true);
+  const [isSavingModel, setIsSavingModel] = useState(false);
+
   const [currentDevice, setCurrentDevice] = useState<Device | null>(initialDevice);
 
   // Sync internal device state with prop updates
@@ -55,8 +68,60 @@ export const DeviceDetailsModal: React.FC<DeviceDetailsModalProps> = ({
     setCurrentDevice(initialDevice);
     if (!initialDevice) {
       setIsEditingRam(false);
+      setIsEditingModel(false);
     }
   }, [initialDevice]);
+
+  const matchingModelDevices = React.useMemo(() => {
+    if (!currentDevice || !allDevices) return [];
+    return allDevices.filter(
+      d => d.brand?.trim().toLowerCase() === currentDevice.brand?.trim().toLowerCase() &&
+           d.model?.trim().toLowerCase() === currentDevice.model?.trim().toLowerCase()
+    );
+  }, [currentDevice, allDevices]);
+
+  const handleStartEditModel = () => {
+    if (!currentDevice) return;
+    setEditModelValue(currentDevice.model || '');
+    setEditBrandValue(currentDevice.brand || '');
+    setApplyToAllMatching(matchingModelDevices.length > 1);
+    setIsEditingModel(true);
+  };
+
+  const handleSaveModel = async () => {
+    if (!currentDevice || !editModelValue.trim()) return;
+    setIsSavingModel(true);
+    try {
+      const cleanModel = editModelValue.trim();
+      const cleanBrand = editBrandValue.trim() || currentDevice.brand;
+
+      if (applyToAllMatching && onBatchRenameModel && matchingModelDevices.length > 0) {
+        const res = await onBatchRenameModel({
+          deviceIds: matchingModelDevices.map(d => d.id),
+          newModel: cleanModel,
+          newBrand: cleanBrand,
+        });
+        if (res.success) {
+          setCurrentDevice({ ...currentDevice, model: cleanModel, brand: cleanBrand });
+          setIsEditingModel(false);
+          onNotify?.({ tone: 'success', text: `Название модели обновлено для ${res.count || matchingModelDevices.length} устройств` });
+        } else {
+          onNotify?.({ tone: 'error', text: res.message || 'Не удалось обновить модель' });
+        }
+      } else if (onUpdateDevice) {
+        const res = await onUpdateDevice(currentDevice.id, { model: cleanModel, brand: cleanBrand });
+        if (res.success && res.device) {
+          setCurrentDevice(res.device);
+          setIsEditingModel(false);
+          onNotify?.({ tone: 'success', text: 'Название модели обновлено' });
+        } else {
+          onNotify?.({ tone: 'error', text: res.message || 'Не удалось обновить модель' });
+        }
+      }
+    } finally {
+      setIsSavingModel(false);
+    }
+  };
 
   if (!currentDevice) return null;
 
@@ -159,6 +224,120 @@ export const DeviceDetailsModal: React.FC<DeviceDetailsModalProps> = ({
               </span>
             )}
           </div>
+        </div>
+
+        {/* Product Model & Brand Card (Editable) */}
+        <div className="p-2.5 rounded-xl bg-surface-raised border border-border/80">
+          {!isEditingModel ? (
+            <div className="flex items-center justify-between gap-2">
+              <div className="min-w-0">
+                <span className="text-[10px] uppercase font-bold text-fg-subtle tracking-wider block">
+                  Товар / Модель
+                </span>
+                <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                  <span className="text-sm sm:text-base font-extrabold text-fg truncate">
+                    {currentDevice.brand} {currentDevice.model}
+                  </span>
+                  {matchingModelDevices.length > 1 && (
+                    <span className="text-[10px] font-bold px-1.5 py-0.2 rounded-full bg-surface border border-border text-fg-subtle">
+                      {matchingModelDevices.length} шт. на складе
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {(isAdminOrPartner || true) && (
+                <button
+                  type="button"
+                  onClick={handleStartEditModel}
+                  className="px-2 py-1 rounded-lg bg-surface hover:bg-surface-raised border border-border text-fg hover:text-accent text-xs font-semibold flex items-center gap-1 transition-all cursor-pointer shrink-0 shadow-2xs"
+                  title="Редактировать название модели или бренда"
+                >
+                  <Edit2 className="w-3 h-3 text-accent" />
+                  <span>Изменить</span>
+                </button>
+              )}
+            </div>
+          ) : (
+            <div className="space-y-2.5">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-fg flex items-center gap-1">
+                  <Edit2 className="w-3.5 h-3.5 text-accent" />
+                  Редактирование названия товара
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setIsEditingModel(false)}
+                  className="text-fg-subtle hover:text-fg p-0.5 cursor-pointer"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <div>
+                  <label className="block text-[10px] font-bold text-fg-subtle uppercase mb-0.5">
+                    Бренд
+                  </label>
+                  <input
+                    type="text"
+                    value={editBrandValue}
+                    onChange={(e) => setEditBrandValue(e.target.value)}
+                    className="w-full h-7.5 px-2 rounded-lg bg-surface border border-border text-xs text-fg font-semibold focus:outline-none focus:border-accent"
+                    placeholder="Например: Redmi, Apple, Samsung"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-fg-subtle uppercase mb-0.5">
+                    Название модели <span className="text-danger">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={editModelValue}
+                    onChange={(e) => setEditModelValue(e.target.value)}
+                    className="w-full h-7.5 px-2 rounded-lg bg-surface border border-border text-xs text-fg font-semibold focus:outline-none focus:border-accent"
+                    placeholder="Например: A7 Pro"
+                    autoFocus
+                  />
+                </div>
+              </div>
+
+              {matchingModelDevices.length > 1 && (
+                <label className="flex items-center gap-2 cursor-pointer select-none text-xs text-fg-muted">
+                  <input
+                    type="checkbox"
+                    checked={applyToAllMatching}
+                    onChange={(e) => setApplyToAllMatching(e.target.checked)}
+                    className="w-4 h-4 rounded text-accent focus:ring-accent accent-accent"
+                  />
+                  <span>
+                    Применить ко всем <strong className="text-fg">{matchingModelDevices.length} шт.</strong> этой модели на складе
+                  </span>
+                </label>
+              )}
+
+              <div className="flex items-center justify-end gap-1.5 pt-1">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => setIsEditingModel(false)}
+                  disabled={isSavingModel}
+                >
+                  Отмена
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={handleSaveModel}
+                  disabled={isSavingModel || !editModelValue.trim()}
+                >
+                  {isSavingModel ? 'Сохранение…' : 'Сохранить'}
+                </Button>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Hardware Specifications Grid */}

@@ -98,3 +98,12 @@ describe('report rows preview', () => {
     expect(withBonus.rows.some((row) => String(row[1]).includes('справочно'))).toBe(true);
   });
 });
+
+describe('formatRate', () => {
+  it('always shows a rate with 2 decimals', async () => {
+    const { formatRate } = await import('./exportReports');
+    expect(formatRate(9.35)).toBe('9.35');
+    expect(formatRate(10)).toBe('10.00');
+    expect(formatRate(10.5)).toBe('10.50');
+  });
+});

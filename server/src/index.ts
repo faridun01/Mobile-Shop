@@ -7,8 +7,7 @@ const currentFile = fileURLToPath(import.meta.url);
 const currentDirectory = path.dirname(currentFile);
 const projectRoot = path.resolve(currentDirectory, '../..');
 
-dotenv.config({ path: path.join(projectRoot, '.env') });
-dotenv.config();
+dotenv.config({ path: path.join(projectRoot, '.env'), quiet: true });
 
 import { app } from './app';
 import { prisma } from './prisma/prisma.service';

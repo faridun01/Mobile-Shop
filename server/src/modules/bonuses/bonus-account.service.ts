@@ -1,7 +1,7 @@
 import { D, moneyJson, type MoneyInput } from '../../common/decimal';
 import { prisma, type TransactionClient } from '../../prisma/prisma.service';
 import { resolveActor } from '../../common/actor';
-import { requirePositiveMoney, roundMoney } from '../../common/money';
+import { averageRate, requirePositiveMoney, roundMoney } from '../../common/money';
 import { findBonusAccount, lockBonusAccount, lockCentralCashRegister } from '../finance/account.service';
 import { cancelTransaction, postTransaction } from '../finance/financial-transaction.service';
 import { cashBalanceFromLedger, loadCashLedger } from '../finance/cash-balance';
@@ -67,7 +67,7 @@ export class BonusAccountService {
         type: 'TRANSFER', direction: 'NEUTRAL', numberPrefix: 'TR',
         accountId: account.id, destinationAccountId: centralAccount.id,
         balanceCurrency: 'USD', amount: amountTjs, currency: 'TJS',
-        exchangeRate: D(amountTjs).div(amountUsd).toDecimalPlaces(4),
+        exchangeRate: averageRate(amountTjs, amountUsd),
         amountTjs, amountUsd, sourceType: TRANSFER,
         description: `Перевод с Бонусного счёта в «${central.name}»`,
         comment: input.comment?.trim() || undefined,
@@ -95,7 +95,7 @@ export class BonusAccountService {
       const posting = await postTransaction(tx, {
         type: 'ADJUSTMENT', direction: 'OUT', numberPrefix: 'BO',
         accountId: account.id, balanceCurrency: 'USD', amount: amountTjs, currency: 'TJS',
-        exchangeRate: D(amountTjs).div(amountUsd).toDecimalPlaces(4),
+        exchangeRate: averageRate(amountTjs, amountUsd),
         amountTjs, amountUsd, categoryName: 'Выдача с Бонусного счёта', sourceType: PAYOUT,
         description: purpose ? `Выдача с Бонусного счёта: ${purpose}` : 'Выдача с Бонусного счёта',
         comment: purpose || undefined,

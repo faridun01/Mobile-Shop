@@ -103,3 +103,27 @@ describe('a refund is reported by fact, on its own day', () => {
   });
 });
 
+
+describe('an exchange row shows the rate of its own day', () => {
+  it.each([
+    ['its recorded rate', { exchangeRate: 9.35 }],
+    ['that day\'s rate for an older exchange without one', {}],
+  ])('uses %s, never TJS ÷ the rounded USD (6500 / 695.19 = 9.3499)', async (_label, extra) => {
+    const day = new Date('2026-09-14T08:00:00Z');
+    rates.byDay.set('2026-09-14', 9.35);
+    const sale = { id: 'exchanged-1', storeId: 'store-0', receiptNumber: 7 };
+    db.sale.findMany.mockImplementation(async ({ where, select }) => (where.id ? [sale] : []).map((row) => project(row, select)));
+    db.auditLog.findMany.mockImplementation(async ({ where, select }) => {
+      const actions: string[] = where.action.in ?? [where.action];
+      const exchange = { targetId: 'exchanged-1', action: 'EXCHANGE', createdAt: day, financialDetails: {
+        newPriceTjs: 6500, newPriceUsd: 695.19, exchangeInValueTjs: 4500, exchangeInValueUsd: 481.28, exchangeProfitUsd: 50, ...extra } };
+      const original = { targetId: 'exchanged-1', action: 'SALE', createdAt: new Date('2026-08-01T08:00:00Z'), financialDetails: { recognizedProfitUsd: 10 } };
+      return [exchange, original].filter((row) => actions.includes(row.action)).map((row) => project(row, select));
+    });
+    const summary = await computeReportsSummary({ period: 'SPECIFIC_MONTH', month: '2026-09', includeEvents: true });
+    const row = summary.events!.find((e) => e.kind === 'EXCHANGE')!;
+    expect(Number(row.rate)).toBe(9.35);
+    expect(Number(row.amountTjs)).toBe(2000);
+    expect(Number(row.amountUsd)).toBe(213.91);
+  });
+});

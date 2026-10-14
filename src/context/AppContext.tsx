@@ -186,7 +186,8 @@ interface AppContextType {
     }[];
     destinationLocationId?: string;
   }) => Promise<{ success: boolean; message?: string }>;
-  updateDevice: (id: string, updates: { ram?: string | null; storage?: string; color?: string; model?: string }) => Promise<{ success: boolean; device?: Device; message?: string }>;
+  updateDevice: (id: string, updates: { ram?: string | null; storage?: string; color?: string; model?: string; brand?: string }) => Promise<{ success: boolean; device?: Device; message?: string }>;
+  batchRenameModel: (params: { deviceIds: string[]; newModel: string; newBrand?: string }) => Promise<{ success: boolean; count?: number; message?: string }>;
   updateSupplierBonus: (id: string, data: {
     campaignTitle?: string;
     amountUsd?: number;
@@ -479,6 +480,30 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return { success: false, message: err?.message || 'Не удалось обновить устройство' };
     }
   }, []);
+
+  const batchRenameModel: AppContextType['batchRenameModel'] = useCallback(async ({ deviceIds, newModel, newBrand }) => {
+    try {
+      const res = await apiClient<{ success: boolean; count: number; devices: any[] }>('/devices/batch-rename-model', {
+        method: 'PATCH',
+        body: JSON.stringify({ deviceIds, newModel, newBrand }),
+      });
+      setDevices((prev) => {
+        const idSet = new Set(deviceIds);
+        return prev.map((d) => {
+          if (!idSet.has(d.id)) return d;
+          return {
+            ...d,
+            ...(newModel ? { model: newModel.trim() } : {}),
+            ...(newBrand ? { brand: newBrand.trim() } : {}),
+          };
+        });
+      });
+      return { success: true, count: res.count };
+    } catch (err: any) {
+      return { success: false, message: err?.message || 'Не удалось переименовать модель' };
+    }
+  }, []);
+
 
   // Bounded by default — the background/startup load used to fetch every sale ever, which
   // only gets slower as the shop's history grows. Anything outside this recent window is
@@ -1680,6 +1705,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         updateSupplierInvoice,
         deleteSupplierInvoice,
         updateDevice,
+        batchRenameModel,
         createSupplierBonus,
         updateSupplierBonus,
         deleteSupplierBonus,

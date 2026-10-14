@@ -16,7 +16,7 @@ import { formatMoney } from '../../utils/money';
 import { LoadingState } from '../ui/Skeleton';
 import { cn } from '../../utils/cn';
 import { TransferDeviceGridProps } from './types';
-import { getPhoneColorHex, formatRam, formatPhoneColor, isRamInStorage } from '../../utils/phoneSpecs';
+import { getPhoneColorHex, formatRam, formatPhoneColor, isRamInStorage, parseAndCanonicalizeModel } from '../../utils/phoneSpecs';
 import { Device } from '../../types';
 import { useVirtualRows } from '../../hooks/useVirtualRows';
 import { CopyImeiButton } from '../common/CopyImeiButton';
@@ -86,13 +86,15 @@ export const TransferDeviceGrid: React.FC<TransferDeviceGridProps> = ({
     }>();
 
     for (const dev of availableDevices) {
-      const key = `${dev.brand}__${dev.model}`.toLowerCase();
+      const bName = dev.brand?.trim() || 'Без бренда';
+      const mInfo = parseAndCanonicalizeModel(dev.model, bName);
+      const key = `${bName}__${mInfo.modelGroupKey}`.toLowerCase();
       let group = map.get(key);
       if (!group) {
         group = {
           key,
-          brand: dev.brand,
-          model: dev.model,
+          brand: bName,
+          model: mInfo.canonicalModel,
           devices: [],
           storageMap: new Map(),
           colorMap: new Map(),

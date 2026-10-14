@@ -69,6 +69,8 @@ export {
   formatRam,
   formatStorage,
   isRamInStorage,
+  parseAndCanonicalizeModel,
+  getModelVariantLabel,
 } from '../../utils/phoneSpecs';
 
 export function getTimelineBadge(type: string) {
@@ -115,22 +117,37 @@ export function getTimelineBadge(type: string) {
   };
 }
 
+
+export interface DeviceVariantGroup {
+  key: string;
+  ram?: string | null;
+  storage: string;
+  label: string;
+  count: number;
+  valueUsd: number;
+  devices: Device[];
+}
+
+export interface ModelGroupItem {
+  key: string;
+  model: string;
+  count: number;
+  valueUsd: number;
+  storageList: { storage: string; count: number }[];
+  ramList: string[];
+  variants: DeviceVariantGroup[];
+  devices: Device[];
+}
+
 export interface BrandGroupItem {
   key: string;
   brand: string;
   totalCount: number;
   totalValueUsd: number;
   distinctModelsCount: number;
-  modelGroups: {
-    key: string;
-    model: string;
-    count: number;
-    valueUsd: number;
-    storageList: { storage: string; count: number }[];
-    ramList: string[];
-    devices: Device[];
-  }[];
+  modelGroups: ModelGroupItem[];
   devices: Device[];
 }
 
 export type InventoryViewMode = 'BY_BRAND' | 'BY_MODEL' | 'FLAT_LIST';
+

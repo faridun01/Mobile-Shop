@@ -128,11 +128,11 @@ export const RepairTopBar: React.FC<RepairTopBarProps> = ({
               <button
                 type="button"
                 onClick={onResetFilters}
-                className="h-8 px-2 text-fg-subtle hover:text-danger hover:bg-danger/10 border border-transparent hover:border-danger/20 rounded-lg text-xs font-medium transition-colors cursor-pointer flex items-center gap-1"
+                className="h-8 w-8 text-fg-subtle hover:text-danger hover:bg-danger/10 border border-border/70 hover:border-danger/25 rounded-xl transition-colors cursor-pointer flex items-center justify-center shrink-0 shadow-2xs"
                 title="Сбросить все фильтры"
+                aria-label="Сбросить все фильтры"
               >
-                <X className="w-3 h-3" />
-                <span className="text-[11px]">Сброс</span>
+                <X className="w-3.5 h-3.5 text-danger/80" />
               </button>
             )}
           </div>

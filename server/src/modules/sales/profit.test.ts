@@ -109,6 +109,15 @@ describe('exchange cost restorations', () => {
     ])).toEqual([{ deviceId: 'a', tradeInCostUsd: D(150), originalCostUsd: D(100) }]);
   });
 
+  it('skips exchanges that returned the device at its own cost', () => {
+    expect(exchangeCostRestorations([
+      { action: 'EXCHANGE', financialDetails: { returnedDeviceId: 'a', exchangeInValueUsd: 150, returnedCostBasisUsd: 100, returnedCostBasisAfterUsd: 100 } },
+    ])).toEqual([]);
+    expect(exchangeCostRestorations([
+      { action: 'EXCHANGE', financialDetails: { returnedDeviceId: 'b', exchangeInValueUsd: 150, returnedCostBasisUsd: 0, returnedCostBasisAfterUsd: 150 } },
+    ])).toEqual([{ deviceId: 'b', tradeInCostUsd: D(150), originalCostUsd: D(0) }]);
+  });
+
   it('skips legacy exchanges that never recorded the original cost', () => {
     expect(exchangeCostRestorations([{ action: 'EXCHANGE', financialDetails: { exchangeInValueUsd: 150 } }])).toEqual([]);
   });

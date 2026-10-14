@@ -35,6 +35,30 @@ export function roundMoney(value: MoneyInput) {
   return D(value).toDecimalPlaces(2);
 }
 
+/** Largest rate the exchange_rates column (DECIMAL(10,2)) holds. */
+const MAX_RATE = '99999999.99';
+
+/**
+ * The USD/TJS rate is set with at most 2 decimals (e.g. 10.50) — never rounded silently: a rate
+ * entered with more is rejected so what is saved is exactly what was typed.
+ */
+export function requireExchangeRate(value: unknown) {
+  const label = 'Курс';
+  const rate = parseMoney(value, label);
+  if (rate.lte(0) || rate.gt(MAX_RATE)) throw new Error('Укажите положительный курс (например, 10.50)');
+  if (rate.decimalPlaces() > 2) throw new Error('Курс указывается не более чем с 2 знаками после запятой (например, 10.50)');
+  return rate;
+}
+
+/**
+ * The average rate of an amount moved with its own TJS and USD (a register's balance built up
+ * over many days), for reference only: the posting moves the exact amounts. Like every rate in
+ * the system it has 2 decimals.
+ */
+export function averageRate(amountTjs: MoneyInput, amountUsd: MoneyInput) {
+  return D(amountUsd).gt(0) ? D(amountTjs).div(amountUsd).toDecimalPlaces(2) : null;
+}
+
 function parseMoney(value: unknown, label: string) {
   if (typeof value !== 'number' && typeof value !== 'string' && !(value && typeof value === 'object' && 'toDecimalPlaces' in value)) {
     throw new Error(`${label}: укажите корректное числовое значение`);

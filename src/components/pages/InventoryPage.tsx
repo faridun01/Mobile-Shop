@@ -19,7 +19,16 @@ import { useNavigationLayout } from '../../hooks/useNavigationLayout';
 import { useVirtualRows } from '../../hooks/useVirtualRows';
 import { findDeviceByCode, looksLikeDeviceCode, normalizeScanCode } from '../../utils/scanLookup';
 import { useStoreContext, formatStoreName } from '../../utils/storeContext';
-import { IN_STOCK_STATUSES, InventoryViewMode, BrandGroupItem, STATUS_LABELS, formatRam, formatStorage } from '../inventory/types';
+import {
+  IN_STOCK_STATUSES,
+  InventoryViewMode,
+  BrandGroupItem,
+  STATUS_LABELS,
+  formatRam,
+  formatStorage,
+  parseAndCanonicalizeModel,
+  getModelVariantLabel,
+} from '../inventory/types';
 import { InventoryStatsBar } from '../inventory/InventoryStatsBar';
 import { InventoryFiltersBar } from '../inventory/InventoryFiltersBar';
 import { InventoryLocationsView } from '../inventory/InventoryLocationsView';
@@ -40,7 +49,8 @@ export const InventoryPage: React.FC = () => {
     isInitialLoading,
     selectedStoreId: globalSelectedStoreId,
     todayRate,
-    updateDevice
+    updateDevice,
+    batchRenameModel
   } = useAppFields(
     'currentUser',
     'devices',
@@ -50,7 +60,8 @@ export const InventoryPage: React.FC = () => {
     'isInitialLoading',
     'selectedStoreId',
     'todayRate',
-    'updateDevice'
+    'updateDevice',
+    'batchRenameModel'
   );
 
   // No fallback rate: a TJS equivalent is only shown when today's rate is actually set.
@@ -348,7 +359,11 @@ export const InventoryPage: React.FC = () => {
 
   const filteredDistinctModelsCount = useMemo(() => {
     const set = new Set<string>();
-    filteredDevices.forEach(d => set.add(`${d.brand}__${d.model}`));
+    filteredDevices.forEach(d => {
+      const b = d.brand?.trim() || 'Без бренда';
+      const mInfo = parseAndCanonicalizeModel(d.model, b);
+      set.add(`${b.toLowerCase()}__${mInfo.modelGroupKey}`);
+    });
     return set.size;
   }, [filteredDevices]);
 
@@ -359,6 +374,16 @@ export const InventoryPage: React.FC = () => {
 
   const brandGroups = useMemo<BrandGroupItem[]>(() => {
     const map = new Map<string, BrandGroupItem>();
+
+    const parseCapacityNum = (val?: string | null): number => {
+      if (!val) return 0;
+      const match = val.match(/(\d+)\s*(tb|gb)?/i);
+      if (!match) return 0;
+      const num = parseInt(match[1], 10);
+      const unit = (match[2] || '').toLowerCase();
+      if (unit === 'tb') return num * 1024;
+      return num;
+    };
 
     for (const dev of filteredDevices) {
       const bName = dev.brand.trim() || 'Без бренда';
@@ -380,17 +405,21 @@ export const InventoryPage: React.FC = () => {
       bGroup.totalValueUsd = moneyNumber(decimal(bGroup.totalValueUsd).plus(dev.purchaseCostUsd || 0));
       bGroup.devices.push(dev);
 
-      // Model group within brand
-      const mName = dev.model.trim() || 'Без модели';
-      let mGroup = bGroup.modelGroups.find(m => m.model === mName);
+      // Model group within brand: canonicalized and unified
+      const modelInfo = parseAndCanonicalizeModel(dev.model, bName);
+      const canonicalName = modelInfo.canonicalModel;
+      const modelKey = `${bName}__${modelInfo.modelGroupKey}`;
+
+      let mGroup = bGroup.modelGroups.find(m => m.key === modelKey);
       if (!mGroup) {
         mGroup = {
-          key: `${bName}__${mName}`,
-          model: mName,
+          key: modelKey,
+          model: canonicalName,
           count: 0,
           valueUsd: 0,
           storageList: [],
           ramList: [],
+          variants: [],
           devices: [],
         };
         bGroup.modelGroups.push(mGroup);
@@ -399,26 +428,57 @@ export const InventoryPage: React.FC = () => {
       mGroup.valueUsd = moneyNumber(decimal(mGroup.valueUsd).plus(dev.purchaseCostUsd || 0));
       mGroup.devices.push(dev);
 
+      // Effective RAM and Storage (preserve dev RAM/storage, fallback to extracted from model string)
+      const effectiveRam = formatRam(dev.ram) || modelInfo.extractedRam || null;
+      const effectiveStorage = formatStorage(dev.storage) || modelInfo.extractedStorage || dev.storage?.trim() || 'Стандарт';
+
       // Storage breakdown
-      const sName = formatStorage(dev.storage) || dev.storage.trim() || 'Стандарт';
-      let sEntry = mGroup.storageList.find(s => s.storage === sName);
+      let sEntry = mGroup.storageList.find(s => s.storage === effectiveStorage);
       if (!sEntry) {
-        sEntry = { storage: sName, count: 0 };
+        sEntry = { storage: effectiveStorage, count: 0 };
         mGroup.storageList.push(sEntry);
       }
       sEntry.count++;
 
       // RAM breakdown
-      const rName = formatRam(dev.ram);
-      if (rName && !mGroup.ramList.includes(rName)) {
-        mGroup.ramList.push(rName);
+      if (effectiveRam && !mGroup.ramList.includes(effectiveRam)) {
+        mGroup.ramList.push(effectiveRam);
       }
+
+      // Variant breakdown (RAM + Storage configuration)
+      const variantKey = `${effectiveRam || 'none'}__${effectiveStorage}`;
+      let variant = mGroup.variants.find(v => v.key === variantKey);
+      if (!variant) {
+        variant = {
+          key: variantKey,
+          ram: effectiveRam,
+          storage: effectiveStorage,
+          label: getModelVariantLabel(effectiveRam, effectiveStorage),
+          count: 0,
+          valueUsd: 0,
+          devices: [],
+        };
+        mGroup.variants.push(variant);
+      }
+      variant.count++;
+      variant.valueUsd = moneyNumber(decimal(variant.valueUsd).plus(dev.purchaseCostUsd || 0));
+      variant.devices.push(dev);
     }
 
     const list = Array.from(map.values());
     for (const b of list) {
       b.distinctModelsCount = b.modelGroups.length;
       b.modelGroups.sort((a, b) => b.count - a.count);
+      for (const m of b.modelGroups) {
+        m.variants.sort((vA, vB) => {
+          const ramA = parseCapacityNum(vA.ram);
+          const ramB = parseCapacityNum(vB.ram);
+          if (ramA !== ramB) return ramA - ramB;
+          const romA = parseCapacityNum(vA.storage);
+          const romB = parseCapacityNum(vB.storage);
+          return romA - romB;
+        });
+      }
     }
 
     // Apply sorting to brands
@@ -699,6 +759,8 @@ export const InventoryPage: React.FC = () => {
             rate={rate}
             totalFilteredDevicesCount={filteredDevices.length}
             onSelectDevice={(device) => setSelectedDevice(device)}
+            onBatchRenameModel={batchRenameModel}
+            onNotify={(msg) => setPageStatus(msg)}
           />
         ) : inventoryViewMode === 'BY_MODEL' ? (
           <ModelGroupedList
@@ -712,6 +774,8 @@ export const InventoryPage: React.FC = () => {
             isAdmin={isAdmin}
             rate={rate}
             onSelectDevice={(device) => setSelectedDevice(device)}
+            onBatchRenameModel={batchRenameModel}
+            onNotify={(msg) => setPageStatus(msg)}
           />
         ) : (
           <FlatDevicesTable
@@ -734,8 +798,11 @@ export const InventoryPage: React.FC = () => {
         rate={rate}
         isAdmin={isAdmin}
         isAdminOrPartner={isAdminOrPartner}
+        allDevices={devices}
         onClose={() => setSelectedDevice(null)}
         onUpdateRam={(deviceId, ram) => updateDevice(deviceId, { ram })}
+        onUpdateDevice={updateDevice}
+        onBatchRenameModel={batchRenameModel}
         onNotify={(msg) => setPageStatus(msg)}
       />
     </div>

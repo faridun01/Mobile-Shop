@@ -211,7 +211,7 @@ export async function computeReportsSummary(input: ReportsSummaryInput) {
   // which would change a closed period's TJS figures every day.
   const dayRates = new Map<string, MoneyInput | null>();
   const neededDays = [
-    ...periodExchangeLogs.filter((log) => !detailNumber(log.financialDetails, 'newPriceUsd')).map((log) => log.createdAt),
+    ...periodExchangeLogs.filter((log) => !detailNumber(log.financialDetails, 'exchangeRate')).map((log) => log.createdAt),
     ...periodSalesAllStores.filter((s) => !s.exchangeRate).map((s) => s.createdAt),
     ...refundedSalesAllStores.filter((s) => !s.exchangeRate).map((s) => s.refundedAt ?? s.createdAt),
   ].filter((d): d is Date => d instanceof Date);
@@ -271,7 +271,9 @@ export async function computeReportsSummary(input: ReportsSummaryInput) {
       revenueTjs: D(newPriceTjs).minus(detailNumber(log.financialDetails, 'exchangeInValueTjs') ?? 0),
       profitUsd: D(profitUsd).plus(detailNumber(log.financialDetails, 'bonusProfitUsd') ?? 0),
       bonusUsd: D(detailNumber(log.financialDetails, 'bonusProfitUsd') ?? 0),
-      rate: newPriceUsd ? D(newPriceTjs).div(newPriceUsd) : rateOn(log.createdAt),
+      // The exchange's own rate (older exchanges: that day's rate). Never TJS ÷ the rounded USD,
+      // which shows a false 9.3499 for a 9.35 day.
+      rate: detailNumber(log.financialDetails, 'exchangeRate') ?? rateOn(log.createdAt),
     });
   }
   // Registers hold USD, so the somoni handed back on a refund cost that day's dollars, which can

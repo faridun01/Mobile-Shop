@@ -376,11 +376,11 @@ export const AuditLogPage: React.FC = () => {
               <button
                 type="button"
                 onClick={handleResetFilters}
-                className="h-8 px-2 rounded-lg bg-surface-raised hover:bg-danger/10 text-fg-subtle hover:text-danger border border-border hover:border-danger/30 text-xs font-semibold transition-colors cursor-pointer shrink-0 flex items-center gap-1"
+                className="h-8 w-8 rounded-xl bg-surface-raised hover:bg-danger/10 text-fg-subtle hover:text-danger border border-border/70 hover:border-danger/30 transition-colors cursor-pointer shrink-0 flex items-center justify-center shadow-2xs"
                 title="Сбросить все фильтры"
+                aria-label="Сбросить все фильтры"
               >
-                <RotateCcw className="w-3 h-3" />
-                <span className="hidden sm:inline">Сброс</span>
+                <X className="w-3.5 h-3.5 text-danger/80" />
               </button>
             )}
           </div>

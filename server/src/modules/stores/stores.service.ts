@@ -5,7 +5,7 @@ import { getStoreCashAccount, lockCashRegister } from '../finance/account.servic
 import { registerLedgerBalance } from '../finance/cash-balance';
 import { postTransaction } from '../finance/financial-transaction.service';
 import { requireTodayRate } from '../exchange-rate/exchange-rate.service';
-import { roundMoney } from '../../common/money';
+import { averageRate, roundMoney } from '../../common/money';
 
 export class StoresService {
   public static async create(name: string, address: string | undefined, userId: string) {
@@ -187,7 +187,7 @@ export class StoresService {
           type: 'TRANSFER', direction: 'NEUTRAL', numberPrefix: 'TR',
           accountId: sourceAccount.id, destinationAccountId: targetAccount.id,
           balanceCurrency: 'USD', amount: cashTjs, currency: 'TJS',
-          exchangeRate: cashUsd.gt(0) ? cashTjs.div(cashUsd).toDecimalPlaces(4) : null,
+          exchangeRate: averageRate(cashTjs, cashUsd),
           amountTjs: cashTjs, amountUsd: cashUsd,
           shopId: sourceStoreId, sourceType: 'STORE_MERGE', sourceId: sourceStoreId,
           description: `Объединение магазинов: касса «${source.name}» → «${target.name}»`,

@@ -81,7 +81,11 @@ export interface ReportTable {
  * ensuring full compatibility with Microsoft Excel, Apple Numbers and Google Sheets.
  */
 async function downloadBlob(blob: Blob, fileName: string): Promise<void> {
-  // 1. Mobile devices (iOS Safari, iOS PWA, Android):
+  // 0. The iOS/Android app: save through the system share sheet (a download link does nothing there).
+  const { shareFileNatively } = await import('../services/nativeFileShare');
+  if (await shareFileNatively(blob, fileName)) return;
+
+  // 1. Mobile browsers (iOS Safari, iOS PWA, Android):
   // Use Web Share API if supported for files - this allows "Save to Files" or opening in Excel natively
   if (typeof navigator !== 'undefined' && typeof navigator.canShare === 'function') {
     try {
@@ -118,13 +122,21 @@ async function downloadBlob(blob: Blob, fileName: string): Promise<void> {
 
 function downloadCsv(content: string, fileName: string) {
   const blob = new Blob(['﻿' + content], { type: 'text/csv;charset=utf-8;' });
-  void downloadBlob(blob, fileName);
+  downloadBlob(blob, fileName).catch((error) => {
+    console.error('Failed to save CSV', error);
+    window.alert('Не удалось сохранить файл. Попробуйте ещё раз.');
+  });
 }
 
 function escapeCsvField(field: any): string {
   if (field === null || field === undefined) return '""';
   const str = String(field);
   return `"${str.replace(/"/g, '""')}"`;
+}
+
+/** A rate always has 2 decimals (it is set that way): 9.35 → "9.35", 10 → "10.00". */
+export function formatRate(rate: number): string {
+  return (Number(rate) || 0).toFixed(2);
 }
 
 /** Cent-exact sum of money amounts (each already rounded to cents). */
@@ -162,7 +174,7 @@ export function buildEventsReportTable(events: ReportEventRow[], cashBonusesUsd:
       operationLabel,
       receiptLabel,
       event.storeName,
-      Number(event.rate).toFixed(4),
+      formatRate(event.rate),
       Number(event.amountTjs).toFixed(2),
       Number(event.amountUsd).toFixed(2),
       Number(event.costUsd).toFixed(2),
@@ -205,6 +217,8 @@ const XLSX_BORDER = 'FFE2E8F0';
 const XLSX_WHITE = 'FFFFFFFF';
 const XLSX_RED = 'FFDC2626';
 const XLSX_MONEY_FORMAT = '#,##0.00;[Red](#,##0.00);-';
+/** A rate always has 2 decimals (it is set that way). */
+const RATE_FORMAT = '0.00';
 
 function safeWorksheetText(value: string | undefined | null, fallback = '-'): string {
   const text = value?.trim();
@@ -338,7 +352,7 @@ export async function buildComprehensiveReportWorkbook({
       operationName,
       event.receiptNumber ?? '',
       safeWorksheetText(event.storeName),
-      Math.round(Number(event.rate) * 10000) / 10000,
+      Math.round(Number(event.rate) * 100) / 100,
       Math.round(Number(event.amountTjs) * 100) / 100,
       Math.round(Number(event.amountUsd) * 100) / 100,
       Math.round(Number(event.costUsd) * 100) / 100,
@@ -353,7 +367,7 @@ export async function buildComprehensiveReportWorkbook({
       cell.border = { bottom: { style: 'hair', color: { argb: XLSX_BORDER } } };
     });
     row.getCell(1).numFmt = 'dd.mm.yyyy hh:mm';
-    row.getCell(5).numFmt = '0.0000';
+    row.getCell(5).numFmt = RATE_FORMAT;
     for (let column = 6; column <= 12; column += 1) row.getCell(column).numFmt = XLSX_MONEY_FORMAT;
     if (event.kind === 'REFUND') row.getCell(2).font = { name: 'Calibri', size: 10, bold: true, color: { argb: XLSX_RED } };
   }
@@ -401,7 +415,7 @@ export async function buildComprehensiveReportWorkbook({
       safeWorksheetText(expense.createdByName),
       safeWorksheetText(expense.comment || expense.description),
       Math.round((expense.amountTjs || 0) * 100) / 100,
-      Number(expense.exchangeRate) ? Math.round(Number(expense.exchangeRate) * 10000) / 10000 : (amountUsd ? Math.round(((expense.amountTjs || 0) / amountUsd) * 10000) / 10000 : 0),
+      Number(expense.exchangeRate) ? Math.round(Number(expense.exchangeRate) * 100) / 100 : (amountUsd ? Math.round(((expense.amountTjs || 0) / amountUsd) * 100) / 100 : 0),
       Math.round((amountUsd || 0) * 100) / 100,
     ]);
     row.eachCell((cell, columnNumber) => {
@@ -411,7 +425,7 @@ export async function buildComprehensiveReportWorkbook({
     });
     row.getCell(1).numFmt = 'dd.mm.yyyy hh:mm';
     row.getCell(9).numFmt = XLSX_MONEY_FORMAT;
-    row.getCell(10).numFmt = '0.0000';
+    row.getCell(10).numFmt = RATE_FORMAT;
     row.getCell(11).numFmt = XLSX_MONEY_FORMAT;
   });
   expensesSheet.autoFilter = { from: 'A4', to: 'K4' };

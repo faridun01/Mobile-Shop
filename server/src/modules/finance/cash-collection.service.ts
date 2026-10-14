@@ -5,7 +5,7 @@ import { lockCashRegister, lockCentralCashRegister, findBonusAccount, lockBonusA
 import { cancelTransaction, postTransaction } from './financial-transaction.service';
 import { getBusinessDateKey } from '../../common/business-date';
 import { resolveActor } from '../../common/actor';
-import { requireNonNegativeMoney, roundMoney } from '../../common/money';
+import { averageRate, requireNonNegativeMoney, roundMoney } from '../../common/money';
 import { DailyClosingService } from './daily-closing.service';
 import { dateRangeForPeriod, dateRangeForCustomDates, type ReportPeriod } from '../reports/reports.service';
 import { cashBalanceFromLedger, loadCashLedger, registerLedgerBalance } from './cash-balance';
@@ -295,7 +295,7 @@ export interface CashCollectionDto {
 
 const destinationName = (regularUsd: Money, bonusUsd: Money, centralName = 'Центральная касса') =>
   bonusUsd.gt(0) && regularUsd.gt(0) ? `${centralName} + Бонусный счёт` : bonusUsd.gt(0) ? 'Бонусный счёт' : centralName;
-const rateOf = (tjs: Money, usd: Money) => (usd.gt(0) ? tjs.div(usd).toDecimalPlaces(4) : null);
+const rateOf = (tjs: Money, usd: Money) => averageRate(tjs, usd);
 
 export interface CashCollectionBreakdownItem {
   id: string;

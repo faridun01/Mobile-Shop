@@ -117,6 +117,14 @@ try {
       assert(ws.events.some((e) => e.type === 'EXCHANGE_RATE_UPDATED'), `${who} did not get EXCHANGE_RATE_UPDATED`);
     }
   });
+  await step('курс с 3 и более знаками после запятой отклоняется, а не округляется', async () => {
+    for (const rate of [9.555, '9.3499']) {
+      const r = await call(admin, 'POST', '/exchange-rate/today', { rate });
+      assert.equal(r.status, 400, JSON.stringify(r));
+      assert.match(String(r.data?.message), /2 знаками/);
+    }
+    assert.equal(money(ok(await call(seller, 'GET', '/exchange-rate/today')).rate), '9.50', 'the saved rate must stay as it was');
+  });
   await step('партнёр и продавец могут задавать курс', async () => {
     ok(await call(partner, 'POST', '/exchange-rate/today', { rate: 9.5 }));
     ok(await call(seller, 'POST', '/exchange-rate/today', { rate: 9.5 }));

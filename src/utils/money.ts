@@ -6,6 +6,34 @@ export const moneyNumber = (value: Decimal | number | string) => new Decimal(val
 export const sumMoney = (values: number[]) => values.reduce((a, b) => a.plus(b), decimal(0)).toNumber();
 
 /**
+ * Splits a receipt's booked dollars across its TJS parts (cash, card, debt, …) in proportion,
+ * cent-exact: parts that cover the whole TJS total add up to totalUsd exactly (parts covering
+ * less get their rounded share of it), the leftover cents going to the largest remainders.
+ * Recomputing each part as TJS ÷ rate would drift from the booked total.
+ */
+export function splitUsdByTjs(totalUsd: number, totalTjs: number, partsTjs: number[]): number[] {
+  const total = decimal(totalTjs || 0);
+  const nonZero = partsTjs.filter((part) => !decimal(part || 0).isZero()).length;
+  if (total.isZero() || nonZero === 0) return partsTjs.map(() => 0);
+  const totalCents = decimal(totalUsd || 0).mul(100).round();
+  const partsSum = partsTjs.reduce((a, b) => a.plus(b || 0), decimal(0));
+  const targetCents = totalCents.mul(partsSum).div(total).round();
+  const exact = partsTjs.map((part) => totalCents.mul(part || 0).div(total));
+  const cents = exact.map((value) => value.isNegative() ? value.ceil() : value.floor());
+  let left = targetCents.minus(cents.reduce((a, b) => a.plus(b), decimal(0))).toNumber();
+  const step = left >= 0 ? 1 : -1;
+  const order = exact
+    .map((value, index) => ({ index, remainder: value.minus(cents[index]).abs() }))
+    .filter(({ index }) => !decimal(partsTjs[index] || 0).isZero())
+    .sort((a, b) => b.remainder.comparedTo(a.remainder) || a.index - b.index);
+  for (let i = 0; left !== 0 && order.length; i = (i + 1) % order.length) {
+    cents[order[i].index] = cents[order[i].index].plus(step);
+    left -= step;
+  }
+  return cents.map((value) => value.div(100).toNumber());
+}
+
+/**
  * Formats a monetary amount to always show 2 decimal places.
  * Example: 10.5 -> "10.50" (or "10,50"), 1250 -> "1,250.00" (or "1 250,00")
  */
@@ -86,6 +114,20 @@ export function convertTjsToUsd(
  * Formats a rate or price for an input field with standard dot separator and 2 decimal places.
  * Example: 10.5 -> "10.50", "10,5" -> "10.50", 11 -> "11.00"
  */
+/** What the rate field accepts while typing: up to 8 digits and at most 2 decimals ("10", "10.", "10,5", "10.50"). */
+export const RATE_TYPING_PATTERN = /^\d{0,8}(?:[.,]\d{0,2})?$/;
+
+/**
+ * A rate as entered, or null: the rate is set with at most 2 decimals (e.g. 10.50) and is never
+ * rounded — "10.555" is rejected, not saved as 10.56.
+ */
+export function parseRateInput(value: string): number | null {
+  const text = value.trim();
+  if (!/^\d{1,8}(?:[.,]\d{1,2})?$/.test(text)) return null;
+  const rate = Number(text.replace(',', '.'));
+  return rate > 0 ? rate : null;
+}
+
 export function formatRateOrInput(value: number | string | null | undefined): string {
   if (value === null || value === undefined || value === '') return '';
   const num = typeof value === 'number' ? value : Number(String(value).trim().replace(',', '.'));

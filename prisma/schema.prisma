@@ -1024,7 +1024,7 @@ model QuarterClosure {
 model ExchangeRate {
   id              String    @id @default(uuid())
   date            String    @unique
-  rate            Decimal   @db.Decimal(10, 4)
+  rate            Decimal   @db.Decimal(10, 2)
   createdByUserId String
   createdAt       DateTime  @default(now())
   updatedByUserId String?

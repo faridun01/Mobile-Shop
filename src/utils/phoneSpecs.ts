@@ -552,3 +552,132 @@ export function isRamInStorage(storage?: string | null, ram?: string | null): bo
     explicitPattern2.test(s)
   );
 }
+
+export interface CanonicalModelInfo {
+  canonicalModel: string;
+  modelGroupKey: string;
+  extractedRam: string | null;
+  extractedStorage: string | null;
+}
+
+/**
+ * Normalizes device model name across input variations:
+ * - Unifies "A7pro", "A7 pro", "A7 Pro", "a7 pro" -> canonical "A7 Pro", key "a7pro"
+ * - Extracts embedded RAM/Storage strings e.g. "A7 Pro 4/64", "A7 Pro 6/128GB", "A7 Pro (128GB)"
+ *   so devices with differing RAM/ROM unify under one model name, and specs are preserved.
+ * - Strips redundant brand prefixes if model repeats brand (e.g. "Redmi Note 13" under brand "Redmi").
+ * - Returns clean Title-Cased canonical model name and a uniform alphanumeric group key.
+ */
+export function parseAndCanonicalizeModel(rawModel?: string | null, brand?: string | null): CanonicalModelInfo {
+  if (!rawModel || !rawModel.trim()) {
+    return {
+      canonicalModel: 'Без модели',
+      modelGroupKey: 'unknown',
+      extractedRam: null,
+      extractedStorage: null,
+    };
+  }
+
+  let clean = rawModel.trim();
+  const b = (brand || '').trim().toLowerCase();
+
+  // Strip brand prefix if model starts with it (e.g. "Redmi Note 13" under brand "Redmi")
+  if (b && clean.toLowerCase().startsWith(b + ' ')) {
+    clean = clean.slice(b.length).trim();
+  } else if (b && clean.toLowerCase().startsWith(b + '-')) {
+    clean = clean.slice(b.length + 1).trim();
+  }
+
+  let extractedRam: string | null = null;
+  let extractedStorage: string | null = null;
+
+  // Pattern 1: Embedded dual spec e.g. "4/64", "4/64GB", "4+64", "6/128", "8/256GB", "(4/64)", "4GB/64GB"
+  const dualSpecMatch = clean.match(/(?:^|[\s\(\[\{])(\d+)\s*(?:gb)?\s*[\/\+\\]\s*(\d+)\s*(?:gb|tb)?(?:[\s\)\]\}]|$)/i);
+  if (dualSpecMatch) {
+    extractedRam = `${dualSpecMatch[1]} GB`;
+    extractedStorage = `${dualSpecMatch[2]} GB`;
+    clean = clean.replace(dualSpecMatch[0], ' ').trim();
+  }
+
+  // Pattern 2: Embedded single storage e.g. "128GB", "(256 GB)", "512 GB", "1TB"
+  const singleStorageMatch = clean.match(/(?:^|[\s\(\[\{])(\d+)\s*(gb|tb)(?:[\s\)\]\}]|$)/i);
+  if (singleStorageMatch && !extractedStorage) {
+    extractedStorage = `${singleStorageMatch[1]} ${singleStorageMatch[2].toUpperCase()}`;
+    clean = clean.replace(singleStorageMatch[0], ' ').trim();
+  }
+
+  // Pattern 3: RAM only e.g. "4GB RAM", "4GB ОЗУ"
+  const singleRamMatch = clean.match(/(?:^|[\s\(\[\{])(\d+)\s*gb\s*(?:ram|озу)(?:[\s\)\]\}]|$)/i);
+  if (singleRamMatch && !extractedRam) {
+    extractedRam = `${singleRamMatch[1]} GB`;
+    clean = clean.replace(singleRamMatch[0], ' ').trim();
+  }
+
+  // Insert space before/after suffix words when glued to numbers, e.g. "A7pro" -> "A7 pro", "15promax" -> "15 pro max"
+  clean = clean.replace(/(\d+)(pro|max|plus|ultra|lite|prime|fe|se|mini|neo|play|power|youth)/gi, '$1 $2');
+  clean = clean.replace(/(pro|max|plus|ultra|lite|prime|fe|se|mini|neo|play|power|youth)(\d+)/gi, '$1 $2');
+
+  // Separate word and digits when letters > 2 (e.g. "Note13" -> "Note 13", "Tab10" -> "Tab 10", but keep "A7", "S24")
+  clean = clean.replace(/([a-zA-Z]{3,})(\d+)/g, '$1 $2');
+
+  // Replace hyphens/underscores with space and collapse spaces
+  clean = clean.replace(/[-_]+/g, ' ').replace(/\s+/g, ' ').trim();
+
+  // If after cleaning it's empty (e.g. rawModel was just "4/64"), revert to rawModel
+  if (!clean) {
+    clean = rawModel.trim();
+  }
+
+  // Title-case canonical model
+  const canonicalModel = clean
+    .split(' ')
+    .map(word => {
+      const lower = word.toLowerCase();
+      if (lower === 'pro') return 'Pro';
+      if (lower === 'max') return 'Max';
+      if (lower === 'plus') return 'Plus';
+      if (lower === 'ultra') return 'Ultra';
+      if (lower === 'lite') return 'Lite';
+      if (lower === 'mini') return 'Mini';
+      if (lower === 'fe') return 'FE';
+      if (lower === 'se') return 'SE';
+      if (lower === '5g') return '5G';
+      if (lower === '4g') return '4G';
+      if (lower === 'lte') return 'LTE';
+      if (lower === 'iphone') return 'iPhone';
+      if (lower === 'ipad') return 'iPad';
+      // Single letter followed by number: a7 -> A7, s24 -> S24, m34 -> M34
+      if (/^[a-zA-Z]\d+$/.test(word)) {
+        return word.toUpperCase();
+      }
+      return word.charAt(0).toUpperCase() + word.slice(1);
+    })
+    .join(' ');
+
+  // Group key is alphanumeric lowercase
+  const modelGroupKey = canonicalModel.toLowerCase().replace(/[^a-z0-9]/g, '');
+
+  return {
+    canonicalModel,
+    modelGroupKey,
+    extractedRam,
+    extractedStorage,
+  };
+}
+
+/**
+ * Returns formatted label for a RAM/Storage configuration variant.
+ */
+export function getModelVariantLabel(ram?: string | null, storage?: string | null): string {
+  const r = formatRam(ram);
+  const s = formatStorage(storage) || (storage ? storage.trim() : '');
+
+  if (r && s) {
+    if (isRamInStorage(s, r)) return s;
+    return `${r} / ${s}`;
+  }
+  if (s) return s;
+  if (r) return `${r} ОЗУ`;
+  return 'Стандарт';
+}
+

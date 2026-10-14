@@ -120,7 +120,7 @@ export const ExpensesHeaderBar: React.FC<ExpensesHeaderBarProps> = ({
               </span>
             </button>
             <span className="text-[10px] opacity-80 shrink-0 font-medium ml-2">
-              {statusFilter === 'UNPAID' ? '✕ сбросить' : '→ показать'}
+              {statusFilter === 'UNPAID' ? '✕' : '→ показать'}
             </span>
           </div>
         )}
@@ -208,11 +208,11 @@ export const ExpensesHeaderBar: React.FC<ExpensesHeaderBarProps> = ({
             <button
               type="button"
               onClick={onResetFilters}
-              className="h-7.5 px-2 rounded-lg border border-border/80 bg-surface-raised hover:bg-surface text-danger hover:text-danger/80 text-xs font-semibold flex items-center gap-1 shrink-0 cursor-pointer transition-colors shadow-2xs"
+              className="h-7.5 w-7.5 rounded-lg border border-border/80 bg-surface-raised hover:bg-surface text-danger hover:text-danger/80 flex items-center justify-center shrink-0 cursor-pointer transition-colors shadow-2xs"
               title="Сбросить фильтры и поиск"
+              aria-label="Сбросить фильтры и поиск"
             >
-              <RotateCcw className="w-3 h-3" />
-              <span className="hidden sm:inline">Сбросить</span>
+              <X className="w-3.5 h-3.5" />
             </button>
           )}
         </div>

@@ -2,6 +2,7 @@ import { D, type MoneyInput } from '../../common/decimal';
 import { prisma } from '../../prisma/prisma.service';
 import type { TransactionClient } from '../../prisma/prisma.service';
 import { getBusinessDateKey } from '../../common/business-date';
+import { requireExchangeRate } from '../../common/money';
 export { getBusinessDateKey } from '../../common/business-date';
 
 export async function getRateForDate(date: Date) {
@@ -33,8 +34,7 @@ export async function requireTodayRate(
 }
 
 export async function setTodayRate(rate: MoneyInput, userId: string) {
-  rate = D(rate).toDecimalPlaces(4);
-  if (D(rate).lte(0) || D(rate).gt('999999.9999')) throw new Error('Укажите положительный курс с точностью до 4 знаков');
+  rate = requireExchangeRate(rate);
   const today = getBusinessDateKey();
   return prisma.exchangeRate.upsert({
     where: { date: today },

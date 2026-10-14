@@ -7,6 +7,8 @@ import {
   isRamInStorage,
   formatRam,
   formatStorage,
+  parseAndCanonicalizeModel,
+  getModelVariantLabel,
 } from './phoneSpecs';
 
 describe('phoneSpecs colors', () => {
@@ -168,3 +170,74 @@ describe('formatStorage', () => {
     expect(formatStorage('')).toBe('');
   });
 });
+
+describe('parseAndCanonicalizeModel', () => {
+  it('unifies spaced and glued model variations (e.g. A7pro vs A7 pro)', () => {
+    const v1 = parseAndCanonicalizeModel('A7pro', 'Redmi');
+    const v2 = parseAndCanonicalizeModel('A7 pro', 'Redmi');
+    const v3 = parseAndCanonicalizeModel('A7 Pro', 'Redmi');
+    const v4 = parseAndCanonicalizeModel('a7 pro', 'Redmi');
+
+    expect(v1.canonicalModel).toBe('A7 Pro');
+    expect(v2.canonicalModel).toBe('A7 Pro');
+    expect(v3.canonicalModel).toBe('A7 Pro');
+    expect(v4.canonicalModel).toBe('A7 Pro');
+
+    expect(v1.modelGroupKey).toBe('a7pro');
+    expect(v2.modelGroupKey).toBe('a7pro');
+    expect(v3.modelGroupKey).toBe('a7pro');
+    expect(v4.modelGroupKey).toBe('a7pro');
+  });
+
+  it('unifies models with embedded RAM and storage suffixes', () => {
+    const v1 = parseAndCanonicalizeModel('A7 Pro 4/64', 'Redmi');
+    const v2 = parseAndCanonicalizeModel('A7 Pro 6/128GB', 'Redmi');
+    const v3 = parseAndCanonicalizeModel('A7 Pro (128GB)', 'Redmi');
+
+    expect(v1.canonicalModel).toBe('A7 Pro');
+    expect(v2.canonicalModel).toBe('A7 Pro');
+    expect(v3.canonicalModel).toBe('A7 Pro');
+
+    expect(v1.modelGroupKey).toBe('a7pro');
+    expect(v2.modelGroupKey).toBe('a7pro');
+    expect(v3.modelGroupKey).toBe('a7pro');
+
+    expect(v1.extractedRam).toBe('4 GB');
+    expect(v1.extractedStorage).toBe('64 GB');
+    expect(v2.extractedRam).toBe('6 GB');
+    expect(v2.extractedStorage).toBe('128 GB');
+    expect(v3.extractedStorage).toBe('128 GB');
+  });
+
+  it('preserves distinct models like "17" and "Note 13 Pro"', () => {
+    const v17 = parseAndCanonicalizeModel('17', 'Redmi');
+    expect(v17.canonicalModel).toBe('17');
+    expect(v17.modelGroupKey).toBe('17');
+
+    const note13 = parseAndCanonicalizeModel('Note13', 'Xiaomi');
+    const note13Pro = parseAndCanonicalizeModel('Note 13 Pro', 'Xiaomi');
+    expect(note13.canonicalModel).toBe('Note 13');
+    expect(note13Pro.canonicalModel).toBe('Note 13 Pro');
+    expect(note13.modelGroupKey).not.toBe(note13Pro.modelGroupKey);
+  });
+
+  it('handles empty and null values gracefully', () => {
+    expect(parseAndCanonicalizeModel('', 'Redmi').canonicalModel).toBe('Без модели');
+    expect(parseAndCanonicalizeModel(null, 'Redmi').canonicalModel).toBe('Без модели');
+  });
+});
+
+describe('getModelVariantLabel', () => {
+  it('combines RAM and storage cleanly', () => {
+    expect(getModelVariantLabel('4 GB', '64 GB')).toBe('4 GB / 64 GB');
+    expect(getModelVariantLabel('4', '64')).toBe('4 GB / 64 GB');
+    expect(getModelVariantLabel(null, '128 GB')).toBe('128 GB');
+    expect(getModelVariantLabel('8 GB', null)).toBe('8 GB ОЗУ');
+    expect(getModelVariantLabel(null, null)).toBe('Стандарт');
+  });
+
+  it('avoids repeating RAM if already inside composite storage string', () => {
+    expect(getModelVariantLabel('4 GB', '4/64')).toBe('4/64');
+  });
+});
+

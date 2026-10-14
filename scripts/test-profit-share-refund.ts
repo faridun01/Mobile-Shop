@@ -74,15 +74,18 @@ try {
     returnedImei: exchanged.item.imei, returnedBrand: 'Test', returnedModel: 'Refund regression',
     exchangeInValueTjs: D(2000), replacementDeviceId: replacement.id, newPriceTjs: D(2500),
     processedByUserId: 'user-admin', paymentMethod: 'CASH' });
-  assert.deepEqual(await balances(), [{ accrued: 135, available: 135 }, { accrued: 115, available: 115 }]);
+  // Exchange = return + sale: replacement $250 − $100 cost, returned item's $100 margin reversed,
+  // nothing withheld (full $200 credit) → +$50 at 50/50 on top of the original 60/40.
+  assert.deepEqual(await balances(), [{ accrued: 85, available: 85 }, { accrued: 65, available: 65 }]);
+  assert.equal((await prisma.device.findUniqueOrThrow({ where: { id: exchanged.item.id } })).costBasisUsd, 100);
   await shares(20);
   await refund(exchanged.sale.id, 2500);
   assert.deepEqual(await balances(), [{ accrued: 0, available: 0 }, { accrued: 0, available: 0 }]);
   assert.equal((await prisma.device.findUniqueOrThrow({ where: { id: exchanged.item.id } })).costBasisUsd, 100);
   console.log('PASS: original sale and exchange allocations reversed after two share changes; traded-in device cost restored');
 
-  // Traded-in device resold before the original sale is refunded: its resale profit was
-  // booked against the $150 trade-in value, so the refund must add the $50 difference.
+  // Traded-in device resold before the original sale is refunded: it came back at its own
+  // $100 cost, so its resale profit is already right and the refund needs no adjustment.
   await shares(50);
   const resoldCase = await makeSale();
   const replacement2 = await device();
@@ -208,14 +211,16 @@ try {
   assert.equal(await pendingPoolUsd(), poolAfterSwap);
   console.log('PASS: exchanged free bonus device is resold as a regular $150-cost sale, pool not counted twice');
 
-  // A free bonus device handed out as the replacement goes to the pool, not straight to owners.
+  // A free bonus device handed out as the replacement goes to the pool, not straight to owners;
+  // the returned phone is back in stock at its $100 cost, so its $100 margin is reversed.
   const baseItem = await device();
   const baseSale = await sell(baseItem.id, 2000);
   const bonusReplacement = await bonusDevice(0);
   const poolBeforeBonusSwap = await pendingPoolUsd();
   assert.deepEqual(await change(() => ExchangesService.process({ saleId: baseSale.id, returnedImei: baseItem.imei,
     returnedBrand: 'Test', returnedModel: 'Refund regression', exchangeInValueTjs: D(2000),
-    replacementDeviceId: bonusReplacement.id, newPriceTjs: D(2200), processedByUserId: 'user-admin', paymentMethod: 'CASH' })), none);
+    replacementDeviceId: bonusReplacement.id, newPriceTjs: D(2200), processedByUserId: 'user-admin', paymentMethod: 'CASH' })),
+    [{ accrued: -50, available: -50 }, { accrued: -50, available: -50 }]);
   assert.equal(D(await pendingPoolUsd()).minus(poolBeforeBonusSwap), 220);
   console.log('PASS: free bonus replacement in an exchange goes to the bonus pool');
 

@@ -402,13 +402,14 @@ export class OwnersService {
 
       // Reset the quarterly counters for the new period:
       // totalAccruedProfitUsd, totalPaidProfitUsd, totalReinvestedUsd are reset to 0.
-      // If transferRemainingToCapital was true, availableProfitUsd is also 0.
+      // availableProfitUsd is left as is: a reinvested balance is already 0 after the sweep, and a
+      // negative one (profit owed back after a refund or exchange) carries over to be covered by
+      // future profit instead of being silently written off.
       await tx.owner.updateMany({
         data: {
           totalAccruedProfitUsd: D(0),
           totalPaidProfitUsd: D(0),
           totalReinvestedUsd: D(0),
-          ...(transferRemainingToCapital ? { availableProfitUsd: D(0) } : {}),
         },
       });
 

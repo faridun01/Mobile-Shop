@@ -1,5 +1,6 @@
+import dotenv from 'dotenv';
+dotenv.config({ quiet: true });
 import { D, moneyJson } from './common/decimal';
-import 'dotenv/config';
 import express, { type NextFunction, type Request, type Response } from 'express';
 import { prisma } from './prisma/prisma.service';
 import type { TransactionClient } from './prisma/prisma.service';
@@ -298,16 +299,113 @@ app.get('/api/devices', authenticateJwt, async (req: AuthenticatedRequest, res, 
   }
 });
 
-app.patch('/api/devices/:id', authenticateJwt, requireRoles('ADMIN', 'PARTNER'), async (req: AuthenticatedRequest, res, next) => {
+app.post('/api/devices/check-imeis', authenticateJwt, async (req: AuthenticatedRequest, res, next) => {
   try {
-    const { ram, storage, color, model } = req.body ?? {};
+    const rawImeis = Array.isArray(req.body?.imeis) ? req.body.imeis : [];
+    const cleanImeis: string[] = rawImeis
+      .map((i: unknown) => String(i).replace(/\D/g, '').slice(0, 15))
+      .filter((i: string) => i.length === 15);
+
+    if (cleanImeis.length === 0) {
+      res.json({ existing: [] });
+      return;
+    }
+
+    const uniqueImeis: string[] = Array.from(new Set(cleanImeis));
+    const found = await prisma.device.findMany({
+      where: {
+        OR: uniqueImeis.flatMap((imei: string) => [{ imei }, { imei2: imei }]),
+      },
+      select: {
+        id: true,
+        imei: true,
+        imei2: true,
+        brand: true,
+        model: true,
+        status: true,
+      },
+    });
+
+    const existingList: Array<{ imei: string; brand: string; model: string; status: string }> = [];
+    for (const d of found) {
+      if (uniqueImeis.includes(d.imei)) {
+        existingList.push({
+          imei: d.imei,
+          brand: d.brand,
+          model: d.model,
+          status: d.status,
+        });
+      }
+      if (d.imei2 && uniqueImeis.includes(d.imei2)) {
+        existingList.push({
+          imei: d.imei2,
+          brand: d.brand,
+          model: d.model,
+          status: d.status,
+        });
+      }
+    }
+
+    res.json({ existing: existingList });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.patch('/api/devices/batch-rename-model', authenticateJwt, requireRoles('ADMIN', 'PARTNER', 'SELLER'), async (req: AuthenticatedRequest, res, next) => {
+  try {
+    const { deviceIds, newModel, newBrand } = req.body ?? {};
+    if (!Array.isArray(deviceIds) || deviceIds.length === 0) {
+      res.status(400).json({ message: 'deviceIds обязателен' });
+      return;
+    }
+    const cleanModel = typeof newModel === 'string' ? newModel.trim() : '';
+    const cleanBrand = typeof newBrand === 'string' ? newBrand.trim() : '';
+    if (!cleanModel && !cleanBrand) {
+      res.status(400).json({ message: 'Укажите новое название модели или бренда' });
+      return;
+    }
+
+    const where: any = { id: { in: deviceIds } };
+    if (req.user!.role === 'PARTNER' || req.user!.role === 'SELLER') {
+      where.storeId = req.user!.storeId;
+    }
+
+    const data: any = {};
+    if (cleanModel) data.model = cleanModel;
+    if (cleanBrand) data.brand = cleanBrand;
+
+    const result = await prisma.device.updateMany({
+      where,
+      data,
+    });
+
+    const updatedDevices = await prisma.device.findMany({
+      where,
+      select: { id: true, brand: true, model: true, storeId: true, ram: true, storage: true, color: true },
+    });
+
+    await rememberPhones(prisma, updatedDevices as any);
+    const storeIds = Array.from(new Set(updatedDevices.map(d => d.storeId)));
+    await syncStockAlerts(prisma, storeIds);
+
+    RealtimeSyncGateway.broadcast('INVENTORY_UPDATE', {});
+    res.json({ success: true, count: result.count, devices: updatedDevices });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.patch('/api/devices/:id', authenticateJwt, requireRoles('ADMIN', 'PARTNER', 'SELLER'), async (req: AuthenticatedRequest, res, next) => {
+  try {
+    const { ram, storage, color, model, brand } = req.body ?? {};
     const existing = await prisma.device.findUnique({ where: { id: req.params.id } });
     if (!existing) {
       res.status(404).json({ message: 'Устройство не найдено' });
       return;
     }
 
-    if (req.user!.role === 'PARTNER' && existing.storeId !== req.user!.storeId) {
+    if ((req.user!.role === 'PARTNER' || req.user!.role === 'SELLER') && existing.storeId !== req.user!.storeId) {
       res.status(403).json({ message: 'Нет доступа к товарам другого магазина' });
       return;
     }
@@ -324,6 +422,7 @@ app.patch('/api/devices/:id', authenticateJwt, requireRoles('ADMIN', 'PARTNER'),
         ...(typeof storage === 'string' && storage.trim() ? { storage: storage.trim() } : {}),
         ...(typeof color === 'string' && color.trim() ? { color: color.trim() } : {}),
         ...(typeof model === 'string' && model.trim() ? { model: model.trim() } : {}),
+        ...(typeof brand === 'string' && brand.trim() ? { brand: brand.trim() } : {}),
       },
       include: { store: true, timeline: { orderBy: { date: 'asc' as const } } },
     });

@@ -4,7 +4,7 @@ import { DollarSign, Clock, AlertCircle } from 'lucide-react';
 import { Dialog } from '../ui/Dialog';
 import { Button } from '../ui/Button';
 import { hasCurrentDailyRate } from '../../utils/dailyRatePrompt';
-import { formatRateOrInput } from '../../utils/money';
+import { formatRateOrInput, parseRateInput, RATE_TYPING_PATTERN } from '../../utils/money';
 import { cn } from '../../utils/cn';
 
 interface DailyRateModalProps {
@@ -40,9 +40,9 @@ export const DailyRateModal: React.FC<DailyRateModalProps> = ({ isOpen, onClose 
 
   const handleSubmit = async () => {
     if (savingRef.current) return;
-    const val = Number(rateInput.trim().replace(',', '.'));
-    if (!Number.isFinite(val) || val <= 0) {
-      setError('Введите корректный курс (например, 10.50)');
+    const val = parseRateInput(rateInput);
+    if (val === null) {
+      setError('Введите курс не более чем с 2 знаками после запятой (например, 10.50)');
       return;
     }
     savingRef.current = true;
@@ -130,6 +130,8 @@ export const DailyRateModal: React.FC<DailyRateModalProps> = ({ isOpen, onClose 
               aria-invalid={!!error}
               value={rateInput}
               onChange={(e) => {
+                // The rate has at most 2 decimals: a third one simply can't be typed.
+                if (!RATE_TYPING_PATTERN.test(e.target.value.trim())) return;
                 setRateInput(e.target.value);
                 setError(null);
               }}
