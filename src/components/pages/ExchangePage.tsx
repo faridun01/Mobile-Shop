@@ -3,29 +3,41 @@ import { formatPhoneColor } from '../../utils/phoneSpecs';
 import React, { useState, useMemo, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useAppFields } from '../../context/AppContext';
-import { Device, PaymentMethod, Sale, SaleItem } from '../../types';
+import { Device, Sale, SaleItem } from '../../types';
 import {
   Search,
   Scan,
   AlertCircle,
+  AlertTriangle,
   X,
   Banknote,
   RotateCcw,
   Loader2,
-  Smartphone
+  Smartphone,
+  Star,
 } from 'lucide-react';
 import { StatusBanner, StatusMessage } from '../ui/StatusBanner';
+import { useBelowCostCheck } from '../../hooks/useBelowCostCheck';
+import { preferredInsteadOf } from '../sale/sellGuidance';
 
+/** The phone handed back: its line on the receipt it was sold on. */
+interface PickedItem {
+  sale: Sale;
+  item: SaleItem;
+}
+
+/**
+ * An exchange is a return followed by a sale: the phone the customer brings back is returned on
+ * its receipt (its price less the withheld amount becomes the customer's credit), and the new
+ * phone is sold on a new receipt paid first with that credit. The customer pays the rest, or
+ * gets the change when the new phone is cheaper.
+ */
 export const ExchangePage: React.FC = () => {
   const location = useLocation();
   const navigatedState = location.state as {
     saleReceiptNumber?: number;
     item?: SaleItem;
-    customerName?: string;
     saleId?: string;
-    saleStoreId?: string;
-    saleStoreName?: string;
-    saleDate?: string;
   } | null;
 
   const {
@@ -36,195 +48,142 @@ export const ExchangePage: React.FC = () => {
     processExchange,
     openScanner,
     stores,
-    selectedStoreId: globalSelectedStoreId
+    selectedStoreId: globalSelectedStoreId,
   } = useAppFields('currentUser', 'sales', 'fetchSalesRange', 'devices', 'processExchange', 'openScanner', 'stores', 'selectedStoreId');
 
   const [receiptSearch, setReceiptSearch] = useState('');
-  const [selectedOldDevice, setSelectedOldDevice] = useState<Device | null>(null);
-  const [receiptChoice, setReceiptChoice] = useState<{ sale: Sale; items: SaleItem[] } | null>(null);
-
-  const [exchangeInValueTjs, setExchangeInValueTjs] = useState<number>(0);
-  // What the customer paid for the returned item — the trade-in credit can't exceed it.
-  const [soldPriceTjs, setSoldPriceTjs] = useState<number>(0);
+  const [picked, setPicked] = useState<PickedItem | null>(null);
+  const [receiptChoice, setReceiptChoice] = useState<Sale | null>(null);
+  const [withheldInput, setWithheldInput] = useState('');
 
   const [deviceSearchQuery, setDeviceSearchQuery] = useState('');
   const [replacementDevice, setReplacementDevice] = useState<Device | null>(null);
-
   const [newPriceTjs, setNewPriceTjs] = useState<number>(0);
 
-  const [exchangePaymentMethod, setExchangePaymentMethod] = useState<PaymentMethod>('CASH');
+  const [paymentMethod, setPaymentMethod] = useState<'CASH' | 'CARD'>('CASH');
   const [givenCashTjs, setGivenCashTjs] = useState<string>('');
 
   const [status, setStatus] = useState<StatusMessage | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // The exchange must happen within a single store — the server already enforces this
-  // (the replacement device lookup is scoped to sale.storeId), but without mirroring it
-  // here, an admin/partner (who has no fixed currentUser.storeId) could browse and pick
-  // a replacement sitting in a different store's stock and only find out at submit time.
-  // Once an old device is selected, its own store (where it was originally sold) wins;
-  // otherwise fall back to the seller's fixed store, then whatever's active on POS Terminal.
-  const effectiveStoreId = selectedOldDevice?.locationId
+  // The exchange happens in the store the phone was sold at (the server enforces it too).
+  const effectiveStoreId = picked?.sale.storeId
     || currentUser?.storeId
     || (globalSelectedStoreId && globalSelectedStoreId !== 'all' ? globalSelectedStoreId : '');
   const currentStoreName = stores.find(s => s.id === effectiveStoreId)?.name || currentUser?.storeName || 'Магазин';
   const isStoreScoped = currentUser?.role === 'SELLER' || currentUser?.role === 'PARTNER';
 
-  const availableDevices = useMemo(() => {
-    return devices.filter(d => {
-      const isAvailable = d.status === 'STORE_STOCK' || d.status === 'IN_STOCK_AFTER_EXCHANGE';
-      if (!isAvailable) return false;
-      if (effectiveStoreId && d.locationId !== effectiveStoreId) return false;
-      if (selectedOldDevice && d.id === selectedOldDevice.id) return false;
+  const soldPriceTjs = picked?.item.salePriceTjs ?? 0;
+  const withheldTjs = Math.max(0, parseFloat(withheldInput.replace(',', '.')) || 0);
+  const withheldTooBig = withheldTjs > soldPriceTjs + 0.001;
+  const creditTjs = moneyNumber(decimal(soldPriceTjs).minus(withheldTjs));
+  const differenceTjs = moneyNumber(decimal(newPriceTjs).minus(creditTjs));
 
+  const availableDevices = useMemo(() => {
+    const list = devices.filter(d => {
+      if (d.status !== 'STORE_STOCK' && d.status !== 'IN_STOCK_AFTER_EXCHANGE') return false;
+      if (effectiveStoreId && d.locationId !== effectiveStoreId) return false;
+      if (picked && d.id === picked.item.deviceId) return false;
       if (deviceSearchQuery.trim()) {
         const q = deviceSearchQuery.toLowerCase().trim();
-        const matches =
-          d.imei.toLowerCase().includes(q) ||
-          (d.imei2 && d.imei2.toLowerCase().includes(q)) ||
-          d.brand.toLowerCase().includes(q) ||
-          d.model.toLowerCase().includes(q) ||
-          d.color.toLowerCase().includes(q);
-        if (!matches) return false;
+        return d.imei.toLowerCase().includes(q)
+          || Boolean(d.imei2 && d.imei2.toLowerCase().includes(q))
+          || d.brand.toLowerCase().includes(q)
+          || d.model.toLowerCase().includes(q)
+          || d.color.toLowerCase().includes(q);
       }
       return true;
     });
-  }, [devices, effectiveStoreId, deviceSearchQuery, selectedOldDevice]);
+    // The phones recommended to sell first come first.
+    return list.sort((a, b) => Number(Boolean(b.preferredToSell)) - Number(Boolean(a.preferredToSell)));
+  }, [devices, effectiveStoreId, deviceSearchQuery, picked]);
 
-  const resolveOldDeviceFromItem = (sale: { storeId: string; storeName: string; date?: string; [key: string]: any }, item: SaleItem): Device => {
-    const matchedDev = devices.find(d => d.imei === item.imei || d.id === item.deviceId);
-    return matchedDev || {
-      id: item.deviceId || `old-${Date.now()}`,
-      imei: item.imei,
-      imei2: item.imei2,
-      brand: item.brand,
-      model: item.model,
-      color: item.color,
-      storage: item.storage,
-      costBasisUsd: 100,
-      purchaseCostUsd: 100,
-      retailPriceTjs: item.salePriceTjs || 1000,
-      status: 'SOLD',
-      locationId: sale.storeId,
-      locationName: sale.storeName,
-      supplierId: 'sup-tradein',
-      createdAt: sale.date || new Date().toISOString(),
-      timeline: [],
-    };
+  // A dearer identical phone in the same store should be sold first.
+  const preferredAlternative = useMemo(
+    () => (replacementDevice ? preferredInsteadOf(replacementDevice, devices) : null),
+    [devices, replacementDevice],
+  );
+
+  const belowCost = useBelowCostCheck(replacementDevice ? [{ deviceId: replacementDevice.id, priceTjs: newPriceTjs }] : []);
+  const replacementBelowCost = Boolean(replacementDevice && belowCost[replacementDevice.id]);
+
+  /** Why this receipt line can't be exchanged, or null when it can. */
+  const blockedReason = (sale: Sale, item: SaleItem): string | null => {
+    if (sale.status === 'REFUNDED') return `Чек #${sale.receiptNumber} уже возвращён`;
+    if (item.returnId) return `Этот телефон уже возвращён по чеку #${sale.receiptNumber}`;
+    if ((sale.debtAmountTjs ?? 0) > 0) return `По чеку #${sale.receiptNumber} есть непогашенный долг — обмен возможен после оплаты долга`;
+    if ((sale.exchangeEvents?.length ?? 0) > 0) return `По чеку #${sale.receiptNumber} был обмен старого образца — оформите возврат всего чека`;
+    return null;
   };
 
-  // The exchange is anchored to whichever store the old device was originally sold at
-  // (see effectiveStoreId above) — if a replacement was already picked from a different
-  // store before that, it's no longer valid and must be cleared rather than silently
-  // left in place to fail at submit.
-  const applySelectedOldDevice = (dev: Device, amountTjs: number) => {
-    setSelectedOldDevice(dev);
-    setExchangeInValueTjs(amountTjs);
-    setSoldPriceTjs(amountTjs);
-    if (replacementDevice && replacementDevice.locationId !== dev.locationId) {
+  const pick = (sale: Sale, item: SaleItem) => {
+    const reason = blockedReason(sale, item);
+    if (reason) {
+      setStatus({ tone: 'error', text: reason });
+      return;
+    }
+    setPicked({ sale, item });
+    setReceiptChoice(null);
+    setWithheldInput('');
+    // A replacement picked from another store is no longer valid.
+    if (replacementDevice && replacementDevice.locationId !== sale.storeId) {
       setReplacementDevice(null);
       setNewPriceTjs(0);
-      setStatus({ tone: 'info', text: `Устройство на замену было выбрано из другого магазина и сброшено — обмен проводится в пределах одного магазина` });
     }
+    setStatus({ tone: 'success', text: `Телефон ${item.brand} ${item.model} выбран из чека #${sale.receiptNumber}. Укажите удержание и выберите новый телефон.` });
   };
 
   useEffect(() => {
-    if (navigatedState?.item) {
-      const item = navigatedState.item;
-      const matchedSale = sales.find(s => (navigatedState.saleReceiptNumber && s.receiptNumber === navigatedState.saleReceiptNumber) || s.id === navigatedState.saleId);
-      const dev = resolveOldDeviceFromItem(matchedSale || {
-        storeId: navigatedState.saleStoreId || currentUser?.storeId || '',
-        storeName: navigatedState.saleStoreName || currentUser?.storeName || 'Магазин',
-        date: navigatedState.saleDate || new Date().toISOString(),
-      }, item);
-
-      applySelectedOldDevice(dev, item.salePriceTjs || 0);
-      setStatus({
-        tone: 'success',
-        text: `Устройство ${item.brand} ${item.model} (${item.imei}) из чека #${navigatedState.saleReceiptNumber || ''} выбрано для обмена. Теперь выберите устройство на замену из наличия.`
-      });
+    if (!navigatedState?.item) return;
+    const run = async () => {
+      let sale = sales.find(s => s.id === navigatedState.saleId || s.receiptNumber === navigatedState.saleReceiptNumber);
+      if (!sale && navigatedState.saleReceiptNumber) {
+        const found = await fetchSalesRange({ search: String(navigatedState.saleReceiptNumber) }).catch(() => []);
+        sale = found.find(s => s.receiptNumber === navigatedState.saleReceiptNumber);
+      }
+      const item = sale?.items.find(i => (navigatedState.item?.id && i.id === navigatedState.item.id) || i.imei === navigatedState.item?.imei);
+      if (sale && item) pick(sale, item);
       window.history.replaceState({}, document.title);
-    }
+    };
+    void run();
+    // Runs once for the receipt the user came from.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [navigatedState]);
 
-  const handlePickReceiptItem = (sale: Sale, item: SaleItem) => {
-    applySelectedOldDevice(resolveOldDeviceFromItem(sale, item), item.salePriceTjs || 0);
-    setReceiptChoice(null);
-    setStatus({ tone: 'success', text: `Устройство ${item.brand} ${item.model} выбрано из чека #${sale.receiptNumber}` });
-  };
-
-  // Only devices with an actual sale record can be traded in — the exchange is modeled
-  // as swapping an item within that sale, not a standalone "customer's own phone" credit.
-  // A device merely sitting in stock (never sold here) has no sale to attach the exchange
-  // to, so that lookup path was removed rather than accepted only to fail on submit.
   const searchSalesFor = (list: Sale[], q: string): boolean => {
     for (const sale of list) {
       if (sale.receiptNumber.toString() === q) {
-        if (sale.items.length > 1) {
-          setReceiptChoice({ sale, items: sale.items });
-          setStatus({ tone: 'info', text: `В чеке #${sale.receiptNumber} несколько товаров — выберите нужный` });
+        const open = sale.items.filter(i => !i.returnId);
+        if (open.length > 1) {
+          setReceiptChoice(sale);
+          setStatus({ tone: 'info', text: `В чеке #${sale.receiptNumber} несколько телефонов — выберите нужный` });
           return true;
         }
-        const item = sale.items[0];
-        if (item) {
-          handlePickReceiptItem(sale, item);
-          setStatus({ tone: 'success', text: `Найдено проданное устройство по чеку #${sale.receiptNumber}` });
-          return true;
-        }
+        pick(sale, open[0] ?? sale.items[0]);
+        return true;
       }
-
-      for (const item of sale.items) {
-        if (
-          item.imei.toLowerCase() === q ||
-          (item.imei2 && item.imei2.toLowerCase() === q)
-        ) {
-          applySelectedOldDevice(resolveOldDeviceFromItem(sale, item), item.salePriceTjs || 0);
-          setStatus({ tone: 'success', text: `Устройство ${item.brand} ${item.model} найдено в истории продаж` });
-          return true;
-        }
+      const item = sale.items.find(i => i.imei.toLowerCase() === q || (i.imei2 && i.imei2.toLowerCase() === q));
+      if (item && (!item.returnId || sale.items.every(i => i.returnId))) {
+        pick(sale, item);
+        return true;
       }
     }
     return false;
   };
 
-  // `sales` only holds a recent window by default — a trade-in against an older sale
-  // falls through to a server-side search (by receipt number or IMEI) before reporting
-  // "not found", instead of only ever checking what happens to already be loaded.
-  const handleFindSoldImei = async (query: string) => {
+  // Recent sales are loaded; an older receipt is found through a server search.
+  const handleFindSold = async (query: string) => {
     const q = query.trim().toLowerCase();
     if (!q) return;
     setReceiptChoice(null);
-
     if (searchSalesFor(sales, q)) return;
-
     try {
       const found = await fetchSalesRange({ search: query.trim() });
       if (searchSalesFor(found, q)) return;
     } catch {
-      // fall through to the not-found message below
+      // fall through to the not-found message
     }
-
-    setStatus({ tone: 'error', text: `Проданное устройство по чеку/IMEI "${query}" не найдено в истории продаж` });
-  };
-
-  const handleScanOldDevice = () => {
-    openScanner((scannedCode) => {
-      handleFindSoldImei(scannedCode);
-    });
-  };
-
-  const handleScanReplacement = () => {
-    openScanner((scannedCode) => {
-      const code = scannedCode.trim();
-      const dev = availableDevices.find(d =>
-        d.imei === code || d.imei2 === code
-      );
-      if (dev) {
-        handleSelectReplacement(dev);
-      } else {
-        setDeviceSearchQuery(code);
-      }
-    });
+    setStatus({ tone: 'error', text: `Проданный телефон по чеку/IMEI "${query}" не найден в истории продаж` });
   };
 
   const handleSelectReplacement = (dev: Device) => {
@@ -232,81 +191,68 @@ export const ExchangePage: React.FC = () => {
     setNewPriceTjs(dev.retailPriceTjs || 0);
   };
 
-  const differenceTjs = useMemo(() => {
-    return moneyNumber(decimal(newPriceTjs).minus(exchangeInValueTjs));
-  }, [newPriceTjs, exchangeInValueTjs]);
+  const handleScanReplacement = () => {
+    openScanner((scannedCode) => {
+      const code = scannedCode.trim();
+      const dev = availableDevices.find(d => d.imei === code || d.imei2 === code);
+      if (dev) handleSelectReplacement(dev);
+      else setDeviceSearchQuery(code);
+    });
+  };
+
+  const resetForm = () => {
+    setPicked(null);
+    setReplacementDevice(null);
+    setReceiptSearch('');
+    setDeviceSearchQuery('');
+    setReceiptChoice(null);
+    setWithheldInput('');
+    setNewPriceTjs(0);
+    setGivenCashTjs('');
+    setPaymentMethod('CASH');
+  };
+
+  const cashShort = differenceTjs > 0 && paymentMethod === 'CASH' && (parseFloat(givenCashTjs) || 0) < differenceTjs;
 
   const handleSubmitExchange = async (e: React.FormEvent) => {
     e.preventDefault();
     if (isSubmitting) return;
-    if (!selectedOldDevice || !replacementDevice) {
-      setStatus({ tone: 'error', text: 'Для проведения обмена выберите сдаваемое и выдаваемое устройство' });
+    if (!picked || !replacementDevice) {
+      setStatus({ tone: 'error', text: 'Выберите сдаваемый телефон и телефон на замену' });
       return;
     }
-
-    if (exchangeInValueTjs <= 0) {
-      setStatus({ tone: 'error', text: 'Залоговая оценочная стоимость сдаваемого аппарата должна быть больше 0' });
+    if (!picked.item.id) {
+      setStatus({ tone: 'error', text: 'Обновите страницу и выберите чек заново' });
       return;
     }
-
-    if (soldPriceTjs > 0 && exchangeInValueTjs > soldPriceTjs) {
-      setStatus({ tone: 'error', text: `Зачётная стоимость не может превышать цену этой позиции в чеке (${formatMoney(soldPriceTjs)} TJS)` });
+    if (withheldTooBig) {
+      setStatus({ tone: 'error', text: `Удержание не может быть больше цены телефона в чеке (${formatMoney(soldPriceTjs)} TJS)` });
       return;
     }
-
     if (newPriceTjs <= 0) {
-      setStatus({ tone: 'error', text: 'Укажите новую цену продажи выдаваемого устройства' });
+      setStatus({ tone: 'error', text: 'Укажите цену нового телефона' });
       return;
     }
-
-    // Customer owes a cash top-up — the exchange must not go through until that
-    // payment is actually confirmed (cash received covers the amount due). Card
-    // top-ups have no numeric confirmation step of their own, so they're exempt.
-    if (differenceTjs > 0 && exchangePaymentMethod === 'CASH') {
-      const givenCash = parseFloat(givenCashTjs) || 0;
-      if (givenCash < differenceTjs) {
-        setStatus({ tone: 'error', text: `Подтвердите оплату: клиент должен доплатить ${differenceTjs.toLocaleString()} TJS наличными, прежде чем можно провести обмен` });
-        return;
-      }
+    // A cash top-up goes through only once the cashier confirms the money was received.
+    if (cashShort) {
+      setStatus({ tone: 'error', text: `Подтвердите оплату: клиент должен доплатить ${formatMoney(differenceTjs)} TJS наличными` });
+      return;
     }
 
     setIsSubmitting(true);
     try {
       const res = await processExchange({
-        originalSaleId: navigatedState?.saleId,
-        originalSaleReceiptNumber: navigatedState?.saleReceiptNumber,
-        returnedImei: selectedOldDevice.imei,
-        returnedItem: {
-          brand: selectedOldDevice.brand,
-          model: selectedOldDevice.model,
-          storage: selectedOldDevice.storage,
-          color: selectedOldDevice.color,
-          imei: selectedOldDevice.imei,
-          exchangeInValueTjs,
-        },
-        exchangeInValueTjs,
+        saleId: picked.sale.id,
+        saleItemId: picked.item.id,
+        withheldTjs,
         replacementDeviceId: replacementDevice.id,
         newPriceTjs,
-        differenceTjs,
-        // The payment-method toggle is only ever shown to the cashier when the customer
-        // owes a top-up (differenceTjs > 0) — for a refund (differenceTjs < 0) the UI never
-        // lets them pick, so we must not forward a stale choice left over from a previous
-        // exchange in this session. Omitting it lets the backend default to CASH, matching
-        // the "Выплатите клиенту из кассы" copy shown for that case.
-        paymentMethod: differenceTjs > 0 ? exchangePaymentMethod : undefined,
+        paymentMethod,
       });
-
       if (res.success) {
-        setStatus({ tone: 'success', text: `Обмен Trade-In успешно проведен!` });
-        setSelectedOldDevice(null);
-        setReplacementDevice(null);
-        setReceiptSearch('');
-        setDeviceSearchQuery('');
-        setReceiptChoice(null);
-        setExchangeInValueTjs(0);
-        setNewPriceTjs(0);
-        setGivenCashTjs('');
-        setExchangePaymentMethod('CASH');
+        const change = res.payoutTjs && res.payoutTjs > 0 ? ` Клиенту выдано ${formatMoney(res.payoutTjs)} TJS.` : '';
+        setStatus({ tone: 'success', text: `Обмен проведён: возврат по чеку #${picked.sale.receiptNumber}, новый чек #${res.newReceiptNumber ?? ''}.${change}` });
+        resetForm();
       } else {
         setStatus({ tone: 'error', text: res.message || 'Ошибка проведения обмена' });
       }
@@ -315,48 +261,44 @@ export const ExchangePage: React.FC = () => {
     }
   };
 
+  const money = (v: number) => `${formatMoney(v)} TJS`;
+
   return (
     <div className="work-screen flex-1 flex flex-col h-full overflow-hidden bg-bg text-fg-muted">
       <StatusBanner message={status} onDismiss={() => setStatus(null)} />
 
       <form onSubmit={handleSubmitExchange} className="flex-1 flex flex-col overflow-hidden">
-        {/* Main 2-column Layout */}
         <div className="flex-1 grid grid-cols-1 lg:grid-cols-2 divide-y lg:divide-y-0 lg:divide-x divide-border overflow-y-auto">
-          {/* LEFT: Step 1 - Сдаваемое устройство (Incoming from customer) */}
+          {/* STEP 1: the phone the customer returns */}
           <div className="p-3 sm:p-4 space-y-3 bg-bg">
             <div className="flex items-center justify-between border-b border-border pb-2.5">
               <div className="flex items-center gap-2">
-                <div className="w-5 h-5 rounded-md bg-accent/15 text-accent border border-accent/30 flex items-center justify-center text-[11px] font-bold shrink-0">
-                  1
-                </div>
-                <h3 className="text-xs sm:text-sm font-bold text-fg">Сдаваемое устройство</h3>
-                <span className="text-[11px] text-fg-subtle">(клиент)</span>
+                <div className="w-5 h-5 rounded-md bg-accent/15 text-accent border border-accent/30 flex items-center justify-center text-[11px] font-bold shrink-0">1</div>
+                <h3 className="text-xs sm:text-sm font-bold text-fg">Возврат телефона</h3>
+                <span className="text-[11px] text-fg-subtle">(клиент сдаёт)</span>
               </div>
-              {selectedOldDevice && (
-                <span className="text-[10px] font-bold text-accent bg-accent/10 px-2 py-0.5 rounded-full border border-accent/20">
-                  Выбрано
-                </span>
+              {picked && (
+                <span className="text-[10px] font-bold text-accent bg-accent/10 px-2 py-0.5 rounded-full border border-accent/20">Выбрано</span>
               )}
             </div>
 
-            {/* Receipt / IMEI search bar */}
-            {!selectedOldDevice ? (
+            {!picked ? (
               <div className="space-y-2.5">
                 <div className="flex items-center gap-1.5">
                   <div className="relative flex-1 min-w-0">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-fg-subtle" />
                     <input
                       type="text"
-                      value={receiptSearch ?? ''}
+                      value={receiptSearch}
                       onChange={(e) => setReceiptSearch(e.target.value)}
-                      onKeyDown={(e) => e.key === 'Enter' && handleFindSoldImei(receiptSearch)}
+                      onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); void handleFindSold(receiptSearch); } }}
                       placeholder="Номер чека или IMEI..."
                       className="w-full h-10 rounded-xl bg-surface border border-border pl-9 pr-3 text-xs text-fg placeholder:text-fg-subtle focus:border-accent focus:outline-none transition-colors"
                     />
                   </div>
                   <button
                     type="button"
-                    onClick={() => handleFindSoldImei(receiptSearch)}
+                    onClick={() => handleFindSold(receiptSearch)}
                     disabled={!receiptSearch.trim()}
                     className="h-10 px-3.5 bg-accent hover:bg-accent-strong active:scale-95 disabled:opacity-40 text-xs font-bold rounded-xl text-accent-fg transition-colors shrink-0 cursor-pointer"
                   >
@@ -364,7 +306,7 @@ export const ExchangePage: React.FC = () => {
                   </button>
                   <button
                     type="button"
-                    onClick={handleScanOldDevice}
+                    onClick={() => openScanner((code) => { void handleFindSold(code); })}
                     className="h-10 w-10 flex items-center justify-center bg-surface-raised hover:bg-surface text-accent rounded-xl border border-border transition-colors shrink-0 cursor-pointer"
                     title="Сканировать"
                   >
@@ -376,17 +318,18 @@ export const ExchangePage: React.FC = () => {
                   <div className="rounded-xl border border-border bg-surface divide-y divide-border overflow-hidden">
                     {receiptChoice.items.map((item, idx) => (
                       <button
-                        key={`${item.deviceId || item.imei}-${idx}`}
+                        key={`${item.id || item.imei}-${idx}`}
                         type="button"
-                        onClick={() => handlePickReceiptItem(receiptChoice.sale, item)}
-                        className="w-full text-left p-3 hover:bg-surface-raised flex items-center justify-between text-xs transition-colors"
+                        disabled={Boolean(item.returnId)}
+                        onClick={() => pick(receiptChoice, item)}
+                        className="w-full text-left p-3 hover:bg-surface-raised disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-between text-xs transition-colors"
                       >
                         <div>
                           <p className="font-bold text-fg-muted">{item.brand} {item.model}</p>
                           <p className="text-[11px] text-fg-muted mt-0.5">{item.storage} • {formatPhoneColor(item.color)}</p>
                           <p className="text-[10px] text-fg-subtle mt-0.5">IMEI: {item.imei}</p>
                         </div>
-                        <span className="font-bold text-accent text-xs">{item.salePriceTjs.toLocaleString()} TJS</span>
+                        <span className="font-bold text-accent text-xs">{item.returnId ? 'Возвращён' : money(item.salePriceTjs)}</span>
                       </button>
                     ))}
                   </div>
@@ -396,10 +339,7 @@ export const ExchangePage: React.FC = () => {
               <div className="p-4 rounded-xl bg-surface border border-border space-y-3.5 relative">
                 <button
                   type="button"
-                  onClick={() => {
-                    setSelectedOldDevice(null);
-                    setExchangeInValueTjs(0);
-                  }}
+                  onClick={() => { setPicked(null); setWithheldInput(''); }}
                   className="absolute right-3.5 top-3.5 text-fg-subtle hover:text-fg-muted transition-colors"
                   title="Отменить выбор"
                 >
@@ -407,54 +347,53 @@ export const ExchangePage: React.FC = () => {
                 </button>
 
                 <div>
-                  <span className="text-[10px] text-accent font-bold tracking-wider block">Принимаемый аппарат</span>
-                  <h4 className="text-sm font-bold text-fg-muted mt-0.5">
-                    {selectedOldDevice.brand} {selectedOldDevice.model}
-                  </h4>
-                  <p className="text-xs text-fg-muted mt-0.5">
-                    {selectedOldDevice.storage} • {formatPhoneColor(selectedOldDevice.color)}
-                  </p>
-                  <p className="text-xs text-fg-subtle mt-1">
-                    IMEI: {selectedOldDevice.imei}
-                  </p>
+                  <span className="text-[10px] text-accent font-bold tracking-wider block">Чек #{picked.sale.receiptNumber}</span>
+                  <h4 className="text-sm font-bold text-fg-muted mt-0.5">{picked.item.brand} {picked.item.model}</h4>
+                  <p className="text-xs text-fg-muted mt-0.5">{picked.item.storage} • {formatPhoneColor(picked.item.color)}</p>
+                  <p className="text-xs text-fg-subtle mt-1">IMEI: {picked.item.imei}</p>
+                  {picked.item.isBelowCost && (
+                    <p className="mt-1.5 inline-flex items-center gap-1 text-[11px] font-semibold text-danger">
+                      <AlertTriangle className="w-3.5 h-3.5" /> Этот телефон был продан ниже себестоимости
+                    </p>
+                  )}
                 </div>
 
-                <div className="pt-3 border-t border-border space-y-3">
+                <div className="pt-3 border-t border-border space-y-2 text-xs">
+                  <div className="flex justify-between"><span className="text-fg-subtle">Цена в чеке</span><span className="font-mono font-bold text-fg">{money(soldPriceTjs)}</span></div>
                   <div>
-                    <label className="block text-xs font-bold text-accent mb-1">
-                      Оценочная зачетная стоимость (TJS):
-                    </label>
+                    <label className="block text-xs font-bold text-warning mb-1">Удержание (TJS)</label>
                     <div className="relative">
-                      <input step="0.01"
-                        type="number"
-                        min="0"
-                        value={exchangeInValueTjs !== 0 ? exchangeInValueTjs : ''}
-                        onChange={(e) => setExchangeInValueTjs(parseFloat(e.target.value) || 0)}
-                        placeholder="Зачетная сумма в сомони..."
-                        className="w-full rounded-xl bg-surface-raised border-2 border-accent/60 hover:border-accent focus:border-accent px-3.5 py-2 text-sm font-bold text-accent focus:outline-none transition-colors"
+                      <input
+                        type="text"
+                        inputMode="decimal"
+                        value={withheldInput}
+                        onChange={(e) => setWithheldInput(e.target.value)}
+                        placeholder="0"
+                        className={`w-full rounded-xl bg-surface-raised border-2 px-3.5 py-2 text-sm font-bold focus:outline-none transition-colors ${withheldTooBig ? 'border-danger text-danger' : 'border-warning/60 hover:border-warning focus:border-warning text-warning'}`}
                       />
-                      <span className="absolute right-3.5 top-2.5 text-xs text-accent font-bold">TJS</span>
+                      <span className="absolute right-3.5 top-2.5 text-xs text-warning font-bold">TJS</span>
                     </div>
+                    {withheldTooBig && <p className="mt-1 text-[11px] text-danger">Удержание больше цены телефона в чеке</p>}
+                  </div>
+                  <div className="flex justify-between pt-1 border-t border-border/60">
+                    <span className="font-semibold text-fg-muted">Зачёт клиенту</span>
+                    <span className="font-mono font-bold text-accent">{money(Math.max(0, creditTjs))}</span>
                   </div>
                 </div>
               </div>
             )}
           </div>
 
-          {/* RIGHT: Step 2 - Выдаваемое устройство со склада */}
+          {/* STEP 2: the new phone, sold on a new receipt */}
           <div className="p-3 sm:p-4 space-y-3 bg-bg">
             <div className="flex items-center justify-between border-b border-border pb-2.5">
               <div className="flex items-center gap-2">
-                <div className="w-5 h-5 rounded-md bg-accent/15 text-accent border border-accent/30 flex items-center justify-center text-[11px] font-bold shrink-0">
-                  2
-                </div>
-                <h3 className="text-xs sm:text-sm font-bold text-fg">Выдаваемое устройство</h3>
-                <span className="text-[11px] text-fg-subtle">(со склада)</span>
+                <div className="w-5 h-5 rounded-md bg-accent/15 text-accent border border-accent/30 flex items-center justify-center text-[11px] font-bold shrink-0">2</div>
+                <h3 className="text-xs sm:text-sm font-bold text-fg">Продажа нового телефона</h3>
+                <span className="text-[11px] text-fg-subtle">(новый чек)</span>
               </div>
               {replacementDevice && (
-                <span className="text-[10px] font-bold text-accent bg-accent/10 px-2 py-0.5 rounded-full border border-accent/20">
-                  Выбрано
-                </span>
+                <span className="text-[10px] font-bold text-accent bg-accent/10 px-2 py-0.5 rounded-full border border-accent/20">Выбрано</span>
               )}
             </div>
 
@@ -462,10 +401,7 @@ export const ExchangePage: React.FC = () => {
               <div className="p-3 sm:p-4 rounded-xl bg-surface border border-border space-y-3 relative">
                 <button
                   type="button"
-                  onClick={() => {
-                    setReplacementDevice(null);
-                    setNewPriceTjs(0);
-                  }}
+                  onClick={() => { setReplacementDevice(null); setNewPriceTjs(0); }}
                   className="absolute right-3.5 top-3.5 text-fg-subtle hover:text-fg-muted transition-colors cursor-pointer"
                   title="Отменить выбор"
                 >
@@ -473,35 +409,40 @@ export const ExchangePage: React.FC = () => {
                 </button>
 
                 <div>
-                  <span className="text-[10px] text-accent font-bold tracking-wider block">Выдаваемый аппарат</span>
-                  <h4 className="text-sm font-bold text-fg-muted mt-0.5">
-                    {replacementDevice.brand} {replacementDevice.model}
-                  </h4>
+                  <span className="text-[10px] text-accent font-bold tracking-wider block">Новый телефон</span>
+                  <h4 className="text-sm font-bold text-fg-muted mt-0.5">{replacementDevice.brand} {replacementDevice.model}</h4>
                   <p className="text-xs text-fg-muted mt-0.5">
                     {replacementDevice.ram ? `${replacementDevice.ram} • ` : ''}{replacementDevice.storage} • {formatPhoneColor(replacementDevice.color)}
                   </p>
-                  <p className="text-xs text-fg-subtle mt-1">
-                    IMEI: {replacementDevice.imei}
-                  </p>
+                  <p className="text-xs text-fg-subtle mt-1">IMEI: {replacementDevice.imei}</p>
                 </div>
 
-                <div className="pt-2.5 border-t border-border space-y-1.5">
-                  <div className="flex items-center justify-between">
-                    <label className="block text-xs font-bold text-accent">
-                      Цена продажи (TJS):
-                    </label>
+                {preferredAlternative && (
+                  <div className="p-2.5 rounded-lg bg-info/10 border border-info/30 text-xs flex items-center justify-between gap-2">
+                    <span className="text-fg-muted">Рекомендуется продать сначала такой же телефон IMEI <strong className="font-mono">{preferredAlternative.imei}</strong></span>
+                    <button type="button" onClick={() => handleSelectReplacement(preferredAlternative)} className="px-2.5 py-1 rounded-md bg-info text-white font-bold shrink-0 cursor-pointer">Заменить</button>
                   </div>
+                )}
+
+                <div className="pt-2.5 border-t border-border space-y-1.5">
+                  <label className="block text-xs font-bold text-accent">Цена продажи (TJS):</label>
                   <div className="relative">
-                    <input step="0.01"
+                    <input
+                      step="0.01"
                       type="number"
                       min="0"
                       value={newPriceTjs !== 0 ? newPriceTjs : ''}
                       onChange={(e) => setNewPriceTjs(parseFloat(e.target.value) || 0)}
                       placeholder="Цена продажи..."
-                      className="w-full rounded-xl bg-surface-raised border-2 border-accent/60 hover:border-accent focus:border-accent px-3.5 py-2 text-sm font-bold text-accent focus:outline-none transition-colors"
+                      className={`w-full rounded-xl bg-surface-raised border-2 px-3.5 py-2 text-sm font-bold focus:outline-none transition-colors ${replacementBelowCost ? 'border-danger text-danger' : 'border-accent/60 hover:border-accent focus:border-accent text-accent'}`}
                     />
                     <span className="absolute right-3.5 top-2.5 text-xs text-accent font-bold">TJS</span>
                   </div>
+                  {replacementBelowCost && (
+                    <p className="flex items-center gap-1 text-xs font-semibold text-danger">
+                      <AlertTriangle className="w-3.5 h-3.5 shrink-0" /> Цена ниже себестоимости
+                    </p>
+                  )}
                 </div>
               </div>
             ) : (
@@ -511,7 +452,7 @@ export const ExchangePage: React.FC = () => {
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-fg-subtle" />
                     <input
                       type="text"
-                      value={deviceSearchQuery ?? ''}
+                      value={deviceSearchQuery}
                       onChange={(e) => setDeviceSearchQuery(e.target.value)}
                       placeholder="Поиск по IMEI или модели..."
                       className="w-full h-10 rounded-xl bg-surface border border-border pl-9 pr-3 text-xs text-fg placeholder:text-fg-subtle focus:border-accent focus:outline-none transition-colors"
@@ -527,7 +468,6 @@ export const ExchangePage: React.FC = () => {
                   </button>
                 </div>
 
-                {/* List of in-stock devices */}
                 <div className="max-h-64 overflow-y-auto divide-y divide-border rounded-xl border border-border bg-surface">
                   {availableDevices.length === 0 ? (
                     <div className="py-5 px-4 text-center text-xs text-fg-subtle flex flex-col items-center justify-center gap-1.5 bg-surface-raised/30">
@@ -543,13 +483,18 @@ export const ExchangePage: React.FC = () => {
                         className="w-full text-left p-3 hover:bg-surface-raised flex items-center justify-between text-xs transition-colors group cursor-pointer"
                       >
                         <div>
-                          <p className="font-bold text-fg-muted group-hover:text-accent transition-colors">{d.brand} {d.model}</p>
+                          <p className="font-bold text-fg-muted group-hover:text-accent transition-colors flex items-center gap-1.5">
+                            {d.brand} {d.model}
+                            {d.preferredToSell && (
+                              <span className="inline-flex items-center gap-0.5 text-[10px] font-bold text-info bg-info/10 border border-info/30 px-1.5 rounded">
+                                <Star className="w-3 h-3" /> продать первым
+                              </span>
+                            )}
+                          </p>
                           <p className="text-[11px] text-fg-muted mt-0.5">{d.ram ? `${d.ram} • ` : ''}{d.storage} • {formatPhoneColor(d.color)}</p>
                           <p className="text-[10px] text-fg-subtle mt-0.5">IMEI: {d.imei}</p>
                         </div>
-                        <span className="font-bold text-accent text-xs">
-                          {formatMoney(d.retailPriceTjs)} TJS
-                        </span>
+                        <span className="font-bold text-accent text-xs">{money(d.retailPriceTjs || 0)}</span>
                       </button>
                     ))
                   )}
@@ -559,74 +504,53 @@ export const ExchangePage: React.FC = () => {
           </div>
         </div>
 
-        {/* Settlement & Difference Banner */}
-        {selectedOldDevice && replacementDevice && (
+        {/* Settlement: the return, the new receipt, and what is paid or handed back */}
+        {picked && replacementDevice && (
           <div className="p-4 bg-surface border-t border-border space-y-3 shrink-0">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-              <div className="flex items-center space-x-2">
-                <Banknote className="w-4.5 h-4.5 text-accent" />
-                <h4 className="text-xs md:text-sm font-bold text-fg-muted">
-                  Расчет разницы обмена
-                </h4>
+            <div className="flex items-center gap-2">
+              <Banknote className="w-4.5 h-4.5 text-accent" />
+              <h4 className="text-xs md:text-sm font-bold text-fg-muted">Расчёт обмена</h4>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+              <div className="p-2.5 rounded-lg bg-surface-raised border border-border space-y-0.5">
+                <p className="font-bold text-fg">1. Возврат по чеку #{picked.sale.receiptNumber}</p>
+                <p className="text-fg-muted">{money(soldPriceTjs)} − удержание {money(withheldTjs)} = <strong className="text-accent">зачёт {money(Math.max(0, creditTjs))}</strong></p>
               </div>
-              <div className="text-xs flex items-center space-x-3">
-                <span className="text-fg-muted">Новый: <strong className="text-accent">{newPriceTjs.toLocaleString()} TJS</strong></span>
-                <span className="text-fg-subtle">—</span>
-                <span className="text-fg-muted">Зачет: <strong className="text-accent">{exchangeInValueTjs.toLocaleString()} TJS</strong></span>
-                <span className="text-fg-subtle">=</span>
-                <strong className="text-xs">
-                  {differenceTjs > 0 ? (
-                    <span className="text-accent font-bold">Разница: +{differenceTjs.toLocaleString()} TJS</span>
-                  ) : differenceTjs < 0 ? (
-                    <span className="text-warning font-bold">Разница: {differenceTjs.toLocaleString()} TJS</span>
-                  ) : (
-                    <span className="text-accent font-bold">Разница: 0 TJS</span>
-                  )}
-                </strong>
+              <div className="p-2.5 rounded-lg bg-surface-raised border border-border space-y-0.5">
+                <p className="font-bold text-fg">2. Новый чек</p>
+                <p className="text-fg-muted">{replacementDevice.brand} {replacementDevice.model} — <strong className="text-accent">{money(newPriceTjs)}</strong></p>
               </div>
             </div>
 
-            {/* Dynamic Alert Banner */}
             {differenceTjs > 0 ? (
               <div className="p-3.5 rounded-xl bg-accent/10 border border-accent/30 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
                 <div className="flex items-start space-x-2.5">
                   <AlertCircle className="w-5 h-5 text-accent shrink-0 mt-0.5" />
                   <div>
-                    <p className="text-xs font-bold text-accent tracking-wide">
-                      Требуется доплата от клиента
-                    </p>
-                    <p className="text-xs text-fg-muted mt-0.5">
-                      Клиенту необходимо доплатить <strong className="text-accent">{differenceTjs.toLocaleString()} TJS</strong>.
-                    </p>
+                    <p className="text-xs font-bold text-accent tracking-wide">Доплата клиента</p>
+                    <p className="text-xs text-fg-muted mt-0.5">Клиент доплачивает <strong className="text-accent">{money(differenceTjs)}</strong>.</p>
                   </div>
                 </div>
-
                 <div className="flex items-center space-x-3 w-full sm:w-auto">
-                  {/* Payment method for the customer's top-up */}
                   <div className="flex items-center bg-surface-raised p-1 rounded-xl border border-border shrink-0">
                     {(['CASH', 'CARD'] as const).map((method) => (
                       <button
                         key={method}
                         type="button"
-                        onClick={() => setExchangePaymentMethod(method)}
-                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${
-                          exchangePaymentMethod === method ? 'bg-accent text-accent-fg' : 'text-fg-muted hover:text-fg'
-                        }`}
+                        onClick={() => setPaymentMethod(method)}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${paymentMethod === method ? 'bg-accent text-accent-fg' : 'text-fg-muted hover:text-fg'}`}
                       >
                         {method === 'CASH' ? 'Наличные' : 'Банк'}
                       </button>
                     ))}
                   </div>
-
-                  {/* Input Cash Given — change calculator for the cashier */}
-                  {exchangePaymentMethod === 'CASH' && (
+                  {paymentMethod === 'CASH' && (
                     <div className="flex items-center space-x-3 bg-surface-raised p-2 rounded-xl border border-border">
                       <div>
-                        <label className="block text-[10px] font-bold text-fg-subtle mb-0.5">
-                          Внесено клиентом:
-                        </label>
+                        <label className="block text-[10px] font-bold text-fg-subtle mb-0.5">Внесено клиентом:</label>
                         <div className="relative">
-                          <input step="0.01"
+                          <input
+                            step="0.01"
                             type="number"
                             min="0"
                             placeholder={differenceTjs.toString()}
@@ -640,9 +564,7 @@ export const ExchangePage: React.FC = () => {
                       {givenCashTjs && (parseFloat(givenCashTjs) || 0) > differenceTjs && (
                         <div>
                           <span className="block text-[10px] font-bold text-fg-subtle mb-0.5">Сдача:</span>
-                          <span className="text-xs font-bold text-warning">
-                            {((parseFloat(givenCashTjs) || 0) - differenceTjs).toLocaleString()} TJS
-                          </span>
+                          <span className="text-xs font-bold text-warning">{money(moneyNumber(decimal(parseFloat(givenCashTjs) || 0).minus(differenceTjs)))}</span>
                         </div>
                       )}
                     </div>
@@ -650,49 +572,51 @@ export const ExchangePage: React.FC = () => {
                 </div>
               </div>
             ) : differenceTjs < 0 ? (
-              <div className="p-3.5 rounded-xl bg-warning/15 border border-warning/30 flex items-center space-x-2.5">
-                <AlertCircle className="w-5 h-5 text-warning shrink-0" />
-                <div>
-                  <p className="text-xs font-bold text-warning tracking-wide">
-                    Возврат разницы клиенту
-                  </p>
-                  <p className="text-xs text-fg-muted mt-0.5">
-                    Сдаваемое устройство дороже. Выплатите клиенту из кассы: <strong className="text-warning">{Math.abs(differenceTjs).toLocaleString()} TJS</strong>.
-                  </p>
+              <div className="p-3.5 rounded-xl bg-warning/15 border border-warning/30 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="flex items-center space-x-2.5">
+                  <AlertCircle className="w-5 h-5 text-warning shrink-0" />
+                  <div>
+                    <p className="text-xs font-bold text-warning tracking-wide">Сдача клиенту</p>
+                    <p className="text-xs text-fg-muted mt-0.5">Новый телефон дешевле зачёта. Выдайте клиенту: <strong className="text-warning">{money(Math.abs(differenceTjs))}</strong>.</p>
+                  </div>
+                </div>
+                <div className="flex items-center bg-surface-raised p-1 rounded-xl border border-border shrink-0">
+                  {(['CASH', 'CARD'] as const).map((method) => (
+                    <button
+                      key={method}
+                      type="button"
+                      onClick={() => setPaymentMethod(method)}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${paymentMethod === method ? 'bg-warning text-white' : 'text-fg-muted hover:text-fg'}`}
+                    >
+                      {method === 'CASH' ? 'Наличными' : 'На карту'}
+                    </button>
+                  ))}
                 </div>
               </div>
-            ) : null}
+            ) : (
+              <p className="text-xs font-semibold text-fg">Зачёт полностью покрывает новый телефон — доплаты нет.</p>
+            )}
           </div>
         )}
 
-        {/* Action Bottom Bar */}
         <div className="p-2.5 sm:p-3.5 bg-surface border-t border-border flex flex-col sm:flex-row gap-2.5 sm:items-center justify-between shrink-0">
           <div className="text-xs font-medium text-fg-muted flex flex-wrap items-center gap-x-2 gap-y-1">
-            <span className="inline-flex items-center gap-1">
-              <span className="text-fg-subtle">Новый:</span>
-              <strong className="text-accent font-semibold">{formatMoney(newPriceTjs)} TJS</strong>
-            </span>
+            <span className="inline-flex items-center gap-1"><span className="text-fg-subtle">Зачёт:</span><strong className="text-accent font-semibold">{money(picked ? Math.max(0, creditTjs) : 0)}</strong></span>
             <span className="text-fg-subtle">·</span>
-            <span className="inline-flex items-center gap-1">
-              <span className="text-fg-subtle">Зачет:</span>
-              <strong className="text-accent font-semibold">{formatMoney(exchangeInValueTjs)} TJS</strong>
-            </span>
+            <span className="inline-flex items-center gap-1"><span className="text-fg-subtle">Новый:</span><strong className="text-accent font-semibold">{money(newPriceTjs)}</strong></span>
             <span className="text-fg-subtle">·</span>
             <span className={`font-bold ${differenceTjs > 0 ? 'text-accent' : differenceTjs < 0 ? 'text-warning' : 'text-fg'}`}>
-              {differenceTjs > 0 ? `Доплата: +${formatMoney(differenceTjs)} TJS` : differenceTjs < 0 ? `Возврат: ${formatMoney(differenceTjs)} TJS` : 'Равный обмен'}
+              {differenceTjs > 0 ? `Доплата: ${money(differenceTjs)}` : differenceTjs < 0 ? `Сдача: ${money(Math.abs(differenceTjs))}` : 'Без доплаты'}
             </span>
           </div>
 
           <button
             type="submit"
-            disabled={
-              !selectedOldDevice || !replacementDevice || exchangeInValueTjs <= 0 || newPriceTjs <= 0 || isSubmitting ||
-              (differenceTjs > 0 && exchangePaymentMethod === 'CASH' && (parseFloat(givenCashTjs) || 0) < differenceTjs)
-            }
+            disabled={!picked || !replacementDevice || withheldTooBig || newPriceTjs <= 0 || isSubmitting || cashShort}
             className="h-10 px-4 bg-accent hover:bg-accent-strong active:scale-95 disabled:opacity-40 text-xs font-bold rounded-xl text-accent-fg tracking-wide flex items-center justify-center space-x-2 transition-all shadow-xs cursor-pointer disabled:cursor-not-allowed shrink-0"
           >
             {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <RotateCcw className="w-4 h-4" />}
-            <span>{isSubmitting ? 'Проведение…' : 'Подтвердить обмен'}</span>
+            <span>{isSubmitting ? 'Проведение…' : 'Оформить возврат и новый чек'}</span>
           </button>
         </div>
       </form>

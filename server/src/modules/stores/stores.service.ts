@@ -165,6 +165,7 @@ export class StoresService {
       await tx.owner.updateMany({ where: { storeId: sourceStoreId }, data: { storeId: targetStoreId } });
       await tx.device.updateMany({ where: { storeId: sourceStoreId }, data: { storeId: targetStoreId } });
       await tx.sale.updateMany({ where: { storeId: sourceStoreId }, data: { storeId: targetStoreId } });
+      await tx.saleReturn.updateMany({ where: { storeId: sourceStoreId }, data: { storeId: targetStoreId } });
       await tx.supplierInvoice.updateMany({ where: { storeId: sourceStoreId }, data: { storeId: targetStoreId } });
       await tx.supplierPayment.updateMany({ where: { storeId: sourceStoreId }, data: { storeId: targetStoreId } });
       await tx.customerPayment.updateMany({ where: { storeId: sourceStoreId }, data: { storeId: targetStoreId } });

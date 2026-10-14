@@ -7,6 +7,7 @@ const db = vi.hoisted(() => ({
   sale: { findMany: vi.fn() }, expense: { findMany: vi.fn() }, supplierBonus: { findMany: vi.fn() },
   supplier: { aggregate: vi.fn(), findMany: vi.fn() }, store: { findFirst: vi.fn(), findMany: vi.fn() },
   auditLog: { findMany: vi.fn() }, device: { findMany: vi.fn() }, customerPaymentAllocation: { findMany: vi.fn() },
+  saleReturn: { findMany: vi.fn() },
 }));
 vi.mock('../../prisma/prisma.service', () => ({ prisma: db }));
 const rates = vi.hoisted(() => ({ byDay: new Map<string, number>(), fallback: 10 }));
@@ -20,7 +21,7 @@ const stores = Array.from({ length: 20 }, (_, i) => ({ id: `store-${i}`, name: `
 const sales = Array.from({ length: 2000 }, (_, i) => ({
   id: `sale-${i}`, storeId: stores[i % 20].id, totalTjs: 3001.2, totalUsd: 300.12, exchangeRate: 10,
   createdAt: date, refundedAt: date, status: i % 13 === 0 ? 'REFUNDED' : 'COMPLETED', penaltyFeeUsd: 1.23, penaltyFeeTjs: 12.3,
-  customerName: `Customer ${i}`, receiptNumber: i + 1, paymentMethod: 'CASH', cashAmountTjs: 3001.2, cardAmountTjs: 0,
+  customerName: `Customer ${i}`, receiptNumber: i + 1, paymentMethod: 'CASH', cashAmountTjs: 3001.2, cardAmountTjs: 0, returns: [],
   saleItems: [{ deviceId: `device-${i}`, imei: String(350000000000000 + i), storage: '128GB', color: 'Black', brand: 'Phone', model: `M${i % 7}`, salePriceUsd: 300.12, salePriceTjs: 3001.2, costBasisUsd: i % 9 ? 200.01 : 0, purchaseCostUsd: 200.01 }],
 }));
 const expenses = Array.from({ length: 2000 }, (_, i) => ({ id: `expense-${i}`, storeId: stores[i % 20].id, createdAt: date, amountTjs: 12.34, amountUsd: 1.23, exchangeRate: 10, comment: `Expense ${i}`, category: 'OTHER', createdByUserId: 'user' }));
@@ -53,6 +54,7 @@ beforeEach(() => {
   });
   db.supplierBonus.findMany.mockResolvedValue([{ bonusType: 'CASH_DISCOUNT', amountUsd: 25.5, exchangeRate: 10, dateReceived: date }, { bonusType: 'FREE_DEVICES', dateReceived: date, status: 'IN_STOCK' }]);
   db.customerPaymentAllocation.findMany.mockResolvedValue([]);
+  db.saleReturn.findMany.mockResolvedValue([]);
   db.supplier.aggregate.mockResolvedValue({ _sum: { totalDebtUsd: 123.45 } });
   db.supplier.findMany.mockResolvedValue([{ id: 'supplier', name: 'Supplier', totalPurchasedUsd: 200, totalPaidUsd: 76.55, totalDebtUsd: 123.45 }]);
   db.store.findFirst.mockResolvedValue({ id: 'warehouse', cashBalanceUsd: 34.57 });
@@ -80,7 +82,7 @@ describe('a refund is reported by fact, on its own day', () => {
     const refundDay = new Date('2026-09-10T08:00:00Z');
     rates.byDay.set('2026-09-10', 11);
     rates.fallback = 12; // "today"
-    const refunded = { id: 'refunded-1', storeId: 'store-0', status: 'REFUNDED', totalTjs: 2000, totalUsd: 200, exchangeRate: 10,
+    const refunded = { id: 'refunded-1', storeId: 'store-0', status: 'REFUNDED', totalTjs: 2000, totalUsd: 200, exchangeRate: 10, returns: [],
       penaltyFeeUsd: 0, penaltyFeeTjs: 0, createdAt: new Date('2026-09-01T08:00:00Z'), updatedAt: refundDay, refundedAt: refundDay, saleItems: [] };
     db.sale.findMany.mockImplementation(async ({ where, select }) => (where.status === 'REFUNDED' ? [refunded] : []).map((row) => project(row, select)));
     db.auditLog.findMany.mockImplementation(async ({ where, select }) => {

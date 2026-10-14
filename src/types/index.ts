@@ -129,11 +129,15 @@ export interface Device {
   costBasisUsd: number; // Cost basis for calculating profit (could be exchange-in value or $0 for bonus)
   isBonus?: boolean;
   bonusCampaign?: string;
+  /** The dearest of identical phones in the store — the one to sell first (cost stays hidden). */
+  preferredToSell?: boolean;
   createdAt: string;
   timeline: DeviceTimelineEvent[];
 }
 
 export interface SaleItem {
+  /** The receipt line itself (needed to return this phone). */
+  id?: string;
   deviceId: string;
   imei: string;
   imei2?: string;
@@ -147,6 +151,29 @@ export interface SaleItem {
   purchaseCostUsd: number;
   costBasisUsd: number;
   isBelowCost?: boolean;
+  isBonus?: boolean;
+  /** Set once this phone was returned (on its own or as the old phone of an exchange). */
+  returnId?: string;
+  returnWithheldTjs?: number;
+  returnWithheldUsd?: number;
+  returnCreditTjs?: number;
+  returnCreditUsd?: number;
+}
+
+/** One return of phones from a receipt; an exchange's return links to the new receipt. */
+export interface SaleReturnInfo {
+  id: string;
+  date: string;
+  reason: string;
+  withheldTjs: number;
+  withheldUsd: number;
+  creditTjs: number;
+  creditUsd: number;
+  payoutTjs: number;
+  payoutUsd: number;
+  payoutMethod?: 'CASH' | 'CARD';
+  exchangeSaleId?: string;
+  exchangeReceiptNumber?: number;
 }
 
 export interface ExchangeEvent {
@@ -191,6 +218,12 @@ export interface Sale {
   cardAmountTjs: number;
   debtAmountTjs?: number;
   exchangeTradeInCreditTjs?: number;
+  /** Dollars of that credit as the return booked them. */
+  exchangeTradeInCreditUsd?: number;
+  /** Returns of phones from this receipt. */
+  returns?: SaleReturnInfo[];
+  /** For a receipt opened by an exchange: the receipt the returned phone came from. */
+  exchangeFrom?: { saleId: string; receiptNumber: number; creditTjs: number; creditUsd: number };
   status: 'COMPLETED' | 'EXCHANGED' | 'REFUNDED';
   hasBelowCostItem?: boolean;
   exchangeEvents?: ExchangeEvent[];

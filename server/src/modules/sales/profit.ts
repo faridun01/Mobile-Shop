@@ -29,6 +29,28 @@ export function allocateOwnerProfit(amountUsd: MoneyInput, owners: { id: string;
   }));
 }
 
+/**
+ * Splits `amountUsd` among owners in the same proportions as an earlier booking (`booked`, whose
+ * amounts add up to `bookedTotalUsd`), cent-exact: the parts always add up to the amount, leftover
+ * cents going to the largest remainders. Used to reverse part of a sale's profit with the shares
+ * it was booked at, however the shares have changed since. Null when there is nothing to scale by.
+ */
+export function allocateLikeBooked(amountUsd: MoneyInput, booked: OwnerProfitAllocation[], bookedTotalUsd: MoneyInput): OwnerProfitAllocation[] | null {
+  const total = D(bookedTotalUsd);
+  if (total.isZero() || booked.length === 0) return null;
+  const cents = D(roundMoney(amountUsd)).mul(100).round();
+  const exact = booked.map((row) => ({ ownerId: row.ownerId, value: cents.mul(row.amountUsd).div(total) }));
+  const parts = exact.map((row) => ({ ownerId: row.ownerId, cents: row.value.trunc(), remainder: row.value.minus(row.value.trunc()) }));
+  let left = cents.minus(parts.reduce((sum, part) => sum.plus(part.cents), D(0))).toNumber();
+  const step = left >= 0 ? 1 : -1;
+  const ranked = [...parts].sort((a, b) => (step > 0 ? b.remainder.comparedTo(a.remainder) : a.remainder.comparedTo(b.remainder)) || a.ownerId.localeCompare(b.ownerId));
+  for (let i = 0; left !== 0 && ranked.length; i = (i + 1) % ranked.length) {
+    ranked[i].cents = ranked[i].cents.plus(step);
+    left -= step;
+  }
+  return parts.map((part) => ({ ownerId: part.ownerId, amountUsd: roundMoney(part.cents.div(100)) }));
+}
+
 /** Reverse the amounts actually booked, including rounding and every exchange. */
 export function refundOwnerProfit(
   logs: ProfitAuditRecord[],
@@ -76,6 +98,11 @@ export function calculateRecognizedProfit(logs: ProfitAuditRecord[], fallbackPro
     }
     if (log.action === 'EXCHANGE' && typeof exchangeProfit === 'number' && Number.isFinite(exchangeProfit)) {
       amount = D(amount).plus(exchangeProfit);
+    }
+    // A return of some phones: their profit is reversed, the withheld part kept.
+    const returnDelta = details.profitDeltaUsd;
+    if (log.action === 'SALE_RETURN' && typeof returnDelta === 'number' && Number.isFinite(returnDelta)) {
+      amount = D(amount).plus(returnDelta);
     }
   }
 

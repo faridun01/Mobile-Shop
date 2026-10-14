@@ -287,35 +287,44 @@ try {
   });
 
   // ---------------------------------------------------------------- 5. exchanges
-  console.log('5. Обмены');
-  const exchange = async (key: string, saleKey: string, storeId: string, creditTjs: number, model: string, newPriceTjs: number, method: 'CASH' | 'CARD') => {
+  console.log('5. Обмены: возврат старого телефона + новый чек');
+  // Owners' profit of returning `item` with `withheldTjs` kept: its booked profit comes back, the
+  // withheld part and the rate result (its booked dollars − the same somoni today) stay.
+  const returnProfit = (item: any, withheldTjs: Dec) => {
+    const booked = bonusIds.has(item.deviceId) ? D(0) : D(item.salePriceUsd).minus(costOf.get(item.deviceId)!);
+    return usd(withheldTjs).plus(D(item.salePriceUsd).minus(usd(item.salePriceTjs))).minus(booked);
+  };
+  const exchange = async (key: string, saleKey: string, storeId: string, withheldTjs: number, model: string, newPriceTjs: number, method: 'CASH' | 'CARD') => {
     const sale = sales[saleKey];
     const item = sale.saleItems[0];
     const replacementId = pick(storeId, model);
-    const diff = D(newPriceTjs).minus(creditTjs);
     const res = ok(await call(seller[storeId], 'POST', '/exchanges', {
-      saleId: sale.id, returnedImei: item.imei, returnedBrand: item.brand, returnedModel: item.model,
-      exchangeInValueTjs: creditTjs, replacementDeviceId: replacementId, newPriceTjs, differenceTjs: diff.toNumber(),
-      paymentMethod: method, cashAmountTjs: method === 'CASH' ? diff.toNumber() : 0, cardAmountTjs: method === 'CARD' ? diff.toNumber() : 0,
+      saleId: sale.id, returnedImei: item.imei, withheldTjs, replacementDeviceId: replacementId, newPriceTjs, paymentMethod: method,
     }));
-    const creditUsd = usd(creditTjs), newUsd = usd(newPriceTjs);
+    const creditTjs = D(item.salePriceTjs).minus(withheldTjs);
+    const creditUsd = usd(item.salePriceTjs).minus(usd(withheldTjs));
+    const newUsd = usd(newPriceTjs);
+    // The register moves by the new receipt's dollars minus the credit's own dollars.
     addCash(storeId, newUsd.minus(creditUsd));
-    // Return + sale: replacement margin − returned item's margin + withheld part of its price.
-    const returnedCost = costOf.get(item.deviceId)!;
-    const profit = newUsd.minus(costOf.get(replacementId)!).minus(D(item.salePriceUsd).minus(returnedCost)).plus(D(item.salePriceUsd).minus(creditUsd));
-    addProfit(storeId, profit);
-    saleProfitBooked.set(sale.id, saleProfitBooked.get(sale.id)!.plus(profit));
+    const returnPart = returnProfit(item, D(withheldTjs));
+    const salePart = newUsd.minus(costOf.get(replacementId)!);
+    addProfit(storeId, returnPart.plus(salePart));
+    saleProfitBooked.set(sale.id, saleProfitBooked.get(sale.id)!.plus(returnPart));
+    saleProfitBooked.set(res.sale.id, salePart);
+    sales[key] = res.sale;
+    eq(res.creditTjs, creditTjs, `${key}: зачёт = цена − удержание`);
+    eq(res.sale.totalTjs, newPriceTjs, `${key}: новый чек на цену нового телефона`);
+    eq(res.sale.exchangeTradeInCreditTjs, creditTjs.lte(newPriceTjs) ? creditTjs : newPriceTjs, `${key}: зачёт в оплате нового чека`);
+    eq(res.payoutTjs, creditTjs.gt(newPriceTjs) ? creditTjs.minus(newPriceTjs) : 0, `${key}: сдача клиенту`);
+    if ((await prisma.sale.findUniqueOrThrow({ where: { id: sale.id } })).status !== 'REFUNDED') fail('старый чек не отмечен как возврат');
     const returned = await prisma.device.findUniqueOrThrow({ where: { id: item.deviceId } });
-    if (returned.status !== 'IN_STOCK_AFTER_EXCHANGE') fail('сданный телефон не вернулся на остаток');
-    eq(returned.costBasisUsd, returnedCost, 'сданный телефон вернулся по своей себестоимости');
-    eq(res.totalTjs, D(sale.totalTjs).plus(diff), `${key}: итого чека TJS`);
-    eq(res.totalUsd, D(sale.totalUsd).plus(newUsd.minus(creditUsd)), `${key}: итого чека USD`);
-    sales[saleKey] = { ...res, saleItems: (await prisma.saleItem.findMany({ where: { saleId: sale.id } })) };
+    if (returned.status !== 'STORE_STOCK') fail('сданный телефон не вернулся на остаток');
+    eq(returned.costBasisUsd, costOf.get(item.deviceId)!, 'сданный телефон вернулся по своей себестоимости');
     await checkBooks(key);
   };
-  await step(`обмен в «${A.name}» с выплатой клиенту: iPhone 15 (зачёт 7 200) → Redmi за 3 600`, () => exchange('обмен A1', 'A1 наличные', A.id, 7200, 'Redmi Note 13 Pro+', 3600, 'CASH'));
-  await step(`обмен в «${B.name}» с доплатой картой: Redmi (полный зачёт) → iPhone 15 за 7 800`, () => exchange('обмен B1', 'B1 наличные', B.id, 3456.78, 'iPhone 15', 7800, 'CARD'));
-  await step(`обмен в «${C.name}» с доплатой наличными: A55 (зачёт 3 000) → iPhone 15 Pro за 10 999.99`, () => exchange('обмен C3', 'C3 наличные', C.id, 3000, 'iPhone 15 Pro', 10999.99, 'CASH'));
+  await step(`обмен в «${A.name}» со сдачей клиенту: iPhone 15 (удержание 454.32) → Redmi за 3 600`, () => exchange('обмен A1', 'A1 наличные', A.id, 454.32, 'Redmi Note 13 Pro+', 3600, 'CASH'));
+  await step(`обмен в «${B.name}» с доплатой картой: Redmi (без удержания) → iPhone 15 за 7 800`, () => exchange('обмен B1', 'B1 наличные', B.id, 0, 'iPhone 15', 7800, 'CARD'));
+  await step(`обмен в «${C.name}» с доплатой наличными: A55 (удержание 150.15) → iPhone 15 Pro за 10 999.99`, () => exchange('обмен C3', 'C3 наличные', C.id, 150.15, 'iPhone 15 Pro', 10999.99, 'CASH'));
 
   // ---------------------------------------------------------------- 6. refunds
   console.log('6. Возвраты');
@@ -337,9 +346,25 @@ try {
     }
     await checkBooks(key);
   };
-  await step(`возврат в «${A.name}»: оплата картой, штраф 300 TJS`, () => refund('возврат A2', 'A2 карта', A.id, 300, 'CARD'));
-  await step(`возврат в «${C.name}»: наличные, штраф 150 TJS`, () => refund('возврат C4', 'C4 наличные', C.id, 150, 'CASH'));
-  await step(`возврат обменённого чека в «${B.name}», штраф 500 TJS`, () => refund('возврат B1 после обмена', 'B1 наличные', B.id, 500, 'CASH'));
+  await step(`возврат всего чека в «${A.name}»: оплата картой, удержание 300 TJS`, () => refund('возврат A2', 'A2 карта', A.id, 300, 'CARD'));
+  await step(`возврат всего чека в «${C.name}»: наличные, удержание 150 TJS`, () => refund('возврат C4', 'C4 наличные', C.id, 150, 'CASH'));
+  await step(`возврат нового чека после обмена в «${B.name}», удержание 500 TJS`, () => refund('возврат чека обмена B1', 'обмен B1', B.id, 500, 'CASH'));
+  await step(`возврат одного телефона из чека с двумя телефонами в «${A.name}», удержание 333.33 TJS`, async () => {
+    const sale = sales['A6 два телефона'];
+    const item = sale.saleItems.find((i: any) => i.model === 'Galaxy A55');
+    ok(await call(partner[A.id], 'POST', `/sales/${sale.id}/return-items`, { items: [{ saleItemId: item.id, withheldTjs: 333.33 }], reason: 'Проверка: возврат одного телефона', paymentMethod: 'CASH' }));
+    addCash(A.id, usd(item.salePriceTjs).minus(usd(333.33)).negated());
+    const part = returnProfit(item, D(333.33));
+    addProfit(A.id, part);
+    saleProfitBooked.set(sale.id, saleProfitBooked.get(sale.id)!.plus(part));
+    const row = await prisma.sale.findUniqueOrThrow({ where: { id: sale.id }, include: { saleItems: true } });
+    if (row.status !== 'COMPLETED') fail('чек с оставшимся телефоном должен остаться проданным');
+    if (row.saleItems.filter((i) => i.returnId).length !== 1) fail('должен быть возвращён ровно один телефон');
+    if ((await prisma.device.findUniqueOrThrow({ where: { id: item.deviceId } })).status !== 'STORE_STOCK') fail('телефон не вернулся на остаток');
+    const whole = await call(partner[A.id], 'POST', `/sales/${sale.id}/refund`, { reason: 'x', refundAmountTjs: 1, penaltyFeeTjs: 1, paymentMethod: 'CASH' });
+    if (whole.status !== 400) fail('возврат всего чека после возврата телефона должен отклоняться');
+    await checkBooks('возврат одного телефона');
+  });
 
   // ---------------------------------------------------------------- 7. customer debt
   console.log('7. Долги клиентов');
@@ -382,7 +407,7 @@ try {
 
   // ---------------------------------------------------------------- 9. receipts
   console.log('9. Чеки');
-  await step('каждый чек: позиции + удержание при обмене = итого; наличные + банк + долг = итого (TJS и USD)', async () => {
+  await step('каждый чек: позиции = итого; наличные + банк + зачёт по обмену + долг = итого (TJS и USD)', async () => {
     const list = ok(await call(admin, 'GET', '/sales?limit=500')) as any[];
     for (const sale of list) {
       const label = `чек #${sale.receiptNumber}`;
@@ -394,10 +419,13 @@ try {
       if (withheldTjs.lt(0) || withheldUsd.lt(0)) fail(`${label}: отрицательное удержание`);
       if (sale.status === 'REFUNDED') continue;
       const cash = D(sale.cashAmountTjs), card = D(sale.cardAmountTjs);
-      const initialDebt = D(sale.totalTjs).minus(cash).minus(card);
+      const tradeIn = D(sale.exchangeTradeInCreditTjs ?? 0);
+      const initialDebt = D(sale.totalTjs).minus(cash).minus(card).minus(tradeIn);
       if (initialDebt.lt(0)) fail(`${label}: наличные + банк больше итога`);
-      const parts = splitUsdByTjs(Number(sale.totalUsd), Number(sale.totalTjs), [Number(cash), Number(card), Number(initialDebt)]);
-      eq(parts.reduce((s, v) => s.plus(v), D(0)), sale.totalUsd, `${label}: доллары по способам оплаты`);
+      // The credit keeps its own booked dollars; the receipt's other dollars are split by TJS.
+      const tradeInUsd = D(sale.exchangeTradeInCreditUsd ?? 0);
+      const parts = splitUsdByTjs(Number(D(sale.totalUsd).minus(tradeInUsd)), Number(D(sale.totalTjs).minus(tradeIn)), [Number(cash), Number(card), Number(initialDebt)]);
+      eq(parts.reduce((s, v) => s.plus(v), tradeInUsd), sale.totalUsd, `${label}: доллары по способам оплаты`);
       for (const ev of sale.exchangeEvents ?? []) eq(D(ev.newPriceTjs).minus(ev.exchangeInValueTjs), ev.differenceTjs, `${label}: доплата обмена`);
     }
   });

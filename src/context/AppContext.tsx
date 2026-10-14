@@ -114,25 +114,24 @@ interface AppContextType {
     debtAmountTjs?: number;
   }) => Promise<{ success: boolean; receiptNumber?: number; message?: string }>;
 
+  /** Exchange = return of one phone (with the withheld amount) + a new receipt for the new phone. */
   processExchange: (params: {
-    originalSaleReceiptNumber?: number | string;
-    originalSaleId?: string;
-    returnedImei?: string;
-    returnedItem?: {
-      brand: string;
-      model: string;
-      storage: string;
-      color: string;
-      imei: string;
-      exchangeInValueTjs: number;
-    };
-    exchangeInValueTjs?: number;
+    saleId: string;
+    saleItemId: string;
+    withheldTjs: number;
     replacementDeviceId: string;
     newPriceTjs: number;
-    differenceTjs?: number;
-    paymentMethod?: PaymentMethod;
+    paymentMethod: 'CASH' | 'CARD' | 'SPLIT';
     cashAmountTjs?: number;
     cardAmountTjs?: number;
+  }) => Promise<{ success: boolean; message?: string; newReceiptNumber?: number; creditTjs?: number; payoutTjs?: number }>;
+
+  /** Return of chosen phones from a receipt, each with its own withheld amount. */
+  processReturnItems: (params: {
+    saleId: string;
+    items: { saleItemId: string; withheldTjs: number }[];
+    reason: string;
+    paymentMethod: 'CASH' | 'CARD';
   }) => Promise<{ success: boolean; message?: string }>;
 
   processRefund: (params: {
@@ -1015,60 +1014,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const processExchange: AppContextType['processExchange'] = async (params) => {
-    const returnedImeiStr = (params.returnedImei || params.returnedItem?.imei || '').trim();
-    const exchangeInValueTjs = params.exchangeInValueTjs ?? params.returnedItem?.exchangeInValueTjs ?? 0;
-
-    let targetReceiptNum: number | undefined;
-    if (typeof params.originalSaleReceiptNumber === 'number') {
-      targetReceiptNum = params.originalSaleReceiptNumber;
-    } else if (typeof params.originalSaleReceiptNumber === 'string') {
-      targetReceiptNum = parseInt(params.originalSaleReceiptNumber.replace('#', ''), 10);
-    } else if (params.originalSaleId) {
-      targetReceiptNum = parseInt(params.originalSaleId.replace('#', ''), 10);
-    }
-
-    let targetSale = sales.find((s) =>
-      (targetReceiptNum && !isNaN(targetReceiptNum) && s.receiptNumber === targetReceiptNum) ||
-      s.id === params.originalSaleId ||
-      s.receiptNumber.toString() === params.originalSaleId?.toString().replace('#', '')
-    );
-    if (!targetSale && returnedImeiStr) {
-      targetSale = sales.find((s) => s.items.some((i) => i.imei === returnedImeiStr));
-    }
-    if (!targetSale) {
-      try {
-        const lookupQuery = targetReceiptNum ? String(targetReceiptNum) : returnedImeiStr;
-        if (lookupQuery) {
-          const found = await fetchSalesRange({ search: lookupQuery });
-          targetSale = found.find((s) =>
-            (targetReceiptNum && s.receiptNumber === targetReceiptNum) ||
-            s.id === params.originalSaleId ||
-            (returnedImeiStr && s.items.some((i) => i.imei === returnedImeiStr))
-          );
-        }
-      } catch {
-        // ignore
-      }
-    }
-    if (!targetSale) {
-      return { success: false, message: `Продажа с указанным чеком/IMEI не найдена` };
-    }
-
-    const returnedItem = params.returnedItem;
     try {
-      await apiClient<any>('/exchanges', {
+      const result = await apiClient<any>('/exchanges', {
         method: 'POST',
         body: JSON.stringify({
-          saleId: targetSale.id,
-          returnedImei: returnedImeiStr,
-          returnedBrand: returnedItem?.brand ?? 'Apple',
-          returnedModel: returnedItem?.model ?? 'iPhone',
-          returnedStorage: returnedItem?.storage,
-          returnedColor: returnedItem?.color,
-          exchangeInValueTjs,
+          saleId: params.saleId,
+          saleItemId: params.saleItemId,
+          withheldTjs: params.withheldTjs,
           replacementDeviceId: params.replacementDeviceId,
           newPriceTjs: params.newPriceTjs,
-          differenceTjs: params.differenceTjs,
           paymentMethod: params.paymentMethod,
           cashAmountTjs: params.cashAmountTjs,
           cardAmountTjs: params.cardAmountTjs,
@@ -1076,9 +1030,28 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       });
       markLocalMutation(['sales', 'devices', 'stores', 'owners']);
       await refreshAfterMutation([fetchSales(), fetchDevices(), fetchStores(), fetchOwners()]);
-      return { success: true };
+      return {
+        success: true,
+        newReceiptNumber: result?.sale?.receiptNumber,
+        creditTjs: Number(result?.creditTjs ?? 0),
+        payoutTjs: Number(result?.payoutTjs ?? 0),
+      };
     } catch (err) {
       return { success: false, message: errorMessage(err, 'Не удалось выполнить обмен') };
+    }
+  };
+
+  const processReturnItems: AppContextType['processReturnItems'] = async ({ saleId, items, reason, paymentMethod }) => {
+    try {
+      await apiClient(`/sales/${saleId}/return-items`, {
+        method: 'POST',
+        body: JSON.stringify({ items, reason, paymentMethod }),
+      });
+      markLocalMutation(['sales', 'devices', 'stores', 'owners']);
+      await refreshAfterMutation([fetchSales(), fetchDevices(), fetchStores(), fetchOwners()]);
+      return { success: true };
+    } catch (err) {
+      return { success: false, message: errorMessage(err, 'Не удалось выполнить возврат') };
     }
   };
 
@@ -1697,6 +1670,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         closeScanner,
         createSale,
         processExchange,
+        processReturnItems,
         processRefund,
         createPurchase,
         createSupplier,

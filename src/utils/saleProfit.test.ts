@@ -167,3 +167,25 @@ describe('computeSaleProfit', () => {
     expect(res.profitTjs).toBe(220);
   });
 });
+
+describe('computeSaleProfit with phones returned one by one', () => {
+  const base = {
+    id: 's9', receiptNumber: 109, date: '2026-10-15T10:00:00Z', storeId: 'store-1', storeName: 'Main', sellerId: 'u', sellerName: 'S',
+    totalTjs: 5000, totalUsd: 500, exchangeRate: 10, paymentMethod: 'CASH' as const, cashAmountTjs: 5000, cardAmountTjs: 0,
+    items: [
+      { id: 'i1', deviceId: 'd1', imei: '1', brand: 'A', model: 'One', storage: '', color: '', salePriceUsd: 200, salePriceTjs: 2000, purchaseCostUsd: 100, costBasisUsd: 100, returnId: 'r1' },
+      { id: 'i2', deviceId: 'd2', imei: '2', brand: 'A', model: 'Two', storage: '', color: '', salePriceUsd: 300, salePriceTjs: 3000, purchaseCostUsd: 100, costBasisUsd: 100 },
+    ],
+  };
+
+  it('leaves the returned phone out of the cost and uses the server profit', () => {
+    const res = computeSaleProfit({ ...base, status: 'COMPLETED', recognizedProfitUsd: 220, returns: [{ id: 'r1' } as any] } as Sale);
+    expect(res.costUsd).toBe(100);
+    expect(res.profitUsd).toBe(220);
+  });
+
+  it('uses the server profit for a receipt fully returned phone by phone', () => {
+    const res = computeSaleProfit({ ...base, status: 'REFUNDED', penaltyFeeUsd: 20, recognizedProfitUsd: 18.5, returns: [{ id: 'r1' } as any] } as Sale);
+    expect(res.profitUsd).toBe(18.5);
+  });
+});

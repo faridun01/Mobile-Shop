@@ -40,6 +40,9 @@ const getLogCategory = (log: { action?: string; details?: string; category?: str
   const details = (log.details || '').toUpperCase();
   const text = `${action} ${details}`;
 
+  // These contain "SALE" but are a return and an exchange.
+  if (action === 'SALE_RETURN') return 'REFUND';
+  if (action === 'SALE_EXCHANGE') return 'EXCHANGE';
   if (text.includes('SALE') || text.includes('SELL') || text.includes('ПРОДАЖ') || text.includes('ПРОДАН')) return 'SALE';
   if (text.includes('REFUND') || text.includes('RETURN') || text.includes('ВОЗВРАТ')) return 'REFUND';
   if (text.includes('EXCHANGE') || text.includes('TRADE_IN') || text.includes('ОБМЕН') || text.includes('ТРЕЙД')) return 'EXCHANGE';

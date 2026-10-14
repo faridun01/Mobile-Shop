@@ -8,6 +8,7 @@ vi.mock('../../prisma/prisma.service', () => {
   const dailyCashClosing = { findUnique: vi.fn(), findFirst: vi.fn(), findMany: vi.fn(), create: vi.fn(), delete: vi.fn() };
   const sale = { findMany: vi.fn() };
   const exchangeEvent = { findMany: vi.fn() };
+  const saleReturn = { findMany: vi.fn().mockResolvedValue([]) };
   const expense = { findMany: vi.fn() };
   const cashHandover = { findMany: vi.fn(), findFirst: vi.fn() };
   const customerPayment = { findMany: vi.fn() };
@@ -19,7 +20,7 @@ vi.mock('../../prisma/prisma.service', () => {
   const user = { findUnique: vi.fn() };
 
   const tx = {
-    store, dailyCashClosing, sale, exchangeEvent, expense, cashHandover, customerPayment,
+    store, dailyCashClosing, sale, exchangeEvent, saleReturn, expense, cashHandover, customerPayment,
     financialAccount, financialTransaction, exchangeRate, auditLog, notification, user,
     $queryRaw: vi.fn(),
   };
@@ -49,6 +50,7 @@ function openDay({
   sales = [] as any[],
   refunds = [] as any[],
   exchanges = [] as any[],
+  returns = [] as any[],
   expenses = [] as any[],
   collections = [] as any[],
   customerPayments = [] as any[],
@@ -59,6 +61,7 @@ function openDay({
   db.dailyCashClosing.findUnique.mockResolvedValue(null);
   db.sale.findMany.mockResolvedValueOnce(sales).mockResolvedValueOnce(refunds);
   db.exchangeEvent.findMany.mockResolvedValue(exchanges);
+  db.saleReturn.findMany.mockResolvedValue(returns);
   db.cashHandover.findMany.mockResolvedValue(collections);
   db.customerPayment.findMany.mockResolvedValue(customerPayments);
   db.financialAccount.findUnique.mockResolvedValue({ id: 'acc-1' });

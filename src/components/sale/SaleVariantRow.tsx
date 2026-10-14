@@ -37,7 +37,11 @@ export const SaleVariantRow: React.FC<SaleVariantRowProps> = ({ variant, expande
   const costs = variant.devices.map((d) => d.purchaseCostUsd ?? d.costBasisUsd ?? 0);
   const maxCost = costs.length ? Math.max(...costs) : 0;
   const hasCostVariance = costs.length > 1 && maxCost > Math.min(...costs);
-  const sortedDevices = [...variant.devices].sort((a, b) => (b.purchaseCostUsd ?? b.costBasisUsd ?? 0) - (a.purchaseCostUsd ?? a.costBasisUsd ?? 0));
+  // The phone to sell first (the server marks the dearest unit) leads the list for everyone;
+  // the admin also sees the costs behind it.
+  const sortedDevices = [...variant.devices].sort((a, b) =>
+    Number(Boolean(b.preferredToSell)) - Number(Boolean(a.preferredToSell))
+    || (b.purchaseCostUsd ?? b.costBasisUsd ?? 0) - (a.purchaseCostUsd ?? a.costBasisUsd ?? 0));
   const retailPrices = variant.devices.map(retailPriceOf).filter((p): p is number => p !== undefined);
   const minRetail = retailPrices.length ? Math.min(...retailPrices) : undefined;
   const maxRetail = retailPrices.length ? Math.max(...retailPrices) : undefined;
@@ -87,7 +91,7 @@ export const SaleVariantRow: React.FC<SaleVariantRowProps> = ({ variant, expande
         <div className="bg-surface/60 border-t border-border px-4 py-2 space-y-2">
           {sortedDevices.map((dev) => {
             const devCost = dev.purchaseCostUsd ?? dev.costBasisUsd ?? 0;
-            const isHighestCost = showCosts && hasCostVariance && devCost === maxCost;
+            const isHighestCost = Boolean(dev.preferredToSell) || (showCosts && hasCostVariance && devCost === maxCost);
             const price = retailPriceOf(dev);
             return (
               <div
@@ -118,6 +122,7 @@ export const SaleVariantRow: React.FC<SaleVariantRowProps> = ({ variant, expande
                     )}
                   </div>
                   {showCosts && devCost > 0 && <p className="text-xs text-fg-subtle mt-0.5">Закупка: ${devCost}</p>}
+                  {isHighestCost && <p className="text-[11px] font-semibold text-warning mt-0.5">Рекомендуется продать первым</p>}
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
                   {price !== undefined && (

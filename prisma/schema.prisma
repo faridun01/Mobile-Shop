@@ -161,6 +161,7 @@ model Store {
   dailyCashClosings     DailyCashClosing[]
   stockRevisions        StockRevision[]
   stockThresholds       StockThreshold[]
+  saleReturns           SaleReturn[]
 
   @@map("stores")
 }
@@ -476,6 +477,8 @@ model Sale {
   // Only DEBT-method sales start with this > 0, decremented as CustomerPayments land.
   debtAmountTjs            Decimal       @default(0) @db.Decimal(14, 2)
   exchangeTradeInCreditTjs Decimal?      @db.Decimal(14, 2)
+  // Dollars of the trade-in credit applied to this sale (an exchange: the returned phone's value).
+  exchangeTradeInCreditUsd Decimal?      @db.Decimal(14, 2)
   status                   SaleStatus    @default(COMPLETED)
   hasBelowCostItem         Boolean       @default(false)
   refundReason             String?
@@ -493,6 +496,8 @@ model Sale {
   exchangeEvents     ExchangeEvent[]
   paymentAllocations CustomerPaymentAllocation[]
   bonusPoolEntries   BonusPoolEntry[]
+  returns            SaleReturn[]                @relation("SaleReturns")
+  exchangeReturn     SaleReturn?                 @relation("ExchangeSale")
 
   @@index([storeId, createdAt])
   @@index([customerId])
@@ -517,13 +522,58 @@ model SaleItem {
   costBasisUsd    Decimal @db.Decimal(14, 2)
   isBelowCost     Boolean @default(false)
   isBonus         Boolean @default(false)
+  // Set when this phone was returned (on its own, or as the old phone of an exchange).
+  returnId          String?
+  returnWithheldTjs Decimal? @db.Decimal(14, 2)
+  returnWithheldUsd Decimal? @db.Decimal(14, 2)
+  returnCreditTjs   Decimal? @db.Decimal(14, 2)
+  returnCreditUsd   Decimal? @db.Decimal(14, 2)
 
-  sale   Sale   @relation(fields: [saleId], references: [id], onDelete: Cascade)
-  device Device @relation(fields: [deviceId], references: [id])
+  sale   Sale        @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  device Device      @relation(fields: [deviceId], references: [id])
+  return SaleReturn? @relation(fields: [returnId], references: [id])
 
   @@index([saleId])
   @@index([deviceId])
+  @@index([returnId])
   @@map("sale_items")
+}
+
+/// One return of phones from a receipt; each returned item links to it. The customer gets the
+/// phones' price back less the withheld amount (удержание): handed out from the register
+/// (payout), or applied to a new receipt when the return is the first half of an exchange.
+model SaleReturn {
+  id                     String   @id @default(uuid())
+  saleId                 String
+  storeId                String
+  userId                 String
+  reason                 String
+  exchangeRate           Decimal  @db.Decimal(10, 2)
+  // The returned items' dollars as their sale booked them, and that minus the same somoni at
+  // the return day's rate (the owners' exchange-rate result).
+  bookedUsd              Decimal  @db.Decimal(14, 2)
+  fxUsd                  Decimal  @db.Decimal(14, 2)
+  withheldTjs            Decimal  @db.Decimal(14, 2)
+  withheldUsd            Decimal  @db.Decimal(14, 2)
+  creditTjs              Decimal  @db.Decimal(14, 2)
+  creditUsd              Decimal  @db.Decimal(14, 2)
+  // Part of the credit handed back from the register; the rest went to the exchange receipt.
+  payoutTjs              Decimal  @db.Decimal(14, 2)
+  payoutUsd              Decimal  @db.Decimal(14, 2)
+  payoutMethod           String?
+  exchangeSaleId         String?  @unique
+  ownerProfitAllocations Json?
+  createdAt              DateTime @default(now())
+
+  sale         Sale       @relation("SaleReturns", fields: [saleId], references: [id])
+  exchangeSale Sale?      @relation("ExchangeSale", fields: [exchangeSaleId], references: [id])
+  store        Store      @relation(fields: [storeId], references: [id])
+  items        SaleItem[]
+
+  @@index([saleId])
+  @@index([storeId, createdAt])
+  @@index([createdAt])
+  @@map("sale_returns")
 }
 
 model ExchangeEvent {

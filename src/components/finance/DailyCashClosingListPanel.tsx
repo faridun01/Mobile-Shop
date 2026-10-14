@@ -311,13 +311,13 @@ export const DailyCashClosingListPanel: React.FC<DailyCashClosingListPanelProps>
         </div>
       </div>
 
-      {/* Sorting & Day Filter Bar with Calendar Picker */}
+      {/* Sorting & Day Filter Bar with Calendar Picker — always one row, on every screen */}
       {closings.length > 0 && (
-        <div className="flex flex-wrap items-center justify-between gap-2 bg-surface p-2 sm:p-2.5 rounded-xl border border-border shadow-2xs">
-          <div className="flex items-center gap-1.5 flex-wrap">
+        <div className="flex flex-nowrap items-center gap-1 sm:gap-2 bg-surface p-2 sm:p-2.5 rounded-xl border border-border shadow-2xs overflow-x-auto">
+          <div className="flex flex-nowrap items-center gap-1 sm:gap-1.5 shrink-0">
             {/* Date Input Calendar Selector */}
-            <div className="flex items-center gap-1.5 bg-surface-raised border border-border hover:border-accent focus-within:border-accent rounded-lg px-2 py-1 transition-all">
-              <Calendar className="w-3.5 h-3.5 text-accent shrink-0" />
+            <div className="flex items-center gap-1.5 shrink-0 bg-surface-raised border border-border hover:border-accent focus-within:border-accent rounded-lg px-1.5 sm:px-2 py-1 transition-all">
+              <Calendar className="hidden sm:block w-3.5 h-3.5 text-accent shrink-0" />
               <input
                 type="date"
                 value={selectedDay === 'all' ? '' : selectedDay}
@@ -332,14 +332,14 @@ export const DailyCashClosingListPanel: React.FC<DailyCashClosingListPanelProps>
             <button
               type="button"
               onClick={() => handleDateSelect(todayStr)}
-              className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer flex items-center gap-1 ${
+              className={`shrink-0 whitespace-nowrap px-2 sm:px-2.5 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer flex items-center gap-1 ${
                 selectedDay === todayStr
                   ? 'bg-accent text-accent-fg shadow-2xs font-bold'
                   : 'bg-surface-raised text-fg-subtle hover:text-fg border border-border hover:bg-surface'
               }`}
               title="Показать сегодняшний день"
             >
-              <Clock className="w-3.5 h-3.5" />
+              <Clock className="hidden sm:block w-3.5 h-3.5" />
               <span>Сегодня</span>
               {todayCount > 0 && (
                 <span className="text-[10px] font-mono opacity-80">({todayCount})</span>
@@ -350,7 +350,7 @@ export const DailyCashClosingListPanel: React.FC<DailyCashClosingListPanelProps>
             <button
               type="button"
               onClick={() => setSelectedDay('all')}
-              className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer flex items-center gap-1 ${
+              className={`shrink-0 whitespace-nowrap px-2 sm:px-2.5 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer flex items-center gap-1 ${
                 selectedDay === 'all'
                   ? 'bg-accent text-accent-fg shadow-2xs font-bold'
                   : 'bg-surface-raised text-fg-subtle hover:text-fg border border-border hover:bg-surface'
@@ -366,11 +366,13 @@ export const DailyCashClosingListPanel: React.FC<DailyCashClosingListPanelProps>
           <button
             type="button"
             onClick={() => setSortOrder((prev) => (prev === 'desc' ? 'asc' : 'desc'))}
-            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-surface-raised border border-border hover:bg-surface text-fg text-xs font-medium transition-colors cursor-pointer active:scale-95 shrink-0"
-            title="Изменить порядок сортировки по дням"
+            className="ml-auto inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-surface-raised border border-border hover:bg-surface text-fg text-xs font-medium transition-colors cursor-pointer active:scale-95 shrink-0 whitespace-nowrap"
+            title={sortOrder === 'desc' ? 'Сначала новые — изменить порядок' : 'Сначала старые — изменить порядок'}
+            aria-label={sortOrder === 'desc' ? 'Сначала новые' : 'Сначала старые'}
           >
             <ArrowUpDown className="w-3.5 h-3.5 text-accent" />
-            <span>{sortOrder === 'desc' ? 'Сначала новые' : 'Сначала старые'}</span>
+            {/* On a phone the icon alone keeps the bar on one row. */}
+            <span className="hidden sm:inline">{sortOrder === 'desc' ? 'Сначала новые' : 'Сначала старые'}</span>
           </button>
         </div>
       )}

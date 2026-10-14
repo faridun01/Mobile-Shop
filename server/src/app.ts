@@ -9,6 +9,7 @@ import { AuthService } from './auth/auth.service';
 import { authenticateJwt, type AuthenticatedRequest, enforceBodyStoreScope, requireRoles } from './auth/auth.middleware';
 import { SalesService } from './modules/sales/sales.service';
 import { hideSaleCosts } from './modules/sales/sale-visibility';
+import { isBelowCost, preferredToSellIds } from './modules/devices/sell-guidance';
 import { RealtimeSyncGateway } from './websocket/websocket.gateway';
 import { registerTransferRoutes } from './modules/transfers/transfers.routes';
 import { registerRepairRoutes } from './modules/repairs/repairs.routes';
@@ -36,7 +37,7 @@ import { syncStockAlerts } from './modules/stock-thresholds/stock-alerts';
 import { decorateTransactions } from './prisma/prisma.service';
 import { withAuditNotifications } from './modules/notifications/audit-notifications';
 import { requireNonNegativeMoney, requirePositiveMoney, roundMoney } from './common/money';
-import { requireTodayRate } from './modules/exchange-rate/exchange-rate.service';
+import { getRateForDate, requireTodayRate } from './modules/exchange-rate/exchange-rate.service';
 import { decimalJsonReplacer } from './common/decimal';
 import { operationContext } from './common/request-operation';
 import { lockCashRegister } from './modules/finance/account.service';
@@ -285,15 +286,112 @@ app.get('/api/devices', authenticateJwt, async (req: AuthenticatedRequest, res, 
       ...(search ? { take: 5 } : {}),
     });
 
-    const sanitizedDevices = req.user!.role === 'ADMIN'
-      ? devices
-      : devices.map((d) => ({
-          ...d,
-          purchasePriceUsd: 0,
-          costBasisUsd: 0,
-        }));
+    // Which unit of identical phones should be sold first (the dearest one) — told to everyone,
+    // while the cost itself stays ADMIN-only.
+    const storeIds = [...new Set(devices.map((d) => d.storeId).filter(Boolean))];
+    const sellable = storeIds.length
+      ? await prisma.device.findMany({
+          where: { storeId: { in: storeIds }, status: { in: ['STORE_STOCK', 'IN_STOCK_AFTER_EXCHANGE'] } },
+          select: { id: true, storeId: true, brand: true, model: true, ram: true, storage: true, color: true, costBasisUsd: true },
+        })
+      : [];
+    const preferred = preferredToSellIds(sellable);
+
+    const sanitizedDevices = devices.map((d) => ({
+      ...d,
+      ...(req.user!.role === 'ADMIN' ? {} : { purchasePriceUsd: 0, costBasisUsd: 0 }),
+      preferredToSell: preferred.has(d.id),
+    }));
 
     res.json(sanitizedDevices);
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Each yes/no answer tells store staff a little about a cost they must not see, so the answers
+// are rationed: one price per phone per request, and at most PRICE_CHECK_MAX distinct prices per
+// phone per user in a window — plenty for a cashier typing a price, far too few to search the
+// cost out. Beyond that no warning is given (the sale itself is still flagged and the admin
+// notified) and the attempt is audited. In-memory, like the login limiter above.
+const PRICE_CHECK_WINDOW_MS = 10 * 60 * 1000;
+const PRICE_CHECK_MAX = 8;
+const priceChecks = new Map<string, { prices: Set<string>; windowStartedAt: number; reported: boolean }>();
+const priceChecksCleanup = setInterval(() => {
+  const cutoff = Date.now() - PRICE_CHECK_WINDOW_MS;
+  for (const [key, entry] of priceChecks) if (entry.windowStartedAt <= cutoff) priceChecks.delete(key);
+}, 60_000);
+priceChecksCleanup.unref();
+
+/** Whether this user may get one more answer for this phone at this price. */
+function allowPriceCheck(userId: string, deviceId: string, price: string): { allowed: boolean; firstDenial: boolean } {
+  const key = `${userId}:${deviceId}`;
+  const now = Date.now();
+  let entry = priceChecks.get(key);
+  if (!entry || now - entry.windowStartedAt > PRICE_CHECK_WINDOW_MS) {
+    entry = { prices: new Set(), windowStartedAt: now, reported: false };
+    priceChecks.set(key, entry);
+  }
+  if (entry.prices.has(price)) return { allowed: true, firstDenial: false };
+  if (entry.prices.size >= PRICE_CHECK_MAX) {
+    const firstDenial = !entry.reported;
+    entry.reported = true;
+    return { allowed: false, firstDenial };
+  }
+  entry.prices.add(price);
+  return { allowed: true, firstDenial: false };
+}
+
+// Whether a price would sell a phone below its cost — a yes/no for everyone, so store staff are
+// warned without ever seeing what the phone cost (that stays ADMIN-only).
+app.post('/api/devices/price-check', authenticateJwt, async (req: AuthenticatedRequest, res, next) => {
+  try {
+    // One price per phone per request: several prices for the same phone would bracket its cost.
+    const seen = new Set<string>();
+    const items: { deviceId?: unknown; priceTjs?: unknown }[] = (Array.isArray(req.body?.items) ? req.body.items : [])
+      .filter((item: any) => {
+        const id = String(item?.deviceId ?? '');
+        if (!id || seen.has(id)) return false;
+        seen.add(id);
+        return true;
+      })
+      .slice(0, 20);
+    const ids = items.map((item) => String(item?.deviceId ?? '')).filter(Boolean);
+    const rate = await getRateForDate(new Date());
+    const devices = ids.length
+      ? await prisma.device.findMany({ where: { id: { in: ids } }, select: { id: true, storeId: true, costBasisUsd: true, isBonus: true, bonusCampaign: true } })
+      : [];
+    const isStoreScoped = req.user!.role === 'SELLER' || req.user!.role === 'PARTNER';
+    const denied: string[] = [];
+    const answers = items.map((item) => {
+      const device = devices.find((d) => d.id === item?.deviceId);
+      const price = Number(item?.priceTjs);
+      if (!device || !rate || !Number.isFinite(price) || price <= 0 || (isStoreScoped && device.storeId !== req.user!.storeId)) {
+        return { deviceId: item?.deviceId ?? null, belowCost: false };
+      }
+      // The admin sees costs anyway; store staff get a rationed number of answers per phone.
+      if (isStoreScoped) {
+        const check = allowPriceCheck(req.user!.userId, device.id, D(price).toFixed(2));
+        if (!check.allowed) {
+          if (check.firstDenial) denied.push(device.id);
+          return { deviceId: device.id, belowCost: false };
+        }
+      }
+      const isFreeBonus = Boolean((device.isBonus || device.bonusCampaign) && D(device.costBasisUsd).eq(0));
+      return { deviceId: device.id, belowCost: isBelowCost(price, device.costBasisUsd, rate, isFreeBonus) };
+    });
+    if (denied.length) {
+      const deniedDevices = await prisma.device.findMany({ where: { id: { in: denied } }, select: { imei: true, model: true } });
+      await prisma.auditLog.create({
+        data: {
+          userId: req.user!.userId,
+          userRole: req.user!.role,
+          action: 'PRICE_CHECK_LIMIT',
+          details: `Слишком много проверок цены «ниже себестоимости» за ${PRICE_CHECK_WINDOW_MS / 60000} мин: ${deniedDevices.map((d) => `${d.model} (IMEI ${d.imei})`).join(', ')}. Ответы приостановлены.`,
+        },
+      });
+    }
+    res.json({ items: answers });
   } catch (error) {
     next(error);
   }

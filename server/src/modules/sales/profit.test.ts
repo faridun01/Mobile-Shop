@@ -1,7 +1,7 @@
 import { D, moneyJson } from '../../common/decimal';
 import '../../common/decimal-test-setup';
 import { describe, expect, it } from 'vitest';
-import { allocateOwnerProfit, calculateRecognizedProfit, exchangeCostRestorations, refundOwnerProfit } from './profit';
+import { allocateLikeBooked, allocateOwnerProfit, calculateRecognizedProfit, exchangeCostRestorations, refundOwnerProfit } from './profit';
 
 describe('recognized sale profit', () => {
   it('adds original sale and every exchange profit impact', () => {
@@ -98,6 +98,32 @@ describe('exact owner allocation', () => {
   });
   it('rejects invalid shares before booking money', () => {
     expect(() => allocateOwnerProfit(100, [{ id: 'a', profitSharePercent: 99.99 }])).toThrow('100%');
+  });
+});
+
+describe('allocateLikeBooked', () => {
+  const booked = [{ ownerId: 'admin', amountUsd: 60 }, { ownerId: 'partner', amountUsd: 40 }];
+  it('splits a part of the profit in the proportions it was booked at', () => {
+    expect(allocateLikeBooked(50, booked, 100)).toEqual([{ ownerId: 'admin', amountUsd: D(30) }, { ownerId: 'partner', amountUsd: D(20) }]);
+  });
+  it('is cent-exact and handles losses and negative amounts', () => {
+    const parts = allocateLikeBooked(-33.33, booked, 100)!;
+    expect(parts.reduce((s, p) => s.plus(p.amountUsd), D(0))).toEqual(D(-33.33));
+    const loss = allocateLikeBooked(-10, [{ ownerId: 'admin', amountUsd: -6 }, { ownerId: 'partner', amountUsd: -4 }], -10)!;
+    expect(loss).toEqual([{ ownerId: 'admin', amountUsd: D(-6) }, { ownerId: 'partner', amountUsd: D(-4) }]);
+  });
+  it('gives up when there is nothing to scale by', () => {
+    expect(allocateLikeBooked(10, booked, 0)).toBeNull();
+    expect(allocateLikeBooked(10, [], 100)).toBeNull();
+  });
+});
+
+describe('recognized profit after a return', () => {
+  it('adds each return\'s profit change to the sale\'s profit', () => {
+    expect(calculateRecognizedProfit([
+      { action: 'SALE', financialDetails: { recognizedProfitUsd: 300 } },
+      { action: 'SALE_RETURN', financialDetails: { profitDeltaUsd: -95.5 } },
+    ], 0)).toEqual(D(204.5));
   });
 });
 

@@ -48,16 +48,23 @@ export function computeSaleItemProfit(item: SaleItem, exchangeRate: number): Sal
  * - Falls back to sum of item profits (price - cost).
  */
 export function computeSaleProfit(sale: Sale, fallbackExchangeRate: number = 0): SaleProfitResult {
-  const costUsd = (sale.items || []).reduce((acc, item) => acc + (Number(item.costBasisUsd) || 0), 0);
+  // A returned phone is back in stock: its cost is no longer part of this receipt.
+  const keptItems = (sale.items || []).filter((item) => !item.returnId);
+  const hasReturns = (sale.returns?.length ?? 0) > 0;
+  const costUsd = keptItems.reduce((acc, item) => acc + (Number(item.costBasisUsd) || 0), 0);
   const revenueUsd = Number(sale.totalUsd) || 0;
+  const recognized = sale.recognizedProfitUsd !== undefined && sale.recognizedProfitUsd !== null ? Number(sale.recognizedProfitUsd) : undefined;
 
   let profitUsd = 0;
-  if (sale.status === 'REFUNDED') {
+  if (hasReturns && recognized !== undefined) {
+    // Returned phone by phone: the server's profit already reverses them and keeps what was withheld.
+    profitUsd = recognized;
+  } else if (sale.status === 'REFUNDED') {
     profitUsd = Number(sale.penaltyFeeUsd) || 0;
-  } else if (sale.recognizedProfitUsd !== undefined && sale.recognizedProfitUsd !== null) {
-    profitUsd = Number(sale.recognizedProfitUsd);
+  } else if (recognized !== undefined) {
+    profitUsd = recognized;
   } else {
-    profitUsd = (sale.items || []).reduce(
+    profitUsd = keptItems.reduce(
       (acc, item) => acc + ((Number(item.salePriceUsd) || 0) - (Number(item.costBasisUsd) || 0)),
       0
     );

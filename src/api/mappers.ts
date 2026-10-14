@@ -43,6 +43,7 @@ export function mapDevice(d: any): Device {
     costBasisUsd: d.costBasisUsd,
     isBonus: d.isBonus ?? undefined,
     bonusCampaign: d.bonusCampaign ?? undefined,
+    preferredToSell: d.preferredToSell ?? undefined,
     createdAt: d.createdAt,
     timeline: mapTimeline(d.timeline),
   };
@@ -50,6 +51,7 @@ export function mapDevice(d: any): Device {
 
 function mapSaleItem(i: any): SaleItem {
   return {
+    id: i.id ?? undefined,
     deviceId: i.deviceId,
     imei: i.imei,
     imei2: i.imei2 ?? undefined,
@@ -63,6 +65,12 @@ function mapSaleItem(i: any): SaleItem {
     purchaseCostUsd: i.purchaseCostUsd,
     costBasisUsd: i.costBasisUsd,
     isBelowCost: i.isBelowCost,
+    isBonus: i.isBonus ?? undefined,
+    returnId: i.returnId ?? undefined,
+    returnWithheldTjs: i.returnWithheldTjs ?? undefined,
+    returnWithheldUsd: i.returnWithheldUsd ?? undefined,
+    returnCreditTjs: i.returnCreditTjs ?? undefined,
+    returnCreditUsd: i.returnCreditUsd ?? undefined,
   };
 }
 
@@ -111,6 +119,24 @@ export function mapSale(s: any, names: NameLookup): Sale {
     cardAmountTjs: s.cardAmountTjs,
     debtAmountTjs: s.debtAmountTjs ?? undefined,
     exchangeTradeInCreditTjs: s.exchangeTradeInCreditTjs ?? undefined,
+    exchangeTradeInCreditUsd: s.exchangeTradeInCreditUsd ?? undefined,
+    returns: (s.returns || []).map((r: any) => ({
+      id: r.id,
+      date: r.createdAt,
+      reason: r.reason,
+      withheldTjs: r.withheldTjs,
+      withheldUsd: r.withheldUsd,
+      creditTjs: r.creditTjs,
+      creditUsd: r.creditUsd,
+      payoutTjs: r.payoutTjs,
+      payoutUsd: r.payoutUsd,
+      payoutMethod: r.payoutMethod ?? undefined,
+      exchangeSaleId: r.exchangeSaleId ?? undefined,
+      exchangeReceiptNumber: r.exchangeSale?.receiptNumber ?? undefined,
+    })),
+    exchangeFrom: s.exchangeReturn?.sale
+      ? { saleId: s.exchangeReturn.sale.id, receiptNumber: s.exchangeReturn.sale.receiptNumber, creditTjs: s.exchangeReturn.creditTjs, creditUsd: s.exchangeReturn.creditUsd }
+      : undefined,
     status: s.status,
     hasBelowCostItem: s.hasBelowCostItem,
     exchangeEvents: (s.exchangeEvents || []).map((e: any) => mapExchangeEvent(e, names)),

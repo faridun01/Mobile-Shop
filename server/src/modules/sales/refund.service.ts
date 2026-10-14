@@ -33,6 +33,10 @@ export class RefundService {
       if (!sale) throw new Error('Чек не найден');
       // Idempotency guard: a sale can only be refunded once.
       if (sale.status === 'REFUNDED') throw new Error('Этот чек уже был возвращён');
+      // Phones returned one by one already gave their money back: the rest go the same way.
+      if (sale.saleItems.some((item) => item.returnId)) {
+        throw new Error('По этому чеку уже возвращены отдельные телефоны — оформите возврат остальных телефонов по позициям');
+      }
 
       const rate = await requireTodayRate(tx);
       const penaltyFeeTjs = requestedPenaltyTjs;

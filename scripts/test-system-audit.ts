@@ -340,31 +340,63 @@ try {
 
   // ------------------------------------------------------------------ BLOCK 4
   block = 'Блок 4: обмен и возврат';
-  await step('обмен с доплатой клиента: касса растёт, принятый телефон IN_STOCK_AFTER_EXCHANGE', async () => {
+  const usd = (tjs: number) => D(D(tjs).div(RATE).toFixed(2));
+  await step('обмен = возврат + новый чек: сданный телефон на остатке, старый чек «Возврат», доплата в кассу', async () => {
     const saleItem = await db.saleItem.findFirstOrThrow({ where: { saleId: sales.cash.id } });
     const [replacement] = await sellable();
     const before = await storeCash('store-siyoma');
-    // inValue 9000 ≤ sold price 9500; new phone 11000 → customer pays 2000
-    ok(await call(seller, 'POST', '/exchanges', { saleId: sales.cash.id, returnedImei: saleItem.imei, exchangeInValueTjs: 9000, replacementDeviceId: replacement.id, newPriceTjs: 11000, differenceTjs: 2000, paymentMethod: 'CASH', cashAmountTjs: 2000, cardAmountTjs: 0 }));
-    assert.equal((await db.device.findUniqueOrThrow({ where: { id: saleItem.deviceId } })).status, 'IN_STOCK_AFTER_EXCHANGE');
+    // Sold for 9500, 500 withheld → credit 9000; new phone 11000 → customer pays 2000.
+    const result = ok(await call(seller, 'POST', '/exchanges', { saleId: sales.cash.id, returnedImei: saleItem.imei, withheldTjs: 500, replacementDeviceId: replacement.id, newPriceTjs: 11000, paymentMethod: 'CASH' }));
+    assert.equal((await db.device.findUniqueOrThrow({ where: { id: saleItem.deviceId } })).status, 'STORE_STOCK');
     assert.equal((await db.device.findUniqueOrThrow({ where: { id: replacement.id } })).status, 'SOLD');
-    // The exchange books USD as newPriceUsd − inValueUsd, each rounded at today's rate.
-    assert.equal(money((await storeCash('store-siyoma')).minus(before)), money(D(D(11000).div(RATE).toFixed(2)).minus(D(9000).div(RATE).toFixed(2))));
+    assert.equal((await db.sale.findUniqueOrThrow({ where: { id: sales.cash.id } })).status, 'REFUNDED');
+    const newSale = await db.sale.findUniqueOrThrow({ where: { id: result.sale.id } });
+    assert.equal(money(newSale.exchangeTradeInCreditTjs), '9000.00');
+    assert.equal(money(newSale.cashAmountTjs), '2000.00');
+    assert.equal(result.sale.saleItems[0].costBasisUsd, 0, 'seller must not see the new phone cost');
+    // The register moves by the new receipt's dollars minus the credit's own dollars.
+    assert.equal(money((await storeCash('store-siyoma')).minus(before)), money(usd(11000).minus(usd(9500).minus(usd(500)))));
     await reconciled('store-siyoma');
   });
-  await step('обмен с выплатой разницы клиенту: касса уменьшается', async () => {
+  await step('обмен на более дешёвый телефон: сдача клиенту из кассы', async () => {
     const saleItem = await db.saleItem.findFirstOrThrow({ where: { saleId: sales.split.id } });
     const [replacement] = await sellable();
     const before = await storeCash('store-siyoma');
-    // inValue 7000, new phone 5000 → shop pays out 2000
-    ok(await call(seller, 'POST', '/exchanges', { saleId: sales.split.id, returnedImei: saleItem.imei, exchangeInValueTjs: 7000, replacementDeviceId: replacement.id, newPriceTjs: 5000, differenceTjs: -2000, paymentMethod: 'CASH', cashAmountTjs: -2000, cardAmountTjs: 0 }));
-    assert.equal(money(before.minus(await storeCash('store-siyoma'))), money(D(D(7000).div(RATE).toFixed(2)).minus(D(5000).div(RATE).toFixed(2))));
+    // Sold for 7000, nothing withheld; new phone 5000 → the shop pays back 2000.
+    const result = ok(await call(seller, 'POST', '/exchanges', { saleId: sales.split.id, returnedImei: saleItem.imei, withheldTjs: 0, replacementDeviceId: replacement.id, newPriceTjs: 5000, paymentMethod: 'CASH' }));
+    assert.equal(money(result.payoutTjs), '2000.00');
+    assert.equal(money(before.minus(await storeCash('store-siyoma'))), money(usd(7000).minus(usd(5000))));
     await reconciled('store-siyoma');
   });
   await step('продавец не может обменять чек чужого магазина', async () => {
     const saleItem = await db.saleItem.findFirstOrThrow({ where: { saleId: sales.card.id } });
-    const r = await call(sellerB, 'POST', '/exchanges', { saleId: sales.card.id, returnedImei: saleItem.imei, exchangeInValueTjs: 1, replacementDeviceId: 'x', newPriceTjs: 1, differenceTjs: 0 });
+    const r = await call(sellerB, 'POST', '/exchanges', { saleId: sales.card.id, returnedImei: saleItem.imei, withheldTjs: 0, replacementDeviceId: 'x', newPriceTjs: 1 });
     assert.equal(r.status, 403);
+  });
+  await step('продавец не может оформить возврат по позициям; цена ниже себестоимости видна как да/нет', async () => {
+    const saleItem = await db.saleItem.findFirstOrThrow({ where: { saleId: sales.card.id } });
+    assert.equal((await call(seller, 'POST', `/sales/${sales.card.id}/return-items`, { items: [{ saleItemId: saleItem.id, withheldTjs: 10 }], reason: 'x', paymentMethod: 'CASH' })).status, 403);
+    const [d] = await sellable();
+    const cost = D((await db.device.findUniqueOrThrow({ where: { id: d.id } })).costBasisUsd).mul(RATE);
+    const priceCheck = async (priceTjs: number) => ok(await call(seller, 'POST', '/devices/price-check', { items: [{ deviceId: d.id, priceTjs }] })).items[0];
+    assert.equal((await priceCheck(cost.minus(1).toNumber())).belowCost, true);
+    const atCost = await priceCheck(cost.toNumber());
+    assert.equal(atCost.belowCost, false);
+    assert.deepEqual(Object.keys(atCost).sort(), ['belowCost', 'deviceId'], 'no cost leaks to the seller');
+  });
+  await step('проверка цены не работает как подбор себестоимости: одна цена на телефон, лимит и запись в аудите', async () => {
+    const [, d] = await sellable();
+    const cost = D((await db.device.findUniqueOrThrow({ where: { id: d.id } })).costBasisUsd).mul(RATE);
+    // Several prices for one phone in a request: only the first is answered.
+    const twice = ok(await call(seller, 'POST', '/devices/price-check', { items: [{ deviceId: d.id, priceTjs: cost.minus(1).toNumber() }, { deviceId: d.id, priceTjs: cost.plus(1).toNumber() }] }));
+    assert.equal(twice.items.length, 1);
+    // 8 distinct prices per phone per 10 minutes, then no more answers (and the admin sees it).
+    for (let i = 2; i <= 8; i++) await call(seller, 'POST', '/devices/price-check', { items: [{ deviceId: d.id, priceTjs: cost.minus(i).toNumber() }] });
+    const ninth = ok(await call(seller, 'POST', '/devices/price-check', { items: [{ deviceId: d.id, priceTjs: cost.minus(9).toNumber() }] }));
+    assert.equal(ninth.items[0].belowCost, false, 'beyond the limit no warning is given');
+    assert(await db.auditLog.findFirst({ where: { action: 'PRICE_CHECK_LIMIT' } }), 'the probing is audited');
+    // A price already checked is still answered (the cashier keeps their warning).
+    assert.equal(ok(await call(seller, 'POST', '/devices/price-check', { items: [{ deviceId: d.id, priceTjs: cost.minus(1).toNumber() }] })).items[0].belowCost, true);
   });
   await step('возврат: телефон в STORE_STOCK, касса −сумма, чек REFUNDED', async () => {
     const before = await storeCash('store-siyoma');
@@ -491,13 +523,14 @@ try {
   block = 'Блок 7: касса, закрытие дня, инкассация';
   await step('касса точки: выручка за день с разделением наличные/банк', async () => {
     const summary = ok(await call(seller, 'GET', '/daily-closings/summary'));
-    // cash: 9500 + 4000(split) + 1000(debt down) + 100(below, refunded same day) − 90 refund (10 withheld)
-    //       + exchanges 2000 − 2000 + customer payment 2000 − rent 950
+    // cash: 9500 + 4000(split) + 1000(debt down) + 100(below, refunded same day) + 2000 paid on the
+    //       first exchange's new receipt (the second's was paid by its credit) + customer payment 2000
+    //       − rent 950; refunds: 90 (100 less the 10 TJS penalty) + the 2000 change of the second exchange
     assert.equal(money(summary.salesCardTjs), '11000.00', 'card = 8000 + 3000');
-    assert.equal(money(summary.salesCashTjs), '14600.00', 'cash sales incl. exchanges');
+    assert.equal(money(summary.salesCashTjs), '16600.00', 'cash sales incl. exchange receipts');
     assert.equal(money(summary.otherCashTjs), '2000.00', 'customer debt repayment');
     assert.equal(money(summary.expensesCashTjs), '950.00', 'only expenses paid from this register');
-    assert.equal(money(summary.refundsCashTjs), '90.00', 'the customer got back 100 TJS less the 10 TJS penalty');
+    assert.equal(money(summary.refundsCashTjs), '2090.00', 'refund 90 + exchange change 2000');
     // A day starts from 0 and its total is cash and bank together.
     assert.equal(money(summary.openingCashTjs), '0.00');
     assert.equal(money(summary.expectedCashTjs), money(D(summary.salesCashTjs).plus(summary.salesCardTjs).plus(summary.otherCashTjs).minus(summary.refundsCashTjs).minus(summary.expensesCashTjs)));

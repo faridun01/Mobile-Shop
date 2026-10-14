@@ -418,19 +418,15 @@ async function main() {
     where: { storeId: 'store-sadbarg', status: 'STORE_STOCK' },
   });
 
+  // Обмен = возврат старого телефона (зачёт 4 500 TJS, остальное — удержание) + новый чек.
+  const returnedItem = saleOctForExchange.saleItems.find((item) => item.imei === sadbargDev3.imei)!;
   const exchangeResult = await ExchangesService.process({
     saleId: saleOctForExchange.id,
     returnedImei: sadbargDev3.imei,
-    returnedBrand: sadbargDev3.brand,
-    returnedModel: sadbargDev3.model,
-    returnedStorage: sadbargDev3.storage,
-    returnedColor: sadbargDev3.color,
-    exchangeInValueTjs: 4500, // оценочная стоимость старого телефона
+    withheldTjs: D(returnedItem.salePriceTjs).minus(4500), // зачёт 4 500 TJS
     replacementDeviceId: replacementDevice.id,
-    newPriceTjs: 6500, // стоимость нового телефона
-    differenceTjs: 2000, // доплата клиента (6500 - 4500)
+    newPriceTjs: 6500, // стоимость нового телефона; клиент доплачивает 2 000 TJS
     paymentMethod: 'CASH',
-    cashAmountTjs: 2000,
     processedByUserId: 'user-admin',
   });
   console.log(`   ✓ Обмен по чеку #${saleOctForExchange.receiptNumber} успешно выполнен:`);

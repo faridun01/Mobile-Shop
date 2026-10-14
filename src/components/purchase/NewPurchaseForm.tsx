@@ -234,8 +234,8 @@ export const NewPurchaseForm: React.FC<NewPurchaseFormProps> = ({
                   </button>
                 </div>
 
-                {/* Batch Paste text helper */}
-                <div>
+                {/* Batch Paste text helper — not on phones: there IMEIs are scanned or typed one by one */}
+                <div className="hidden md:block">
                   <input
                     type="text"
                     placeholder="Быстрая вставка списка IMEI (по 15 цифр через пробел, запятую или Enter)..."

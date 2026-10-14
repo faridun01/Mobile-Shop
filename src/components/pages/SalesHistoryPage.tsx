@@ -78,6 +78,7 @@ export const SalesHistoryPage: React.FC = () => {
     openScanner,
     setActivePage,
     processRefund,
+    processReturnItems,
     isInitialLoading,
     selectedStoreId: globalSelectedStoreId,
     todayRate,
@@ -90,6 +91,7 @@ export const SalesHistoryPage: React.FC = () => {
     'openScanner',
     'setActivePage',
     'processRefund',
+    'processReturnItems',
     'isInitialLoading',
     'selectedStoreId',
     'todayRate'
@@ -138,6 +140,7 @@ export const SalesHistoryPage: React.FC = () => {
 
   const [refundReason, setRefundReason] = useState('');
   const [penaltyFeeTjs, setPenaltyFeeTjs] = useState<string>('');
+  const [returnSelection, setReturnSelection] = useState<Record<string, { selected: boolean; withheld: string }>>({});
   const [refundMethod, setRefundMethod] = useState<'CASH' | 'CARD'>('CASH');
   const [status, setStatus] = useState<StatusMessage | null>(null);
   const [isSubmittingRefund, setIsSubmittingRefund] = useState(false);
@@ -334,8 +337,10 @@ export const SalesHistoryPage: React.FC = () => {
 
   const handlePickAction = (page: 'EXCHANGE' | 'REPAIR') => {
     if (!selectedSale) return;
-    if (selectedSale.items.length === 1) {
-      navigateWithItem(page, selectedSale.items[0]);
+    // A phone already returned can't be exchanged again.
+    const candidates = page === 'EXCHANGE' ? selectedSale.items.filter((item) => !item.returnId) : selectedSale.items;
+    if (candidates.length === 1) {
+      navigateWithItem(page, candidates[0]);
     } else {
       setDialogView(page === 'EXCHANGE' ? 'pick-exchange' : 'pick-repair');
     }
@@ -347,7 +352,7 @@ export const SalesHistoryPage: React.FC = () => {
   // Every refund withholds a penalty; only a receipt with nothing paid has nothing to withhold.
   const penaltyRequired = refundCollectedTjs > 0;
   const penaltyError = penaltyVal > refundCollectedTjs + 0.001
-    ? `Штраф не может быть больше оплаченной суммы (${formatMoney(refundCollectedTjs)} TJS)`
+    ? `Удержание не может быть больше оплаченной суммы (${formatMoney(refundCollectedTjs)} TJS)`
     : null;
   const penaltyMissing = penaltyRequired && penaltyVal <= 0;
 
@@ -358,7 +363,7 @@ export const SalesHistoryPage: React.FC = () => {
       return;
     }
     if (penaltyMissing) {
-      setStatus({ tone: 'error', text: 'Укажите штраф за возврат' });
+      setStatus({ tone: 'error', text: 'Укажите удержание при возврате' });
       return;
     }
 
@@ -388,6 +393,65 @@ export const SalesHistoryPage: React.FC = () => {
   };
 
   const canRefund = currentUser?.role === 'ADMIN' || currentUser?.role === 'PARTNER';
+
+  // Phones are returned one by one, each with its own withheld amount. A receipt with an unpaid
+  // debt (or an old-style exchange) is still refunded as a whole.
+  const itemReturnMode = Boolean(selectedSale && (selectedSale.debtAmountTjs ?? 0) <= 0 && !(selectedSale.exchangeEvents?.length));
+  const openReturnItems = selectedSale ? selectedSale.items.filter((item) => item.id && !item.returnId) : [];
+  const returnLines = openReturnItems
+    .filter((item) => returnSelection[item.id!]?.selected)
+    .map((item) => {
+      const withheld = Math.max(0, parseFloat((returnSelection[item.id!]?.withheld ?? '').replace(',', '.')) || 0);
+      return { item, withheld, tooBig: withheld > item.salePriceTjs + 0.001 };
+    });
+  const returnWithheldTotal = sumMoney(returnLines.map((line) => line.withheld));
+  const returnCreditTotal = sumMoney(returnLines.map((line) => line.item.salePriceTjs - line.withheld));
+  const returnHasTooBig = returnLines.some((line) => line.tooBig);
+  const startReturn = () => {
+    setStatus(null);
+    setRefundReason('');
+    setPenaltyFeeTjs('');
+    setReturnSelection(Object.fromEntries(openReturnItems.map((item) => [item.id!, { selected: true, withheld: '' }])));
+    setDialogView('refund');
+  };
+
+  const handleExecuteReturnItems = async () => {
+    if (!selectedSale || isSubmittingRefund) return;
+    if (!refundReason.trim()) {
+      setStatus({ tone: 'error', text: 'Укажите причину возврата' });
+      return;
+    }
+    if (!returnLines.length) {
+      setStatus({ tone: 'error', text: 'Отметьте телефоны для возврата' });
+      return;
+    }
+    if (returnHasTooBig) {
+      setStatus({ tone: 'error', text: 'Удержание не может быть больше цены телефона' });
+      return;
+    }
+    if (returnWithheldTotal <= 0) {
+      setStatus({ tone: 'error', text: 'Укажите удержание за возврат' });
+      return;
+    }
+    setIsSubmittingRefund(true);
+    try {
+      const res = await processReturnItems({
+        saleId: selectedSale.id,
+        items: returnLines.map((line) => ({ saleItemId: line.item.id!, withheldTjs: line.withheld })),
+        reason: refundReason.trim(),
+        paymentMethod: refundMethod,
+      });
+      if (res.success) {
+        setSelectedSaleId(null);
+        setRefundReason('');
+        setStatus({ tone: 'success', text: `Возврат по чеку #${selectedSale.receiptNumber} оформлен: выдано клиенту ${formatMoney(returnCreditTotal)} TJS` });
+      } else {
+        setStatus({ tone: 'error', text: res.message || 'Ошибка возврата' });
+      }
+    } finally {
+      setIsSubmittingRefund(false);
+    }
+  };
 
   return (
     <div className="work-screen flex-1 flex flex-col h-full overflow-hidden bg-bg text-fg-muted">
@@ -729,7 +793,7 @@ export const SalesHistoryPage: React.FC = () => {
                                       +${profit.profitUsd}
                                     </span>
                                     <span className="text-[10px] text-warning block">
-                                      штраф {formatMoney(profit.profitTjs)} TJS
+                                      удержано {formatMoney(profit.profitTjs)} TJS
                                     </span>
                                   </div>
                                 ) : (
@@ -752,9 +816,10 @@ export const SalesHistoryPage: React.FC = () => {
                           );
                         })()}
                         <td className="py-1.5 px-2.5 text-center whitespace-nowrap">
-                          {sale.status === 'EXCHANGED' && <Badge tone="accent">Обмен</Badge>}
+                          {(sale.status === 'EXCHANGED' || sale.exchangeFrom) && <Badge tone="accent">Обмен</Badge>}
                           {sale.status === 'REFUNDED' && <Badge tone="danger">Возврат</Badge>}
-                          {sale.status === 'COMPLETED' && <Badge tone="neutral">Оплачен</Badge>}
+                          {sale.status === 'COMPLETED' && sale.items.some((i) => i.returnId) && <Badge tone="warning">Частичный возврат</Badge>}
+                          {sale.status === 'COMPLETED' && !sale.exchangeFrom && !sale.items.some((i) => i.returnId) && <Badge tone="neutral">Оплачен</Badge>}
                         </td>
                       </tr>
                     );
@@ -781,8 +846,11 @@ export const SalesHistoryPage: React.FC = () => {
                         <span className="font-mono text-[10.5px] font-bold text-accent bg-accent/10 border border-accent/20 px-1.5 py-0.2 rounded shrink-0">
                           #{sale.receiptNumber}
                         </span>
-                        {sale.status === 'EXCHANGED' && (
+                        {(sale.status === 'EXCHANGED' || sale.exchangeFrom) && (
                           <Badge tone="accent" className="!text-[10px] !px-1.5 !py-0 shrink-0">Обмен</Badge>
+                        )}
+                        {sale.status === 'COMPLETED' && sale.items.some((i) => i.returnId) && (
+                          <Badge tone="warning" className="!text-[10px] !px-1.5 !py-0 shrink-0">Частичный возврат</Badge>
                         )}
                         {sale.status === 'REFUNDED' && (
                           <Badge tone="danger" className="!text-[10px] !px-1.5 !py-0 shrink-0">Возврат</Badge>
@@ -877,7 +945,7 @@ export const SalesHistoryPage: React.FC = () => {
                           if (sale.status === 'REFUNDED') {
                             return profit.profitUsd > 0 ? (
                               <span className="text-[10px] font-bold font-mono text-warning bg-warning/10 border border-warning/20 px-1.5 py-0.2 rounded">
-                                штраф +${profit.profitUsd % 1 === 0 ? profit.profitUsd.toFixed(0) : profit.profitUsd.toFixed(2)}
+                                удерж. +${profit.profitUsd % 1 === 0 ? profit.profitUsd.toFixed(0) : profit.profitUsd.toFixed(2)}
                               </span>
                             ) : null;
                           }
@@ -945,12 +1013,7 @@ export const SalesHistoryPage: React.FC = () => {
                   variant="danger"
                   leftIcon={RotateCcw}
                   className="col-span-2 sm:col-span-1"
-                  onClick={() => {
-                    setStatus(null);
-                    setRefundReason('');
-                    setPenaltyFeeTjs('');
-                    setDialogView('refund');
-                  }}
+                  onClick={startReturn}
                 >
                   Возврат
                 </Button>
@@ -959,7 +1022,11 @@ export const SalesHistoryPage: React.FC = () => {
           ) : dialogView === 'refund' ? (
             <>
               <Button variant="secondary" fullWidth disabled={isSubmittingRefund} onClick={() => setDialogView('details')}>Отмена</Button>
-              <Button variant="danger" fullWidth loading={isSubmittingRefund} disabled={Boolean(penaltyError) || penaltyMissing} onClick={handleExecuteRefund}>Подтвердить возврат</Button>
+              {itemReturnMode ? (
+                <Button variant="danger" fullWidth loading={isSubmittingRefund} disabled={!returnLines.length || returnHasTooBig || returnWithheldTotal <= 0} onClick={handleExecuteReturnItems}>Подтвердить возврат</Button>
+              ) : (
+                <Button variant="danger" fullWidth loading={isSubmittingRefund} disabled={Boolean(penaltyError) || penaltyMissing} onClick={handleExecuteRefund}>Подтвердить возврат</Button>
+              )}
             </>
           ) : (
             <Button variant="secondary" fullWidth leftIcon={ArrowLeft} onClick={() => setDialogView('details')}>Назад</Button>
@@ -1039,6 +1106,16 @@ export const SalesHistoryPage: React.FC = () => {
                           <div className="mt-1.5">
                             <ImeiBadge imei={item.imei} imei2={item.imei2} />
                           </div>
+                          {(item.returnId || item.isBelowCost) && (
+                            <div className="flex items-center gap-1.5 flex-wrap mt-1.5">
+                              {item.returnId && (
+                                <Badge tone="danger" className="!text-[10px]">
+                                  Возвращён{(item.returnWithheldTjs ?? 0) > 0 ? `, удержано ${formatMoney(item.returnWithheldTjs)} TJS` : ''}
+                                </Badge>
+                              )}
+                              {item.isBelowCost && <Badge tone="warning" className="!text-[10px]">Продан ниже себестоимости</Badge>}
+                            </div>
+                          )}
                         </div>
                       </div>
 
@@ -1107,6 +1184,53 @@ export const SalesHistoryPage: React.FC = () => {
               );
             })()}
 
+            {selectedSale.exchangeFrom && (
+              <div className="p-3 rounded-xl border border-accent/30 bg-accent/10 text-xs flex items-center justify-between gap-2">
+                <span className="text-fg-muted">
+                  Обмен: оплачено зачётом по возврату из <strong>чека #{selectedSale.exchangeFrom.receiptNumber}</strong>
+                </span>
+                <span className="font-mono font-bold text-accent shrink-0">{formatMoney(selectedSale.exchangeFrom.creditTjs)} TJS</span>
+              </div>
+            )}
+
+            {selectedSale.returns && selectedSale.returns.length > 0 && (
+              <div className="space-y-2">
+                <p className="text-xs font-semibold text-danger tracking-wide">Возвраты по чеку</p>
+                <div className="p-3 bg-danger/5 border border-danger/20 rounded-xl space-y-2 text-xs">
+                  {selectedSale.returns.map((ret) => {
+                    const phones = selectedSale.items.filter((item) => item.returnId === ret.id);
+                    return (
+                      <div key={ret.id} className="border-b border-danger/15 pb-2 last:border-b-0 last:pb-0 space-y-0.5">
+                        <p className="font-semibold text-danger">
+                          {ret.exchangeSaleId ? 'Обмен' : 'Возврат'} от {new Date(ret.date).toLocaleString('ru-RU')}
+                        </p>
+                        <p className="text-fg-subtle">{phones.map((p) => `${p.brand} ${p.model}`).join(', ')} — {ret.reason}</p>
+                        <div className="flex justify-between"><span className="text-fg-subtle">Зачёт клиенту</span><span className="font-mono font-semibold text-fg">{formatMoney(ret.creditTjs)} TJS</span></div>
+                        {ret.withheldTjs > 0 && (
+                          <div className="flex justify-between"><span className="text-fg-subtle">Удержано</span><span className="font-mono font-semibold text-warning">{formatMoney(ret.withheldTjs)} TJS</span></div>
+                        )}
+                        {ret.payoutTjs > 0 && (
+                          <div className="flex justify-between">
+                            <span className="text-fg-subtle">Выдано клиенту {ret.payoutMethod === 'CARD' ? 'на карту' : 'наличными'}</span>
+                            <span className="font-mono font-semibold text-danger">{formatMoney(ret.payoutTjs)} TJS</span>
+                          </div>
+                        )}
+                        {ret.exchangeSaleId && (
+                          <button
+                            type="button"
+                            onClick={() => { void openSaleByCode(String(ret.exchangeReceiptNumber ?? ''), 'camera'); }}
+                            className="text-accent font-semibold underline underline-offset-2 cursor-pointer"
+                          >
+                            Новый чек #{ret.exchangeReceiptNumber ?? ''} (обмен) →
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
             {selectedSale.exchangeEvents && selectedSale.exchangeEvents.length > 0 && (
               <div className="space-y-2">
                 <p className="text-xs font-semibold text-accent tracking-wide">История обменов</p>
@@ -1158,7 +1282,14 @@ export const SalesHistoryPage: React.FC = () => {
                 const repaidLater = Math.max(0, Math.round((initialDebt - currentDebt) * 100) / 100);
                 const totalPaidSoFar = initialPaidAtSale + repaidLater;
                 // Dollars come from the booked total, split cent-exact, so the lines add up to «Итого».
-                const [cashUsd, cardUsd, tradeInUsd, initialDebtUsd] = splitUsdByTjs(selectedSaleUsd, selectedSale.totalTjs, [cashPaid, cardPaid, tradeInPaid, initialDebt]);
+                // An exchange credit keeps the dollars its return booked; the rest is split by TJS.
+                const bookedTradeInUsd = selectedSale.exchangeTradeInCreditUsd;
+                const [cashUsd, cardUsd, tradeInUsd, initialDebtUsd] = bookedTradeInUsd !== undefined
+                  ? (() => {
+                      const [c, k, d] = splitUsdByTjs(sumMoney([selectedSaleUsd, -bookedTradeInUsd]), sumMoney([selectedSale.totalTjs, -tradeInPaid]), [cashPaid, cardPaid, initialDebt]);
+                      return [c, k, bookedTradeInUsd, d];
+                    })()
+                  : splitUsdByTjs(selectedSaleUsd, selectedSale.totalTjs, [cashPaid, cardPaid, tradeInPaid, initialDebt]);
                 const [repaidLaterUsd, currentDebtUsd] = splitUsdByTjs(initialDebtUsd, initialDebt, [repaidLater, currentDebt]);
                 const totalPaidSoFarUsd = sumMoney([cashUsd, cardUsd, tradeInUsd, repaidLaterUsd]);
                 const hasDebtHistory = initialDebt > 0 || currentDebt > 0 || selectedSale.paymentMethod === 'DEBT';
@@ -1216,7 +1347,7 @@ export const SalesHistoryPage: React.FC = () => {
 
                     {tradeInPaid > 0 && (
                       <div className="flex justify-between text-xs">
-                        <span className="text-fg-subtle">Зачёт Trade-In</span>
+                        <span className="text-fg-subtle">{selectedSale.exchangeFrom ? `Зачёт по возврату (чек #${selectedSale.exchangeFrom.receiptNumber})` : 'Зачёт Trade-In'}</span>
                         <span className="text-fg font-mono font-bold">
                           {isAdmin ? (
                             <>
@@ -1326,7 +1457,7 @@ export const SalesHistoryPage: React.FC = () => {
                               +${saleProfit.profitUsd}
                             </span>
                             <span className="text-[11px] text-warning font-mono block">
-                              штраф {formatMoney(saleProfit.profitTjs)} TJS
+                              удержано {formatMoney(saleProfit.profitTjs)} TJS
                             </span>
                           </div>
                         ) : (
@@ -1351,7 +1482,7 @@ export const SalesHistoryPage: React.FC = () => {
               })()}
             </div>
 
-            {selectedSale.status === 'REFUNDED' && (
+            {selectedSale.status === 'REFUNDED' && !selectedSale.returns?.length && (
               <div className="bg-danger/10 border border-danger/30 p-3 rounded-lg space-y-1.5 text-sm">
                 <p className="text-xs font-semibold text-danger tracking-wide">
                   Возврат {selectedSale.refundedAt ? `от ${new Date(selectedSale.refundedAt).toLocaleString('ru-RU')}` : ''}
@@ -1361,7 +1492,7 @@ export const SalesHistoryPage: React.FC = () => {
                 )}
                 {(selectedSale.penaltyFeeTjs ?? 0) > 0 && (
                   <div className="flex justify-between text-xs">
-                    <span className="text-fg-subtle ">Штраф удержан</span>
+                    <span className="text-fg-subtle">Удержано</span>
                     <span className="text-warning font-semibold font-mono">
                       {isAdmin ? (
                         <>
@@ -1395,6 +1526,75 @@ export const SalesHistoryPage: React.FC = () => {
               </div>
             )}
           </div>
+        ) : dialogView === 'refund' && itemReturnMode ? (
+          <div className="space-y-3.5">
+            <p className="text-xs text-fg-subtle">Отметьте телефоны, которые возвращает клиент, и укажите удержание за каждый. Телефоны вернутся на склад по своей себестоимости.</p>
+
+            <div className="space-y-2">
+              {openReturnItems.map((item) => {
+                const row = returnSelection[item.id!] ?? { selected: false, withheld: '' };
+                const line = returnLines.find((l) => l.item.id === item.id);
+                return (
+                  <div key={item.id} className={cn('p-3 rounded-lg border bg-surface space-y-2', row.selected ? 'border-danger/40' : 'border-border opacity-70')}>
+                    <label className="flex items-start gap-2.5 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        className="mt-1 accent-danger"
+                        checked={row.selected}
+                        onChange={(e) => setReturnSelection((prev) => ({ ...prev, [item.id!]: { ...row, selected: e.target.checked } }))}
+                      />
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-semibold text-fg-muted">{item.brand} {item.model}</p>
+                        <p className="text-xs text-fg-subtle">{item.storage} · {formatPhoneColor(item.color)} · IMEI: {item.imei}</p>
+                        {item.isBelowCost && <p className="text-[11px] font-semibold text-danger mt-0.5">Был продан ниже себестоимости</p>}
+                      </div>
+                      <span className="text-sm font-bold font-mono text-fg shrink-0">{formatMoney(item.salePriceTjs)} TJS</span>
+                    </label>
+                    {row.selected && (
+                      <div className="flex items-center gap-2 pl-6">
+                        <span className="text-xs text-warning font-semibold shrink-0">Удержание</span>
+                        <input
+                          type="text"
+                          inputMode="decimal"
+                          value={row.withheld}
+                          onChange={(e) => setReturnSelection((prev) => ({ ...prev, [item.id!]: { ...row, withheld: e.target.value } }))}
+                          placeholder="0"
+                          className={cn('flex-1 min-w-0 h-9 rounded-lg bg-bg border px-2.5 text-sm font-semibold text-warning focus:outline-none', line?.tooBig ? 'border-danger' : 'border-border focus:border-warning')}
+                        />
+                        <span className="text-xs text-fg-subtle shrink-0">TJS → клиенту <strong className="text-fg font-mono">{formatMoney(Math.max(0, item.salePriceTjs - (line?.withheld ?? 0)))}</strong></span>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-fg-muted mb-1">Причина возврата <span className="text-danger">*</span></label>
+              <input
+                type="text"
+                value={refundReason}
+                onChange={(e) => setRefundReason(e.target.value)}
+                placeholder="Причина возврата..."
+                className="w-full h-11 rounded-lg bg-bg border border-border px-3 text-sm text-fg-muted focus:outline-none focus:border-danger focus:ring-1 focus:ring-danger"
+              />
+            </div>
+
+            <div className="p-3 rounded-lg bg-surface border border-border space-y-1 text-xs">
+              <div className="flex justify-between"><span className="text-fg-subtle">Цена возвращаемых телефонов</span><span className="font-mono font-medium text-fg-muted">{formatMoney(sumMoney(returnLines.map((l) => l.item.salePriceTjs)))} TJS</span></div>
+              <div className="flex justify-between text-warning font-semibold"><span>Удержание</span><span className="font-mono">−{formatMoney(returnWithheldTotal)} TJS</span></div>
+              <div className="flex justify-between pt-1 border-t border-border font-bold"><span className="text-fg-muted">Выдать клиенту</span><span className="font-mono text-accent">{formatMoney(returnCreditTotal)} TJS</span></div>
+              {returnWithheldTotal <= 0 && returnLines.length > 0 && <p className="text-danger pt-1">Укажите удержание хотя бы по одному телефону</p>}
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-fg-muted mb-1">Способ возврата денег</label>
+              <Select value={refundMethod} onChange={(e) => setRefundMethod(e.target.value as 'CASH' | 'CARD')} className="w-full">
+                <option value="CASH">Наличные из кассы</option>
+                <option value="CARD">Банк</option>
+              </Select>
+            </div>
+          </div>
         ) : dialogView === 'refund' ? (
           <div className="space-y-3.5">
             <p className="text-xs text-fg-subtle">Товары будут оприходованы на склад по исходной себестоимости закупки ($).</p>
@@ -1412,7 +1612,7 @@ export const SalesHistoryPage: React.FC = () => {
 
             <div>
               <label className="flex items-center justify-between text-xs font-medium text-fg-muted mb-1">
-                <span>Штраф за возврат (TJS) {penaltyRequired && <span className="text-danger">*</span>}</span>
+                <span>Удержание при возврате (TJS) {penaltyRequired && <span className="text-danger">*</span>}</span>
                 <span className="text-warning font-normal">100% в чистую прибыль</span>
               </label>
               <div className="mb-2">
@@ -1469,7 +1669,7 @@ export const SalesHistoryPage: React.FC = () => {
                 </div>
                 {penaltyVal > 0 && (
                   <div className="flex justify-between pt-1 border-t border-border font-semibold">
-                    <span className="text-warning">Штраф за возврат</span>
+                    <span className="text-warning">Удержание</span>
                     <span className="text-warning font-mono">
                       {isAdmin ? (
                         <>
@@ -1497,7 +1697,7 @@ export const SalesHistoryPage: React.FC = () => {
             <p className="text-xs text-fg-subtle mb-1">
               В чеке несколько товаров — выберите, какой из них {dialogView === 'pick-exchange' ? 'обменять' : 'принять в ремонт'}.
             </p>
-            {selectedSale.items.map((item, i) => (
+            {selectedSale.items.filter((item) => dialogView !== 'pick-exchange' || !item.returnId).map((item, i) => (
               <button
                 key={i}
                 onClick={() => navigateWithItem(dialogView === 'pick-exchange' ? 'EXCHANGE' : 'REPAIR', item)}

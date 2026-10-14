@@ -108,8 +108,9 @@ export async function computeReportsSummary(input: ReportsSummaryInput) {
     periodSalesAllStores,
     periodExpensesAllStores,
     allBonuses,
-    refundedSalesAllStores,
+    refundedSalesFetched,
     periodExchangeLogs,
+    periodReturns,
     supplierDebtAgg,
     topSuppliersByDebt,
     mainWarehouseStore,
@@ -129,7 +130,7 @@ export async function computeReportsSummary(input: ReportsSummaryInput) {
         id: true, storeId: true, status: true, totalTjs: true, totalUsd: true, exchangeRate: true, receiptNumber: true, createdAt: true,
         saleItems: { select: {
           brand: true, model: true, salePriceUsd: true, salePriceTjs: true,
-          costBasisUsd: true, purchaseCostUsd: true,
+          costBasisUsd: true, purchaseCostUsd: true, returnId: true,
         } },
       },
       orderBy: { createdAt: 'desc' },
@@ -153,6 +154,7 @@ export async function computeReportsSummary(input: ReportsSummaryInput) {
         id: true, storeId: true, totalTjs: true, totalUsd: true, exchangeRate: true, penaltyFeeUsd: true, penaltyFeeTjs: true,
         actualRefundAmountTjs: true, refundReason: true,
         receiptNumber: true, refundedAt: true, createdAt: true,
+        returns: { select: { id: true }, take: 1 },
         saleItems: { select: { brand: true, model: true, costBasisUsd: true } },
       },
     }),
@@ -161,6 +163,18 @@ export async function computeReportsSummary(input: ReportsSummaryInput) {
       where: { action: 'EXCHANGE', ...(dateRange ? { createdAt: dateRange } : {}) },
       select: { targetId: true, financialDetails: true, createdAt: true },
     }),
+    // Phones returned in the period (on their own or as the old phone of an exchange), whenever
+    // they were sold: each return is reported on its own day, like a refund.
+    prisma.saleReturn.findMany({
+      where: { ...(storeFilter ? { storeId: storeFilter } : {}), ...(dateRange ? { createdAt: dateRange } : {}) },
+      select: {
+        id: true, storeId: true, createdAt: true, exchangeRate: true, reason: true, bookedUsd: true, fxUsd: true,
+        withheldTjs: true, withheldUsd: true, creditTjs: true, creditUsd: true, exchangeSaleId: true,
+        sale: { select: { id: true, receiptNumber: true } },
+        items: { select: { brand: true, model: true, salePriceTjs: true, salePriceUsd: true, costBasisUsd: true, isBonus: true } },
+      },
+      orderBy: { createdAt: 'asc' },
+    }),
     prisma.supplier.aggregate({ _sum: { totalDebtUsd: true } }),
     prisma.supplier.findMany({ where: { totalDebtUsd: { gt: 0 } }, orderBy: { totalDebtUsd: 'desc' }, take: 8,
       select: { id: true, name: true, totalPurchasedUsd: true, totalPaidUsd: true, totalDebtUsd: true } }),
@@ -168,6 +182,8 @@ export async function computeReportsSummary(input: ReportsSummaryInput) {
     prisma.store.findMany({ where: { isMainWarehouse: false, active: true, ...(storeFilter ? { id: storeFilter } : {}) },
       select: { id: true, name: true, cashBalanceUsd: true } }),
   ]);
+  // A receipt whose phones were returned one by one is reported through those returns.
+  const refundedSalesAllStores = refundedSalesFetched.filter((sale) => sale.returns.length === 0);
   // Today's (or the latest known) rate only values USD figures in TJS for display; every
   // money total below sums each record's own stored USD amount.
   const rate = rateRow ? D(rateRow) : D(0);
@@ -309,6 +325,28 @@ export async function computeReportsSummary(input: ReportsSummaryInput) {
     });
   }
 
+  // A return of phones: the dollars handed back (their booked dollars less the rate result) and
+  // their booked profit are reversed; the withheld part is retained profit, reported with the
+  // refund penalties. A free bonus phone's price comes back out of the bonus figures.
+  for (const ret of periodReturns) {
+    const bonusUsd = ret.items.filter((item) => item.isBonus).reduce((sum, item) => sum.plus(item.salePriceUsd), D(0));
+    const bookedProfitUsd = ret.items.reduce((sum, item) => sum.plus(item.salePriceUsd).minus(item.costBasisUsd), D(0));
+    const reversedRevenueUsd = D(ret.bookedUsd).minus(ret.fxUsd);
+    refundsRevenueUsd = refundsRevenueUsd.plus(reversedRevenueUsd);
+    profitEvents.push({
+      kind: 'REFUND', date: ret.createdAt, saleId: ret.sale.id, receiptNumber: ret.sale.receiptNumber,
+      refundReason: ret.reason,
+      penaltyTjs: D(ret.withheldTjs), penaltyUsd: D(ret.withheldUsd),
+      storeId: ret.storeId,
+      revenueUsd: reversedRevenueUsd.negated(),
+      revenueTjs: ret.items.reduce((sum, item) => sum.plus(item.salePriceTjs), D(0)).negated(),
+      profitUsd: bookedProfitUsd.negated().plus(ret.fxUsd),
+      bonusUsd: bonusUsd.negated(),
+      rate: D(ret.exchangeRate),
+    });
+    if (ret.exchangeSaleId) exchangesCount++;
+  }
+
   // Unit/receipt/model statistics count only sales that stayed sold: a refunded device goes
   // back to stock and is counted again when it is resold. (Money is handled by profitEvents.)
   const keptSalesAllStores = periodSalesAllStores.filter((s) => s.status !== 'REFUNDED');
@@ -326,7 +364,8 @@ export async function computeReportsSummary(input: ReportsSummaryInput) {
 
   periodSales.forEach((sale) => {
     const saleRate = sale.exchangeRate || rate;
-    sale.saleItems.forEach((item) => {
+    // A returned phone is not sold any more: it is counted again when it is resold.
+    sale.saleItems.filter((item) => !item.returnId).forEach((item) => {
       unitsSold++;
       const itemCostUsd = item.costBasisUsd ?? item.purchaseCostUsd ?? 0;
       const itemPriceUsd = item.salePriceUsd || roundMoney(toUsd(item.salePriceTjs, saleRate));
@@ -378,13 +417,19 @@ export async function computeReportsSummary(input: ReportsSummaryInput) {
   const freeDeviceBonusesInStock = allBonuses.filter((b) => b.bonusType === 'FREE_DEVICES' && b.status !== 'SOLD').length;
 
   const refundedSales = storeFilter ? refundedSalesAllStores.filter((s) => s.storeId === storeFilter) : refundedSalesAllStores;
-  const periodRefundPenaltiesUsd = refundedSales.reduce((acc, s) => D(acc).plus((s.penaltyFeeUsd || 0)), D(0));
-  const periodRefundPenaltiesTjs = refundedSales.reduce((acc, s) => D(acc).plus((s.penaltyFeeTjs || 0)), D(0));
+  const periodRefundPenaltiesUsd = refundedSales.reduce((acc, s) => D(acc).plus((s.penaltyFeeUsd || 0)), D(0))
+    .plus(periodReturns.reduce((acc, r) => acc.plus(r.withheldUsd), D(0)));
+  const periodRefundPenaltiesTjs = refundedSales.reduce((acc, s) => D(acc).plus((s.penaltyFeeTjs || 0)), D(0))
+    .plus(periodReturns.reduce((acc, r) => acc.plus(r.withheldTjs), D(0)));
   const refundPenaltiesByStore = new Map<string, { usd: MoneyInput; tjs: MoneyInput }>();
   for (const s of refundedSalesAllStores) {
     if (!s.storeId) continue;
     const prev = refundPenaltiesByStore.get(s.storeId) || { usd: D(0), tjs: D(0) };
     refundPenaltiesByStore.set(s.storeId, { usd: D(prev.usd).plus((s.penaltyFeeUsd || 0)), tjs: D(prev.tjs).plus((s.penaltyFeeTjs || 0)) });
+  }
+  for (const r of periodReturns) {
+    const prev = refundPenaltiesByStore.get(r.storeId) || { usd: D(0), tjs: D(0) };
+    refundPenaltiesByStore.set(r.storeId, { usd: D(prev.usd).plus(r.withheldUsd), tjs: D(prev.tjs).plus(r.withheldTjs) });
   }
 
   // Exchange-rate result of customer debt repaid in the period at a rate other than the sale's
@@ -479,8 +524,9 @@ export async function computeReportsSummary(input: ReportsSummaryInput) {
       const storeModels = new Map<string, { name: string; count: number; revenueUsd: MoneyInput; profitUsd: MoneyInput }>();
       storeSales.forEach((sale) => {
         const saleRate = sale.exchangeRate || rate;
-        storeUnits += sale.saleItems.length;
-        for (const item of sale.saleItems) {
+        const keptItems = sale.saleItems.filter((item) => !item.returnId);
+        storeUnits += keptItems.length;
+        for (const item of keptItems) {
           const name = `${item.brand} ${item.model}`.trim();
           const itemPriceUsd = item.salePriceUsd || roundMoney(toUsd(item.salePriceTjs, saleRate));
           const itemCostUsd = item.costBasisUsd ?? item.purchaseCostUsd ?? 0;
@@ -520,7 +566,7 @@ export async function computeReportsSummary(input: ReportsSummaryInput) {
           .slice(0, 5),
         unitsSold: storeUnits,
         salesCount: storeSales.length,
-        refundsCount: refundedSalesAllStores.filter((sale) => sale.storeId === store.id).length,
+        refundsCount: refundedSalesAllStores.filter((sale) => sale.storeId === store.id).length + periodReturns.filter((r) => r.storeId === store.id).length,
         cashUsd: roundMoney(D(store.cashBalanceUsd ?? 0)),
         cashTjs: roundMoney(D(store.cashBalanceUsd ?? 0).mul(rate)),
         stockCount: stock.length,
@@ -582,7 +628,20 @@ export async function computeReportsSummary(input: ReportsSummaryInput) {
         items: s.saleItems.map((item) => `${item.brand} ${item.model}`.trim()).filter(Boolean).join(', '),
         storeId: s.storeId,
       };
-    });
+    })
+    .concat(periodReturns.map((r) => ({
+      saleId: r.sale.id,
+      receiptNumber: r.sale.receiptNumber,
+      date: r.createdAt.toISOString(),
+      amountTjs: roundMoney(r.creditTjs).toNumber(),
+      amountUsd: roundMoney(r.creditUsd).toNumber(),
+      penaltyFeeTjs: roundMoney(r.withheldTjs).toNumber(),
+      penaltyFeeUsd: roundMoney(r.withheldUsd).toNumber(),
+      reason: r.reason,
+      items: r.items.map((item) => `${item.brand} ${item.model}`.trim()).filter(Boolean).join(', '),
+      storeId: r.storeId,
+    })))
+    .sort((a, b) => b.date.localeCompare(a.date));
 
   return {
     unitsSold,
@@ -590,7 +649,7 @@ export async function computeReportsSummary(input: ReportsSummaryInput) {
     // instead of fetching the full sales list (only actually needed for the Excel export).
     salesCount: periodSales.length,
     // Refunds/exchanges processed in the period (revenue/profit above already include them).
-    refundsCount: refundedSalesAllStores.length,
+    refundsCount: refundedSalesAllStores.length + periodReturns.length,
     refundsRevenueUsd: roundMoney(refundsRevenueUsd),
     refundedReceipts,
     exchangesCount,

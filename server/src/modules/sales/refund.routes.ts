@@ -4,6 +4,7 @@ import type { Prisma } from '@prisma/client';
 import { authenticateJwt, requireRoles, enforceStoreScope, type AuthenticatedRequest } from '../../auth/auth.middleware';
 import { prisma } from '../../prisma/prisma.service';
 import { RefundService } from './refund.service';
+import { ReturnsService } from './returns.service';
 import { RealtimeSyncGateway } from '../../websocket/websocket.gateway';
 import { calculateRecognizedProfit } from './profit';
 import { hideSaleCosts } from './sale-visibility';
@@ -67,6 +68,10 @@ export function registerRefundRoutes(app: Express) {
         include: {
           saleItems: { include: { device: { select: { ram: true } } } },
           exchangeEvents: true,
+          // Returns from this receipt (with the receipt an exchange went on to), and, for a
+          // receipt opened by an exchange, the receipt the returned phone came from.
+          returns: { orderBy: { createdAt: 'asc' }, include: { exchangeSale: { select: { id: true, receiptNumber: true } } } },
+          exchangeReturn: { select: { id: true, creditTjs: true, creditUsd: true, createdAt: true, sale: { select: { id: true, receiptNumber: true } } } },
           store: true,
           user: { select: { id: true, name: true, role: true } }
         },
@@ -76,7 +81,7 @@ export function registerRefundRoutes(app: Express) {
       const saleIds = sales.map((sale) => sale.id);
       const profitLogs = saleIds.length
         ? await prisma.auditLog.findMany({
-            where: { targetId: { in: saleIds }, action: { in: ['SALE', 'SALE_BELOW_COST', 'EXCHANGE', 'REFUND'] } },
+            where: { targetId: { in: saleIds }, action: { in: ['SALE', 'SALE_BELOW_COST', 'EXCHANGE', 'REFUND', 'SALE_RETURN'] } },
             select: { targetId: true, action: true, financialDetails: true },
           })
         : [];
@@ -145,6 +150,44 @@ export function registerRefundRoutes(app: Express) {
 
       RealtimeSyncGateway.broadcast('REFUND_PROCESSED', { saleId: sale.id }, { storeIds: [sale.storeId] });
       res.json(sale);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Return of chosen phones from a receipt, each with its own withheld amount (удержание).
+  app.post('/api/sales/:id/return-items', authenticateJwt, requireRoles('ADMIN', 'PARTNER'), async (req: AuthenticatedRequest, res, next) => {
+    try {
+      if (req.user!.role === 'PARTNER') {
+        const saleRecord = await prisma.sale.findUnique({ where: { id: req.params.id }, select: { storeId: true } });
+        if (!saleRecord || saleRecord.storeId !== req.user!.storeId) {
+          res.status(403).json({ message: 'Нет доступа к возврату товаров другого магазина' });
+          return;
+        }
+      }
+      const { items, reason, paymentMethod } = req.body ?? {};
+      if (!Array.isArray(items) || items.length === 0 || !paymentMethod) {
+        res.status(400).json({ message: 'Выберите телефоны для возврата и способ возврата денег' });
+        return;
+      }
+      // Every return withholds something, entered by hand in TJS (an exchange may withhold 0).
+      const totalWithheld = items.reduce((sum: ReturnType<typeof D>, item: any) => {
+        const value = Number(item?.withheldTjs);
+        return Number.isFinite(value) && value > 0 ? sum.plus(D(value)) : sum;
+      }, D(0));
+      if (totalWithheld.lte(0)) {
+        res.status(400).json({ message: 'Удержание при возврате обязательно: укажите сумму больше 0' });
+        return;
+      }
+      const result = await ReturnsService.returnItems({
+        saleId: req.params.id,
+        items: items.map((item: any) => ({ saleItemId: String(item?.saleItemId ?? ''), withheldTjs: item?.withheldTjs })),
+        reason,
+        payoutMethod: paymentMethod,
+        userId: req.user!.userId,
+      });
+      RealtimeSyncGateway.broadcast('REFUND_PROCESSED', { saleId: req.params.id }, { storeIds: [result.storeId] });
+      res.json(result);
     } catch (error) {
       next(error);
     }

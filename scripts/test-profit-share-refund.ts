@@ -28,6 +28,7 @@ try {
   const { SalesService } = await import('../server/src/modules/sales/sales.service');
   const { RefundService } = await import('../server/src/modules/sales/refund.service');
   const { ExchangesService } = await import('../server/src/modules/exchanges/exchanges.service');
+  const { ReturnsService } = await import('../server/src/modules/sales/returns.service');
   const { OwnersService } = await import('../server/src/modules/owners/owners.service');
   const { setTodayRate } = await import('../server/src/modules/exchange-rate/exchange-rate.service');
   await setTodayRate(10, 'user-admin');
@@ -70,40 +71,40 @@ try {
   const exchanged = await makeSale();
   await shares(50);
   const replacement = await device();
-  await ExchangesService.process({ saleId: exchanged.sale.id,
-    returnedImei: exchanged.item.imei, returnedBrand: 'Test', returnedModel: 'Refund regression',
-    exchangeInValueTjs: D(2000), replacementDeviceId: replacement.id, newPriceTjs: D(2500),
-    processedByUserId: 'user-admin', paymentMethod: 'CASH' });
-  // Exchange = return + sale: replacement $250 − $100 cost, returned item's $100 margin reversed,
-  // nothing withheld (full $200 credit) → +$50 at 50/50 on top of the original 60/40.
-  assert.deepEqual(await balances(), [{ accrued: 85, available: 85 }, { accrued: 65, available: 65 }]);
+  const firstExchange = await ExchangesService.process({ saleId: exchanged.sale.id, returnedImei: exchanged.item.imei,
+    withheldTjs: 0, replacementDeviceId: replacement.id, newPriceTjs: D(2500), processedByUserId: 'user-admin', paymentMethod: 'CASH' });
+  // Exchange = return + sale. The return takes back the $100 margin exactly as it was booked
+  // (60/40, though the shares are 50/50 now), nothing withheld; the new $250 phone (cost $100)
+  // books $150 at 50/50.
+  assert.deepEqual(await balances(), [{ accrued: 75, available: 75 }, { accrued: 75, available: 75 }]);
   assert.equal((await prisma.device.findUniqueOrThrow({ where: { id: exchanged.item.id } })).costBasisUsd, 100);
+  assert.equal((await prisma.sale.findUniqueOrThrow({ where: { id: exchanged.sale.id } })).status, 'REFUNDED');
   await shares(20);
-  await refund(exchanged.sale.id, 2500);
+  await refund(firstExchange.sale.id, 2500);
   assert.deepEqual(await balances(), [{ accrued: 0, available: 0 }, { accrued: 0, available: 0 }]);
   assert.equal((await prisma.device.findUniqueOrThrow({ where: { id: exchanged.item.id } })).costBasisUsd, 100);
-  console.log('PASS: original sale and exchange allocations reversed after two share changes; traded-in device cost restored');
+  console.log('PASS: exchange = return (reversed at the booked 60/40) + new receipt; refunding it after two share changes leaves 0');
 
-  // Traded-in device resold before the original sale is refunded: it came back at its own
-  // $100 cost, so its resale profit is already right and the refund needs no adjustment.
+  // The returned phone comes back at its own $100 cost and is resold; the new receipt is refunded.
+  // Owners keep the $50 withheld at the exchange and the $80 resale profit: $130 = 65/65.
   await shares(50);
   const resoldCase = await makeSale();
   const replacement2 = await device();
-  await ExchangesService.process({ saleId: resoldCase.sale.id,
-    returnedImei: resoldCase.item.imei, returnedBrand: 'Test', returnedModel: 'Refund regression',
-    exchangeInValueTjs: D(1500), replacementDeviceId: replacement2.id, newPriceTjs: D(2500),
-    processedByUserId: 'user-admin', paymentMethod: 'CASH' });
+  const secondExchange = await ExchangesService.process({ saleId: resoldCase.sale.id, returnedImei: resoldCase.item.imei,
+    withheldTjs: D(500), replacementDeviceId: replacement2.id, newPriceTjs: D(2500), processedByUserId: 'user-admin', paymentMethod: 'CASH' });
+  assert.equal(secondExchange.creditTjs, 1500);
   await SalesService.executeSale({ storeId: 'store-siyoma', userId: 'user-admin',
     items: [{ deviceId: resoldCase.item.id, salePriceTjs: D(1800) }], paymentMethod: 'CASH' });
-  await refund(resoldCase.sale.id, 3000);
-  assert.deepEqual(await balances(), [{ accrued: 40, available: 40 }, { accrued: 40, available: 40 }]);
-  console.log('PASS: refund after the traded-in device was resold books its resale against original cost');
+  await refund(secondExchange.sale.id, 2500);
+  assert.deepEqual(await balances(), [{ accrued: 65, available: 65 }, { accrued: 65, available: 65 }]);
+  console.log('PASS: withheld $50 and the resale of the returned phone ($80) stay with the owners after the new receipt is refunded');
 
   await shares(60);
   const penalized = await makeSale();
   await shares(50);
   await refund(penalized.sale.id, 2000, 100);
-  assert.deepEqual(await balances(), [{ accrued: 45, available: 45 }, { accrued: 45, available: 45 }]);
+  // 65/65 from the cases above, plus the 100 TJS penalty ($10) at 50/50.
+  assert.deepEqual(await balances(), [{ accrued: 70, available: 70 }, { accrued: 70, available: 70 }]);
   console.log('PASS: only the new penalty is allocated at current 50/50 shares');
 
   // Reports put a refund in the month it happened: last month's figures stay as they were,
@@ -198,18 +199,20 @@ try {
   assert.deepEqual(await change(() => refund(freeSale.id, 1900)), [{ accrued: -95, available: -95 }, { accrued: -95, available: -95 }]);
   console.log('PASS: refund of a sold free bonus device reverses the historically distributed $190');
 
-  // Exchanged free bonus device comes back at its trade-in value, so its resale is a regular
-  // sale; the pool keeps only the original $190: 190 - 150 credit + 160 resale = $200 total.
+  // A returned free bonus phone is still a free bonus phone: its $190 leaves the pool, the 400 TJS
+  // withheld ($40) is the owners' with the new $100-cost phone's $100 profit (+$70 each), and its
+  // resale goes to the pool again.
   const swapBonus = await bonusDevice(0);
   const swapSale = await sell(swapBonus.id, 1900);
   const swapReplacement = await device();
-  await ExchangesService.process({ saleId: swapSale.id, returnedImei: swapBonus.imei, returnedBrand: 'Test',
-    returnedModel: 'Bonus regression', exchangeInValueTjs: D(1500), replacementDeviceId: swapReplacement.id,
-    newPriceTjs: D(2000), processedByUserId: 'user-admin', paymentMethod: 'CASH' });
-  const poolAfterSwap = await pendingPoolUsd();
-  assert.deepEqual(await change(() => sell(swapBonus.id, 1600)), [{ accrued: 5, available: 5 }, { accrued: 5, available: 5 }]);
-  assert.equal(await pendingPoolUsd(), poolAfterSwap);
-  console.log('PASS: exchanged free bonus device is resold as a regular $150-cost sale, pool not counted twice');
+  const poolBeforeSwap = await pendingPoolUsd();
+  assert.deepEqual(await change(() => ExchangesService.process({ saleId: swapSale.id, returnedImei: swapBonus.imei, withheldTjs: D(400),
+    replacementDeviceId: swapReplacement.id, newPriceTjs: D(2000), processedByUserId: 'user-admin', paymentMethod: 'CASH' })),
+    [{ accrued: 70, available: 70 }, { accrued: 70, available: 70 }]);
+  assert.equal(D(await pendingPoolUsd()).minus(poolBeforeSwap), -190);
+  assert.deepEqual(await change(() => sell(swapBonus.id, 1600)), none);
+  assert.equal(D(await pendingPoolUsd()).minus(poolBeforeSwap), -30);
+  console.log('PASS: a returned free bonus phone leaves the pool, the withheld part goes to owners, its resale goes to the pool again');
 
   // A free bonus device handed out as the replacement goes to the pool, not straight to owners;
   // the returned phone is back in stock at its $100 cost, so its $100 margin is reversed.
@@ -217,20 +220,56 @@ try {
   const baseSale = await sell(baseItem.id, 2000);
   const bonusReplacement = await bonusDevice(0);
   const poolBeforeBonusSwap = await pendingPoolUsd();
-  assert.deepEqual(await change(() => ExchangesService.process({ saleId: baseSale.id, returnedImei: baseItem.imei,
-    returnedBrand: 'Test', returnedModel: 'Refund regression', exchangeInValueTjs: D(2000),
+  assert.deepEqual(await change(() => ExchangesService.process({ saleId: baseSale.id, returnedImei: baseItem.imei, withheldTjs: 0,
     replacementDeviceId: bonusReplacement.id, newPriceTjs: D(2200), processedByUserId: 'user-admin', paymentMethod: 'CASH' })),
     [{ accrued: -50, available: -50 }, { accrued: -50, available: -50 }]);
   assert.equal(D(await pendingPoolUsd()).minus(poolBeforeBonusSwap), 220);
   console.log('PASS: free bonus replacement in an exchange goes to the bonus pool');
 
-  // Trade-in credit above what the customer paid for that item is rejected.
+  // Withholding more than the customer paid for that phone is rejected.
   const capItem = await device();
   const capSale = await sell(capItem.id, 1000);
-  await assert.rejects(ExchangesService.process({ saleId: capSale.id, returnedImei: capItem.imei, returnedBrand: 'Test',
-    returnedModel: 'Refund regression', exchangeInValueTjs: D(3000), replacementDeviceId: (await device()).id,
-    newPriceTjs: D(500), processedByUserId: 'user-admin', paymentMethod: 'CASH' }), /не может превышать/);
-  console.log('PASS: trade-in credit above the item price (3000 > 1000 TJS) is rejected');
+  await assert.rejects(ExchangesService.process({ saleId: capSale.id, returnedImei: capItem.imei, withheldTjs: D(1000.01),
+    replacementDeviceId: (await device()).id, newPriceTjs: D(500), processedByUserId: 'user-admin', paymentMethod: 'CASH' }), /не может быть больше его цены/);
+  console.log('PASS: withholding more than the price of the phone (1000.01 > 1000 TJS) is rejected');
+
+  // A return of one phone of two: its $100 profit comes back with the shares the sale was booked
+  // at (60/40), the 200 TJS withheld ($20) is new income at today's 50/50; the rest stays sold.
+  const cashOf = async () => D((await prisma.store.findUniqueOrThrow({ where: { id: 'store-siyoma' } })).cashBalanceUsd);
+  await shares(60);
+  const [phoneA, phoneB] = [await device(), await device()];
+  const twoPhoneSale = await SalesService.executeSale({ storeId: 'store-siyoma', userId: 'user-admin', paymentMethod: 'CASH',
+    items: [{ deviceId: phoneA.id, salePriceTjs: D(2000) }, { deviceId: phoneB.id, salePriceTjs: D(3000) }] });
+  await shares(50);
+  const itemOf = (deviceId: string) => twoPhoneSale.saleItems.find((i) => i.deviceId === deviceId)!;
+  let cashBefore = await cashOf();
+  assert.deepEqual(await change(() => ReturnsService.returnItems({ saleId: twoPhoneSale.id, reason: 'Проверка', userId: 'user-admin', payoutMethod: 'CASH',
+    items: [{ saleItemId: itemOf(phoneA.id).id, withheldTjs: D(200) }] })), [{ accrued: -50, available: -50 }, { accrued: -30, available: -30 }]);
+  assert.equal(cashBefore.minus(await cashOf()), 180);
+  assert.equal((await prisma.sale.findUniqueOrThrow({ where: { id: twoPhoneSale.id } })).status, 'COMPLETED');
+  assert.equal((await prisma.device.findUniqueOrThrow({ where: { id: phoneA.id } })).status, 'STORE_STOCK');
+  await assert.rejects(refund(twoPhoneSale.id, 3000, 100), /по позициям/);
+  // The last phone takes back exactly what is left of the booked 180/120: 120/80.
+  assert.deepEqual(await change(() => ReturnsService.returnItems({ saleId: twoPhoneSale.id, reason: 'Проверка', userId: 'user-admin', payoutMethod: 'CASH',
+    items: [{ saleItemId: itemOf(phoneB.id).id, withheldTjs: 0 }] })), [{ accrued: -120, available: -120 }, { accrued: -80, available: -80 }]);
+  assert.equal((await prisma.sale.findUniqueOrThrow({ where: { id: twoPhoneSale.id } })).status, 'REFUNDED');
+  await assert.rejects(ReturnsService.returnItems({ saleId: twoPhoneSale.id, reason: 'x', userId: 'user-admin', payoutMethod: 'CASH',
+    items: [{ saleItemId: itemOf(phoneB.id).id, withheldTjs: 0 }] }), /уже полностью возвращён/);
+  console.log('PASS: returns phone by phone reverse the booked 60/40 exactly, keep the withheld part, and close the receipt');
+
+  // Exchange for a cheaper phone: the register hands back the change, in the return's dollars.
+  const dear = await device();
+  const dearSale = await sell(dear.id, 3000);
+  const cheap = await device();
+  cashBefore = await cashOf();
+  const cheapExchange = await ExchangesService.process({ saleId: dearSale.id, returnedImei: dear.imei, withheldTjs: D(100),
+    replacementDeviceId: cheap.id, newPriceTjs: D(1500), processedByUserId: 'user-admin', paymentMethod: 'CASH' });
+  // Credit 2900 TJS ($290) pays the 1500 TJS receipt ($150); $140 goes back to the customer.
+  assert.equal(cheapExchange.payoutTjs, 1400);
+  assert.equal(cashBefore.minus(await cashOf()), 140);
+  assert.equal(cheapExchange.sale.exchangeTradeInCreditTjs, 1500);
+  assert.equal(cheapExchange.sale.cashAmountTjs, 0);
+  console.log('PASS: exchange for a cheaper phone pays the change out of the register');
 
   // Item USD amounts add up to the receipt total: 3 x 100 TJS at 10.95 = $27.40, not $27.39.
   await setTodayRate(10.95, 'user-admin');

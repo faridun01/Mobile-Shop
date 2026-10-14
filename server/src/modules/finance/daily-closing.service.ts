@@ -163,6 +163,8 @@ export class DailyClosingService {
         cashAmountTjs: true,
         cardAmountTjs: true,
         exchangeRate: true,
+        totalUsd: true,
+        exchangeTradeInCreditUsd: true,
         exchangeEvents: { select: { cashAmountTjs: true, cardAmountTjs: true, paymentMethod: true, differenceTjs: true } },
       },
     });
@@ -176,8 +178,15 @@ export class DailyClosingService {
       const cardTjs = s.exchangeEvents.reduce((sum, ev) => sum.minus(exchangeCard(ev)), D(s.cardAmountTjs || 0));
       // The register booked the paid part as one amount at the sale's rate; cash is converted on
       // its own and bank is the rest, so the two add up to exactly what the register received.
-      const paidUsd = roundMoney(usdAt(cashTjs.plus(cardTjs), s.exchangeRate));
-      const cashUsd = roundMoney(usdAt(cashTjs, s.exchangeRate));
+      // A receipt opened by an exchange: the returned phone's credit paid part of it, and the
+      // register took the receipt's dollars minus the credit's own dollars.
+      const paidUsd = s.exchangeTradeInCreditUsd != null
+        ? roundMoney(D(s.totalUsd).minus(s.exchangeTradeInCreditUsd))
+        : roundMoney(usdAt(cashTjs.plus(cardTjs), s.exchangeRate));
+      const paidTjs = cashTjs.plus(cardTjs);
+      const cashUsd = s.exchangeTradeInCreditUsd != null
+        ? (paidTjs.isZero() ? D(0) : roundMoney(paidUsd.mul(cashTjs).div(paidTjs)))
+        : roundMoney(usdAt(cashTjs, s.exchangeRate));
       salesCashTjs = salesCashTjs.plus(cashTjs);
       salesCardTjs = salesCardTjs.plus(cardTjs);
       salesCashUsd = salesCashUsd.plus(cashUsd);
@@ -205,7 +214,8 @@ export class DailyClosingService {
     // 2c. Refunds made today: the customer gets back the somoni they paid, less the penalty; in
     // dollars that is the refund day's rate (the penalty is booked in dollars at the same rate).
     const refunds = await db.sale.findMany({
-      where: { storeId, refundedAt: dateRange, status: 'REFUNDED' },
+      // A receipt whose phones were returned one by one is counted through those returns (2c').
+      where: { storeId, refundedAt: dateRange, status: 'REFUNDED', returns: { none: {} } },
       select: { id: true, receiptNumber: true, actualRefundAmountTjs: true, penaltyFeeTjs: true, penaltyFeeUsd: true, refundReason: true },
     });
     let refundsCashTjs = D(0);
@@ -223,6 +233,23 @@ export class DailyClosingService {
         amountTjs: roundMoney(refundTjs).toString(),
         amountUsd: roundMoney(refundUsd).toString(),
         reason: r.refundReason ?? undefined,
+      });
+    }
+
+    // 2c'. Phones returned today: only the money handed back left the register — an exchange's
+    // credit paid for its new receipt instead (counted with that sale above).
+    const returns = await db.saleReturn.findMany({
+      where: { storeId, createdAt: dateRange, payoutTjs: { gt: 0 } },
+      select: { payoutTjs: true, payoutUsd: true, reason: true, sale: { select: { receiptNumber: true } } },
+    });
+    for (const r of returns) {
+      refundsCashTjs = refundsCashTjs.plus(r.payoutTjs);
+      refundsCashUsd = refundsCashUsd.plus(r.payoutUsd);
+      refundedReceipts.push({
+        receiptNumber: r.sale.receiptNumber,
+        amountTjs: roundMoney(r.payoutTjs).toString(),
+        amountUsd: roundMoney(r.payoutUsd).toString(),
+        reason: r.reason,
       });
     }
 

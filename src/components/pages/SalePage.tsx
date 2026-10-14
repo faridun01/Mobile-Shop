@@ -31,6 +31,9 @@ import { hasCurrentDailyRate } from '../../utils/dailyRatePrompt';
 import { CustomerPaymentControls } from '../sale/CustomerPaymentControls';
 import { SaleReceiptDialog } from '../sale/SaleReceiptDialog';
 import { SaleVariantRow, retailPriceOf, type SaleVariant } from '../sale/SaleVariantRow';
+import { PreferredSuggestion } from '../sale/PreferredSuggestion';
+import { preferredInsteadOf } from '../sale/sellGuidance';
+import { useBelowCostCheck } from '../../hooks/useBelowCostCheck';
 
 interface CartItem {
   device: Device;
@@ -210,6 +213,11 @@ export const SalePage: React.FC = () => {
     });
   };
 
+  // The cashier keeps the agreed price; only the phone changes to the one to sell first.
+  const handleReplaceCartDevice = (index: number, device: Device) => {
+    setCart(prev => prev.map((item, i) => (i === index ? { ...item, device } : item)));
+  };
+
   const handleRemoveFromCart = (index: number) => {
     setCart(prev => {
       const updated = prev.filter((_, i) => i !== index);
@@ -276,10 +284,15 @@ export const SalePage: React.FC = () => {
     }
   }, [rateReady, isCentralCashMode, currentUser, setDailyRateModalOpen]);
 
+  // Store staff never get the cost: the server answers "below cost" as a yes/no for them.
+  const serverBelowCost = useBelowCostCheck(isAdmin ? [] : cart.map((item) => ({ deviceId: item.device.id, priceTjs: item.salePriceTjs })));
   const isItemBelowCost = (item: CartItem) => {
-    if (!todayRate || item.salePriceTjs === undefined || isNaN(item.salePriceTjs)) return false;
+    if (item.salePriceTjs === undefined || isNaN(item.salePriceTjs)) return false;
+    if (!isAdmin) return Boolean(serverBelowCost[item.device.id]);
+    if (!todayRate) return false;
     return decimal(item.salePriceTjs).lt(decimal(item.device.costBasisUsd).mul(todayRate.rate));
   };
+  const cartDeviceIds = new Set(cart.map((item) => item.device.id));
 
   // Keep the payment amounts in step with the total when phones are added or prices change.
   // Customer and payment method stay as the cashier left them until the sale is done.
@@ -692,6 +705,10 @@ export const SalePage: React.FC = () => {
                             <AlertTriangle className="w-3 h-3 shrink-0" /> Ниже себестоимости
                           </p>
                         )}
+                        {(() => {
+                          const suggestion = preferredInsteadOf(item.device, devices, cartDeviceIds);
+                          return suggestion ? <PreferredSuggestion compact suggestion={suggestion} onReplace={() => handleReplaceCartDevice(idx, suggestion)} /> : null;
+                        })()}
                       </div>
                     </div>
                   );
@@ -909,6 +926,10 @@ export const SalePage: React.FC = () => {
                       <AlertTriangle className="w-3.5 h-3.5 shrink-0" /> Цена ниже себестоимости
                     </p>
                   )}
+                  {(() => {
+                    const suggestion = preferredInsteadOf(item.device, devices, cartDeviceIds);
+                    return suggestion ? <PreferredSuggestion suggestion={suggestion} onReplace={() => handleReplaceCartDevice(idx, suggestion)} /> : null;
+                  })()}
                 </div>
               </div>
             );

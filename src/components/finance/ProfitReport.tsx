@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { decimal, moneyNumber, sumMoney } from '../../utils/money';
+import { decimal, moneyNumber } from '../../utils/money';
 import { useAppFields } from '../../context/AppContext';
 import { apiClient } from '../../api/client';
 import { mapExpense, mapSale, buildNameLookup } from '../../api/mappers';
@@ -14,7 +14,6 @@ import {
   Wallet,
   PiggyBank,
   ChevronDown,
-  Sparkles,
   Package,
   Banknote,
   AlertTriangle,
@@ -332,7 +331,6 @@ export const ProfitReport: React.FC<ProfitReportProps> = ({
   }, [salesReportStoreId, month, startDate, endDate, namesLookup, revision, stores]);
 
   const data: ReportsSummary = summary ?? EMPTY_SUMMARY;
-  const fxResultUsd = sumMoney([data.periodDebtFxUsd ?? 0, data.periodExpenseFxUsd ?? 0]);
 
   const totalStockCostUsd = useMemo(() => {
     if (selectedStore !== 'all') {
@@ -491,89 +489,6 @@ export const ProfitReport: React.FC<ProfitReportProps> = ({
                 <StatCard label="Чистая прибыль" value={signedUsd(data.netProfitUsd)} subvalue="после вычета расходов" icon={PiggyBank} tone={data.netProfitUsd >= 0 ? 'accent' : 'danger'} />
               </div>
             </div>
-
-            {/* How net profit is built — clearly distinguishing core operations from separate bonus income */}
-            <div className="p-3.5 rounded-xl bg-surface border border-border space-y-2.5 text-sm shadow-xs">
-              <div className="space-y-2.5">
-                <div className="flex items-center justify-between pb-1 border-b border-border">
-                  <h4 className="text-[10px] font-bold text-fg-subtle uppercase tracking-wider">Как считается чистая прибыль</h4>
-                  <span className="text-[10px] font-semibold text-accent bg-accent/10 px-2 py-0.5 rounded-md border border-accent/20">
-                    Операционная деятельность
-                  </span>
-                </div>
-                <div className="space-y-1.5">
-                  {[
-                    ...(data.refundsCount
-                      ? [
-                          { label: 'Продажи и обмены', value: usd(data.revenueUsd + data.refundsRevenueUsd) },
-                          { label: `Возвраты за период (${data.refundsCount})`, value: `−${usd(data.refundsRevenueUsd)}` },
-                        ]
-                      : [{ label: 'Выручка', value: usd(data.revenueUsd) }]),
-                    { label: 'Себестоимость проданного', value: `−${usd(data.cogsUsd)}` },
-                    ...(data.bonusDeviceProfitUsd ? [{ label: 'Прибыль бонусных телефонов (не доход)', value: `−${usd(data.bonusDeviceProfitUsd)}` }] : []),
-                    ...(data.periodRefundPenaltiesUsd ? [{ label: 'Удержано при возвратах', value: `+${usd(data.periodRefundPenaltiesUsd)}` }] : []),
-                    { label: 'Расходы (включая зарплату)', value: `−${usd(data.expensesUsd)}` },
-                    ...(fxResultUsd ? [{ label: 'Курсовая разница', value: `${fxResultUsd > 0 ? '+' : '−'}${usd(Math.abs(fxResultUsd))}` }] : []),
-                  ].map((row) => (
-                    <div key={row.label} className="flex items-center justify-between text-fg-muted">
-                      <span>{row.label}</span>
-                      <span className="font-semibold font-mono">{row.value}</span>
-                    </div>
-                  ))}
-
-                  {data.refundedReceipts && data.refundedReceipts.length > 0 && (
-                    <div className="mt-2 p-2.5 rounded-xl bg-danger/5 border border-danger/20 space-y-1.5">
-                      <div className="flex items-center justify-between text-[11px] font-bold text-danger uppercase tracking-wider">
-                        <span>Возвращённые чеки ({data.refundedReceipts.length})</span>
-                        <span>Сумма возврата</span>
-                      </div>
-                      <div className="space-y-1">
-                        {data.refundedReceipts.map((r, idx) => (
-                          <div key={r.saleId || idx} className="flex items-center justify-between text-xs font-mono">
-                            <span className="text-fg font-medium">
-                              Чек № {r.receiptNumber}
-                              {r.items ? <span className="text-fg-subtle text-[11px] font-sans ml-1.5">({r.items})</span> : null}
-                              {r.reason ? <span className="text-fg-subtle text-[11px] font-sans ml-1">— {r.reason}</span> : null}
-                            </span>
-                            <span className="text-danger font-bold shrink-0">
-                              −{usd(r.amountUsd)} <span className="text-fg-subtle font-normal font-sans">({tjs(r.amountTjs)})</span>
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                <div className="flex items-center justify-between pt-1.5 border-t border-border font-bold">
-                  <span>Чистая прибыль</span>
-                  <span className={`font-mono ${data.netProfitUsd >= 0 ? 'text-accent' : 'text-danger'}`}>
-                    {signedUsd(data.netProfitUsd)}
-                  </span>
-                </div>
-              </div>
-
-              {/* Supplier bonuses: for reference only — not income, not in profit, not credited anywhere */}
-              <div className="pt-2 border-t border-dashed border-border/80 space-y-1.5 mt-2">
-                <div className="flex items-center justify-between gap-2">
-                  <span className="text-xs font-semibold text-info flex items-center gap-1.5">
-                    <Sparkles className="w-3.5 h-3.5" />
-                    <span>Бонусы поставщиков — справочно</span>
-                  </span>
-                  <span className="text-[10px] text-fg-subtle">не входят в прибыль</span>
-                </div>
-                <div className="flex items-center justify-between text-[11px] text-fg-subtle">
-                  <span>Денежные бонусы</span>
-                  <span className="font-medium text-fg-muted font-mono">{usd(data.periodCashBonusesUsd || 0)}</span>
-                </div>
-                <div className="flex items-center justify-between text-[11px] text-fg-subtle">
-                  <span>Прибыль бонусных телефонов</span>
-                  <span className="font-medium text-fg-muted font-mono">{usd(data.bonusDeviceProfitUsd || 0)}</span>
-                </div>
-              </div>
-            </div>
-
-
 
             {data.modelCounts.length > 0 && (
               <div className="p-3.5 rounded-xl bg-surface border border-border space-y-2.5">

@@ -3,13 +3,14 @@ import { authenticateJwt, type AuthenticatedRequest } from '../../auth/auth.midd
 import { prisma } from '../../prisma/prisma.service';
 import { ExchangesService } from './exchanges.service';
 import { RealtimeSyncGateway } from '../../websocket/websocket.gateway';
+import { hideSaleCosts } from '../sales/sale-visibility';
 
 export function registerExchangeRoutes(app: Express) {
   app.post('/api/exchanges', authenticateJwt, async (req: AuthenticatedRequest, res, next) => {
     try {
       const body = req.body ?? {};
-      if (!body.saleId || !body.returnedImei || !body.replacementDeviceId || body.newPriceTjs === null || body.exchangeInValueTjs === null) {
-        res.status(400).json({ message: 'saleId, returnedImei, replacementDeviceId, exchangeInValueTjs и newPriceTjs обязательны' });
+      if (!body.saleId || !(body.saleItemId || body.returnedImei) || !body.replacementDeviceId || body.newPriceTjs === undefined || body.newPriceTjs === null) {
+        res.status(400).json({ message: 'Укажите чек, сдаваемый телефон, телефон на замену и его цену' });
         return;
       }
 
@@ -23,9 +24,21 @@ export function registerExchangeRoutes(app: Express) {
         }
       }
 
-      const sale = await ExchangesService.process({ ...body, processedByUserId: req.user!.userId });
-      RealtimeSyncGateway.broadcast('EXCHANGE_PROCESSED', { saleId: sale.id }, { storeIds: [sale.storeId] });
-      res.json(sale);
+      const result = await ExchangesService.process({
+        saleId: body.saleId,
+        saleItemId: body.saleItemId,
+        returnedImei: body.returnedImei,
+        withheldTjs: body.withheldTjs,
+        replacementDeviceId: body.replacementDeviceId,
+        newPriceTjs: body.newPriceTjs,
+        paymentMethod: body.paymentMethod,
+        cashAmountTjs: body.cashAmountTjs,
+        cardAmountTjs: body.cardAmountTjs,
+        reason: body.reason,
+        processedByUserId: req.user!.userId,
+      });
+      RealtimeSyncGateway.broadcast('EXCHANGE_PROCESSED', { saleId: result.originalSaleId, newSaleId: result.sale.id }, { storeIds: [result.sale.storeId] });
+      res.json({ ...result, sale: hideSaleCosts(result.sale, req.user!.role) });
     } catch (error) {
       next(error);
     }
