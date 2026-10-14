@@ -525,20 +525,6 @@ export const StockThresholdsPage: React.FC = () => {
     <div className="w-full max-w-7xl mx-auto p-3 sm:p-5 space-y-3.5 sm:space-y-4 min-w-0 overflow-x-hidden">
       {/* 1. Header & Location Selector */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 bg-surface border border-border rounded-2xl p-3 sm:p-4 shadow-2xs w-full max-w-full min-w-0">
-        <div className="flex items-center gap-2.5 min-w-0">
-          <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-accent/10 border border-accent/20 flex items-center justify-center shrink-0">
-            <SlidersHorizontal className="w-4 h-4 text-accent" />
-          </div>
-          <div className="min-w-0 flex-1">
-            <h1 className="text-sm sm:text-base font-black text-fg tracking-tight truncate">
-              Минимальные остатки
-            </h1>
-            <p className="text-[11px] text-fg-subtle truncate hidden sm:block">
-              Контроль неснижаемого запаса и автоматическое отслеживание дефицита
-            </p>
-          </div>
-        </div>
-
         {/* Store Selector (Admin can switch between Main Warehouse & Retail Stores) */}
         {isAdmin && (
           <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0 scrollbar-none w-full sm:w-auto max-w-full min-w-0">

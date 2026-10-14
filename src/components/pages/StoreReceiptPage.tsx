@@ -9,7 +9,6 @@ import { StatusBanner, StatusMessage } from '../ui/StatusBanner';
 import { LoadingState } from '../ui/Skeleton';
 import { Button } from '../ui/Button';
 import { Dialog } from '../ui/Dialog';
-import { StoreSelector } from '../common/StoreSelector';
 import {
   PackagePlus,
   Barcode,
@@ -29,18 +28,17 @@ import {
 } from 'lucide-react';
 
 export const StoreReceiptPage: React.FC = () => {
-  const { currentUser, stores, openScanner, selectedStoreId, setSelectedStoreId } = useAppFields(
+  const { currentUser, stores, openScanner, selectedStoreId } = useAppFields(
     'currentUser',
     'stores',
     'openScanner',
-    'selectedStoreId',
-    'setSelectedStoreId'
+    'selectedStoreId'
   );
 
   const isAdmin = currentUser?.role === 'ADMIN';
   const isPartner = currentUser?.role === 'PARTNER';
 
-  // Store resolution: Staff users are locked to their assigned store; Admins can choose
+  // Store resolution: staff are locked to their assigned store; an admin works in the store they switched into
   const retailStores = useMemo(() => stores.filter((s) => !s.isMainWarehouse && s.active), [stores]);
   const defaultStoreId = retailStores[0]?.id || '';
   const effectiveStoreId =
@@ -242,22 +240,11 @@ export const StoreReceiptPage: React.FC = () => {
       {/* Top Header Controls Bar */}
       <div className="px-3 py-2 border-b border-border bg-surface shrink-0 flex items-center justify-between gap-2 flex-wrap">
         <div className="flex items-center gap-2">
-          {/* Admin Store Switcher or Store Badge */}
-          {isAdmin && retailStores.length > 0 ? (
-            <StoreSelector
-              value={effectiveStoreId}
-              onChange={setSelectedStoreId}
-              stores={retailStores}
-              retailOnly
-              className="w-44 sm:w-56"
-              title="Выбрать магазин приёма"
-            />
-          ) : (
-            <span className="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-lg bg-surface-raised border border-border text-fg-muted">
-              <StoreIcon className="w-3.5 h-3.5 text-accent shrink-0" />
-              <span>{formatStoreDisplayTitle(currentStore)}</span>
-            </span>
-          )}
+          {/* The store being worked in: no picker, the receipt always goes to it */}
+          <span className="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-lg bg-surface-raised border border-border text-fg-muted">
+            <StoreIcon className="w-3.5 h-3.5 text-accent shrink-0" />
+            <span>{formatStoreDisplayTitle(currentStore)}</span>
+          </span>
         </div>
 
         {/* Tab Switcher */}

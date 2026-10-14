@@ -1,5 +1,4 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { decimal, moneyNumber, sumMoney } from '../../utils/money';
 import { useAppFields } from '../../context/AppContext';
 import { Device } from '../../types';
@@ -9,9 +8,7 @@ import {
   Smartphone,
   Warehouse,
   Store as StoreIcon,
-  SlidersHorizontal,
 } from 'lucide-react';
-import { useGroupedDevices } from '../../hooks/useGroupedDevices';
 import { EmptyState } from '../ui/EmptyState';
 import { LoadingState } from '../ui/Skeleton';
 import { StatusBanner, StatusMessage } from '../ui/StatusBanner';
@@ -33,13 +30,12 @@ import { InventoryStatsBar } from '../inventory/InventoryStatsBar';
 import { InventoryFiltersBar } from '../inventory/InventoryFiltersBar';
 import { InventoryLocationsView } from '../inventory/InventoryLocationsView';
 import { BrandGroupedList } from '../inventory/BrandGroupedList';
-import { ModelGroupedList } from '../inventory/ModelGroupedList';
+import { InventoryVariantList } from '../inventory/InventoryVariantList';
 import { FlatDevicesTable } from '../inventory/FlatDevicesTable';
 import { DeviceDetailsModal } from '../inventory/DeviceDetailsModal';
 import { CustomSelect, CustomSelectOption } from '../ui/CustomSelect';
 
 export const InventoryPage: React.FC = () => {
-  const navigate = useNavigate();
   const {
     currentUser,
     devices,
@@ -133,10 +129,9 @@ export const InventoryPage: React.FC = () => {
   const [sortBy, setSortBy] = useState<'COUNT_DESC' | 'COUNT_ASC' | 'NAME_ASC' | 'NAME_DESC' | 'PRICE_DESC' | 'PRICE_ASC'>('COUNT_DESC');
   const [showAdvancedFilters, setShowAdvancedFilters] = useState<boolean>(false);
 
-  const [inventoryViewMode, setInventoryViewMode] = useState<InventoryViewMode>('BY_BRAND');
+  const [inventoryViewMode, setInventoryViewMode] = useState<InventoryViewMode>('BY_MODEL');
   const [expandedBrandKeys, setExpandedBrandKeys] = useState<Record<string, boolean>>({});
   const [expandedModelKeys, setExpandedModelKeys] = useState<Record<string, boolean>>({});
-  const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
 
   const [selectedDevice, setSelectedDevice] = useState<Device | null>(null);
 
@@ -501,8 +496,6 @@ export const InventoryPage: React.FC = () => {
     return list;
   }, [filteredDevices, sortBy]);
 
-  const groups = useGroupedDevices(filteredDevices);
-
   /**
    * Opens the scanned phone.
    */
@@ -629,16 +622,6 @@ export const InventoryPage: React.FC = () => {
 
           {/* Action buttons & Location Selector */}
           <div className="flex items-center gap-2 shrink-0 ml-auto">
-            <button
-              type="button"
-              onClick={() => navigate('/stock-thresholds')}
-              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-border bg-surface-raised hover:bg-surface-elevated text-xs font-semibold text-fg-muted hover:text-fg transition-colors cursor-pointer"
-              title="Настройка минимальных остатков товаров"
-            >
-              <SlidersHorizontal className="w-3.5 h-3.5 text-accent" />
-              <span className="hidden sm:inline">Мин. остатки</span>
-            </button>
-
             {!isStoreScoped && storeCtx.mode === 'CENTRAL' && (
               <div className="flex items-center gap-1.5">
                 <span className="text-xs text-fg-subtle font-medium hidden sm:inline">Локация:</span>
@@ -763,19 +746,14 @@ export const InventoryPage: React.FC = () => {
             onNotify={(msg) => setPageStatus(msg)}
           />
         ) : inventoryViewMode === 'BY_MODEL' ? (
-          <ModelGroupedList
-            groups={groups}
-            expandedGroups={expandedGroups}
-            onToggleGroup={(key) =>
-              setExpandedGroups(prev => ({ ...prev, [key]: !prev[key] }))
-            }
+          <InventoryVariantList
+            devices={filteredDevices}
+            sortBy={sortBy}
             stores={stores}
             selectedLocationId={selectedLocationId}
             isAdmin={isAdmin}
             rate={rate}
             onSelectDevice={(device) => setSelectedDevice(device)}
-            onBatchRenameModel={batchRenameModel}
-            onNotify={(msg) => setPageStatus(msg)}
           />
         ) : (
           <FlatDevicesTable
