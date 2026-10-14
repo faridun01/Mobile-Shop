@@ -77,8 +77,9 @@ export const StoreSwitchModal: React.FC<StoreSwitchModalProps> = ({ isOpen, onCl
 
     setSelectedStoreId('all');
     useUIStore.getState().setSelectedStoreId('all');
-    setActivePage('REPORTS');
-    navigate('/reports');
+    // Leaving a store always opens the home page of the Central Cash.
+    setActivePage('WELCOME');
+    navigate('/');
     onClose();
   };
 

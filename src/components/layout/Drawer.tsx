@@ -529,8 +529,9 @@ export const Drawer: React.FC = () => {
                           isCentral: true,
                         });
                         setSelectedStoreId('all');
-                        setActivePage('CASH_DESK');
-                        navigate('/cash');
+                        // Leaving a store always opens the home page of the Central Cash.
+                        setActivePage('WELCOME');
+                        navigate('/');
                       }}
                       className="h-8 px-2 rounded-lg bg-accent hover:bg-accent-strong text-accent-fg text-xs font-semibold flex items-center justify-center gap-1.5 transition-all shadow-xs active:scale-95 cursor-pointer"
                     >

@@ -150,6 +150,7 @@ export const TabletNavRail: React.FC = () => {
                   isCentral: true,
                 });
                 setSelectedStoreId('all');
+                // Leaving a store always opens the home page of the Central Cash.
                 setActivePage('WELCOME');
                 navigate('/');
               } else if (location.pathname !== '/') {

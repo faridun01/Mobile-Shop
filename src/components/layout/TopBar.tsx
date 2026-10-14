@@ -148,8 +148,9 @@ export const TopBar: React.FC = () => {
                       isCentral: true,
                     });
                     setSelectedStoreId('all');
-                    setActivePage('CASH_DESK');
-                    navigate('/cash');
+                    // Leaving a store always opens the home page of the Central Cash.
+                    setActivePage('WELCOME');
+                    navigate('/');
                   }}
                   className="inline-flex items-center gap-1 px-2 sm:px-2.5 py-1 rounded-xl bg-surface-raised hover:bg-accent hover:text-accent-fg border border-border text-xs font-semibold text-fg transition-all shadow-2xs active:scale-95 cursor-pointer shrink-0"
                   title="Вернуться в Центральную кассу"
