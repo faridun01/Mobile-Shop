@@ -74,23 +74,45 @@ const dayFigures = (source: (DailyClosingSummary | DailyCashClosing) | undefined
  * The day on its own: cash and bank taken, debt repayments, refunds and the store's paid
  * expenses, and the day's total that goes to collection. The admin sees dollars first.
  */
-const DayBreakdown: React.FC<{ figures: DayFigures; showUsd: boolean }> = ({ figures, showUsd }) => {
-  const rows: { label: string; tjs: number; usd: number; sign: '' | '−' }[] = [
+const DayBreakdown: React.FC<{
+  figures: DayFigures;
+  showUsd: boolean;
+  refundedReceipts?: { receiptNumber: number; amountTjs: string; amountUsd: string; reason?: string }[];
+}> = ({ figures, showUsd, refundedReceipts }) => {
+  const rows: { label: string; tjs: number; usd: number; sign: '' | '−'; details?: React.ReactNode }[] = [
     { label: 'Наличные', tjs: figures.cashTjs, usd: figures.cashUsd, sign: '' },
     { label: 'Банк', tjs: figures.bankTjs, usd: figures.bankUsd, sign: '' },
     ...(figures.otherTjs || figures.otherUsd ? [{ label: 'Погашения долгов и прочее', tjs: figures.otherTjs, usd: figures.otherUsd, sign: '' as const }] : []),
-    ...(figures.refundsTjs ? [{ label: 'Возвраты', tjs: figures.refundsTjs, usd: figures.refundsUsd, sign: '−' as const }] : []),
+    ...(figures.refundsTjs ? [{
+      label: 'Возвраты',
+      tjs: figures.refundsTjs,
+      usd: figures.refundsUsd,
+      sign: '−' as const,
+      details: refundedReceipts && refundedReceipts.length > 0 ? (
+        <div className="mt-1 pl-2 border-l-2 border-danger/40 space-y-0.5 text-[11px] text-fg-subtle">
+          {refundedReceipts.map((r, i) => (
+            <div key={i} className="flex items-center justify-between font-mono">
+              <span>Чек № {r.receiptNumber}{r.reason ? ` (${r.reason})` : ''}</span>
+              <span className="text-danger font-semibold">−{formatTjs(r.amountTjs)}</span>
+            </div>
+          ))}
+        </div>
+      ) : undefined,
+    }] : []),
     ...(figures.expensesTjs ? [{ label: 'Расходы магазина', tjs: figures.expensesTjs, usd: figures.expensesUsd, sign: '−' as const }] : []),
   ];
   return (
     <div className="rounded-2xl bg-surface-raised border border-border p-3.5 space-y-1.5 text-sm">
       {rows.map((row) => (
-        <div key={row.label} className="flex items-center justify-between gap-3 text-fg-muted">
-          <span>{row.label}</span>
-          <span className="font-mono font-semibold text-right">
-            {showUsd ? `${row.sign}${formatUsd(row.usd)}` : `${row.sign}${formatTjs(row.tjs)}`}
-            {showUsd && <span className="block text-[11px] font-normal text-fg-subtle">{row.sign}{formatTjs(row.tjs)}</span>}
-          </span>
+        <div key={row.label} className="space-y-1">
+          <div className="flex items-center justify-between gap-3 text-fg-muted">
+            <span>{row.label}</span>
+            <span className="font-mono font-semibold text-right">
+              {showUsd ? `${row.sign}${formatUsd(row.usd)}` : `${row.sign}${formatTjs(row.tjs)}`}
+              {showUsd && <span className="block text-[11px] font-normal text-fg-subtle">{row.sign}{formatTjs(row.tjs)}</span>}
+            </span>
+          </div>
+          {row.details}
         </div>
       ))}
       <div className="flex items-center justify-between gap-3 pt-2 border-t border-border font-bold text-fg">
@@ -458,7 +480,7 @@ export const DailyCashClosingModal: React.FC<DailyCashClosingModalProps> = ({
             {summary.alreadyClosed ? (
               <>
                 {dayFigures(closing, 'actual')
-                  ? <DayBreakdown figures={dayFigures(closing, 'actual')!} showUsd={isAdmin} />
+                  ? <DayBreakdown figures={dayFigures(closing, 'actual')!} showUsd={isAdmin} refundedReceipts={summary.refundedReceipts} />
                   : <DayTotals cashTjs={closing?.actualCashTjs} bankTjs={closing?.salesCardTjs} />}
                 <p className="text-xs text-fg-subtle flex items-center gap-1.5 flex-wrap">
                   <UserCheck className="w-3.5 h-3.5 text-success" />
@@ -512,7 +534,7 @@ export const DailyCashClosingModal: React.FC<DailyCashClosingModalProps> = ({
             ) : (
               <>
                 {dayFigures(summary, 'expected')
-                  ? <DayBreakdown figures={dayFigures(summary, 'expected')!} showUsd={isAdmin} />
+                  ? <DayBreakdown figures={dayFigures(summary, 'expected')!} showUsd={isAdmin} refundedReceipts={summary.refundedReceipts} />
                   : <DayTotals cashTjs={summary.expectedCashTjs} bankTjs={summary.salesCardTjs} />}
                 {!isInsideTargetStore && (
                   <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/25 text-amber-700 dark:text-amber-300 text-xs flex items-center justify-between gap-2.5">

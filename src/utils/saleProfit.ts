@@ -26,7 +26,7 @@ export function computeSaleItemProfit(item: SaleItem, exchangeRate: number): Sal
   const priceUsd = Number(item.salePriceUsd) || 0;
   const profitUsd = Math.round((priceUsd - costUsd) * 100) / 100;
   const rate = exchangeRate > 0 ? exchangeRate : 1;
-  const profitTjs = Math.round(profitUsd * rate);
+  const profitTjs = Math.round(profitUsd * rate * 100) / 100;
   const marginPercent = costUsd > 0
     ? Math.round((profitUsd / costUsd) * 100)
     : (priceUsd > 0 ? 100 : 0);
@@ -68,7 +68,7 @@ export function computeSaleProfit(sale: Sale, fallbackExchangeRate: number = 0):
     ? sale.exchangeRate
     : (sale.totalUsd > 0 && sale.totalTjs > 0 ? sale.totalTjs / sale.totalUsd : fallbackExchangeRate);
 
-  const profitTjs = Math.round(roundedProfitUsd * rate);
+  const profitTjs = Math.round(roundedProfitUsd * rate * 100) / 100;
   const roundedCostUsd = Math.round(costUsd * 100) / 100;
   const marginPercent = roundedCostUsd > 0
     ? Math.round((roundedProfitUsd / roundedCostUsd) * 100)

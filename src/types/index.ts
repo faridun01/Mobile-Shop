@@ -615,6 +615,7 @@ export interface DailyClosingSummary {
   refundsCashTjs: string;
   refundsCashUsd: string;
   refundsCount: number;
+  refundedReceipts?: { receiptNumber: number; amountTjs: string; amountUsd: string; reason?: string }[];
   collectionsCashTjs: string;
   collectionsCashUsd: string;
   collectionsCount: number;

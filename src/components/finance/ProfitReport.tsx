@@ -61,6 +61,18 @@ interface ReportsSummary {
    *  when the refunded sale itself was made in an earlier period. */
   refundsCount: number;
   refundsRevenueUsd: number;
+  refundedReceipts?: {
+    saleId: string;
+    receiptNumber: number;
+    date: string;
+    amountTjs: number;
+    amountUsd: number;
+    penaltyFeeTjs?: number;
+    penaltyFeeUsd?: number;
+    reason?: string;
+    items?: string;
+    storeId?: string;
+  }[];
   exchangesCount: number;
   revenueUsd: number;
   revenueTjs: number;
@@ -108,7 +120,7 @@ interface ReportsSummary {
 
 const EMPTY_EXPENSES: ExpenseBreakdown = { expensesUsd: 0, expensesTjs: 0, unpaidExpensesTjs: 0, expensesByCategory: [] };
 const EMPTY_SUMMARY: ReportsSummary = {
-  unitsSold: 0, salesCount: 0, refundsCount: 0, refundsRevenueUsd: 0, exchangesCount: 0, revenueUsd: 0, revenueTjs: 0, cogsUsd: 0, cogsTjs: 0,
+  unitsSold: 0, salesCount: 0, refundsCount: 0, refundsRevenueUsd: 0, refundedReceipts: [], exchangesCount: 0, revenueUsd: 0, revenueTjs: 0, cogsUsd: 0, cogsTjs: 0,
   grossProfitUsd: 0, grossProfitTjs: 0, grossMarginPercent: 0,
   profitUsd: 0, profitTjs: 0, expensesTjs: 0, expensesUsd: 0,
   periodRefundPenaltiesUsd: 0, periodRefundPenaltiesTjs: 0,
@@ -508,6 +520,29 @@ export const ProfitReport: React.FC<ProfitReportProps> = ({
                       <span className="font-semibold font-mono">{row.value}</span>
                     </div>
                   ))}
+
+                  {data.refundedReceipts && data.refundedReceipts.length > 0 && (
+                    <div className="mt-2 p-2.5 rounded-xl bg-danger/5 border border-danger/20 space-y-1.5">
+                      <div className="flex items-center justify-between text-[11px] font-bold text-danger uppercase tracking-wider">
+                        <span>Возвращённые чеки ({data.refundedReceipts.length})</span>
+                        <span>Сумма возврата</span>
+                      </div>
+                      <div className="space-y-1">
+                        {data.refundedReceipts.map((r, idx) => (
+                          <div key={r.saleId || idx} className="flex items-center justify-between text-xs font-mono">
+                            <span className="text-fg font-medium">
+                              Чек № {r.receiptNumber}
+                              {r.items ? <span className="text-fg-subtle text-[11px] font-sans ml-1.5">({r.items})</span> : null}
+                              {r.reason ? <span className="text-fg-subtle text-[11px] font-sans ml-1">— {r.reason}</span> : null}
+                            </span>
+                            <span className="text-danger font-bold shrink-0">
+                              −{usd(r.amountUsd)} <span className="text-fg-subtle font-normal font-sans">({tjs(r.amountTjs)})</span>
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 <div className="flex items-center justify-between pt-1.5 border-t border-border font-bold">

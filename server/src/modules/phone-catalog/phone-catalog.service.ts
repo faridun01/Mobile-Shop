@@ -73,20 +73,20 @@ export async function findPhoneByImei(imei: string): Promise<CatalogPhone | null
         ram: existing.ram ? existing.ram.trim() : null,
         storage: existing.storage ? existing.storage.trim() : null,
         color: existing.color ? existing.color.trim() : null,
-        lastPurchasePriceUsd: existing.costBasisUsd ? Number(existing.costBasisUsd) : null,
+        lastPurchasePriceUsd: null,
       };
     }
   }
   if (!entry) return null;
 
-  // Retrieve latest color and purchase price for this model from Device table
+  // Retrieve latest color for this model from Device table
   const lastDevice = await prisma.device.findFirst({
     where: {
       brand: { equals: entry.brand, mode: 'insensitive' },
       model: { equals: entry.model, mode: 'insensitive' },
     },
     orderBy: { createdAt: 'desc' },
-    select: { color: true, costBasisUsd: true },
+    select: { color: true },
   });
 
   return {
@@ -95,7 +95,7 @@ export async function findPhoneByImei(imei: string): Promise<CatalogPhone | null
     ram: entry.ram,
     storage: entry.storage,
     color: lastDevice?.color ? lastDevice.color.trim() : null,
-    lastPurchasePriceUsd: lastDevice?.costBasisUsd ? Number(lastDevice.costBasisUsd) : null,
+    lastPurchasePriceUsd: null,
   };
 }
 
@@ -221,7 +221,7 @@ export async function getKnownCatalogSpecs(): Promise<KnownCatalogSpecs> {
     rams: Array.from(m.rams),
     storages: Array.from(m.storages),
     colors: Array.from(m.colors),
-    lastPrice: m.lastPrice ?? null,
+    lastPrice: null,
   }));
 
   return {

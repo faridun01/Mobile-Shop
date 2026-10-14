@@ -61,7 +61,7 @@ describe('comprehensive Excel report', () => {
     const operations = workbook.getWorksheet('Операции')!;
     expect(operations.getCell('B5').value).toBe('Продажа');
     expect(operations.getCell('C5').value).toBe(101);
-    expect(operations.getCell('B6').value).toBe('Возврат');
+    expect(operations.getCell('B6').value).toBe('Возврат (чек № 90)');
     expect(operations.getCell('G6').value).toBe(-95.24);
     // The expense keeps the dollars it was registered at.
     expect(workbook.getWorksheet('Расходы')?.getCell('K5').value).toBe(20);

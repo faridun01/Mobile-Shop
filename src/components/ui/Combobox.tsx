@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { cn } from '../../utils/cn';
+import { X } from 'lucide-react';
 
 interface ComboboxProps {
   value: string;
@@ -9,6 +10,7 @@ interface ComboboxProps {
   className?: string;
   required?: boolean;
   autoFocus?: boolean;
+  clearable?: boolean;
 }
 
 /**
@@ -19,7 +21,16 @@ interface ComboboxProps {
  * This opens the full option list immediately on focus/tap, narrows it as you type, and
  * still accepts free text for a genuinely new brand/model the list doesn't have yet.
  */
-export const Combobox: React.FC<ComboboxProps> = ({ value, onChange, options, placeholder, className, required, autoFocus }) => {
+export const Combobox: React.FC<ComboboxProps> = ({
+  value,
+  onChange,
+  options,
+  placeholder,
+  className,
+  required,
+  autoFocus,
+  clearable = true,
+}) => {
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -46,26 +57,46 @@ export const Combobox: React.FC<ComboboxProps> = ({ value, onChange, options, pl
 
   return (
     <div className="app-combobox relative" ref={containerRef}>
-      <input
-        type="text"
-        required={required}
-        autoFocus={autoFocus}
-        value={value}
-        onChange={(e) => {
-          onChange(e.target.value);
-          setOpen(true);
-        }}
-        onFocus={() => setOpen(true)}
-        onClick={() => setOpen(true)}
-        onKeyDown={(e) => {
-          if (e.key === 'Escape' || e.key === 'Enter') {
-            setOpen(false);
-          }
-        }}
-        placeholder={placeholder}
-        className={cn('w-full', className)}
-        autoComplete="off"
-      />
+      <div className="relative flex items-center">
+        <input
+          type="text"
+          required={required}
+          autoFocus={autoFocus}
+          value={value}
+          onChange={(e) => {
+            onChange(e.target.value);
+            setOpen(true);
+          }}
+          onFocus={() => setOpen(true)}
+          onClick={() => setOpen(true)}
+          onKeyDown={(e) => {
+            if (e.key === 'Escape' || e.key === 'Enter') {
+              setOpen(false);
+            }
+          }}
+          placeholder={placeholder}
+          className={cn('w-full', className, value && clearable ? '!pr-6' : '')}
+          autoComplete="off"
+        />
+
+        {value && clearable && (
+          <button
+            type="button"
+            tabIndex={-1}
+            onMouseDown={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onChange('');
+              setOpen(false);
+            }}
+            className="absolute right-1.5 top-1/2 -translate-y-1/2 p-0.5 rounded text-fg-subtle hover:text-fg hover:bg-surface-raised transition-colors cursor-pointer select-none"
+            title="Очистить"
+            aria-label="Очистить"
+          >
+            <X className="w-3 h-3" />
+          </button>
+        )}
+      </div>
 
       {open && filtered.length > 0 && (
         <div className="absolute z-50 top-full left-0 mt-1 w-full max-h-48 overflow-y-auto rounded-lg border border-border bg-surface shadow-lg py-1">

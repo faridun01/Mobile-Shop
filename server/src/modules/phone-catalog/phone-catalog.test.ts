@@ -104,7 +104,7 @@ describe('findPhoneByImei', () => {
       ram: '8 GB',
       storage: '256 GB',
       color: 'Natural Titanium',
-      lastPurchasePriceUsd: 950,
+      lastPurchasePriceUsd: null,
     });
     expect((prisma as any).phoneCatalog.create).toHaveBeenCalled();
   });

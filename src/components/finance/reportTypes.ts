@@ -25,11 +25,25 @@ export interface StoreBreakdown extends ExpenseBreakdown {
   topModels: { name: string; count: number; revenueUsd: number; profitUsd: number }[];
 }
 
+export interface RefundedReceiptInfo {
+  saleId: string;
+  receiptNumber: number;
+  date: string;
+  amountTjs: number;
+  amountUsd: number;
+  penaltyFeeTjs?: number;
+  penaltyFeeUsd?: number;
+  reason?: string;
+  items?: string;
+  storeId?: string;
+}
+
 export interface ReportsSummary {
   unitsSold: number;
   salesCount: number;
   refundsCount: number;
   refundsRevenueUsd: number;
+  refundedReceipts?: RefundedReceiptInfo[];
   exchangesCount: number;
   revenueUsd: number;
   revenueTjs: number;
@@ -72,7 +86,7 @@ export interface ReportsSummary {
 
 export const EMPTY_EXPENSES: ExpenseBreakdown = { expensesUsd: 0, expensesTjs: 0, unpaidExpensesTjs: 0, expensesByCategory: [] };
 export const EMPTY_SUMMARY: ReportsSummary = {
-  unitsSold: 0, salesCount: 0, refundsCount: 0, refundsRevenueUsd: 0, exchangesCount: 0, revenueUsd: 0, revenueTjs: 0, cogsUsd: 0, cogsTjs: 0,
+  unitsSold: 0, salesCount: 0, refundsCount: 0, refundsRevenueUsd: 0, refundedReceipts: [], exchangesCount: 0, revenueUsd: 0, revenueTjs: 0, cogsUsd: 0, cogsTjs: 0,
   grossProfitUsd: 0, grossProfitTjs: 0, grossMarginPercent: 0,
   profitUsd: 0, profitTjs: 0, expensesTjs: 0, expensesUsd: 0,
   periodRefundPenaltiesUsd: 0, periodRefundPenaltiesTjs: 0,

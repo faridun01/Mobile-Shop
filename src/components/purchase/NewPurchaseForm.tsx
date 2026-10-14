@@ -16,6 +16,7 @@ import {
   X,
   Truck,
   Sparkles,
+  RotateCcw,
 } from 'lucide-react';
 
 interface NewPurchaseFormProps {
@@ -26,6 +27,8 @@ interface NewPurchaseFormProps {
   onSelectSupplierId: (id: string) => void;
   groups: PurchaseItemGroup[];
   onUpdateGroup: (idx: number, field: keyof Omit<PurchaseItemGroup, 'items'>, value: any) => void;
+  onClearGroupSpecs?: (idx: number) => void;
+  onResetGroup?: (idx: number) => void;
   onAddGroup: () => void;
   onRemoveGroup: (idx: number) => void;
   onAddImeiToGroup: (groupIdx: number) => void;
@@ -58,6 +61,8 @@ export const NewPurchaseForm: React.FC<NewPurchaseFormProps> = ({
   onSelectSupplierId,
   groups,
   onUpdateGroup,
+  onClearGroupSpecs,
+  onResetGroup,
   onAddGroup,
   onRemoveGroup,
   onAddImeiToGroup,
@@ -173,7 +178,7 @@ export const NewPurchaseForm: React.FC<NewPurchaseFormProps> = ({
                   )}
                 </div>
 
-                {groups.length > 1 && (
+                {groups.length > 1 ? (
                   <button
                     type="button"
                     onClick={() => onRemoveGroup(groupIdx)}
@@ -182,6 +187,18 @@ export const NewPurchaseForm: React.FC<NewPurchaseFormProps> = ({
                   >
                     <Trash2 className="w-3.5 h-3.5" />
                   </button>
+                ) : (
+                  (group.brand || group.model || group.items.some((i) => i.imei.trim())) && onResetGroup && (
+                    <button
+                      type="button"
+                      onClick={() => onResetGroup(groupIdx)}
+                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-fg-subtle hover:text-danger hover:bg-danger/10 transition-colors text-[10px] font-semibold cursor-pointer border border-border select-none active:scale-95"
+                      title="Очистить позицию целиком"
+                    >
+                      <RotateCcw className="w-3 h-3" />
+                      <span className="hidden sm:inline">Сбросить позицию</span>
+                    </button>
+                  )
                 )}
               </div>
 
@@ -262,21 +279,32 @@ export const NewPurchaseForm: React.FC<NewPurchaseFormProps> = ({
                               className={cn(
                                 'w-full h-7 rounded-lg bg-surface border px-2 text-xs text-fg font-mono focus:outline-none shadow-2xs transition-colors',
                                 is1Incomplete
-                                  ? 'border-amber-500/80 dark:border-amber-400/80 bg-amber-50/15 dark:bg-amber-950/20 pr-20 text-amber-700 dark:text-amber-300'
+                                  ? 'border-amber-500/80 dark:border-amber-400/80 bg-amber-50/15 dark:bg-amber-950/20 pr-24 text-amber-700 dark:text-amber-300'
                                   : is1Valid
-                                    ? 'border-emerald-500/60 dark:border-emerald-400/60 pr-20 text-emerald-700 dark:text-emerald-300 font-bold'
+                                    ? 'border-emerald-500/60 dark:border-emerald-400/60 pr-24 text-emerald-700 dark:text-emerald-300 font-bold'
                                     : 'border-border focus:border-accent pr-7'
                               )}
                             />
                             {clean1.length > 0 && (
                               <span
                                 className={cn(
-                                  'absolute right-13 text-[10px] font-bold font-mono pointer-events-none select-none',
+                                  'absolute right-17 text-[10px] font-bold font-mono pointer-events-none select-none',
                                   is1Incomplete ? 'text-amber-600 dark:text-amber-400' : 'text-emerald-600 dark:text-emerald-400'
                                 )}
                               >
                                 {is1Valid ? '15 ✓' : `${clean1.length}/15`}
                               </span>
+                            )}
+                            {clean1.length > 0 && (
+                              <button
+                                type="button"
+                                onClick={() => onUpdateImei(groupIdx, itemIdx, clean2 ? ` / ${clean2}` : '')}
+                                className="absolute right-11 top-1/2 -translate-y-1/2 text-fg-subtle hover:text-danger p-0.5 cursor-pointer rounded transition-colors"
+                                title="Очистить IMEI 1"
+                                aria-label="Очистить IMEI 1"
+                              >
+                                <X className="w-3.5 h-3.5" />
+                              </button>
                             )}
                             {clean1.length > 0 && (
                               <CopyImeiButton
@@ -313,21 +341,32 @@ export const NewPurchaseForm: React.FC<NewPurchaseFormProps> = ({
                               className={cn(
                                 'w-full h-7 rounded-lg bg-surface border px-2 text-xs text-fg font-mono focus:outline-none shadow-2xs transition-colors',
                                 is2Incomplete
-                                  ? 'border-amber-500/80 dark:border-amber-400/80 bg-amber-50/15 dark:bg-amber-950/20 pr-20 text-amber-700 dark:text-amber-300'
+                                  ? 'border-amber-500/80 dark:border-amber-400/80 bg-amber-50/15 dark:bg-amber-950/20 pr-24 text-amber-700 dark:text-amber-300'
                                   : is2Valid
-                                    ? 'border-emerald-500/60 dark:border-emerald-400/60 pr-20 text-emerald-700 dark:text-emerald-300 font-bold'
+                                    ? 'border-emerald-500/60 dark:border-emerald-400/60 pr-24 text-emerald-700 dark:text-emerald-300 font-bold'
                                     : 'border-border focus:border-accent pr-7'
                               )}
                             />
                             {clean2.length > 0 && (
                               <span
                                 className={cn(
-                                  'absolute right-13 text-[10px] font-bold font-mono pointer-events-none select-none',
+                                  'absolute right-17 text-[10px] font-bold font-mono pointer-events-none select-none',
                                   is2Incomplete ? 'text-amber-600 dark:text-amber-400' : 'text-emerald-600 dark:text-emerald-400'
                                 )}
                               >
                                 {is2Valid ? '15 ✓' : `${clean2.length}/15`}
                               </span>
+                            )}
+                            {clean2.length > 0 && (
+                              <button
+                                type="button"
+                                onClick={() => onUpdateImei2(groupIdx, itemIdx, '')}
+                                className="absolute right-11 top-1/2 -translate-y-1/2 text-fg-subtle hover:text-danger p-0.5 cursor-pointer rounded transition-colors"
+                                title="Очистить IMEI 2"
+                                aria-label="Очистить IMEI 2"
+                              >
+                                <X className="w-3.5 h-3.5" />
+                              </button>
                             )}
                             {clean2.length > 0 && (
                               <CopyImeiButton
@@ -368,14 +407,28 @@ export const NewPurchaseForm: React.FC<NewPurchaseFormProps> = ({
               {/* 2. Group Specs Form (Placed BELOW IMEI - auto-filled from scanned IMEI) */}
               <div className="pt-2 border-t border-border space-y-1.5">
                 <div className="flex items-center justify-between">
-                  <span className="text-[10px] font-bold text-fg-subtle uppercase tracking-wider">
-                    Спецификации и цена
-                  </span>
-                  {(group.brand || group.model) && (
-                    <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold flex items-center gap-1">
-                      <Sparkles className="w-3 h-3" />
-                      Автозаполнение по IMEI
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[10px] font-bold text-fg-subtle uppercase tracking-wider">
+                      Спецификации и цена
                     </span>
+                    {(group.brand || group.model) && (
+                      <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold flex items-center gap-1">
+                        <Sparkles className="w-3 h-3" />
+                        Автозаполнение по IMEI
+                      </span>
+                    )}
+                  </div>
+
+                  {(group.brand || group.model || group.ram || group.storage || group.color || Boolean(group.purchasePriceUsd)) && onClearGroupSpecs && (
+                    <button
+                      type="button"
+                      onClick={() => onClearGroupSpecs(groupIdx)}
+                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-surface-raised hover:bg-danger/10 text-fg-subtle hover:text-danger border border-border text-[10px] font-semibold transition-all cursor-pointer select-none active:scale-95 shadow-2xs"
+                      title="Очистить все поля модели (бренд, модель, RAM, память, цвет, цену)"
+                    >
+                      <RotateCcw className="w-3 h-3" />
+                      <span>Очистить поля</span>
+                    </button>
                   )}
                 </div>
 
@@ -452,7 +505,7 @@ export const NewPurchaseForm: React.FC<NewPurchaseFormProps> = ({
                     <label className="block text-[10px] font-bold text-fg-subtle uppercase tracking-wider mb-0.5 truncate">
                       Цена закупки ($)
                     </label>
-                    <div className="relative">
+                    <div className="relative flex items-center">
                       <span className="absolute left-2 top-1/2 -translate-y-1/2 text-xs font-mono font-bold text-emerald-600 dark:text-emerald-400 pointer-events-none">$</span>
                       <input
                         type="number"
@@ -461,9 +514,20 @@ export const NewPurchaseForm: React.FC<NewPurchaseFormProps> = ({
                         step="0.01"
                         value={group.purchasePriceUsd || ''}
                         onChange={(e) => onUpdateGroup(groupIdx, 'purchasePriceUsd', parseFloat(e.target.value) || 0)}
-                        className="w-full h-7.5 rounded-lg bg-surface-raised border border-border pl-5 pr-2 text-xs text-emerald-600 dark:text-emerald-400 font-bold font-mono focus:border-accent focus:bg-surface focus:outline-none transition-all shadow-2xs"
+                        className="w-full h-7.5 rounded-lg bg-surface-raised border border-border pl-5 pr-6 text-xs text-emerald-600 dark:text-emerald-400 font-bold font-mono focus:border-accent focus:bg-surface focus:outline-none transition-all shadow-2xs"
                         placeholder="0"
                       />
+                      {Boolean(group.purchasePriceUsd) && (
+                        <button
+                          type="button"
+                          tabIndex={-1}
+                          onClick={() => onUpdateGroup(groupIdx, 'purchasePriceUsd', 0)}
+                          className="absolute right-1.5 top-1/2 -translate-y-1/2 p-0.5 rounded text-fg-subtle hover:text-fg hover:bg-surface transition-colors cursor-pointer"
+                          title="Очистить цену"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      )}
                     </div>
                   </div>
                 </div>

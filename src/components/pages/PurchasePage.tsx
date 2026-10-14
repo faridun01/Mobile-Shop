@@ -7,7 +7,7 @@ import { soundEffects } from '../../utils/sound';
 import { getBusinessDateKey } from '../../utils/businessDate';
 import { useUnfinishedWork } from '../../utils/pwaUpdateSafety';
 import { DEFAULT_PHONE_COLORS_EN, normalizePhoneColor, formatRam, formatStorage } from '../../utils/phoneSpecs';
-import { lookupPhoneByImei, clearPhoneCatalogCache, matchesCatalog, fetchCatalogSpecs, type CatalogSpecs } from '../../services/phoneCatalog';
+import { lookupPhoneByImei, clearPhoneCatalogCache, fetchCatalogSpecs, type CatalogSpecs } from '../../services/phoneCatalog';
 
 import {
   PurchaseItemGroup,
@@ -431,7 +431,7 @@ export const PurchasePage: React.FC = () => {
       const next = [...prev];
       const current = { ...next[idx], [field]: value };
 
-      // When user selects or types a model, autofill RAM, storage, color, and price from known database specs
+      // When user selects or types a model, autofill RAM, storage, and color from known specs (price is never auto-filled)
       if (field === 'model' && typeof value === 'string' && value.trim()) {
         const modelTrim = value.trim().toLowerCase();
         const matchedCatalog = (catalogSpecs?.models || []).find(
@@ -446,21 +446,50 @@ export const PurchasePage: React.FC = () => {
           if (!current.ram.trim() && matchedCatalog.rams.length > 0) current.ram = formatRam(matchedCatalog.rams[0]) || matchedCatalog.rams[0];
           if (!current.storage.trim() && matchedCatalog.storages.length > 0) current.storage = formatStorage(matchedCatalog.storages[0]) || matchedCatalog.storages[0];
           if (!current.color.trim() && matchedCatalog.colors.length > 0) current.color = matchedCatalog.colors[0];
-          if ((!current.purchasePriceUsd || current.purchasePriceUsd === 0) && matchedCatalog.lastPrice) {
-            current.purchasePriceUsd = matchedCatalog.lastPrice;
-          }
         } else if (matchedDevice) {
           if (!current.brand.trim()) current.brand = matchedDevice.brand;
           if (!current.ram.trim() && matchedDevice.ram) current.ram = formatRam(matchedDevice.ram) || matchedDevice.ram;
           if (!current.storage.trim() && matchedDevice.storage) current.storage = formatStorage(matchedDevice.storage) || matchedDevice.storage;
           if (!current.color.trim() && matchedDevice.color) current.color = matchedDevice.color;
-          if ((!current.purchasePriceUsd || current.purchasePriceUsd === 0) && matchedDevice.costBasisUsd) {
-            current.purchasePriceUsd = Number(matchedDevice.costBasisUsd);
-          }
         }
       }
 
       next[idx] = current;
+      return next;
+    });
+  };
+
+  const handleClearGroupSpecs = (groupIdx: number) => {
+    setGroups((prev) => {
+      const next = [...prev];
+      if (!next[groupIdx]) return prev;
+      next[groupIdx] = {
+        ...next[groupIdx],
+        brand: '',
+        model: '',
+        ram: '',
+        storage: '',
+        color: '',
+        purchasePriceUsd: 0,
+      };
+      return next;
+    });
+  };
+
+  const handleResetGroup = (groupIdx: number) => {
+    setGroups((prev) => {
+      const next = [...prev];
+      if (!next[groupIdx]) return prev;
+      next[groupIdx] = {
+        id: `group-${Date.now()}`,
+        items: [{ imei: '' }],
+        brand: '',
+        model: '',
+        ram: '',
+        storage: '',
+        color: '',
+        purchasePriceUsd: 0,
+      };
       return next;
     });
   };
@@ -523,8 +552,7 @@ export const PurchasePage: React.FC = () => {
   };
 
   // IMEI autofill: the phone catalog knows the model behind an IMEI's first 8 digits. An empty
-  // position takes brand, model, RAM, storage, color, and price; a filled one fills missing fields
-  // and validates the model matches.
+  // position takes brand, model, RAM, storage, and color. Purchase price is NEVER auto-filled per user request.
   const fillGroupFromImei = useCallback(async (groupIdx: number, imei: string) => {
     const phone = await lookupPhoneByImei(imei);
     const group = groupsRef.current[groupIdx];
@@ -539,7 +567,6 @@ export const PurchasePage: React.FC = () => {
     const suggestedRam = phone.ram ? (formatRam(phone.ram) || phone.ram) : (foundInCatalog?.rams?.[0] ? (formatRam(foundInCatalog.rams[0]) || foundInCatalog.rams[0]) : '');
     const suggestedStorage = phone.storage ? (formatStorage(phone.storage) || phone.storage) : (foundInCatalog?.storages?.[0] ? (formatStorage(foundInCatalog.storages[0]) || foundInCatalog.storages[0]) : '');
     const suggestedColor = phone.color || foundInCatalog?.colors?.[0] || '';
-    const suggestedPrice = (phone.lastPurchasePriceUsd && phone.lastPurchasePriceUsd > 0) ? phone.lastPurchasePriceUsd : (foundInCatalog?.lastPrice || 0);
 
     if (!group.model.trim() && sameBrand) {
       setGroups((prev) => {
@@ -553,7 +580,7 @@ export const PurchasePage: React.FC = () => {
           ram: current.ram.trim() || suggestedRam,
           storage: current.storage.trim() || suggestedStorage,
           color: current.color.trim() || suggestedColor,
-          purchasePriceUsd: (current.purchasePriceUsd && current.purchasePriceUsd > 0) ? current.purchasePriceUsd : suggestedPrice,
+          // Purchase price is left untouched - never auto-filled!
         };
         return next;
       });
@@ -564,7 +591,7 @@ export const PurchasePage: React.FC = () => {
       return;
     }
 
-    // Model was already set and matches: autofill remaining blank fields
+    // Model was already set and matches: autofill remaining blank fields (except price)
     if (sameBrand && group.model.trim().toLowerCase() === phone.model.toLowerCase()) {
       setGroups((prev) => {
         const next = [...prev];
@@ -575,19 +602,11 @@ export const PurchasePage: React.FC = () => {
           ram: current.ram.trim() || suggestedRam,
           storage: current.storage.trim() || suggestedStorage,
           color: current.color.trim() || suggestedColor,
-          purchasePriceUsd: (current.purchasePriceUsd && current.purchasePriceUsd > 0) ? current.purchasePriceUsd : suggestedPrice,
+          // Purchase price is left untouched - never auto-filled!
         };
         return next;
       });
       return;
-    }
-
-    if (!matchesCatalog(phone, group.brand || phone.brand, group.model || phone.model)) {
-      setStatusMessage({
-        type: 'error',
-        text: `IMEI ${imei} — это ${phone.brand} ${phone.model}, а в позиции #${groupIdx + 1} указано ${`${group.brand} ${group.model}`.trim()}. Проверьте позицию.`,
-      });
-      soundEffects.playError();
     }
   }, [catalogSpecs?.models]);
 
@@ -984,6 +1003,8 @@ export const PurchasePage: React.FC = () => {
           onSelectSupplierId={setSelectedSupplierId}
           groups={groups}
           onUpdateGroup={handleUpdateGroup}
+          onClearGroupSpecs={handleClearGroupSpecs}
+          onResetGroup={handleResetGroup}
           onAddGroup={handleAddGroup}
           onRemoveGroup={handleRemoveGroup}
           onAddImeiToGroup={handleAddImeiToGroup}

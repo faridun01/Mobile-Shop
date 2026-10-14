@@ -122,7 +122,7 @@ describe('computeSaleProfit', () => {
 
     const res = computeSaleProfit(sale);
     expect(res.profitUsd).toBe(75.5);
-    expect(res.profitTjs).toBe(831);
+    expect(res.profitTjs).toBe(830.5);
   });
 
   it('treats refunded sale profit as retained penalty fee only', () => {

@@ -12,22 +12,16 @@ import {
   AlertTriangle,
   CheckCircle2,
   AlertCircle,
-  HelpCircle,
-  Flame,
-  Zap,
   Package,
   Plus,
   Minus,
-  Sparkles,
   Loader2,
-  RefreshCw,
   Check,
+  X,
 } from 'lucide-react';
-import { Badge } from '../ui/Badge';
 import { StatCard } from '../ui/StatCard';
 import { LoadingState } from '../ui/Skeleton';
 import { EmptyState } from '../ui/EmptyState';
-import { Button } from '../ui/Button';
 import { useStoreContext } from '../../utils/storeContext';
 
 /** A minimum set for every capacity of a model together (the server's ALL_STORAGE). */
@@ -54,7 +48,8 @@ const ThresholdController: React.FC<{
   isSaved: boolean;
   onSave: (row: ModelRowData, newMin: number) => Promise<void>;
   onOptimisticChange?: (row: ModelRowData, newMin: number) => void;
-}> = ({ row, canEdit, isSaving, isSaved, onSave, onOptimisticChange }) => {
+  compact?: boolean;
+}> = ({ row, canEdit, isSaving, isSaved, onSave, onOptimisticChange, compact }) => {
   const [val, setVal] = useState<string>(String(row.minQuantity));
   const [isEditing, setIsEditing] = useState(false);
   const pendingValueRef = useRef<number | null>(null);
@@ -119,9 +114,8 @@ const ThresholdController: React.FC<{
 
   if (!canEdit) {
     return (
-      <div className="flex items-center gap-1.5">
-        <span className="text-xs text-fg-subtle md:hidden font-semibold">Минимум:</span>
-        <span className="font-extrabold font-mono text-xs text-fg bg-surface-raised px-2.5 py-1 rounded-lg border border-border">
+      <div className="flex items-center gap-1.5 shrink-0">
+        <span className="font-extrabold font-mono text-xs text-fg bg-surface-raised px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-lg border border-border">
           {row.minQuantity > 0 ? `${row.minQuantity} шт.` : 'Не задан'}
         </span>
       </div>
@@ -129,14 +123,20 @@ const ThresholdController: React.FC<{
   }
 
   return (
-    <div className="flex items-center gap-2">
+    <div className="flex items-center gap-1 shrink-0">
       {/* Stepper Controller */}
-      <div className="flex items-center rounded-xl bg-surface-raised border border-border shadow-2xs overflow-hidden focus-within:border-accent focus-within:ring-1 focus-within:ring-accent transition-all">
+      <div
+        className={`flex items-center rounded-xl bg-surface-raised border border-border shadow-2xs overflow-hidden focus-within:border-accent focus-within:ring-1 focus-within:ring-accent transition-all ${
+          compact ? 'h-7 sm:h-8' : 'h-8 sm:h-9'
+        }`}
+      >
         <button
           type="button"
           disabled={currentDisplayNumber <= 0}
           onClick={() => handleStep(-1)}
-          className="p-1.5 sm:p-2 text-fg-subtle hover:text-fg hover:bg-surface active:bg-surface active:scale-95 transition-all disabled:opacity-30 cursor-pointer select-none touch-manipulation"
+          className={`text-fg-subtle hover:text-fg hover:bg-surface active:bg-surface active:scale-90 transition-all disabled:opacity-20 cursor-pointer select-none touch-manipulation flex items-center justify-center shrink-0 ${
+            compact ? 'w-6 h-7 sm:w-8 sm:h-8' : 'w-8 h-8 sm:w-9 sm:h-9'
+          }`}
           title="Уменьшить минимум на 1"
           aria-label="Уменьшить минимум на 1"
         >
@@ -169,14 +169,18 @@ const ThresholdController: React.FC<{
               e.currentTarget.blur();
             }
           }}
-          className="w-12 text-center text-xs sm:text-sm font-extrabold font-mono text-fg bg-transparent focus:outline-none select-all"
+          className={`text-center font-extrabold font-mono text-fg bg-transparent focus:outline-none select-all ${
+            compact ? 'w-8 sm:w-10 text-xs sm:text-sm' : 'w-11 sm:w-12 text-xs sm:text-sm'
+          }`}
           title="Нажмите, чтобы ввести число вручную"
         />
 
         <button
           type="button"
           onClick={() => handleStep(1)}
-          className="p-1.5 sm:p-2 text-fg-subtle hover:text-fg hover:bg-surface active:bg-surface active:scale-95 transition-all cursor-pointer select-none touch-manipulation"
+          className={`text-fg-subtle hover:text-fg hover:bg-surface active:bg-surface active:scale-90 transition-all cursor-pointer select-none touch-manipulation flex items-center justify-center shrink-0 ${
+            compact ? 'w-6 h-7 sm:w-8 sm:h-8' : 'w-8 h-8 sm:w-9 sm:h-9'
+          }`}
           title="Увеличить минимум на 1"
           aria-label="Увеличить минимум на 1"
         >
@@ -184,14 +188,16 @@ const ThresholdController: React.FC<{
         </button>
       </div>
 
-      {/* Status feedback icon */}
-      <div className="w-4 flex items-center justify-center shrink-0">
-        {isSaving ? (
-          <Loader2 className="w-3.5 h-3.5 animate-spin text-accent" />
-        ) : isSaved ? (
-          <Check className="w-3.5 h-3.5 text-emerald-500 animate-in zoom-in-50" />
-        ) : null}
-      </div>
+      {/* Status feedback icon - only occupies space when saving or just saved */}
+      {(isSaving || isSaved) && (
+        <div className="w-3.5 flex items-center justify-center shrink-0">
+          {isSaving ? (
+            <Loader2 className="w-3.5 h-3.5 animate-spin text-accent" />
+          ) : (
+            <Check className="w-3.5 h-3.5 text-emerald-500 animate-in zoom-in-50" />
+          )}
+        </div>
+      )}
     </div>
   );
 };
@@ -516,14 +522,26 @@ export const StockThresholdsPage: React.FC = () => {
   }, [canEdit, selectedStoreId, handleOptimisticChange, fetchThresholds]);
 
   return (
-    <div className="p-3 sm:p-5 max-w-7xl mx-auto space-y-4">
+    <div className="w-full max-w-7xl mx-auto p-3 sm:p-5 space-y-3.5 sm:space-y-4 min-w-0 overflow-x-hidden">
       {/* 1. Header & Location Selector */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 bg-surface border border-border rounded-2xl p-4 sm:p-5 shadow-2xs">
-
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 bg-surface border border-border rounded-2xl p-3 sm:p-4 shadow-2xs w-full max-w-full min-w-0">
+        <div className="flex items-center gap-2.5 min-w-0">
+          <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-accent/10 border border-accent/20 flex items-center justify-center shrink-0">
+            <SlidersHorizontal className="w-4 h-4 text-accent" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <h1 className="text-sm sm:text-base font-black text-fg tracking-tight truncate">
+              Минимальные остатки
+            </h1>
+            <p className="text-[11px] text-fg-subtle truncate hidden sm:block">
+              Контроль неснижаемого запаса и автоматическое отслеживание дефицита
+            </p>
+          </div>
+        </div>
 
         {/* Store Selector (Admin can switch between Main Warehouse & Retail Stores) */}
         {isAdmin && (
-          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0 scrollbar-none">
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0 scrollbar-none w-full sm:w-auto max-w-full min-w-0">
             {activeStores.map((s) => {
               const isSelected = s.id === selectedStoreId;
               const isWh = s.isMainWarehouse;
@@ -532,39 +550,46 @@ export const StockThresholdsPage: React.FC = () => {
                   key={s.id}
                   type="button"
                   onClick={() => setSelectedStoreId(s.id)}
-                  className={`flex items-center gap-1.5 px-3 py-2 rounded-xl font-bold text-xs whitespace-nowrap transition-all cursor-pointer ${
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-bold text-xs whitespace-nowrap transition-all cursor-pointer select-none active:scale-95 shrink-0 ${
                     isSelected
                       ? isWh
                         ? 'bg-amber-500 text-white shadow-xs'
                         : 'bg-accent text-accent-fg shadow-xs'
-                      : 'bg-surface-raised border border-border text-fg-muted hover:bg-surface-raised/70'
+                      : 'bg-surface-raised border border-border text-fg-muted hover:text-fg hover:bg-surface'
                   }`}
                 >
-                  {isWh ? <Warehouse className="w-3.5 h-3.5" /> : <StoreIcon className="w-3.5 h-3.5" />}
-                  <span>{isWh ? 'Главный склад' : s.name}</span>
+                  {isWh ? <Warehouse className="w-3.5 h-3.5 shrink-0" /> : <StoreIcon className="w-3.5 h-3.5 shrink-0" />}
+                  <span className="truncate">{isWh ? 'Главный склад' : s.name}</span>
                 </button>
               );
             })}
           </div>
         )}
 
-
-
         {!isAdmin && (
-          <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-surface-raised border border-border text-xs font-bold text-fg self-start md:self-auto">
-            {currentStore?.isMainWarehouse ? <Warehouse className="w-4 h-4 text-amber-500" /> : <StoreIcon className="w-4 h-4 text-accent" />}
-            <span>{currentStore?.isMainWarehouse ? 'Главный склад' : currentStore?.name || 'Мой магазин'}</span>
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-surface-raised border border-border text-xs font-bold text-fg self-start sm:self-auto shrink-0 max-w-full truncate">
+            {currentStore?.isMainWarehouse ? <Warehouse className="w-4 h-4 text-amber-500 shrink-0" /> : <StoreIcon className="w-4 h-4 text-accent shrink-0" />}
+            <span className="truncate">{currentStore?.isMainWarehouse ? 'Главный склад' : currentStore?.name || 'Мой магазин'}</span>
           </div>
         )}
       </div>
 
-      {/* 2. Top Summary Metric Cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-3">
-        <StatCard
-          label="Всего позиций"
-          value={`${metrics.total} шт.`}
-          icon={Package}
-        />
+      {/* 2. Summary Metric Cards: Desktop Cards vs Mobile KPI Bar */}
+      {/* Desktop / Tablet Grid (>= sm) */}
+      <div className="hidden sm:grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-3">
+        <div
+          onClick={() => setStatusFilter('ALL')}
+          className={`cursor-pointer transition-transform active:scale-[0.98] ${
+            statusFilter === 'ALL' ? 'ring-2 ring-accent rounded-2xl' : ''
+          }`}
+        >
+          <StatCard
+            label="Всего позиций"
+            value={`${metrics.total} шт.`}
+            subvalue="В каталоге магазина"
+            icon={Package}
+          />
+        </div>
         <div
           onClick={() => setStatusFilter(statusFilter === 'DEFICIT' ? 'ALL' : 'DEFICIT')}
           className={`cursor-pointer transition-transform active:scale-[0.98] ${
@@ -574,7 +599,7 @@ export const StockThresholdsPage: React.FC = () => {
           <StatCard
             label="Заканчиваются"
             value={`${metrics.deficit} шт.`}
-            subvalue={metrics.deficit > 0 ? 'Требуется заказ/перемещение' : 'Дефицита нет'}
+            subvalue={metrics.deficit > 0 ? 'Требуется закупка' : 'Дефицита нет'}
             icon={AlertTriangle}
             tone={metrics.deficit > 0 ? 'danger' : 'neutral'}
           />
@@ -588,7 +613,7 @@ export const StockThresholdsPage: React.FC = () => {
           <StatCard
             label="На пределе"
             value={`${metrics.atRisk} шт.`}
-            subvalue="Осталось ровно минимум"
+            subvalue="Запас равен минимуму"
             icon={AlertCircle}
             tone={metrics.atRisk > 0 ? 'warning' : 'neutral'}
           />
@@ -609,29 +634,104 @@ export const StockThresholdsPage: React.FC = () => {
         </div>
       </div>
 
+      {/* Mobile Sleek KPI Bar (< sm, saves ~130px of vertical space) */}
+      <div className="grid sm:hidden grid-cols-4 bg-surface border border-border rounded-xl p-1 gap-1 shadow-2xs w-full max-w-full min-w-0">
+        <button
+          type="button"
+          onClick={() => setStatusFilter('ALL')}
+          className={`flex flex-col items-center justify-center py-1.5 px-0.5 rounded-lg transition-all cursor-pointer min-w-0 ${
+            statusFilter === 'ALL'
+              ? 'bg-accent/15 text-accent border border-accent/30 font-black'
+              : 'text-fg-muted hover:bg-surface-raised'
+          }`}
+        >
+          <span className="text-[9px] uppercase font-bold text-fg-subtle truncate max-w-full">Все</span>
+          <span className="text-xs font-black text-fg mt-0.5 truncate">{metrics.total}</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setStatusFilter(statusFilter === 'DEFICIT' ? 'ALL' : 'DEFICIT')}
+          className={`flex flex-col items-center justify-center py-1.5 px-0.5 rounded-lg transition-all cursor-pointer min-w-0 ${
+            statusFilter === 'DEFICIT'
+              ? 'bg-danger/20 text-danger border border-danger/40 font-black'
+              : 'text-fg-muted hover:bg-surface-raised'
+          }`}
+        >
+          <span className={`text-[9px] uppercase font-bold flex items-center justify-center gap-0.5 max-w-full truncate ${metrics.deficit > 0 ? 'text-danger' : 'text-fg-subtle'}`}>
+            {metrics.deficit > 0 && <span className="w-1.5 h-1.5 rounded-full bg-danger animate-pulse shrink-0" />}
+            <span className="truncate">Дефицит</span>
+          </span>
+          <span className={`text-xs font-black mt-0.5 truncate ${metrics.deficit > 0 ? 'text-danger' : 'text-fg'}`}>
+            {metrics.deficit}
+          </span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setStatusFilter(statusFilter === 'AT_RISK' ? 'ALL' : 'AT_RISK')}
+          className={`flex flex-col items-center justify-center py-1.5 px-0.5 rounded-lg transition-all cursor-pointer min-w-0 ${
+            statusFilter === 'AT_RISK'
+              ? 'bg-amber-500/20 text-amber-500 border border-amber-500/40 font-black'
+              : 'text-fg-muted hover:bg-surface-raised'
+          }`}
+        >
+          <span className={`text-[9px] uppercase font-bold truncate max-w-full ${metrics.atRisk > 0 ? 'text-amber-500' : 'text-fg-subtle'}`}>
+            Предел
+          </span>
+          <span className={`text-xs font-black mt-0.5 truncate ${metrics.atRisk > 0 ? 'text-amber-500' : 'text-fg'}`}>
+            {metrics.atRisk}
+          </span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setStatusFilter(statusFilter === 'NORMAL' ? 'ALL' : 'NORMAL')}
+          className={`flex flex-col items-center justify-center py-1.5 px-0.5 rounded-lg transition-all cursor-pointer min-w-0 ${
+            statusFilter === 'NORMAL'
+              ? 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/40 font-black'
+              : 'text-fg-muted hover:bg-surface-raised'
+          }`}
+        >
+          <span className="text-[9px] uppercase font-bold text-fg-subtle truncate max-w-full">В норме</span>
+          <span className="text-xs font-black text-emerald-600 dark:text-emerald-400 mt-0.5 truncate">{metrics.normal}</span>
+        </button>
+      </div>
+
       {/* 3. Search & Filter Bar */}
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 bg-surface border border-border rounded-xl p-2.5 sm:p-3 shadow-2xs">
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 bg-surface border border-border rounded-xl p-2 sm:p-2.5 shadow-2xs w-full max-w-full min-w-0">
         {/* Search */}
-        <div className="relative flex-1">
+        <div className="relative flex-1 min-w-0 w-full">
           <Search className="w-4 h-4 text-fg-subtle absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
           <input
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Поиск по бренду, модели или памяти..."
-            className="w-full pl-9 pr-3 py-2 text-xs rounded-lg bg-surface-raised border border-border text-fg placeholder:text-fg-subtle focus:outline-none focus:ring-1 focus:ring-accent"
+            className="w-full pl-9 pr-8 py-2 text-xs sm:text-sm rounded-lg bg-surface-raised border border-border text-fg placeholder:text-fg-subtle focus:outline-none focus:ring-1 focus:ring-accent"
           />
+          {searchQuery && (
+            <button
+              type="button"
+              onClick={() => setSearchQuery('')}
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 text-fg-subtle hover:text-fg rounded-md transition-colors"
+              title="Очистить поиск"
+              aria-label="Очистить поиск"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          )}
         </div>
 
         {/* Filter Pills */}
-        <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none pb-0.5 sm:pb-0">
+        <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none pb-1 sm:pb-0 w-full sm:w-auto max-w-full min-w-0">
           <button
             type="button"
             onClick={() => setStatusFilter('ALL')}
-            className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition-colors whitespace-nowrap cursor-pointer ${
+            className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap cursor-pointer shrink-0 ${
               statusFilter === 'ALL'
-                ? 'bg-accent text-accent-fg'
-                : 'bg-surface-raised text-fg-muted hover:bg-surface-raised/70'
+                ? 'bg-accent text-accent-fg shadow-xs'
+                : 'bg-surface-raised text-fg-muted hover:text-fg border border-border/60'
             }`}
           >
             Все ({metrics.total})
@@ -639,46 +739,75 @@ export const StockThresholdsPage: React.FC = () => {
           <button
             type="button"
             onClick={() => setStatusFilter('DEFICIT')}
-            className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition-colors whitespace-nowrap flex items-center gap-1 cursor-pointer ${
+            className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap flex items-center gap-1.5 cursor-pointer shrink-0 ${
               statusFilter === 'DEFICIT'
-                ? 'bg-danger text-white'
-                : metrics.deficit > 0
-                ? 'bg-danger/10 text-danger border border-danger/30 hover:bg-danger/20'
-                : 'bg-surface-raised text-fg-muted hover:bg-surface-raised/70'
+                ? 'bg-danger text-white shadow-xs'
+                : 'bg-surface-raised border border-border text-fg-muted hover:text-fg'
             }`}
           >
-            <AlertTriangle className="w-3 h-3" />
-            <span>Дефицит ({metrics.deficit})</span>
+            <AlertTriangle className={`w-3.5 h-3.5 shrink-0 ${statusFilter === 'DEFICIT' ? 'text-white' : metrics.deficit > 0 ? 'text-danger' : 'text-fg-subtle'}`} />
+            <span>Дефицит</span>
+            <span
+              className={`px-1.5 py-0.2 rounded-full text-[10px] font-mono ${
+                statusFilter === 'DEFICIT'
+                  ? 'bg-white/20 text-white font-extrabold'
+                  : metrics.deficit > 0
+                  ? 'bg-danger/15 text-danger font-extrabold'
+                  : 'bg-surface text-fg-subtle'
+              }`}
+            >
+              {metrics.deficit}
+            </span>
           </button>
           <button
             type="button"
             onClick={() => setStatusFilter('AT_RISK')}
-            className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition-colors whitespace-nowrap flex items-center gap-1 cursor-pointer ${
+            className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap flex items-center gap-1.5 cursor-pointer shrink-0 ${
               statusFilter === 'AT_RISK'
-                ? 'bg-amber-500 text-white'
-                : 'bg-surface-raised text-fg-muted hover:bg-surface-raised/70'
+                ? 'bg-amber-500 text-white shadow-xs'
+                : 'bg-surface-raised border border-border text-fg-muted hover:text-fg'
             }`}
           >
-            <span>На пределе ({metrics.atRisk})</span>
+            <span>На пределе</span>
+            <span
+              className={`px-1.5 py-0.2 rounded-full text-[10px] font-mono ${
+                statusFilter === 'AT_RISK'
+                  ? 'bg-white/20 text-white font-extrabold'
+                  : metrics.atRisk > 0
+                  ? 'bg-amber-500/15 text-amber-500 font-extrabold'
+                  : 'bg-surface text-fg-subtle'
+              }`}
+            >
+              {metrics.atRisk}
+            </span>
           </button>
           <button
             type="button"
             onClick={() => setStatusFilter('NORMAL')}
-            className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition-colors whitespace-nowrap flex items-center gap-1 cursor-pointer ${
+            className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap flex items-center gap-1.5 cursor-pointer shrink-0 ${
               statusFilter === 'NORMAL'
-                ? 'bg-emerald-600 text-white'
-                : 'bg-surface-raised text-fg-muted hover:bg-surface-raised/70'
+                ? 'bg-emerald-600 text-white shadow-xs'
+                : 'bg-surface-raised border border-border text-fg-muted hover:text-fg'
             }`}
           >
-            <span>В норме ({metrics.normal})</span>
+            <span>В норме</span>
+            <span
+              className={`px-1.5 py-0.2 rounded-full text-[10px] font-mono ${
+                statusFilter === 'NORMAL'
+                  ? 'bg-white/20 text-white font-extrabold'
+                  : 'bg-surface text-fg-subtle'
+              }`}
+            >
+              {metrics.normal}
+            </span>
           </button>
           <button
             type="button"
             onClick={() => setStatusFilter('NONE')}
-            className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition-colors whitespace-nowrap cursor-pointer ${
+            className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap cursor-pointer shrink-0 ${
               statusFilter === 'NONE'
-                ? 'bg-fg-muted text-surface'
-                : 'bg-surface-raised text-fg-subtle hover:bg-surface-raised/70'
+                ? 'bg-fg text-surface shadow-xs'
+                : 'bg-surface-raised border border-border text-fg-subtle hover:text-fg'
             }`}
           >
             Без лимита ({metrics.none})
@@ -686,67 +815,98 @@ export const StockThresholdsPage: React.FC = () => {
         </div>
       </div>
 
-      {/* 4. Model Thresholds List */}
+      {/* 4. Model Thresholds List: Mobile Cards vs Desktop Table */}
       {loading ? (
         <LoadingState label="Загрузка лимитов остатков…" />
       ) : filteredRows.length === 0 ? (
-        <EmptyState
-          icon={SlidersHorizontal}
-          title="Товары не найдены"
-          description="Попробуйте изменить поисковый запрос или фильтр по статусу остатка"
-        />
-      ) : (
-        <div className="bg-surface border border-border rounded-2xl shadow-2xs divide-y divide-border overflow-hidden">
-          {/* Header Row for Desktop */}
-          <div className="hidden md:grid grid-cols-12 gap-3 px-4 py-3 bg-surface-raised/60 text-[11px] font-bold text-fg-subtle uppercase tracking-wider">
-            <div className="col-span-5">Модель устройства</div>
-            <div className="col-span-2 text-center">В наличии</div>
-            <div className="col-span-3 text-center">Минимальный порог</div>
-            <div className="col-span-2 text-right">Статус</div>
-          </div>
-
-          {/* Rows */}
-          {filteredRows.map((row) => {
-            const isSaving = savingKeys[row.key];
-            const isSaved = savedSuccessKeys[row.key];
-            const brandStyle = getBrandBadgeStyle(row.brand);
-
-            return (
-              <div
-                key={row.key}
-                className={`p-3.5 sm:p-4 transition-colors hover:bg-surface-raised/40 ${
-                  row.status === 'DEFICIT' ? 'bg-danger/5 dark:bg-danger/10' : ''
-                }`}
+        <div className="bg-surface border border-border rounded-2xl p-6 shadow-2xs">
+          <EmptyState
+            icon={SlidersHorizontal}
+            title="Товары не найдены"
+            description={
+              searchQuery
+                ? 'По вашему запросу ничего не найдено. Попробуйте сбросить поиск.'
+                : 'По выбранному фильтру товаров нет.'
+            }
+          />
+          {(searchQuery || statusFilter !== 'ALL') && (
+            <div className="flex justify-center mt-3">
+              <button
+                type="button"
+                onClick={() => {
+                  setSearchQuery('');
+                  setStatusFilter('ALL');
+                }}
+                className="px-3.5 py-1.5 rounded-xl bg-accent text-accent-fg text-xs font-bold transition-transform active:scale-95 cursor-pointer"
               >
-                <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-center">
-                  {/* Col 1: Model & Storage */}
-                  <div className="md:col-span-5 flex items-center gap-3">
-                    <span
-                      className={`px-2 py-0.5 rounded-lg text-[10px] font-extrabold uppercase tracking-wide border shrink-0 ${brandStyle.bg} ${brandStyle.border}`}
-                    >
-                      {row.brand}
-                    </span>
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2">
-                        <span className="font-extrabold text-xs sm:text-sm text-fg truncate">
-                          {row.model}
-                        </span>
-                        <span className="px-1.5 py-0.5 rounded text-[10px] font-bold font-mono bg-surface-raised border border-border text-fg-muted shrink-0">
-                          {storageLabel(row.storage)}
-                        </span>
-                      </div>
-                      <span className="text-[11px] text-fg-subtle block">
-                        Локация: {currentStore?.name || 'Точка'}
+                Сбросить фильтры
+              </button>
+            </div>
+          )}
+        </div>
+      ) : (
+        <>
+          {/* Mobile Card Feed (< md) */}
+          <div className="md:hidden space-y-2 w-full max-w-full min-w-0">
+            {filteredRows.map((row) => {
+              const isSaving = savingKeys[row.key];
+              const isSaved = savedSuccessKeys[row.key];
+              const brandStyle = getBrandBadgeStyle(row.brand);
+
+              return (
+                <div
+                  key={row.key}
+                  className={`p-3 rounded-xl border transition-all w-full max-w-full min-w-0 overflow-hidden ${
+                    row.status === 'DEFICIT'
+                      ? 'bg-surface border-danger/40 border-l-4 border-l-danger shadow-xs'
+                      : row.status === 'AT_RISK'
+                      ? 'bg-surface border-amber-500/30 border-l-4 border-l-amber-500'
+                      : 'bg-surface border-border'
+                  }`}
+                >
+                  {/* Card Top: Brand, Model, Storage & Status Pill */}
+                  <div className="flex items-center justify-between gap-2 min-w-0 w-full">
+                    <div className="flex items-center gap-1.5 min-w-0 flex-1 overflow-hidden">
+                      <span className={`px-1.5 py-0.5 rounded text-[10px] font-extrabold uppercase tracking-wide border shrink-0 ${brandStyle.bg} ${brandStyle.border}`}>
+                        {row.brand}
                       </span>
+                      <span className="font-extrabold text-xs text-fg truncate">
+                        {row.model}
+                      </span>
+                      <span className="px-1.5 py-0.5 rounded text-[10px] font-bold font-mono bg-surface-raised border border-border text-fg-muted shrink-0">
+                        {storageLabel(row.storage)}
+                      </span>
+                    </div>
+
+                    {/* Status Badge */}
+                    <div className="shrink-0">
+                      {row.status === 'DEFICIT' ? (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-danger/15 text-danger border border-danger/30 text-[11px] font-bold animate-pulse whitespace-nowrap">
+                          <AlertTriangle className="w-3 h-3 shrink-0" />
+                          <span>-{row.deficit} шт.</span>
+                        </span>
+                      ) : row.status === 'AT_RISK' ? (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-500/15 text-amber-500 border border-amber-500/30 text-[11px] font-bold whitespace-nowrap">
+                          <AlertCircle className="w-3 h-3 shrink-0" />
+                          <span>Предел</span>
+                        </span>
+                      ) : row.status === 'NORMAL' ? (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 text-[11px] font-bold whitespace-nowrap">
+                          <CheckCircle2 className="w-3 h-3 shrink-0" />
+                          <span>В норме</span>
+                        </span>
+                      ) : (
+                        <span className="text-[10px] text-fg-subtle font-medium whitespace-nowrap">Без порога</span>
+                      )}
                     </div>
                   </div>
 
-                  {/* Col 2: Current In-Stock Count */}
-                  <div className="md:col-span-2 flex md:justify-center items-center gap-2">
-                    <span className="text-xs text-fg-subtle md:hidden font-semibold">В наличии:</span>
-                    <div className="flex items-baseline gap-1">
+                  {/* Card Bottom: Current Stock & Stepper */}
+                  <div className="flex items-center justify-between gap-2 mt-2 pt-2 border-t border-border/50 min-w-0 w-full">
+                    <div className="flex items-baseline gap-1 shrink-0">
+                      <span className="text-xs text-fg-subtle font-semibold">В наличии:</span>
                       <span
-                        className={`text-base sm:text-lg font-black font-mono leading-none ${
+                        className={`text-sm font-black font-mono leading-none ${
                           row.status === 'DEFICIT'
                             ? 'text-danger'
                             : row.status === 'AT_RISK'
@@ -756,51 +916,130 @@ export const StockThresholdsPage: React.FC = () => {
                       >
                         {row.currentCount}
                       </span>
-                      <span className="text-[11px] text-fg-subtle font-mono">шт.</span>
+                      <span className="text-[11px] text-fg-subtle">шт.</span>
+                    </div>
+
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <span className="text-xs text-fg-subtle font-semibold">Минимум:</span>
+                      <ThresholdController
+                        row={row}
+                        canEdit={canEdit}
+                        isSaving={Boolean(isSaving)}
+                        isSaved={Boolean(isSaved)}
+                        onSave={handleSetThreshold}
+                        onOptimisticChange={handleOptimisticChange}
+                        compact
+                      />
                     </div>
                   </div>
-
-                  {/* Col 3: Minimum Threshold Controller */}
-                  <div className="md:col-span-3 flex flex-col md:items-center gap-1.5">
-                    <ThresholdController
-                      row={row}
-                      canEdit={canEdit}
-                      isSaving={Boolean(isSaving)}
-                      isSaved={Boolean(isSaved)}
-                      onSave={handleSetThreshold}
-                      onOptimisticChange={handleOptimisticChange}
-                    />
-                  </div>
-
-                  {/* Col 4: Status Badge */}
-                  <div className="md:col-span-2 flex md:justify-end items-center">
-                    {row.status === 'DEFICIT' ? (
-                      <div className="flex items-center gap-1 px-2.5 py-1 rounded-xl bg-danger/15 text-danger border border-danger/30 text-xs font-bold animate-pulse">
-                        <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
-                        <span>Не хватает {row.deficit} шт.</span>
-                      </div>
-                    ) : row.status === 'AT_RISK' ? (
-                      <div className="flex items-center gap-1 px-2.5 py-1 rounded-xl bg-amber-500/15 text-amber-500 border border-amber-500/30 text-xs font-bold">
-                        <AlertCircle className="w-3.5 h-3.5 shrink-0" />
-                        <span>На пределе ({row.currentCount}/{row.minQuantity})</span>
-                      </div>
-                    ) : row.status === 'NORMAL' ? (
-                      <div className="flex items-center gap-1 px-2.5 py-1 rounded-xl bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 text-xs font-bold">
-                        <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
-                        <span>В норме (+{row.currentCount - row.minQuantity})</span>
-                      </div>
-                    ) : (
-                      <span className="text-[11px] text-fg-subtle font-medium">Без лимита</span>
-                    )}
-                  </div>
                 </div>
+              );
+            })}
+          </div>
+
+          {/* Desktop Table (>= md) */}
+          <div className="hidden md:block bg-surface border border-border rounded-2xl shadow-2xs overflow-x-auto w-full max-w-full">
+            <div className="min-w-[700px] divide-y divide-border">
+              {/* Header Row for Desktop */}
+              <div className="grid grid-cols-12 gap-3 px-4 py-3 bg-surface-raised/60 text-[11px] font-bold text-fg-subtle uppercase tracking-wider">
+                <div className="col-span-5">Модель устройства</div>
+                <div className="col-span-2 text-center">В наличии</div>
+                <div className="col-span-3 text-center">Минимальный порог</div>
+                <div className="col-span-2 text-right">Статус</div>
               </div>
-            );
-          })}
-        </div>
+
+              {/* Rows */}
+              {filteredRows.map((row) => {
+                const isSaving = savingKeys[row.key];
+                const isSaved = savedSuccessKeys[row.key];
+                const brandStyle = getBrandBadgeStyle(row.brand);
+
+                return (
+                  <div
+                    key={row.key}
+                    className={`p-3.5 sm:p-4 transition-colors hover:bg-surface-raised/40 ${
+                      row.status === 'DEFICIT' ? 'bg-danger/5 dark:bg-danger/10' : ''
+                    }`}
+                  >
+                    <div className="grid grid-cols-12 gap-3 items-center">
+                      {/* Col 1: Model & Storage */}
+                      <div className="col-span-5 flex items-center gap-3">
+                        <span
+                          className={`px-2 py-0.5 rounded-lg text-[10px] font-extrabold uppercase tracking-wide border shrink-0 ${brandStyle.bg} ${brandStyle.border}`}
+                        >
+                          {row.brand}
+                        </span>
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className="font-extrabold text-sm text-fg truncate">
+                              {row.model}
+                            </span>
+                            <span className="px-1.5 py-0.5 rounded text-[10px] font-bold font-mono bg-surface-raised border border-border text-fg-muted shrink-0">
+                              {storageLabel(row.storage)}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Col 2: Current In-Stock Count */}
+                      <div className="col-span-2 flex justify-center items-center">
+                        <div className="flex items-baseline gap-1">
+                          <span
+                            className={`text-base sm:text-lg font-black font-mono leading-none ${
+                              row.status === 'DEFICIT'
+                                ? 'text-danger'
+                                : row.status === 'AT_RISK'
+                                ? 'text-amber-500'
+                                : 'text-fg'
+                            }`}
+                          >
+                            {row.currentCount}
+                          </span>
+                          <span className="text-[11px] text-fg-subtle font-mono">шт.</span>
+                        </div>
+                      </div>
+
+                      {/* Col 3: Minimum Threshold Controller */}
+                      <div className="col-span-3 flex justify-center items-center">
+                        <ThresholdController
+                          row={row}
+                          canEdit={canEdit}
+                          isSaving={Boolean(isSaving)}
+                          isSaved={Boolean(isSaved)}
+                          onSave={handleSetThreshold}
+                          onOptimisticChange={handleOptimisticChange}
+                        />
+                      </div>
+
+                      {/* Col 4: Status Badge */}
+                      <div className="col-span-2 flex justify-end items-center">
+                        {row.status === 'DEFICIT' ? (
+                          <div className="flex items-center gap-1 px-2.5 py-1 rounded-xl bg-danger/15 text-danger border border-danger/30 text-xs font-bold animate-pulse">
+                            <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+                            <span>Не хватает {row.deficit} шт.</span>
+                          </div>
+                        ) : row.status === 'AT_RISK' ? (
+                          <div className="flex items-center gap-1 px-2.5 py-1 rounded-xl bg-amber-500/15 text-amber-500 border border-amber-500/30 text-xs font-bold">
+                            <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                            <span>На пределе ({row.currentCount}/{row.minQuantity})</span>
+                          </div>
+                        ) : row.status === 'NORMAL' ? (
+                          <div className="flex items-center gap-1 px-2.5 py-1 rounded-xl bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 text-xs font-bold">
+                            <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+                            <span>В норме (+{row.currentCount - row.minQuantity})</span>
+                          </div>
+                        ) : (
+                          <span className="text-[11px] text-fg-subtle font-medium">Без лимита</span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </>
       )}
-
-
     </div>
   );
 };

@@ -35,6 +35,7 @@ export interface DailyClosingSummary {
   refundsCashTjs: string;
   refundsCashUsd: string;
   refundsCount: number;
+  refundedReceipts?: { receiptNumber: number; amountTjs: string; amountUsd: string; reason?: string }[];
   collectionsCashTjs: string;
   collectionsCashUsd: string;
   collectionsCount: number;
@@ -205,16 +206,24 @@ export class DailyClosingService {
     // dollars that is the refund day's rate (the penalty is booked in dollars at the same rate).
     const refunds = await db.sale.findMany({
       where: { storeId, refundedAt: dateRange, status: 'REFUNDED' },
-      select: { id: true, actualRefundAmountTjs: true, penaltyFeeTjs: true, penaltyFeeUsd: true },
+      select: { id: true, receiptNumber: true, actualRefundAmountTjs: true, penaltyFeeTjs: true, penaltyFeeUsd: true, refundReason: true },
     });
     let refundsCashTjs = D(0);
     let refundsCashUsd = D(0);
+    const refundedReceipts: { receiptNumber: number; amountTjs: string; amountUsd: string; reason?: string }[] = [];
     for (const r of refunds) {
       const refundTjs = D(r.actualRefundAmountTjs ?? 0);
       if (refundTjs.isZero()) continue;
       const collectedTjs = refundTjs.plus(r.penaltyFeeTjs ?? 0);
       refundsCashTjs = refundsCashTjs.plus(refundTjs);
-      refundsCashUsd = refundsCashUsd.plus(roundMoney(usdAt(collectedTjs, dayRate)).minus(r.penaltyFeeUsd ?? 0));
+      const refundUsd = roundMoney(usdAt(collectedTjs, dayRate)).minus(r.penaltyFeeUsd ?? 0);
+      refundsCashUsd = refundsCashUsd.plus(refundUsd);
+      refundedReceipts.push({
+        receiptNumber: r.receiptNumber,
+        amountTjs: roundMoney(refundTjs).toString(),
+        amountUsd: roundMoney(refundUsd).toString(),
+        reason: r.refundReason ?? undefined,
+      });
     }
 
     // 2d. Expenses that actually left THIS register (a partner's paid store expense, or one the
@@ -288,6 +297,7 @@ export class DailyClosingService {
       refundsCashTjs: roundMoney(refundsCashTjs).toString(),
       refundsCashUsd: roundMoney(refundsCashUsd).toString(),
       refundsCount: refunds.length,
+      refundedReceipts,
       collectionsCashTjs: '0',
       collectionsCashUsd: '0',
       collectionsCount: 0,

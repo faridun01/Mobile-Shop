@@ -10,6 +10,7 @@ export interface ReportEventRow {
   date: string;
   saleId: string;
   receiptNumber: number | null;
+  refundReason?: string | null;
   storeId: string;
   storeName: string;
   rate: number;
@@ -149,18 +150,26 @@ export function buildEventsReportTable(events: ReportEventRow[], cashBonusesUsd:
     'Удержание ($)',
   ];
 
-  const rows: (string | number)[][] = events.map((event) => [
-    new Date(event.date).toLocaleString('ru-RU'),
-    EVENT_LABELS[event.kind],
-    event.receiptNumber ?? '',
-    event.storeName,
-    Number(event.rate).toFixed(4),
-    Number(event.amountTjs).toFixed(2),
-    Number(event.amountUsd).toFixed(2),
-    Number(event.costUsd).toFixed(2),
-    Number(event.profitUsd).toFixed(2),
-    Number(event.penaltyUsd).toFixed(2),
-  ]);
+  const rows: (string | number)[][] = events.map((event) => {
+    const isRefund = event.kind === 'REFUND';
+    const operationLabel = isRefund
+      ? (event.receiptNumber ? `Возврат (чек № ${event.receiptNumber})` : 'Возврат')
+      : EVENT_LABELS[event.kind];
+    const receiptLabel = event.receiptNumber ? `Чек № ${event.receiptNumber}` : '';
+
+    return [
+      new Date(event.date).toLocaleString('ru-RU'),
+      operationLabel,
+      receiptLabel,
+      event.storeName,
+      Number(event.rate).toFixed(4),
+      Number(event.amountTjs).toFixed(2),
+      Number(event.amountUsd).toFixed(2),
+      Number(event.costUsd).toFixed(2),
+      Number(event.profitUsd).toFixed(2),
+      Number(event.penaltyUsd).toFixed(2),
+    ];
+  });
 
   // Supplier cash bonuses are nobody's income: shown once for reference, never added to profit.
   if (cashBonusesUsd !== 0) {
@@ -322,19 +331,21 @@ export async function buildComprehensiveReportWorkbook({
   styleHeader(eventsHeader);
 
   for (const event of events) {
+    const isRefund = event.kind === 'REFUND';
+    const operationName = isRefund && event.receiptNumber ? `Возврат (чек № ${event.receiptNumber})` : EVENT_LABELS[event.kind];
     const row = eventsSheet.addRow([
       new Date(event.date),
-      EVENT_LABELS[event.kind],
+      operationName,
       event.receiptNumber ?? '',
       safeWorksheetText(event.storeName),
-      Number(event.rate),
-      Number(event.amountTjs),
-      Number(event.amountUsd),
-      Number(event.costUsd),
-      Number(event.profitUsd),
-      Number(event.bonusUsd),
-      Number(event.penaltyTjs),
-      Number(event.penaltyUsd),
+      Math.round(Number(event.rate) * 10000) / 10000,
+      Math.round(Number(event.amountTjs) * 100) / 100,
+      Math.round(Number(event.amountUsd) * 100) / 100,
+      Math.round(Number(event.costUsd) * 100) / 100,
+      Math.round(Number(event.profitUsd) * 100) / 100,
+      Math.round(Number(event.bonusUsd) * 100) / 100,
+      Math.round(Number(event.penaltyTjs) * 100) / 100,
+      Math.round(Number(event.penaltyUsd) * 100) / 100,
     ]);
     row.eachCell((cell, columnNumber) => {
       cell.font = { name: 'Calibri', size: 10, color: { argb: XLSX_DARK } };
@@ -389,10 +400,9 @@ export async function buildComprehensiveReportWorkbook({
       safeWorksheetText(expense.employeeName),
       safeWorksheetText(expense.createdByName),
       safeWorksheetText(expense.comment || expense.description),
-      expense.amountTjs || 0,
-      // The rate of the day the expense was registered: its TJS over its registered dollars.
-      amountUsd ? (expense.amountTjs || 0) / amountUsd : Number(expense.exchangeRate) || 0,
-      amountUsd,
+      Math.round((expense.amountTjs || 0) * 100) / 100,
+      Number(expense.exchangeRate) ? Math.round(Number(expense.exchangeRate) * 10000) / 10000 : (amountUsd ? Math.round(((expense.amountTjs || 0) / amountUsd) * 10000) / 10000 : 0),
+      Math.round((amountUsd || 0) * 100) / 100,
     ]);
     row.eachCell((cell, columnNumber) => {
       cell.font = { name: 'Calibri', size: 10, color: { argb: XLSX_DARK } };
