@@ -384,19 +384,16 @@ try {
     assert.equal(atCost.belowCost, false);
     assert.deepEqual(Object.keys(atCost).sort(), ['belowCost', 'deviceId'], 'no cost leaks to the seller');
   });
-  await step('проверка цены не работает как подбор себестоимости: одна цена на телефон, лимит и запись в аудите', async () => {
+  await step('проверка цены отвечает на каждую введённую цену, без ограничений', async () => {
     const [, d] = await sellable();
     const cost = D((await db.device.findUniqueOrThrow({ where: { id: d.id } })).costBasisUsd).mul(RATE);
-    // Several prices for one phone in a request: only the first is answered.
+    for (let i = 1; i <= 12; i++) {
+      const answer = ok(await call(seller, 'POST', '/devices/price-check', { items: [{ deviceId: d.id, priceTjs: cost.minus(i).toNumber() }] })).items[0];
+      assert.equal(answer.belowCost, true, `price #${i} must still be warned about`);
+    }
+    // One answer per phone per request.
     const twice = ok(await call(seller, 'POST', '/devices/price-check', { items: [{ deviceId: d.id, priceTjs: cost.minus(1).toNumber() }, { deviceId: d.id, priceTjs: cost.plus(1).toNumber() }] }));
     assert.equal(twice.items.length, 1);
-    // 8 distinct prices per phone per 10 minutes, then no more answers (and the admin sees it).
-    for (let i = 2; i <= 8; i++) await call(seller, 'POST', '/devices/price-check', { items: [{ deviceId: d.id, priceTjs: cost.minus(i).toNumber() }] });
-    const ninth = ok(await call(seller, 'POST', '/devices/price-check', { items: [{ deviceId: d.id, priceTjs: cost.minus(9).toNumber() }] }));
-    assert.equal(ninth.items[0].belowCost, false, 'beyond the limit no warning is given');
-    assert(await db.auditLog.findFirst({ where: { action: 'PRICE_CHECK_LIMIT' } }), 'the probing is audited');
-    // A price already checked is still answered (the cashier keeps their warning).
-    assert.equal(ok(await call(seller, 'POST', '/devices/price-check', { items: [{ deviceId: d.id, priceTjs: cost.minus(1).toNumber() }] })).items[0].belowCost, true);
   });
   await step('возврат: телефон в STORE_STOCK, касса −сумма, чек REFUNDED', async () => {
     const before = await storeCash('store-siyoma');
