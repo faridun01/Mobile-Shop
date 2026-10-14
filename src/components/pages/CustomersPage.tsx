@@ -437,7 +437,7 @@ export const CustomersPage: React.FC = () => {
             onClick={handleOpenAdd}
             className="h-7.5 px-2.5 text-xs font-bold cursor-pointer shadow-xs shrink-0 whitespace-nowrap"
           >
-            <span>+ Клиент</span>
+            <span>Клиент</span>
           </Button>
         </div>
       </div>
