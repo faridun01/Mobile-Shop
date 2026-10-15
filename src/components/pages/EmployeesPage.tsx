@@ -426,14 +426,7 @@ export const EmployeesPage: React.FC = () => {
   return (
     <div className="work-screen flex-1 flex flex-col h-full overflow-hidden bg-bg text-fg-muted">
       {/* Header Bar */}
-      <div className="p-2.5 sm:p-3 md:px-5 border-b border-border bg-surface flex items-center justify-between gap-2 shrink-0">
-        <div className="flex items-center space-x-2 min-w-0">
-          <Users className="w-4 h-4 text-accent shrink-0" />
-          <h3 className="text-xs sm:text-sm font-bold text-fg truncate">
-            Сотрудники и оклады
-          </h3>
-        </div>
-
+      <div className="p-2.5 sm:p-3 md:px-5 border-b border-border bg-surface flex items-center justify-end gap-2 shrink-0">
         <div className="flex items-center gap-1.5 shrink-0">
           <button
             type="button"
