@@ -11,6 +11,7 @@ import { getStoreCashAccount } from '../finance/account.service';
 import { postTransaction } from '../finance/financial-transaction.service';
 import { assertShiftOpen } from '../finance/shift-guard';
 import { syncStockAlerts } from '../stock-thresholds/stock-alerts';
+import { returnOvercollectedBonus } from '../finance/cash-collection.service';
 
 export interface ReturnItemInput {
   saleItemId: string;
@@ -147,6 +148,8 @@ export class ReturnsService {
       }
       if (entry) await tx.bonusPoolEntry.delete({ where: { id: entry.id } });
     }
+    // Their money may already be on the Bonus Account (collected before this return): hand it back to the Central Cash.
+    if (items.some((y) => y.item.isBonus)) await returnOvercollectedBonus(tx, sale.storeId, actor, `возврат по чеку #${sale.receiptNumber}`);
 
     // Owners give back the phones' booked profit — with the shares the sale was booked at, however
     // they have changed since; the last phone of the receipt takes back exactly what is left — and

@@ -1,16 +1,17 @@
 import { D, decimalMax, type MoneyInput } from '../server/src/common/decimal';
 import 'dotenv/config';
 import { prisma } from '../server/src/prisma/prisma.service';
+import { getBusinessDateKey } from '../server/src/common/business-date';
 
 const close = (left: MoneyInput, right: MoneyInput, tolerance = 0.02) => D(left).minus(right).abs().lte(tolerance);
 
 async function main() {
-  const [stores, devices, sales, suppliers, invoices, owners, transfers, expenses, ledger, todayRate] = await Promise.all([
+  const [stores, devices, sales, suppliers, invoices, owners, transfers, expenses, ledger, todayRate, storeShares] = await Promise.all([
     prisma.store.findMany({ select: { id: true, isMainWarehouse: true, cashBalanceUsd: true, active: true } }),
     prisma.device.findMany({ select: { id: true, storeId: true, status: true } }),
     prisma.sale.findMany({
       include: {
-        saleItems: { select: { deviceId: true, salePriceTjs: true, costBasisUsd: true } },
+        saleItems: { select: { deviceId: true, salePriceTjs: true, costBasisUsd: true, returnId: true } },
         exchangeEvents: { select: { id: true } },
         paymentAllocations: { select: { allocatedAmountTjs: true } },
       },
@@ -21,7 +22,9 @@ async function main() {
     prisma.transferRequest.findMany({ where: { status: 'PENDING_APPROVAL' }, include: { items: { select: { deviceId: true } } } }),
     prisma.expense.findMany({ select: { id: true, amountTjs: true, amountUsd: true, exchangeRate: true } }),
     prisma.ledgerEntry.findMany({ select: { type: true, referenceId: true } }),
-    prisma.exchangeRate.findUnique({ where: { date: new Date().toISOString().split('T')[0] } }),
+    // Today is the business day (BUSINESS_TIME_ZONE), not the UTC date.
+    prisma.exchangeRate.findUnique({ where: { date: getBusinessDateKey() } }),
+    prisma.storeProfitShare.findMany({ select: { storeId: true, sharePercent: true } }),
   ]);
 
   const storeById = new Map(stores.map((store) => [store.id, store]));
@@ -47,9 +50,22 @@ async function main() {
     return !close(paidOrDebt, sale.totalTjs);
   }).map((sale) => sale.id));
   add('COMPLETED_SALE_ITEM_TOTAL_MISMATCH', sales.filter((sale) => (sale.status === 'COMPLETED' || sale.status === 'EXCHANGED') && !close(sale.saleItems.reduce((sum, item) => D(sum).plus(item.salePriceTjs), D(0)), sale.totalTjs)).map((sale) => sale.id));
-  add('REFUND_TOTAL_MISMATCH', sales.filter((sale) => sale.status === 'REFUNDED' && !close(D((sale.actualRefundAmountTjs ?? 0)).plus((sale.penaltyFeeTjs ?? 0)), sale.totalTjs)).map((sale) => sale.id));
-  add('ACTIVE_SALE_DEVICE_NOT_SOLD', sales.filter((sale) => sale.status !== 'REFUNDED' && sale.saleItems.some((item) => deviceById.get(item.deviceId)?.status !== 'SOLD')).map((sale) => sale.id));
-  add('REFUNDED_CURRENT_DEVICE_NOT_RESTOCKED', sales.filter((sale) => sale.status === 'REFUNDED' && sale.saleItems.some((item) => !['STORE_STOCK', 'IN_STOCK_AFTER_EXCHANGE'].includes(deviceById.get(item.deviceId)?.status ?? ''))).map((sale) => sale.id));
+  // A whole-receipt refund hands back what the customer actually paid (cash, bank, exchange credit
+  // and debt repayments) less the penalty; any unpaid debt is forgiven, not refunded. Receipts
+  // emptied phone by phone (returns, exchanges) carry no refund amount and are left out.
+  add('REFUND_TOTAL_MISMATCH', sales.filter((sale) => {
+    if (sale.status !== 'REFUNDED' || sale.actualRefundAmountTjs === null) return false;
+    const paid = D(sale.cashAmountTjs).plus(sale.cardAmountTjs).plus(sale.exchangeTradeInCreditTjs ?? 0)
+      .plus((sale.paymentAllocations || []).reduce((sum, a) => D(sum).plus(a.allocatedAmountTjs), D(0)));
+    return !close(D(sale.actualRefundAmountTjs).plus(sale.penaltyFeeTjs ?? 0), paid);
+  }).map((sale) => sale.id));
+  add('ACTIVE_SALE_DEVICE_NOT_SOLD', sales.filter((sale) => sale.status !== 'REFUNDED' && sale.saleItems.some((item) => !item.returnId && deviceById.get(item.deviceId)?.status !== 'SOLD')).map((sale) => sale.id));
+  // A refunded phone is back in stock, unless it has since been sold again on another active receipt.
+  const soldOnActiveSale = new Set(sales.filter((sale) => sale.status !== 'REFUNDED').flatMap((sale) => sale.saleItems.filter((item) => !item.returnId).map((item) => item.deviceId)));
+  add('REFUNDED_CURRENT_DEVICE_NOT_RESTOCKED', sales.filter((sale) => sale.status === 'REFUNDED' && sale.saleItems.some((item) => {
+    const status = deviceById.get(item.deviceId)?.status ?? '';
+    return status === 'SOLD' ? !soldOnActiveSale.has(item.deviceId) : !['STORE_STOCK', 'IN_STOCK_AFTER_EXCHANGE', 'MAIN_WAREHOUSE', 'TRANSFER_PENDING', 'IN_REPAIR'].includes(status);
+  })).map((sale) => sale.id));
   add('SALE_WITHOUT_LEDGER', sales.filter((sale) => !ledgerRefs.has(sale.id)).map((sale) => sale.id));
   add('EXPENSE_WITHOUT_LEDGER', expenses.filter((expense) => !ledgerRefs.has(expense.id)).map((expense) => expense.id));
   add('INVALID_EXPENSE_RATE_CONVERSION', expenses.filter((expense) => D(expense.amountTjs).lte(0) || !expense.exchangeRate || !expense.amountUsd || !close(expense.amountUsd, D(expense.amountTjs).div(expense.exchangeRate))).map((expense) => expense.id));
@@ -64,7 +80,12 @@ async function main() {
 
   add('PENDING_TRANSFER_DEVICE_NOT_RESERVED', transfers.filter((transfer) => transfer.items.some((item) => deviceById.get(item.deviceId)?.status !== 'TRANSFER_PENDING')).map((transfer) => transfer.id));
   if (!owners.length) add('OWNER_RECORDS_MISSING', ['owners']);
-  else if (!close(owners.reduce((sum, owner) => D(sum).plus(owner.profitSharePercent), D(0)), 100)) add('OWNER_SHARES_NOT_100', owners.map((owner) => owner.id));
+  else if (storeShares.length) {
+    // Partner shares are set per store; the admin always gets the rest, so they must stay under 100%.
+    const byStore = new Map<string, ReturnType<typeof D>>();
+    for (const sh of storeShares) byStore.set(sh.storeId, (byStore.get(sh.storeId) ?? D(0)).plus(sh.sharePercent));
+    add('STORE_PARTNER_SHARES_NOT_UNDER_100', [...byStore].filter(([, total]) => total.gte(100) || total.lt(0)).map(([storeId, total]) => `${storeId}:${total.toFixed(2)}%`));
+  } else if (!close(owners.reduce((sum, owner) => D(sum).plus(owner.profitSharePercent), D(0)), 100)) add('OWNER_SHARES_NOT_100', owners.map((owner) => owner.id));
   if (!todayRate || D(todayRate.rate).lte(0)) add('TODAY_EXCHANGE_RATE_MISSING', ['today']);
 
   const counts = {

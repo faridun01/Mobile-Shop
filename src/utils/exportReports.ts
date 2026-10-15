@@ -61,6 +61,7 @@ const EXPENSE_CATEGORY_LABELS: Record<string, string> = {
   TAXES: 'Налоги и сборы',
   SUPPLIES: 'Расходные материалы',
   OTHER: 'Прочие расходы',
+  CASH_SHORTAGE: 'Недостача кассы',
 };
 
 const EVENT_LABELS: Record<ReportEventRow['kind'], string> = {

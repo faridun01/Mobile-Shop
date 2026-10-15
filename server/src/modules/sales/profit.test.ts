@@ -148,3 +148,34 @@ describe('exchange cost restorations', () => {
     expect(exchangeCostRestorations([{ action: 'EXCHANGE', financialDetails: { exchangeInValueUsd: 150 } }])).toEqual([]);
   });
 });
+
+describe('tied cents between owners', () => {
+  // An odd cent split 50/50 (or 75/25 on 2 mod 4 cents) is a tie: it must not always go to the
+  // same owner, or one partner quietly earns more over thousands of sales.
+  const drift = (shares: [string, number][], from: number, to: number) => {
+    const owners = shares.map(([id, p]) => ({ id, profitSharePercent: p }));
+    const total = new Map<string, number>(shares.map(([id]) => [id, 0]));
+    for (let cents = from; cents <= to; cents++) {
+      for (const part of allocateOwnerProfit(cents / 100, owners)) {
+        const share = shares.find(([id]) => id === part.ownerId)![1];
+        total.set(part.ownerId, total.get(part.ownerId)! + Number(part.amountUsd) - (cents / 100) * share / 100);
+      }
+    }
+    return [...total.values()];
+  };
+
+  it('spreads tied cents evenly for 50/50, 75/25 and three owners', () => {
+    for (const shares of [[['owner-admin', 50], ['owner-partner', 50]], [['owner-admin', 75], ['e05eb9e4', 25]], [['a', 33.33], ['b', 33.33], ['c', 33.34]]] as [string, number][][]) {
+      for (const d of drift(shares, 1, 20000)) expect(Math.abs(d)).toBeLessThan(0.2);
+    }
+  });
+
+  it('gives the same split for the same amount and always adds up', () => {
+    const owners = [{ id: 'owner-admin', profitSharePercent: 50 }, { id: 'owner-partner', profitSharePercent: 50 }];
+    expect(allocateOwnerProfit(12.35, owners)).toEqual(allocateOwnerProfit(12.35, owners));
+    for (const amount of [0.01, 0.03, -0.05, 123.45, -987.65]) {
+      const parts = allocateOwnerProfit(amount, owners);
+      expect(parts.reduce((s, p) => s.plus(p.amountUsd), D(0)).toFixed(2)).toBe(D(amount).toFixed(2));
+    }
+  });
+});

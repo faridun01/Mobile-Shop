@@ -9,7 +9,7 @@ import {
   Package,
   Wrench,
 } from 'lucide-react';
-import { STANDARD_EXPENSE_CATEGORIES, LEGACY_EXPENSE_LABELS } from '../../utils/expenseCategories';
+import { STANDARD_EXPENSE_CATEGORIES, LEGACY_EXPENSE_LABELS, SYSTEM_EXPENSE_LABELS } from '../../utils/expenseCategories';
 import { Expense, ExpenseCategory, Store, User } from '../../types';
 
 export const STANDARD_CATEGORIES = STANDARD_EXPENSE_CATEGORIES;
@@ -32,7 +32,7 @@ export function getCategoryLabel(key: string, customCategories: CustomCategory[]
   if (std) return std.label;
   const custom = customCategories.find(c => c.id === key || c.label === key);
   if (custom) return custom.label;
-  return LEGACY_EXPENSE_LABELS[key] || key || 'Прочие расходы';
+  return SYSTEM_EXPENSE_LABELS[key] || LEGACY_EXPENSE_LABELS[key] || key || 'Прочие расходы';
 }
 
 export function getCategoryIcon(key: string): React.ElementType {

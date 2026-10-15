@@ -8,6 +8,43 @@ import { roundMoney } from '../../common/money';
 
 export type OwnerProfitAllocation = { ownerId: string; amountUsd: MoneyInput };
 
+/**
+ * Orders parts for the leftover cents: by fractional remainder (largest first, or smallest first
+ * when cents are taken back), and owners whose remainders are equal (a tie, e.g. an odd cent split
+ * 50/50) in a rotation chosen by the amount. A fixed order would always hand a tied cent to the
+ * same owner; the rotation (Fibonacci hashing of the cents) gives each tied owner the cent about
+ * equally often over many bookings, and the same amount always gives the same result.
+ */
+function rankForLeftover<T extends { ownerId: string; remainder: ReturnType<typeof D> }>(parts: T[], cents: ReturnType<typeof D>, largestFirst = true): T[] {
+  const sorted = [...parts].sort((a, b) => (largestFirst ? b.remainder.comparedTo(a.remainder) : a.remainder.comparedTo(b.remainder)) || a.ownerId.localeCompare(b.ownerId));
+  const spread = (Math.imul(Number(cents.abs().mod(4294967296)), 0x9e3779b1) >>> 0) / 4294967296;
+  const ranked: T[] = [];
+  for (let i = 0; i < sorted.length;) {
+    let j = i;
+    while (j < sorted.length && sorted[j].remainder.eq(sorted[i].remainder)) j++;
+    const group = sorted.slice(i, j);
+    const shift = Math.floor(spread * group.length);
+    for (let k = 0; k < group.length; k++) ranked.push(group[(k + shift) % group.length]);
+    i = j;
+  }
+  return ranked;
+}
+
+/**
+ * The dollars a debt sale booked for its unpaid part: the receipt's dollars less what its register
+ * took up front (the paid TJS at the sale's rate). Register, receivable and profit then add up to
+ * the cent; a share of the receipt's dollars by TJS would leave a stray cent on some sales.
+ * Without the sale's rate (very old sales) it falls back to that share.
+ */
+export function bookedDebtUsd(sale: { totalUsd: MoneyInput; totalTjs: MoneyInput; cashAmountTjs: MoneyInput; cardAmountTjs: MoneyInput; exchangeRate?: MoneyInput | null }, originalDebtTjs: MoneyInput): ReturnType<typeof D> {
+  if (!D(originalDebtTjs).gt(0) || !D(sale.totalTjs).gt(0)) return D(0);
+  if (sale.exchangeRate && D(sale.exchangeRate).gt(0)) {
+    const paidUpFrontUsd = roundMoney(D(sale.cashAmountTjs).plus(sale.cardAmountTjs).div(sale.exchangeRate));
+    return roundMoney(D(sale.totalUsd).minus(paidUpFrontUsd));
+  }
+  return roundMoney(D(sale.totalUsd).mul(originalDebtTjs).div(sale.totalTjs));
+}
+
 export function allocateOwnerProfit(amountUsd: MoneyInput, owners: { id: string; profitSharePercent: MoneyInput }[]): OwnerProfitAllocation[] {
   if (!owners.length) return [];
   const totalShare = owners.reduce((sum, owner) => D(sum).plus(owner.profitSharePercent), D(0));
@@ -21,7 +58,7 @@ export function allocateOwnerProfit(amountUsd: MoneyInput, owners: { id: string;
     return { ownerId: owner.id, cents: exact.floor(), remainder: exact.minus(exact.floor()) };
   });
   const remainder = D(cents).minus(parts.reduce((sum, part) => D(sum).plus(part.cents), D(0)));
-  const ranked = [...parts].sort((a, b) => b.remainder.comparedTo(a.remainder) || a.ownerId.localeCompare(b.ownerId));
+  const ranked = rankForLeftover(parts, cents);
   for (let i = 0; i < remainder.toNumber(); i++) ranked[i].cents = ranked[i].cents.plus(1);
   return parts.map((part) => ({
     ownerId: part.ownerId,
@@ -43,7 +80,7 @@ export function allocateLikeBooked(amountUsd: MoneyInput, booked: OwnerProfitAll
   const parts = exact.map((row) => ({ ownerId: row.ownerId, cents: row.value.trunc(), remainder: row.value.minus(row.value.trunc()) }));
   let left = cents.minus(parts.reduce((sum, part) => sum.plus(part.cents), D(0))).toNumber();
   const step = left >= 0 ? 1 : -1;
-  const ranked = [...parts].sort((a, b) => (step > 0 ? b.remainder.comparedTo(a.remainder) : a.remainder.comparedTo(b.remainder)) || a.ownerId.localeCompare(b.ownerId));
+  const ranked = rankForLeftover(parts, cents, step > 0);
   for (let i = 0; left !== 0 && ranked.length; i = (i + 1) % ranked.length) {
     ranked[i].cents = ranked[i].cents.plus(step);
     left -= step;

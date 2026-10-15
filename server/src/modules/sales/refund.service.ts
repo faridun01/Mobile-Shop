@@ -4,12 +4,13 @@ import { resolveActor } from '../../common/actor';
 import { requireTodayRate } from '../exchange-rate/exchange-rate.service';
 import { reverseDistributedBonus } from '../bonuses/bonuses.service';
 import { moneyEquals, requireNonNegativeMoney, roundMoney } from '../../common/money';
-import { exchangeCostRestorations, refundOwnerProfit } from './profit';
+import { bookedDebtUsd, exchangeCostRestorations, refundOwnerProfit } from './profit';
 import { getOwnersForStore } from '../finance/owner-allocations';
 import { getStoreCashAccount } from '../finance/account.service';
 import { postTransaction } from '../finance/financial-transaction.service';
 import { assertShiftOpen } from '../finance/shift-guard';
 import { syncStockAlerts } from '../stock-thresholds/stock-alerts';
+import { returnOvercollectedBonus } from '../finance/cash-collection.service';
 
 interface RefundInput {
   saleId: string;
@@ -57,9 +58,20 @@ export class RefundService {
       const collectedTodayUsd = roundMoney(D(amountActuallyCollectedTjs).div(rate));
       const penaltyUsd = roundMoney(D(penaltyFeeTjs).div(rate));
       const actualRefundUsd = roundMoney(D(collectedTodayUsd).minus(penaltyUsd));
-      const bookedCollectedUsd = D(sale.totalTjs).gt(0)
-        ? roundMoney(D(sale.totalUsd ?? D(sale.totalTjs).div(sale.exchangeRate || rate)).mul(amountActuallyCollectedTjs).div(sale.totalTjs))
-        : D(0);
+      // What the sale booked for the money actually collected: the whole receipt for a paid one; for
+      // a debt receipt, its dollars less the part of the booked debt still open (the booked debt
+      // minus what its repayments booked), so a refund leaves no stray cent between cash and profit.
+      // Only a sale with a customer can have had a debt and repayments.
+      const repaid = sale.customerId
+        ? await tx.customerPaymentAllocation.aggregate({ where: { saleId: sale.id }, _sum: { allocatedAmountTjs: true, bookedAmountUsd: true } })
+        : { _sum: { allocatedAmountTjs: null, bookedAmountUsd: null } };
+      const originalDebtTjs = D(sale.debtAmountTjs).plus(repaid._sum.allocatedAmountTjs ?? 0);
+      const saleUsd = D(sale.totalUsd ?? D(sale.totalTjs).div(sale.exchangeRate || rate));
+      const bookedCollectedUsd = !D(sale.totalTjs).gt(0)
+        ? D(0)
+        : originalDebtTjs.gt(0)
+          ? roundMoney(saleUsd.minus(bookedDebtUsd({ ...sale, totalUsd: saleUsd }, originalDebtTjs)).plus(repaid._sum.bookedAmountUsd ?? 0))
+          : roundMoney(saleUsd.mul(amountActuallyCollectedTjs).div(sale.totalTjs));
       const fxGainUsd = roundMoney(D(bookedCollectedUsd).minus(collectedTodayUsd));
       const profitLogs = await tx.auditLog.findMany({
         where: { targetId: sale.id, action: { in: ['SALE', 'SALE_BELOW_COST', 'EXCHANGE'] } },
@@ -169,6 +181,7 @@ export class RefundService {
         if (updated.count !== 1) throw new Error('Партнёр из распределения прибыли не найден. Восстановите его учётную запись перед возвратом.');
       }
 
+      const hadBonusPhones = sale.saleItems.some((item) => item.isBonus);
       await tx.bonusPoolEntry.updateMany({
         where: { saleId: sale.id, status: 'PENDING' },
         data: {
@@ -178,6 +191,8 @@ export class RefundService {
           annulledNote: refundNote,
         },
       });
+      // Its money may already be on the Bonus Account (collected before this refund): hand it back to the Central Cash.
+      if (hadBonusPhones) await returnOvercollectedBonus(tx, sale.storeId, actor, `возврат чека #${sale.receiptNumber}`);
 
       await tx.ledgerEntry.create({
         data: {

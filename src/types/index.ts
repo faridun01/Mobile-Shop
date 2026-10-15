@@ -32,6 +32,7 @@ export type ExpenseCategory =
   | 'SUPPLIES'
   | 'REPAIR_PARTS'
   | 'OTHER'
+  | 'CASH_SHORTAGE'
   | 'Аренда'
   | 'Зарплата'
   | 'Аванс сотрудника'

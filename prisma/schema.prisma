@@ -281,6 +281,8 @@ model DailyCashClosing {
   // Closing day's USD/TJS rate the discrepancy was valued at (null on early closings).
   exchangeRate       Decimal? @db.Decimal(10, 4)
   comment            String?
+  // A shortage is booked as a store expense (CASH_SHORTAGE) when the shift closes; cancelling the closing cancels it.
+  shortageExpenseId  String?  @unique
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
 

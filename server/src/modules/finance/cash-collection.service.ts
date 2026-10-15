@@ -49,8 +49,11 @@ export interface RegisterBalance {
  * there. Classification follows the bonus pool, never the payment method. A refunded sale gave
  * its money back, so its phone no longer counts; the quarterly close of bonus reporting does not
  * change where the cash is. Cash collected before the split existed went to Central Cash whole,
- * so only phones sold after the store's latest such collection count.
+ * so only phones sold after the store's latest such collection count. Money the Bonus Account
+ * already handed back for bonus phones refunded after their collection (see
+ * returnOvercollectedBonus) no longer counts as collected.
  */
+export const BONUS_RETURN_SOURCE = 'BONUS_OVERCOLLECTION_RETURN';
 async function bonusDue(db: Db, storeId: string) {
   const legacy = await db.cashHandover.findMany({
     where: { storeId, bonusAmountUsd: null, cancelledAt: null },
@@ -70,10 +73,54 @@ async function bonusDue(db: Db, storeId: string) {
     db.cashHandover.findMany({ where: { storeId, cancelledAt: null, bonusAmountUsd: { not: null } }, select: { bonusAmountUsd: true, bonusAmountTjs: true, createdAt: true } }),
     db.cashHandover.findFirst({ where: { storeId, cancelledAt: null, bonusAmountUsd: { not: null } }, orderBy: { createdAt: 'desc' }, select: { createdAt: true } }),
   ]);
-  const usd = earned.reduce((s, e) => s.plus(e.profitUsd), D(0)).minus(collected.reduce((s, h) => s.plus(h.bonusAmountUsd ?? 0), D(0)));
-  const tjs = earned.reduce((s, e) => s.plus(e.profitTjs), D(0)).minus(collected.reduce((s, h) => s.plus(h.bonusAmountTjs ?? 0), D(0)));
+  const returned = await db.financialTransaction.findMany({
+    where: { sourceType: BONUS_RETURN_SOURCE, shopId: storeId, status: 'POSTED' },
+    select: { amountUsd: true, amountTjs: true },
+  });
+  const usd = earned.reduce((s, e) => s.plus(e.profitUsd), D(0))
+    .minus(collected.reduce((s, h) => s.plus(h.bonusAmountUsd ?? 0), D(0)))
+    .plus(returned.reduce((s, r) => s.plus(r.amountUsd), D(0)));
+  const tjs = earned.reduce((s, e) => s.plus(e.profitTjs), D(0))
+    .minus(collected.reduce((s, h) => s.plus(h.bonusAmountTjs ?? 0), D(0)))
+    .plus(returned.reduce((s, r) => s.plus(r.amountTjs ?? 0), D(0)));
   const count = earned.filter((e) => !lastSplit || e.createdAt > lastSplit.createdAt).length;
   return { usd, tjs, count };
+}
+
+/**
+ * A bonus phone refunded after its collection: the store register paid the customer back, but
+ * its money already sits on the Bonus Account. That over-collected part goes back from the Bonus
+ * Account to the Central Cash at once (never more than the account holds), instead of waiting
+ * for the store's next bonus phones. Called inside the refund's transaction.
+ */
+export async function returnOvercollectedBonus(tx: TransactionClient, storeId: string, actor: { id: string; name: string; role: string }, reason: string) {
+  const due = await bonusDue(tx, storeId);
+  if (!due.usd.lt(0)) return null;
+  const bonusAccount = await lockBonusAccount(tx);
+  const amountUsd = roundMoney(decimalMin(due.usd.negated(), bonusAccount.balanceUsd));
+  if (!amountUsd.gt(0)) return null;
+  // The TJS that left the Bonus Account for this money, in proportion when only part goes back.
+  const amountTjs = due.usd.negated().eq(amountUsd) ? roundMoney(due.tjs.negated()) : roundMoney(due.tjs.negated().mul(amountUsd).div(due.usd.negated()));
+  const { store: central, account: centralAccount } = await lockCentralCashRegister(tx, actor, 'Возврат бонусных денег из-за возврата телефона');
+  await tx.store.update({ where: { id: central.id }, data: { cashBalanceUsd: { increment: amountUsd } } });
+  const posting = await postTransaction(tx, {
+    type: 'TRANSFER', direction: 'NEUTRAL', numberPrefix: 'TR',
+    accountId: bonusAccount.id, destinationAccountId: centralAccount.id,
+    balanceCurrency: 'USD', amount: amountTjs, currency: 'TJS', exchangeRate: rateOf(amountTjs, amountUsd),
+    amountTjs, amountUsd,
+    shopId: storeId, sourceType: BONUS_RETURN_SOURCE, sourceId: randomUUID(),
+    description: `Бонусный счёт → ${central.name}: возврат бонусного телефона после инкассации (${reason})`,
+    createdByUserId: actor.id, guardBalance: true,
+  });
+  await tx.auditLog.create({
+    data: {
+      userId: actor.id, userName: actor.name, userRole: actor.role,
+      action: 'BONUS_ACCOUNT_TRANSFER', targetId: posting.id,
+      details: `С Бонусного счёта в «${central.name}» возвращено ${amountUsd}: бонусный телефон возвращён покупателю после инкассации (${reason})`,
+      financialDetails: moneyJson({ amountUsd, amountTjs, storeId }),
+    },
+  });
+  return { amountUsd, amountTjs, transactionId: posting.id };
 }
 
 /**

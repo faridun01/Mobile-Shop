@@ -48,7 +48,11 @@ async function main() {
     const diffTjs = D(a.balanceTjs).minus(l.tjs);
     if (!diffUsd.isZero()) problem(`счёт ${a.id}: баланс ${usd(a.balanceUsd)}, по журналу ${usd(l.usd)} — зачислено вне журнала ${usd(diffUsd)} (двойное зачисление)`);
     else ok(`счёт ${a.id}: баланс ${usd(a.balanceUsd)} = журнал`);
-    if (!diffTjs.isZero()) problem(`счёт ${a.id}: TJS ${D(a.balanceTjs).toFixed(2)}, по журналу ${l.tjs.toFixed(2)} (разница ${diffTjs.toFixed(2)})`);
+    // The account is kept in USD: its postings never move the TJS column, and its TJS is rebuilt
+    // from the ledger (as the app shows it). Only an account that still carries a TJS balance from
+    // the earlier version is compared with the ledger.
+    if (D(a.balanceTjs).isZero()) ok(`счёт ${a.id}: в TJS по журналу ${l.tjs.toFixed(2)} (счёт ведётся в USD)`);
+    else if (!diffTjs.isZero()) problem(`счёт ${a.id}: TJS ${D(a.balanceTjs).toFixed(2)}, по журналу ${l.tjs.toFixed(2)} (разница ${diffTjs.toFixed(2)})`);
   }
   const bonusIds = new Set(bonusAccounts.map((a) => a.id));
 

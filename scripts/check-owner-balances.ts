@@ -1,5 +1,6 @@
 import 'dotenv/config';
 import { PrismaClient, Prisma } from '@prisma/client';
+import { bookedDebtUsd } from '../server/src/modules/sales/profit';
 
 // Read-only reconciliation of partner profit balances. Every profit movement keeps
 //   available = carried over + accrued - paid - reinvested
@@ -13,10 +14,11 @@ const D = (v: Prisma.Decimal.Value) => new Prisma.Decimal(v);
 const fmt = (v: Prisma.Decimal) => `$${v.toFixed(2)}`;
 
 async function main() {
-  const [owners, sums, lastClose] = await Promise.all([
+  const [owners, sums, lastClose, storeShares] = await Promise.all([
     prisma.owner.findMany({ orderBy: { createdAt: 'asc' } }),
     prisma.ownerTransaction.groupBy({ by: ['ownerId', 'type'], _sum: { amountUsd: true } }),
     prisma.quarterClosure.findFirst({ orderBy: { closedAt: 'desc' }, select: { quarterName: true, closedAt: true, snapshot: true } }),
+    prisma.storeProfitShare.findMany({ select: { ownerId: true, sharePercent: true, store: { select: { name: true } } } }),
   ]);
   // The close's own reinvestments share its transaction timestamp, so they belong to the closed period.
   const periodSums = lastClose
@@ -46,7 +48,9 @@ async function main() {
       ['Капитал = вложения + реинвест − изъятия', capital,
         history(owner.id, 'INVESTMENT').plus(history(owner.id, 'REINVEST')).minus(history(owner.id, 'WITHDRAWAL'))],
     ];
-    console.log(`\n${owner.name} (${D(owner.profitSharePercent).toString()}%)`);
+    // Shares are set per store (the admin gets the rest); the old company-wide percent applies only without them.
+    const shares = storeShares.filter((sh) => sh.ownerId === owner.id).map((sh) => `${sh.store.name} ${D(sh.sharePercent).toString()}%`);
+    console.log(`\n${owner.name} (${storeShares.length ? (shares.length ? shares.join(', ') : 'остаток долей во всех магазинах') : `${D(owner.profitSharePercent).toString()}%`})`);
     for (const [label, actual, expected] of checks) {
       const diff = actual.minus(expected);
       const ok = diff.abs().lte(0.01);
@@ -118,7 +122,7 @@ async function reconcileCapital(owners: { capitalBalanceUsd: Prisma.Decimal; ava
     prisma.bonusPoolEntry.aggregate({ _sum: { profitUsd: true }, where: { sale: { status: { not: 'REFUNDED' } }, OR: [{ status: { in: ['PENDING', 'ANNULLED'] } }, { status: 'DISTRIBUTED', annulledAt: { not: null } }] } }),
     prisma.expense.findMany({ where: { status: 'UNPAID', cancelledAt: null }, select: { amountUsd: true, amountTjs: true, exchangeRate: true } }),
     prisma.supplierBonus.findMany({ where: { bonusType: 'CASH_DISCOUNT' }, select: { amountUsd: true, ownerProfitAllocations: true, bonusAccountTransactionId: true } }),
-    prisma.sale.findMany({ where: { status: { not: 'REFUNDED' } }, select: { id: true, totalUsd: true, totalTjs: true, cardAmountTjs: true, debtAmountTjs: true } }),
+    prisma.sale.findMany({ where: { status: { not: 'REFUNDED' } }, select: { id: true, totalUsd: true, totalTjs: true, cashAmountTjs: true, cardAmountTjs: true, debtAmountTjs: true, exchangeRate: true } }),
     prisma.financialTransaction.findMany({ where: { type: 'ADJUSTMENT', status: 'POSTED', sourceType: 'STORE_ADJUSTMENT' }, select: { direction: true, amountUsd: true } }),
     // The posting each sale made into its register ("Чек #N: ..."), to tell which sales put their card part there.
     prisma.financialTransaction.findMany({ where: { sourceType: 'SALE', type: 'INCOME', description: { startsWith: 'Чек #' } }, select: { sourceId: true, description: true } }),
@@ -144,7 +148,16 @@ async function reconcileCapital(owners: { capitalBalanceUsd: Prisma.Decimal; ava
   const cardTakings = sum(keptSales.map((s) => D(s.totalTjs).gt(0) && D(s.cardAmountTjs ?? 0).gt(0) && cardOutside(s.id) ? D(s.totalUsd).mul(s.cardAmountTjs ?? 0).div(s.totalTjs) : D(0)));
   // Each sale booked its unpaid TJS in dollars at its own rate; repayments book their exchange
   // difference to the owners, so the receivable is worth exactly that booked amount (never today's rate).
-  const customerReceivable = sum(keptSales.map((s) => D(s.totalTjs).gt(0) && D(s.debtAmountTjs).gt(0) ? D(s.totalUsd).mul(s.debtAmountTjs).div(s.totalTjs) : D(0)));
+  // Booked exactly as the books do: a sale's debt in its dollars (bookedDebtUsd: the receipt's
+  // dollars less what its register took up front), less what its repayments already booked.
+  const repaid = await prisma.customerPaymentAllocation.groupBy({ by: ['saleId'], _sum: { allocatedAmountTjs: true, bookedAmountUsd: true } });
+  const repaidBySale = new Map(repaid.map((a) => [a.saleId, a._sum]));
+  const customerReceivable = sum(keptSales.map((s) => {
+    if (!D(s.totalTjs).gt(0) || !D(s.debtAmountTjs).gt(0)) return D(0);
+    const paid = repaidBySale.get(s.id);
+    const originalDebtTjs = D(s.debtAmountTjs).plus(paid?.allocatedAmountTjs ?? 0);
+    return D(bookedDebtUsd(s, originalDebtTjs)).minus(paid?.bookedAmountUsd ?? 0);
+  }));
   const unpaidUsd = sum(unpaid.map((e) => e.amountUsd ?? (e.exchangeRate ? D(e.amountTjs).div(e.exchangeRate) : 0)));
   const manual = sum(adjustments.map((a) => (a.direction === 'IN' ? D(a.amountUsd) : D(a.amountUsd).negated())));
   const explained: [string, Prisma.Decimal][] = [

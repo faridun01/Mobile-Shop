@@ -25,6 +25,7 @@ export const EXPENSE_CATEGORY_NAMES: Record<string, string> = {
   TAXES: 'Налоги и сборы',
   SUPPLIES: 'Расходные материалы',
   OTHER: 'Прочие расходы',
+  CASH_SHORTAGE: 'Недостача кассы',
   'Аренда': 'Аренда помещения',
   'Зарплата': 'Зарплата сотрудников',
   'Аванс сотрудника': 'Аванс сотрудника',
@@ -333,6 +334,7 @@ export async function updateExpense(
     const existing = await tx.expense.findUnique({ where: { id } });
     if (!existing) throw new Error('Расход не найден');
     if (existing.cancelledAt) throw new Error('Нельзя редактировать отменённый расход');
+    if (existing.category === SHORTAGE_CATEGORY) throw new Error('Недостачу кассы нельзя редактировать: она проведена закрытием смены. Чтобы изменить, переоткройте смену и закройте её заново.');
     const payroll = await tx.$queryRaw<Array<{ expense_id: string }>>`SELECT expense_id FROM payroll_payouts WHERE expense_id = ${id}`;
     if (payroll?.length && (input.amountTjs !== undefined || input.category !== undefined || input.storeId !== undefined)) {
       throw new Error('Сумму и категорию расчётной выплаты нельзя менять. Отмените выплату и выполните новый расчёт зарплаты.');
@@ -497,13 +499,26 @@ export async function updateExpense(
   }, { maxWait: 10000, timeout: 25000 });
 }
 
+export const SHORTAGE_CATEGORY = 'CASH_SHORTAGE';
+
 export async function deleteExpense(id: string, actorId: string) {
-  return prisma.$transaction(async (tx) => {
+  return prisma.$transaction((tx) => cancelExpenseInTx(tx, id, actorId), { maxWait: 10000, timeout: 25000 });
+}
+
+/**
+ * Cancels an expense inside the caller's transaction. A shortage booked by a shift closing is
+ * cancelled only together with that closing (`fromClosing`), never on its own.
+ */
+export async function cancelExpenseInTx(tx: TransactionClient, id: string, actorId: string, fromClosing = false) {
+  {
     await lockExpenseEmployee(tx, id);
     await tx.$queryRaw`SELECT id FROM expenses WHERE id = ${id} FOR UPDATE`;
     const existing = await tx.expense.findUnique({ where: { id } });
     if (!existing) throw new Error('Расход не найден');
     if (existing.cancelledAt) throw new Error('Расход уже отменён');
+    if (existing.category === SHORTAGE_CATEGORY && !fromClosing) {
+      throw new Error('Недостачу кассы нельзя отменить отдельно: переоткройте смену, и недостача отменится вместе с закрытием.');
+    }
 
     const actor = await resolveActor(tx, actorId);
 
@@ -560,5 +575,5 @@ export async function deleteExpense(id: string, actorId: string) {
     // Cancelled, never hard-deleted — the row (and its reversed ledger transaction)
     // stay queryable forever for audit purposes.
     return tx.expense.update({ where: { id }, data: { cancelledAt: new Date(), cancelledByUserId: actor.id } });
-  }, { maxWait: 10000, timeout: 25000 });
+  }
 }

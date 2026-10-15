@@ -261,22 +261,28 @@ await withSchema('main', async (c) => {
   await c.assertReconciled(['store-a', 'store-b', 'store-c', 'store-d']);
   pass('G: two simultaneous cancellations move the money back once');
 
-  // A bonus phone refunded after its money was collected: the register paid the customer back,
-  // so the Bonus Account's $150 for it is offset against the store's next bonus money — the phone
-  // is never counted both as bonus and as regular.
+  // A bonus phone refunded after its money was collected: the store register paid the customer
+  // back, so the Bonus Account hands its $150 for that phone back to the Central Cash at once —
+  // whether or not the store ever sells another bonus phone. Never counted twice.
   const bonusSale = await c.sell('store-a', 1500, { bonus: true });
   await collectAndCheck(c, 'store-a', { regularUsd: '0', regularTjs: '0', bonusUsd: '150', bonusTjs: '1500' });
   await c.sell('store-a', 2000, { cost: 100 });
+  const [m0, b0] = [await c.reg('main-warehouse'), await c.bonus()];
   const refund = await c.call('POST', `/sales/${bonusSale.id}/refund`, { reason: 'Брак', refundAmountTjs: 1400, penaltyFeeTjs: 100, paymentMethod: 'CASH' });
   assert.equal(refund.status, 200, JSON.stringify(refund));
+  const [m1, b1] = [await c.reg('main-warehouse'), await c.bonus()];
+  assert.equal(b0.usd.minus(b1.usd).toString(), '150', 'Bonus Account −$150 at the refund');
+  assert.equal(b0.ledgerTjs.minus(b1.ledgerTjs).toString(), '1500', 'Bonus Account −1500 TJS (the TJS it took in)');
+  assert.equal(m1.usd.minus(m0.usd).toString(), '150', 'Central Cash +$150 at the refund');
   // $200 sale − $140 refunded (1500 TJS less the 100 TJS penalty) = $60 left in the register.
   await collectAndCheck(c, 'store-a', { regularUsd: '60', regularTjs: '600', bonusUsd: '0', bonusTjs: '0' });
+  // The next bonus phones go to the Bonus Account as usual: nothing is netted twice.
   await c.sell('store-a', 1500, { bonus: true });
-  await collectAndCheck(c, 'store-a', { regularUsd: '150', regularTjs: '1500', bonusUsd: '0', bonusTjs: '0' });
+  await collectAndCheck(c, 'store-a', { regularUsd: '0', regularTjs: '0', bonusUsd: '150', bonusTjs: '1500' });
   await c.sell('store-a', 1500, { bonus: true });
   await collectAndCheck(c, 'store-a', { regularUsd: '0', regularTjs: '0', bonusUsd: '150', bonusTjs: '1500' });
   await c.assertReconciled(['store-a', 'store-b', 'store-c', 'store-d']);
-  pass('refund after collection: the collected $150 is offset against the next bonus money, never counted twice');
+  pass('refund after collection: the collected $150 goes back from the Bonus Account to the Central Cash at once, never counted twice');
 });
 
 // ===================== scenario set 2: rates, retries, insufficient funds, legacy account =====================

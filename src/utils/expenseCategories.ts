@@ -12,6 +12,11 @@ export const STANDARD_EXPENSE_CATEGORIES = [
   { id: 'OTHER', label: 'Прочие расходы' },
 ];
 
+/** Booked by the system, never picked by hand: a shift closed with less money than expected. */
+export const SYSTEM_EXPENSE_LABELS: Record<string, string> = {
+  CASH_SHORTAGE: 'Недостача кассы',
+};
+
 export const LEGACY_EXPENSE_LABELS: Record<string, string> = {
   'Аренда': 'Аренда помещения',
   'Зарплата': 'Зарплата сотрудников',
@@ -26,7 +31,7 @@ export const LEGACY_EXPENSE_LABELS: Record<string, string> = {
 
 /** Custom categories are stored by their readable name, so an unknown key is shown as-is. */
 export function expenseCategoryLabel(key: string): string {
-  return STANDARD_EXPENSE_CATEGORIES.find((c) => c.id === key)?.label || LEGACY_EXPENSE_LABELS[key] || key || 'Прочие расходы';
+  return STANDARD_EXPENSE_CATEGORIES.find((c) => c.id === key)?.label || SYSTEM_EXPENSE_LABELS[key] || LEGACY_EXPENSE_LABELS[key] || key || 'Прочие расходы';
 }
 
 /** Translates any bracketed category codes like [UTILITIES] or [RENT] to user-facing Russian names. */

@@ -7,6 +7,7 @@ import { resolveActor } from '../../common/actor';
 import { onCommit } from '../../common/after-commit';
 import { notifyAdmins } from '../notifications/notification.service';
 import { RealtimeSyncGateway } from '../../websocket/websocket.gateway';
+import { createExpense, cancelExpenseInTx, SHORTAGE_CATEGORY } from '../expenses/expenses.service';
 
 type Db = TransactionClient;
 type Money = ReturnType<typeof D>;
@@ -390,6 +391,25 @@ export class DailyClosingService {
       const differenceUsd = roundMoney(differenceTjs.div(rate));
       const actualUsd = roundMoney(D(summary.expectedCashUsd).plus(differenceUsd));
 
+      // A shortage is a real loss of the store: it leaves the register as a store expense
+      // (CASH_SHORTAGE), so the register, the ledger, the owners' profit (by the store's shares)
+      // and the reports all show it. It is booked before the closing row, while the shift is
+      // still open. A surplus stays a recorded discrepancy for the admin to trace (usually a
+      // sale that was not entered), it is not profit until that sale is found.
+      let shortageExpenseId: string | null = null;
+      if (differenceTjs.isNegative()) {
+        const shortage = await createExpense(tx, {
+          category: SHORTAGE_CATEGORY,
+          amountTjs: differenceTjs.negated(),
+          storeId: store.id,
+          targetType: 'STORE',
+          paidFromCashRegister: true,
+          createdByUserId: actor.id,
+          comment: `Недостача при закрытии смены ${businessDate}${input.comment?.trim() ? `: ${input.comment.trim()}` : ''}`,
+        });
+        shortageExpenseId = shortage.id;
+      }
+
       const closing = await tx.dailyCashClosing.create({
         data: {
           storeId: store.id,
@@ -418,6 +438,7 @@ export class DailyClosingService {
           differenceUsd: differenceUsd.toString(),
           exchangeRate: rate,
           comment: input.comment?.trim() || null,
+          shortageExpenseId,
         },
       });
 
@@ -550,6 +571,8 @@ export class DailyClosingService {
       }
 
       await tx.dailyCashClosing.delete({ where: { id } });
+      // The shortage this closing booked goes back into the register, and out of the owners' loss.
+      if (closing.shortageExpenseId) await cancelExpenseInTx(tx, closing.shortageExpenseId, actor.id, true);
 
       await tx.auditLog.create({
         data: {

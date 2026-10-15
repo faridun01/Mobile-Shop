@@ -2,6 +2,7 @@ import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { DailyClosingService } from './daily-closing.service';
 import { prisma } from '../../prisma/prisma.service';
 import { resolveActor } from '../../common/actor';
+import { createExpense, cancelExpenseInTx } from '../expenses/expenses.service';
 
 vi.mock('../../prisma/prisma.service', () => {
   const store = { findUnique: vi.fn() };
@@ -35,6 +36,14 @@ vi.mock('../../prisma/prisma.service', () => {
 
 vi.mock('../../common/actor', () => ({
   resolveActor: vi.fn().mockResolvedValue({ id: 'u1', name: 'Alisher', role: 'SELLER' }),
+}));
+
+// The shortage expense itself is the expense service's job (tested there); here we check it is
+// booked, linked and cancelled with the closing.
+vi.mock('../expenses/expenses.service', () => ({
+  SHORTAGE_CATEGORY: 'CASH_SHORTAGE',
+  createExpense: vi.fn().mockResolvedValue({ id: 'exp-shortage' }),
+  cancelExpenseInTx: vi.fn().mockResolvedValue({}),
 }));
 
 vi.mock('../../websocket/websocket.gateway', () => ({
@@ -78,6 +87,8 @@ describe('DailyClosingService', () => {
     db.$transaction.mockImplementation((cb: any) => cb(db));
     db.notification.create.mockResolvedValue({ id: 'n1' });
     vi.mocked(resolveActor).mockResolvedValue({ id: 'u1', name: 'Alisher', role: 'SELLER' } as any);
+    vi.mocked(createExpense).mockResolvedValue({ id: 'exp-shortage' } as any);
+    vi.mocked(cancelExpenseInTx).mockResolvedValue({} as any);
   });
 
   it('a day starts from 0 and totals cash and bank less the store expenses paid that day', async () => {
@@ -208,6 +219,33 @@ describe('DailyClosingService', () => {
     expect(db.$transaction).toHaveBeenCalled();
   });
 
+  it('books a shortage as a store expense from the register and links it to the closing', async () => {
+    vi.mocked(createExpense).mockClear();
+    openDay({ sales: [{ id: 's1', cashAmountTjs: 200, cardAmountTjs: 0, exchangeRate: 10, exchangeEvents: [] }] });
+    db.dailyCashClosing.create.mockImplementation(async ({ data }: any) => data);
+
+    const result = await DailyClosingService.closeDay('u1', { storeId: 'store-1', businessDate: '2026-10-06', actualCashTjs: 180 });
+
+    expect(createExpense).toHaveBeenCalledTimes(1);
+    const input = vi.mocked(createExpense).mock.calls[0][1];
+    expect(input).toMatchObject({ category: 'CASH_SHORTAGE', storeId: 'store-1', targetType: 'STORE', paidFromCashRegister: true, createdByUserId: 'u1' });
+    expect(String(input.amountTjs)).toBe('20');
+    expect(result.shortageExpenseId).toBe('exp-shortage');
+    // Booked while the shift is still open: before the closing row exists.
+    expect(vi.mocked(createExpense).mock.invocationCallOrder[0]).toBeLessThan(db.dailyCashClosing.create.mock.invocationCallOrder.at(-1));
+  });
+
+  it('books nothing for a surplus or an exact count', async () => {
+    vi.mocked(createExpense).mockClear();
+    openDay({ sales: [{ id: 's1', cashAmountTjs: 200, cardAmountTjs: 0, exchangeRate: 10, exchangeEvents: [] }] });
+    db.dailyCashClosing.create.mockImplementation(async ({ data }: any) => data);
+    await DailyClosingService.closeDay('u1', { storeId: 'store-1', businessDate: '2026-10-06', actualCashTjs: 230 });
+    openDay({ sales: [{ id: 's1', cashAmountTjs: 200, cardAmountTjs: 0, exchangeRate: 10, exchangeEvents: [] }] });
+    db.dailyCashClosing.create.mockImplementation(async ({ data }: any) => data);
+    await DailyClosingService.closeDay('u1', { storeId: 'store-1', businessDate: '2026-10-06' });
+    expect(createExpense).not.toHaveBeenCalled();
+  });
+
   it('confirms the day as calculated and stores the bank takings in dollars', async () => {
     openDay({ sales: [{ id: 's1', cashAmountTjs: 200, cardAmountTjs: 300, exchangeRate: 10, exchangeEvents: [] }] });
 
@@ -242,6 +280,16 @@ describe('DailyClosingService', () => {
 
     await DailyClosingService.delete('dc-1', 'u1');
     expect(db.dailyCashClosing.delete).toHaveBeenCalledWith({ where: { id: 'dc-1' } });
+  });
+
+  it('reopening a shift closed with a shortage cancels that shortage expense', async () => {
+    vi.mocked(cancelExpenseInTx).mockClear();
+    db.dailyCashClosing.findUnique.mockResolvedValue({ id: 'dc-2', storeId: 'store-1', businessDate: '2026-10-06', createdAt: new Date('2026-10-06T15:00:00Z'), actualCashTjs: 180, shortageExpenseId: 'exp-shortage', store: { id: 'store-1', name: 'Сиёма' } });
+    db.cashHandover.findFirst.mockResolvedValue(null);
+
+    await DailyClosingService.delete('dc-2', 'u1');
+    expect(cancelExpenseInTx).toHaveBeenCalledWith(expect.anything(), 'exp-shortage', 'u1', true);
+    expect(vi.mocked(cancelExpenseInTx).mock.invocationCallOrder[0]).toBeGreaterThan(db.dailyCashClosing.delete.mock.invocationCallOrder.at(-1));
   });
 
   it('refuses to close without a rate for the business day', async () => {

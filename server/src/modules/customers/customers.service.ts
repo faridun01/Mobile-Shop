@@ -6,7 +6,7 @@ import { getStoreCashAccount } from '../finance/account.service';
 import { postTransaction } from '../finance/financial-transaction.service';
 import { assertShiftOpen } from '../finance/shift-guard';
 import { currentOwnerAllocations, replaceOwnerAllocations } from '../finance/owner-allocations';
-import type { OwnerProfitAllocation } from '../sales/profit';
+import { bookedDebtUsd, type OwnerProfitAllocation } from '../sales/profit';
 import { allocateMoney } from '../../common/allocation';
 import { PushNotificationService, isAllowedPushEndpoint } from '../notifications/push.service';
 import { Prisma } from '@prisma/client';
@@ -297,15 +297,17 @@ export class CustomersService {
       for (const sale of unpaidSales) {
         if (remainingToAllocate.lte(0)) break;
         const allocation = D(sale.debtAmountTjs).lte(remainingToAllocate) ? D(sale.debtAmountTjs) : remainingToAllocate;
-        const bookedShareUsd = (tjs: MoneyInput) => (D(sale.totalTjs).gt(0) ? roundMoney(D(sale.totalUsd).mul(tjs).div(sale.totalTjs)) : D(0));
+        // The sale booked its debt as its dollars less what the register took up front
+        // (bookedDebtUsd); each payment takes its share of that, and the payment that clears the
+        // sale takes whatever is left, so register and profit never drift apart by a cent.
+        const earlier = await tx.customerPaymentAllocation.findMany({ where: { saleId: sale.id }, select: { allocatedAmountTjs: true, bookedAmountUsd: true } });
+        const originalDebtTjs = earlier.reduce((sum, a) => sum.plus(a.allocatedAmountTjs), D(sale.debtAmountTjs));
+        const debtUsd = bookedDebtUsd(sale, originalDebtTjs);
+        const bookedShareUsd = (tjs: MoneyInput) => (originalDebtTjs.gt(0) ? roundMoney(debtUsd.mul(tjs).div(originalDebtTjs)) : D(0));
         let bookedUsd = bookedShareUsd(allocation);
         if (allocation.eq(sale.debtAmountTjs)) {
-          // The payment that clears the sale takes whatever its debt booked minus the earlier
-          // payments, so rounding never leaves stray cents between register and profit.
-          const earlier = await tx.customerPaymentAllocation.findMany({ where: { saleId: sale.id }, select: { allocatedAmountTjs: true, bookedAmountUsd: true } });
-          const originalDebtTjs = earlier.reduce((sum, a) => sum.plus(a.allocatedAmountTjs), D(allocation));
           const earlierBookedUsd = earlier.reduce((sum, a) => sum.plus(a.bookedAmountUsd ?? bookedShareUsd(a.allocatedAmountTjs)), D(0));
-          bookedUsd = roundMoney(bookedShareUsd(originalDebtTjs).minus(earlierBookedUsd));
+          bookedUsd = roundMoney(debtUsd.minus(earlierBookedUsd));
         }
         parts.push({ sale, allocationTjs: allocation, bookedUsd });
         remainingToAllocate = remainingToAllocate.minus(allocation);
