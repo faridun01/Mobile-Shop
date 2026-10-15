@@ -128,6 +128,7 @@ export const InventoryVariantList: React.FC<InventoryVariantListProps> = ({
                       hideModelName
                       compact
                       hideSpecs
+                      hideColor
                       onClick={() => onSelectDevice(dev)}
                     />
                   );

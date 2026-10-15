@@ -1,10 +1,51 @@
 import React, { useState } from 'react';
 import { Device, Store as StoreType } from '../../types';
-import { formatUsd } from '../../utils/money';
-import { Sparkles, ChevronDown, Smartphone, SlidersHorizontal, Layers, Edit2 } from 'lucide-react';
+import { formatUsd, sumMoney } from '../../utils/money';
+import { formatPhoneColor } from '../../utils/phoneSpecs';
+import { Sparkles, ChevronDown, Edit2 } from 'lucide-react';
 import { DeviceRow } from './DeviceRow';
 import { BrandGroupItem } from './types';
 import { RenameModelModal } from './RenameModelModal';
+
+/** One stock line inside a brand: the same model, memory and colour. */
+interface StockLine {
+  key: string;
+  model: string;
+  ram?: string | null;
+  storage: string;
+  color: string;
+  devices: Device[];
+  valueUsd: number;
+  /** Every phone of the model (all its lines): a rename applies to the whole model. */
+  modelDeviceIds: string[];
+}
+
+function stockLines(bGroup: BrandGroupItem): StockLine[] {
+  const lines: StockLine[] = [];
+  for (const mGroup of bGroup.modelGroups) {
+    const modelDeviceIds = mGroup.devices.map((d) => d.id);
+    for (const variant of mGroup.variants) {
+      const byColor = new Map<string, Device[]>();
+      for (const dev of variant.devices) {
+        const color = formatPhoneColor(dev.color) || 'Стандарт';
+        byColor.set(color, [...(byColor.get(color) ?? []), dev]);
+      }
+      for (const [color, devices] of [...byColor].sort(([x], [y]) => x.localeCompare(y, 'ru'))) {
+        lines.push({
+          key: `${mGroup.key}__${variant.key}__${color}`,
+          model: mGroup.model,
+          ram: variant.ram,
+          storage: variant.storage,
+          color,
+          devices,
+          valueUsd: sumMoney(devices.map((d) => d.purchaseCostUsd || 0)),
+          modelDeviceIds,
+        });
+      }
+    }
+  }
+  return lines;
+}
 
 interface BrandGroupedListProps {
   brandGroups: BrandGroupItem[];
@@ -41,7 +82,6 @@ export const BrandGroupedList: React.FC<BrandGroupedListProps> = ({
   onBatchRenameModel,
   onNotify,
 }) => {
-  const [collapsedVariantKeys, setCollapsedVariantKeys] = useState<Record<string, boolean>>({});
   const [renameModal, setRenameModal] = useState<{
     isOpen: boolean;
     brand: string;
@@ -53,13 +93,6 @@ export const BrandGroupedList: React.FC<BrandGroupedListProps> = ({
     model: '',
     deviceIds: [],
   });
-
-  const handleToggleVariant = (vKey: string) => {
-    setCollapsedVariantKeys(prev => ({
-      ...prev,
-      [vKey]: !prev[vKey],
-    }));
-  };
 
   const allExpanded = brandGroups.length > 0 && brandGroups.every(b => expandedBrandKeys[b.key]);
 
@@ -155,32 +188,26 @@ export const BrandGroupedList: React.FC<BrandGroupedListProps> = ({
               </div>
             </div>
 
-            {/* Brand Models Accordion Body */}
+            {/* Brand body: one line per configuration (model · memory · colour); a tap shows its IMEIs */}
             {isBrandExpanded && (
               <div className="bg-surface/30 border-t border-border px-2 sm:px-3 py-2 space-y-1.5">
-                {bGroup.modelGroups.map((mGroup) => {
-                  const isModelExpanded = !!expandedModelKeys[mGroup.key];
-                  const hasMultipleVariants = mGroup.variants && mGroup.variants.length > 1;
-
+                {stockLines(bGroup).map((line) => {
+                  const isOpen = !!expandedModelKeys[line.key];
                   return (
-                    <div key={mGroup.key} className="space-y-1.5">
-                      {/* Model Row Header */}
-                      <div className="w-full py-1.5 px-2.5 sm:px-3 rounded-xl flex items-center justify-between gap-2 bg-surface-raised/50 hover:bg-surface-raised active:bg-surface-raised border border-border/70 hover:border-border transition-colors">
-                        <button
-                          type="button"
-                          onClick={() => onToggleModelKey(mGroup.key)}
-                          className="min-w-0 flex-1 flex items-center gap-2 text-left cursor-pointer"
-                        >
-                          <div className="w-7 h-7 rounded-lg bg-accent/10 border border-accent/20 flex items-center justify-center shrink-0 text-accent">
-                            <Smartphone className="w-3.5 h-3.5" />
-                          </div>
-                          <span className="text-xs sm:text-sm font-extrabold text-fg truncate">
-                            {mGroup.model}
-                          </span>
-                        </button>
+                    <div key={line.key} className="rounded-xl border border-border/70 bg-surface overflow-hidden">
+                      <div
+                        onClick={() => onToggleModelKey(line.key)}
+                        className="w-full px-3 py-2 flex items-center justify-between gap-2 hover:bg-surface-raised/40 active:bg-surface-raised transition-colors cursor-pointer select-none"
+                      >
+                        <div className="min-w-0">
+                          <p className="text-sm font-bold text-fg truncate">{line.model}</p>
+                          <p className="text-xs text-fg-subtle mt-0.5 truncate">
+                            {[line.ram, line.storage, line.color].filter(Boolean).join(' · ')}
+                          </p>
+                        </div>
 
                         <div className="flex items-center gap-1.5 shrink-0">
-                          {/* Quick Rename Button */}
+                          {/* Quick Rename Button: renames the whole model, all its configurations */}
                           {onBatchRenameModel && (
                             <button
                               type="button"
@@ -189,184 +216,52 @@ export const BrandGroupedList: React.FC<BrandGroupedListProps> = ({
                                 setRenameModal({
                                   isOpen: true,
                                   brand: bGroup.brand,
-                                  model: mGroup.model,
-                                  deviceIds: mGroup.devices.map(d => d.id),
+                                  model: line.model,
+                                  deviceIds: line.modelDeviceIds,
                                 });
                               }}
-                              className="p-1.5 rounded-lg text-fg-subtle hover:text-accent hover:bg-surface active:scale-95 transition-all cursor-pointer"
+                              className="p-1.5 rounded-lg text-fg-subtle hover:text-accent hover:bg-surface-raised active:scale-95 transition-all cursor-pointer"
                               title="Переименовать модель"
                             >
                               <Edit2 className="w-3.5 h-3.5" />
                             </button>
                           )}
-
-                          <div
-                            onClick={() => onToggleModelKey(mGroup.key)}
-                            className="flex items-center gap-1.5 cursor-pointer select-none"
-                          >
-                            <div className="text-right">
-                              <span className="inline-block px-2 py-0.5 rounded-lg text-xs font-bold font-mono bg-accent/10 text-accent border border-accent/20">
-                                {mGroup.count} шт.
+                          <div className="text-right">
+                            <span className="inline-block px-2 py-0.5 rounded-lg text-xs font-bold font-mono bg-accent/10 text-accent border border-accent/20">
+                              {line.devices.length} шт.
+                            </span>
+                            {isAdmin && line.valueUsd > 0 && (
+                              <span className="block text-[10px] text-fg-subtle font-mono leading-none mt-0.5 font-medium">
+                                {formatUsd(line.valueUsd)}
                               </span>
-                              {isAdmin && (
-                                <span className="block text-[10px] text-fg-subtle font-mono leading-none mt-0.5 font-medium">
-                                  {formatUsd(mGroup.valueUsd)}
-                                </span>
-                              )}
-                            </div>
-                            <div
-                              className={`p-1 rounded-md text-fg-subtle transition-transform duration-200 ${
-                                isModelExpanded ? 'rotate-180 text-accent' : ''
-                              }`}
-                            >
-                              <ChevronDown className="w-3.5 h-3.5" />
-                            </div>
+                            )}
                           </div>
+                          <ChevronDown className={`w-4 h-4 text-fg-subtle transition-transform duration-200 ${isOpen ? 'rotate-180 text-accent' : ''}`} />
                         </div>
                       </div>
 
-                      {/* Model Devices Content (Compact & Consolidated) */}
-                      {isModelExpanded && (
-                        <div className="space-y-1.5 pl-1 sm:pl-3 my-1">
-                          {/* If multiple configurations exist, show a compact variant overview bar */}
-                          {hasMultipleVariants && (
-                            <div className="flex items-center justify-between gap-1.5 px-2.5 py-1.5 rounded-lg bg-surface-raised/60 border border-border/70 text-[11px]">
-                              <div className="flex items-center gap-1.5 flex-wrap min-w-0">
-                                <SlidersHorizontal className="w-3 h-3 text-accent shrink-0" />
-                                <span className="text-[10px] font-bold text-fg-subtle uppercase tracking-wider">
-                                  Конфигурации:
-                                </span>
-                                {mGroup.variants.map((v) => (
-                                  <span
-                                    key={v.key}
-                                    className="px-1.5 py-0.2 rounded bg-surface border border-border text-[10px] font-mono font-bold text-fg shadow-2xs"
-                                  >
-                                    {v.label} <span className="text-accent font-extrabold">({v.count})</span>
-                                  </span>
-                                ))}
-                              </div>
-                              <div className="text-[10px] text-fg-subtle font-mono shrink-0">
-                                Всего: <strong className="text-fg font-bold">{mGroup.count} шт.</strong>
-                              </div>
-                            </div>
-                          )}
-
-                          {/* Render Variants breakdown */}
-                          {hasMultipleVariants ? (
-                            mGroup.variants.map((variant) => {
-                              const isVariantCollapsed = !!collapsedVariantKeys[`${mGroup.key}__${variant.key}`];
-                              return (
-                                <div
-                                  key={variant.key}
-                                  className="rounded-xl border border-border/70 bg-surface/50 overflow-hidden shadow-2xs"
-                                >
-                                  {/* Variant Header Row */}
-                                  <div
-                                    onClick={() => handleToggleVariant(`${mGroup.key}__${variant.key}`)}
-                                    className="w-full px-2.5 py-1.5 bg-surface-raised/70 hover:bg-surface-raised active:bg-surface-raised flex items-center justify-between gap-2 transition-colors cursor-pointer select-none border-b border-border/50"
-                                  >
-                                    <div className="flex items-center gap-2 flex-wrap min-w-0">
-                                      <Layers className="w-3.5 h-3.5 text-accent shrink-0" />
-                                      {variant.ram && (
-                                        <span className="px-1.5 py-0.2 rounded-md text-[10px] font-extrabold bg-accent/15 text-accent border border-accent/25 font-mono">
-                                          ОЗУ: {variant.ram}
-                                        </span>
-                                      )}
-                                      <span className="px-1.5 py-0.2 rounded-md text-[10px] font-black bg-surface border border-border text-fg font-mono shadow-2xs">
-                                        Память: {variant.storage}
-                                      </span>
-                                    </div>
-
-                                    <div className="flex items-center gap-1.5 shrink-0">
-                                      <span className="px-1.5 py-0.2 rounded-md text-[11px] font-bold font-mono bg-accent/10 text-accent border border-accent/20">
-                                        {variant.count} шт.
-                                      </span>
-                                      {isAdmin && variant.valueUsd > 0 && (
-                                        <span className="text-[10px] text-fg-subtle font-mono font-semibold">
-                                          {formatUsd(variant.valueUsd)}
-                                        </span>
-                                      )}
-                                      <div
-                                        className={`p-0.5 text-fg-subtle transition-transform duration-200 ${
-                                          isVariantCollapsed ? '-rotate-90' : 'rotate-0'
-                                        }`}
-                                      >
-                                        <ChevronDown className="w-3 h-3" />
-                                      </div>
-                                    </div>
-                                  </div>
-
-                                  {/* Compact Devices List inside Variant */}
-                                  {!isVariantCollapsed && (
-                                    <div className="p-1 space-y-1 bg-surface/30">
-                                      {variant.devices.map((dev) => {
-                                        const store = stores.find(s => s.id === dev.locationId);
-                                        const isWh = store?.isMainWarehouse || dev.status === 'MAIN_WAREHOUSE';
-                                        const storeName = isWh ? 'Главный склад' : dev.locationName || store?.name || 'Магазин';
-                                        return (
-                                          <DeviceRow
-                                            key={dev.id}
-                                            device={dev}
-                                            isAdmin={isAdmin}
-                                            storeName={selectedLocationId === 'ALL' ? storeName : undefined}
-                                            isMainWarehouse={isWh}
-                                            rate={rate}
-                                            hideModelName
-                                            compact
-                                            hideSpecs
-                                            onClick={() => onSelectDevice(dev)}
-                                          />
-                                        );
-                                      })}
-                                    </div>
-                                  )}
-                                </div>
-                              );
-                            })
-                          ) : (
-                            /* Single Variant or Flat List: Render a compact header + sleek device rows directly */
-                            <div className="space-y-1">
-                              {mGroup.variants && mGroup.variants[0] && (
-                                <div className="flex items-center justify-between gap-2 px-2.5 py-1 rounded-lg bg-surface-raised/50 border border-border/60 text-xs font-mono">
-                                  <div className="flex items-center gap-1.5">
-                                    <Layers className="w-3 h-3 text-accent shrink-0" />
-                                    <span className="font-bold text-fg text-[11px]">
-                                      {mGroup.variants[0].label}
-                                    </span>
-                                    <span className="text-[10px] text-accent font-bold px-1.5 py-0.2 rounded bg-accent/10 border border-accent/20">
-                                      {mGroup.count} шт.
-                                    </span>
-                                  </div>
-                                  {isAdmin && mGroup.valueUsd > 0 && (
-                                    <span className="text-[11px] text-fg-subtle font-medium">
-                                      {formatUsd(mGroup.valueUsd)}
-                                    </span>
-                                  )}
-                                </div>
-                              )}
-                              <div className="space-y-1">
-                                {mGroup.devices.map((dev) => {
-                                  const store = stores.find(s => s.id === dev.locationId);
-                                  const isWh = store?.isMainWarehouse || dev.status === 'MAIN_WAREHOUSE';
-                                  const storeName = isWh ? 'Главный склад' : dev.locationName || store?.name || 'Магазин';
-                                  return (
-                                    <DeviceRow
-                                      key={dev.id}
-                                      device={dev}
-                                      isAdmin={isAdmin}
-                                      storeName={selectedLocationId === 'ALL' ? storeName : undefined}
-                                      isMainWarehouse={isWh}
-                                      rate={rate}
-                                      hideModelName
-                                      compact
-                                      hideSpecs
-                                      onClick={() => onSelectDevice(dev)}
-                                    />
-                                  );
-                                })}
-                              </div>
-                            </div>
-                          )}
+                      {isOpen && (
+                        <div className="border-t border-border/60 p-1.5 space-y-1 bg-surface/40">
+                          {line.devices.map((dev) => {
+                            const store = stores.find(s => s.id === dev.locationId);
+                            const isWh = store?.isMainWarehouse || dev.status === 'MAIN_WAREHOUSE';
+                            const storeName = isWh ? 'Главный склад' : dev.locationName || store?.name || 'Магазин';
+                            return (
+                              <DeviceRow
+                                key={dev.id}
+                                device={dev}
+                                isAdmin={isAdmin}
+                                storeName={selectedLocationId === 'ALL' ? storeName : undefined}
+                                isMainWarehouse={isWh}
+                                rate={rate}
+                                hideModelName
+                                compact
+                                hideSpecs
+                                hideColor
+                                onClick={() => onSelectDevice(dev)}
+                              />
+                            );
+                          })}
                         </div>
                       )}
                     </div>

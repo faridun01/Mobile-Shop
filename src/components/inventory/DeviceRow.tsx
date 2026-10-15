@@ -29,11 +29,13 @@ export interface DeviceRowProps {
   hideModelName?: boolean;
   compact?: boolean;
   hideSpecs?: boolean;
+  /** The colour is already shown by the row above (a model · memory · colour line). */
+  hideColor?: boolean;
   onClick: () => void;
 }
 
 export const DeviceRow = React.forwardRef<HTMLButtonElement, DeviceRowProps>(
-  ({ device, isAdmin, storeName, isMainWarehouse, rate, hideModelName, compact, hideSpecs, onClick }, ref) => {
+  ({ device, isAdmin, storeName, isMainWarehouse, rate, hideModelName, compact, hideSpecs, hideColor, onClick }, ref) => {
     const isSpecialStatus = device.status !== 'STORE_STOCK' && device.status !== 'MAIN_WAREHOUSE';
     const showStatusBadge = isSpecialStatus || !storeName;
     const colorHex = getPhoneColorHex(device.color);
@@ -50,6 +52,7 @@ export const DeviceRow = React.forwardRef<HTMLButtonElement, DeviceRowProps>(
         >
           <div className="flex items-center gap-1.5 sm:gap-2 min-w-0 flex-1 flex-nowrap overflow-hidden">
             {/* Color Indicator & Color Name */}
+            {!hideColor && (
             <div className="flex items-center gap-1 shrink-0 max-w-20 sm:max-w-28 truncate">
               {colorHex ? (
                 <span
@@ -63,6 +66,7 @@ export const DeviceRow = React.forwardRef<HTMLButtonElement, DeviceRowProps>(
                 {formatPhoneColor(device.color) || 'Стандарт'}
               </span>
             </div>
+            )}
 
             {/* IMEI badge */}
             <div className="shrink-0 font-mono">
