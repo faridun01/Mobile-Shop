@@ -7,14 +7,12 @@ import {
   Coins,
   Briefcase,
   Loader2,
-  FileText,
   ArrowUpRight,
 } from 'lucide-react';
 import { StatusBanner, StatusMessage } from '../ui/StatusBanner';
 import { useStoreContext } from '../../utils/storeContext';
 import { OwnerTransactionModal } from '../owners/OwnerTransactionModal';
 import { StoreSharesModal } from '../owners/StoreSharesModal';
-import { QuarterReportModal } from '../owners/QuarterReportModal';
 import { OwnerCard } from '../owners/OwnerCard';
 import { OwnerTransactionsTable } from '../owners/OwnerTransactionsTable';
 
@@ -29,7 +27,6 @@ export const OwnersPage: React.FC = () => {
     todayRate,
     createOwnerTransaction,
     setStoreProfitShares,
-    closeQuarterPeriod,
     initializeOwners
   } = useAppFields(
     'currentUser',
@@ -42,7 +39,6 @@ export const OwnersPage: React.FC = () => {
     'todayRate',
     'createOwnerTransaction',
     'setStoreProfitShares',
-    'closeQuarterPeriod',
     'initializeOwners'
   );
 
@@ -57,7 +53,6 @@ export const OwnersPage: React.FC = () => {
 
   const [isSharesModalOpen, setIsSharesModalOpen] = useState(false);
 
-  const [isQuarterModalOpen, setIsQuarterModalOpen] = useState(false);
 
   const rate = Number(todayRate?.rate) || 0;
   const storeCtx = useStoreContext();
@@ -115,12 +110,6 @@ export const OwnersPage: React.FC = () => {
     const pair = sharePairOf(storeId);
     return (pair && owners.find(o => o.id === pair.ownerId))
       || owners.find(o => o.storeId === storeId && o.id !== adminOwner?.id);
-  };
-  const ownerShareLabel = (ownerId: string) => {
-    if (ownerId === adminOwner?.id) return 'остаток прибыли магазинов';
-    const pairs = storeProfitShares.filter(sh => sh.ownerId === ownerId);
-    if (!pairs.length) return 'доля не задана';
-    return pairs.map(sh => `${stores.find(st => st.id === sh.storeId)?.name || 'Магазин'} ${sh.sharePercent}%`).join(', ');
   };
 
   const openTxModalForOwner = (ownerId: string, type: 'INVESTMENT' | 'WITHDRAWAL') => {
@@ -194,29 +183,6 @@ export const OwnersPage: React.FC = () => {
     }
   };
 
-  const handleConfirmCloseQuarter = async (data: { quarterName: string; transferRemainingToCapital: boolean }) => {
-    if (isSubmitting) return;
-    setIsSubmitting(true);
-    try {
-      const res = await closeQuarterPeriod({
-        quarterName: data.quarterName,
-        transferRemainingToCapital: data.transferRemainingToCapital
-      });
-
-      if (res.success) {
-        setIsQuarterModalOpen(false);
-        setStatusBanner({
-          tone: 'success',
-          text: `Финансовый период «${data.quarterName}» успешно закрыт`
-        });
-      } else {
-        setStatusBanner({ tone: 'error', text: res.message || 'Ошибка закрытия периода' });
-      }
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
   return (
     <div className="flex-1 flex flex-col h-full overflow-hidden bg-bg text-fg">
       <StatusBanner message={statusBanner} onDismiss={() => setStatusBanner(null)} />
@@ -248,19 +214,6 @@ export const OwnersPage: React.FC = () => {
               >
                 {isInitializing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Coins className="w-3.5 h-3.5" />}
                 <span>Инициализировать</span>
-              </button>
-            )}
-
-            {currentUser?.role === 'ADMIN' && (
-              <button
-                type="button"
-                onClick={() => setIsQuarterModalOpen(true)}
-                className="px-2.5 py-1.5 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/30 text-amber-500 font-bold text-xs shadow-2xs transition-all flex items-center gap-1.5 cursor-pointer"
-                title="Сводная ведомость, закрытие периода и архив отчётов"
-              >
-                <FileText className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">Отчёт за период</span>
-                <span className="sm:hidden">Период</span>
               </button>
             )}
 
@@ -377,16 +330,6 @@ export const OwnersPage: React.FC = () => {
         isSubmitting={isSubmitting}
       />
 
-      {/* MODAL: Quarterly Report */}
-      <QuarterReportModal
-        open={isQuarterModalOpen}
-        onClose={() => setIsQuarterModalOpen(false)}
-        onConfirmClose={handleConfirmCloseQuarter}
-        displayOwners={displayOwners}
-        getOwnerDetails={getOwnerDetails}
-        ownerShareLabel={ownerShareLabel}
-        isSubmitting={isSubmitting}
-      />
     </div>
   );
 };

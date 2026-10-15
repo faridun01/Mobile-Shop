@@ -15,6 +15,7 @@ import { DEVICE_STATUS_LABELS, findDeviceByCode, normalizeScanCode } from '../..
 import { formatPhoneColor } from '../../utils/phoneSpecs';
 import { RevisionHistoryPanel } from '../revision/RevisionHistoryPanel';
 import { RestrictedAccess } from '../ui/RestrictedAccess';
+import { ClosePeriodDialog } from '../owners/ClosePeriodDialog';
 import {
   CheckCircle2,
   RotateCcw,
@@ -29,6 +30,7 @@ import {
   History,
   FileCheck2,
   ClipboardCheck,
+  CalendarCheck,
 } from 'lucide-react';
 
 interface ModelGroup {
@@ -109,6 +111,9 @@ export const RevisionPage: React.FC = () => {
   const [pageTab, setPageTab] = useState<'AUDIT' | 'HISTORY'>('AUDIT');
   const [revisionComment, setRevisionComment] = useState('');
   const [isSavingRevision, setIsSavingRevision] = useState(false);
+  // The month ends with a stock count, then the financial period is closed from here.
+  const [isPeriodOpen, setIsPeriodOpen] = useState(false);
+  const [offerPeriodClose, setOfferPeriodClose] = useState(false);
 
   // Reset revision session when store changes
   React.useEffect(() => {
@@ -272,6 +277,7 @@ export const RevisionPage: React.FC = () => {
 
       // Navigate to History tab so user immediately sees the saved record
       setPageTab('HISTORY');
+      setOfferPeriodClose(true);
     } catch (err: any) {
       soundEffects.playError();
       setStatus({
@@ -343,9 +349,9 @@ export const RevisionPage: React.FC = () => {
 
       {/* Top Header Bar */}
       <div className="px-2.5 sm:px-4 py-1.5 sm:py-2 border-b border-border bg-surface shrink-0 shadow-2xs sticky top-0 z-20">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-2">
           {/* Left Group: Store Selector + Tabs (Desktop) */}
-          <div className="flex items-center gap-2 min-w-0 flex-wrap sm:flex-nowrap">
+          <div className="flex items-center gap-2 min-w-0 md:flex-nowrap">
             {!isAdmin && (
               <span className="inline-flex items-center gap-1.5 text-xs font-bold px-2.5 py-1 rounded-lg bg-accent/10 text-accent border border-accent/25 shrink-0">
                 <StoreIcon className="w-3.5 h-3.5 shrink-0" />
@@ -359,13 +365,26 @@ export const RevisionPage: React.FC = () => {
                 onChange={setSelectedStoreId}
                 stores={stores}
                 compact
-                className="w-full xs:w-auto xs:max-w-48 sm:max-w-52 shrink-0"
+                className="w-full flex-1 min-w-0 md:flex-none md:w-44"
                 title="Точка для сверки"
               />
             )}
 
+            {/* Closing the financial period (the month ends with a stock count): on the right of the
+                store on a phone or tablet, the last action on the right on a wide screen. */}
+            <button
+              type="button"
+              onClick={() => setIsPeriodOpen(true)}
+              className="inline-flex md:hidden h-8 px-2.5 rounded-lg items-center gap-1.5 text-xs font-bold whitespace-nowrap text-amber-500 border border-amber-500/30 bg-amber-500/10 hover:bg-amber-500/20 cursor-pointer shrink-0"
+              title="Сводная ведомость и закрытие финансового периода"
+              aria-label="Закрыть период"
+            >
+              <CalendarCheck className="w-4 h-4 shrink-0" />
+              Закрыть период
+            </button>
+
             {/* Desktop Tabs */}
-            <div className="hidden sm:flex items-center bg-surface-raised border border-border rounded-lg p-0.5 shrink-0">
+            <div className="hidden md:flex items-center bg-surface-raised border border-border rounded-lg p-0.5 shrink-0">
               <button
                 type="button"
                 onClick={() => setPageTab('AUDIT')}
@@ -401,9 +420,9 @@ export const RevisionPage: React.FC = () => {
           </div>
 
           {/* Right Group on Desktop / Row 2 on Mobile: Mobile Tabs + Action Buttons */}
-          <div className="flex items-center justify-between sm:justify-end gap-2 shrink-0">
-            {/* Mobile Tabs (only shown on screen < sm) */}
-            <div className="flex sm:hidden items-center bg-surface-raised border border-border rounded-lg p-0.5 shrink-0">
+          <div className="flex items-center justify-between md:justify-end gap-2 shrink-0">
+            {/* Mobile Tabs (only shown on screen < md) */}
+            <div className="flex md:hidden items-center bg-surface-raised border border-border rounded-lg p-0.5 shrink-0">
               <button
                 type="button"
                 onClick={() => setPageTab('AUDIT')}
@@ -480,9 +499,48 @@ export const RevisionPage: React.FC = () => {
                 </Button>
               </div>
             )}
+
+            <button
+              type="button"
+              onClick={() => setIsPeriodOpen(true)}
+              className="hidden md:inline-flex h-8 px-2.5 rounded-lg items-center gap-1.5 text-xs font-bold whitespace-nowrap text-amber-500 border border-amber-500/30 bg-amber-500/10 hover:bg-amber-500/20 cursor-pointer shrink-0"
+              title="Сводная ведомость и закрытие финансового периода"
+              aria-label="Закрыть период (широкий экран)"
+            >
+              <CalendarCheck className="w-4 h-4 shrink-0" />
+              Закрыть период
+            </button>
           </div>
         </div>
       </div>
+
+      {offerPeriodClose && (
+        <div className="mx-2 sm:mx-2.5 mt-2 p-2.5 rounded-xl border border-amber-500/30 bg-amber-500/10 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+          <div className="flex items-start gap-2 min-w-0">
+            <CalendarCheck className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
+            <div className="text-xs min-w-0">
+              <p className="font-bold text-fg">Ревизия сохранена. Закрыть финансовый период?</p>
+              <p className="text-fg-subtle">Если это ревизия на конец месяца, закройте период: итоги партнёров попадут в архив, остаток прибыли можно перенести в капитал.</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-1.5 shrink-0 self-end sm:self-auto">
+            <Button type="button" variant="secondary" size="sm" data-compact="true" className="min-h-0 h-7.5 px-3 text-xs cursor-pointer" onClick={() => setOfferPeriodClose(false)}>
+              Позже
+            </Button>
+            <Button
+              type="button"
+              variant="primary"
+              size="sm"
+              data-compact="true"
+              leftIcon={CalendarCheck}
+              className="min-h-0 h-7.5 px-3 text-xs font-bold cursor-pointer whitespace-nowrap"
+              onClick={() => { setOfferPeriodClose(false); setIsPeriodOpen(true); }}
+            >
+              Закрыть период
+            </Button>
+          </div>
+        </div>
+      )}
 
       {/* Main Content Area */}
       {pageTab === 'AUDIT' ? (
@@ -1065,6 +1123,15 @@ export const RevisionPage: React.FC = () => {
             </div>
           </div>
         }
+      />
+
+      <ClosePeriodDialog
+        open={isPeriodOpen}
+        onClose={() => setIsPeriodOpen(false)}
+        onResult={(result) => {
+          setStatus({ tone: result.ok ? 'success' : 'error', text: result.text });
+          if (result.ok) setIsPeriodOpen(false);
+        }}
       />
     </div>
   );
