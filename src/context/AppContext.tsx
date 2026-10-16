@@ -1738,7 +1738,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }), [
     resolvedCurrentUser, todayRate, activePage, selectedStoreId, stores, devices, sales,
     transfers, transfersAllLoaded, repairs, suppliers, invoices, bonuses, expenses, owners,
-    ownerTransactions, users, auditLogs, isInitialLoading,
+    storeProfitShares, ownerTransactions, users, auditLogs, isInitialLoading,
     isRateModalOpen, isScannerOpen, scannerCallback, drawerOpen, theme, authToken,
   ]);
 

@@ -13,6 +13,7 @@ import { StatusBanner, StatusMessage } from '../ui/StatusBanner';
 import { useStoreContext } from '../../utils/storeContext';
 import { OwnerTransactionModal } from '../owners/OwnerTransactionModal';
 import { StoreSharesModal } from '../owners/StoreSharesModal';
+import { StoreSharesSection } from '../owners/StoreSharesSection';
 import { OwnerCard } from '../owners/OwnerCard';
 import { OwnerTransactionsTable } from '../owners/OwnerTransactionsTable';
 
@@ -51,8 +52,8 @@ export const OwnersPage: React.FC = () => {
   const [txModalOwnerId, setTxModalOwnerId] = useState<string | undefined>(undefined);
   const [txModalType, setTxModalType] = useState<'INVESTMENT' | 'WITHDRAWAL'>('INVESTMENT');
 
-  const [isSharesModalOpen, setIsSharesModalOpen] = useState(false);
-
+  // The store whose profit split is being edited (the dialog is open while it is set).
+  const [sharesStoreId, setSharesStoreId] = useState<string | null>(null);
 
   const rate = Number(todayRate?.rate) || 0;
   const storeCtx = useStoreContext();
@@ -112,6 +113,20 @@ export const OwnersPage: React.FC = () => {
       || owners.find(o => o.storeId === storeId && o.id !== adminOwner?.id);
   };
 
+  // Stores whose split is shown: every retail store at Central Cash, the selected one inside a store.
+  const sharesStores = useMemo(
+    () => (storeCtx.mode === 'STORE' ? retailStores.filter((s) => s.id === storeCtx.storeId) : retailStores),
+    [retailStores, storeCtx]
+  );
+  const sharesStore = sharesStoreId ? stores.find((s) => s.id === sharesStoreId) : undefined;
+  const sharesPartner = sharesStoreId ? partnerForStore(sharesStoreId) : undefined;
+  const sharesCurrentPercent = (() => {
+    const pair = sharesStoreId && sharesPartner
+      ? storeProfitShares.find((sh) => sh.storeId === sharesStoreId && sh.ownerId === sharesPartner.id)
+      : undefined;
+    return pair ? Number(pair.sharePercent) : undefined;
+  })();
+
   const openTxModalForOwner = (ownerId: string, type: 'INVESTMENT' | 'WITHDRAWAL') => {
     setTxModalOwnerId(ownerId);
     setTxModalType(type);
@@ -170,10 +185,12 @@ export const OwnersPage: React.FC = () => {
       const adminNum = Math.round((100 - partnerSharePercent) * 100) / 100;
       const res = await setStoreProfitShares(storeId, [{ ownerId: partnerOwnerId, sharePercent: partnerSharePercent }]);
       if (res.success) {
-        setIsSharesModalOpen(false);
+        setSharesStoreId(null);
         setStatusBanner({
           tone: 'success',
-          text: `Доли магазина «${targetStore?.name || ''}» сохранены: ${formatUserName(adminOwner?.name)} ${adminNum}%, ${formatUserName(partnerOwner?.name)} ${partnerSharePercent}%. Действуют для прибыли с этого момента.`
+          text: partnerSharePercent > 0
+            ? `Доли магазина «${targetStore?.name || ''}» сохранены: ${formatUserName(adminOwner?.name)} ${adminNum}%, ${formatUserName(partnerOwner?.name)} ${partnerSharePercent}%. Действуют для продаж с этого момента.`
+            : `Доля партнёра в магазине «${targetStore?.name || ''}» снята: вся прибыль магазина идёт администратору.`
         });
       } else {
         setStatusBanner({ tone: 'error', text: res.message || 'Ошибка сохранения долей' });
@@ -260,6 +277,18 @@ export const OwnersPage: React.FC = () => {
       {/* Scrollable Content */}
       <div className="flex-1 overflow-y-auto p-2.5 sm:p-4 lg:p-6 bg-bg">
         <div className="max-w-6xl xl:max-w-7xl mx-auto w-full space-y-3 sm:space-y-4">
+          {/* Section: profit split per store (admin only) */}
+          {currentUser?.role === 'ADMIN' && (
+            <StoreSharesSection
+              stores={sharesStores}
+              adminOwner={adminOwner}
+              partnerForStore={partnerForStore}
+              storeProfitShares={storeProfitShares}
+              showMainWarehouseNote={storeCtx.mode === 'CENTRAL' && Boolean(mainWarehouse)}
+              onEdit={(storeId) => setSharesStoreId(storeId)}
+            />
+          )}
+
           {/* Section: Partner Cards */}
           <div className="space-y-2 sm:space-y-2.5">
             <div className="flex items-center gap-1.5 sm:gap-2">
@@ -302,15 +331,13 @@ export const OwnersPage: React.FC = () => {
 
       {/* MODAL: Edit Shares */}
       <StoreSharesModal
-        open={isSharesModalOpen}
-        onClose={() => setIsSharesModalOpen(false)}
+        open={sharesStoreId !== null}
+        onClose={() => setSharesStoreId(null)}
         onSave={handleSaveShares}
-        retailStores={retailStores}
-        stores={stores}
+        store={sharesStore}
+        partner={sharesPartner}
         adminOwner={adminOwner}
-        partnerForStore={partnerForStore}
-        storeProfitShares={storeProfitShares}
-        initialStoreId=""
+        currentPercent={sharesCurrentPercent}
         isSubmitting={isSubmitting}
       />
 
