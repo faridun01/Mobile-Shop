@@ -34,9 +34,7 @@ export const StoreSharesSection: React.FC<StoreSharesSectionProps> = ({
         <Percent className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-accent" />
         <h2 className="text-xs sm:text-sm font-bold text-fg uppercase tracking-wide">Доли прибыли по магазинам</h2>
       </div>
-      <p className="text-[11px] sm:text-xs text-fg-subtle">
-        Прибыль каждого магазина делится между партнёром этого магазина и администратором: вы задаёте долю партнёра, остальное получает администратор.
-      </p>
+     
 
       <div className="rounded-2xl border border-border bg-surface divide-y divide-border overflow-hidden">
         {stores.length === 0 && (
