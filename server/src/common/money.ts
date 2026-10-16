@@ -68,3 +68,5 @@ function parseMoney(value: unknown, label: string) {
   if (amount.abs().gt('999999999999.99')) throw new Error(`${label}: превышен допустимый размер суммы`);
   return amount;
 }
+
+export { D };
