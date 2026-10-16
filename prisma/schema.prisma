@@ -162,6 +162,7 @@ model Store {
   stockRevisions        StockRevision[]
   stockThresholds       StockThreshold[]
   saleReturns           SaleReturn[]
+  partnerOwners         Owner[]
 
   @@map("stores")
 }
@@ -418,7 +419,6 @@ model Device {
   bonusPoolEntries BonusPoolEntry[]
   receiptItems    StoreReceiptItem[]
 
-  @@index([imei])
   @@index([storeId, status])
   @@index([status])
   @@index([createdAt])
@@ -430,7 +430,8 @@ model Device {
 model DeviceIdentifier {
   identifier String @id
   deviceId String @map("device_id")
-  device Device @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  // onUpdate as the migration created the key (ids never change, so it has no effect either way).
+  device Device @relation(fields: [deviceId], references: [id], onDelete: Cascade, onUpdate: NoAction)
   @@index([deviceId], map: "device_identifiers_device_idx")
   @@map("device_identifiers")
 }
@@ -996,8 +997,9 @@ model PayrollPayout {
   previousSalaryTjs   Decimal  @map("previous_salary_tjs") @db.Decimal(14, 2)
   paidAdvancesTjs     Decimal  @map("paid_advances_tjs") @db.Decimal(14, 2)
   createdAt          DateTime @default(now()) @map("created_at") @db.Timestamptz
-  expense            Expense  @relation(fields: [expenseId], references: [id], onDelete: Restrict)
-  employee           User     @relation(fields: [employeeId], references: [id], onDelete: Restrict)
+  // onUpdate as the migration created these keys (ids never change, so it has no effect either way).
+  expense            Expense  @relation(fields: [expenseId], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  employee           User     @relation(fields: [employeeId], references: [id], onDelete: Restrict, onUpdate: NoAction)
 
   @@index([employeeId, month], map: "payroll_payouts_employee_month_idx")
   @@map("payroll_payouts")
@@ -1020,6 +1022,9 @@ model Owner {
   createdAt             DateTime @default(now())
 
   user         User?              @relation(fields: [userId], references: [id], onDelete: SetNull)
+  // Declared as the migration created it (20260930000000_partner_store_and_device_ram); without
+  // it in the schema the next generated migration would drop this foreign key.
+  store        Store?             @relation(fields: [storeId], references: [id], onDelete: SetNull, onUpdate: Cascade)
   transactions OwnerTransaction[]
   storeShares  StoreProfitShare[]
 

@@ -279,7 +279,7 @@ export class SalesService {
       },
       include: {
         saleItems: { include: { device: { select: { ram: true } } } },
-        store: true,
+        store: { select: { id: true, name: true, isMainWarehouse: true } },
         user: { select: { id: true, name: true, role: true } },
         customer: true,
       },

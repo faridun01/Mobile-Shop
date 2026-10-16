@@ -35,6 +35,14 @@ function versionJsonPlugin(commit: string, builtAt: string, version: string): Pl
         next();
       });
     },
+    // The build's identity goes into the page, not the JS bundle (see src/services/buildInfo.ts).
+    transformIndexHtml() {
+      return [{
+        tag: 'meta',
+        attrs: { name: 'app-build', content: JSON.stringify({ commit, buildTime: builtAt, version }) },
+        injectTo: 'head',
+      }];
+    },
     generateBundle() {
       this.emitFile({
         type: 'asset',
@@ -58,11 +66,6 @@ export default defineConfig(({ mode }) => {
   const appVersion = process.env.npm_package_version || '1.0.0';
 
   return {
-    define: {
-      __COMMIT_SHA__: JSON.stringify(commitSha),
-      __BUILD_TIME__: JSON.stringify(buildTime),
-      __APP_VERSION__: JSON.stringify(appVersion),
-    },
     plugins: [
       react(),
       tailwindcss(),
@@ -172,9 +175,13 @@ export default defineConfig(({ mode }) => {
       chunkSizeWarningLimit: 1000,
       rollupOptions: {
         output: {
+          // Libraries change far less often than the app: in their own chunks they stay cached
+          // across deploys. react-dom/client (the renderer) and scheduler are listed explicitly,
+          // otherwise they land in the app's entry chunk and are downloaded again after every deploy.
           manualChunks: {
-            'vendor-react': ['react', 'react-dom', 'react-router-dom'],
+            'vendor-react': ['react', 'react-dom', 'react-dom/client', 'scheduler', 'react-router', 'react-router-dom'],
             'vendor-icons': ['lucide-react'],
+            'vendor-capacitor': ['@capacitor/core'],
           },
         },
       },

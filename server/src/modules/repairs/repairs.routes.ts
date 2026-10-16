@@ -32,7 +32,7 @@ export function registerRepairRoutes(app: Express) {
         // `user: true` used to pull the technician's full row — password hash and PIN
         // included — into every repairs-list response. Only the display fields are
         // actually used, so select those explicitly instead.
-        include: { statusHistory: { orderBy: { updatedAt: 'asc' } }, store: true, user: { select: { id: true, name: true, role: true } } },
+        include: { statusHistory: { orderBy: { updatedAt: 'asc' } }, store: { select: { id: true, name: true, isMainWarehouse: true } }, user: { select: { id: true, name: true, role: true } } },
         orderBy: { createdAt: 'desc' },
         ...(limit ? { take: limit } : {}),
       });

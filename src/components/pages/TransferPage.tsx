@@ -26,6 +26,8 @@ export const TransferPage: React.FC = () => {
     stores,
     devices,
     transfers,
+    transfersAllLoaded,
+    fetchOlderTransfers,
     createTransferRequest,
     approveTransfer,
     rejectTransfer,
@@ -37,6 +39,8 @@ export const TransferPage: React.FC = () => {
     'stores',
     'devices',
     'transfers',
+    'transfersAllLoaded',
+    'fetchOlderTransfers',
     'createTransferRequest',
     'approveTransfer',
     'rejectTransfer',
@@ -605,6 +609,8 @@ export const TransferPage: React.FC = () => {
             }}
             onNavigateToCreate={() => setActiveTab('create')}
             onOpenInvoice={(tr) => setSelectedInvoiceTransfer(tr)}
+            canLoadOlder={!transfersAllLoaded}
+            onLoadOlder={fetchOlderTransfers}
           />
         )}
       </div>

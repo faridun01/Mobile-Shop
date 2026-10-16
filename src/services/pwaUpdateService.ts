@@ -1,4 +1,7 @@
 import { getUpdateSafetyAssessment } from '../utils/pwaUpdateSafety';
+import { readBuildInfo } from './buildInfo';
+
+const buildInfo = readBuildInfo();
 
 export interface PWAUpdateState {
   hasUpdate: boolean;
@@ -20,7 +23,7 @@ class PWAUpdateService {
     hasUpdate: false,
     isChecking: false,
     lastChecked: null,
-    currentCommit: typeof __COMMIT_SHA__ !== 'undefined' ? __COMMIT_SHA__ : 'dev',
+    currentCommit: buildInfo.commit || 'dev',
     latestCommit: null,
     serverVersion: null,
     isUpdating: false,
@@ -437,9 +440,9 @@ class PWAUpdateService {
 
   public getBuildInfo() {
     return {
-      version: typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '1.0.0',
-      commit: typeof __COMMIT_SHA__ !== 'undefined' ? __COMMIT_SHA__ : 'dev',
-      buildTime: typeof __BUILD_TIME__ !== 'undefined' ? __BUILD_TIME__ : new Date().toISOString(),
+      version: buildInfo.version || '1.0.0',
+      commit: buildInfo.commit || 'dev',
+      buildTime: buildInfo.buildTime || new Date().toISOString(),
     };
   }
 }

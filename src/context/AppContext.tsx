@@ -58,6 +58,10 @@ interface AppContextType {
   // has awaited it once for the record it needed.
   fetchSalesRange: (params: { period?: 'TODAY' | 'MONTH' | 'SPECIFIC_MONTH' | 'ALL'; month?: string; startDate?: string; endDate?: string; storeId?: string; sellerId?: string; search?: string }) => Promise<Sale[]>;
   transfers: TransferRequest[];
+  // `transfers` holds the last 180 days plus every pending transfer until
+  // fetchOlderTransfers loads the full history.
+  transfersAllLoaded: boolean;
+  fetchOlderTransfers: () => Promise<void>;
   repairs: RepairTicket[];
   // `repairs` only holds a recent, bounded window by default (see fetchRepairs) — this
   // reaches further back via an explicit period/month, same pattern as fetchSalesRange.
@@ -287,6 +291,9 @@ interface AppContextType {
   setTheme: (theme: ThemeMode) => void;
   toggleTheme: () => void;
 }
+
+// How far back the transfer history loads by default (see fetchTransfers).
+const TRANSFER_WINDOW_DAYS = 180;
 
 const AppContext = createContext<StoreApi<AppContextType> | null>(null);
 const AppLoaderContext = createContext<((keys: readonly (keyof AppContextType)[]) => void) | null>(null);
@@ -531,12 +538,24 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return mapped;
   }, []);
 
-  // Bounded — no page needs the full transfer history for correctness (no cross-page
-  // lookup depends on it, unlike sales/devices), so a generous cap is enough.
+  // Bounded — the last TRANSFER_WINDOW_DAYS plus every transfer still waiting for approval.
+  // No page needs older history for correctness (no cross-page lookup depends on it, unlike
+  // sales/devices); the history list reaches it on demand via fetchOlderTransfers, after
+  // which refetches keep loading the full history.
+  const transfersAllLoadedRef = useRef(false);
+  const [transfersAllLoaded, setTransfersAllLoaded] = useState(false);
   const fetchTransfers = useCallback(() => coalesceFetch('transfers', async () => {
-    const raw = await fetchAllPages<any>('/transfers');
+    const since = new Date(Date.now() - TRANSFER_WINDOW_DAYS * 24 * 60 * 60 * 1000).toISOString();
+    const raw = await fetchAllPages<any>(transfersAllLoadedRef.current ? '/transfers' : `/transfers?since=${encodeURIComponent(since)}`);
     setTransfers(raw.map((t) => mapTransfer(t, namesRef.current)).sort((a, b) => new Date(b.requestedAt).getTime() - new Date(a.requestedAt).getTime()));
   }), [coalesceFetch]);
+
+  const fetchOlderTransfers = useCallback(async () => {
+    const raw = await fetchAllPages<any>('/transfers');
+    transfersAllLoadedRef.current = true;
+    setTransfersAllLoaded(true);
+    setTransfers(raw.map((t) => mapTransfer(t, namesRef.current)).sort((a, b) => new Date(b.requestedAt).getTime() - new Date(a.requestedAt).getTime()));
+  }, []);
 
   // Bounded — RepairPage's own month filter (defaults to the current month) reaches
   // further back on demand via fetchRepairsRange.
@@ -912,6 +931,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     apiClient('/auth/logout', { method: 'POST' }).catch(() => {});
     useAuthStore.getState().logout();
     setCurrentUserState(null);
+    transfersAllLoadedRef.current = false;
+    setTransfersAllLoaded(false);
   };
 
   const setDailyRate: AppContextType['setDailyRate'] = async (rate) => {
@@ -1638,6 +1659,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         sales,
         fetchSalesRange,
         transfers,
+        transfersAllLoaded,
+        fetchOlderTransfers,
         repairs,
         fetchRepairsRange,
         suppliers,
@@ -1714,7 +1737,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         toggleTheme
   }), [
     resolvedCurrentUser, todayRate, activePage, selectedStoreId, stores, devices, sales,
-    transfers, repairs, suppliers, invoices, bonuses, expenses, owners,
+    transfers, transfersAllLoaded, repairs, suppliers, invoices, bonuses, expenses, owners,
     ownerTransactions, users, auditLogs, isInitialLoading,
     isRateModalOpen, isScannerOpen, scannerCallback, drawerOpen, theme, authToken,
   ]);

@@ -7,7 +7,7 @@ const db = vi.hoisted(() => ({
   sale: { findMany: vi.fn() }, expense: { findMany: vi.fn() }, supplierBonus: { findMany: vi.fn() },
   supplier: { aggregate: vi.fn(), findMany: vi.fn() }, store: { findFirst: vi.fn(), findMany: vi.fn() },
   auditLog: { findMany: vi.fn() }, device: { findMany: vi.fn() }, customerPaymentAllocation: { findMany: vi.fn() },
-  saleReturn: { findMany: vi.fn() },
+  saleReturn: { findMany: vi.fn() }, saleItem: { findMany: vi.fn() },
 }));
 vi.mock('../../prisma/prisma.service', () => ({ prisma: db }));
 const rates = vi.hoisted(() => ({ byDay: new Map<string, number>(), fallback: 10 }));
@@ -46,6 +46,10 @@ beforeEach(() => {
   db.sale.findMany.mockImplementation(async ({ where, select }) => result('sales', sales.filter((sale) =>
     (!where.storeId || sale.storeId === where.storeId) && (!where.id || where.id.in.includes(sale.id)) &&
     (where.status !== 'REFUNDED' || sale.status === 'REFUNDED')), select));
+  // The report reads a period's sale items as a flat query filtered through their sale.
+  db.saleItem.findMany.mockImplementation(async ({ where, select }) => result('saleItems', sales
+    .filter((sale) => !where.sale?.storeId || sale.storeId === where.sale.storeId)
+    .flatMap((sale) => sale.saleItems.map((item) => ({ ...item, saleId: sale.id }))), select));
   db.expense.findMany.mockImplementation(async ({ where, select }) => result('expenses', expenses.filter((expense: any) => (!where?.storeId || expense.storeId === where.storeId) && (!where?.paymentFxUsd || Number(expense.paymentFxUsd ?? 0) !== 0)), select));
   db.auditLog.findMany.mockImplementation(async ({ where, select }) => {
     const ids = where.targetId ? new Set(where.targetId.in) : undefined;

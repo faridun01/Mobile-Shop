@@ -21,4 +21,8 @@ if [ -n "$MIGRATE_URL" ]; then
 fi
 
 echo "Starting Application..."
+# The image ships the server bundled by `npm run build:server`; without it, run the sources through tsx.
+if [ -f server/dist/index.mjs ]; then
+  exec node --enable-source-maps server/dist/index.mjs
+fi
 exec ./node_modules/.bin/tsx server/src/index.ts

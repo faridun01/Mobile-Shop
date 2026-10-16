@@ -72,7 +72,8 @@ export function registerRefundRoutes(app: Express) {
           // receipt opened by an exchange, the receipt the returned phone came from.
           returns: { orderBy: { createdAt: 'asc' }, include: { exchangeSale: { select: { id: true, receiptNumber: true } } } },
           exchangeReturn: { select: { id: true, creditTjs: true, creditUsd: true, createdAt: true, sale: { select: { id: true, receiptNumber: true } } } },
-          store: true,
+          // Only the store's name is read (receipt header); not its full row with the cash balance.
+          store: { select: { id: true, name: true, isMainWarehouse: true } },
           user: { select: { id: true, name: true, role: true } }
         },
         orderBy: { createdAt: 'desc' },

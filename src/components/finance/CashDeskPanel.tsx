@@ -57,7 +57,8 @@ export const CashDeskPanel: React.FC<CashDeskPanelProps> = ({ storeId }) => {
 
   const loadSummary = useCallback(async () => {
     try {
-      const url = `/cash-desk/summary${selectedStoreId !== 'all' ? `?storeId=${encodeURIComponent(selectedStoreId)}` : ''}`;
+      // The panel shows only the stock totals, not the per-phone list.
+      const url = `/cash-desk/summary?inventoryItems=0${selectedStoreId !== 'all' ? `&storeId=${encodeURIComponent(selectedStoreId)}` : ''}`;
       const res = await apiClient<CashDeskSummary>(url);
       setSummaryData(res);
     } catch {

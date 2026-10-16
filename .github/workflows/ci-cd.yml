@@ -91,6 +91,9 @@ jobs:
       - name: Build Production Bundle
         run: npm run build
 
+      - name: Build Server Bundle
+        run: npm run build:server
+
   security-scan:
     name: Security Audit & Vulnerability Scan
     needs: quality-checks

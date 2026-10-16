@@ -90,6 +90,9 @@ export interface TransferHistoryListProps {
   onRequestReject: (transfer: TransferRequest) => void;
   onNavigateToCreate: () => void;
   onOpenInvoice: (transfer: TransferRequest) => void;
+  // The list holds the last 180 days (and every pending transfer) until older history is asked for.
+  canLoadOlder?: boolean;
+  onLoadOlder?: () => Promise<void>;
 }
 
 export interface ConfirmTransferModalProps {

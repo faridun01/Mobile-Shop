@@ -6,7 +6,7 @@ export async function fetchAllPages<T extends { id: string }>(endpoint: string):
   let cursor: string | undefined;
   while (true) {
     const params = new URLSearchParams({ limit: '200', ...(cursor ? { cursor } : {}) });
-    const page = await apiClient<T[]>(`${endpoint}?${params}`);
+    const page = await apiClient<T[]>(`${endpoint}${endpoint.includes('?') ? '&' : '?'}${params}`);
     for (const record of page) records.set(record.id, record);
     if (page.length < 200) return [...records.values()];
     const next = page.at(-1)!.id;

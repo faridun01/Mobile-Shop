@@ -1,4 +1,10 @@
 import { describe, expect, it, beforeEach, afterEach, vi } from 'vitest';
+
+// A page from a real build carries its commit in index.html (see buildInfo.ts).
+vi.mock('./buildInfo', () => ({
+  readBuildInfo: () => ({ commit: 'abc1234', buildTime: '2026-10-02T10:00:00Z', version: '1.0.0' }),
+}));
+
 import { pwaUpdateService } from './pwaUpdateService';
 import * as safetyModule from '../utils/pwaUpdateSafety';
 

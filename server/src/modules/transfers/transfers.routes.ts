@@ -24,10 +24,26 @@ export function registerTransferRoutes(app: Express) {
       const cursor = typeof req.query.cursor === 'string' ? req.query.cursor : undefined;
       const limit = req.query.limit !== undefined ? Math.min(Math.max(Number(req.query.limit) || 0, 1), 2000) : undefined;
 
+      // `since`: the history page's recent window. Transfers still waiting for approval are
+      // always included, however old.
+      let since: Date | undefined;
+      if (typeof req.query.since === 'string') {
+        since = new Date(req.query.since);
+        if (Number.isNaN(since.getTime())) {
+          res.status(400).json({ message: 'Неверная дата начала периода' });
+          return;
+        }
+      }
+      const recent = since ? { OR: [{ requestedAt: { gte: since } }, { status: 'PENDING_APPROVAL' as const }] } : undefined;
+
       const transfers = await prisma.transferRequest.findMany({
-        where: storeScope,
-        // Only the store name is ever read (mapTransfer) — the full row isn't needed.
-        include: { items: true, fromStore: { select: { name: true } }, toStore: { select: { name: true } } },
+        where: { AND: [storeScope ?? {}, recent ?? {}] },
+        // Only the store name and the item's phone fields are ever read (mapTransfer).
+        include: {
+          items: { select: { deviceId: true, imei: true, brand: true, model: true } },
+          fromStore: { select: { name: true } },
+          toStore: { select: { name: true } },
+        },
         orderBy: [{ requestedAt: 'desc' }, { id: 'desc' }], ...(cursor ? { skip: 1, cursor: { id: cursor } } : {}),
         ...(limit ? { take: limit } : {}),
       });

@@ -15,3 +15,5 @@ ios
 android
 output
 .claude
+PERFORMANCE_AUDIT
+server/dist

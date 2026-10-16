@@ -281,7 +281,9 @@ app.get('/api/devices', authenticateJwt, async (req: AuthenticatedRequest, res, 
 
     const devices = await prisma.device.findMany({
       where,
-      include: { store: true, timeline: { orderBy: { date: 'asc' as const } } },
+      // Only the store's name is read by clients; the full row (cash balance included) is not
+      // repeated in every phone.
+      include: { store: { select: { id: true, name: true, isMainWarehouse: true } }, timeline: { orderBy: { date: 'asc' as const } } },
       orderBy: { createdAt: 'desc' },
       ...(search ? { take: 5 } : {}),
     });
@@ -469,7 +471,7 @@ app.patch('/api/devices/:id', authenticateJwt, requireRoles('ADMIN', 'PARTNER', 
         ...(typeof model === 'string' && model.trim() ? { model: model.trim() } : {}),
         ...(typeof brand === 'string' && brand.trim() ? { brand: brand.trim() } : {}),
       },
-      include: { store: true, timeline: { orderBy: { date: 'asc' as const } } },
+      include: { store: { select: { id: true, name: true, isMainWarehouse: true } }, timeline: { orderBy: { date: 'asc' as const } } },
     });
     // A corrected model name is what autofill suggests from now on.
     await rememberPhones(prisma, [updated]);

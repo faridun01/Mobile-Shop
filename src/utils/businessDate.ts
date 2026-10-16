@@ -15,13 +15,17 @@ export function resolveTimeZone(zone: string | undefined, fallback = 'Asia/Tashk
  */
 export const BUSINESS_TIME_ZONE = resolveTimeZone(import.meta.env?.VITE_BUSINESS_TIME_ZONE);
 
+// Built once: creating an Intl.DateTimeFormat is far slower than formatting with one, and this
+// runs for every receipt when a list is filtered by day.
+const BUSINESS_DAY_FORMAT = new Intl.DateTimeFormat('en-US', {
+  timeZone: BUSINESS_TIME_ZONE,
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+});
+
 export function getBusinessDateKey(date: Date = new Date()): string {
-  const parts = new Intl.DateTimeFormat('en-US', {
-    timeZone: BUSINESS_TIME_ZONE,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).formatToParts(date);
+  const parts = BUSINESS_DAY_FORMAT.formatToParts(date);
   const value = (type: Intl.DateTimeFormatPartTypes) => parts.find((part) => part.type === type)?.value;
   return `${value('year')}-${value('month')}-${value('day')}`;
 }

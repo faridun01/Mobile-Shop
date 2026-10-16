@@ -103,9 +103,14 @@ export async function computeReportsSummary(input: ReportsSummaryInput) {
   // together instead of one round-trip at a time — each of these used to be a separate
   // sequential `await`, and that latency only compounds as the dataset (and DB round-trip
   // time) grows.
+  const periodSaleWhere = {
+    ...(storeFilter ? { storeId: storeFilter } : {}),
+    ...(dateRange ? { createdAt: dateRange } : {}),
+  };
   const [
     rateRow,
-    periodSalesAllStores,
+    periodSalesOnly,
+    periodSaleItems,
     periodExpensesAllStores,
     allBonuses,
     refundedSalesFetched,
@@ -121,19 +126,20 @@ export async function computeReportsSummary(input: ReportsSummaryInput) {
     // the refund is reported in its own period as a negative (see refundedSalesAllStores),
     // so a closed month never changes retroactively and matches owner profit accruals.
     // The breakdown uses the same store scope, so unrelated stores are not needed.
+    // The sales and their items are read as two flat queries and joined below: loading the
+    // items as a nested relation made Prisma send every sale id back in an IN list and stitch
+    // the rows together itself, which took more than twice as long for a long period.
     prisma.sale.findMany({
-      where: {
-        ...(storeFilter ? { storeId: storeFilter } : {}),
-        ...(dateRange ? { createdAt: dateRange } : {}),
-      },
-      select: {
-        id: true, storeId: true, status: true, totalTjs: true, totalUsd: true, exchangeRate: true, receiptNumber: true, createdAt: true,
-        saleItems: { select: {
-          brand: true, model: true, salePriceUsd: true, salePriceTjs: true,
-          costBasisUsd: true, purchaseCostUsd: true, returnId: true,
-        } },
-      },
+      where: periodSaleWhere,
+      select: { id: true, storeId: true, status: true, totalTjs: true, totalUsd: true, exchangeRate: true, receiptNumber: true, createdAt: true },
       orderBy: { createdAt: 'desc' },
+    }),
+    prisma.saleItem.findMany({
+      where: { sale: periodSaleWhere },
+      select: {
+        saleId: true, brand: true, model: true, salePriceUsd: true, salePriceTjs: true,
+        costBasisUsd: true, purchaseCostUsd: true, returnId: true,
+      },
     }),
     prisma.expense.findMany({
       where: { cancelledAt: null, ...(dateRange ? { createdAt: dateRange } : {}), ...(storeFilter ? { storeId: storeFilter } : {}) },
@@ -182,6 +188,13 @@ export async function computeReportsSummary(input: ReportsSummaryInput) {
     prisma.store.findMany({ where: { isMainWarehouse: false, active: true, ...(storeFilter ? { id: storeFilter } : {}) },
       select: { id: true, name: true, cashBalanceUsd: true } }),
   ]);
+  const itemsBySale = new Map<string, Omit<(typeof periodSaleItems)[number], 'saleId'>[]>();
+  for (const { saleId, ...item } of periodSaleItems) {
+    const list = itemsBySale.get(saleId);
+    if (list) list.push(item);
+    else itemsBySale.set(saleId, [item]);
+  }
+  const periodSalesAllStores = periodSalesOnly.map((sale) => ({ ...sale, saleItems: itemsBySale.get(sale.id) ?? [] }));
   // A receipt whose phones were returned one by one is reported through those returns.
   const refundedSalesAllStores = refundedSalesFetched.filter((sale) => sale.returns.length === 0);
   // Today's (or the latest known) rate only values USD figures in TJS for display; every

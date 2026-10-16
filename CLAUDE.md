@@ -22,6 +22,7 @@ npm test                 # vitest run (unit tests, no DB needed)
 npx vitest run server/src/modules/sales/profit.test.ts   # single test file
 npx vitest run -t "name of test"                         # single test by name
 npm run build            # production web build to dist/
+npm run build:server     # bundle the server (esbuild) to server/dist/index.mjs, which the Docker image runs
 ```
 
 Database (local Postgres from `docker-compose.yml` listens on **port 5435**; `docker compose up -d db`):
@@ -81,6 +82,6 @@ Native: `npm run native:sync` (runs `vite build --mode native`, then `cap sync`)
 
 ## Deployment
 
-- `Dockerfile` + `docker-compose.prod.yml`: a single `app` container serves both the API and `dist/`, behind nginx (`nginx/nginx.conf`, which rate-limits `/api`). `docker-entrypoint.sh` runs migrations on start. `JWT_SECRET` and `APP_URL` are required in production, and the server refuses to boot without them.
+- `Dockerfile` + `docker-compose.prod.yml`: a single `app` container serves both the API and `dist/`, behind nginx (`nginx/nginx.conf`, which rate-limits `/api`). `docker-entrypoint.sh` runs migrations on start, then starts the server bundle `server/dist/index.mjs` with `node` (falling back to `tsx server/src/index.ts` if the bundle is missing). The runtime image drops the frontend-only packages listed in the Dockerfile; a new server import of one of them must be removed from that list. `JWT_SECRET` and `APP_URL` are required in production, and the server refuses to boot without them.
 - `vercel.json` deploys the static frontend and rewrites `/api/*` to the Render-hosted backend. The CSP there must list any new external origin.
 - Backup and restore scripts: `scripts/backup-db.sh` and `scripts/restore-db.sh`.

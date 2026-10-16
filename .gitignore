@@ -18,3 +18,7 @@ output/
 # Native build outputs
 *.apk
 *.aab
+
+# Performance audit: raw measurement output (screenshots, profiles, logs) and the test database
+# login (random passwords) stay local; the reports and scripts are committed.
+PERFORMANCE_AUDIT/data/

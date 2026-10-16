@@ -28,6 +28,7 @@ import { Button } from '../ui/Button';
 import { Badge } from '../ui/Badge';
 import { EmptyState } from '../ui/EmptyState';
 import { LoadingState } from '../ui/Skeleton';
+import { useNavigationLayout } from '../../hooks/useNavigationLayout';
 import { Dialog } from '../ui/Dialog';
 import { StatusBanner, StatusMessage } from '../ui/StatusBanner';
 
@@ -36,6 +37,11 @@ import { summarizeSales } from '../../utils/salesSummary';
 import { computeSaleProfit, computeSaleItemProfit } from '../../utils/saleProfit';
 import { looksLikeDeviceCode, normalizeScanCode } from '../../utils/scanLookup';
 import { useStoreContext, formatStoreName } from '../../utils/storeContext';
+
+// Built once for the receipt rows (same output as toLocaleTimeString / toLocaleDateString with
+// these options, without building a new formatter for every row).
+const RECEIPT_TIME = new Intl.DateTimeFormat('ru-RU', { hour: '2-digit', minute: '2-digit' });
+const RECEIPT_DAY = new Intl.DateTimeFormat('ru-RU', { day: '2-digit', month: '2-digit' });
 
 type DialogView = 'details' | 'refund' | 'pick-exchange' | 'pick-repair';
 
@@ -250,6 +256,9 @@ export const SalesHistoryPage: React.FC = () => {
   }, [sales, currentUser, isSeller, selectedStoreFilter, periodFilter, selectedStartDate, selectedEndDate, selectedMonth, searchQuery]);
 
   const periodSummary = useMemo(() => summarizeSales(filteredSales), [filteredSales]);
+  // Only the layout visible at this width is rendered: the table from 768px (Tailwind `md`),
+  // the cards below it. Both used to be rendered for every receipt, one of them hidden by CSS.
+  const showTable = useNavigationLayout() !== 'mobile';
 
   const periodProfitSummary = useMemo(() => {
     if (!isAdmin) return { profitUsd: 0, profitTjs: 0, costUsd: 0 };
@@ -679,6 +688,7 @@ export const SalesHistoryPage: React.FC = () => {
         ) : (
           <>
             {/* Desktop Table View (>= 768px) */}
+            {showTable && (
             <div className="hidden md:block overflow-x-auto">
               <table className="w-full text-left text-xs">
                 <thead className="bg-surface text-[10px] font-bold text-fg-subtle border-b border-border sticky top-0 z-10 uppercase tracking-wider select-none">
@@ -697,8 +707,8 @@ export const SalesHistoryPage: React.FC = () => {
                 </thead>
                 <tbody className="divide-y divide-border">
                   {filteredSales.map((sale) => {
-                    const timeStr = new Date(sale.date).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
-                    const dateStr = new Date(sale.date).toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit' });
+                    const timeStr = RECEIPT_TIME.format(new Date(sale.date));
+                    const dateStr = RECEIPT_DAY.format(new Date(sale.date));
                     return (
                       <tr
                         key={sale.id}
@@ -827,12 +837,14 @@ export const SalesHistoryPage: React.FC = () => {
                 </tbody>
               </table>
             </div>
+            )}
 
             {/* Mobile Cards View (< 768px) - Beautiful & Compact 2-Line Feed */}
+            {!showTable && (
             <div className="md:hidden divide-y divide-border/60">
               {filteredSales.map((sale) => {
-                const timeStr = new Date(sale.date).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
-                const dateStr = new Date(sale.date).toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit' });
+                const timeStr = RECEIPT_TIME.format(new Date(sale.date));
+                const dateStr = RECEIPT_DAY.format(new Date(sale.date));
 
                 return (
                   <button
@@ -993,6 +1005,7 @@ export const SalesHistoryPage: React.FC = () => {
                 );
               })}
             </div>
+            )}
           </>
         )}
       </div>

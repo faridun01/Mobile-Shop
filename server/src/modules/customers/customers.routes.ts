@@ -9,7 +9,8 @@ export function registerCustomerRoutes(app: Express) {
   app.get('/api/cash-desk/summary', authenticateJwt, enforceStoreScope, async (req: AuthenticatedRequest, res, next) => {
     try {
       const storeId = typeof req.query.storeId === 'string' && req.query.storeId !== 'all' ? req.query.storeId : undefined;
-      const summary = await CustomersService.getCashDeskSummary(storeId);
+      // inventoryItems=0: the caller shows only the stock totals, so the per-phone list is skipped.
+      const summary = await CustomersService.getCashDeskSummary(storeId, { inventoryDetails: req.query.inventoryItems !== '0' });
       // Supplier debt and the Central Cash balance are business-wide data, ADMIN-only like
       // /api/suppliers and /api/cash-collections; so is the stock's purchase cost (store staff
       // see what is in stock, not what it cost).

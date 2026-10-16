@@ -53,7 +53,10 @@ export const TransferHistoryList: React.FC<TransferHistoryListProps> = ({
   onRequestReject,
   onNavigateToCreate,
   onOpenInvoice,
+  canLoadOlder,
+  onLoadOlder,
 }) => {
+  const [loadingOlder, setLoadingOlder] = useState(false);
   const [historySort, setHistorySort] = useState<'NEWEST' | 'OLDEST' | 'ITEMS_DESC' | 'ITEMS_ASC'>('NEWEST');
 
   const sortedTransfers = useMemo(() => {
@@ -508,6 +511,23 @@ export const TransferHistoryList: React.FC<TransferHistoryListProps> = ({
               </div>
             );
           })}
+        </div>
+      )}
+
+      {canLoadOlder && onLoadOlder && (
+        <div className="flex justify-center pt-1 pb-2">
+          <button
+            type="button"
+            disabled={loadingOlder}
+            onClick={async () => {
+              setLoadingOlder(true);
+              try { await onLoadOlder(); } catch { /* the list stays as it was */ } finally { setLoadingOlder(false); }
+            }}
+            className="h-8 px-3.5 rounded-xl bg-surface border border-border text-xs font-semibold text-accent hover:bg-surface-raised transition-colors cursor-pointer disabled:opacity-60 flex items-center gap-1.5"
+          >
+            {loadingOlder ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Clock className="w-3.5 h-3.5" />}
+            <span>{loadingOlder ? 'Загрузка…' : 'Показать перемещения старше 180 дней'}</span>
+          </button>
         </div>
       )}
     </div>

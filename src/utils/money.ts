@@ -33,6 +33,19 @@ export function splitUsdByTjs(totalUsd: number, totalTjs: number, partsTjs: numb
   return cents.map((value) => value.div(100).toNumber());
 }
 
+// One Intl.NumberFormat per locale and precision, reused: `number.toLocaleString(locale, options)`
+// builds a new one on every call, which made long lists of amounts slow. Same output.
+const moneyFormats = new Map<string, Intl.NumberFormat>();
+function moneyFormat(locale: string | undefined, min: number, max: number): Intl.NumberFormat {
+  const key = `${locale ?? ''}|${min}|${max}`;
+  let format = moneyFormats.get(key);
+  if (!format) {
+    format = new Intl.NumberFormat(locale, { minimumFractionDigits: min, maximumFractionDigits: max });
+    moneyFormats.set(key, format);
+  }
+  return format;
+}
+
 /**
  * Formats a monetary amount to always show 2 decimal places.
  * Example: 10.5 -> "10.50" (or "10,50"), 1250 -> "1,250.00" (or "1 250,00")
@@ -54,10 +67,7 @@ export function formatMoney(
   if (!Number.isFinite(num)) return '0.00';
   const min = options?.minimumFractionDigits ?? 2;
   const max = options?.maximumFractionDigits ?? 2;
-  return num.toLocaleString(options?.locale, {
-    minimumFractionDigits: min,
-    maximumFractionDigits: max,
-  });
+  return moneyFormat(options?.locale, min, max).format(num);
 }
 
 /** Formats a monetary value in TJS with 2 decimal places: e.g. "10.50 TJS" or "-10.50 TJS" */

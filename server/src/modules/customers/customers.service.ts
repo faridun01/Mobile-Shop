@@ -523,7 +523,12 @@ export class CustomersService {
    * 3. Debt to suppliers (total and breakdown)
    * 4. Customer debts (total and list of debtors)
    */
-  public static async getCashDeskSummary(storeId?: string) {
+  /**
+   * With inventoryDetails = false the stock list and its per-model breakdown are left out (empty
+   * arrays) and only the fields the totals need are read; the totals themselves are identical.
+   */
+  public static async getCashDeskSummary(storeId?: string, options: { inventoryDetails?: boolean } = {}) {
+    const inventoryDetails = options.inventoryDetails !== false;
     const debtorWhere = { totalDebtTjs: { gt: 0 } };
     const [rateVal, stores, inStockDevices, suppliersWithDebt, customerDebtors, customerDebtTotals] = await Promise.all([
       getRateForDate(new Date()),
@@ -533,19 +538,21 @@ export class CustomersService {
           status: { in: ['STORE_STOCK', 'MAIN_WAREHOUSE', 'IN_STOCK_AFTER_EXCHANGE'] },
           ...(storeId && storeId !== 'all' ? { storeId } : {}),
         },
-        select: {
-          id: true,
-          storeId: true,
-          brand: true,
-          model: true,
-          storage: true,
-          color: true,
-          imei: true,
-          purchasePriceUsd: true,
-          costBasisUsd: true,
-          retailPriceTjs: true,
-        },
-      }),
+        select: inventoryDetails
+          ? {
+              id: true,
+              storeId: true,
+              brand: true,
+              model: true,
+              storage: true,
+              color: true,
+              imei: true,
+              purchasePriceUsd: true,
+              costBasisUsd: true,
+              retailPriceTjs: true,
+            }
+          : { purchasePriceUsd: true, costBasisUsd: true },
+      }) as Promise<Array<{ id: string; storeId: string; brand: string; model: string; storage: string | null; color: string | null; imei: string; purchasePriceUsd: Prisma.Decimal | null; costBasisUsd: Prisma.Decimal | null; retailPriceTjs: Prisma.Decimal | null }>>,
       prisma.supplier.findMany({
         where: { active: true, totalDebtUsd: { gt: 0 } },
         orderBy: { totalDebtUsd: 'desc' },
@@ -619,7 +626,7 @@ export class CustomersService {
       storesMap: Map<string, { storeId: string; storeName: string; count: number }>;
     }>();
 
-    for (const d of inStockDevices) {
+    for (const d of inventoryDetails ? inStockDevices : []) {
       const brand = d.brand || 'Не указан';
       const model = d.model || 'Модель';
       const storage = d.storage || null;
@@ -668,7 +675,7 @@ export class CustomersService {
       })
       .sort((a, b) => b.totalCostUsd - a.totalCostUsd);
 
-    const items = inStockDevices.map((d) => {
+    const items = (inventoryDetails ? inStockDevices : []).map((d) => {
       const costUsd = deviceCostUsd(d);
       return {
         id: d.id,
