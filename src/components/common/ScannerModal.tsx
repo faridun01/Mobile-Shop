@@ -6,7 +6,9 @@ import { AlertCircle, ArrowRight, Barcode, Flashlight, FlashlightOff, Focus, X }
 import { useAppFields } from '../../context/AppContext';
 import { Dialog } from '../ui/Dialog';
 import { soundEffects } from '../../utils/sound';
-import { extractImeis, SCAN_HINTS } from '../../services/scanner/imei';
+import { useStore } from 'zustand';
+import { CODE_SCAN_HINTS, extractImeis, extractScanCode, SCAN_HINTS } from '../../services/scanner/imei';
+import { scanModeState, setScanMode } from '../../services/scanner/scannerService';
 import { cn } from '../../utils/cn';
 const DECODE_INTERVAL_MS = 60;
 // The aiming band is cropped at camera resolution, capped here to bound decode time.
@@ -35,6 +37,17 @@ const SUPPORTED_FORMATS = [
   Html5QrcodeSupportedFormats.QR_CODE,
   Html5QrcodeSupportedFormats.DATA_MATRIX,
 ];
+// SN / barcode mode: a tablet SN or an accessory barcode can be any common symbology.
+const CODE_FORMATS = [
+  ...SUPPORTED_FORMATS,
+  Html5QrcodeSupportedFormats.EAN_13,
+  Html5QrcodeSupportedFormats.EAN_8,
+  Html5QrcodeSupportedFormats.UPC_A,
+  Html5QrcodeSupportedFormats.UPC_E,
+  Html5QrcodeSupportedFormats.ITF,
+  Html5QrcodeSupportedFormats.CODE_93,
+  Html5QrcodeSupportedFormats.CODABAR,
+];
 
 /** Aiming band in CSS pixels of the preview. Generous framing so barcodes anywhere on the box are scanned easily. */
 function aimingBand(previewWidth: number, previewHeight?: number) {
@@ -52,6 +65,10 @@ function aimingBand(previewWidth: number, previewHeight?: number) {
  */
 export const ScannerModal: React.FC = () => {
   const { isScannerOpen, scannerCallback, closeScanner } = useAppFields('isScannerOpen', 'scannerCallback', 'closeScanner');
+  // IMEI only, or any code (a tablet SN, an accessory barcode); a lookup may switch between them.
+  const { mode, allowSwitch } = useStore(scanModeState);
+  const codeMode = mode === 'code';
+  const hints = codeMode ? CODE_SCAN_HINTS : SCAN_HINTS;
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const trackRef = useRef<MediaStreamTrack | null>(null);
   const stopCameraRef = useRef<() => void>(() => {});
@@ -89,13 +106,13 @@ export const ScannerModal: React.FC = () => {
   // Instant recognition for valid barcodes
   const confirmScan = (decodedText: string) => {
     if (scanLockedRef.current) return;
-    const imeis = extractImeis(decodedText);
-    if (imeis.length === 0) {
-      setScanHint(SCAN_HINTS.notImei);
+    const codes = codeMode ? [extractScanCode(decodedText)].filter((c): c is string => Boolean(c)) : extractImeis(decodedText);
+    if (codes.length === 0) {
+      setScanHint(hints.notImei);
       return;
     }
-    const code = imeis[0];
-    setScanHint(SCAN_HINTS.hold);
+    const code = codes[0];
+    setScanHint(hints.hold);
     resolveScan(code);
   };
 
@@ -139,10 +156,11 @@ export const ScannerModal: React.FC = () => {
       setTorchOn(false);
       setFocusSupported(false);
       setIsFocusing(false);
-      setScanHint(SCAN_HINTS.aim);
+      setScanHint(hints.aim);
       setManualCode('');
       return;
     }
+    setScanHint(hints.aim);
 
     let cancelled = false;
     let timer = 0;
@@ -189,7 +207,8 @@ export const ScannerModal: React.FC = () => {
     let nativeDetector: { detect: (source: HTMLVideoElement) => Promise<BrowserBarcode[]> } | null = null;
     if (typeof window !== 'undefined' && 'BarcodeDetector' in window) {
       try {
-        const formats = ['code_128', 'code_39', 'code_93', 'qr_code', 'data_matrix', 'ean_13', 'upc_a'];
+        const formats = ['code_128', 'code_39', 'code_93', 'qr_code', 'data_matrix', 'ean_13', 'upc_a',
+          ...(codeMode ? ['ean_8', 'upc_e', 'itf', 'codabar'] : [])];
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         nativeDetector = new (window as any).BarcodeDetector({ formats });
       } catch {
@@ -197,7 +216,7 @@ export const ScannerModal: React.FC = () => {
       }
     }
 
-    const decoder = new Html5QrcodeShim(SUPPORTED_FORMATS, true, false, new BaseLoggger(false));
+    const decoder = new Html5QrcodeShim(codeMode ? CODE_FORMATS : SUPPORTED_FORMATS, true, false, new BaseLoggger(false));
     const canvas = document.createElement('canvas');
     const context = canvas.getContext('2d', { willReadFrequently: true });
 
@@ -217,8 +236,10 @@ export const ScannerModal: React.FC = () => {
               const candidates: { code: string; distance: number }[] = [];
 
               for (const b of barcodes) {
-                const imeis = extractImeis(b.rawValue || '');
-                for (const imei of imeis) {
+                const codes = codeMode
+                  ? [extractScanCode(b.rawValue || '')].filter((c): c is string => Boolean(c))
+                  : extractImeis(b.rawValue || '');
+                for (const imei of codes) {
                   let centerX = targetX;
                   let centerY = targetY;
                   if (b.boundingBox) {
@@ -234,11 +255,11 @@ export const ScannerModal: React.FC = () => {
 
               if (candidates.length > 0) {
                 candidates.sort((a, b) => a.distance - b.distance);
-                setScanHint(SCAN_HINTS.hold);
+                setScanHint(hints.hold);
                 resolveScan(candidates[0].code);
                 detected = true;
               } else {
-                setScanHint(SCAN_HINTS.notImei);
+                setScanHint(hints.notImei);
               }
             }
           } catch {
@@ -333,20 +354,40 @@ export const ScannerModal: React.FC = () => {
       stopCamera();
       cameraRelease = startPromise.then(stopCamera);
     };
-  }, [isScannerOpen]);
+    // Switching IMEI / SN restarts the camera with that mode's decoders.
+  }, [isScannerOpen, codeMode]);
 
-  const isHolding = scanHint === SCAN_HINTS.hold;
+  const isHolding = scanHint === hints.hold;
 
   return (
     <Dialog
       open={isScannerOpen}
       onClose={closeScanner}
-      title="Сканирование IMEI"
-      subtitle="Наведите камеру на штрих-код устройства"
+      title={codeMode ? 'Сканирование SN / штрихкода' : 'Сканирование IMEI'}
+      subtitle={codeMode ? 'Наведите камеру на штрих-код серийного номера или товара' : 'Наведите камеру на штрих-код устройства'}
       maxWidth="sm"
       compact
     >
       <div className="space-y-2.5">
+        {allowSwitch && (
+          <div role="radiogroup" aria-label="Что сканировать" className="grid grid-cols-2 gap-1 p-1 rounded-xl bg-surface-raised border border-border text-xs font-semibold">
+            {(['imei', 'code'] as const).map((value) => (
+              <button
+                key={value}
+                type="button"
+                role="radio"
+                aria-checked={mode === value}
+                onClick={() => setScanMode(value)}
+                className={cn(
+                  'min-h-9 rounded-lg transition-colors cursor-pointer',
+                  mode === value ? 'bg-accent text-accent-fg shadow-xs' : 'text-fg-muted hover:text-fg'
+                )}
+              >
+                {value === 'imei' ? 'IMEI (телефон)' : 'SN (планшет)'}
+              </button>
+            ))}
+          </div>
+        )}
         {/* Camera Viewport with Tap-to-Focus */}
         <div
           onClick={refocus}
@@ -462,7 +503,7 @@ export const ScannerModal: React.FC = () => {
               'absolute bottom-2.5 left-1/2 -translate-x-1/2 z-10 px-3 py-1 rounded-full backdrop-blur-md text-[11px] font-medium transition-all duration-200 pointer-events-none flex items-center gap-1.5 shadow-lg border max-w-[92%] truncate',
               isHolding
                 ? 'bg-emerald-600/90 text-white border-emerald-400/50 shadow-emerald-950/50 animate-pulse'
-                : scanHint === SCAN_HINTS.notImei
+                : scanHint === hints.notImei
                   ? 'bg-amber-600/90 text-white border-amber-400/50 shadow-amber-950/50'
                   : 'bg-black/70 text-white/95 border-white/20'
             )}
@@ -472,7 +513,7 @@ export const ScannerModal: React.FC = () => {
                 'w-1.5 h-1.5 rounded-full shrink-0',
                 isHolding
                   ? 'bg-white'
-                  : scanHint === SCAN_HINTS.notImei
+                  : scanHint === hints.notImei
                     ? 'bg-amber-200'
                     : 'bg-cyan-400 animate-ping'
               )}
@@ -505,7 +546,7 @@ export const ScannerModal: React.FC = () => {
               type="text"
               value={manualCode}
               onChange={(e) => setManualCode(e.target.value)}
-              placeholder="Или введите IMEI вручную..."
+              placeholder={codeMode ? 'Или введите SN / штрихкод вручную...' : 'Или введите IMEI вручную...'}
               className="w-full h-9 pl-8 pr-7 bg-surface-raised border border-border rounded-xl text-xs font-mono text-fg placeholder:font-sans placeholder:text-fg-subtle focus:outline-none focus:border-accent transition-colors"
             />
             {manualCode && (

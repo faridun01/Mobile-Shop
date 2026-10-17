@@ -66,6 +66,8 @@ export class StoresService {
         where: { storeId, status: { not: 'STORE_STOCK' } },
         data: { storeId: mainWarehouse.id },
       });
+      // Accessories on hand go back to the main warehouse with their own batch costs.
+      await tx.accessoryBatch.updateMany({ where: { storeId }, data: { storeId: mainWarehouse.id } });
 
       // A store this deletable has no financial history either (every dependent table
       // above was empty or fully reassigned) — its FinancialAccount, if one exists at
@@ -197,6 +199,7 @@ export class StoresService {
       await tx.user.updateMany({ where: { storeId: sourceStoreId }, data: { storeId: targetStoreId } });
       await tx.owner.updateMany({ where: { storeId: sourceStoreId }, data: { storeId: targetStoreId } });
       await tx.device.updateMany({ where: { storeId: sourceStoreId }, data: { storeId: targetStoreId } });
+      await tx.accessoryBatch.updateMany({ where: { storeId: sourceStoreId }, data: { storeId: targetStoreId } });
       await tx.sale.updateMany({ where: { storeId: sourceStoreId }, data: { storeId: targetStoreId } });
       await tx.saleReturn.updateMany({ where: { storeId: sourceStoreId }, data: { storeId: targetStoreId } });
       await tx.supplierInvoice.updateMany({ where: { storeId: sourceStoreId }, data: { storeId: targetStoreId } });

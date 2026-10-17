@@ -12,7 +12,7 @@ import { useUIStore } from '../stores/useUIStore';
 import { useNotificationsActions } from './NotificationsContext';
 import { apiClient } from '../api/client';
 import { useRealtimeSync } from '../hooks/useRealtimeSync';
-import { scanCode, cancelScan, isNativeScanner } from '../services/scanner/scannerService';
+import { scanCode, cancelScan, isNativeScanner, type ScanOptions } from '../services/scanner/scannerService';
 import { soundEffects } from '../utils/sound';
 import {
   buildNameLookup,
@@ -103,12 +103,17 @@ interface AppContextType {
   setActivePage: (page: PageId, navTargetId?: string) => void;
   setSelectedStoreId: (storeId: string) => void;
   setDrawerOpen: (open: boolean) => void;
-  openScanner: (callback: (code: string) => void) => void;
+  /** IMEI only by default; `mode: 'code'` takes any barcode, `allowModeSwitch` shows IMEI / SN. */
+  openScanner: (callback: (code: string) => void, options?: ScanOptions) => void;
   closeScanner: () => void;
 
   // Business logic operations
   createSale: (params: {
     items: { device: Device; salePriceTjs: number }[];
+    /** Accessory lines: a quantity of one card at a unit price (TJS). */
+    accessories?: { productId: string; quantity: number; unitPriceTjs: number }[];
+    /** The store selling (needed when the receipt holds only accessories). */
+    storeId?: string;
     paymentMethod: PaymentMethod;
     cashAmountTjs: number;
     cardAmountTjs: number;
@@ -134,6 +139,8 @@ interface AppContextType {
   processReturnItems: (params: {
     saleId: string;
     items: { saleItemId: string; withheldTjs: number }[];
+    /** Accessory units returned, by receipt line. */
+    accessories?: { lineId: string; quantity: number; withheldTjs: number }[];
     reason: string;
     paymentMethod: 'CASH' | 'CARD';
   }) => Promise<{ success: boolean; message?: string }>;
@@ -198,7 +205,7 @@ interface AppContextType {
   }) => Promise<{ success: boolean; message?: string }>;
   deleteSupplierBonus: (id: string) => Promise<{ success: boolean; message?: string }>;
 
-  createTransferRequest: (toLocationIdOrParams: string | { fromLocationId?: string; toLocationId: string; deviceIds: string[] }, deviceIds?: string[]) => Promise<{ success: boolean; message?: string; transfer?: TransferRequest }>;
+  createTransferRequest: (toLocationIdOrParams: string | { fromLocationId?: string; toLocationId: string; deviceIds: string[]; accessories?: { productId: string; quantity: number }[] }, deviceIds?: string[]) => Promise<{ success: boolean; message?: string; transfer?: TransferRequest }>;
   approveTransfer: (transferId: string) => Promise<{ success: boolean; message?: string }>;
   rejectTransfer: (transferId: string, reason: string) => Promise<{ success: boolean; message?: string }>;
 
@@ -967,7 +974,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     useUIStore.getState().setSelectedStoreId(storeId);
   };
 
-  const openScanner = (callback: (code: string) => void) => {
+  const openScanner = (callback: (code: string) => void, options?: ScanOptions) => {
     void scanCode({
       open: (onResult) => {
         setScannerCallback(() => onResult);
@@ -977,7 +984,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setIsScannerOpen(false);
         setScannerCallback(null);
       },
-    }).then((code) => {
+    }, options).then((code) => {
       if (code === null) return;
       if (isNativeScanner()) soundEffects.playAddToCartSuccess();
       return callback(code);
@@ -996,6 +1003,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const createSale: AppContextType['createSale'] = async ({
     items,
+    accessories,
+    storeId: requestedStoreId,
     paymentMethod,
     cashAmountTjs,
     cardAmountTjs,
@@ -1009,7 +1018,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     // warehouse on the Inventory page must not have that leak into a POS sale here.
     const storeId = currentUser?.role === 'SELLER'
       ? currentUser.storeId
-      : (items[0]?.device.locationId || (selectedStoreId !== 'all' ? selectedStoreId : undefined));
+      : (items[0]?.device.locationId || requestedStoreId || (selectedStoreId !== 'all' ? selectedStoreId : undefined));
     if (!storeId) return { success: false, message: 'Не удалось определить магазин для продажи' };
 
     try {
@@ -1018,6 +1027,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         body: JSON.stringify({
           storeId,
           items: items.map((i) => ({ deviceId: i.device.id, salePriceTjs: i.salePriceTjs })),
+          ...(accessories?.length ? { accessories } : {}),
           paymentMethod,
           cashAmountTjs,
           cardAmountTjs,
@@ -1063,11 +1073,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
-  const processReturnItems: AppContextType['processReturnItems'] = async ({ saleId, items, reason, paymentMethod }) => {
+  const processReturnItems: AppContextType['processReturnItems'] = async ({ saleId, items, accessories, reason, paymentMethod }) => {
     try {
       await apiClient(`/sales/${saleId}/return-items`, {
         method: 'POST',
-        body: JSON.stringify({ items, reason, paymentMethod }),
+        body: JSON.stringify({ items, accessories, reason, paymentMethod }),
       });
       markLocalMutation(['sales', 'devices', 'stores', 'owners']);
       await refreshAfterMutation([fetchSales(), fetchDevices(), fetchStores(), fetchOwners()]);
@@ -1214,11 +1224,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     let fromLocId = currentUser?.storeId || 'main-warehouse';
     let toLocationId = '';
     let deviceIds: string[] = [];
+    let accessories: { productId: string; quantity: number }[] = [];
 
     if (typeof toLocationIdOrParams === 'object') {
       fromLocId = toLocationIdOrParams.fromLocationId || fromLocId;
       toLocationId = toLocationIdOrParams.toLocationId;
       deviceIds = toLocationIdOrParams.deviceIds;
+      accessories = toLocationIdOrParams.accessories || [];
     } else {
       toLocationId = toLocationIdOrParams;
       deviceIds = deviceIdsParam || [];
@@ -1227,7 +1239,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     try {
       const raw = await apiClient<any>('/transfers', {
         method: 'POST',
-        body: JSON.stringify({ fromStoreId: fromLocId, toStoreId: toLocationId, deviceIds }),
+        body: JSON.stringify({ fromStoreId: fromLocId, toStoreId: toLocationId, deviceIds, accessories }),
       });
       markLocalMutation(['transfers', 'devices']);
       await refreshAfterMutation([fetchTransfers(), fetchDevices()]);

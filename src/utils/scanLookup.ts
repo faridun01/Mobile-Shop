@@ -16,15 +16,25 @@ export function normalizeScanCode(code: string): string {
   return code.trim().replace(/\s+/g, '');
 }
 
-/** Long digit strings are IMEIs/barcodes; anything else typed into search is a text query. */
+/**
+ * Long digit strings are IMEIs/barcodes, and a word of 8+ letters and digits with at least one
+ * digit is a tablet serial number; anything else typed into search (with spaces, no digits) is
+ * a text query.
+ */
 export function looksLikeDeviceCode(code: string): boolean {
-  return /^\d{8,}$/.test(normalizeScanCode(code));
+  const c = normalizeScanCode(code);
+  if (/^\d{8,}$/.test(c)) return true;
+  // A serial number is one word: "iphone 15" with its space stays a text search.
+  const word = code.trim();
+  return /^[A-Za-z0-9\-_./]{8,64}$/.test(word) && /\d/.test(word) && /[A-Za-z]/.test(word);
 }
 
+/** The device behind a scanned IMEI or SN; a tablet SN matches in any letter case. */
 export function findDeviceByCode(devices: Device[], code: string): Device | undefined {
   const c = normalizeScanCode(code);
   if (!c) return undefined;
-  return devices.find((d) => d.imei === c || d.imei2 === c);
+  const upper = c.toUpperCase();
+  return devices.find((d) => d.imei === c || d.imei2 === c || d.imei.toUpperCase() === upper || d.imei2?.toUpperCase() === upper);
 }
 
 export type SaleScanResult =
@@ -68,6 +78,6 @@ export function saleScanMessage(result: Exclude<SaleScanResult, { kind: 'add' }>
     case 'unavailable':
       return `${result.device.brand} ${result.device.model} нельзя продать: статус «${result.statusLabel}»`;
     case 'not-found':
-      return `Устройство с IMEI ${result.code} не найдено среди телефонов в наличии`;
+      return `Устройство с IMEI/SN ${result.code} не найдено среди устройств в наличии`;
   }
 }

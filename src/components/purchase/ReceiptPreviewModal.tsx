@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { Supplier, Store } from '../../types';
-import { PurchasePreviewData, formatInvoiceDate } from './types';
+import { PurchasePreviewData, formatInvoiceDate, previewUnits } from './types';
 import { formatMoney } from '../../utils/money';
 import { formatPhoneColor } from '../../utils/phoneSpecs';
 import {
@@ -45,10 +45,11 @@ export const ReceiptPreviewModal: React.FC<ReceiptPreviewModalProps> = ({
 
   const totalInvoiceUsd = useMemo(() => {
     if (!previewInvoice) return 0;
+    // Cents, so the total of many lines doesn't drift from the server's exact sum.
     return previewInvoice.groups.reduce(
-      (sum, g) => sum + g.items.length * g.purchasePriceUsd,
+      (sum, g) => sum + Math.round(previewUnits(g) * g.purchasePriceUsd * 100),
       0
-    );
+    ) / 100;
   }, [previewInvoice]);
 
   // Set default payment mode based on central cash availability
@@ -98,7 +99,7 @@ export const ReceiptPreviewModal: React.FC<ReceiptPreviewModalProps> = ({
     onConfirm(effectivePaidUsd);
   };
 
-  const totalUnits = previewInvoice.groups.reduce((a, b) => a + b.items.length, 0);
+  const totalUnits = previewInvoice.groups.reduce((a, b) => a + previewUnits(b), 0);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-xs p-3 sm:p-4">
@@ -163,30 +164,44 @@ export const ReceiptPreviewModal: React.FC<ReceiptPreviewModalProps> = ({
 
           {/* Items Summary Accordion/List */}
           <div className="rounded-xl border border-border divide-y divide-border overflow-hidden bg-surface-raised/30 max-h-48 overflow-y-auto">
-            {previewInvoice.groups.map((g, idx) => (
+            {previewInvoice.groups.map((g, idx) => {
+              const units = previewUnits(g);
+              const kind = g.category === 'ACCESSORY' ? 'Аксессуар' : g.category === 'TABLET' ? 'Планшет' : 'Телефон';
+              return (
               <div key={idx} className="p-2.5 sm:p-3 flex items-center justify-between gap-2">
                 <div className="min-w-0">
                   <p className="font-bold text-fg text-xs truncate">
-                    {g.brand} {g.model}
+                    <span className="mr-1 px-1.5 py-0.2 rounded bg-surface-raised border border-border text-[9px] font-semibold uppercase text-fg-subtle align-middle">{kind}</span>
+                    {g.category === 'ACCESSORY' ? `${g.brand} ${g.name || ''}`.trim() : `${g.brand} ${g.model}`}
                   </p>
                   <p className="text-[11px] text-fg-muted mt-0.5 truncate">
-                    {[g.ram, g.storage, formatPhoneColor(g.color)].filter(Boolean).join(' • ')}
+                    {g.category === 'ACCESSORY'
+                      ? [`Штрихкод ${g.barcode}`, g.accessoryCategory, g.model, g.attributes].filter(Boolean).join(' • ')
+                      : g.category === 'TABLET'
+                        ? [g.ram, g.storage, g.color, g.connectivity, g.screenSize].filter(Boolean).join(' • ')
+                        : [g.ram, g.storage, formatPhoneColor(g.color)].filter(Boolean).join(' • ')}
                   </p>
+                  {g.category === 'TABLET' && (
+                    <p className="text-[10px] text-fg-subtle mt-0.5 font-mono truncate">
+                      SN: {g.items.map((it) => (it.imei2 ? `${it.imei} (+${it.imei2})` : it.imei)).join(', ')}
+                    </p>
+                  )}
                   <p className="text-[10px] text-fg-subtle mt-0.5">
-                    {g.items.length} шт. × ${formatMoney(g.purchasePriceUsd)}
+                    {units} шт. × ${formatMoney(g.purchasePriceUsd)}
                   </p>
                 </div>
                 <span className="font-bold font-mono text-fg shrink-0 text-xs sm:text-sm">
-                  ${formatMoney(g.items.length * g.purchasePriceUsd)}
+                  ${formatMoney(Math.round(units * g.purchasePriceUsd * 100) / 100)}
                 </span>
               </div>
-            ))}
+              );
+            })}
           </div>
 
           {/* Subtotal */}
           <div className="flex items-center justify-between p-2.5 sm:p-3 rounded-xl bg-surface-raised border border-border">
             <span className="text-fg-muted text-xs">
-              Всего устройств: <strong className="text-fg font-bold font-mono">{totalUnits} шт.</strong>
+              Всего товаров: <strong className="text-fg font-bold font-mono">{totalUnits} шт.</strong>
             </span>
             <div className="text-right">
               <span className="text-[10px] text-fg-subtle block uppercase font-semibold">Итого за партию</span>

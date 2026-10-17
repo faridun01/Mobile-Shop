@@ -5,6 +5,7 @@ import { Device } from '../../types';
 import {
   List,
   Building2,
+  Headphones,
   Smartphone,
   Warehouse,
   Store as StoreIcon,
@@ -33,6 +34,7 @@ import { BrandGroupedList } from '../inventory/BrandGroupedList';
 import { InventoryVariantList } from '../inventory/InventoryVariantList';
 import { FlatDevicesTable } from '../inventory/FlatDevicesTable';
 import { DeviceDetailsModal } from '../inventory/DeviceDetailsModal';
+import { AccessoryStockList } from '../inventory/AccessoryStockList';
 import { CustomSelect, CustomSelectOption } from '../ui/CustomSelect';
 
 export const InventoryPage: React.FC = () => {
@@ -92,7 +94,7 @@ export const InventoryPage: React.FC = () => {
   ], [mainWarehouse, retailStores]);
 
   // Tab mode: 'DEVICES' (list of goods) or 'LOCATIONS' (list of warehouse and stores)
-  const [viewTab, setViewTab] = useState<'DEVICES' | 'LOCATIONS'>('DEVICES');
+  const [viewTab, setViewTab] = useState<'DEVICES' | 'LOCATIONS' | 'ACCESSORIES'>('DEVICES');
   // Inside a store there is only that store's stock — no per-location overview.
   useEffect(() => {
     if (storeCtx.mode === 'STORE') setViewTab('DEVICES');
@@ -548,7 +550,7 @@ export const InventoryPage: React.FC = () => {
   const handleScanDevice = () => {
     openScanner((scannedCode) => {
       void openDeviceByCode(scannedCode, 'camera');
-    });
+    }, { allowModeSwitch: true });
   };
 
   const handleSelectLocationAndSwitch = (storeId: string) => {
@@ -574,8 +576,7 @@ export const InventoryPage: React.FC = () => {
       <div className="p-2 sm:p-3 border-b border-border bg-surface space-y-2 sm:space-y-2.5 shrink-0 shadow-xs">
         {/* Row 1: Mode Switcher & Location Selector */}
         <div className="flex items-center justify-between gap-2">
-          {!isStoreScoped && storeCtx.mode === 'CENTRAL' ? (
-            <div className="flex-1 sm:flex-initial flex items-center gap-1 p-0.5 sm:p-1 rounded-xl bg-surface-raised border border-border">
+          <div className="flex-1 sm:flex-initial flex items-center gap-1 p-0.5 sm:p-1 rounded-xl bg-surface-raised border border-border">
               <button
                 type="button"
                 onClick={() => setViewTab('DEVICES')}
@@ -597,6 +598,7 @@ export const InventoryPage: React.FC = () => {
                 </span>
               </button>
 
+              {!isStoreScoped && storeCtx.mode === 'CENTRAL' && (
               <button
                 type="button"
                 onClick={() => setViewTab('LOCATIONS')}
@@ -617,8 +619,22 @@ export const InventoryPage: React.FC = () => {
                   {stores.length}
                 </span>
               </button>
+              )}
+
+              {/* Accessories are counted by quantity, not by IMEI/SN: their own list */}
+              <button
+                type="button"
+                onClick={() => setViewTab('ACCESSORIES')}
+                className={`flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                  viewTab === 'ACCESSORIES'
+                    ? 'bg-accent text-accent-fg shadow-xs'
+                    : 'text-fg-subtle hover:text-fg-muted'
+                }`}
+              >
+                <Headphones className="w-3.5 h-3.5" />
+                <span>Аксессуары</span>
+              </button>
             </div>
-          ) : null}
 
           {/* Action buttons & Location Selector */}
           <div className="flex items-center gap-2 shrink-0 ml-auto">
@@ -643,8 +659,8 @@ export const InventoryPage: React.FC = () => {
           </div>
         </div>
 
-        {/* Desktop & Mobile Summary Stats Cards */}
-        <InventoryStatsBar
+        {/* Desktop & Mobile Summary Stats Cards (devices; accessories show their own totals) */}
+        {viewTab !== 'ACCESSORIES' && <InventoryStatsBar
           filteredUnitsCount={filteredUnitsCount}
           isFiltered={isFiltered}
           totalUnitsCount={devicesInActiveLocation.length}
@@ -655,7 +671,7 @@ export const InventoryPage: React.FC = () => {
           isAdmin={isAdmin}
           filteredStockValueUsd={filteredStockValueUsd}
           stockValueUsd={stockValueUsd}
-        />
+        />}
 
         {/* Search, Filters & Grouping Toolbar */}
         {viewTab === 'DEVICES' && (
@@ -704,7 +720,9 @@ export const InventoryPage: React.FC = () => {
 
       {/* Main Content Area */}
       <div className="flex-none md:flex-1 md:min-h-0 md:overflow-y-auto">
-        {isInitialLoading ? (
+        {viewTab === 'ACCESSORIES' ? (
+          <AccessoryStockList locationId={isStoreScoped ? undefined : selectedLocationId} isAdmin={isAdmin} />
+        ) : isInitialLoading ? (
           <LoadingState label="Загрузка склада товаров…" />
         ) : viewTab === 'LOCATIONS' ? (
           <InventoryLocationsView

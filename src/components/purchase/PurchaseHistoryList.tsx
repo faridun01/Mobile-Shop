@@ -1,6 +1,6 @@
 import React from 'react';
 import { SupplierInvoice, Supplier, Store, User } from '../../types';
-import { formatInvoiceDate } from './types';
+import { formatInvoiceDate, invoiceUnits } from './types';
 import { MonthPicker } from '../ui/MonthPicker';
 import { CustomSelect } from '../ui/CustomSelect';
 import {
@@ -145,7 +145,7 @@ export const PurchaseHistoryList: React.FC<PurchaseHistoryListProps> = ({
             <span>{filteredInvoices.length} накл.</span>
             <span>·</span>
             <span className="text-accent font-bold">
-              {filteredInvoices.reduce((sum, inv) => sum + (inv.devicesCount || 0), 0)} шт
+              {filteredInvoices.reduce((sum, inv) => sum + invoiceUnits(inv), 0)} шт
             </span>
             <span>·</span>
             <span className="font-bold text-fg">
@@ -258,7 +258,7 @@ export const PurchaseHistoryList: React.FC<PurchaseHistoryListProps> = ({
                   </div>
 
                   <div className="flex items-center gap-2 shrink-0">
-                    <span className="text-accent font-bold font-mono">{inv.devicesCount || 0} шт.</span>
+                    <span className="text-accent font-bold font-mono">{invoiceUnits(inv)} шт.</span>
 
                     {/* Quick Edit/Delete */}
                     {(currentUser?.role === 'ADMIN' || currentUser?.role === 'PARTNER') && (

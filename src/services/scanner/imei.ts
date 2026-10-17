@@ -38,3 +38,21 @@ export const SCAN_HINTS = {
   several: 'В кадре несколько IMEI — наведите рамку на нужный',
   hold: 'IMEI найден — держите камеру неподвижно',
 };
+
+/** Guidance for the any-code mode (a tablet SN or an accessory barcode). */
+export const CODE_SCAN_HINTS = {
+  aim: 'Наведите рамку на штрих-код SN или товара',
+  notImei: 'Код не распознан — наведите рамку на штрих-код',
+  several: 'В кадре несколько штрих-кодов — наведите рамку на нужный',
+  hold: 'Код найден — держите камеру неподвижно',
+};
+
+/**
+ * Any barcode's value as one code (a serial number, EAN/UPC, a shop label): trimmed, at most
+ * 128 printable characters. Null for an empty or multi-line payload, which is not one code.
+ */
+export function extractScanCode(raw: string): string | null {
+  const value = raw.trim();
+  if (!value || value.length > 128 || /[\u0000-\u001f\u007f]/.test(value)) return null;
+  return value;
+}

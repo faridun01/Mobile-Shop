@@ -1,9 +1,17 @@
+/** What a receipt position holds: phones by IMEI, tablets by SN, accessories by barcode + quantity. */
+export type PurchaseCategory = 'PHONE' | 'TABLET' | 'ACCESSORY';
+
 export interface PurchaseItem {
+  /** A phone's "IMEI 1 / IMEI 2", or a tablet's main SN. */
   imei: string;
+  /** A tablet's additional SN (e.g. its keyboard). */
+  imei2?: string;
 }
 
 export interface PurchaseItemGroup {
   id: string;
+  /** PHONE when absent. */
+  category?: PurchaseCategory;
   brand: string;
   model: string;
   ram: string;
@@ -13,9 +21,23 @@ export interface PurchaseItemGroup {
   isBonus?: boolean;
   bonusCampaign?: string;
   items: PurchaseItem[];
+  // Tablet
+  connectivity?: string;
+  screenSize?: string;
+  // Accessory
+  barcode?: string;
+  name?: string;
+  accessoryCategory?: string;
+  attributes?: string;
+  quantity?: number;
+  /** The saved card a scanned barcode was found as (its fields then come from the card). */
+  productId?: string | null;
+  /** Barcode lookup state: found in the catalog, new (to be filled by hand), or being checked. */
+  barcodeStatus?: 'idle' | 'loading' | 'found' | 'new';
 }
 
 export interface PurchasePreviewGroup {
+  category?: PurchaseCategory;
   brand: string;
   model: string;
   ram: string;
@@ -26,6 +48,13 @@ export interface PurchasePreviewGroup {
   bonusCampaign?: string;
   items: PurchaseItem[];
   imeis: string[];
+  connectivity?: string;
+  screenSize?: string;
+  barcode?: string;
+  name?: string;
+  accessoryCategory?: string;
+  attributes?: string;
+  quantity?: number;
 }
 
 export interface PurchasePreviewData {
@@ -37,6 +66,29 @@ export interface PurchasePreviewData {
   groups: PurchasePreviewGroup[];
   paidAmountUsd?: number;
 }
+
+/** All units an invoice received: its devices plus its accessory batches' quantities. */
+export const invoiceUnits = (inv: { devicesCount?: number; accessoryBatches?: { quantityReceived: number }[] }) =>
+  (inv.devicesCount || 0) + (inv.accessoryBatches ?? []).reduce((sum, b) => sum + b.quantityReceived, 0);
+
+/** Units a preview position adds: its serialized items, or an accessory line's quantity. */
+export const previewUnits = (g: PurchasePreviewGroup) => (g.category === 'ACCESSORY' ? g.quantity || 0 : g.items.length);
+
+export const emptyGroup = (category: PurchaseCategory = 'PHONE'): PurchaseItemGroup => ({
+  id: `g-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+  category,
+  brand: '',
+  model: '',
+  ram: '',
+  storage: '',
+  color: '',
+  purchasePriceUsd: 0,
+  items: category === 'ACCESSORY' ? [] : [{ imei: '' }],
+  ...(category === 'TABLET' ? { connectivity: '', screenSize: '' } : {}),
+  ...(category === 'ACCESSORY'
+    ? { barcode: '', name: '', accessoryCategory: '', attributes: '', quantity: 1, productId: null, barcodeStatus: 'idle' as const }
+    : {}),
+});
 
 export const formatInvoiceDate = (dateVal?: string): string => {
   if (!dateVal) return '-';
@@ -81,4 +133,3 @@ export const compareInvoicesDesc = (
   }
   return (b.id || '').localeCompare(a.id || '');
 };
-

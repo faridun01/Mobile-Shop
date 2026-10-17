@@ -1,4 +1,5 @@
 import React from 'react';
+import { deviceCodeLabel } from '../../utils/deviceCode';
 import {
   Loader2,
   Send,
@@ -6,7 +7,8 @@ import {
   Store as StoreIcon,
   ArrowRight,
   Smartphone,
-  Check
+  Check,
+  Headphones
 } from 'lucide-react';
 import { Dialog } from '../ui/Dialog';
 import { getPhoneColorHex, formatRam, formatPhoneColor, isRamInStorage } from '../../utils/phoneSpecs';
@@ -18,6 +20,7 @@ export const ConfirmTransferModal: React.FC<ConfirmTransferModalProps> = ({
   onClose,
   isStoreScoped,
   selectedDevices,
+  selectedAccessories = [],
   fromStore,
   toStore,
   fromStoreName,
@@ -30,7 +33,7 @@ export const ConfirmTransferModal: React.FC<ConfirmTransferModalProps> = ({
       open={open}
       onClose={() => { if (!isSubmittingTransfer) onClose(); }}
       title={isStoreScoped ? 'Накладная на отправку' : 'Накладная на перемещение'}
-      subtitle={`Формирование накладной на передачу (${selectedDevices.length} шт.)`}
+      subtitle={`Формирование накладной на передачу (${selectedDevices.length + selectedAccessories.reduce((s, a) => s + a.quantity, 0)} шт.)`}
       maxWidth="md"
       footer={
         <div className="flex items-center justify-end gap-2.5 w-full">
@@ -119,8 +122,33 @@ export const ConfirmTransferModal: React.FC<ConfirmTransferModalProps> = ({
           </div>
         </div>
 
+        {selectedAccessories.length > 0 && (
+          <div className="space-y-2">
+            <div className="flex items-center justify-between text-xs px-1">
+              <span className="font-bold text-fg-muted uppercase tracking-wider text-[11px] flex items-center gap-1.5">
+                <Headphones className="w-3.5 h-3.5 text-accent" />
+                <span>Аксессуары к перемещению</span>
+              </span>
+              <span className="px-2 py-0.5 rounded-full bg-accent/10 border border-accent/25 text-accent font-bold font-mono text-[11px]">
+                {selectedAccessories.reduce((s, a) => s + a.quantity, 0)} шт.
+              </span>
+            </div>
+            <div className="max-h-40 overflow-y-auto space-y-1.5 p-1 rounded-xl bg-surface-raised/30 border border-border/70 overscroll-contain">
+              {selectedAccessories.map((a) => (
+                <div key={a.barcode} className="p-2.5 rounded-xl bg-surface border border-border/80 flex items-center justify-between gap-3 text-xs">
+                  <div className="min-w-0">
+                    <p className="font-bold text-fg truncate">{a.name}</p>
+                    <p className="text-[10px] text-fg-subtle font-mono">Штрихкод: {a.barcode}</p>
+                  </div>
+                  <span className="font-bold font-mono text-accent shrink-0">{a.quantity} шт.</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Selected Devices List */}
-        <div className="space-y-2">
+        {selectedDevices.length > 0 && <div className="space-y-2">
           <div className="flex items-center justify-between text-xs px-1">
             <span className="font-bold text-fg-muted uppercase tracking-wider text-[11px] flex items-center gap-1.5">
               <Smartphone className="w-3.5 h-3.5 text-accent" />
@@ -173,7 +201,7 @@ export const ConfirmTransferModal: React.FC<ConfirmTransferModalProps> = ({
                       </div>
                       <div className="flex items-center gap-2 text-[10px] text-fg-subtle mt-1 font-mono">
                         <span className="bg-surface-raised px-1.5 py-0.2 rounded border border-border/60 inline-flex items-center gap-1">
-                          <span>IMEI: <span className="text-fg font-semibold">{dev.imei}</span></span>
+                          <span>{deviceCodeLabel(dev.category)}: <span className="text-fg font-semibold">{dev.imei}</span></span>
                           <CopyImeiButton imei={dev.imei} />
                         </span>
                         {dev.imei2 && (
@@ -189,7 +217,7 @@ export const ConfirmTransferModal: React.FC<ConfirmTransferModalProps> = ({
               );
             })}
           </div>
-        </div>
+        </div>}
 
         {/* Flow note */}
         <div className="p-2.5 rounded-xl bg-accent/10 border border-accent/20 flex items-start gap-2.5 text-xs">
@@ -198,7 +226,7 @@ export const ConfirmTransferModal: React.FC<ConfirmTransferModalProps> = ({
           </div>
           <p className="text-[11px] text-fg-muted leading-relaxed">
             {isStoreScoped
-              ? 'После отправки устройства перейдут в статус «Ожидает приёмки» и будут зачислены на главный склад после подтверждения администратором.'
+              ? 'После отправки устройства перейдут в статус «Ожидает приёмки», а аксессуары будут зарезервированы; на главный склад всё зачислится после подтверждения администратором.'
               : 'После подтверждения устройства будут сразу привязаны к выбранному объекту назначения.'}
           </p>
         </div>

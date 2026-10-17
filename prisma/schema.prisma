@@ -23,6 +23,14 @@ enum DeviceStatus {
   TRANSFER_PENDING
 }
 
+// What a serialized unit is. Phones are identified by IMEI; tablets by their serial number (SN)
+// kept in the same imei/imei2 columns, so every device flow (sale, transfer, return, exchange,
+// reports) treats both alike.
+enum DeviceCategory {
+  PHONE
+  TABLET
+}
+
 enum RepairStatus {
   ACCEPTED
   IN_PROGRESS
@@ -163,6 +171,7 @@ model Store {
   stockThresholds       StockThreshold[]
   saleReturns           SaleReturn[]
   partnerOwners         Owner[]
+  accessoryBatches      AccessoryBatch[]
 
   @@map("stores")
 }
@@ -385,17 +394,25 @@ model PushSubscription {
 
 model Device {
   id                String       @id @default(uuid())
+  category          DeviceCategory @default(PHONE)
+  // A phone's IMEI 1, or a tablet's main serial number (SN, upper-cased).
   imei              String       @unique
-  // A phone's second (dual-SIM) IMEI is a real hardware identifier and must never
-  // repeat across devices — nullable @unique gives Postgres a partial unique index
-  // that allows unlimited NULLs (most devices have no second slot) while rejecting
-  // any duplicate non-null value.
+  // A phone's second (dual-SIM) IMEI, or a tablet's additional SN (e.g. its keyboard), is a
+  // real hardware identifier and must never repeat across devices — nullable @unique gives
+  // Postgres a partial unique index that allows unlimited NULLs (most devices have no second
+  // slot) while rejecting any duplicate non-null value. The device_identifiers trigger also
+  // keeps one code from being one device's imei and another's imei2.
   imei2             String?      @unique
   brand             String
   model             String
   ram               String?
   storage           String
   color             String
+  // Tablet-only optional characteristics (Wi-Fi / Wi-Fi + Cellular, screen size).
+  connectivity      String?
+  screenSize        String?
+  // The catalog variant a tablet was received as (phones use the TAC phone catalog instead).
+  variantId         String?
   status            DeviceStatus @default(MAIN_WAREHOUSE)
   storeId           String
   purchasePriceUsd  Decimal      @db.Decimal(14, 2)
@@ -414,6 +431,7 @@ model Device {
   store           Store                 @relation(fields: [storeId], references: [id])
   supplier        Supplier?             @relation(fields: [supplierId], references: [id])
   purchaseInvoice SupplierInvoice?      @relation(fields: [purchaseInvoiceId], references: [id])
+  variant         ProductVariant?       @relation(fields: [variantId], references: [id])
   timeline        DeviceTimelineEvent[]
   saleItems       SaleItem[]
   repairTickets   RepairTicket[]
@@ -427,7 +445,141 @@ model Device {
   @@index([createdAt])
   @@index([supplierId])
   @@index([purchaseInvoiceId])
+  @@index([category])
   @@map("devices")
+}
+
+// A tablet product variant (brand + model + specs), saved the first time it is received; every
+// unit received afterwards with the same specs links to it, so variants are never duplicated.
+// Empty strings stand for "not specified" (a NULL would defeat the unique key).
+model ProductVariant {
+  id           String         @id @default(uuid())
+  category     DeviceCategory
+  brand        String
+  model        String
+  ram          String         @default("")
+  storage      String         @default("")
+  color        String         @default("")
+  connectivity String         @default("")
+  screenSize   String         @default("")
+  createdAt    DateTime       @default(now())
+
+  devices Device[]
+
+  @@unique([category, brand, model, ram, storage, color, connectivity, screenSize])
+  @@index([category, brand])
+  @@map("product_variants")
+}
+
+// An accessory product, counted by quantity rather than by unit. Its barcode (any symbology —
+// EAN, UPC, Code 128, the shop's own label) is the key a scan finds it by.
+model AccessoryProduct {
+  id         String   @id @default(uuid())
+  barcode    String   @unique
+  brand      String
+  name       String
+  category   String
+  // Model or type, where it applies (e.g. "iPhone 15", "Type-C 1 м"); empty when not.
+  model      String   @default("")
+  // Further characteristics as free text (colour, power, length…).
+  attributes String   @default("")
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  batches        AccessoryBatch[]
+  saleItems      SaleAccessoryItem[]
+  transferLines  TransferAccessoryLine[]
+
+  @@index([brand])
+  @@index([category])
+  @@map("accessory_products")
+}
+
+// One receipt of an accessory: the units received at a store with this receipt's own unit cost
+// (USD, fixed at receipt). Stock is the sum of quantityRemaining; units leave oldest batch first
+// (FIFO), so each sale costs what its own batch cost.
+model AccessoryBatch {
+  id                String   @id @default(uuid())
+  productId         String
+  storeId           String
+  purchaseInvoiceId String?
+  supplierId        String?
+  quantityReceived  Int
+  // Units still in this batch (sold or moved-out units leave it).
+  quantityRemaining Int
+  // Of those, units held by a transfer awaiting approval: still here (and in stock value), not
+  // available to sell or move again until the transfer is approved or rejected.
+  quantityReserved  Int      @default(0)
+  unitCostUsd       Decimal  @db.Decimal(14, 2)
+  receivedAt        DateTime @default(now())
+  createdAt         DateTime @default(now())
+
+  product         AccessoryProduct @relation(fields: [productId], references: [id])
+  store           Store            @relation(fields: [storeId], references: [id])
+  purchaseInvoice SupplierInvoice? @relation(fields: [purchaseInvoiceId], references: [id])
+  supplier        Supplier?        @relation(fields: [supplierId], references: [id])
+
+  @@index([productId, storeId, receivedAt])
+  @@index([storeId])
+  @@index([purchaseInvoiceId])
+  @@map("accessory_batches")
+}
+
+// An accessory line of a receipt: a quantity of one card at a unit price. Its cost is taken from
+// the store's batches oldest first (FIFO) at each batch's own unit cost; `allocations` keeps which
+// batches gave which units ([{ batchId, quantity, unitCostUsd }]) so a refund puts them back.
+model SaleAccessoryItem {
+  id           String  @id @default(uuid())
+  saleId       String
+  productId    String
+  barcode      String
+  brand        String
+  name         String
+  category     String
+  model        String  @default("")
+  quantity     Int
+  unitPriceTjs Decimal @db.Decimal(14, 2)
+  // The line's total price (quantity × unit price) and its dollars at the sale's rate.
+  salePriceTjs Decimal @db.Decimal(14, 2)
+  salePriceUsd Decimal @db.Decimal(14, 2)
+  // The line's cost: the sum of its batch units at their own unit costs.
+  costUsd      Decimal @db.Decimal(14, 2)
+  allocations  Json
+  isBelowCost  Boolean @default(false)
+  // Units of this line already returned (one by one or with the whole receipt) and the part of
+  // the line's price, dollars and cost they took back; the last units take exactly the rest.
+  returnedQuantity Int     @default(0)
+  returnedPriceTjs Decimal @default(0) @db.Decimal(14, 2)
+  returnedPriceUsd Decimal @default(0) @db.Decimal(14, 2)
+  returnedCostUsd  Decimal @default(0) @db.Decimal(14, 2)
+
+  sale    Sale             @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  product AccessoryProduct @relation(fields: [productId], references: [id])
+
+  @@index([saleId])
+  @@index([productId])
+  @@map("sale_accessory_items")
+}
+
+// An accessory line of a transfer. While the transfer awaits approval its units are reserved in
+// the source batches listed in `allocations` ([{ batchId, quantity, unitCostUsd }]); approval moves
+// them into new batches at the destination with the same unit costs, rejection releases them.
+model TransferAccessoryLine {
+  id          String @id @default(uuid())
+  transferId  String
+  productId   String
+  barcode     String
+  brand       String
+  name        String
+  quantity    Int
+  allocations Json
+
+  transfer TransferRequest  @relation(fields: [transferId], references: [id], onDelete: Cascade)
+  product  AccessoryProduct @relation(fields: [productId], references: [id])
+
+  @@index([transferId])
+  @@index([productId])
+  @@map("transfer_accessory_lines")
 }
 
 model DeviceIdentifier {
@@ -499,6 +651,7 @@ model Sale {
   user               User                        @relation(fields: [userId], references: [id])
   customer           Customer?                   @relation(fields: [customerId], references: [id])
   saleItems          SaleItem[]
+  accessoryItems     SaleAccessoryItem[]
   exchangeEvents     ExchangeEvent[]
   paymentAllocations CustomerPaymentAllocation[]
   bonusPoolEntries   BonusPoolEntry[]
@@ -516,6 +669,8 @@ model SaleItem {
   id              String  @id @default(uuid())
   saleId          String
   deviceId        String
+  // Copied from the device: a tablet's imei/imei2 here are its serial numbers.
+  category        DeviceCategory @default(PHONE)
   brand           String
   model           String
   storage         String
@@ -569,6 +724,10 @@ model SaleReturn {
   payoutMethod           String?
   exchangeSaleId         String?  @unique
   ownerProfitAllocations Json?
+  // Accessory units returned with it: [{ lineId, productId, name, quantity, priceTjs, priceUsd,
+  // costUsd, withheldTjs, withheldUsd, creditTjs, creditUsd }] — their price, booked dollars and
+  // cost, like the phones in `items`.
+  accessoryLines         Json?
   createdAt              DateTime @default(now())
 
   sale         Sale       @relation("SaleReturns", fields: [saleId], references: [id])
@@ -625,6 +784,7 @@ model Supplier {
   invoices SupplierInvoice[]
   bonuses  SupplierBonus[]
   payments SupplierPayment[]
+  accessoryBatches AccessoryBatch[]
 
   @@map("suppliers")
 }
@@ -646,6 +806,7 @@ model SupplierInvoice {
   groups      InvoiceGroup[]
   devices     Device[]
   allocations SupplierPaymentAllocation[]
+  accessoryBatches AccessoryBatch[]
 
   @@index([supplierId])
   @@index([storeId])
@@ -870,6 +1031,7 @@ model TransferRequest {
   fromStore Store          @relation("FromStore", fields: [fromStoreId], references: [id])
   toStore   Store          @relation("ToStore", fields: [toStoreId], references: [id])
   items     TransferItem[]
+  accessoryLines TransferAccessoryLine[]
 
   @@index([fromStoreId])
   @@index([toStoreId])

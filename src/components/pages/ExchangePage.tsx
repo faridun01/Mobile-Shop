@@ -1,4 +1,5 @@
 import { decimal, moneyNumber, formatMoney } from '../../utils/money';
+import { deviceCodeLabel } from '../../utils/deviceCode';
 import { formatPhoneColor } from '../../utils/phoneSpecs';
 import React, { useState, useMemo, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
@@ -19,6 +20,7 @@ import {
 import { StatusBanner, StatusMessage } from '../ui/StatusBanner';
 import { useBelowCostCheck } from '../../hooks/useBelowCostCheck';
 import { preferredInsteadOf } from '../sale/sellGuidance';
+import { findDeviceByCode } from '../../utils/scanLookup';
 
 /** The phone handed back: its line on the receipt it was sold on. */
 interface PickedItem {
@@ -194,10 +196,10 @@ export const ExchangePage: React.FC = () => {
   const handleScanReplacement = () => {
     openScanner((scannedCode) => {
       const code = scannedCode.trim();
-      const dev = availableDevices.find(d => d.imei === code || d.imei2 === code);
+      const dev = findDeviceByCode(availableDevices, code);
       if (dev) handleSelectReplacement(dev);
       else setDeviceSearchQuery(code);
-    });
+    }, { allowModeSwitch: true });
   };
 
   const resetForm = () => {
@@ -306,7 +308,7 @@ export const ExchangePage: React.FC = () => {
                   </button>
                   <button
                     type="button"
-                    onClick={() => openScanner((code) => { void handleFindSold(code); })}
+                    onClick={() => openScanner((code) => { void handleFindSold(code); }, { allowModeSwitch: true })}
                     className="h-10 w-10 flex items-center justify-center bg-surface-raised hover:bg-surface text-accent rounded-xl border border-border transition-colors shrink-0 cursor-pointer"
                     title="Сканировать"
                   >
@@ -327,7 +329,7 @@ export const ExchangePage: React.FC = () => {
                         <div>
                           <p className="font-bold text-fg-muted">{item.brand} {item.model}</p>
                           <p className="text-[11px] text-fg-muted mt-0.5">{item.storage} • {formatPhoneColor(item.color)}</p>
-                          <p className="text-[10px] text-fg-subtle mt-0.5">IMEI: {item.imei}</p>
+                          <p className="text-[10px] text-fg-subtle mt-0.5">{deviceCodeLabel(item.category)}: {item.imei}</p>
                         </div>
                         <span className="font-bold text-accent text-xs">{item.returnId ? 'Возвращён' : money(item.salePriceTjs)}</span>
                       </button>
@@ -350,7 +352,7 @@ export const ExchangePage: React.FC = () => {
                   <span className="text-[10px] text-accent font-bold tracking-wider block">Чек #{picked.sale.receiptNumber}</span>
                   <h4 className="text-sm font-bold text-fg-muted mt-0.5">{picked.item.brand} {picked.item.model}</h4>
                   <p className="text-xs text-fg-muted mt-0.5">{picked.item.storage} • {formatPhoneColor(picked.item.color)}</p>
-                  <p className="text-xs text-fg-subtle mt-1">IMEI: {picked.item.imei}</p>
+                  <p className="text-xs text-fg-subtle mt-1">{deviceCodeLabel(picked.item.category)}: {picked.item.imei}</p>
                   {picked.item.isBelowCost && (
                     <p className="mt-1.5 inline-flex items-center gap-1 text-[11px] font-semibold text-danger">
                       <AlertTriangle className="w-3.5 h-3.5" /> Этот телефон был продан ниже себестоимости
@@ -414,7 +416,7 @@ export const ExchangePage: React.FC = () => {
                   <p className="text-xs text-fg-muted mt-0.5">
                     {replacementDevice.ram ? `${replacementDevice.ram} • ` : ''}{replacementDevice.storage} • {formatPhoneColor(replacementDevice.color)}
                   </p>
-                  <p className="text-xs text-fg-subtle mt-1">IMEI: {replacementDevice.imei}</p>
+                  <p className="text-xs text-fg-subtle mt-1">{deviceCodeLabel(replacementDevice.category)}: {replacementDevice.imei}</p>
                 </div>
 
                 {preferredAlternative && (
@@ -492,7 +494,7 @@ export const ExchangePage: React.FC = () => {
                             )}
                           </p>
                           <p className="text-[11px] text-fg-muted mt-0.5">{d.ram ? `${d.ram} • ` : ''}{d.storage} • {formatPhoneColor(d.color)}</p>
-                          <p className="text-[10px] text-fg-subtle mt-0.5">IMEI: {d.imei}</p>
+                          <p className="text-[10px] text-fg-subtle mt-0.5">{deviceCodeLabel(d.category)}: {d.imei}</p>
                         </div>
                         <span className="font-bold text-accent text-xs">{money(d.retailPriceTjs || 0)}</span>
                       </button>

@@ -2,7 +2,8 @@ import { Capacitor, type PluginListenerHandle } from '@capacitor/core';
 import { App } from '@capacitor/app';
 import { BarcodeScanner, BarcodeFormat, LensFacing, Resolution, type Barcode } from '@capacitor-mlkit/barcode-scanning';
 import { createStore } from 'zustand/vanilla';
-import { extractImeis, SCAN_HINTS } from './imei';
+import { CODE_SCAN_HINTS, extractImeis, extractScanCode, SCAN_HINTS } from './imei';
+import { scanModeState } from './scannerService';
 
 type Phase = 'idle' | 'permission' | 'starting' | 'scanning' | 'denied' | 'error' | 'stopping';
 export const nativeScannerState = createStore<{ phase: Phase; message: string; hint: string; torchAvailable: boolean; torchOn: boolean }>(() => ({
@@ -12,6 +13,11 @@ export const nativeScannerState = createStore<{ phase: Phase; message: string; h
 // IMEI labels are Code 128 (occasionally Code 39); some brands add a QR/DataMatrix with
 // both IMEIs. EAN/ITF can never hold a 15-digit IMEI, so they're not decoded at all.
 const formats = [BarcodeFormat.Code128, BarcodeFormat.Code39, BarcodeFormat.QrCode, BarcodeFormat.DataMatrix];
+// A tablet SN or an accessory barcode can be any common symbology (EAN/UPC on product boxes).
+const codeFormats = [
+  ...formats, BarcodeFormat.Ean13, BarcodeFormat.Ean8, BarcodeFormat.UpcA, BarcodeFormat.UpcE,
+  BarcodeFormat.Itf, BarcodeFormat.Code93, BarcodeFormat.Codabar,
+].filter(Boolean);
 // A little optical zoom lets the phone stay far enough away to focus on the thin bars.
 const PREFERRED_ZOOM = 1.5;
 
@@ -30,19 +36,19 @@ function barcodeCenter(barcode: Barcode) {
  * screen pixels on both platforms. Such a position-based pick is flagged `confirm`: the
  * caller accepts it only once two consecutive frames agree.
  */
-function chooseImei(found: ImeiBarcode[]): { imei: string | null; hint: string; confirm?: boolean } {
-  if (!found.length) return { imei: null, hint: SCAN_HINTS.notImei };
+function chooseImei(found: ImeiBarcode[], hints: typeof SCAN_HINTS = SCAN_HINTS): { imei: string | null; hint: string; confirm?: boolean } {
+  if (!found.length) return { imei: null, hint: hints.notImei };
   const distinct = new Set(found.flatMap((barcode) => barcode.imeis));
   // One barcode (a QR with both IMEIs yields IMEI 1) or the same IMEI printed twice.
-  if (distinct.size === 1 || found.length === 1) return { imei: found[0].imeis[0], hint: SCAN_HINTS.hold };
+  if (distinct.size === 1 || found.length === 1) return { imei: found[0].imeis[0], hint: hints.hold };
   const scale = window.devicePixelRatio || 1;
   const target = { x: (window.innerWidth * scale) / 2, y: (window.innerHeight * scale) / 2 };
   const ranked = found
     .filter((barcode) => barcode.center)
     .map((barcode) => ({ barcode, distance: Math.hypot(barcode.center!.x - target.x, barcode.center!.y - target.y) }))
     .sort((a, b) => a.distance - b.distance);
-  if (ranked.length >= 2 && ranked[0].distance < ranked[1].distance * 0.6) return { imei: ranked[0].barcode.imeis[0], hint: SCAN_HINTS.hold, confirm: true };
-  return { imei: null, hint: SCAN_HINTS.several };
+  if (ranked.length >= 2 && ranked[0].distance < ranked[1].distance * 0.6) return { imei: ranked[0].barcode.imeis[0], hint: hints.hold, confirm: true };
+  return { imei: null, hint: hints.several };
 }
 
 export async function toggleNativeTorch(): Promise<void> {
@@ -85,7 +91,8 @@ export async function scanNativeCode(signal: AbortSignal): Promise<string | null
   };
   const hidePreview = () => document.documentElement.classList.remove('native-scanner-active');
 
-  nativeScannerState.setState({ phase: 'permission', message: '', hint: SCAN_HINTS.aim, torchAvailable: false, torchOn: false });
+  const hintsFor = () => (scanModeState.getState().mode === 'code' ? CODE_SCAN_HINTS : SCAN_HINTS);
+  nativeScannerState.setState({ phase: 'permission', message: '', hint: hintsFor().aim, torchAvailable: false, torchOn: false });
   try {
     await stop();
     // iOS pause means background, unlike willResignActive (permission sheets).
@@ -113,12 +120,20 @@ export async function scanNativeCode(signal: AbortSignal): Promise<string | null
     let pendingChoice: string | null = null;
     handles.push(await BarcodeScanner.addListener('barcodesScanned', ({ barcodes }) => {
       if (finished) return;
-      // Only IMEIs count: the other labels on a phone box (EAN, S/N, part number) are ignored.
-      const found = barcodes
-        .filter((barcode) => formats.includes(barcode.format))
-        .map((barcode) => ({ imeis: extractImeis(barcode.rawValue ?? ''), center: barcodeCenter(barcode) }))
-        .filter((barcode) => barcode.imeis.length > 0);
-      const { imei, hint, confirm } = chooseImei(found);
+      // The mode is read on every frame: the scanner's IMEI / SN switch changes it mid-scan.
+      const codeMode = scanModeState.getState().mode === 'code';
+      // IMEI mode: only IMEIs count, the other labels on a phone box (EAN, S/N, part number)
+      // are ignored. Code mode: any barcode is the code (a tablet SN, an accessory barcode).
+      const found = codeMode
+        ? barcodes
+            .map((barcode) => ({ code: extractScanCode(barcode.rawValue ?? ''), center: barcodeCenter(barcode) }))
+            .filter((barcode): barcode is { code: string; center: ReturnType<typeof barcodeCenter> } => Boolean(barcode.code))
+            .map((barcode) => ({ imeis: [barcode.code], center: barcode.center }))
+        : barcodes
+            .filter((barcode) => formats.includes(barcode.format))
+            .map((barcode) => ({ imeis: extractImeis(barcode.rawValue ?? ''), center: barcodeCenter(barcode) }))
+            .filter((barcode) => barcode.imeis.length > 0);
+      const { imei, hint, confirm } = chooseImei(found, codeMode ? CODE_SCAN_HINTS : SCAN_HINTS);
       if (imei && (!confirm || pendingChoice === imei)) {
         finish(imei);
         return;
@@ -135,7 +150,11 @@ export async function scanNativeCode(signal: AbortSignal): Promise<string | null
     document.documentElement.classList.add('native-scanner-active');
     releaseRequired = true;
     // 1080p resolves the thin bars of a 15-digit Code 128 far better than the 720p default.
-    await BarcodeScanner.startScan({ formats, lensFacing: LensFacing.Back, resolution: Resolution['1920x1080'] });
+    // A fixed IMEI scan decodes only the IMEI symbologies (as always); a scan that may switch to
+    // SN / barcode decodes the common product symbologies too (IMEI mode still filters them out).
+    const { mode, allowSwitch } = scanModeState.getState();
+    const startFormats = mode === 'code' || allowSwitch ? codeFormats : formats;
+    await BarcodeScanner.startScan({ formats: startFormats, lensFacing: LensFacing.Back, resolution: Resolution['1920x1080'] });
     if (!finished) nativeScannerState.setState({ phase: 'scanning' });
     try {
       const { zoomRatio: maxZoom } = await BarcodeScanner.getMaxZoomRatio();

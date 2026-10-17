@@ -6,6 +6,7 @@ import { getBusinessDateKey } from '../../common/business-date';
 import { calculateRecognizedProfit } from '../sales/profit';
 import { roundMoney } from '../../common/money';
 import { registerTjsBalances, SURPLUS_SOURCE } from '../finance/cash-balance';
+import { accessoryStockCost } from '../catalog/catalog.service';
 
 import { dateRangeForPeriod, dateRangeForCustomDates, type ReportPeriod } from '../../common/business-date';
 export { dateRangeForPeriod, dateRangeForCustomDates, type ReportPeriod } from '../../common/business-date';
@@ -175,7 +176,7 @@ export async function computeReportsSummary(input: ReportsSummaryInput) {
     prisma.saleReturn.findMany({
       where: { ...(storeFilter ? { storeId: storeFilter } : {}), ...(dateRange ? { createdAt: dateRange } : {}) },
       select: {
-        id: true, storeId: true, createdAt: true, exchangeRate: true, reason: true, bookedUsd: true, fxUsd: true,
+        id: true, storeId: true, createdAt: true, exchangeRate: true, reason: true, bookedUsd: true, fxUsd: true, accessoryLines: true,
         withheldTjs: true, withheldUsd: true, creditTjs: true, creditUsd: true, exchangeSaleId: true,
         sale: { select: { id: true, receiptNumber: true } },
         items: { select: { brand: true, model: true, salePriceTjs: true, salePriceUsd: true, costBasisUsd: true, isBonus: true } },
@@ -354,8 +355,14 @@ export async function computeReportsSummary(input: ReportsSummaryInput) {
   // their booked profit are reversed; the withheld part is retained profit, reported with the
   // refund penalties. A free bonus phone's price comes back out of the bonus figures.
   for (const ret of periodReturns) {
+    // Accessory units returned with it: their own price, booked dollars and cost.
+    const accessoryParts = Array.isArray(ret.accessoryLines)
+      ? (ret.accessoryLines as { priceTjs?: number; priceUsd?: number; costUsd?: number }[])
+      : [];
+    const accessoryPriceTjs = accessoryParts.reduce((sum, a) => sum.plus(a.priceTjs ?? 0), D(0));
+    const accessoryProfitUsd = accessoryParts.reduce((sum, a) => sum.plus(a.priceUsd ?? 0).minus(a.costUsd ?? 0), D(0));
     const bonusUsd = ret.items.filter((item) => item.isBonus).reduce((sum, item) => sum.plus(item.salePriceUsd), D(0));
-    const bookedProfitUsd = ret.items.reduce((sum, item) => sum.plus(item.salePriceUsd).minus(item.costBasisUsd), D(0));
+    const bookedProfitUsd = ret.items.reduce((sum, item) => sum.plus(item.salePriceUsd).minus(item.costBasisUsd), D(0)).plus(accessoryProfitUsd);
     const reversedRevenueUsd = D(ret.bookedUsd).minus(ret.fxUsd);
     refundsRevenueUsd = refundsRevenueUsd.plus(reversedRevenueUsd);
     profitEvents.push({
@@ -364,7 +371,7 @@ export async function computeReportsSummary(input: ReportsSummaryInput) {
       penaltyTjs: D(ret.withheldTjs), penaltyUsd: D(ret.withheldUsd),
       storeId: ret.storeId,
       revenueUsd: reversedRevenueUsd.negated(),
-      revenueTjs: ret.items.reduce((sum, item) => sum.plus(item.salePriceTjs), D(0)).negated(),
+      revenueTjs: ret.items.reduce((sum, item) => sum.plus(item.salePriceTjs), D(0)).plus(accessoryPriceTjs).negated(),
       profitUsd: bookedProfitUsd.negated().plus(ret.fxUsd),
       bonusUsd: bonusUsd.negated(),
       rate: D(ret.exchangeRate),
@@ -502,7 +509,11 @@ export async function computeReportsSummary(input: ReportsSummaryInput) {
   const totalSupplierDebtUsd = D(supplierDebtAgg._sum.totalDebtUsd ?? 0);
   const totalSupplierDebtTjs = roundMoney(D(totalSupplierDebtUsd).mul(rate));
 
-  const mainWarehouseStockCostUsd = D(mainWarehouseStock.reduce((sum, d) => D(sum).plus((d.costBasisUsd ?? d.purchasePriceUsd ?? 0)), D(0)).toFixed(2));
+  // Accessories on hand count in stock by the units left in each batch at that batch's own cost.
+  const accessoryStock = await accessoryStockCost(prisma);
+  const accessoryAt = (id: string | undefined) => (id ? accessoryStock.byStore.get(id) : undefined) ?? { quantity: 0, costUsd: D(0) };
+  const mainWarehouseAccessories = accessoryAt(mainWarehouseStore?.id);
+  const mainWarehouseStockCostUsd = D(mainWarehouseStock.reduce((sum, d) => D(sum).plus((d.costBasisUsd ?? d.purchasePriceUsd ?? 0)), D(0)).plus(mainWarehouseAccessories.costUsd).toFixed(2));
   const mainWarehouseStockCostTjs = roundMoney(D(mainWarehouseStockCostUsd).mul(rate));
   // Registers are kept in USD; their TJS is the somoni they hold, at the rates the money came in at.
   const mainWarehouseCashUsd = D(mainWarehouseStore?.cashBalanceUsd ?? 0);
@@ -574,7 +585,8 @@ export async function computeReportsSummary(input: ReportsSummaryInput) {
       const storeExpenses = summarizeExpenses(expensesByStore.get(store.id) ?? []);
       const storeExpenseFxUsd = roundMoney(expenseFxByStore.get(store.id) ?? 0);
       const stock = (stockByStore.get(store.id) ?? []);
-      const stockCostUsd = stock.reduce((sum, d) => D(sum).plus((d.costBasisUsd ?? d.purchasePriceUsd ?? 0)), D(0));
+      const storeAccessories = accessoryAt(store.id);
+      const stockCostUsd = stock.reduce((sum, d) => D(sum).plus((d.costBasisUsd ?? d.purchasePriceUsd ?? 0)), D(0)).plus(storeAccessories.costUsd);
       // Same "с учетом возвратов" treatment as the overall totals: a refund reverses the
       // sale's margin in the refund's own period; the withheld penalty is retained profit.
       const storePenalty = refundPenaltiesByStore.get(store.id) || { usd: D(0), tjs: D(0) };
@@ -609,7 +621,7 @@ export async function computeReportsSummary(input: ReportsSummaryInput) {
         refundsCount: refundedSalesAllStores.filter((sale) => sale.storeId === store.id).length + periodReturns.filter((r) => r.storeId === store.id).length,
         cashUsd: roundMoney(D(store.cashBalanceUsd ?? 0)),
         cashTjs: registerTjs.get(store.id) ?? D(0),
-        stockCount: stock.length,
+        stockCount: stock.length + storeAccessories.quantity,
         stockCostUsd: roundMoney(D(stockCostUsd)),
         stockCostTjs: roundMoney(D(stockCostUsd).mul(rate)),
       };
@@ -727,7 +739,7 @@ export async function computeReportsSummary(input: ReportsSummaryInput) {
     freeDeviceBonusesInStock,
     totalSupplierDebtUsd: D(totalSupplierDebtUsd.toFixed(2)),
     totalSupplierDebtTjs,
-    mainWarehouseStockCount: mainWarehouseStock.length,
+    mainWarehouseStockCount: mainWarehouseStock.length + mainWarehouseAccessories.quantity,
     mainWarehouseStockCostUsd,
     mainWarehouseStockCostTjs,
     mainWarehouseCashUsd,

@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { deviceCodeLabel } from '../../utils/deviceCode';
 import { Device, Store as StoreType } from '../../types';
 import { formatMoney, formatUsd } from '../../utils/money';
 import {
@@ -220,7 +221,7 @@ export const DeviceDetailsModal: React.FC<DeviceDetailsModalProps> = ({
               </span>
             ) : (
               <span className="text-[10px] text-fg-subtle font-mono">
-                IMEI: ...{currentDevice.imei.slice(-6)}
+                {deviceCodeLabel(currentDevice.category)}: ...{currentDevice.imei.slice(-6)}
               </span>
             )}
           </div>
@@ -503,7 +504,7 @@ export const DeviceDetailsModal: React.FC<DeviceDetailsModalProps> = ({
             {/* IMEI 1 */}
             <div className="px-2.5 py-1.5 rounded-lg bg-surface border border-border flex items-center justify-between gap-2">
               <div className="min-w-0">
-                <span className="text-[9px] uppercase font-bold text-fg-subtle block">IMEI 1</span>
+                <span className="text-[9px] uppercase font-bold text-fg-subtle block">{currentDevice.category === 'TABLET' ? 'SN' : 'IMEI 1'}</span>
                 <span className="font-mono font-bold text-fg select-all text-xs tracking-wider truncate block">
                   {currentDevice.imei}
                 </span>

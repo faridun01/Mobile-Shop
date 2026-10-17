@@ -11,12 +11,18 @@ import { DEFAULT_PHONE_COLORS_EN, normalizePhoneColor, formatRam, formatStorage 
 import { lookupPhoneByImei, clearPhoneCatalogCache, fetchCatalogSpecs, type CatalogSpecs } from '../../services/phoneCatalog';
 
 import {
+  PurchaseCategory,
   PurchaseItemGroup,
   PurchasePreviewGroup,
   PurchasePreviewData,
   getImeiPair,
   compareInvoicesDesc,
+  emptyGroup,
+  previewUnits,
 } from '../purchase/types';
+import { DEVICE_STATUS_LABELS, findDeviceByCode } from '../../utils/scanLookup';
+import { isValidSerial, normalizeSerial } from '../../utils/deviceCode';
+import { findAccessoryByBarcode } from '../../services/catalog';
 import { AddSupplierModal } from '../purchase/AddSupplierModal';
 import { EditInvoiceModal } from '../purchase/EditInvoiceModal';
 import { ReceiptPreviewModal } from '../purchase/ReceiptPreviewModal';
@@ -170,17 +176,20 @@ export const PurchasePage: React.FC = () => {
     void loadSpecs();
   }, [loadSpecs, dataRefreshRevision]);
 
+  // Phone suggestions come from phones only; tablets have their own saved variants.
+  const phoneDevices = useMemo(() => (devices || []).filter((d) => d.category !== 'TABLET'), [devices]);
+
   // Autocomplete suggestion lists derived from database devices, phone catalog, and standard presets
   const brandOptions = useMemo(() => {
     const set = new Set<string>(['Apple', 'Samsung', 'Xiaomi', 'Honor', 'Huawei', 'Realme', 'Tecno', 'Infinix', 'OnePlus', 'Google', 'Novey', 'itel', 'Nothing']);
     (catalogSpecs?.brands || []).forEach((b) => {
       if (b.trim()) set.add(b.trim());
     });
-    (devices || []).forEach((d) => {
+    phoneDevices.forEach((d) => {
       if (d.brand) set.add(d.brand.trim());
     });
     return Array.from(set).sort((a, b) => a.localeCompare(b, 'ru', { sensitivity: 'base' }));
-  }, [catalogSpecs?.brands, devices]);
+  }, [catalogSpecs?.brands, phoneDevices]);
 
   const getModelOptions = useCallback(
     (selectedBrand: string) => {
@@ -193,14 +202,14 @@ export const PurchasePage: React.FC = () => {
         }
       });
       // Models from active devices
-      (devices || []).forEach((d) => {
+      phoneDevices.forEach((d) => {
         if (d.model && (!brandLower || (d.brand && d.brand.toLowerCase() === brandLower))) {
           set.add(d.model.trim());
         }
       });
       return Array.from(set).sort((a, b) => a.localeCompare(b, 'ru', { sensitivity: 'base' }));
     },
-    [catalogSpecs?.models, devices]
+    [catalogSpecs?.models, phoneDevices]
   );
 
   const ramOptions = useMemo(() => {
@@ -209,7 +218,7 @@ export const PurchasePage: React.FC = () => {
       const formatted = formatRam(r);
       if (formatted) set.add(formatted);
     });
-    (devices || []).forEach((d) => {
+    phoneDevices.forEach((d) => {
       const formatted = formatRam(d.ram);
       if (formatted) set.add(formatted);
     });
@@ -218,7 +227,7 @@ export const PurchasePage: React.FC = () => {
       const numB = parseInt(b, 10) || 0;
       return numA - numB;
     });
-  }, [catalogSpecs?.rams, devices]);
+  }, [catalogSpecs?.rams, phoneDevices]);
 
   const storageOptions = useMemo(() => {
     const set = new Set<string>(['32 GB', '64 GB', '128 GB', '256 GB', '512 GB', '1 TB']);
@@ -226,13 +235,13 @@ export const PurchasePage: React.FC = () => {
       const formatted = formatStorage(s);
       if (formatted) set.add(formatted);
     });
-    (devices || []).forEach((d) => {
+    phoneDevices.forEach((d) => {
       const formatted = formatStorage(d.storage);
       if (formatted) set.add(formatted);
     });
     const order: Record<string, number> = { '32 GB': 32, '64 GB': 64, '128 GB': 128, '256 GB': 256, '512 GB': 512, '1 TB': 1024, '2 TB': 2048 };
     return Array.from(set).sort((a, b) => (order[a] ?? 9999) - (order[b] ?? 9999));
-  }, [catalogSpecs?.storages, devices]);
+  }, [catalogSpecs?.storages, phoneDevices]);
 
   const colorOptions = useMemo(() => {
     const set = new Set<string>(DEFAULT_PHONE_COLORS_EN);
@@ -241,7 +250,7 @@ export const PurchasePage: React.FC = () => {
       if (translated) set.add(translated);
       else if (c.trim()) set.add(c.trim());
     });
-    (devices || []).forEach((d) => {
+    phoneDevices.forEach((d) => {
       if (d.color) {
         const translated = normalizePhoneColor(d.color);
         if (translated) set.add(translated);
@@ -249,7 +258,7 @@ export const PurchasePage: React.FC = () => {
       }
     });
     return Array.from(set);
-  }, [catalogSpecs?.colors, devices]);
+  }, [catalogSpecs?.colors, phoneDevices]);
 
   // Filtered list of purchase invoices
   const filteredInvoices = useMemo(() => {
@@ -304,7 +313,7 @@ export const PurchasePage: React.FC = () => {
   const handleScanFinder = () => {
     openScanner(async (scannedCode) => {
       const code = scannedCode.trim();
-      let matchedDevice = devices.find((d) => d.imei === code || d.imei2 === code);
+      let matchedDevice = findDeviceByCode(devices, code);
       if (!matchedDevice) {
         try {
           [matchedDevice] = await findDeviceByImei(code);
@@ -342,7 +351,7 @@ export const PurchasePage: React.FC = () => {
       } else {
         setSearchQuery(code);
       }
-    });
+    }, { allowModeSwitch: true });
   };
 
   const handleSaveEditInvoice = async (
@@ -381,9 +390,12 @@ export const PurchasePage: React.FC = () => {
   };
 
   // Form helpers
-  const handleAddGroup = () => {
+  const isPhoneGroup = (g: PurchaseItemGroup) => (g.category ?? 'PHONE') === 'PHONE';
+
+  const handleAddGroup = (category: PurchaseCategory = 'PHONE') => {
     for (let gIdx = 0; gIdx < groups.length; gIdx++) {
       const g = groups[gIdx];
+      if (!isPhoneGroup(g)) continue;
       for (let itIdx = 0; itIdx < g.items.length; itIdx++) {
         const [imei1, imei2] = getImeiPair(g.items[itIdx].imei);
         const clean1 = imei1.replace(/\D/g, '');
@@ -408,19 +420,17 @@ export const PurchasePage: React.FC = () => {
     }
 
     soundEffects.playAddToCartSuccess();
-    setGroups((prev) => [
-      ...prev,
-      {
-        id: `g-${Date.now()}`,
-        brand: '',
-        model: '',
-        ram: '',
-        storage: '',
-        color: '',
-        purchasePriceUsd: 0,
-        items: [{ imei: '' }],
-      },
-    ]);
+    setGroups((prev) => [...prev, emptyGroup(category)]);
+  };
+
+  // A position switched to another kind of goods starts its fields over.
+  const handleChangeGroupCategory = (idx: number, category: PurchaseCategory) => {
+    setGroups((prev) => {
+      const next = [...prev];
+      if (!next[idx]) return prev;
+      next[idx] = { ...emptyGroup(category), id: next[idx].id };
+      return next;
+    });
   };
 
   const handleRemoveGroup = (idx: number) => {
@@ -431,14 +441,20 @@ export const PurchasePage: React.FC = () => {
     setGroups((prev) => {
       const next = [...prev];
       const current = { ...next[idx], [field]: value };
+      // A typed barcode is looked up again before it counts.
+      if (field === 'barcode') {
+        current.barcodeStatus = 'idle';
+        current.productId = null;
+      }
 
-      // When user selects or types a model, autofill RAM, storage, and color from known specs (price is never auto-filled)
-      if (field === 'model' && typeof value === 'string' && value.trim()) {
+      // When user selects or types a model, autofill RAM, storage, and color from known specs (price is never auto-filled).
+      // Phones only: a tablet's model never fills its other fields.
+      if (field === 'model' && typeof value === 'string' && value.trim() && isPhoneGroup(current)) {
         const modelTrim = value.trim().toLowerCase();
         const matchedCatalog = (catalogSpecs?.models || []).find(
           (m) => m.model.toLowerCase() === modelTrim && (!current.brand.trim() || m.brand.toLowerCase() === current.brand.trim().toLowerCase())
         );
-        const matchedDevice = (devices || []).find(
+        const matchedDevice = phoneDevices.find(
           (d) => d.model.toLowerCase() === modelTrim && (!current.brand.trim() || d.brand.toLowerCase() === current.brand.trim().toLowerCase())
         );
 
@@ -481,22 +497,34 @@ export const PurchasePage: React.FC = () => {
     setGroups((prev) => {
       const next = [...prev];
       if (!next[groupIdx]) return prev;
-      next[groupIdx] = {
-        id: `group-${Date.now()}`,
-        items: [{ imei: '' }],
-        brand: '',
-        model: '',
-        ram: '',
-        storage: '',
-        color: '',
-        purchasePriceUsd: 0,
-      };
+      next[groupIdx] = emptyGroup(next[groupIdx].category ?? 'PHONE');
       return next;
     });
   };
 
   const handleAddImeiToGroup = (groupIdx: number) => {
     const group = groups[groupIdx];
+    // A tablet: the last unit needs a valid main SN before the next one is added.
+    if (group && group.category === 'TABLET') {
+      const last = group.items[group.items.length - 1];
+      const sn = normalizeSerial(last?.imei || '');
+      if (last && !isValidSerial(sn)) {
+        setStatusMessage({
+          type: 'error',
+          text: `Позиция #${groupIdx + 1}, планшет #${group.items.length}: введите основной SN (4–64 букв и цифр) перед добавлением следующего`,
+        });
+        soundEffects.playError();
+        return;
+      }
+      soundEffects.playAddToCartSuccess();
+      setGroups((prev) => {
+        const next = [...prev];
+        next[groupIdx] = { ...next[groupIdx], items: [...next[groupIdx].items, { imei: '', imei2: '' }] };
+        return next;
+      });
+      window.setTimeout(() => document.querySelector<HTMLInputElement>(`[data-sn="${groupIdx}-${group.items.length}-1"]`)?.focus(), 0);
+      return;
+    }
     if (group) {
       const items = group.items;
       const last = items[items.length - 1];
@@ -546,7 +574,7 @@ export const PurchasePage: React.FC = () => {
       const items = next[groupIdx].items.filter((_, i) => i !== itemIdx);
       next[groupIdx] = {
         ...next[groupIdx],
-        items: items.length > 0 ? items : [{ imei: '' }],
+        items: items.length > 0 ? items : [next[groupIdx].category === 'TABLET' ? { imei: '', imei2: '' } : { imei: '' }],
       };
       return next;
     });
@@ -557,7 +585,7 @@ export const PurchasePage: React.FC = () => {
   const fillGroupFromImei = useCallback(async (groupIdx: number, imei: string) => {
     const phone = await lookupPhoneByImei(imei);
     const group = groupsRef.current[groupIdx];
-    if (!phone || !group) return;
+    if (!phone || !group || (group.category ?? 'PHONE') !== 'PHONE') return;
     const sameBrand = !group.brand.trim() || group.brand.trim().toLowerCase() === phone.brand.toLowerCase();
 
     // Look up model in catalogSpecs to get any additional specs
@@ -647,6 +675,83 @@ export const PurchasePage: React.FC = () => {
     });
   };
 
+  // Tablets: a unit's main SN (slot 1) or additional SN (slot 2), stored as the server stores it.
+  const handleUpdateSerial = (groupIdx: number, itemIdx: number, slot: 1 | 2, value: string) => {
+    const sn = value.replace(/\s+/g, '').toUpperCase().slice(0, 64);
+    setGroups((prev) => {
+      const next = [...prev];
+      const items = [...next[groupIdx].items];
+      items[itemIdx] = { ...items[itemIdx], ...(slot === 1 ? { imei: sn } : { imei2: sn }) };
+      next[groupIdx] = { ...next[groupIdx], items };
+      return next;
+    });
+  };
+
+  const handleScanSerial = (groupIdx: number, itemIdx: number, slot: 1 | 2) => {
+    openScanner((scannedCode) => {
+      const sn = normalizeSerial(scannedCode);
+      if (!isValidSerial(sn)) {
+        setStatusMessage({ type: 'error', text: `Отсканированный код «${scannedCode.trim()}» не похож на серийный номер (4–64 букв и цифр)` });
+        soundEffects.playError();
+        return;
+      }
+      handleUpdateSerial(groupIdx, itemIdx, slot, sn);
+      // Main SN scanned: the additional one is next (it may be left empty).
+      window.setTimeout(() => document.querySelector<HTMLInputElement>(`[data-sn="${groupIdx}-${itemIdx}-${slot === 1 ? 2 : 1}"]`)?.focus(), 0);
+    }, { mode: 'code' });
+  };
+
+  // Accessories: a barcode is looked up in the catalog; a known one fills the card in by itself.
+  const handleBarcodeCommit = async (groupIdx: number, raw: string) => {
+    const barcode = raw.replace(/\s+/g, '').toUpperCase();
+    if (!barcode) return;
+    setGroups((prev) => {
+      const next = [...prev];
+      if (!next[groupIdx]) return prev;
+      next[groupIdx] = { ...next[groupIdx], barcode, barcodeStatus: 'loading' };
+      return next;
+    });
+    let product = null;
+    try {
+      product = await findAccessoryByBarcode(barcode);
+    } catch {
+      setStatusMessage({ type: 'error', text: `Не удалось проверить штрихкод ${barcode}. Проверьте связь и попробуйте снова` });
+      setGroups((prev) => {
+        const next = [...prev];
+        if (next[groupIdx]?.barcode === barcode) next[groupIdx] = { ...next[groupIdx], barcodeStatus: 'idle' };
+        return next;
+      });
+      return;
+    }
+    setGroups((prev) => {
+      const next = [...prev];
+      const current = next[groupIdx];
+      if (!current || current.barcode !== barcode) return prev;
+      next[groupIdx] = product
+        ? {
+            ...current, barcodeStatus: 'found', productId: product.id,
+            brand: product.brand, name: product.name, accessoryCategory: product.category,
+            model: product.model || '', attributes: product.attributes || '',
+          }
+        : { ...current, barcodeStatus: 'new', productId: null };
+      return next;
+    });
+    if (product) soundEffects.playAddToCartSuccess();
+  };
+
+  const handleScanBarcode = (groupIdx: number) => {
+    openScanner((scannedCode) => { void handleBarcodeCommit(groupIdx, scannedCode); }, { mode: 'code' });
+  };
+
+  const handleClearBarcode = (groupIdx: number) => {
+    setGroups((prev) => {
+      const next = [...prev];
+      if (!next[groupIdx]) return prev;
+      next[groupIdx] = { ...emptyGroup('ACCESSORY'), id: next[groupIdx].id };
+      return next;
+    });
+  };
+
   const handleBatchImeiPaste = (groupIdx: number, text: string) => {
     if (!text.trim()) return;
     const tokens = text
@@ -696,30 +801,29 @@ export const PurchasePage: React.FC = () => {
     }
   };
 
-  // Calculate totals for new intake form (only valid 15-digit IMEIs count)
-  const totalFormUnits = groups.reduce((acc, g) => {
-    return (
-      acc +
-      g.items.filter((i) => {
-        const [p1] = getImeiPair(i.imei);
-        return p1.replace(/\D/g, '').length === 15;
-      }).length
-    );
-  }, 0);
+  // Units a position adds to the receipt: phones with a full 15-digit IMEI, tablets with a valid
+  // main SN, and an accessory line's quantity once its barcode has been checked.
+  const phoneUnitCount = (g: PurchaseItemGroup) => g.items.filter((i) => {
+    const [p1] = getImeiPair(i.imei);
+    return p1.replace(/\D/g, '').length === 15;
+  }).length;
+  const groupUnits = (g: PurchaseItemGroup) => {
+    if (g.category === 'ACCESSORY') return g.barcodeStatus === 'found' || g.barcodeStatus === 'new' ? g.quantity || 0 : 0;
+    if (g.category === 'TABLET') return g.items.filter((i) => isValidSerial(normalizeSerial(i.imei))).length;
+    return phoneUnitCount(g);
+  };
+
+  // Calculate totals for new intake form (only complete codes count)
+  const totalFormUnits = groups.reduce((acc, g) => acc + groupUnits(g), 0);
 
   const totalFormUsd = moneyNumber(
-    groups.reduce((acc, g) => {
-      const count = g.items.filter((i) => {
-        const [p1] = getImeiPair(i.imei);
-        return p1.replace(/\D/g, '').length === 15;
-      }).length;
-      return acc.plus(decimal(g.purchasePriceUsd || 0).mul(count));
-    }, decimal(0))
+    groups.reduce((acc, g) => acc.plus(decimal(g.purchasePriceUsd || 0).mul(groupUnits(g))), decimal(0))
   );
 
+  // Phones only: a tablet's SN is letters and digits, never a partial IMEI.
   const hasIncompleteImeis = useMemo(() => {
     return groups.some((g) =>
-      g.items.some((item) => {
+      (g.category ?? 'PHONE') === 'PHONE' && g.items.some((item) => {
         const raw = item.imei.trim();
         if (!raw) return false;
         const [imei1, imei2] = getImeiPair(raw);
@@ -732,10 +836,11 @@ export const PurchasePage: React.FC = () => {
     );
   }, [groups]);
 
-  // Collect all 15-digit IMEIs currently typed/pasted in groups
+  // Collect all 15-digit IMEIs currently typed/pasted in phone positions
   const allFormImeis = useMemo(() => {
     const list: string[] = [];
     for (const g of groups) {
+      if ((g.category ?? 'PHONE') !== 'PHONE') continue;
       for (const it of g.items) {
         const [p1, p2] = getImeiPair(it.imei);
         const c1 = p1.replace(/\D/g, '').slice(0, 15);
@@ -747,9 +852,35 @@ export const PurchasePage: React.FC = () => {
     return list;
   }, [groups]);
 
+  // Every valid tablet SN (main and additional) in the form, as stored.
+  const allFormSerials = useMemo(() => {
+    const list: string[] = [];
+    for (const g of groups) {
+      if (g.category !== 'TABLET') continue;
+      for (const it of g.items) {
+        for (const raw of [it.imei, it.imei2 || '']) {
+          const sn = normalizeSerial(raw);
+          if (isValidSerial(sn)) list.push(sn);
+        }
+      }
+    }
+    return list;
+  }, [groups]);
+
+  // IMEIs and SNs share one space: a code may be registered once, in either slot.
+  const allFormCodes = useMemo(() => [...allFormImeis, ...allFormSerials], [allFormImeis, allFormSerials]);
+
+  type ExistingInfo = { brand?: string; model?: string; status?: string; locationName?: string; storeName?: string };
+  const existingText = (info: ExistingInfo) => {
+    const where = info.storeName || info.locationName;
+    const status = info.status ? DEVICE_STATUS_LABELS[info.status as keyof typeof DEVICE_STATUS_LABELS] || info.status : '';
+    const details = [info.model ? `${info.brand || ''} ${info.model}`.trim() : '', where, status].filter(Boolean).join(', ');
+    return `уже зарегистрирован${details ? ` (${details})` : ''}`;
+  };
+
   // Fast in-memory lookup against all loaded devices
   const inMemoryExistingMap = useMemo(() => {
-    const map = new Map<string, { brand?: string; model?: string; status?: string; locationName?: string }>();
+    const map = new Map<string, ExistingInfo>();
     for (const d of devices) {
       if (d.imei) {
         map.set(d.imei, { brand: d.brand, model: d.model, status: d.status, locationName: d.locationName });
@@ -761,16 +892,14 @@ export const PurchasePage: React.FC = () => {
     return map;
   }, [devices]);
 
-  // Server-verified existing IMEIs (catches sold/historical devices too)
-  const [serverExistingImeis, setServerExistingImeis] = useState<
-    Map<string, { brand?: string; model?: string; status?: string; locationName?: string }>
-  >(new Map());
+  // Server-verified existing codes (catches sold/historical devices too)
+  const [serverExistingImeis, setServerExistingImeis] = useState<Map<string, ExistingInfo>>(new Map());
 
-  // Debounced server batch check for entered 15-digit IMEIs
+  // Debounced server batch check for entered IMEIs and tablet SNs
   useEffect(() => {
     if (viewMode !== 'form') return;
-    const imeisToCheck = allFormImeis.filter((imei) => !serverExistingImeis.has(imei));
-    if (imeisToCheck.length === 0) return;
+    const codesToCheck = allFormCodes.filter((code) => !serverExistingImeis.has(code));
+    if (codesToCheck.length === 0) return;
 
     const timer = setTimeout(async () => {
       try {
@@ -778,7 +907,10 @@ export const PurchasePage: React.FC = () => {
           existing: Array<{ imei: string; brand: string; model: string; status: string; storeName?: string }>;
         }>('/devices/check-imeis', {
           method: 'POST',
-          body: JSON.stringify({ imeis: imeisToCheck }),
+          body: JSON.stringify({
+            imeis: codesToCheck.filter((code) => /^\d{15}$/.test(code)),
+            serials: codesToCheck.filter((code) => !/^\d{15}$/.test(code)),
+          }),
         });
         if (res?.existing && res.existing.length > 0) {
           setServerExistingImeis((prev) => {
@@ -795,41 +927,76 @@ export const PurchasePage: React.FC = () => {
     }, 250);
 
     return () => clearTimeout(timer);
-  }, [allFormImeis, serverExistingImeis, viewMode]);
+  }, [allFormCodes, serverExistingImeis, viewMode]);
 
   // Count occurrences within the form to detect intra-form duplicates
   const formImeiCounts = useMemo(() => {
     const counts = new Map<string, number>();
-    for (const imei of allFormImeis) {
-      counts.set(imei, (counts.get(imei) || 0) + 1);
+    for (const code of allFormCodes) {
+      counts.set(code, (counts.get(code) || 0) + 1);
     }
     return counts;
-  }, [allFormImeis]);
+  }, [allFormCodes]);
 
-  // Map of imei -> user-friendly error message
+  // Map of IMEI/SN -> user-friendly error message
   const imeiErrorsMap = useMemo(() => {
     const errors: Record<string, string> = {};
-    for (const imei of allFormImeis) {
-      if ((formImeiCounts.get(imei) || 0) > 1) {
-        errors[imei] = 'дублируется в текущей партии';
+    for (const code of allFormCodes) {
+      if ((formImeiCounts.get(code) || 0) > 1) {
+        errors[code] = 'дублируется в текущей партии';
         continue;
       }
-      const inMem = inMemoryExistingMap.get(imei);
+      const inMem = inMemoryExistingMap.get(code);
       if (inMem) {
-        errors[imei] = `уже зарегистрирован${inMem.model ? ` (${inMem.brand || ''} ${inMem.model})` : ''}`;
+        errors[code] = existingText(inMem);
         continue;
       }
-      const onServer = serverExistingImeis.get(imei);
+      const onServer = serverExistingImeis.get(code);
       if (onServer) {
-        errors[imei] = `уже зарегистрирован${onServer.model ? ` (${onServer.brand || ''} ${onServer.model})` : ''}`;
+        errors[code] = existingText(onServer);
         continue;
       }
     }
     return errors;
-  }, [allFormImeis, formImeiCounts, inMemoryExistingMap, serverExistingImeis]);
+  }, [allFormCodes, formImeiCounts, inMemoryExistingMap, serverExistingImeis]);
 
   const hasExistingImeis = Object.keys(imeiErrorsMap).length > 0;
   const firstExistingImei = Object.keys(imeiErrorsMap)[0] || '';
+
+  // Accessory positions: the same barcode twice (its quantities belong in one position).
+  const accessoryDuplicates = useMemo(() => {
+    const firstIdx = new Map<string, number>();
+    const dups: Record<number, number> = {};
+    groups.forEach((g, idx) => {
+      if (g.category !== 'ACCESSORY') return;
+      const code = (g.barcode || '').replace(/\s+/g, '').toUpperCase();
+      if (!code) return;
+      if (firstIdx.has(code)) dups[idx] = firstIdx.get(code)!;
+      else firstIdx.set(code, idx);
+    });
+    return dups;
+  }, [groups]);
+
+  // Why the receipt can't be previewed yet, for accessory and tablet positions.
+  const submitBlockedReason = useMemo(() => {
+    for (const [idx, g] of groups.entries()) {
+      if (g.category === 'ACCESSORY') {
+        if (!(g.barcode || '').trim()) return `Позиция #${idx + 1}: отсканируйте или введите штрихкод аксессуара`;
+        if (g.barcodeStatus === 'loading') return `Позиция #${idx + 1}: проверяется штрихкод…`;
+        if (g.barcodeStatus !== 'found' && g.barcodeStatus !== 'new') return `Позиция #${idx + 1}: подтвердите штрихкод (Enter или сканер)`;
+        if (accessoryDuplicates[idx] !== undefined) return `Позиция #${idx + 1}: штрихкод уже в позиции #${accessoryDuplicates[idx] + 1}`;
+      }
+      if (g.category === 'TABLET') {
+        const bad = g.items.find((i) => {
+          const main = normalizeSerial(i.imei);
+          const extra = normalizeSerial(i.imei2 || '');
+          return (main && !isValidSerial(main)) || (extra && !isValidSerial(extra)) || (extra && extra === main);
+        });
+        if (bad) return `Позиция #${idx + 1}: проверьте серийные номера планшета`;
+      }
+    }
+    return undefined;
+  }, [groups, accessoryDuplicates]);
 
   const [previewInvoice, setPreviewInvoice] = useState<PurchasePreviewData | null>(null);
 
@@ -842,7 +1009,7 @@ export const PurchasePage: React.FC = () => {
     if (hasExistingImeis) {
       setStatusMessage({
         type: 'error',
-        text: `IMEI ${firstExistingImei} ${imeiErrorsMap[firstExistingImei] || 'уже зарегистрирован'}! Замените или удалите дублирующийся IMEI перед просмотром чека.`,
+        text: `IMEI/SN ${firstExistingImei} ${imeiErrorsMap[firstExistingImei] || 'уже зарегистрирован'}! Замените или удалите дублирующийся код перед просмотром чека.`,
       });
       soundEffects.playError();
       return;
@@ -861,8 +1028,54 @@ export const PurchasePage: React.FC = () => {
       return;
     }
 
+    if (submitBlockedReason) {
+      setStatusMessage({ type: 'error', text: submitBlockedReason });
+      return;
+    }
+
     for (let i = 0; i < groups.length; i++) {
       const g = groups[i];
+      if (g.category === 'ACCESSORY') {
+        const fail = (text: string) => { setStatusMessage({ type: 'error', text: `Позиция #${i + 1} (аксессуар): ${text}` }); };
+        if (g.barcodeStatus === 'new' && (!g.brand.trim() || !(g.name || '').trim() || !(g.accessoryCategory || '').trim())) {
+          fail('для нового штрихкода укажите бренд, название и категорию');
+          return;
+        }
+        if (!Number.isInteger(g.quantity) || (g.quantity || 0) < 1) {
+          fail('укажите количество (целое число от 1)');
+          return;
+        }
+        if (!(g.purchasePriceUsd > 0)) {
+          fail('укажите цену закупки за штуку');
+          return;
+        }
+        continue;
+      }
+      if (g.category === 'TABLET') {
+        const label = `Позиция #${i + 1} (планшет${g.brand || g.model ? ` ${g.brand} ${g.model}`.trimEnd() : ''})`;
+        if (!g.brand.trim() || !g.model.trim()) {
+          setStatusMessage({ type: 'error', text: `${label}: укажите бренд и модель` });
+          return;
+        }
+        if (!g.storage.trim() || !g.color.trim()) {
+          setStatusMessage({ type: 'error', text: `${label}: укажите встроенную память и цвет` });
+          return;
+        }
+        if (!(g.purchasePriceUsd > 0)) {
+          setStatusMessage({ type: 'error', text: `${label}: укажите цену закупки` });
+          return;
+        }
+        if (!g.items.some((it) => isValidSerial(normalizeSerial(it.imei)))) {
+          setStatusMessage({ type: 'error', text: `${label}: отсканируйте или введите основной SN хотя бы одного планшета` });
+          return;
+        }
+        const missingMain = g.items.findIndex((it) => !normalizeSerial(it.imei) && normalizeSerial(it.imei2 || ''));
+        if (missingMain >= 0) {
+          setStatusMessage({ type: 'error', text: `${label}, планшет #${missingMain + 1}: указан только дополнительный SN — введите основной` });
+          return;
+        }
+        continue;
+      }
       if (!g.brand.trim()) {
         setStatusMessage({ type: 'error', text: `Позиция #${i + 1}: укажите бренд устройства` });
         return;
@@ -936,6 +1149,7 @@ export const PurchasePage: React.FC = () => {
     const allImeis = new Set<string>();
     for (let i = 0; i < groups.length; i++) {
       const g = groups[i];
+      if ((g.category ?? 'PHONE') !== 'PHONE') continue;
       for (let j = 0; j < g.items.length; j++) {
         const raw = g.items[j].imei.trim();
         if (!raw) continue;
@@ -966,7 +1180,43 @@ export const PurchasePage: React.FC = () => {
     }
 
     const cleanGroups: PurchasePreviewGroup[] = groups
-      .map((g) => {
+      .map((g): PurchasePreviewGroup => {
+        if (g.category === 'ACCESSORY') {
+          return {
+            category: 'ACCESSORY',
+            barcode: (g.barcode || '').replace(/\s+/g, '').toUpperCase(),
+            brand: g.brand.trim(),
+            name: (g.name || '').trim(),
+            accessoryCategory: (g.accessoryCategory || '').trim(),
+            model: g.model.trim(),
+            attributes: (g.attributes || '').trim(),
+            quantity: g.quantity || 0,
+            ram: '', storage: '', color: '',
+            purchasePriceUsd: g.purchasePriceUsd,
+            items: [],
+            imeis: [],
+          };
+        }
+        if (g.category === 'TABLET') {
+          // Each field exactly as entered (no phone formatting or colour translation).
+          const units = g.items
+            .map((it) => ({ imei: normalizeSerial(it.imei), imei2: normalizeSerial(it.imei2 || '') }))
+            .filter((it) => isValidSerial(it.imei))
+            .map((it) => (it.imei2 ? it : { imei: it.imei }));
+          return {
+            category: 'TABLET',
+            brand: g.brand.trim(),
+            model: g.model.trim(),
+            ram: g.ram.trim(),
+            storage: g.storage.trim(),
+            color: g.color.trim(),
+            connectivity: (g.connectivity || '').trim(),
+            screenSize: (g.screenSize || '').trim(),
+            purchasePriceUsd: g.purchasePriceUsd,
+            items: units,
+            imeis: units.map((u) => u.imei),
+          };
+        }
         const validItems = g.items
           .filter((i) => {
             const [p1] = getImeiPair(i.imei);
@@ -993,21 +1243,21 @@ export const PurchasePage: React.FC = () => {
           imeis: validItems.map((i) => i.imei),
         };
       })
-      .filter((g) => g.items.length > 0);
+      .filter((g) => (g.category === 'ACCESSORY' ? (g.quantity || 0) > 0 : g.items.length > 0));
 
     if (cleanGroups.length === 0) {
-      setStatusMessage({ type: 'error', text: 'Добавьте хотя бы одно устройство с заполненным 15-значным IMEI' });
+      setStatusMessage({ type: 'error', text: 'Добавьте хотя бы одно устройство с заполненным IMEI/SN или аксессуар' });
       return;
     }
 
     // Final pre-flight verification against server database
-    if (allFormImeis.length > 0) {
+    if (allFormCodes.length > 0) {
       try {
         const checkRes = await apiClient<{
           existing: Array<{ imei: string; brand: string; model: string; status: string; storeName?: string }>;
         }>('/devices/check-imeis', {
           method: 'POST',
-          body: JSON.stringify({ imeis: allFormImeis }),
+          body: JSON.stringify({ imeis: allFormImeis, serials: allFormSerials }),
         });
         if (checkRes?.existing && checkRes.existing.length > 0) {
           const found = checkRes.existing[0];
@@ -1020,7 +1270,7 @@ export const PurchasePage: React.FC = () => {
           });
           setStatusMessage({
             type: 'error',
-            text: `IMEI ${found.imei} уже зарегистрирован (${found.brand} ${found.model})! Просмотр чека заблокирован.`,
+            text: `IMEI/SN ${found.imei} ${existingText(found)}! Просмотр чека заблокирован.`,
           });
           soundEffects.playError();
           return;
@@ -1056,18 +1306,7 @@ export const PurchasePage: React.FC = () => {
         clearPhoneCatalogCache();
         void loadSpecs();
 
-        setGroups([
-          {
-            id: `g-${Date.now()}`,
-            brand: '',
-            model: '',
-            ram: '',
-            storage: '',
-            color: '',
-            purchasePriceUsd: 0,
-            items: [{ imei: '' }],
-          },
-        ]);
+        setGroups([emptyGroup('PHONE')]);
         setPreviewInvoice(null);
         setSelectedSupplierId('');
 
@@ -1085,7 +1324,7 @@ export const PurchasePage: React.FC = () => {
           : ' (в долг)';
         setStatusMessage({
           type: 'success',
-          text: `Приход по накладной ${savedNum} успешно сохранен (${previewInvoice.groups.reduce((a, b) => a + b.items.length, 0)} шт.)${paymentNote}!`,
+          text: `Приход по накладной ${savedNum} успешно сохранен (${previewInvoice.groups.reduce((a, b) => a + previewUnits(b), 0)} шт.)${paymentNote}!`,
         });
       } else {
         setStatusMessage({ type: 'error', text: res.message || 'Ошибка сохранения прихода' });
@@ -1146,6 +1385,7 @@ export const PurchasePage: React.FC = () => {
           onClearGroupSpecs={handleClearGroupSpecs}
           onResetGroup={handleResetGroup}
           onAddGroup={handleAddGroup}
+          onChangeGroupCategory={handleChangeGroupCategory}
           onRemoveGroup={handleRemoveGroup}
           onAddImeiToGroup={handleAddImeiToGroup}
           onRemoveImeiFromGroup={handleRemoveImeiFromGroup}
@@ -1175,6 +1415,13 @@ export const PurchasePage: React.FC = () => {
           onOpenScannerForImei2={(groupIdx, itemIdx) => {
             openScanner((scannedCode) => handleUpdateImei2(groupIdx, itemIdx, scannedCode));
           }}
+          onUpdateSerial={handleUpdateSerial}
+          onScanSerial={handleScanSerial}
+          onBarcodeCommit={(groupIdx, barcode) => { void handleBarcodeCommit(groupIdx, barcode); }}
+          onScanBarcode={handleScanBarcode}
+          onClearBarcode={handleClearBarcode}
+          accessoryDuplicates={accessoryDuplicates}
+          submitBlockedReason={submitBlockedReason}
         />
       )}
 

@@ -11,6 +11,7 @@ import { postTransaction } from '../finance/financial-transaction.service';
 import { assertShiftOpen } from '../finance/shift-guard';
 import { syncStockAlerts } from '../stock-thresholds/stock-alerts';
 import { returnOvercollectedBonus } from '../finance/cash-collection.service';
+import { readAllocations, restoreAllocations } from '../catalog/accessory-stock';
 
 interface RefundInput {
   saleId: string;
@@ -30,13 +31,13 @@ export class RefundService {
 
     return prisma.$transaction(async (tx) => {
       const actor = await resolveActor(tx, input.refundedByUserId);
-      const sale = await tx.sale.findUnique({ where: { id: input.saleId }, include: { saleItems: true } });
+      const sale = await tx.sale.findUnique({ where: { id: input.saleId }, include: { saleItems: true, accessoryItems: true } });
       if (!sale) throw new Error('Чек не найден');
       // Idempotency guard: a sale can only be refunded once.
       if (sale.status === 'REFUNDED') throw new Error('Этот чек уже был возвращён');
       // Phones returned one by one already gave their money back: the rest go the same way.
-      if (sale.saleItems.some((item) => item.returnId)) {
-        throw new Error('По этому чеку уже возвращены отдельные телефоны — оформите возврат остальных телефонов по позициям');
+      if (sale.saleItems.some((item) => item.returnId) || (sale.accessoryItems ?? []).some((line) => line.returnedQuantity > 0)) {
+        throw new Error('По этому чеку уже возвращены отдельные позиции — оформите возврат остальных по позициям');
       }
 
       const rate = await requireTodayRate(tx);
@@ -106,6 +107,14 @@ export class RefundService {
       });
       if (restockResult.count !== deviceIds.length) {
         throw new Error('Не удалось вернуть устройства на склад — состояние изменилось');
+      }
+      // Accessories go back into the very batches they were sold from, at their own cost.
+      for (const line of sale.accessoryItems ?? []) {
+        await restoreAllocations(tx, readAllocations(line.allocations));
+        await tx.saleAccessoryItem.update({
+          where: { id: line.id },
+          data: { returnedQuantity: line.quantity, returnedPriceTjs: line.salePriceTjs, returnedPriceUsd: line.salePriceUsd, returnedCostUsd: line.costUsd },
+        });
       }
       // The refund's money leaves today's register, which must still be open.
       await assertShiftOpen(tx, sale.storeId);

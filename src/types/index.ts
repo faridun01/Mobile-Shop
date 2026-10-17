@@ -110,8 +110,13 @@ export interface DeviceTimelineEvent {
   priceUsd?: number;
 }
 
+/** A serialized unit: a phone (IMEI) or a tablet (serial number, SN). */
+export type DeviceCategory = 'PHONE' | 'TABLET';
+
 export interface Device {
   id: string;
+  /** PHONE when absent (older data). A tablet's imei/imei2 are its main and additional SN. */
+  category?: DeviceCategory;
   imei: string;
   imei2?: string;
   brand: string;
@@ -119,6 +124,10 @@ export interface Device {
   ram?: string;
   storage: string;
   color: string;
+  /** Tablet-only: Wi-Fi / Wi-Fi + Cellular. */
+  connectivity?: string;
+  /** Tablet-only: screen size. */
+  screenSize?: string;
   status: DeviceStatus;
   locationId: string; // Store id or 'main_warehouse'
   locationName: string;
@@ -142,6 +151,8 @@ export interface SaleItem {
   /** The receipt line itself (needed to return this phone). */
   id?: string;
   deviceId: string;
+  /** PHONE when absent; a tablet's imei/imei2 are its serial numbers. */
+  category?: DeviceCategory;
   imei: string;
   imei2?: string;
   brand: string;
@@ -163,6 +174,27 @@ export interface SaleItem {
   returnCreditUsd?: number;
 }
 
+/** An accessory line of a receipt. Its cost is ADMIN-only (0 for store staff). */
+export interface SaleAccessoryLine {
+  id: string;
+  productId: string;
+  barcode: string;
+  brand: string;
+  name: string;
+  category: string;
+  model?: string;
+  quantity: number;
+  unitPriceTjs: number;
+  salePriceTjs: number;
+  salePriceUsd: number;
+  costUsd: number;
+  isBelowCost?: boolean;
+  /** Units of the line already returned, with their price and cost. */
+  returnedQuantity: number;
+  returnedPriceTjs: number;
+  returnedCostUsd: number;
+}
+
 /** One return of phones from a receipt; an exchange's return links to the new receipt. */
 export interface SaleReturnInfo {
   id: string;
@@ -177,6 +209,8 @@ export interface SaleReturnInfo {
   payoutMethod?: 'CASH' | 'CARD';
   exchangeSaleId?: string;
   exchangeReceiptNumber?: number;
+  /** Accessory units returned by this return. */
+  accessoryLines?: { lineId: string; name: string; quantity: number; priceTjs: number; withheldTjs: number }[];
 }
 
 export interface ExchangeEvent {
@@ -212,6 +246,8 @@ export interface Sale {
   customerPhone?: string;
   customerId?: string;
   items: SaleItem[];
+  /** Accessory lines of the receipt (quantity × unit price). */
+  accessoryItems?: SaleAccessoryLine[];
   totalTjs: number;
   totalUsd: number;
   recognizedProfitUsd?: number;
@@ -251,6 +287,8 @@ export interface TransferRequest {
   deviceImeis: string[];
   deviceBrands: string[];
   deviceModels: string[];
+  /** Accessories moved by quantity. */
+  accessoryLines?: { productId: string; barcode: string; brand: string; name: string; quantity: number }[];
   requestedBy: string;
   requestedAt: string;
   status: TransferStatus;
@@ -327,6 +365,37 @@ export interface SupplierInvoice {
   isStorePurchase?: boolean;
   storeId?: string;
   groups?: InvoiceGroup[];
+  /** The receipt's accessory lines (quantity at a unit cost each). */
+  accessoryBatches?: InvoiceAccessoryBatch[];
+}
+
+/** An accessory card: found by its barcode, counted by quantity. */
+export interface AccessoryProduct {
+  id: string;
+  barcode: string;
+  brand: string;
+  name: string;
+  category: string;
+  model?: string;
+  attributes?: string;
+}
+
+export interface InvoiceAccessoryBatch {
+  id: string;
+  quantityReceived: number;
+  quantityRemaining: number;
+  unitCostUsd: number;
+  product: AccessoryProduct;
+}
+
+/** An accessory card with its stock by location (cost ADMIN-only). */
+export interface AccessoryStockItem extends AccessoryProduct {
+  /** On hand, units in a pending transfer included. */
+  quantity: number;
+  /** Can be sold or moved now. */
+  available: number;
+  stockCostUsd?: number;
+  stores: { storeId: string; storeName: string; quantity: number; reserved: number; available: number; costUsd?: number }[];
 }
 
 export interface Supplier {

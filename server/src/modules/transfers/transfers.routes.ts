@@ -41,6 +41,7 @@ export function registerTransferRoutes(app: Express) {
         // Only the store name and the item's phone fields are ever read (mapTransfer).
         include: {
           items: { select: { deviceId: true, imei: true, brand: true, model: true } },
+          accessoryLines: { select: { productId: true, barcode: true, brand: true, name: true, quantity: true } },
           fromStore: { select: { name: true } },
           toStore: { select: { name: true } },
         },
@@ -55,9 +56,14 @@ export function registerTransferRoutes(app: Express) {
 
   app.post('/api/transfers', authenticateJwt, async (req: AuthenticatedRequest, res, next) => {
     try {
-      const { fromStoreId, toStoreId, deviceIds } = req.body ?? {};
-      if (!fromStoreId || !toStoreId || !Array.isArray(deviceIds)) {
-        res.status(400).json({ message: 'fromStoreId, toStoreId и deviceIds обязательны' });
+      const { fromStoreId, toStoreId } = req.body ?? {};
+      const deviceIds: string[] = Array.isArray(req.body?.deviceIds) ? req.body.deviceIds.map(String) : [];
+      // Accessories move by quantity: [{ productId, quantity }].
+      const accessories = Array.isArray(req.body?.accessories)
+        ? req.body.accessories.map((a: any) => ({ productId: String(a?.productId ?? ''), quantity: Number(a?.quantity) }))
+        : [];
+      if (!fromStoreId || !toStoreId || (deviceIds.length === 0 && accessories.length === 0)) {
+        res.status(400).json({ message: 'Укажите откуда, куда и что перемещать (устройства или аксессуары)' });
         return;
       }
       // Store staff (SELLER and PARTNER) request transfers OUT of their own store only; an
@@ -68,13 +74,13 @@ export function registerTransferRoutes(app: Express) {
           res.status(403).json({ message: 'Перемещать можно только товары своего магазина. Телефоны с главного склада принимаются через «Приход товара»' });
           return;
         }
-        const transfer = await TransfersService.create({ fromStoreId, toStoreId, deviceIds, requestedByUserId: req.user!.userId });
+        const transfer = await TransfersService.create({ fromStoreId, toStoreId, deviceIds, accessories, requestedByUserId: req.user!.userId });
         res.status(201).json(transfer);
         return;
       }
 
       // The ADMIN moves stock directly, without a separate approval step.
-      const transfer = await TransfersService.createDirect({ fromStoreId, toStoreId, deviceIds, requestedByUserId: req.user!.userId });
+      const transfer = await TransfersService.createDirect({ fromStoreId, toStoreId, deviceIds, accessories, requestedByUserId: req.user!.userId });
       res.status(201).json(transfer);
     } catch (error) {
       next(error);

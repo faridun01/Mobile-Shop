@@ -1,4 +1,5 @@
 import { decimal, moneyNumber, sumMoney, formatMoney } from '../../utils/money';
+import { deviceCodeLabel } from '../../utils/deviceCode';
 import React, { useState, useMemo, useRef } from 'react';
 import { useAppFields } from '../../context/AppContext';
 import { Device, PaymentMethod } from '../../types';
@@ -34,6 +35,9 @@ import { SaleVariantRow, retailPriceOf, type SaleVariant } from '../sale/SaleVar
 import { PreferredSuggestion } from '../sale/PreferredSuggestion';
 import { preferredInsteadOf } from '../sale/sellGuidance';
 import { useBelowCostCheck } from '../../hooks/useBelowCostCheck';
+import { availableAt, useAccessoryStock } from '../../hooks/useAccessoryStock';
+import { AccessoryCartLine, AccessoryPickList, addAccessoryUnit, filterAccessories, findAccessoryByCode, type AccessoryCartItem } from '../sale/AccessoryCart';
+import type { AccessoryStockItem } from '../../types';
 
 interface CartItem {
   device: Device;
@@ -58,7 +62,10 @@ export const SalePage: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedBrand, setSelectedBrand] = useState<string>('ALL');
   const [cart, setCart] = useState<CartItem[]>([]);
-  useUnfinishedWork(cart.length > 0, 'Незавершённая продажа');
+  // Accessories in the receipt: a quantity of one card each, at a unit price.
+  const [accessoryCart, setAccessoryCart] = useState<AccessoryCartItem[]>([]);
+  const cartCount = cart.length + accessoryCart.length;
+  useUnfinishedWork(cartCount > 0, 'Незавершённая продажа');
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [expandedVariantKey, setExpandedVariantKey] = useState<string | null>(null);
   const [isClearConfirmOpen, setIsClearConfirmOpen] = useState(false);
@@ -125,6 +132,27 @@ export const SalePage: React.FC = () => {
   const activeStore = stores.find(s => s.id === effectiveStoreId);
   const activeStoreName = activeStore?.name || 'Магазин';
   const isCurrentStoreWarehouse = Boolean(activeStore?.isMainWarehouse);
+
+  // Accessories in stock at this store (units held by a pending transfer excluded).
+  const { items: accessoryStock } = useAccessoryStock(effectiveStoreId || undefined);
+  // Accessories are sold from one store's batches: another store starts an empty list.
+  React.useEffect(() => { setAccessoryCart([]); }, [effectiveStoreId]);
+  const visibleAccessories = useMemo(
+    () => filterAccessories(accessoryStock, searchQuery).filter((item) => selectedBrand === 'ALL' || item.brand === selectedBrand),
+    [accessoryStock, searchQuery, selectedBrand],
+  );
+  const maxOf = (product: AccessoryStockItem) => availableAt(product, effectiveStoreId || undefined);
+  const addAccessoryToCart = (product: AccessoryStockItem) => {
+    const { cart: next, added } = addAccessoryUnit(accessoryCart, product, maxOf(product));
+    if (!added) {
+      soundEffects.playError();
+      setPaymentStatus({ tone: 'warning', text: `${product.brand} ${product.name}: в наличии только ${maxOf(product)} шт.` });
+      return false;
+    }
+    soundEffects.playAddToCartSuccess();
+    setAccessoryCart(next);
+    return true;
+  };
 
   const availableDevices = useMemo(() => {
     return devices.filter(d => {
@@ -221,7 +249,7 @@ export const SalePage: React.FC = () => {
   const handleRemoveFromCart = (index: number) => {
     setCart(prev => {
       const updated = prev.filter((_, i) => i !== index);
-      if (updated.length === 0) setIsCartOpen(false);
+      if (updated.length === 0 && accessoryCart.length === 0) setIsCartOpen(false);
       return updated;
     });
   };
@@ -254,6 +282,22 @@ export const SalePage: React.FC = () => {
       }
       return;
     }
+    // Not a phone or tablet: an accessory's barcode adds one unit of it (one more each scan).
+    if (result.kind === 'not-found') {
+      const accessory = findAccessoryByCode(accessoryStock, code);
+      if (accessory) {
+        if (addAccessoryToCart(accessory)) {
+          if (source === 'camera') {
+            setPaymentStatus(null);
+            setIsCartOpen(true);
+          } else {
+            setSearchQuery('');
+            setPaymentStatus({ tone: 'success', text: `Добавлено в корзину: ${accessory.brand} ${accessory.name}` });
+          }
+        }
+        return;
+      }
+    }
     // Enter on an ordinary text search ("iphone 15") just keeps filtering the catalog.
     if (source === 'enter' && result.kind === 'not-found' && !looksLikeDeviceCode(code)) return;
     soundEffects.playError();
@@ -262,15 +306,19 @@ export const SalePage: React.FC = () => {
   };
 
   const handleTriggerScanner = () => {
-    openScanner((scannedCode) => handleDeviceCode(scannedCode, 'camera'));
+    openScanner((scannedCode) => handleDeviceCode(scannedCode, 'camera'), { allowModeSwitch: true });
   };
 
   const handleAddMore = () => {
     setIsCartOpen(false);
   };
 
-  const totalTjs = sumMoney(cart.map(item => item.salePriceTjs && item.salePriceTjs > 0 ? item.salePriceTjs : 0));
-  const hasEmptyPrice = cart.some(item => item.salePriceTjs === undefined || item.salePriceTjs <= 0);
+  const totalTjs = sumMoney([
+    ...cart.map(item => item.salePriceTjs && item.salePriceTjs > 0 ? item.salePriceTjs : 0),
+    ...accessoryCart.map(line => moneyNumber(decimal(line.unitPriceTjs && line.unitPriceTjs > 0 ? line.unitPriceTjs : 0).mul(line.quantity))),
+  ]);
+  const hasEmptyPrice = cart.some(item => item.salePriceTjs === undefined || item.salePriceTjs <= 0)
+    || accessoryCart.some(line => !(line.unitPriceTjs && line.unitPriceTjs > 0));
   // A rate from an earlier day is not today's: the server refuses the sale until the admin sets it.
   const rateReady = hasCurrentDailyRate(todayRate);
   const totalUsd = todayRate ? moneyNumber(decimal(totalTjs).div(todayRate.rate)) : 0;
@@ -293,6 +341,33 @@ export const SalePage: React.FC = () => {
     return decimal(item.salePriceTjs).lt(decimal(item.device.costBasisUsd).mul(todayRate.rate));
   };
   const cartDeviceIds = new Set(cart.map((item) => item.device.id));
+  // Admin only: the unit price under the average unit cost of the store's batches.
+  const isAccessoryBelowCost = (line: AccessoryCartItem) => {
+    if (!isAdmin || !todayRate || !line.unitPriceTjs) return false;
+    const here = line.product.stores.find((s) => s.storeId === effectiveStoreId);
+    if (!here?.costUsd || here.quantity <= 0) return false;
+    return decimal(line.unitPriceTjs).lt(decimal(here.costUsd).div(here.quantity).mul(todayRate.rate));
+  };
+  const updateAccessoryLine = (productId: string, next: AccessoryCartItem) =>
+    setAccessoryCart((prev) => prev.map((line) => (line.product.id === productId ? next : line)));
+  const removeAccessoryLine = (productId: string) => {
+    const next = accessoryCart.filter((line) => line.product.id !== productId);
+    if (next.length === 0 && cart.length === 0) setIsCartOpen(false);
+    setAccessoryCart(next);
+  };
+  const renderAccessoryLines = (large: boolean) => accessoryCart.map((line) => (
+    <div key={line.product.id} className={large ? 'p-3 rounded-lg border border-border bg-surface' : 'pt-2.5 first:pt-0'}>
+      <AccessoryCartLine
+        line={line}
+        max={maxOf(line.product)}
+        withPrice
+        large={large}
+        belowCost={isAccessoryBelowCost(line)}
+        onChange={(next) => updateAccessoryLine(line.product.id, next)}
+        onRemove={() => removeAccessoryLine(line.product.id)}
+      />
+    </div>
+  ));
 
   // Keep the payment amounts in step with the total when phones are added or prices change.
   // Customer and payment method stay as the cashier left them until the sale is done.
@@ -333,7 +408,7 @@ export const SalePage: React.FC = () => {
   };
 
   const handleOpenCart = () => {
-    if (cart.length === 0) return;
+    if (cartCount === 0) return;
     setPaymentStatus(null);
     setIsCartOpen(true);
   };
@@ -345,6 +420,11 @@ export const SalePage: React.FC = () => {
     const invalidItem = cart.find(ci => ci.salePriceTjs === undefined || ci.salePriceTjs <= 0);
     if (invalidItem) {
       setPaymentStatus({ tone: 'error', text: `Укажите цену продажи для устройства: ${invalidItem.device.brand} ${invalidItem.device.model}` });
+      return;
+    }
+    const unpricedAccessory = accessoryCart.find(line => !(line.unitPriceTjs && line.unitPriceTjs > 0));
+    if (unpricedAccessory) {
+      setPaymentStatus({ tone: 'error', text: `Укажите цену за штуку: ${unpricedAccessory.product.brand} ${unpricedAccessory.product.name}` });
       return;
     }
 
@@ -390,6 +470,8 @@ export const SalePage: React.FC = () => {
     try {
       const res = await createSale({
         items: cart.map(ci => ({ device: ci.device, salePriceTjs: ci.salePriceTjs! })),
+        accessories: accessoryCart.map(line => ({ productId: line.product.id, quantity: line.quantity, unitPriceTjs: line.unitPriceTjs! })),
+        storeId: effectiveStoreId || undefined,
         paymentMethod,
         cashAmountTjs: cashVal,
         cardAmountTjs: cardVal,
@@ -403,6 +485,7 @@ export const SalePage: React.FC = () => {
         setCompletedReceiptNumber(res.receiptNumber);
         setIsCartOpen(false);
         setCart([]);
+        setAccessoryCart([]);
         resetCheckout();
       } else {
         setPaymentStatus({ tone: 'error', text: res.message || 'Ошибка оформления продажи' });
@@ -484,7 +567,7 @@ export const SalePage: React.FC = () => {
             >
               {isInitialLoading ? (
                 <LoadingState label="Загрузка каталога…" />
-              ) : groupedVariants.length === 0 ? (
+              ) : groupedVariants.length === 0 && visibleAccessories.length === 0 ? (
                 <EmptyState
                   icon={Smartphone}
                   title="Товары не найдены"
@@ -526,17 +609,23 @@ export const SalePage: React.FC = () => {
                       showUsd={isAdmin}
                     />
                   ))}
+                  <AccessoryPickList
+                    items={visibleAccessories}
+                    storeId={effectiveStoreId || undefined}
+                    cart={accessoryCart}
+                    onAdd={(item) => { addAccessoryToCart(item); }}
+                  />
               </>
             )}
           </div>
 
           {/* Floating Cart Bar on Mobile & Tablet (< 1024px) */}
-          {cart.length > 0 && (
+          {cartCount > 0 && (
             <div className="lg:hidden shrink-0 px-3 pt-2 pb-7 md:pb-3 border-t border-border bg-bg">
               <div className="max-w-2xl mx-auto p-3 rounded-xl bg-surface border border-accent/40 flex items-center justify-between gap-2" role="region" aria-label="Корзина">
                 <div className="flex items-center gap-3 min-w-0 pl-1">
                   <div className="w-9 h-9 rounded-lg bg-accent text-accent-fg flex items-center justify-center font-bold text-sm shrink-0">
-                    {cart.length}
+                    {cartCount}
                   </div>
                   <div className="truncate">
                     {isAdmin && rateReady ? (
@@ -589,9 +678,9 @@ export const SalePage: React.FC = () => {
 
             <div className="flex items-center gap-1.5 shrink-0">
               <span className="px-2 py-0.5 rounded-full bg-accent/15 border border-accent/30 text-accent font-bold font-mono text-xs">
-                {cart.length} шт
+                {cartCount} поз.
               </span>
-              {cart.length > 0 && (
+              {cartCount > 0 && (
                 <button
                   type="button"
                   onClick={() => setIsClearConfirmOpen(true)}
@@ -605,14 +694,14 @@ export const SalePage: React.FC = () => {
           </div>
 
           {/* Body: Empty State or Cart Items & Checkout */}
-          {cart.length === 0 ? (
+          {cartCount === 0 ? (
             <div className="flex-1 flex flex-col items-center justify-center p-6 text-center text-fg-subtle space-y-2.5">
               <div className="w-14 h-14 rounded-2xl bg-surface-raised border border-border flex items-center justify-center text-fg-subtle/50 mb-1">
                 <ShoppingCart className="w-7 h-7" />
               </div>
               <p className="text-sm font-bold text-fg">Чек пуст</p>
               <p className="text-xs text-fg-subtle">
-                Выберите товар или отсканируйте IMEI
+                Выберите товар или отсканируйте IMEI / SN / штрихкод
               </p>
             </div>
           ) : (
@@ -652,7 +741,7 @@ export const SalePage: React.FC = () => {
                             })()}
                           </div>
                           <p className="text-[10px] text-fg-subtle font-mono truncate mt-0.5">
-                            IMEI: {item.device.imei}
+                            {deviceCodeLabel(item.device.category)}: {item.device.imei}
                           </p>
                         </div>
                         <button
@@ -713,6 +802,7 @@ export const SalePage: React.FC = () => {
                     </div>
                   );
                 })}
+                {renderAccessoryLines(false)}
               </div>
 
               {/* Bottom Checkout Controls */}
@@ -798,10 +888,11 @@ export const SalePage: React.FC = () => {
       <ConfirmDialog
         open={isClearConfirmOpen}
         title="Очистить корзину?"
-        message={`Из корзины будут удалены все ${cart.length} товар(ов). Это действие нельзя отменить.`}
+        message={`Из корзины будут удалены все ${cartCount} позиц.(ий). Это действие нельзя отменить.`}
         confirmLabel="Очистить"
         onConfirm={() => {
           setCart([]);
+          setAccessoryCart([]);
           resetCheckout();
           setIsClearConfirmOpen(false);
         }}
@@ -879,7 +970,7 @@ export const SalePage: React.FC = () => {
                       {item.device.ram ? `${item.device.ram} · ` : ''}{item.device.storage} · {formatPhoneColor(item.device.color)}
                     </p>
                     <p className="text-xs text-fg-subtle mt-0.5">
-                      IMEI: {item.device.imei}{item.device.imei2 ? ` / ${item.device.imei2}` : ''}
+                      {deviceCodeLabel(item.device.category)}: {item.device.imei}{item.device.imei2 ? ` / ${item.device.imei2}` : ''}
                     </p>
                   </div>
                   <IconButton icon={Trash2} tone="danger" size="sm" aria-label="Удалить из корзины" onClick={() => handleRemoveFromCart(idx)} />
@@ -934,6 +1025,7 @@ export const SalePage: React.FC = () => {
               </div>
             );
           })}
+          {renderAccessoryLines(true)}
         </div>
 
         <div className="pt-1">

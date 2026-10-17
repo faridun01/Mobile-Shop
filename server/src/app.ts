@@ -39,6 +39,10 @@ import { withAuditNotifications } from './modules/notifications/audit-notificati
 import { requireNonNegativeMoney, requirePositiveMoney, roundMoney } from './common/money';
 import { getRateForDate, requireTodayRate } from './modules/exchange-rate/exchange-rate.service';
 import { registerTjsBalances } from './modules/finance/cash-balance';
+import { parsePurchaseGroups, purchaseTotalUsd } from './modules/catalog/purchase-items';
+import { linkTabletVariants, receiveAccessories } from './modules/catalog/catalog.service';
+import { registerCatalogRoutes } from './modules/catalog/catalog.routes';
+import { deviceCodeCandidates, normalizeSerial } from './common/device-code';
 import { decimalJsonReplacer } from './common/decimal';
 import { operationContext } from './common/request-operation';
 import { lockCashRegister } from './modules/finance/account.service';
@@ -277,7 +281,9 @@ app.get('/api/devices', authenticateJwt, async (req: AuthenticatedRequest, res, 
     }
 
     if (search) {
-      where = { ...where, OR: [{ imei: search }, { imei2: search }] };
+      // An IMEI as typed, or a tablet SN in any letter case.
+      const codes = deviceCodeCandidates(search);
+      where = { ...where, OR: [{ imei: { in: codes } }, { imei2: { in: codes } }] };
     } else if (purchaseInvoiceId) {
       where = { ...where, purchaseInvoiceId };
     } else if (excludeSold) {
@@ -357,45 +363,39 @@ app.post('/api/devices/check-imeis', authenticateJwt, async (req: AuthenticatedR
     const cleanImeis: string[] = rawImeis
       .map((i: unknown) => String(i).replace(/\D/g, '').slice(0, 15))
       .filter((i: string) => i.length === 15);
+    // Tablet serial numbers (letters and digits) are checked the same way, as stored (upper case).
+    const rawSerials = Array.isArray(req.body?.serials) ? req.body.serials : [];
+    const cleanSerials: string[] = rawSerials.map(normalizeSerial).filter((s: string) => s.length >= 4 && s.length <= 64);
 
-    if (cleanImeis.length === 0) {
+    if (cleanImeis.length === 0 && cleanSerials.length === 0) {
       res.json({ existing: [] });
       return;
     }
 
-    const uniqueImeis: string[] = Array.from(new Set(cleanImeis));
+    const uniqueImeis: string[] = Array.from(new Set([...cleanImeis, ...cleanSerials])).slice(0, 500);
     const found = await prisma.device.findMany({
       where: {
-        OR: uniqueImeis.flatMap((imei: string) => [{ imei }, { imei2: imei }]),
+        OR: [{ imei: { in: uniqueImeis } }, { imei2: { in: uniqueImeis } }],
       },
       select: {
         id: true,
+        category: true,
         imei: true,
         imei2: true,
         brand: true,
         model: true,
         status: true,
+        // Where it is — the receipt form is ADMIN-only, so the location may be shown.
+        store: { select: { name: true } },
       },
     });
 
-    const existingList: Array<{ imei: string; brand: string; model: string; status: string }> = [];
+    const existingList: Array<{ imei: string; category: string; brand: string; model: string; status: string; storeName?: string }> = [];
+    const isAdmin = req.user!.role === 'ADMIN';
     for (const d of found) {
-      if (uniqueImeis.includes(d.imei)) {
-        existingList.push({
-          imei: d.imei,
-          brand: d.brand,
-          model: d.model,
-          status: d.status,
-        });
-      }
-      if (d.imei2 && uniqueImeis.includes(d.imei2)) {
-        existingList.push({
-          imei: d.imei2,
-          brand: d.brand,
-          model: d.model,
-          status: d.status,
-        });
-      }
+      const entry = { category: d.category, brand: d.brand, model: d.model, status: d.status, ...(isAdmin ? { storeName: d.store.name } : {}) };
+      if (uniqueImeis.includes(d.imei)) existingList.push({ imei: d.imei, ...entry });
+      if (d.imei2 && uniqueImeis.includes(d.imei2)) existingList.push({ imei: d.imei2, ...entry });
     }
 
     res.json({ existing: existingList });
@@ -434,10 +434,10 @@ app.patch('/api/devices/batch-rename-model', authenticateJwt, requireRoles('ADMI
 
     const updatedDevices = await prisma.device.findMany({
       where,
-      select: { id: true, brand: true, model: true, storeId: true, ram: true, storage: true, color: true },
+      select: { id: true, category: true, imei: true, imei2: true, brand: true, model: true, storeId: true, ram: true, storage: true, color: true },
     });
 
-    await rememberPhones(prisma, updatedDevices as any);
+    await rememberPhones(prisma, updatedDevices);
     const storeIds = Array.from(new Set(updatedDevices.map(d => d.storeId)));
     await syncStockAlerts(prisma, storeIds);
 
@@ -462,7 +462,8 @@ app.patch('/api/devices/:id', authenticateJwt, requireRoles('ADMIN', 'PARTNER', 
       return;
     }
 
-    if (ram !== undefined && (typeof ram !== 'string' || !ram.trim())) {
+    // A phone always has its RAM stated; a tablet's RAM is optional (often not on the box).
+    if (ram !== undefined && (typeof ram !== 'string' || (!ram.trim() && existing.category === 'PHONE'))) {
       res.status(400).json({ message: 'RAM обязателен для устройства' });
       return;
     }
@@ -511,73 +512,26 @@ app.post('/api/purchases', authenticateJwt, requireRoles('ADMIN'), enforceBodySt
       const store = mainWarehouse;
       const targetStoreId = mainWarehouse.id;
 
-      const normalizedDevices = groups.flatMap((group: any) => {
-        const isBonus = Boolean(group.isBonus);
-        const purchasePriceUsd = isBonus
-          ? requireNonNegativeMoney(group.purchasePriceUsd ?? 0, 'Закупочная цена')
-          : requirePositiveMoney(group.purchasePriceUsd, 'Закупочная цена');
-        const bonusCampaign = isBonus ? (String(group.bonusCampaign || '').trim() || 'Бонус от поставщика') : null;
-
-        if (Array.isArray(group.items) && group.items.length > 0) {
-          return group.items
-            .filter((item: any) => item && typeof item.imei === 'string' && item.imei.trim().length > 0)
-            .map((item: any) => {
-              const [imei1, imei2] = String(item.imei).split(/[\/,]/).map((part) => part.trim());
-              const explicitImei2 = typeof item.imei2 === 'string' && item.imei2.trim() ? item.imei2.trim() : null;
-              return {
-                imei: imei1,
-                imei2: explicitImei2 || imei2 || null,
-                brand: String(group.brand || '').trim(),
-                model: String(group.model || '').trim(),
-                ram: String(group.ram || '').trim(),
-                storage: String(group.storage || '').trim(),
-                color: String(group.color || '').trim(),
-                purchasePriceUsd,
-                isBonus,
-                bonusCampaign,
-              };
-            });
-        }
-
-        const imeis = Array.isArray(group.imeis) ? group.imeis : [];
-        return imeis.filter((imei: unknown): imei is string => typeof imei === 'string' && imei.trim().length > 0).map((imei: string) => {
-          const [imei1, imei2] = imei.split(/[\/,]/).map((part) => part.trim());
-          return {
-            imei: imei1,
-            imei2: imei2 || null,
-            brand: String(group.brand || '').trim(),
-            model: String(group.model || '').trim(),
-            ram: String(group.ram || '').trim(),
-            storage: String(group.storage || '').trim(),
-            color: String(group.color || '').trim(),
-            purchasePriceUsd,
-            isBonus,
-            bonusCampaign,
-          };
-        });
-      });
-
-      if (normalizedDevices.length === 0 || normalizedDevices.some((device) => !device.imei || !device.brand || !device.model || !device.ram || !device.storage)) {
+      // Phones (IMEI), tablets (SN) and accessories (barcode + quantity), each by its own rules.
+      const { devices: normalizedDevices, accessories, deviceGroups } = parsePurchaseGroups(groups);
+      if (normalizedDevices.length === 0 && accessories.length === 0) {
         throw new Error('Каждое устройство должно содержать IMEI, бренд, модель, RAM и память');
       }
 
-      for (const device of normalizedDevices) {
-        if (!device.imei || !/^\d{15}$/.test(device.imei)) {
-          throw new Error(`IMEI устройства (${device.brand} ${device.model}) должен содержать ровно 15 цифр (получено: "${device.imei}")`);
-        }
-        if (device.imei2 && !/^\d{15}$/.test(device.imei2)) {
-          throw new Error(`IMEI 2 устройства (${device.brand} ${device.model}) должен содержать ровно 15 цифр (получено: "${device.imei2}")`);
-        }
+      const identifiers = normalizedDevices.flatMap((device) => [device.imei, device.imei2]).filter((code): code is string => Boolean(code));
+      if (new Set(identifiers).size !== identifiers.length) throw new Error('В запросе обнаружены дублирующиеся IMEI/SN');
+      const existing = identifiers.length
+        ? await transaction.device.findFirst({
+            where: { OR: identifiers.flatMap((identifier) => [{ imei: identifier }, { imei2: identifier }]) },
+            select: { imei: true, imei2: true, category: true, brand: true, model: true },
+          })
+        : null;
+      if (existing) {
+        const code = identifiers.find((id) => id === existing.imei || id === existing.imei2) ?? existing.imei;
+        throw new Error(`${existing.category === 'TABLET' ? 'SN' : 'IMEI'} ${code} уже зарегистрирован (${existing.brand} ${existing.model})`);
       }
 
-      const identifiers = normalizedDevices.flatMap((device) => [device.imei, device.imei2]).filter(Boolean);
-      if (new Set(identifiers).size !== identifiers.length) throw new Error('В запросе обнаружены дублирующиеся IMEI');
-      const existing = await transaction.device.findFirst({
-        where: { OR: identifiers.flatMap((identifier) => [{ imei: identifier }, { imei2: identifier }]) },
-      });
-      if (existing) throw new Error(`IMEI ${existing.imei} уже зарегистрирован`);
-
-      const totalAmountUsd = normalizedDevices.reduce((sum, device) => D(sum).plus(device.purchasePriceUsd), D(0));
+      const totalAmountUsd = purchaseTotalUsd(normalizedDevices, accessories);
 
       if (D(paidAmountUsd).gt(totalAmountUsd)) {
         throw new Error(`Сумма оплаты ($${paidAmountUsd}) не может превышать стоимость партии ($${totalAmountUsd})`);
@@ -620,41 +574,33 @@ app.post('/api/purchases', authenticateJwt, requireRoles('ADMIN'), enforceBodySt
           devicesCount: normalizedDevices.length,
           isStorePurchase: false,
           storeId: targetStoreId,
-          groups: {
-            create: groups.map((group: any) => {
-              const isBonus = Boolean(group.isBonus);
-              const purchasePriceUsd = isBonus
-                ? requireNonNegativeMoney(group.purchasePriceUsd ?? 0, 'Закупочная цена')
-                : requirePositiveMoney(group.purchasePriceUsd, 'Закупочная цена');
-              return {
-                brand: String(group.brand || '').trim(), model: String(group.model || '').trim(),
-                ram: String(group.ram || '').trim(),
-                storage: String(group.storage || '').trim(), color: String(group.color || '').trim(),
-                quantity: Array.isArray(group.items)
-                  ? group.items.filter((i: any) => i && typeof i.imei === 'string' && i.imei.trim().length > 0).length
-                  : (Array.isArray(group.imeis) ? group.imeis.filter(Boolean).length : 0),
-                purchasePriceUsd,
-              };
-            }),
-          },
+          // Phone and tablet positions; accessory lines are the invoice's accessory batches.
+          groups: { create: deviceGroups },
         },
       });
 
       const targetStatus = 'MAIN_WAREHOUSE' as const;
-      const devices = await transaction.device.createManyAndReturn({
-        data: normalizedDevices.map((device) => ({
-          ...device,
-          storeId: targetStoreId,
-          status: targetStatus,
-          costBasisUsd: device.purchasePriceUsd,
-          supplierId,
-          supplierName: supplier.name,
-          invoiceNumber: invoice.invoiceNumber,
-          purchaseInvoiceId: invoice.id,
-        })),
+      const devices = normalizedDevices.length
+        ? await transaction.device.createManyAndReturn({
+            data: normalizedDevices.map((device) => ({
+              ...device,
+              storeId: targetStoreId,
+              status: targetStatus,
+              costBasisUsd: device.purchasePriceUsd,
+              supplierId,
+              supplierName: supplier.name,
+              invoiceNumber: invoice.invoiceNumber,
+              purchaseInvoiceId: invoice.id,
+            })),
+          })
+        : [];
+      // Every phone received teaches the catalog its model, so the next one fills in by itself;
+      // a tablet's SN is no IMEI and never enters that catalog — its variant is saved instead.
+      await rememberPhones(transaction, normalizedDevices.filter((device) => device.category === 'PHONE'));
+      await linkTabletVariants(transaction, devices);
+      const accessoryBatches = await receiveAccessories(transaction, accessories, {
+        storeId: targetStoreId, purchaseInvoiceId: invoice.id, supplierId, receivedAt: invoiceDate,
       });
-      // Every phone received teaches the catalog its model, so the next one fills in by itself.
-      await rememberPhones(transaction, normalizedDevices);
       await syncStockAlerts(transaction, [targetStoreId]);
 
       const unpaidAmountUsd = D(totalAmountUsd).minus(paidAmountUsd);
@@ -723,10 +669,15 @@ app.post('/api/purchases', authenticateJwt, requireRoles('ADMIN'), enforceBodySt
         });
       }
 
+      const accessoryUnits = accessories.reduce((sum, line) => sum + line.quantity, 0);
+      const contents = [
+        devices.length ? `${devices.length} устройств` : '',
+        accessoryUnits ? `${accessoryUnits} шт. аксессуаров (${accessories.length} поз.)` : '',
+      ].filter(Boolean).join(', ');
       await transaction.ledgerEntry.create({
         data: {
           type: 'PURCHASE',
-          description: `Приход по накладной ${invoice.invoiceNumber} (${supplier.name}): ${devices.length} устройств`,
+          description: `Приход по накладной ${invoice.invoiceNumber} (${supplier.name}): ${contents}`,
           amountUsd: totalAmountUsd,
           exchangeRate,
           storeId: store.id,
@@ -744,12 +695,23 @@ app.post('/api/purchases', authenticateJwt, requireRoles('ADMIN'), enforceBodySt
           userId: req.user!.userId,
           userRole: req.user!.role,
           action: 'PURCHASE',
-          details: `Создан приход по накладной ${invoice.invoiceNumber} (${supplier.name}): ${devices.length} устройств, сумма $${totalAmountUsd}${paymentAuditNote}`,
-          financialDetails: moneyJson({ amountUsd: totalAmountUsd, paidAmountUsd, exchangeRate }),
+          details: `Создан приход по накладной ${invoice.invoiceNumber} (${supplier.name}): ${contents}, сумма $${totalAmountUsd}${paymentAuditNote}`,
+          financialDetails: moneyJson({
+            amountUsd: totalAmountUsd, paidAmountUsd, exchangeRate,
+            ...(accessories.length ? {
+              accessories: accessoryBatches.map(({ batch, product }) => ({
+                barcode: product.barcode, name: product.name, quantity: batch.quantityReceived, unitCostUsd: batch.unitCostUsd,
+              })),
+            } : {}),
+          }),
+          targetId: invoice.id,
         },
       });
 
-      return { invoice, devices, paidAmountUsd: Number(paidAmountUsd), mainWarehouseId: mainWarehouse.id };
+      return {
+        invoice, devices, paidAmountUsd: Number(paidAmountUsd), mainWarehouseId: mainWarehouse.id,
+        accessoryBatches: accessoryBatches.map(({ batch }) => batch),
+      };
     }, { maxWait: 10000, timeout: 25000 });
 
     const updatedStoreId = result.invoice.storeId || undefined;
@@ -797,6 +759,7 @@ registerCustomerRoutes(app);
 registerStockRevisionRoutes(app);
 registerStockThresholdRoutes(app);
 registerPhoneCatalogRoutes(app);
+registerCatalogRoutes(app);
 // Every audited business event inside a transaction also notifies the admin (same transaction).
 decorateTransactions(withAuditNotifications);
 

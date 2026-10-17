@@ -3,6 +3,7 @@ import { SupplierInvoice, Device, User } from '../../types';
 import { formatInvoiceDate } from './types';
 import { formatMoney } from '../../utils/money';
 import { getPhoneColorHex, formatRam, formatStorage, formatPhoneColor } from '../../utils/phoneSpecs';
+import { deviceCodeLabel } from '../../utils/deviceCode';
 import {
   Receipt,
   CheckCircle2,
@@ -121,10 +122,10 @@ export const InvoiceDetailsModal: React.FC<InvoiceDetailsModalProps> = ({
             <button
               type="button"
               onClick={() => handleCopyText(dev.imei)}
-              title="Скопировать IMEI"
+              title={`Скопировать ${deviceCodeLabel(dev.category)}`}
               className="group inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-surface-raised border border-border/80 hover:border-accent/50 text-[10px] font-mono text-fg-muted hover:text-fg transition-all cursor-pointer"
             >
-              <span className="text-[9px] text-fg-subtle font-sans">IMEI:</span>
+              <span className="text-[9px] text-fg-subtle font-sans">{deviceCodeLabel(dev.category)}:</span>
               <span className="font-bold text-fg">{dev.imei}</span>
               {copiedImei === dev.imei ? (
                 <span className="text-accent flex items-center gap-0.5 text-[9px] font-sans font-bold">
@@ -140,10 +141,10 @@ export const InvoiceDetailsModal: React.FC<InvoiceDetailsModalProps> = ({
               <button
                 type="button"
                 onClick={() => handleCopyText(dev.imei2!)}
-                title="Скопировать IMEI 2"
+                title={`Скопировать ${deviceCodeLabel(dev.category, 2)}`}
                 className="group inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-surface-raised border border-border/80 hover:border-accent/50 text-[10px] font-mono text-fg-muted hover:text-fg transition-all cursor-pointer"
               >
-                <span className="text-[9px] text-fg-subtle font-sans">IMEI 2:</span>
+                <span className="text-[9px] text-fg-subtle font-sans">{deviceCodeLabel(dev.category, 2)}:</span>
                 <span className="font-bold text-fg">{dev.imei2}</span>
                 {copiedImei === dev.imei2 ? (
                   <span className="text-accent flex items-center gap-0.5 text-[9px] font-sans font-bold">
@@ -382,6 +383,41 @@ export const InvoiceDetailsModal: React.FC<InvoiceDetailsModalProps> = ({
           </div>
         )}
 
+        {/* Accessory lines: each is its own batch with its own unit cost */}
+        {invoice.accessoryBatches && invoice.accessoryBatches.length > 0 && (
+          <div className="p-3.5 sm:p-4 bg-surface-raised/30 border-b border-border/70 space-y-2 shrink-0">
+            <div className="flex items-center justify-between text-xs font-bold text-fg-muted">
+              <span className="flex items-center gap-1.5">
+                <Package className="w-3.5 h-3.5 text-accent" />
+                <span>Аксессуары</span>
+              </span>
+              <span className="text-[11px] font-mono text-fg-subtle">
+                Всего: {invoice.accessoryBatches.reduce((acc, b) => acc + b.quantityReceived, 0)} шт.
+              </span>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+              {invoice.accessoryBatches.map((batch) => (
+                <div key={batch.id} className="p-3 rounded-xl bg-surface border border-border/80 shadow-2xs flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="font-bold text-fg text-xs truncate">{batch.product.brand} {batch.product.name}</div>
+                    <div className="text-[10px] text-fg-subtle truncate mt-0.5">
+                      {[batch.product.category, batch.product.model, batch.product.attributes].filter(Boolean).join(' • ')}
+                    </div>
+                    <div className="text-[10px] font-mono text-fg-subtle mt-0.5">Штрихкод: {batch.product.barcode}</div>
+                  </div>
+                  <div className="text-right shrink-0">
+                    <span className="font-bold font-mono text-accent text-xs block">{batch.quantityReceived} шт.</span>
+                    <span className="text-[10px] font-mono text-fg-subtle block">${formatMoney(batch.unitCostUsd)} / шт.</span>
+                    {batch.quantityRemaining !== batch.quantityReceived && (
+                      <span className="text-[10px] text-warning block">осталось {batch.quantityRemaining}</span>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Contained Devices List */}
         <div className="p-3 sm:p-3.5 bg-surface-raised/50 border-b border-border/70 flex items-center justify-between text-xs font-bold text-fg-muted shrink-0">
           <span className="flex items-center gap-2">
@@ -396,7 +432,9 @@ export const InvoiceDetailsModal: React.FC<InvoiceDetailsModalProps> = ({
         <div className="flex-1 overflow-y-auto p-3 sm:p-4 space-y-2.5 bg-surface-raised/20">
           {containedDevices.length === 0 ? (
             <div className="p-8 text-center text-fg-subtle text-xs">
-              Устройства для этой архивной накладной были оприходованы ранее
+              {invoice.accessoryBatches?.length
+                ? 'В этой накладной только аксессуары'
+                : 'Устройства для этой архивной накладной были оприходованы ранее'}
             </div>
           ) : hasGroups && variantGroups.size > 0 ? (
             Array.from(variantGroups.entries()).map(([key, group]) => {

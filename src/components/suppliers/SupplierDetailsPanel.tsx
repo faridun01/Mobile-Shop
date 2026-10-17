@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { Supplier, SupplierInvoice } from '../../types';
 import { formatMoney } from '../../utils/money';
 import { formatDateStr } from './types';
+import { invoiceUnits } from '../purchase/types';
 import {
   DollarSign,
   Edit,
@@ -145,7 +146,7 @@ export const SupplierDetailsPanel: React.FC<SupplierDetailsPanelProps> = ({
                         </span>
                       </div>
                       <p className="text-[11px] text-fg-subtle mt-1">
-                        Дата: {formatDateStr(inv.date)} • Устройств: {inv.devicesCount ?? 0} шт.
+                        Дата: {formatDateStr(inv.date)} • Товаров: {invoiceUnits(inv)} шт.
                       </p>
                     </div>
 
@@ -331,7 +332,7 @@ export const SupplierDetailsPanel: React.FC<SupplierDetailsPanelProps> = ({
                         </span>
                       </div>
                       <p className="text-[11px] text-fg-subtle mt-0.5">
-                        {formatDateStr(inv.date)} • {inv.devicesCount ?? 0} устройств
+                        {formatDateStr(inv.date)} • {invoiceUnits(inv)} шт. товаров
                       </p>
                     </div>
 

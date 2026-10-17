@@ -1,7 +1,9 @@
 import React from 'react';
 import { Supplier, Store, User } from '../../types';
-import { PurchaseItemGroup, getImeiPair } from './types';
+import { PurchaseCategory, PurchaseItemGroup, getImeiPair } from './types';
 import { Combobox } from '../ui/Combobox';
+import { TabletGroupFields } from './TabletGroupFields';
+import { AccessoryGroupFields } from './AccessoryGroupFields';
 import { normalizePhoneColor, formatPhoneColor } from '../../utils/phoneSpecs';
 import { cn } from '../../utils/cn';
 import { CopyImeiButton } from '../common/CopyImeiButton';
@@ -17,7 +19,16 @@ import {
   Truck,
   Sparkles,
   RotateCcw,
+  Smartphone,
+  Tablet,
+  Headphones,
 } from 'lucide-react';
+
+const CATEGORY_TABS: { value: PurchaseCategory; label: string; icon: typeof Smartphone }[] = [
+  { value: 'PHONE', label: 'Телефон', icon: Smartphone },
+  { value: 'TABLET', label: 'Планшет', icon: Tablet },
+  { value: 'ACCESSORY', label: 'Аксессуар', icon: Headphones },
+];
 
 interface NewPurchaseFormProps {
   suppliers: Supplier[];
@@ -29,7 +40,9 @@ interface NewPurchaseFormProps {
   onUpdateGroup: (idx: number, field: keyof Omit<PurchaseItemGroup, 'items'>, value: any) => void;
   onClearGroupSpecs?: (idx: number) => void;
   onResetGroup?: (idx: number) => void;
-  onAddGroup: () => void;
+  onAddGroup: (category?: PurchaseCategory) => void;
+  /** Switches a position to phones, tablets or accessories (its fields start empty). */
+  onChangeGroupCategory: (idx: number, category: PurchaseCategory) => void;
   onRemoveGroup: (idx: number) => void;
   onAddImeiToGroup: (groupIdx: number) => void;
   onRemoveImeiFromGroup: (groupIdx: number, itemIdx: number) => void;
@@ -54,6 +67,17 @@ interface NewPurchaseFormProps {
   onOpenAddSupplier: () => void;
   onSubmitForm: (e: React.FormEvent) => void;
   onOpenScannerForImei2: (groupIdx: number, itemIdx: number) => void;
+  // Tablets
+  onUpdateSerial: (groupIdx: number, itemIdx: number, slot: 1 | 2, value: string) => void;
+  onScanSerial: (groupIdx: number, itemIdx: number, slot: 1 | 2) => void;
+  // Accessories
+  onBarcodeCommit: (groupIdx: number, barcode: string) => void;
+  onScanBarcode: (groupIdx: number) => void;
+  onClearBarcode: (groupIdx: number) => void;
+  /** Position index → the earlier position holding the same barcode. */
+  accessoryDuplicates?: Record<number, number>;
+  /** Why the receipt can't be previewed yet (shown on the disabled button). */
+  submitBlockedReason?: string;
 }
 
 export const NewPurchaseForm: React.FC<NewPurchaseFormProps> = ({
@@ -67,6 +91,7 @@ export const NewPurchaseForm: React.FC<NewPurchaseFormProps> = ({
   onClearGroupSpecs,
   onResetGroup,
   onAddGroup,
+  onChangeGroupCategory,
   onRemoveGroup,
   onAddImeiToGroup,
   onRemoveImeiFromGroup,
@@ -91,6 +116,13 @@ export const NewPurchaseForm: React.FC<NewPurchaseFormProps> = ({
   onOpenAddSupplier,
   onSubmitForm,
   onOpenScannerForImei2,
+  onUpdateSerial,
+  onScanSerial,
+  onBarcodeCommit,
+  onScanBarcode,
+  onClearBarcode,
+  accessoryDuplicates = {},
+  submitBlockedReason,
 }) => {
   return (
     <div className="work-screen flex-1 flex flex-col h-full overflow-y-auto bg-bg text-fg select-none min-h-0">
@@ -163,7 +195,13 @@ export const NewPurchaseForm: React.FC<NewPurchaseFormProps> = ({
 
         {/* Groups list */}
         <div className="flex-1 p-2 sm:p-3 space-y-2.5 bg-bg pb-4 max-w-7xl mx-auto w-full">
-          {groups.map((group, groupIdx) => (
+          {groups.map((group, groupIdx) => {
+            const category: PurchaseCategory = group.category ?? 'PHONE';
+            const title = category === 'ACCESSORY'
+              ? [group.brand, group.name].filter(Boolean).join(' ') || group.barcode || ''
+              : `${group.brand} ${group.model}`.trim();
+            const touched = Boolean(title || group.items.some((i) => i.imei.trim()) || group.barcode);
+            return (
             <div
               key={group.id}
               className="rounded-xl border border-border bg-surface shadow-2xs p-2.5 sm:p-3 space-y-2 relative transition-all"
@@ -175,13 +213,34 @@ export const NewPurchaseForm: React.FC<NewPurchaseFormProps> = ({
                     #{groupIdx + 1}
                   </span>
                   <span className="text-xs font-bold text-fg truncate">
-                    {group.brand || group.model ? `${group.brand} ${group.model}`.trim() : `Позиция #${groupIdx + 1}`}
+                    {title || `Позиция #${groupIdx + 1}`}
                   </span>
-                  {(group.storage || group.color) && (
+                  {category !== 'ACCESSORY' && (group.storage || group.color) && (
                     <span className="text-[11px] text-fg-subtle truncate hidden sm:inline">
                       ({[group.storage, formatPhoneColor(group.color)].filter(Boolean).join(', ')})
                     </span>
                   )}
+                </div>
+
+                {/* What this position holds; switching starts its fields over */}
+                <div role="radiogroup" aria-label={`Тип товара позиции #${groupIdx + 1}`} className="ml-auto flex items-center gap-0.5 p-0.5 rounded-lg bg-surface-raised border border-border shrink-0">
+                  {CATEGORY_TABS.map(({ value, label, icon: Icon }) => (
+                    <button
+                      key={value}
+                      type="button"
+                      role="radio"
+                      aria-checked={category === value}
+                      onClick={() => category !== value && onChangeGroupCategory(groupIdx, value)}
+                      title={label}
+                      className={cn(
+                        'h-7 px-1.5 sm:px-2 rounded-md text-[11px] font-semibold flex items-center gap-1 transition-colors cursor-pointer',
+                        category === value ? 'bg-accent text-accent-fg shadow-2xs' : 'text-fg-subtle hover:text-fg'
+                      )}
+                    >
+                      <Icon className="w-3.5 h-3.5" />
+                      <span className="hidden sm:inline">{label}</span>
+                    </button>
+                  ))}
                 </div>
 
                 {groups.length > 1 ? (
@@ -194,7 +253,7 @@ export const NewPurchaseForm: React.FC<NewPurchaseFormProps> = ({
                     <Trash2 className="w-3.5 h-3.5" />
                   </button>
                 ) : (
-                  (group.brand || group.model || group.items.some((i) => i.imei.trim())) && onResetGroup && (
+                  touched && onResetGroup && (
                     <button
                       type="button"
                       onClick={() => onResetGroup(groupIdx)}
@@ -208,6 +267,28 @@ export const NewPurchaseForm: React.FC<NewPurchaseFormProps> = ({
                 )}
               </div>
 
+              {category === 'TABLET' ? (
+                <TabletGroupFields
+                  group={group}
+                  groupIdx={groupIdx}
+                  onUpdateGroup={onUpdateGroup}
+                  onUpdateSerial={onUpdateSerial}
+                  onScanSerial={onScanSerial}
+                  onAddUnit={onAddImeiToGroup}
+                  onRemoveUnit={onRemoveImeiFromGroup}
+                  codeErrors={imeiErrorsMap}
+                />
+              ) : category === 'ACCESSORY' ? (
+                <AccessoryGroupFields
+                  group={group}
+                  groupIdx={groupIdx}
+                  onUpdateGroup={onUpdateGroup}
+                  onBarcodeCommit={onBarcodeCommit}
+                  onScanBarcode={onScanBarcode}
+                  onClearBarcode={onClearBarcode}
+                  duplicateOf={accessoryDuplicates[groupIdx]}
+                />
+              ) : (<>
               {/* 1. IMEI Input List with Batch Paste (placed FIRST for instant autofill) */}
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between gap-2">
@@ -230,7 +311,7 @@ export const NewPurchaseForm: React.FC<NewPurchaseFormProps> = ({
                     className="h-6 px-2 rounded-lg bg-surface-raised hover:bg-surface border border-border text-fg hover:text-accent text-[11px] font-semibold flex items-center gap-1 transition-colors cursor-pointer shadow-2xs"
                   >
                     <Plus className="w-3 h-3 text-accent" />
-                    <span>+ Устройство</span>
+                    <span>Устройство</span>
                   </button>
                 </div>
 
@@ -578,18 +659,26 @@ export const NewPurchaseForm: React.FC<NewPurchaseFormProps> = ({
                   </div>
                 </div>
               </div>
+              </>)}
             </div>
-          ))}
+            );
+          })}
 
-          {/* Button to add another position */}
-          <button
-            type="button"
-            onClick={onAddGroup}
-            className="w-full py-1.5 rounded-xl border border-dashed border-border hover:border-accent bg-surface-raised hover:bg-surface text-fg hover:text-accent text-xs font-semibold flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-2xs"
-          >
-            <Plus className="w-3.5 h-3.5 text-accent" />
-            <span>+ Добавить ещё одну модель</span>
-          </button>
+          {/* Add another position: a phone model, a tablet model or an accessory */}
+          <div className="grid grid-cols-3 gap-1.5">
+            {CATEGORY_TABS.map(({ value, label, icon: Icon }) => (
+              <button
+                key={value}
+                type="button"
+                onClick={() => onAddGroup(value)}
+                className="py-2 rounded-xl border border-dashed border-border hover:border-accent bg-surface-raised hover:bg-surface text-fg hover:text-accent text-xs font-semibold flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-2xs min-h-10"
+              >
+                <Plus className="w-3.5 h-3.5 text-accent" />
+                <Icon className="w-3.5 h-3.5 text-accent hidden xs:inline" />
+                <span>{label}</span>
+              </button>
+            ))}
+          </div>
         </div>
 
         {/* Bottom Actions & Total Bar (Sticky at bottom) */}
@@ -597,7 +686,7 @@ export const NewPurchaseForm: React.FC<NewPurchaseFormProps> = ({
           {hasExistingImeis ? (
             <div className="flex items-center gap-1.5 text-xs text-danger font-bold bg-danger/10 border border-danger/30 px-2.5 py-1 rounded-lg animate-pulse">
               <AlertCircle className="w-4 h-4 shrink-0 text-danger" />
-              <span>IMEI {firstExistingImei} уже зарегистрирован</span>
+              <span>IMEI/SN {firstExistingImei} уже зарегистрирован</span>
             </div>
           ) : statusMessage ? (
             <div className={`flex items-center space-x-2 text-xs ${
@@ -609,7 +698,7 @@ export const NewPurchaseForm: React.FC<NewPurchaseFormProps> = ({
           ) : (
             <div className="flex items-center gap-2 text-xs">
               <span className="text-fg-subtle text-[11px]">
-                Позиций: <strong className="text-fg">{groups.length}</strong> • Устройств: <strong className="text-accent font-bold">{totalFormUnits} шт.</strong>
+                Позиций: <strong className="text-fg">{groups.length}</strong> • Товаров: <strong className="text-accent font-bold">{totalFormUnits} шт.</strong>
               </span>
               <span className="text-border">|</span>
               <div className="flex items-center gap-1 font-mono">
@@ -633,13 +722,13 @@ export const NewPurchaseForm: React.FC<NewPurchaseFormProps> = ({
 
             <button
               type="submit"
-              disabled={totalFormUnits === 0 || hasIncompleteImeis || hasExistingImeis || isSubmitting}
+              disabled={totalFormUnits === 0 || hasIncompleteImeis || hasExistingImeis || Boolean(submitBlockedReason) || isSubmitting}
               title={
                 hasExistingImeis
-                  ? `Невозможно просмотреть чек: IMEI ${firstExistingImei} уже зарегистрирован`
+                  ? `Невозможно просмотреть чек: IMEI/SN ${firstExistingImei} уже зарегистрирован`
                   : hasIncompleteImeis
                     ? 'Каждый указанный IMEI должен содержать ровно 15 цифр'
-                    : undefined
+                    : submitBlockedReason
               }
               className="h-7.5 px-3.5 rounded-lg bg-accent hover:opacity-90 active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed text-xs font-bold text-accent-fg shadow-xs transition-all flex items-center gap-1.5 cursor-pointer"
             >

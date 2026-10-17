@@ -1,5 +1,6 @@
 import type { PaymentMethod, Sale } from '../types';
 import { formatMoney } from './money';
+import { deviceCodeLabel } from './deviceCode';
 
 export const PAYMENT_METHOD_LABELS: Record<PaymentMethod, string> = {
   CASH: 'Наличные',
@@ -34,7 +35,13 @@ export function formatReceiptText(
       const priceStr = includeUsd
         ? `$${formatMoney(item.salePriceTjs / sale.exchangeRate!)} (${formatMoney(item.salePriceTjs)} TJS)`
         : `${formatMoney(item.salePriceTjs)} TJS`;
-      return `${item.brand} ${item.model}${item.storage ? ` ${item.storage}` : ''} — ${priceStr}\nIMEI: ${item.imei}`;
+      return `${item.brand} ${item.model}${item.storage ? ` ${item.storage}` : ''} — ${priceStr}\n${deviceCodeLabel(item.category)}: ${item.imei}`;
+    }),
+    ...(sale.accessoryItems || []).map((line) => {
+      const priceStr = includeUsd
+        ? `$${formatMoney(line.salePriceTjs / sale.exchangeRate!)} (${formatMoney(line.salePriceTjs)} TJS)`
+        : `${formatMoney(line.salePriceTjs)} TJS`;
+      return `${line.brand} ${line.name} — ${line.quantity} × ${formatMoney(line.unitPriceTjs)} = ${priceStr}`;
     }),
     '',
     `Итого: ${includeUsd ? `$${formatMoney(sale.totalTjs / sale.exchangeRate!)} (${formatMoney(sale.totalTjs)} TJS)` : `${formatMoney(sale.totalTjs)} TJS`}`,

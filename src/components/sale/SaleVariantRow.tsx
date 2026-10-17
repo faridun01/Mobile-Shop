@@ -1,4 +1,5 @@
 import React from 'react';
+import { deviceCodeLabel } from '../../utils/deviceCode';
 import { ChevronDown } from 'lucide-react';
 import { Device } from '../../types';
 import { formatMoney } from '../../utils/money';
@@ -111,7 +112,7 @@ export const SaleVariantRow: React.FC<SaleVariantRowProps> = ({ variant, expande
               >
                 <div className="min-w-0">
                   <div className="text-xs font-semibold text-fg-muted font-mono flex items-center gap-1 flex-wrap">
-                    <span>IMEI: {dev.imei}</span>
+                    <span>{deviceCodeLabel(dev.category)}: {dev.imei}</span>
                     <CopyImeiButton imei={dev.imei} />
                     {dev.imei2 && (
                       <>

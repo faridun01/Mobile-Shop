@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { deviceCodeLabel } from '../../utils/deviceCode';
 import { CheckCircle2, Share2 } from 'lucide-react';
 import { Sale } from '../../types';
 import { formatMoney } from '../../utils/money';
@@ -91,7 +92,7 @@ export const SaleReceiptDialog: React.FC<SaleReceiptDialogProps> = ({
                   <div className="min-w-0">
                     <p className="font-medium text-fg-muted">{item.brand} {item.model}</p>
                     <div className="flex items-center gap-1 text-xs text-fg-subtle">
-                      <span>IMEI: {item.imei}</span>
+                      <span>{deviceCodeLabel(item.category)}: {item.imei}</span>
                       <CopyImeiButton imei={item.imei} />
                     </div>
                   </div>
@@ -114,6 +115,26 @@ export const SaleReceiptDialog: React.FC<SaleReceiptDialogProps> = ({
                 </div>
               );
             })}
+            {(sale.accessoryItems || []).map((line) => (
+              <div key={line.id} className="flex items-start justify-between gap-3 px-3 py-2">
+                <div className="min-w-0">
+                  <p className="font-medium text-fg-muted">{line.brand} {line.name}</p>
+                  <p className="text-xs text-fg-subtle">
+                    {line.quantity} шт. × {formatMoney(line.unitPriceTjs)} TJS · <span className="font-mono">{line.barcode}</span>
+                  </p>
+                </div>
+                <div className="text-right shrink-0">
+                  {isAdmin && line.salePriceUsd > 0 ? (
+                    <>
+                      <span className="tabular-nums font-bold text-fg block font-mono">${formatMoney(line.salePriceUsd)}</span>
+                      <span className="text-[10px] tabular-nums text-fg-subtle block font-mono">{formatMoney(line.salePriceTjs)} TJS</span>
+                    </>
+                  ) : (
+                    <span className="tabular-nums font-semibold text-fg-muted whitespace-nowrap">{formatMoney(line.salePriceTjs)} TJS</span>
+                  )}
+                </div>
+              </div>
+            ))}
             <div className="flex items-center justify-between px-3 py-2.5">
               <span className="text-fg-muted font-medium">Итого</span>
               {(() => {

@@ -309,7 +309,7 @@ export const StoreReceiptPage: React.FC = () => {
                   )}
                   <button
                     type="button"
-                    onClick={() => openScanner((code) => handleLookupImei(code))}
+                    onClick={() => openScanner((code) => handleLookupImei(code), { allowModeSwitch: true })}
                     className="p-1.5 rounded-lg text-accent hover:bg-accent/15 border border-transparent hover:border-accent/25 cursor-pointer transition-colors"
                     title="Сканировать IMEI камерой"
                     aria-label="Сканировать IMEI камерой"
@@ -381,7 +381,7 @@ export const StoreReceiptPage: React.FC = () => {
                             <div className="flex items-center gap-2 text-[11px] text-fg-subtle flex-wrap mt-0.5">
                               {item.storage && <span>{item.storage}</span>}
                               {item.color && <span>• {formatPhoneColor(item.color)}</span>}
-                              <span className="font-mono text-accent font-semibold">• IMEI: {item.imei}</span>
+                              <span className="font-mono text-accent font-semibold">• IMEI/SN: {item.imei}</span>
                             </div>
                           </div>
                         </div>
@@ -587,7 +587,7 @@ export const StoreReceiptPage: React.FC = () => {
                       <th className="p-2 text-fg-subtle font-semibold">№</th>
                       <th className="p-2 text-fg-subtle font-semibold">Модель</th>
                       <th className="p-2 text-fg-subtle font-semibold">Память/Цвет</th>
-                      <th className="p-2 text-fg-subtle font-semibold">IMEI</th>
+                      <th className="p-2 text-fg-subtle font-semibold">IMEI / SN</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border">

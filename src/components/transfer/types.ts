@@ -1,3 +1,4 @@
+import type React from 'react';
 import { Store, Device, TransferRequest, User } from '../../types';
 
 export const isLocationWarehouse = (
@@ -53,6 +54,8 @@ export interface TransferDeviceGridProps {
   onlySelected: boolean;
   setOnlySelected: (val: boolean) => void;
   onToggleBatchDevices?: (ids: string[], select: boolean) => void;
+  /** Accessories of the origin (picked by quantity), shown above the devices. */
+  accessoriesSlot?: React.ReactNode;
 }
 
 export interface TransferBottomBarProps {
@@ -100,6 +103,7 @@ export interface ConfirmTransferModalProps {
   onClose: () => void;
   isStoreScoped: boolean;
   selectedDevices: Device[];
+  selectedAccessories?: { name: string; barcode: string; quantity: number }[];
   fromStore?: Store;
   toStore?: Store;
   fromStoreName: string;

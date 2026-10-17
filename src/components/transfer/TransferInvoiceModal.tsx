@@ -53,6 +53,8 @@ export const TransferInvoiceModal: React.FC<TransferInvoiceModalProps> = ({
 
   const items = getTransferInvoiceItems(transfer, devicesById, devicesByImei);
   const totalCostUsd = items.reduce((sum, item) => sum + item.costUsd, 0);
+  const accessoryLines = transfer?.accessoryLines || [];
+  const accessoryUnits = accessoryLines.reduce((sum, line) => sum + line.quantity, 0);
   // Purchase cost is ADMIN-only; store staff get the transfer note without it.
   const showCost = currentUser?.role === 'ADMIN';
 
@@ -329,7 +331,7 @@ export const TransferInvoiceModal: React.FC<TransferInvoiceModalProps> = ({
           <div className="space-y-1.5">
             <div className="flex items-center justify-between text-xs font-bold text-fg">
               <span>Список передаваемых товаров</span>
-              <span className="font-mono text-accent">Всего: {items.length} шт.</span>
+              <span className="font-mono text-accent">Всего: {items.length + accessoryUnits} шт.</span>
             </div>
 
             <div className="overflow-x-auto rounded-lg border border-border/80 print-border-black">
@@ -338,7 +340,7 @@ export const TransferInvoiceModal: React.FC<TransferInvoiceModalProps> = ({
                   <tr className="bg-surface-raised border-b border-border/80 text-[10px] font-bold text-fg-subtle uppercase tracking-wider print-border-black">
                     <th className="py-1.5 px-2.5 w-9 text-center">№</th>
                     <th className="py-1.5 px-2.5">Наименование</th>
-                    <th className="py-1.5 px-2.5 w-44">IMEI</th>
+                    <th className="py-1.5 px-2.5 w-44">IMEI / SN</th>
                     <th className="py-1.5 px-2.5 w-16 text-center">Кол-во</th>
                     {showCost && <th className="py-1.5 px-2.5 w-24 text-right">Оценка ($)</th>}
                     {showCost && <th className="py-1.5 px-2.5 w-24 text-right">Сумма ($)</th>}
@@ -397,6 +399,25 @@ export const TransferInvoiceModal: React.FC<TransferInvoiceModalProps> = ({
                       )}
                     </tr>
                   ))}
+                  {accessoryLines.map((line, i) => (
+                    <tr key={line.productId} className="hover:bg-surface-raised/40 transition-colors">
+                      <td className="py-1.5 px-2.5 text-center font-mono text-fg-subtle text-[11px]">
+                        {items.length + i + 1}
+                      </td>
+                      <td className="py-1.5 px-2.5">
+                        <span className="font-bold text-fg">{line.brand} {line.name}</span>
+                        <span className="ml-1.5 text-[10px] text-fg-subtle">аксессуар</span>
+                      </td>
+                      <td className="py-1.5 px-2.5 whitespace-nowrap font-mono text-[11px] text-fg-muted">
+                        Штрихкод: {line.barcode}
+                      </td>
+                      <td className="py-1.5 px-2.5 text-center font-bold text-fg whitespace-nowrap">
+                        {line.quantity} шт.
+                      </td>
+                      {showCost && <td className="py-1.5 px-2.5 text-right font-mono text-fg-muted">—</td>}
+                      {showCost && <td className="py-1.5 px-2.5 text-right font-mono text-fg-muted">—</td>}
+                    </tr>
+                  ))}
                 </tbody>
                 <tfoot>
                   <tr className="bg-surface-raised/80 font-bold border-t-2 border-border print-border-black">
@@ -404,7 +425,7 @@ export const TransferInvoiceModal: React.FC<TransferInvoiceModalProps> = ({
                       Итого по накладной
                     </td>
                     <td className="py-1.5 px-2.5 text-center font-mono text-accent">
-                      {items.length} шт.
+                      {items.length + accessoryUnits} шт.
                     </td>
                     {showCost && (
                       <td className="py-1.5 px-2.5 text-right text-fg-subtle text-[10px]">

@@ -1,4 +1,4 @@
-import type { Device, DeviceTimelineEvent, Sale, SaleItem, ExchangeEvent, Supplier, SupplierInvoice, SupplierBonus, Expense, Owner, OwnerTransaction, TransferRequest, RepairTicket, User, Store, NotificationItem, AuditLogEntry, DailyRate, StoreReceipt } from '../types';
+import type { AccessoryProduct, AccessoryStockItem, Device, DeviceTimelineEvent, Sale, SaleItem, ExchangeEvent, Supplier, SupplierInvoice, SupplierBonus, Expense, Owner, OwnerTransaction, TransferRequest, RepairTicket, User, Store, NotificationItem, AuditLogEntry, DailyRate, StoreReceipt } from '../types';
 import { translateExpenseText } from '../utils/expenseCategories';
 
 type NameLookup = Map<string, string>;
@@ -23,6 +23,7 @@ function mapTimeline(events: any[]): DeviceTimelineEvent[] {
 export function mapDevice(d: any): Device {
   return {
     id: d.id,
+    category: d.category === 'TABLET' ? 'TABLET' : 'PHONE',
     imei: d.imei,
     imei2: d.imei2 ?? undefined,
     brand: d.brand,
@@ -30,6 +31,8 @@ export function mapDevice(d: any): Device {
     ram: d.ram ?? undefined,
     storage: d.storage,
     color: d.color,
+    connectivity: d.connectivity ?? undefined,
+    screenSize: d.screenSize ?? undefined,
     status: d.status,
     locationId: d.storeId,
     locationName: d.store?.name ?? '',
@@ -53,6 +56,7 @@ function mapSaleItem(i: any): SaleItem {
   return {
     id: i.id ?? undefined,
     deviceId: i.deviceId,
+    category: i.category === 'TABLET' ? 'TABLET' : 'PHONE',
     imei: i.imei,
     imei2: i.imei2 ?? undefined,
     brand: i.brand,
@@ -110,6 +114,24 @@ export function mapSale(s: any, names: NameLookup): Sale {
     customerPhone: s.customer?.phone ?? s.customerPhone ?? undefined,
     customerId: s.customerId ?? undefined,
     items: (s.saleItems || []).map(mapSaleItem),
+    accessoryItems: (s.accessoryItems || []).map((l: any) => ({
+      id: l.id,
+      productId: l.productId,
+      barcode: l.barcode,
+      brand: l.brand,
+      name: l.name,
+      category: l.category,
+      model: l.model || undefined,
+      quantity: Number(l.quantity) || 0,
+      unitPriceTjs: Number(l.unitPriceTjs) || 0,
+      salePriceTjs: Number(l.salePriceTjs) || 0,
+      salePriceUsd: Number(l.salePriceUsd) || 0,
+      costUsd: Number(l.costUsd) || 0,
+      isBelowCost: l.isBelowCost ?? undefined,
+      returnedQuantity: Number(l.returnedQuantity) || 0,
+      returnedPriceTjs: Number(l.returnedPriceTjs) || 0,
+      returnedCostUsd: Number(l.returnedCostUsd) || 0,
+    })),
     totalTjs: s.totalTjs,
     totalUsd: s.totalUsd,
     recognizedProfitUsd: s.recognizedProfitUsd ?? undefined,
@@ -133,6 +155,15 @@ export function mapSale(s: any, names: NameLookup): Sale {
       payoutMethod: r.payoutMethod ?? undefined,
       exchangeSaleId: r.exchangeSaleId ?? undefined,
       exchangeReceiptNumber: r.exchangeSale?.receiptNumber ?? undefined,
+      accessoryLines: Array.isArray(r.accessoryLines)
+        ? r.accessoryLines.map((l: any) => ({
+            lineId: l.lineId,
+            name: l.name,
+            quantity: Number(l.quantity) || 0,
+            priceTjs: Number(l.priceTjs) || 0,
+            withheldTjs: Number(l.withheldTjs) || 0,
+          }))
+        : undefined,
     })),
     exchangeFrom: s.exchangeReturn?.sale
       ? { saleId: s.exchangeReturn.sale.id, receiptNumber: s.exchangeReturn.sale.receiptNumber, creditTjs: s.exchangeReturn.creditTjs, creditUsd: s.exchangeReturn.creditUsd }
@@ -163,6 +194,9 @@ export function mapTransfer(t: any, names: NameLookup): TransferRequest {
     deviceImeis: items.map((i: any) => i.imei),
     deviceBrands: items.map((i: any) => i.brand),
     deviceModels: items.map((i: any) => i.model),
+    accessoryLines: (t.accessoryLines || []).map((l: any) => ({
+      productId: l.productId, barcode: l.barcode, brand: l.brand, name: l.name, quantity: Number(l.quantity) || 0,
+    })),
     requestedBy: names.get(t.requestedByUserId) || t.requestedByUserId,
     requestedAt: t.requestedAt,
     status: t.status,
@@ -256,6 +290,44 @@ export function mapSupplierInvoice(inv: any): SupplierInvoice {
           purchasePriceUsd: g.purchasePriceUsd,
         }))
       : undefined,
+    accessoryBatches: Array.isArray(inv.accessoryBatches)
+      ? inv.accessoryBatches.map((b: any) => ({
+          id: b.id,
+          quantityReceived: b.quantityReceived,
+          quantityRemaining: b.quantityRemaining,
+          unitCostUsd: Number(b.unitCostUsd) || 0,
+          product: mapAccessoryProduct(b.product ?? {}),
+        }))
+      : undefined,
+  };
+}
+
+export function mapAccessoryProduct(p: any): AccessoryProduct {
+  return {
+    id: p.id,
+    barcode: p.barcode,
+    brand: p.brand,
+    name: p.name,
+    category: p.category,
+    model: p.model || undefined,
+    attributes: p.attributes || undefined,
+  };
+}
+
+export function mapAccessoryStockItem(p: any): AccessoryStockItem {
+  return {
+    ...mapAccessoryProduct(p),
+    quantity: Number(p.quantity) || 0,
+    available: p.available !== undefined ? Number(p.available) || 0 : Number(p.quantity) || 0,
+    stockCostUsd: p.stockCostUsd !== undefined ? Number(p.stockCostUsd) : undefined,
+    stores: Array.isArray(p.stores)
+      ? p.stores.map((s: any) => ({
+          storeId: s.storeId, storeName: s.storeName, quantity: Number(s.quantity) || 0,
+          reserved: Number(s.reserved) || 0,
+          available: s.available !== undefined ? Number(s.available) || 0 : Number(s.quantity) || 0,
+          costUsd: s.costUsd !== undefined ? Number(s.costUsd) : undefined,
+        }))
+      : [],
   };
 }
 

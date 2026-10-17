@@ -19,6 +19,9 @@ import { ConfirmTransferModal } from '../transfer/ConfirmTransferModal';
 import { RejectTransferModal } from '../transfer/RejectTransferModal';
 import { TransferInvoiceModal } from '../transfer/TransferInvoiceModal';
 import { TransferDeviceSortOption } from '../transfer/types';
+import { availableAt, useAccessoryStock } from '../../hooks/useAccessoryStock';
+import { AccessoryCartLine, AccessoryPickList, addAccessoryUnit, filterAccessories, findAccessoryByCode, type AccessoryCartItem } from '../sale/AccessoryCart';
+import type { AccessoryStockItem } from '../../types';
 
 export const TransferPage: React.FC = () => {
   const {
@@ -280,6 +283,23 @@ export const TransferPage: React.FC = () => {
     return devices.filter(d => selectedIdSet.has(d.id));
   }, [devices, selectedIdSet]);
 
+  // Accessories go by quantity from the origin's batches (oldest first on the server).
+  const { items: accessoryStock } = useAccessoryStock(fromLocationId || undefined);
+  const [accessoryCart, setAccessoryCart] = useState<AccessoryCartItem[]>([]);
+  useEffect(() => { setAccessoryCart([]); }, [fromLocationId]);
+  const visibleAccessories = useMemo(() => filterAccessories(accessoryStock, searchQuery), [accessoryStock, searchQuery]);
+  const accessoryUnits = accessoryCart.reduce((sum, line) => sum + line.quantity, 0);
+  const maxOf = (product: AccessoryStockItem) => availableAt(product, fromLocationId || undefined);
+  const addAccessory = (product: AccessoryStockItem) => {
+    const { cart, added } = addAccessoryUnit(accessoryCart, product, maxOf(product));
+    if (!added) {
+      setStatusBanner({ tone: 'warning', text: `${product.brand} ${product.name}: в наличии только ${maxOf(product)} шт.` });
+      return false;
+    }
+    setAccessoryCart(cart);
+    return true;
+  };
+
   const handleToggleSelectDevice = (id: string) => {
     setSelectedDeviceIds(prev =>
       prev.includes(id) ? prev.filter(item => item !== id) : [...prev, id]
@@ -324,10 +344,18 @@ export const TransferPage: React.FC = () => {
       }
       return;
     }
+    if (!device) {
+      const accessory = findAccessoryByCode(accessoryStock, code);
+      if (accessory) {
+        if (source === 'enter') setSearchQuery('');
+        if (addAccessory(accessory)) setStatusBanner({ tone: 'success', text: `Добавлено: ${accessory.brand} ${accessory.name} (+1 шт.)` });
+        return;
+      }
+    }
     if (source === 'enter' && !device && !looksLikeDeviceCode(code)) return;
     if (source === 'camera') setSearchQuery(code);
     if (!device) {
-      setStatusBanner({ tone: 'error', text: `Устройство с IMEI ${code} не найдено` });
+      setStatusBanner({ tone: 'error', text: `Товар с кодом ${code} не найден в «${fromStore?.name || 'выбранной точке'}»` });
     } else if (device.locationId !== fromLocationId) {
       const where = stores.find(st => st.id === device.locationId)?.name || device.locationName || 'другой точке';
       setStatusBanner({ tone: 'warning', text: `${device.brand} ${device.model} числится в «${where}», а не в «${fromStore?.name || 'выбранной точке'}»` });
@@ -337,7 +365,7 @@ export const TransferPage: React.FC = () => {
   };
 
   const handleScanDevice = () => {
-    openScanner((scannedCode) => handleDeviceCode(scannedCode, 'camera'));
+    openScanner((scannedCode) => handleDeviceCode(scannedCode, 'camera'), { allowModeSwitch: true });
   };
 
   const handleOpenConfirmModal = () => {
@@ -351,8 +379,8 @@ export const TransferPage: React.FC = () => {
       setStatusMessage({ type: 'error', text: 'Пожалуйста, выберите куда отправлять товар (пункт назначения)' });
       return;
     }
-    if (selectedDeviceIds.length === 0) {
-      setStatusMessage({ type: 'error', text: 'Выберите хотя бы одно устройство для перемещения' });
+    if (selectedDeviceIds.length === 0 && accessoryCart.length === 0) {
+      setStatusMessage({ type: 'error', text: 'Выберите хотя бы одно устройство или аксессуар для перемещения' });
       return;
     }
     if (effectiveFromId === effectiveToId) {
@@ -384,17 +412,20 @@ export const TransferPage: React.FC = () => {
         fromLocationId: effectiveFromId,
         toLocationId: effectiveToId,
         deviceIds: selectedDeviceIds,
+        accessories: accessoryCart.map(line => ({ productId: line.product.id, quantity: line.quantity })),
       });
 
       if (res.success) {
+        const units = selectedDeviceIds.length + accessoryUnits;
         setConfirmTransferModal(false);
         setStatusBanner({
           tone: 'success',
           text: isStoreScoped
-            ? `Накладная на перемещение (${selectedDeviceIds.length} шт.) создана и ожидает подтверждения администратора.`
-            : `Накладная на перемещение (${selectedDeviceIds.length} шт.) успешно проведена.`
+            ? `Накладная на перемещение (${units} шт.) создана и ожидает подтверждения администратора.`
+            : `Накладная на перемещение (${units} шт.) успешно проведена.`
         });
         setSelectedDeviceIds([]);
+        setAccessoryCart([]);
         setToLocationId(isStoreScoped ? (mainWarehouse?.id || '') : '');
         setActiveTab('list');
         if (res.transfer) {
@@ -568,10 +599,32 @@ export const TransferPage: React.FC = () => {
               onlySelected={onlySelected}
               setOnlySelected={setOnlySelected}
               onToggleBatchDevices={handleToggleBatchDevices}
+              accessoriesSlot={(visibleAccessories.length > 0 || accessoryCart.length > 0) ? (
+                <div className="border-b border-border bg-surface">
+                  {accessoryCart.length > 0 && (
+                    <div className="p-2.5 space-y-2.5 border-b border-border bg-accent/5">
+                      <p className="text-[11px] font-bold text-fg-muted uppercase tracking-wide">Аксессуары к перемещению: {accessoryUnits} шт.</p>
+                      {accessoryCart.map(line => (
+                        <AccessoryCartLine
+                          key={line.product.id}
+                          line={line}
+                          max={maxOf(line.product)}
+                          withPrice={false}
+                          onChange={(next) => setAccessoryCart(prev => prev.map(l => (l.product.id === line.product.id ? next : l)))}
+                          onRemove={() => setAccessoryCart(prev => prev.filter(l => l.product.id !== line.product.id))}
+                        />
+                      ))}
+                    </div>
+                  )}
+                  <div className="max-h-56 overflow-y-auto">
+                    <AccessoryPickList items={visibleAccessories} storeId={fromLocationId || undefined} cart={accessoryCart} onAdd={(item) => { addAccessory(item); }} />
+                  </div>
+                </div>
+              ) : null}
             />
 
             <TransferBottomBar
-              selectedCount={selectedDeviceIds.length}
+              selectedCount={selectedDeviceIds.length + accessoryUnits}
               fromStoreName={fromStoreName}
               toStoreName={toStoreName}
               toLocationId={toLocationId}
@@ -620,6 +673,7 @@ export const TransferPage: React.FC = () => {
         onClose={() => { if (!isSubmittingTransfer) setConfirmTransferModal(false); }}
         isStoreScoped={isStoreScoped}
         selectedDevices={selectedDevices}
+        selectedAccessories={accessoryCart.map(line => ({ name: `${line.product.brand} ${line.product.name}`, barcode: line.product.barcode, quantity: line.quantity }))}
         fromStore={fromStore}
         toStore={toStore}
         fromStoreName={fromStoreName}

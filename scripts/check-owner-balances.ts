@@ -112,9 +112,11 @@ async function checkCustomerDebts() {
  */
 async function reconcileCapital(owners: { capitalBalanceUsd: Prisma.Decimal; availableProfitUsd: Prisma.Decimal }[]) {
   const sum = (values: Prisma.Decimal.Value[]) => values.reduce<Prisma.Decimal>((acc, v) => acc.plus(v), D(0));
-  const [stores, stock, supplierDebt, pool, unpaid, cashBonuses, keptSales, adjustments, salePostings, bonusAccount, bonusPayouts] = await Promise.all([
+  const [stores, stock, accessoryBatches, supplierDebt, pool, unpaid, cashBonuses, keptSales, adjustments, salePostings, bonusAccount, bonusPayouts] = await Promise.all([
     prisma.store.findMany({ select: { cashBalanceUsd: true } }),
     prisma.device.aggregate({ _sum: { costBasisUsd: true }, where: { status: { not: 'SOLD' } } }),
+    // Accessories on hand: the units left in each batch at that batch's own unit cost.
+    prisma.accessoryBatch.findMany({ where: { quantityRemaining: { gt: 0 } }, select: { quantityRemaining: true, unitCostUsd: true } }),
     prisma.supplier.aggregate({ _sum: { totalDebtUsd: true } }),
     // Bonus-phone profit is nobody's income: pending or zeroed at a quarterly close, its cash stays
     // in the registers (a refunded sale gave it back to the customer).
@@ -135,7 +137,8 @@ async function reconcileCapital(owners: { capitalBalanceUsd: Prisma.Decimal; ava
   const profit = sum(owners.map((o) => o.availableProfitUsd));
   const registers = sum(stores.map((s) => s.cashBalanceUsd));
   const bonusHeld = D(bonusAccount?.balanceUsd ?? 0);
-  const stockCost = D(stock._sum.costBasisUsd ?? 0);
+  const stockCost = D(stock._sum.costBasisUsd ?? 0)
+    .plus(sum(accessoryBatches.map((b) => D(b.unitCostUsd).mul(b.quantityRemaining))));
   const debt = D(supplierDebt._sum.totalDebtUsd ?? 0);
   const ownersSide = capital.plus(profit);
   const businessSide = registers.plus(bonusHeld).plus(stockCost).minus(debt);

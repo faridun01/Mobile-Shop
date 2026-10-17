@@ -51,7 +51,9 @@ export function computeSaleProfit(sale: Sale, fallbackExchangeRate: number = 0):
   // A returned phone is back in stock: its cost is no longer part of this receipt.
   const keptItems = (sale.items || []).filter((item) => !item.returnId);
   const hasReturns = (sale.returns?.length ?? 0) > 0;
-  const costUsd = keptItems.reduce((acc, item) => acc + (Number(item.costBasisUsd) || 0), 0);
+  // Accessories: the cost of the units still sold (returned units are back in their batches).
+  const accessoryCostUsd = (sale.accessoryItems || []).reduce((acc, line) => acc + (line.costUsd - line.returnedCostUsd), 0);
+  const costUsd = keptItems.reduce((acc, item) => acc + (Number(item.costBasisUsd) || 0), 0) + accessoryCostUsd;
   const revenueUsd = Number(sale.totalUsd) || 0;
   const recognized = sale.recognizedProfitUsd !== undefined && sale.recognizedProfitUsd !== null ? Number(sale.recognizedProfitUsd) : undefined;
 
@@ -67,7 +69,7 @@ export function computeSaleProfit(sale: Sale, fallbackExchangeRate: number = 0):
     profitUsd = keptItems.reduce(
       (acc, item) => acc + ((Number(item.salePriceUsd) || 0) - (Number(item.costBasisUsd) || 0)),
       0
-    );
+    ) + (sale.accessoryItems || []).reduce((acc, line) => acc + (line.salePriceUsd - line.costUsd), 0);
   }
 
   const roundedProfitUsd = Math.round(profitUsd * 100) / 100;

@@ -274,7 +274,8 @@ export const TransferHistoryList: React.FC<TransferHistoryListProps> = ({
         <div className="space-y-2">
           {sortedTransfers.map((tr: TransferRequest) => {
             const isExpanded = expandedTransferIds.has(tr.id);
-            const deviceCount = (tr.deviceIds || []).length;
+            const accessoryLines = tr.accessoryLines || [];
+            const deviceCount = (tr.deviceIds || []).length + accessoryLines.reduce((sum, line) => sum + line.quantity, 0);
             const rawModels = tr.deviceModels || [];
             const displayModels = isExpanded || rawModels.length <= 3 ? rawModels : rawModels.slice(0, 3);
 
@@ -377,6 +378,11 @@ export const TransferHistoryList: React.FC<TransferHistoryListProps> = ({
                 <div className="flex items-center justify-between gap-2 px-1 text-[11px]">
                   <div className="text-fg-subtle truncate flex-1 min-w-0">
                     {displayModels.slice(0, 3).join(', ')}{rawModels.length > 3 ? ` и ещё ${rawModels.length - 3} шт.` : ''}
+                    {accessoryLines.length > 0 && (
+                      <span className="block truncate">
+                        Аксессуары: {accessoryLines.map(line => `${line.brand} ${line.name} × ${line.quantity}`).join(', ')}
+                      </span>
+                    )}
                   </div>
                   <button
                     type="button"

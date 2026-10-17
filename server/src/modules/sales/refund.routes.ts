@@ -8,6 +8,7 @@ import { ReturnsService } from './returns.service';
 import { RealtimeSyncGateway } from '../../websocket/websocket.gateway';
 import { calculateRecognizedProfit } from './profit';
 import { hideSaleCosts } from './sale-visibility';
+import { deviceCodeCandidates } from '../../common/device-code';
 import { dateRangeForPeriod, dateRangeForCustomDates, type ReportPeriod } from '../reports/reports.service';
 
 const VALID_PERIODS: ReportPeriod[] = ['TODAY', 'MONTH', 'SPECIFIC_MONTH', 'ALL'];
@@ -40,7 +41,9 @@ export function registerRefundRoutes(app: Express) {
           ...(storeId ? { storeId } : {}),
           OR: [
             ...(receiptNumber !== undefined ? [{ receiptNumber }] : []),
-            { saleItems: { some: { OR: [{ imei: search }, { imei2: search }] } } },
+            // A phone's IMEI or a tablet's SN (any letter case); an accessory's barcode.
+            { saleItems: { some: { OR: [{ imei: { in: deviceCodeCandidates(search) } }, { imei2: { in: deviceCodeCandidates(search) } }] } } },
+            { accessoryItems: { some: { barcode: search.replace(/\s+/g, '').toUpperCase() } } },
           ],
         };
       } else {
@@ -67,6 +70,7 @@ export function registerRefundRoutes(app: Express) {
         // actually used (receipt "sold by"), so select those explicitly instead.
         include: {
           saleItems: { include: { device: { select: { ram: true } } } },
+          accessoryItems: true,
           exchangeEvents: true,
           // Returns from this receipt (with the receipt an exchange went on to), and, for a
           // receipt opened by an exchange, the receipt the returned phone came from.
@@ -92,7 +96,8 @@ export function registerRefundRoutes(app: Express) {
       // staff get the receipt itself without them.
       const showCost = req.user!.role === 'ADMIN';
       res.json(sales.map((sale) => {
-        const fallbackCost = sale.saleItems.reduce((sum, item) => D(sum).plus(item.costBasisUsd), D(0));
+        const fallbackCost = sale.saleItems.reduce((sum, item) => D(sum).plus(item.costBasisUsd), D(0))
+          .plus(sale.accessoryItems.reduce((sum, line) => D(sum).plus(line.costUsd), D(0)));
         // The dollars that left the register on the refund (its own day's rate), as recorded then.
         const refundDetails = (profits.get(sale.id) ?? []).find((log) => log.action === 'REFUND')?.financialDetails as Record<string, unknown> | undefined;
         const actualRefundUsd = typeof refundDetails?.amountUsd === 'number' ? refundDetails.amountUsd : undefined;
@@ -166,13 +171,15 @@ export function registerRefundRoutes(app: Express) {
           return;
         }
       }
-      const { items, reason, paymentMethod } = req.body ?? {};
-      if (!Array.isArray(items) || items.length === 0 || !paymentMethod) {
-        res.status(400).json({ message: 'Выберите телефоны для возврата и способ возврата денег' });
+      const { reason, paymentMethod } = req.body ?? {};
+      const items = Array.isArray(req.body?.items) ? req.body.items : [];
+      const accessories = Array.isArray(req.body?.accessories) ? req.body.accessories : [];
+      if ((items.length === 0 && accessories.length === 0) || !paymentMethod) {
+        res.status(400).json({ message: 'Выберите товары для возврата и способ возврата денег' });
         return;
       }
       // Every return withholds something, entered by hand in TJS (an exchange may withhold 0).
-      const totalWithheld = items.reduce((sum: ReturnType<typeof D>, item: any) => {
+      const totalWithheld = [...items, ...accessories].reduce((sum: ReturnType<typeof D>, item: any) => {
         const value = Number(item?.withheldTjs);
         return Number.isFinite(value) && value > 0 ? sum.plus(D(value)) : sum;
       }, D(0));
@@ -183,6 +190,7 @@ export function registerRefundRoutes(app: Express) {
       const result = await ReturnsService.returnItems({
         saleId: req.params.id,
         items: items.map((item: any) => ({ saleItemId: String(item?.saleItemId ?? ''), withheldTjs: item?.withheldTjs })),
+        accessories: accessories.map((line: any) => ({ lineId: String(line?.lineId ?? ''), quantity: Number(line?.quantity), withheldTjs: line?.withheldTjs })),
         reason,
         payoutMethod: paymentMethod,
         userId: req.user!.userId,

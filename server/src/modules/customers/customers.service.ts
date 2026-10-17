@@ -6,6 +6,7 @@ import { getStoreCashAccount } from '../finance/account.service';
 import { postTransaction } from '../finance/financial-transaction.service';
 import { assertShiftOpen } from '../finance/shift-guard';
 import { registerTjsBalances } from '../finance/cash-balance';
+import { accessoryStockCost } from '../catalog/catalog.service';
 import { currentOwnerAllocations, replaceOwnerAllocations } from '../finance/owner-allocations';
 import { bookedDebtUsd, type OwnerProfitAllocation } from '../sales/profit';
 import { allocateMoney } from '../../common/allocation';
@@ -620,9 +621,11 @@ export class CustomersService {
       ? selectedRetailStore._cashTjs
       : centralCashTjs.plus(retailStoresCash.reduce((sum, s) => sum.plus(s._cashTjs), D(0)));
 
-    // 2. Stock Inventory by Cost Price
-    const totalStockCount = inStockDevices.length;
-    const totalStockCostUsd = inStockDevices.reduce((sum, d) => sum.plus(deviceCostUsd(d)), D(0));
+    // 2. Stock Inventory by Cost Price — phones and tablets by unit, accessories by the units left
+    // in each batch at that batch's own cost.
+    const accessories = await accessoryStockCost(prisma, storeId && storeId !== 'all' ? storeId : undefined);
+    const totalStockCount = inStockDevices.length + accessories.totalQuantity;
+    const totalStockCostUsd = inStockDevices.reduce((sum, d) => sum.plus(deviceCostUsd(d)), D(0)).plus(accessories.totalUsd);
 
     // Aggregate inventory by model
     const modelMap = new Map<string, {
@@ -725,6 +728,9 @@ export class CustomersService {
         totalCount: totalStockCount,
         totalCostUsd: Number(roundMoney(totalStockCostUsd)),
         totalCostTjs: Number(toTjs(totalStockCostUsd)),
+        // The accessory part of the totals above.
+        accessoryCount: accessories.totalQuantity,
+        accessoryCostUsd: Number(accessories.totalUsd),
         models,
         items,
       },

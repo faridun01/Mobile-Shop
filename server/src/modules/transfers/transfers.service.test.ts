@@ -19,6 +19,8 @@ const db = vi.hoisted(() => {
     ledgerEntry: model(),
     notification: model(),
     auditLog: model(),
+    // Row lock taken by approve/reject before reading the request.
+    $queryRaw: vi.fn(),
   };
 });
 
@@ -67,7 +69,7 @@ describe('TransfersService', () => {
           deviceIds: [],
           requestedByUserId: 'user-1',
         })
-      ).rejects.toThrow('Выберите устройства для перемещения');
+      ).rejects.toThrow('Выберите устройства или аксессуары для перемещения');
     });
 
     it('throws if fromStoreId and toStoreId are identical', async () => {

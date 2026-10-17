@@ -11,6 +11,8 @@ export interface CatalogPhone {
 }
 
 export interface PhoneToRemember {
+  /** Only phones are remembered: a tablet's SN is no IMEI and has no TAC. */
+  category?: string | null;
   imei: string;
   imei2?: string | null;
   brand: string;
@@ -43,8 +45,10 @@ export async function findPhoneByImei(imei: string): Promise<CatalogPhone | null
   let entry = await prisma.phoneCatalog.findUnique({ where: { tac } });
   if (!entry) {
     // If not yet in phone_catalog, check if any device in stock/history matches this TAC
+    // Phones only: a tablet's serial number is no IMEI and has no TAC.
     const existing = await prisma.device.findFirst({
       where: {
+        category: 'PHONE',
         OR: [
           { imei: { startsWith: tac } },
           { imei2: { startsWith: tac } },
@@ -82,6 +86,7 @@ export async function findPhoneByImei(imei: string): Promise<CatalogPhone | null
   // Retrieve latest color for this model from Device table
   const lastDevice = await prisma.device.findFirst({
     where: {
+      category: 'PHONE',
       brand: { equals: entry.brand, mode: 'insensitive' },
       model: { equals: entry.model, mode: 'insensitive' },
     },
@@ -109,6 +114,7 @@ const filled = (value: string | null | undefined) => (typeof value === 'string' 
 export async function rememberPhones(tx: TransactionClient, phones: PhoneToRemember[]) {
   const byTac = new Map<string, { brand: string; model: string; ram?: string; storage?: string }>();
   for (const phone of phones) {
+    if (phone.category && phone.category !== 'PHONE') continue;
     const brand = filled(phone.brand);
     const model = filled(phone.model);
     if (!brand || !model) continue;
@@ -136,7 +142,9 @@ export async function rememberPhones(tx: TransactionClient, phones: PhoneToRemem
  */
 export async function getKnownCatalogSpecs(): Promise<KnownCatalogSpecs> {
   const [devices, catalog] = await Promise.all([
+    // Phone suggestions come from phones only; tablets have their own saved variants.
     prisma.device.findMany({
+      where: { category: 'PHONE' },
       select: { brand: true, model: true, ram: true, storage: true, color: true, costBasisUsd: true, createdAt: true },
       orderBy: { createdAt: 'desc' },
     }),

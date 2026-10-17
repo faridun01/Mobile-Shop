@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect, useSyncExternalStore } from 'react';
+import { deviceCodeLabel } from '../../utils/deviceCode';
 import {
   Search,
   X,
@@ -68,6 +69,7 @@ export const TransferDeviceGrid: React.FC<TransferDeviceGridProps> = ({
   onlySelected,
   setOnlySelected,
   onToggleBatchDevices,
+  accessoriesSlot,
 }) => {
   const selectedCount = selectedDeviceIds.length;
   const selectedSet = useMemo(() => new Set(selectedDeviceIds), [selectedDeviceIds]);
@@ -283,7 +285,7 @@ export const TransferDeviceGrid: React.FC<TransferDeviceGridProps> = ({
                       {/* Bottom line: IMEI tag + RAM + color fallback on mobile */}
                       <div className="flex items-center gap-1.5 text-[10px] text-fg-subtle pt-0.5 min-w-0">
                         <span className="font-mono truncate bg-surface-raised/80 px-1 py-0.2 rounded border border-border/60 inline-flex items-center gap-1">
-                          <span>IMEI: <strong className="text-fg font-semibold">{dev.imei}</strong></span>
+                          <span>{deviceCodeLabel(dev.category)}: <strong className="text-fg font-semibold">{dev.imei}</strong></span>
                           <CopyImeiButton imei={dev.imei} />
                         </span>
                         {formattedRam && !isRamInStorage(dev.storage, dev.ram) && (
@@ -506,6 +508,8 @@ export const TransferDeviceGrid: React.FC<TransferDeviceGridProps> = ({
           </div>
         )}
       </div>
+
+      {accessoriesSlot}
 
       {/* Devices Content */}
       <div className="flex-1 bg-bg p-1.5 sm:p-2 space-y-1.5 pb-20 flex flex-col">
@@ -750,7 +754,7 @@ export const TransferDeviceGrid: React.FC<TransferDeviceGridProps> = ({
                                   </span>
                                 )}
                                 <span className="font-mono text-[10px] text-fg-subtle bg-surface px-1.5 py-0.2 rounded border border-border/50 inline-flex items-center gap-1">
-                                  <span>IMEI: <strong className="text-fg font-medium">{dev.imei}</strong></span>
+                                  <span>{deviceCodeLabel(dev.category)}: <strong className="text-fg font-medium">{dev.imei}</strong></span>
                                   <CopyImeiButton imei={dev.imei} />
                                 </span>
                               </div>

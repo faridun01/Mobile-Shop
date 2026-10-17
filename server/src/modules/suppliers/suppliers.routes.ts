@@ -68,7 +68,18 @@ export function registerSupplierRoutes(app: Express) {
       const invoices = await prisma.supplierInvoice.findMany({
         where,
         // Only the supplier name is ever read (mapSupplierInvoice) — the full row isn't needed.
-        include: { groups: true, supplier: { select: { name: true } } },
+        include: {
+          groups: true,
+          supplier: { select: { name: true } },
+          // The receipt's accessory lines: quantity, what is left and the unit cost of each.
+          accessoryBatches: {
+            select: {
+              id: true, quantityReceived: true, quantityRemaining: true, unitCostUsd: true,
+              product: { select: { id: true, barcode: true, brand: true, name: true, category: true, model: true, attributes: true } },
+            },
+            orderBy: { createdAt: 'asc' },
+          },
+        },
         orderBy: [
           { date: 'desc' },
           { invoiceNumber: 'desc' },

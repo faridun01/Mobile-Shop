@@ -636,6 +636,11 @@ export class SuppliersService {
         data.totalAmountUsd = newTotal;
 
         if (!diff.isZero()) {
+          // An accessory batch's unit cost was fixed at receipt; a new total can't be spread over
+          // its units to the cent, so such an invoice keeps its sum (delete and re-enter it instead).
+          if (await tx.accessoryBatch.count({ where: { purchaseInvoiceId: id } })) {
+            throw new Error('Сумму накладной с аксессуарами изменить нельзя: себестоимость партий зафиксирована при приходе. Удалите накладную и оформите приход заново');
+          }
           const invoiceDevices = await tx.device.findMany({ where: { purchaseInvoiceId: id }, select: { id: true } });
           if (await deviceHasTransactionHistory(tx, invoiceDevices.map((device) => device.id))) {
             throw new Error('Нельзя менять сумму накладной после продажи, перемещения или ремонта её устройств');
@@ -700,9 +705,17 @@ export class SuppliersService {
         }
       }
 
+      // Accessories leave with the invoice only while every unit of its batches is still in stock.
+      await tx.$queryRaw`SELECT id FROM accessory_batches WHERE "purchaseInvoiceId" = ${id} ORDER BY id FOR UPDATE`;
+      const batches = await tx.accessoryBatch.findMany({ where: { purchaseInvoiceId: id }, select: { id: true, quantityReceived: true, quantityRemaining: true, quantityReserved: true } });
+      if (batches.some((batch) => batch.quantityRemaining !== batch.quantityReceived || batch.quantityReserved > 0)) {
+        throw new Error('Нельзя удалить накладную: часть аксессуаров из неё уже продана или перемещена');
+      }
+
       const remainingDebtOnInvoice = D(invoice.totalAmountUsd).minus(invoice.paidAmountUsd);
 
       await tx.invoiceGroup.deleteMany({ where: { invoiceId: id } });
+      if (batches.length) await tx.accessoryBatch.deleteMany({ where: { id: { in: batches.map((batch) => batch.id) } } });
       await tx.supplierPaymentAllocation.deleteMany({ where: { invoiceId: id } });
       if (invoiceDeviceIds.length > 0) {
         await tx.deviceTimelineEvent.deleteMany({ where: { deviceId: { in: invoiceDeviceIds } } });

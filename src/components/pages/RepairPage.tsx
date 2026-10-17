@@ -8,6 +8,7 @@ import { useAppFields } from '../../context/AppContext';
 import { RepairTicket, RepairStatus, SaleItem } from '../../types';
 import { StatusBanner, StatusMessage } from '../ui/StatusBanner';
 import { useStoreContext } from '../../utils/storeContext';
+import { findDeviceByCode } from '../../utils/scanLookup';
 import { RepairTopBar } from '../repair/RepairTopBar';
 import { RepairTicketsList } from '../repair/RepairTicketsList';
 import { NewRepairForm } from '../repair/NewRepairForm';
@@ -264,7 +265,7 @@ export const RepairPage: React.FC = () => {
   const handleScanListSearch = () => {
     openScanner((scannedCode) => {
       setSearchQuery(scannedCode.trim());
-    });
+    }, { allowModeSwitch: true });
   };
 
   const handleScanTicket = () => {
@@ -273,7 +274,7 @@ export const RepairPage: React.FC = () => {
       const q = code.toLowerCase();
       if (applySoldDeviceMatch(sales, q)) return;
 
-      const devMatch = devices.find(d => d.imei === code || d.imei2 === code);
+      const devMatch = findDeviceByCode(devices, code);
       if (devMatch) {
         setDeviceModel(`${devMatch.brand} ${devMatch.model} ${devMatch.storage}`);
         if (devMatch.imei) setImei(devMatch.imei);
@@ -303,7 +304,7 @@ export const RepairPage: React.FC = () => {
 
       setImei(code);
       setImei2('');
-    });
+    }, { allowModeSwitch: true });
   };
 
   const handleFindSoldDevice = async (query: string) => {

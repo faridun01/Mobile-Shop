@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { deviceCodeLabel } from '../../utils/deviceCode';
 import { useAppFields } from '../../context/AppContext';
 import { formatStoreDisplayTitle } from '../../utils/storeContext';
 import { apiClient } from '../../api/client';
@@ -180,7 +181,7 @@ export const RevisionPage: React.FC = () => {
     setStatus({ tone: 'warning', text: `Излишек: IMEI ${code}` });
   };
 
-  const handleScanCamera = () => openScanner((code) => handleScanCode(code));
+  const handleScanCamera = () => openScanner((code) => handleScanCode(code), { allowModeSwitch: true });
 
   // Toggle single item manual check
   const handleToggleCheck = (device: Device) => {
@@ -845,7 +846,7 @@ export const RevisionPage: React.FC = () => {
                                     <Check className="w-2.5 h-2.5 stroke-3" />
                                   </button>
                                   <span className="font-mono text-fg-subtle text-[11px] truncate">
-                                    IMEI: <strong className="text-fg font-semibold">{device.imei}</strong>
+                                    {deviceCodeLabel(device.category)}: <strong className="text-fg font-semibold">{device.imei}</strong>
                                   </span>
                                 </div>
                                 <span className={`text-[10px] font-medium ${isChecked ? 'text-emerald-600 dark:text-emerald-400' : 'text-fg-subtle'}`}>
@@ -922,7 +923,7 @@ export const RevisionPage: React.FC = () => {
                             )}
 
                             <span className="font-mono text-fg-subtle text-[10px] bg-surface-raised/80 px-1 py-0.2 rounded border border-border/50 shrink-0">
-                              IMEI: <strong className="text-fg font-medium">{device.imei}</strong>
+                              {deviceCodeLabel(device.category)}: <strong className="text-fg font-medium">{device.imei}</strong>
                             </span>
                           </div>
                         </div>

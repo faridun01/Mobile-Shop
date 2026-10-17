@@ -11,11 +11,14 @@ import { getStoreCashAccount } from '../finance/account.service';
 import { postTransaction } from '../finance/financial-transaction.service';
 import { assertShiftOpen } from '../finance/shift-guard';
 import { syncStockAlerts } from '../stock-thresholds/stock-alerts';
+import { takeFifo } from '../catalog/accessory-stock';
 
 interface CreateSaleInput {
   storeId: string;
   userId: string;
   items: { deviceId: string; salePriceTjs: MoneyInput }[];
+  /** Accessory lines: a quantity of one card at a unit price (TJS). */
+  accessories?: { productId: string; quantity: number; unitPriceTjs: MoneyInput }[];
   paymentMethod: 'CASH' | 'CARD' | 'SPLIT' | 'DEBT';
   cashAmountTjs?: MoneyInput;
   cardAmountTjs?: MoneyInput;
@@ -53,20 +56,33 @@ export class SalesService {
 
   /** The sale inside the caller's transaction (an exchange runs it together with the return). */
   public static async executeSaleInTx(tx: TransactionClient, input: CreateSaleInput, tradeIn?: TradeInCredit) {
-    if (!input.items || input.items.length === 0) {
+    const inputItems = Array.isArray(input.items) ? input.items : [];
+    const inputAccessories = Array.isArray(input.accessories) ? input.accessories : [];
+    if (inputItems.length === 0 && inputAccessories.length === 0) {
       throw new Error('Корзина пуста');
     }
 
     if (!input.storeId) throw new Error('Не удалось определить магазин продажи');
     if (!['CASH', 'CARD', 'SPLIT', 'DEBT'].includes(input.paymentMethod)) throw new Error('Некорректный способ оплаты');
-    const deviceIds = input.items.map((item) => item.deviceId);
+    const deviceIds = inputItems.map((item) => item.deviceId);
     if (new Set(deviceIds).size !== deviceIds.length) throw new Error('Одно устройство нельзя добавить в чек дважды');
 
-    const normalizedItems = input.items.map((item) => ({
+    const normalizedItems = inputItems.map((item) => ({
       ...item,
       salePriceTjs: requirePositiveMoney(item.salePriceTjs, 'Цена продажи'),
     }));
-    const totalTjs = normalizedItems.reduce((sum, item) => D(sum).plus(item.salePriceTjs), D(0));
+    // An accessory line costs quantity × unit price; one card is one line of the receipt.
+    const accessoryLines = inputAccessories.map((line) => {
+      const quantity = Number(line?.quantity);
+      if (!Number.isInteger(quantity) || quantity < 1 || quantity > 100000) throw new Error('Количество аксессуара должно быть целым числом от 1');
+      if (typeof line?.productId !== 'string' || !line.productId) throw new Error('Не указан аксессуар');
+      const unitPriceTjs = requirePositiveMoney(line.unitPriceTjs, 'Цена аксессуара');
+      return { productId: line.productId, quantity, unitPriceTjs, lineTjs: roundMoney(unitPriceTjs.mul(quantity)) };
+    });
+    const productIds = accessoryLines.map((line) => line.productId);
+    if (new Set(productIds).size !== productIds.length) throw new Error('Один аксессуар указан в чеке дважды: объедините количество в одну строку');
+    const totalTjs = normalizedItems.reduce((sum, item) => D(sum).plus(item.salePriceTjs), D(0))
+      .plus(accessoryLines.reduce((sum, line) => sum.plus(line.lineTjs), D(0)));
     // An exchange's credit pays part of the receipt; the customer pays only the rest.
     if (tradeIn) {
       if (input.paymentMethod === 'DEBT') throw new Error('Обмен нельзя оформить в долг');
@@ -108,14 +124,16 @@ export class SalesService {
     if (!store || !store.active || store.isMainWarehouse) {
       throw new Error('Главный склад предназначен исключительно для хранения телефонов. Продажи со склада запрещены — продажа возможна только через розничные торговые точки.');
     }
-    await tx.$queryRaw(Prisma.sql`SELECT id FROM devices WHERE id IN (${Prisma.join(deviceIds)}) ORDER BY id FOR UPDATE`);
-    const devices = await tx.device.findMany({
-      where: {
-        id: { in: deviceIds },
-        storeId: input.storeId,
-        status: { in: ['STORE_STOCK', 'IN_STOCK_AFTER_EXCHANGE'] },
-      },
-    });
+    if (deviceIds.length) await tx.$queryRaw(Prisma.sql`SELECT id FROM devices WHERE id IN (${Prisma.join(deviceIds)}) ORDER BY id FOR UPDATE`);
+    const devices = deviceIds.length
+      ? await tx.device.findMany({
+          where: {
+            id: { in: deviceIds },
+            storeId: input.storeId,
+            status: { in: ['STORE_STOCK', 'IN_STOCK_AFTER_EXCHANGE'] },
+          },
+        })
+      : [];
 
     if (devices.length !== deviceIds.length) {
       throw new Error('Одно или несколько выбранных устройств недоступны для продажи (уже продано, в ремонте или перемещается)');
@@ -125,9 +143,11 @@ export class SalesService {
     const deviceById = new Map(devices.map((d) => [d.id, d]));
 
     const totalUsd = roundMoney(D(totalTjs).div(rate));
-    // Split the receipt's USD total across items by price so the items add up to it
-    // exactly — rounding each item on its own drifts by a cent from the total.
-    const itemUsd = allocateMoney(totalUsd, normalizedItems.map((item) => item.salePriceTjs));
+    // Split the receipt's USD total across items and accessory lines by price so they add up to
+    // it exactly — rounding each on its own drifts by a cent from the total.
+    const splitUsd = allocateMoney(totalUsd, [...normalizedItems.map((item) => item.salePriceTjs), ...accessoryLines.map((line) => line.lineTjs)]);
+    const itemUsd = splitUsd.slice(0, normalizedItems.length);
+    const lineUsd = splitUsd.slice(normalizedItems.length);
     let totalCostUsd = D(0);
     let regularRevenueUsd = D(0);
     let regularCostUsd = D(0);
@@ -157,6 +177,8 @@ export class SalesService {
 
       return {
         deviceId: device.id,
+        // A tablet's imei/imei2 below are its serial numbers.
+        category: device.category ?? 'PHONE',
         brand: device.brand,
         model: device.model,
         storage: device.storage,
@@ -171,6 +193,29 @@ export class SalesService {
         isBonus,
       };
     });
+
+    // Accessory units leave the store's batches oldest first, each at its own batch cost.
+    const accessoryItemsData = [];
+    for (const [index, line] of accessoryLines.entries()) {
+      const product = await tx.accessoryProduct.findUnique({ where: { id: line.productId } });
+      if (!product) throw new Error('Аксессуар не найден');
+      const { allocations, costUsd } = await takeFifo(tx, {
+        storeId: input.storeId, productId: product.id, quantity: line.quantity, mode: 'consume',
+        label: `${product.brand} ${product.name}`.trim(),
+      });
+      const salePriceUsd = lineUsd[index];
+      const isBelowCost = line.lineTjs.lt(costUsd.mul(rate));
+      if (isBelowCost) hasBelowCostItem = true;
+      totalCostUsd = D(totalCostUsd).plus(costUsd);
+      regularRevenueUsd = D(regularRevenueUsd).plus(salePriceUsd);
+      regularCostUsd = D(regularCostUsd).plus(costUsd);
+      accessoryItemsData.push({
+        productId: product.id, barcode: product.barcode, brand: product.brand, name: product.name,
+        category: product.category, model: product.model,
+        quantity: line.quantity, unitPriceTjs: line.unitPriceTjs, salePriceTjs: line.lineTjs, salePriceUsd,
+        costUsd, allocations: allocations as unknown as Prisma.InputJsonValue, isBelowCost,
+      });
+    }
 
     let finalCustomerId: string | null = null;
     let finalCustomerName = input.customerName?.trim() || null;
@@ -276,9 +321,11 @@ export class SalesService {
         exchangeTradeInCreditTjs: tradeIn?.creditTjs ?? null,
         exchangeTradeInCreditUsd: tradeIn?.creditUsd ?? null,
         saleItems: { create: saleItemsData },
+        accessoryItems: { create: accessoryItemsData },
       },
       include: {
         saleItems: { include: { device: { select: { ram: true } } } },
+        accessoryItems: true,
         store: { select: { id: true, name: true, isMainWarehouse: true } },
         user: { select: { id: true, name: true, role: true } },
         customer: true,
@@ -362,6 +409,12 @@ export class SalesService {
     }
 
     const regularProfitUsd = roundMoney(D(regularRevenueUsd).minus(regularCostUsd));
+    // What the receipt holds, for the journal and audit texts.
+    const accessoryUnits = accessoryItemsData.reduce((sum, line) => sum + line.quantity, 0);
+    const contents = [
+      saleItemsData.length ? `${saleItemsData.length} устройств` : '',
+      accessoryUnits ? `${accessoryUnits} шт. аксессуаров` : '',
+    ].filter(Boolean).join(' и ');
     const owners = await getOwnersForStore(tx, input.storeId);
     // Only regular profit is auto-distributed to owners on sale — a loss too, the same as
     // an exchange, so owner balances always match the profit the reports show.
@@ -377,7 +430,7 @@ export class SalesService {
     await tx.ledgerEntry.create({
       data: {
         type: input.paymentMethod === 'CASH' ? 'CASH_SALE' : input.paymentMethod === 'CARD' ? 'CARD_SALE' : 'SALE',
-        description: `Чек #${sale.receiptNumber}: продажа ${saleItemsData.length} устройств${input.paymentMethod === 'DEBT' ? ` в долг (${finalCustomerName || 'Клиент'}, долг ${debtAmountTjs} TJS)` : ''}`,
+        description: `Чек #${sale.receiptNumber}: продажа ${contents}${input.paymentMethod === 'DEBT' ? ` в долг (${finalCustomerName || 'Клиент'}, долг ${debtAmountTjs} TJS)` : ''}`,
         amountTjs: totalTjs,
         amountUsd: totalUsd,
         exchangeRate: rate,
@@ -391,7 +444,7 @@ export class SalesService {
       data: {
         userId: input.userId,
         action: hasBelowCostItem ? 'SALE_BELOW_COST' : 'SALE',
-        details: `Чек #${sale.receiptNumber}: продажа ${saleItemsData.length} устройств на сумму ${totalTjs} TJS ($${totalUsd})${tradeIn ? ` — обмен по чеку #${tradeIn.fromReceiptNumber}, зачёт ${tradeIn.creditTjs} TJS` : ''}${input.paymentMethod === 'DEBT' ? ` в долг (${finalCustomerName}, долг ${debtAmountTjs} TJS)` : ''}${bonusItems.length > 0 ? ` (включая ${bonusItems.length} бонусных устройств, $${roundMoney(bonusProfitUsd)} в бонусный пул)` : ''}`,
+        details: `Чек #${sale.receiptNumber}: продажа ${contents} на сумму ${totalTjs} TJS ($${totalUsd})${tradeIn ? ` — обмен по чеку #${tradeIn.fromReceiptNumber}, зачёт ${tradeIn.creditTjs} TJS` : ''}${input.paymentMethod === 'DEBT' ? ` в долг (${finalCustomerName}, долг ${debtAmountTjs} TJS)` : ''}${bonusItems.length > 0 ? ` (включая ${bonusItems.length} бонусных устройств, $${roundMoney(bonusProfitUsd)} в бонусный пул)` : ''}`,
         financialDetails: moneyJson({
           amountTjs: totalTjs,
           amountUsd: totalUsd,

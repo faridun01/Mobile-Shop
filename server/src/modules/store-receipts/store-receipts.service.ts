@@ -6,6 +6,7 @@ import { onCommit } from '../../common/after-commit';
 import { notifyAdmins } from '../notifications/notification.service';
 import { receiptNotificationText } from '../notifications/notification-text';
 import { RealtimeSyncGateway } from '../../websocket/websocket.gateway';
+import { deviceCodeCandidates } from '../../common/device-code';
 
 export interface StaffUser {
   userId: string;
@@ -59,8 +60,10 @@ export class StoreReceiptsService {
     if (!imei) throw fail('Введите или отсканируйте IMEI', 400);
     const warehouse = await prisma.store.findFirst({ where: { isMainWarehouse: true }, select: { id: true } });
     if (!warehouse) throw fail('Главный склад не найден', 409);
-    const device = await prisma.device.findFirst({ where: { OR: [{ imei }, { imei2: imei }] }, select: { ...SAFE_DEVICE, storeId: true, status: true } });
-    if (!device) throw fail(`Телефон с IMEI ${imei} не найден. Новый товар оформляет администратор`, 404);
+    // A phone's IMEI, or a tablet's SN in any letter case.
+    const codes = deviceCodeCandidates(imei);
+    const device = await prisma.device.findFirst({ where: { OR: [{ imei: { in: codes } }, { imei2: { in: codes } }] }, select: { ...SAFE_DEVICE, storeId: true, status: true } });
+    if (!device) throw fail(`Устройство с IMEI/SN ${imei} не найдено. Новый товар оформляет администратор`, 404);
     const reason = rejectionReason(device, warehouse.id, storeId);
     if (reason) throw fail(reason, 409);
     const { storeId: _s, status: _st, ...safe } = device;
@@ -76,7 +79,8 @@ export class StoreReceiptsService {
     const storeId = requireStaffStore(user, bodyStoreId);
     if (!Array.isArray(rawImeis) || rawImeis.length === 0) throw fail('Отсканируйте хотя бы один телефон', 400);
     if (rawImeis.length > MAX_ITEMS) throw fail(`В одном приходе не больше ${MAX_ITEMS} телефонов`, 400);
-    const imeis = rawImeis.map(normalizeImei);
+    // A tablet SN is stored upper-case; an IMEI is digits, which upper-casing leaves as they are.
+    const imeis = rawImeis.map((raw) => normalizeImei(raw).toUpperCase());
     if (imeis.some((i) => !i)) throw fail('Пустой IMEI в списке', 400);
     const duplicate = imeis.find((i, idx) => imeis.indexOf(i) !== idx);
     if (duplicate) throw fail(`IMEI ${duplicate} указан дважды`, 400);

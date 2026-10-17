@@ -34,13 +34,24 @@ describe('resolveSaleScan', () => {
   it('a phone after exchange is sellable', () => {
     expect(resolve([device({ status: 'IN_STOCK_AFTER_EXCHANGE' })], '111111111111111').kind).toBe('add');
   });
+
+  it('adds a tablet by its main or additional SN in any letter case', () => {
+    const tablet = device({ id: 't1', category: 'TABLET', imei: 'R9XN1234567', imei2: 'KB778899', brand: 'Xiaomi', model: 'Redmi Pad Pro' });
+    expect(resolve([tablet], 'r9xn1234567').kind).toBe('add');
+    expect(resolve([tablet], 'kb778899').kind).toBe('add');
+  });
 });
 
 describe('scan code helpers', () => {
   it('normalizes and recognizes device codes', () => {
     expect(normalizeScanCode(' 35 1234 \r\n')).toBe('351234');
     expect(looksLikeDeviceCode('351234567890123')).toBe(true);
+    expect(looksLikeDeviceCode('3512 3456 7890 123')).toBe(true);
     expect(looksLikeDeviceCode('iphone 15')).toBe(false);
     expect(looksLikeDeviceCode('1234')).toBe(false);
+    // A tablet serial number is one word of letters and digits.
+    expect(looksLikeDeviceCode('R9XN1234567')).toBe(true);
+    expect(looksLikeDeviceCode('Galaxy Tab A9')).toBe(false);
+    expect(looksLikeDeviceCode('RedmiPad')).toBe(false);
   });
 });

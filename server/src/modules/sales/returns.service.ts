@@ -12,6 +12,28 @@ import { postTransaction } from '../finance/financial-transaction.service';
 import { assertShiftOpen } from '../finance/shift-guard';
 import { syncStockAlerts } from '../stock-thresholds/stock-alerts';
 import { returnOvercollectedBonus } from '../finance/cash-collection.service';
+import { allocationsCostUsd, readAllocations, restoreAllocations, type BatchAllocation } from '../catalog/accessory-stock';
+
+/**
+ * The next `count` units of a line to come back, taken from the end of its allocations (the units
+ * sold last come back first) after the `alreadyReturned` units that came back before.
+ */
+function unitsFromEnd(allocations: BatchAllocation[], alreadyReturned: number, count: number): BatchAllocation[] {
+  const taken: BatchAllocation[] = [];
+  let skip = alreadyReturned;
+  let left = count;
+  for (const a of [...allocations].reverse()) {
+    if (left === 0) break;
+    const usable = Math.max(0, a.quantity - skip);
+    skip = Math.max(0, skip - a.quantity);
+    if (usable === 0) continue;
+    const take = Math.min(usable, left);
+    taken.push({ ...a, quantity: take });
+    left -= take;
+  }
+  if (left > 0) throw new Error('Распределение аксессуара по партиям не сходится с количеством в чеке');
+  return taken;
+}
 
 export interface ReturnItemInput {
   saleItemId: string;
@@ -19,9 +41,18 @@ export interface ReturnItemInput {
   withheldTjs: MoneyInput;
 }
 
+export interface ReturnAccessoryInput {
+  lineId: string;
+  quantity: number;
+  /** The amount kept from these units' price, in TJS; 0 or more. */
+  withheldTjs: MoneyInput;
+}
+
 export interface ReturnInput {
   saleId: string;
   items: ReturnItemInput[];
+  /** Accessory units returned, by receipt line. */
+  accessories?: ReturnAccessoryInput[];
   reason: string;
   userId: string;
   /** How the money goes back to the customer; not needed when it all goes to an exchange. */
@@ -62,14 +93,18 @@ export class ReturnsService {
   public static async returnItemsInTx(tx: TransactionClient, input: ReturnInput, rate: Prisma.Decimal): Promise<ReturnResult> {
     const reason = input.reason?.trim();
     if (!reason) throw new Error('Укажите причину возврата');
-    if (!Array.isArray(input.items) || input.items.length === 0) throw new Error('Выберите телефоны для возврата');
-    const itemIds = input.items.map((item) => item.saleItemId);
+    const inputItems = Array.isArray(input.items) ? input.items : [];
+    const inputAccessories = Array.isArray(input.accessories) ? input.accessories : [];
+    if (inputItems.length === 0 && inputAccessories.length === 0) throw new Error('Выберите товары для возврата');
+    const itemIds = inputItems.map((item) => item.saleItemId);
     if (new Set(itemIds).size !== itemIds.length) throw new Error('Один телефон указан для возврата дважды');
+    const lineIds = inputAccessories.map((line) => line.lineId);
+    if (new Set(lineIds).size !== lineIds.length) throw new Error('Один аксессуар указан для возврата дважды');
     if (input.payoutMethod && !['CASH', 'CARD'].includes(input.payoutMethod)) throw new Error('Некорректный способ возврата денег');
 
     const actor = await resolveActor(tx, input.userId);
     await tx.$queryRaw`SELECT id FROM sales WHERE id = ${input.saleId} FOR UPDATE`;
-    const sale = await tx.sale.findUnique({ where: { id: input.saleId }, include: { saleItems: true, exchangeEvents: { select: { id: true } } } });
+    const sale = await tx.sale.findUnique({ where: { id: input.saleId }, include: { saleItems: true, accessoryItems: true, exchangeEvents: { select: { id: true } } } });
     if (!sale) throw new Error('Чек не найден');
     if (sale.status === 'REFUNDED') throw new Error('Этот чек уже полностью возвращён');
     if (D(sale.debtAmountTjs).gt(0)) {
@@ -79,7 +114,7 @@ export class ReturnsService {
       throw new Error('По этому чеку был обмен старого образца — оформите возврат всего чека');
     }
 
-    const items = input.items.map((entry) => {
+    const items = inputItems.map((entry) => {
       const item = sale.saleItems.find((i) => i.id === entry.saleItemId);
       if (!item) throw new Error('Телефон не найден в этом чеке');
       if (item.returnId) throw new Error(`Телефон ${item.model} (IMEI ${item.imei}) уже возвращён`);
@@ -102,13 +137,48 @@ export class ReturnsService {
         bookedProfitUsd: item.isBonus ? D(0) : roundMoney(D(item.salePriceUsd).minus(item.costBasisUsd)),
       };
     });
-    const sum = (pick: (x: (typeof items)[number]) => MoneyInput) => roundMoney(items.reduce((acc, x) => acc.plus(pick(x)), D(0)));
+    // Accessory units: their share of the line's price, booked dollars and cost. The units sold
+    // last come back first, into their own batches; the last units of a line take exactly what is
+    // left of it, so a line returned in parts adds up to the cent.
+    const accessories = inputAccessories.map((entry) => {
+      const line = (sale.accessoryItems ?? []).find((l) => l.id === entry.lineId);
+      if (!line) throw new Error('Аксессуар не найден в этом чеке');
+      const remaining = line.quantity - line.returnedQuantity;
+      const quantity = Number(entry.quantity);
+      if (!Number.isInteger(quantity) || quantity < 1 || quantity > remaining) {
+        throw new Error(`${line.brand} ${line.name}: можно вернуть от 1 до ${remaining} шт.`);
+      }
+      const last = quantity === remaining;
+      const priceTjs = last ? roundMoney(D(line.salePriceTjs).minus(line.returnedPriceTjs)) : roundMoney(D(line.salePriceTjs).mul(quantity).div(line.quantity));
+      const priceUsd = last ? roundMoney(D(line.salePriceUsd).minus(line.returnedPriceUsd)) : roundMoney(D(line.salePriceUsd).mul(quantity).div(line.quantity));
+      const restore = unitsFromEnd(readAllocations(line.allocations), line.returnedQuantity, quantity);
+      const costUsd = last ? roundMoney(D(line.costUsd).minus(line.returnedCostUsd)) : allocationsCostUsd(restore);
+      const withheldTjs = requireNonNegativeMoney(entry.withheldTjs ?? 0, 'Удержание');
+      if (withheldTjs.gt(priceTjs)) throw new Error(`Удержание за ${line.name} не может быть больше его цены (${priceTjs} TJS)`);
+      const priceTodayUsd = roundMoney(priceTjs.div(rate));
+      const withheldUsd = roundMoney(withheldTjs.div(rate));
+      return {
+        line, quantity, priceTjs, priceUsd, costUsd, restore,
+        withheldTjs, withheldUsd,
+        creditTjs: priceTjs.minus(withheldTjs),
+        creditUsd: roundMoney(priceTodayUsd.minus(withheldUsd)),
+        fxUsd: roundMoney(priceUsd.minus(priceTodayUsd)),
+        bookedProfitUsd: roundMoney(priceUsd.minus(costUsd)),
+      };
+    });
+
+    type Part = { withheldTjs: MoneyInput; withheldUsd: MoneyInput; creditTjs: MoneyInput; creditUsd: MoneyInput; fxUsd: MoneyInput; bookedUsd: MoneyInput; bookedProfitUsd: MoneyInput };
+    const parts: Part[] = [
+      ...items.map((x) => ({ ...x, bookedUsd: x.item.salePriceUsd })),
+      ...accessories.map((x) => ({ ...x, bookedUsd: x.priceUsd })),
+    ];
+    const sum = (pick: (x: Part) => MoneyInput) => roundMoney(parts.reduce((acc, x) => acc.plus(pick(x)), D(0)));
     const withheldTjs = sum((x) => x.withheldTjs);
     const withheldUsd = sum((x) => x.withheldUsd);
     const creditTjs = sum((x) => x.creditTjs);
     const creditUsd = sum((x) => x.creditUsd);
     const fxUsd = sum((x) => x.fxUsd);
-    const bookedUsd = sum((x) => x.item.salePriceUsd);
+    const bookedUsd = sum((x) => x.bookedUsd);
 
     // An exchange applies the credit to the new receipt; whatever is left over (the new phone is
     // cheaper) goes back to the customer. Applied dollars never exceed the new receipt's own.
@@ -136,6 +206,19 @@ export class ReturnsService {
       data: { status: 'STORE_STOCK', storeId: sale.storeId },
     });
     if (restocked.count !== deviceIds.length) throw new Error('Не удалось вернуть телефоны на склад — их состояние изменилось');
+    // Accessory units go back into the batches they were sold from, at their own cost.
+    for (const x of accessories) {
+      await restoreAllocations(tx, x.restore);
+      await tx.saleAccessoryItem.update({
+        where: { id: x.line.id },
+        data: {
+          returnedQuantity: { increment: x.quantity },
+          returnedPriceTjs: { increment: x.priceTjs },
+          returnedPriceUsd: { increment: x.priceUsd },
+          returnedCostUsd: { increment: x.costUsd },
+        },
+      });
+    }
     // The return's money and stock belong to today's shift, which must still be open.
     await assertShiftOpen(tx, sale.storeId);
     await syncStockAlerts(tx, [sale.storeId]);
@@ -169,7 +252,11 @@ export class ReturnsService {
       const rows = (log.financialDetails as { reversedAllocations?: { ownerId: string; amountUsd: number }[] } | null)?.reversedAllocations ?? [];
       for (const row of rows) reversedBefore.set(row.ownerId, (reversedBefore.get(row.ownerId) ?? D(0)).plus(row.amountUsd));
     }
-    const lastPhones = sale.saleItems.filter((i) => i.returnId).length + items.length === sale.saleItems.length;
+    // The last goods of the receipt — every phone and every accessory unit — take back exactly
+    // what is left of the booked profit.
+    const accessoryUnitsLeft = (sale.accessoryItems ?? []).reduce((acc, l) => acc + l.quantity - l.returnedQuantity, 0)
+      - accessories.reduce((acc, x) => acc + x.quantity, 0);
+    const lastPhones = sale.saleItems.filter((i) => i.returnId).length + items.length === sale.saleItems.length && accessoryUnitsLeft === 0;
     let reversal: OwnerProfitAllocation[] | null = null;
     if (reversedUsd.isZero()) reversal = [];
     else if (lastPhones && booked.length) reversal = booked.map((row) => ({ ownerId: row.ownerId, amountUsd: roundMoney(D(row.amountUsd).minus(reversedBefore.get(row.ownerId) ?? 0)) }));
@@ -243,6 +330,13 @@ export class ReturnsService {
         payoutUsd,
         payoutMethod: payoutTjs.gt(0) ? input.payoutMethod ?? null : null,
         ownerProfitAllocations: moneyJson(ownerProfitAllocations),
+        accessoryLines: accessories.length
+          ? moneyJson(accessories.map((x) => ({
+              lineId: x.line.id, productId: x.line.productId, name: `${x.line.brand} ${x.line.name}`.trim(), quantity: x.quantity,
+              priceTjs: x.priceTjs, priceUsd: x.priceUsd, costUsd: x.costUsd,
+              withheldTjs: x.withheldTjs, withheldUsd: x.withheldUsd, creditTjs: x.creditTjs, creditUsd: x.creditUsd,
+            })))
+          : undefined,
       },
     });
     for (const x of items) {
@@ -260,10 +354,10 @@ export class ReturnsService {
       })),
     });
 
-    // Every phone of the receipt returned: the receipt itself is returned.
-    const returnedBefore = sale.saleItems.filter((i) => i.returnId);
-    if (returnedBefore.length + items.length === sale.saleItems.length) {
-      const all = [...returnedBefore.map((i) => ({ withheldTjs: D(i.returnWithheldTjs ?? 0), withheldUsd: D(i.returnWithheldUsd ?? 0), creditTjs: D(i.returnCreditTjs ?? 0) })), ...items];
+    // Every phone and every accessory unit of the receipt returned: the receipt itself is returned,
+    // with the totals of all its returns (this one included).
+    if (lastPhones) {
+      const all = await tx.saleReturn.aggregate({ where: { saleId: sale.id }, _sum: { withheldTjs: true, withheldUsd: true, creditTjs: true } });
       await tx.sale.update({
         where: { id: sale.id },
         data: {
@@ -271,14 +365,17 @@ export class ReturnsService {
           refundedAt: new Date(),
           refundedByUserId: actor.id,
           refundReason: reason,
-          penaltyFeeTjs: roundMoney(all.reduce((acc, x) => acc.plus(x.withheldTjs), D(0))),
-          penaltyFeeUsd: roundMoney(all.reduce((acc, x) => acc.plus(x.withheldUsd), D(0))),
-          actualRefundAmountTjs: roundMoney(all.reduce((acc, x) => acc.plus(x.creditTjs), D(0))),
+          penaltyFeeTjs: roundMoney(all._sum.withheldTjs ?? 0),
+          penaltyFeeUsd: roundMoney(all._sum.withheldUsd ?? 0),
+          actualRefundAmountTjs: roundMoney(all._sum.creditTjs ?? 0),
         },
       });
     }
 
-    const phones = items.map((x) => `${x.item.model} (IMEI ${x.item.imei})`).join(', ');
+    const phones = [
+      ...items.map((x) => `${x.item.model} (${x.item.category === 'TABLET' ? 'SN' : 'IMEI'} ${x.item.imei})`),
+      ...accessories.map((x) => `${x.line.brand} ${x.line.name} × ${x.quantity}`),
+    ].join(', ');
     await tx.auditLog.create({
       data: {
         userId: actor.id,
@@ -290,6 +387,7 @@ export class ReturnsService {
           saleReturnId: saleReturn.id,
           exchangeRate: rate,
           items: items.map((x) => ({ saleItemId: x.item.id, deviceId: x.item.deviceId, withheldTjs: x.withheldTjs, withheldUsd: x.withheldUsd, creditTjs: x.creditTjs, creditUsd: x.creditUsd, fxUsd: x.fxUsd, bookedProfitUsd: x.bookedProfitUsd })),
+          accessories: accessories.map((x) => ({ lineId: x.line.id, quantity: x.quantity, priceTjs: x.priceTjs, priceUsd: x.priceUsd, costUsd: x.costUsd, withheldTjs: x.withheldTjs, creditTjs: x.creditTjs, fxUsd: x.fxUsd, bookedProfitUsd: x.bookedProfitUsd })),
           withheldTjs, withheldUsd, creditTjs, creditUsd, fxUsd, payoutTjs, payoutUsd,
           profitDeltaUsd: ownerDeltaUsd,
           reversedAllocations: moneyJson(reversal),

@@ -22,6 +22,7 @@ export function registerCustomerRoutes(app: Express) {
             ...summary.inventory,
             totalCostUsd: 0,
             totalCostTjs: 0,
+            accessoryCostUsd: 0,
             models: summary.inventory.models.map((m) => ({ ...m, avgCostUsd: 0, totalCostUsd: 0, totalCostTjs: 0 })),
             items: summary.inventory.items.map((item) => ({ ...item, costBasisUsd: 0, costBasisTjs: 0 })),
           },
