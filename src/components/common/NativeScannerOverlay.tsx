@@ -48,7 +48,7 @@ export function NativeScannerOverlay() {
                   onClick={() => switchTo(value)}
                   className={`min-h-9 rounded-lg px-4 font-semibold ${mode === value ? 'bg-white text-black' : 'text-white'}`}
                 >
-                  {value === 'imei' ? 'IMEI (телефон)' : 'SN (планшет)'}
+                  {value === 'imei' ? 'IMEI (телефон)' : 'SN / штрихкод'}
                 </button>
               ))}
             </div>

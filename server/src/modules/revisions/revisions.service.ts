@@ -9,6 +9,18 @@ export interface CreateStockRevisionInput {
   comment?: string;
   checkedImeis: string[];
   surplusDevices?: Array<{ code: string; note?: string }>;
+  /** Accessories counted by hand or by scanning their barcode: units found per card. */
+  accessoryCounts?: Array<{ productId: string; counted: number }>;
+}
+
+/** One accessory card of a revision: units on the books at the store and units counted. */
+export interface RevisionAccessoryLine {
+  productId: string;
+  barcode: string;
+  brand: string;
+  name: string;
+  expected: number;
+  counted: number;
 }
 
 export interface StaffUser {
@@ -124,9 +136,42 @@ export class StockRevisionService {
       (s) => s.code && s.code.trim().length > 0
     );
 
-    const totalExpected = storeDevices.length;
-    const totalMissing = missingDevices.length;
-    const totalSurplus = surplusDevices.length;
+    // Accessories: units left in the store's batches (units held by a pending transfer are still
+    // physically here) against the units counted. A card counted but not on the books is a surplus.
+    const counted = new Map<string, number>();
+    for (const row of input.accessoryCounts || []) {
+      const units = Number(row?.counted);
+      if (typeof row?.productId !== 'string' || !row.productId) continue;
+      if (!Number.isInteger(units) || units < 0) {
+        throw Object.assign(new Error('Количество аксессуара в ревизии должно быть целым числом от 0'), { status: 400 });
+      }
+      counted.set(row.productId, units);
+    }
+    const batches = await prisma.accessoryBatch.findMany({
+      where: { storeId: store.id, quantityRemaining: { gt: 0 } },
+      select: { productId: true, quantityRemaining: true },
+    });
+    const expectedByProduct = new Map<string, number>();
+    for (const b of batches) expectedByProduct.set(b.productId, (expectedByProduct.get(b.productId) ?? 0) + b.quantityRemaining);
+    const productIds = [...new Set([...expectedByProduct.keys(), ...counted.keys()])];
+    const products = productIds.length
+      ? await prisma.accessoryProduct.findMany({ where: { id: { in: productIds } }, select: { id: true, barcode: true, brand: true, name: true } })
+      : [];
+    if (products.length !== productIds.length) {
+      throw Object.assign(new Error('Аксессуар из ревизии не найден в базе'), { status: 400 });
+    }
+    const accessoryLines: RevisionAccessoryLine[] = products
+      .map((p) => ({ productId: p.id, barcode: p.barcode, brand: p.brand, name: p.name, expected: expectedByProduct.get(p.id) ?? 0, counted: counted.get(p.id) ?? 0 }))
+      .sort((a, b) => `${a.brand} ${a.name}`.localeCompare(`${b.brand} ${b.name}`, 'ru'));
+    const accessoryExpected = accessoryLines.reduce((sum, l) => sum + l.expected, 0);
+    const accessoryChecked = accessoryLines.reduce((sum, l) => sum + Math.min(l.expected, l.counted), 0);
+    const accessoryMissing = accessoryLines.reduce((sum, l) => sum + Math.max(0, l.expected - l.counted), 0);
+    const accessorySurplus = accessoryLines.reduce((sum, l) => sum + Math.max(0, l.counted - l.expected), 0);
+    totalChecked += accessoryChecked;
+
+    const totalExpected = storeDevices.length + accessoryExpected;
+    const totalMissing = missingDevices.length + accessoryMissing;
+    const totalSurplus = surplusDevices.length + accessorySurplus;
     const status = totalMissing === 0 && totalSurplus === 0 ? 'MATCH' : 'DISCREPANCY';
 
     const revision = await prisma.$transaction(async (tx) => {
@@ -145,6 +190,7 @@ export class StockRevisionService {
           missingDevices: missingDevices as any,
           surplusDevices: surplusDevices as any,
           checkedImeis: (input.checkedImeis || []) as any,
+          accessoryLines: accessoryLines.length ? (accessoryLines as any) : undefined,
           comment: input.comment?.trim() || null,
         },
       });
@@ -223,6 +269,7 @@ export class StockRevisionService {
           "missingDevices" JSONB,
           "surplusDevices" JSONB,
           "checkedImeis" JSONB,
+          "accessoryLines" JSONB,
           "comment" TEXT,
           "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
           "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,

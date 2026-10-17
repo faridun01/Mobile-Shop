@@ -37,12 +37,14 @@ export function registerStockRevisionRoutes(app: Express) {
       const comment = typeof body.comment === 'string' ? body.comment : undefined;
       const checkedImeis = Array.isArray(body.checkedImeis) ? body.checkedImeis : [];
       const surplusDevices = Array.isArray(body.surplusDevices) ? body.surplusDevices : [];
+      const accessoryCounts = Array.isArray(body.accessoryCounts) ? body.accessoryCounts : [];
 
       const result = await StockRevisionService.create(user, {
         storeId,
         comment,
         checkedImeis,
         surplusDevices,
+        accessoryCounts,
       });
 
       res.status(201).json(result);

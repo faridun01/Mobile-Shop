@@ -4,6 +4,14 @@ import { dateRangeForPeriod, dateRangeForCustomDates, getBusinessDateKey } from 
 afterEach(() => { vi.useRealTimers(); vi.unstubAllEnvs(); });
 
 describe('business report boundaries', () => {
+  it.each(['2026-02-29', '2026-02-31', '2026-04-31', '2026-13-01', '2026-00-10', '2026-01-00', 'invalid'])('rejects impossible custom dates: %s', (date) => {
+    expect(() => dateRangeForCustomDates(date)).toThrow('начала');
+    expect(() => dateRangeForCustomDates('2026-01-01', date)).toThrow('окончания');
+  });
+  it('accepts a real leap day and rejects an explicitly empty end date', () => {
+    expect(() => dateRangeForCustomDates('2024-02-29')).not.toThrow();
+    expect(() => dateRangeForCustomDates('2026-01-01', '')).toThrow('окончания');
+  });
   it('includes the first five local hours in today', () => {
     vi.stubEnv('BUSINESS_TIME_ZONE', 'Asia/Tashkent');
     vi.useFakeTimers();

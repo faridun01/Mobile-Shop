@@ -15,7 +15,7 @@ export function registerStoreReceiptRoutes(app: Express) {
   // Completes the receipt into the store
   app.post('/api/store-receipts', authenticateJwt, requireRoles('SELLER', 'PARTNER', 'ADMIN'), async (req: AuthenticatedRequest, res, next) => {
     try {
-      res.status(201).json(await StoreReceiptsService.create(req.user!, req.body?.imeis, req.body?.storeId));
+      res.status(201).json(await StoreReceiptsService.create(req.user!, req.body?.imeis, req.body?.storeId, req.body?.accessories));
     } catch (error) {
       next(error);
     }

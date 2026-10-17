@@ -50,11 +50,19 @@ export function dateRangeForPeriod(period: ReportPeriod, month?: string): { gte:
 }
 
 export function dateRangeForCustomDates(startDate: string, endDate?: string): { gte: Date; lt: Date } {
-  if (!startDate || !/^\d{4}-\d{2}-\d{2}$/.test(startDate)) {
+  const validDate = (key: string) => {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(key) || Number(key.slice(0, 4)) < 1000) return false;
+    const parsed = new Date(`${key}T00:00:00Z`);
+    return Number.isFinite(parsed.getTime()) && parsed.toISOString().slice(0, 10) === key;
+  };
+  if (!startDate || !validDate(startDate)) {
     throw new Error('Укажите корректную дату начала в формате YYYY-MM-DD');
   }
+  if (endDate !== undefined && !validDate(endDate)) {
+    throw new Error('Укажите корректную дату окончания в формате YYYY-MM-DD');
+  }
   let startKey = startDate;
-  let endKey = endDate && /^\d{4}-\d{2}-\d{2}$/.test(endDate) ? endDate : startDate;
+  let endKey = endDate ?? startDate;
   if (startKey > endKey) {
     const tmp = startKey;
     startKey = endKey;

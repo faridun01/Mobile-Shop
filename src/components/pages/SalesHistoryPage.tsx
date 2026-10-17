@@ -1,10 +1,11 @@
 import { useDataRefreshRevision } from '../../hooks/useDataRefreshRevision';
 import { deviceCodeLabel } from '../../utils/deviceCode';
-import { decimal, formatMoney, moneyNumber, splitUsdByTjs, sumMoney } from '../../utils/money';
+import { formatMoney, splitUsdByTjs, sumMoney } from '../../utils/money';
+import { accessoryReturnPrice } from '../../utils/accessoryReturn';
 import React, { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAppFields } from '../../context/AppContext';
-import { Sale, SaleAccessoryLine, SaleItem } from '../../types';
+import { Sale, SaleItem } from '../../types';
 import {
   ChevronRight,
   RefreshCw,
@@ -45,13 +46,6 @@ const saleContents = (sale: Sale) => [
   ...sale.items.map((i) => `${i.brand} ${i.model}`),
   ...(sale.accessoryItems || []).map((l) => `${l.brand} ${l.name}${l.quantity > 1 ? ` × ${l.quantity}` : ''}`),
 ].join(', ');
-
-/** The price of `quantity` more units of an accessory line, as the server splits it. */
-const accessoryReturnPrice = (line: SaleAccessoryLine, quantity: number) => {
-  const remaining = line.quantity - line.returnedQuantity;
-  if (quantity >= remaining) return moneyNumber(decimal(line.salePriceTjs).minus(line.returnedPriceTjs));
-  return moneyNumber(decimal(line.salePriceTjs).mul(quantity).div(line.quantity));
-};
 
 // Built once for the receipt rows (same output as toLocaleTimeString / toLocaleDateString with
 // these options, without building a new formatter for every row).
@@ -366,6 +360,15 @@ export const SalesHistoryPage: React.FC = () => {
 
   const handlePickAction = (page: 'EXCHANGE' | 'REPAIR') => {
     if (!selectedSale) return;
+    // A receipt with accessories opens the exchange screen on the receipt, which lists every
+    // phone, tablet and accessory line still to hand back.
+    if (page === 'EXCHANGE' && (selectedSale.accessoryItems || []).some((line) => line.quantity > line.returnedQuantity)) {
+      const { receiptNumber, id: saleId } = selectedSale;
+      setSelectedSaleId(null);
+      setActivePage('EXCHANGE');
+      navigate('/exchange', { state: { saleReceiptNumber: receiptNumber, saleId } });
+      return;
+    }
     // A phone already returned can't be exchanged again.
     const candidates = page === 'EXCHANGE' ? selectedSale.items.filter((item) => !item.returnId) : selectedSale.items;
     if (candidates.length === 1) {
@@ -1052,7 +1055,7 @@ export const SalesHistoryPage: React.FC = () => {
         footer={
           !selectedSale ? undefined : dialogView === 'details' ? (
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 w-full">
-              {selectedSale.items.length > 0 && <Button variant="secondary" leftIcon={RefreshCw} onClick={() => handlePickAction('EXCHANGE')}>Обмен</Button>}
+              <Button variant="secondary" leftIcon={RefreshCw} onClick={() => handlePickAction('EXCHANGE')}>Обмен</Button>
               {selectedSale.items.length > 0 && <Button variant="secondary" leftIcon={Wrench} onClick={() => handlePickAction('REPAIR')}>Ремонт</Button>}
               {canRefund && selectedSale.status !== 'REFUNDED' && (
                 <Button
@@ -1691,7 +1694,7 @@ export const SalesHistoryPage: React.FC = () => {
                           value={row.withheld}
                           onChange={(e) => setRow({ withheld: e.target.value })}
                           placeholder="0"
-                          className={cn('flex-1 min-w-[5rem] h-9 rounded-lg bg-bg border px-2.5 text-sm font-semibold text-warning focus:outline-none', picked?.tooBig ? 'border-danger' : 'border-border focus:border-warning')}
+                          className={cn('flex-1 min-w-20 h-9 rounded-lg bg-bg border px-2.5 text-sm font-semibold text-warning focus:outline-none', picked?.tooBig ? 'border-danger' : 'border-border focus:border-warning')}
                         />
                         <span className="text-xs text-fg-subtle shrink-0">TJS → клиенту <strong className="text-fg font-mono">{formatMoney(Math.max(0, (picked?.priceTjs ?? 0) - (picked?.withheld ?? 0)))}</strong></span>
                       </div>

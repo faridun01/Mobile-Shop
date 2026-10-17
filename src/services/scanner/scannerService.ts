@@ -10,14 +10,19 @@ export type ScanMode = 'imei' | 'code';
 
 export interface ScanOptions {
   mode?: ScanMode;
-  /** Shows an IMEI / SN switch in the scanner (device lookups that may meet a tablet). */
+  /** Shows an IMEI / SN-barcode switch in the scanner (lookups that may meet a tablet or an accessory). */
   allowModeSwitch?: boolean;
 }
 
 /** The running scan's mode, read by both camera UIs and switched from them. */
 export const scanModeState = createStore<{ mode: ScanMode; allowSwitch: boolean }>(() => ({ mode: 'imei', allowSwitch: false }));
 
+// The mode last chosen on the switch: the next switchable scan opens in it (a run of accessory
+// barcodes doesn't need the switch every time).
+let lastSwitchedMode: ScanMode = 'imei';
+
 export function setScanMode(mode: ScanMode): void {
+  if (scanModeState.getState().allowSwitch) lastSwitchedMode = mode;
   scanModeState.setState({ mode });
 }
 
@@ -31,7 +36,10 @@ export async function scanCode(webHost: WebScannerHost, options: ScanOptions = {
   if (activeSession) return null;
   const session = new AbortController();
   activeSession = session;
-  scanModeState.setState({ mode: options.mode ?? 'imei', allowSwitch: Boolean(options.allowModeSwitch) });
+  scanModeState.setState({
+    mode: options.mode ?? (options.allowModeSwitch ? lastSwitchedMode : 'imei'),
+    allowSwitch: Boolean(options.allowModeSwitch),
+  });
   try {
     if (isNativeScanner()) {
       const { scanNativeCode } = await import('./nativeScanner');

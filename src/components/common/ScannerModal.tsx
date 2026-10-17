@@ -383,7 +383,7 @@ export const ScannerModal: React.FC = () => {
                   mode === value ? 'bg-accent text-accent-fg shadow-xs' : 'text-fg-muted hover:text-fg'
                 )}
               >
-                {value === 'imei' ? 'IMEI (телефон)' : 'SN (планшет)'}
+                {value === 'imei' ? 'IMEI (телефон)' : 'SN / штрихкод'}
               </button>
             ))}
           </div>

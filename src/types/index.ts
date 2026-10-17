@@ -600,6 +600,17 @@ export interface StoreReceipt {
   acknowledgedAt?: string | null;
   acknowledgedByName?: string | null;
   items: StoreReceiptItem[];
+  /** Accessories received by quantity (no cost: store staff see the receipt too). */
+  accessoryLines?: StoreReceiptAccessoryLine[];
+}
+
+export interface StoreReceiptAccessoryLine {
+  id?: string;
+  productId: string;
+  barcode: string;
+  brand: string;
+  name: string;
+  quantity: number;
 }
 
 export interface AuditLogEntry {
@@ -866,7 +877,18 @@ export interface StockRevision {
   missingDevices?: StockRevisionItem[] | null;
   surplusDevices?: StockRevisionSurplus[] | null;
   checkedImeis?: string[] | null;
+  /** Accessories counted by units: on the books (expected) and found (counted). */
+  accessoryLines?: StockRevisionAccessoryLine[] | null;
   comment?: string | null;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface StockRevisionAccessoryLine {
+  productId: string;
+  barcode: string;
+  brand: string;
+  name: string;
+  expected: number;
+  counted: number;
 }

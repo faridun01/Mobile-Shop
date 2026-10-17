@@ -64,7 +64,7 @@ try {
     const stores = (await call(token, 'GET', '/stores')).data as any[];
     const wh = stores.find((s) => s.isMainWarehouse);
     assert(wh && wh.cashBalanceUsd === undefined, 'main warehouse balance must be hidden');
-    const pull = await call(token, 'POST', '/transfers', { fromStoreId: warehouse.id, toStoreId: token === seller ? 'store-sahovat' : 'store-siyoma', deviceIds: [] });
+    const pull = await call(token, 'POST', '/transfers', { fromStoreId: warehouse.id, toStoreId: token === seller ? 'store-sahovat' : 'store-siyoma', deviceIds: ['forbidden-warehouse-device'] });
     assert.equal(pull.status, 403, JSON.stringify(pull));
   }
   pass('sellers and partners cannot list, search, query or pull main warehouse stock; its cash is hidden');
@@ -72,7 +72,8 @@ try {
   // ---------- scanning ----------
   const lookup = await call(seller, 'POST', '/store-receipts/lookup', { imei: ` ${imeis[0]} ` });
   assert.equal(lookup.status, 200, JSON.stringify(lookup));
-  assert.deepEqual(Object.keys(lookup.data).sort(), ['brand', 'color', 'id', 'imei', 'imei2', 'model', 'ram', 'storage'].sort());
+  assert.equal(lookup.data.kind, 'DEVICE');
+  assert.deepEqual(Object.keys(lookup.data).sort(), ['kind', 'brand', 'color', 'id', 'imei', 'imei2', 'model', 'ram', 'storage'].sort());
   for (const [imei, expected] of [['000000000000000', 404], [soldElsewhere.imei, 409]] as const) {
     const r = await call(seller, 'POST', '/store-receipts/lookup', { imei });
     assert.equal(r.status, expected, `${imei}: ${JSON.stringify(r)}`);

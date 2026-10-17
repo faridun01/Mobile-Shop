@@ -1,0 +1,16 @@
+{
+  "schema": "audit_fixes_quarter_1792248421723_14676",
+  "days": 90,
+  "productCards": 1000,
+  "physicalUnits": 3700,
+  "operations": 3785,
+  "sales": 3400,
+  "expenses": 270,
+  "revenueUsd": 207113.96,
+  "costUsd": 164517,
+  "netProfitUsd": 42560.09,
+  "cashDifferenceUsd": "0.00",
+  "stockDifference": 0,
+  "dateMethod": "Fixture dates on sales/expenses; real execution clock and daily rate changes",
+  "excluded": "Debt, returns, exchanges, repairs, transfers, payroll and collections are covered separately by other suites, not this volume model"
+}

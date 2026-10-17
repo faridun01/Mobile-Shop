@@ -18,6 +18,8 @@ const db = vi.hoisted(() => {
     stockRevision: model(),
     auditLog: model(),
     notification: model(),
+    accessoryBatch: model(),
+    accessoryProduct: model(),
   };
 });
 
@@ -51,6 +53,9 @@ import { StockRevisionService } from './revisions.service';
 describe('StockRevisionService', () => {
   beforeEach(() => {
     vi.resetAllMocks();
+    // No accessories at the store unless a test says otherwise.
+    db.accessoryBatch.findMany.mockResolvedValue([]);
+    db.accessoryProduct.findMany.mockResolvedValue([]);
   });
 
   describe('create', () => {
@@ -111,6 +116,49 @@ describe('StockRevisionService', () => {
       expect(result.missingDevices).toHaveLength(1);
       expect((result.missingDevices as any)[0].imei).toBe('222222222222222');
       expect(result.surplusDevices).toEqual([{ code: '999999999999999', note: 'Лишний телефон' }]);
+    });
+
+    it('counts accessories by units: a shortage of one card and a surplus of another', async () => {
+      db.user.findUnique.mockResolvedValue({ id: 'user-admin', storeId: null, role: 'ADMIN' });
+      db.store.findUnique.mockResolvedValue({ id: 'store-1', name: 'Магазин 1', isMainWarehouse: false });
+      db.device.findMany.mockResolvedValue([]);
+      // 3 + 2 cables in two batches on the books; no cases.
+      db.accessoryBatch.findMany.mockResolvedValue([
+        { productId: 'cable', quantityRemaining: 3 },
+        { productId: 'cable', quantityRemaining: 2 },
+      ]);
+      db.accessoryProduct.findMany.mockResolvedValue([
+        { id: 'cable', barcode: '4600000000017', brand: 'Baseus', name: 'Кабель' },
+        { id: 'case', barcode: '4600000000024', brand: 'Nillkin', name: 'Чехол' },
+      ]);
+      db.stockRevision.create.mockImplementation(({ data }: any) => Promise.resolve({ id: 'rev-3', ...data }));
+      db.auditLog.create.mockResolvedValue({ id: 'audit-3' });
+
+      const result = await StockRevisionService.create(
+        { userId: 'user-admin', role: 'ADMIN' },
+        { storeId: 'store-1', checkedImeis: [], accessoryCounts: [{ productId: 'cable', counted: 4 }, { productId: 'case', counted: 2 }] },
+      );
+
+      expect(result.status).toBe('DISCREPANCY');
+      expect(result.totalExpected).toBe(5);
+      expect(result.totalChecked).toBe(4);
+      expect(result.totalMissing).toBe(1);
+      expect(result.totalSurplus).toBe(2);
+      expect(result.accessoryLines).toEqual([
+        { productId: 'cable', barcode: '4600000000017', brand: 'Baseus', name: 'Кабель', expected: 5, counted: 4 },
+        { productId: 'case', barcode: '4600000000024', brand: 'Nillkin', name: 'Чехол', expected: 0, counted: 2 },
+      ]);
+    });
+
+    it('rejects a negative or fractional accessory count', async () => {
+      db.user.findUnique.mockResolvedValue({ id: 'user-admin', storeId: null, role: 'ADMIN' });
+      db.store.findUnique.mockResolvedValue({ id: 'store-1', name: 'Магазин 1', isMainWarehouse: false });
+      db.device.findMany.mockResolvedValue([]);
+      await expect(StockRevisionService.create(
+        { userId: 'user-admin', role: 'ADMIN' },
+        { storeId: 'store-1', checkedImeis: [], accessoryCounts: [{ productId: 'cable', counted: 1.5 }] },
+      )).rejects.toThrow('целым числом');
+      expect(db.stockRevision.create).not.toHaveBeenCalled();
     });
   });
 

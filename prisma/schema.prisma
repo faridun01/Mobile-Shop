@@ -195,6 +195,7 @@ model StoreReceipt {
   store     Store              @relation("ReceiptStore", fields: [storeId], references: [id])
   fromStore Store              @relation("ReceiptSource", fields: [fromStoreId], references: [id])
   items     StoreReceiptItem[]
+  accessoryLines StoreReceiptAccessoryLine[]
 
   @@index([storeId, createdAt])
   @@index([createdAt])
@@ -218,6 +219,27 @@ model StoreReceiptItem {
   @@unique([receiptId, deviceId])
   @@index([deviceId])
   @@map("store_receipt_items")
+}
+
+// Accessory units taken into a store by a store receipt: a quantity of one card, moved out of the
+// main warehouse's batches oldest first; `allocations` records which batches gave which units
+// ([{ batchId, quantity, unitCostUsd }]) — ADMIN-only data, never sent to store staff.
+model StoreReceiptAccessoryLine {
+  id          String @id @default(uuid())
+  receiptId   String
+  productId   String
+  barcode     String
+  brand       String
+  name        String
+  quantity    Int
+  allocations Json
+
+  receipt StoreReceipt     @relation(fields: [receiptId], references: [id], onDelete: Cascade)
+  product AccessoryProduct @relation(fields: [productId], references: [id])
+
+  @@index([receiptId])
+  @@index([productId])
+  @@map("store_receipt_accessory_lines")
 }
 
 // Daily cash handover: the admin collects a store register's whole balance into the
@@ -324,6 +346,8 @@ model StockRevision {
   missingDevices  Json?
   surplusDevices  Json?
   checkedImeis    Json?
+  // Accessories counted by quantity: [{ productId, barcode, brand, name, expected, counted }].
+  accessoryLines  Json?
   comment         String?
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
@@ -489,6 +513,7 @@ model AccessoryProduct {
   batches        AccessoryBatch[]
   saleItems      SaleAccessoryItem[]
   transferLines  TransferAccessoryLine[]
+  receiptLines   StoreReceiptAccessoryLine[]
 
   @@index([brand])
   @@index([category])

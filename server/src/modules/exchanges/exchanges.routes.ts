@@ -9,8 +9,10 @@ export function registerExchangeRoutes(app: Express) {
   app.post('/api/exchanges', authenticateJwt, async (req: AuthenticatedRequest, res, next) => {
     try {
       const body = req.body ?? {};
-      if (!body.saleId || !(body.saleItemId || body.returnedImei) || !body.replacementDeviceId || body.newPriceTjs === undefined || body.newPriceTjs === null) {
-        res.status(400).json({ message: 'Укажите чек, сдаваемый телефон, телефон на замену и его цену' });
+      const returnsSomething = Boolean(body.saleItemId || body.returnedImei || body.returnedAccessory);
+      const sellsDevice = Boolean(body.replacementDeviceId) && body.newPriceTjs !== undefined && body.newPriceTjs !== null;
+      if (!body.saleId || !returnsSomething || !(sellsDevice || body.replacementAccessory)) {
+        res.status(400).json({ message: 'Укажите чек, сдаваемый товар, товар на замену и его цену' });
         return;
       }
 
@@ -28,9 +30,15 @@ export function registerExchangeRoutes(app: Express) {
         saleId: body.saleId,
         saleItemId: body.saleItemId,
         returnedImei: body.returnedImei,
+        returnedAccessory: body.returnedAccessory
+          ? { lineId: String(body.returnedAccessory.lineId ?? ''), quantity: Number(body.returnedAccessory.quantity) }
+          : undefined,
         withheldTjs: body.withheldTjs,
         replacementDeviceId: body.replacementDeviceId,
         newPriceTjs: body.newPriceTjs,
+        replacementAccessory: body.replacementAccessory
+          ? { productId: String(body.replacementAccessory.productId ?? ''), quantity: Number(body.replacementAccessory.quantity), unitPriceTjs: body.replacementAccessory.unitPriceTjs }
+          : undefined,
         paymentMethod: body.paymentMethod,
         cashAmountTjs: body.cashAmountTjs,
         cardAmountTjs: body.cardAmountTjs,

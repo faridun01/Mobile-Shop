@@ -126,10 +126,16 @@ interface AppContextType {
   /** Exchange = return of one phone (with the withheld amount) + a new receipt for the new phone. */
   processExchange: (params: {
     saleId: string;
-    saleItemId: string;
+    /** The phone/tablet handed back… */
+    saleItemId?: string;
+    /** …or accessory units of a receipt line. */
+    returnedAccessory?: { lineId: string; quantity: number };
     withheldTjs: number;
-    replacementDeviceId: string;
-    newPriceTjs: number;
+    /** The new phone/tablet at its price… */
+    replacementDeviceId?: string;
+    newPriceTjs?: number;
+    /** …or new accessory units at a unit price. */
+    replacementAccessory?: { productId: string; quantity: number; unitPriceTjs: number };
     paymentMethod: 'CASH' | 'CARD' | 'SPLIT';
     cashAmountTjs?: number;
     cardAmountTjs?: number;
@@ -1052,9 +1058,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         body: JSON.stringify({
           saleId: params.saleId,
           saleItemId: params.saleItemId,
+          returnedAccessory: params.returnedAccessory,
           withheldTjs: params.withheldTjs,
           replacementDeviceId: params.replacementDeviceId,
           newPriceTjs: params.newPriceTjs,
+          replacementAccessory: params.replacementAccessory,
           paymentMethod: params.paymentMethod,
           cashAmountTjs: params.cashAmountTjs,
           cardAmountTjs: params.cardAmountTjs,

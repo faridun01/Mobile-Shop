@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { useAppFields } from '../../context/AppContext';
 import { formatStoreDisplayTitle } from '../../utils/storeContext';
 import { apiClient } from '../../api/client';
-import { StoreReceipt, StoreReceiptItem } from '../../types';
+import { StoreReceipt, StoreReceiptAccessoryLine, StoreReceiptItem } from '../../types';
 import { formatPhoneColor, normalizePhoneColor } from '../../utils/phoneSpecs';
 import { soundEffects } from '../../utils/sound';
 import { StatusBanner, StatusMessage } from '../ui/StatusBanner';
@@ -25,7 +25,14 @@ import {
   History,
   Check,
   X,
+  Headphones,
+  Minus,
 } from 'lucide-react';
+
+/** An accessory card being received: units to take from the main warehouse (at most `available`). */
+interface IntakeAccessory extends StoreReceiptAccessoryLine {
+  available: number;
+}
 
 export const StoreReceiptPage: React.FC = () => {
   const { currentUser, stores, openScanner, selectedStoreId } = useAppFields(
@@ -56,6 +63,9 @@ export const StoreReceiptPage: React.FC = () => {
   // Intake State
   const [imeiInput, setImeiInput] = useState('');
   const [scannedItems, setScannedItems] = useState<StoreReceiptItem[]>([]);
+  const [scannedAccessories, setScannedAccessories] = useState<IntakeAccessory[]>([]);
+  const accessoryUnits = scannedAccessories.reduce((sum, line) => sum + line.quantity, 0);
+  const intakeCount = scannedItems.length + accessoryUnits;
   const [isLookingUp, setIsLookingUp] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [status, setStatus] = useState<StatusMessage | null>(null);
@@ -133,6 +143,24 @@ export const StoreReceiptPage: React.FC = () => {
         }),
       });
 
+      // An accessory's barcode: one more unit of it (up to what the main warehouse has free).
+      if (res.kind === 'ACCESSORY') {
+        const existing = scannedAccessories.find((line) => line.productId === res.id);
+        if (existing && existing.quantity >= res.available) {
+          soundEffects.playError();
+          setStatus({ tone: 'warning', text: `${res.brand} ${res.name}: на главном складе свободно только ${res.available} шт.` });
+          return;
+        }
+        setScannedAccessories((prev) => existing
+          ? prev.map((line) => (line.productId === res.id ? { ...line, quantity: line.quantity + 1, available: res.available } : line))
+          : [{ productId: res.id, barcode: res.barcode, brand: res.brand, name: res.name, quantity: 1, available: res.available }, ...prev]);
+        setImeiInput('');
+        soundEffects.playAddToCartSuccess();
+        setStatus({ tone: 'success', text: `Добавлен аксессуар: ${res.brand} ${res.name} (${(existing?.quantity ?? 0) + 1} шт.)` });
+        setTimeout(() => imeiInputRef.current?.focus(), 50);
+        return;
+      }
+
       const newItem: StoreReceiptItem = {
         id: res.id,
         deviceId: res.id,
@@ -160,12 +188,17 @@ export const StoreReceiptPage: React.FC = () => {
       soundEffects.playError();
       setStatus({
         tone: 'error',
-        text: err?.message || `Устройство с IMEI ${cleanImei} не найдено на главном складе`,
+        text: err?.message || `Товар с кодом ${cleanImei} не найден на главном складе`,
       });
     } finally {
       setIsLookingUp(false);
     }
-  }, [scannedItems, effectiveStoreId]);
+  }, [scannedItems, scannedAccessories, effectiveStoreId]);
+
+  const setAccessoryQuantity = (productId: string, quantity: number) =>
+    setScannedAccessories((prev) => prev.map((line) => (
+      line.productId === productId ? { ...line, quantity: Math.max(1, Math.min(line.available, Math.floor(quantity) || 1)) } : line
+    )));
 
   // Form submit for IMEI field
   const handleInputSubmit = (e: React.FormEvent) => {
@@ -181,7 +214,7 @@ export const StoreReceiptPage: React.FC = () => {
 
   // Complete Receipt Intake
   const handleCreateReceipt = async () => {
-    if (scannedItems.length === 0) return;
+    if (intakeCount === 0) return;
 
     try {
       setIsSubmitting(true);
@@ -191,12 +224,14 @@ export const StoreReceiptPage: React.FC = () => {
         method: 'POST',
         body: JSON.stringify({
           imeis: scannedItems.map((item) => item.imei),
+          accessories: scannedAccessories.map((line) => ({ productId: line.productId, quantity: line.quantity })),
           storeId: effectiveStoreId || undefined,
         }),
       });
 
       soundEffects.playAddToCartSuccess();
       setScannedItems([]);
+      setScannedAccessories([]);
       setSelectedReceipt(res);
       setStatus({
         tone: 'success',
@@ -229,6 +264,9 @@ export const StoreReceiptPage: React.FC = () => {
           item.imei.toLowerCase().includes(q) ||
           item.brand.toLowerCase().includes(q) ||
           item.model.toLowerCase().includes(q)
+        ) ||
+        (r.accessoryLines || []).some((line) =>
+          line.barcode.toLowerCase().includes(q) || `${line.brand} ${line.name}`.toLowerCase().includes(q)
         )
     );
   }, [historyList, historySearch]);
@@ -259,7 +297,7 @@ export const StoreReceiptPage: React.FC = () => {
             }`}
           >
             <PackagePlus className="w-3.5 h-3.5" />
-            Новый приход {scannedItems.length > 0 && `(${scannedItems.length})`}
+            Новый приход {intakeCount > 0 && `(${intakeCount})`}
           </button>
           <button
             type="button"
@@ -288,7 +326,7 @@ export const StoreReceiptPage: React.FC = () => {
                   type="text"
                   value={imeiInput}
                   onChange={(e) => setImeiInput(e.target.value)}
-                  placeholder="Введите или отсканируйте 15-значный IMEI..."
+                  placeholder="IMEI / SN устройства или штрихкод аксессуара..."
                   disabled={isLookingUp || isSubmitting}
                   className="w-full h-10 pl-3.5 pr-20 rounded-xl border border-border bg-surface text-fg font-mono text-xs sm:text-sm focus:outline-none focus:border-accent shadow-xs"
                   autoFocus
@@ -311,8 +349,8 @@ export const StoreReceiptPage: React.FC = () => {
                     type="button"
                     onClick={() => openScanner((code) => handleLookupImei(code), { allowModeSwitch: true })}
                     className="p-1.5 rounded-lg text-accent hover:bg-accent/15 border border-transparent hover:border-accent/25 cursor-pointer transition-colors"
-                    title="Сканировать IMEI камерой"
-                    aria-label="Сканировать IMEI камерой"
+                    title="Сканировать камерой"
+                    aria-label="Сканировать камерой"
                   >
                     <Barcode className="w-5 h-5" />
                   </button>
@@ -336,14 +374,14 @@ export const StoreReceiptPage: React.FC = () => {
                 <div className="flex items-center gap-2">
                   <Smartphone className="w-4 h-4 text-accent" />
                   <h3 className="text-sm font-bold text-fg">
-                    Устройства к приёму ({scannedItems.length} шт.)
+                    Товары к приёму ({intakeCount} шт.)
                   </h3>
                 </div>
 
-                {scannedItems.length > 0 && (
+                {intakeCount > 0 && (
                   <button
                     type="button"
-                    onClick={() => setScannedItems([])}
+                    onClick={() => { setScannedItems([]); setScannedAccessories([]); }}
                     disabled={isSubmitting}
                     className="text-xs text-danger hover:underline cursor-pointer font-medium"
                   >
@@ -352,19 +390,65 @@ export const StoreReceiptPage: React.FC = () => {
                 )}
               </div>
 
-              {scannedItems.length === 0 ? (
+              {intakeCount === 0 ? (
                 <div className="py-8 text-center text-fg-subtle space-y-1.5">
                   <div className="w-10 h-10 rounded-full bg-surface-raised flex items-center justify-center mx-auto text-fg-subtle">
                     <Barcode className="w-5 h-5 opacity-50" />
                   </div>
                   <p className="text-xs font-semibold text-fg">Список прихода пуст</p>
                   <p className="text-[11px] text-fg-subtle">
-                    Отсканируйте или введите IMEI выше
+                    Отсканируйте IMEI / SN устройства или штрихкод аксессуара
                   </p>
                 </div>
               ) : (
                 <div className="space-y-2">
                   <div className="max-h-[380px] overflow-y-auto space-y-2 pr-1">
+                    {scannedAccessories.map((line) => (
+                      <div
+                        key={line.productId}
+                        className="p-3 rounded-xl bg-surface-raised border border-border flex items-center justify-between gap-3 hover:border-accent/40 transition-colors"
+                      >
+                        <div className="flex items-center gap-3 min-w-0">
+                          <span className="w-6 h-6 rounded-lg bg-accent/10 border border-accent/25 flex items-center justify-center text-accent shrink-0">
+                            <Headphones className="w-3.5 h-3.5" />
+                          </span>
+                          <div className="min-w-0">
+                            <p className="text-xs sm:text-sm font-bold text-fg truncate">{line.brand} {line.name}</p>
+                            <p className="text-[11px] text-fg-subtle mt-0.5 font-mono">Штрихкод: {line.barcode} • свободно на складе {line.available} шт.</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          <div className="flex items-center rounded-lg border border-border bg-bg">
+                            <button type="button" onClick={() => setAccessoryQuantity(line.productId, line.quantity - 1)} disabled={isSubmitting || line.quantity <= 1} className="h-8 w-7 flex items-center justify-center text-fg-subtle hover:text-fg disabled:opacity-40 cursor-pointer" aria-label="Меньше">
+                              <Minus className="w-3.5 h-3.5" />
+                            </button>
+                            <input
+                              type="number"
+                              inputMode="numeric"
+                              min={1}
+                              max={line.available}
+                              value={line.quantity}
+                              disabled={isSubmitting}
+                              onChange={(e) => setAccessoryQuantity(line.productId, Number(e.target.value))}
+                              className="h-8 w-11 text-center text-xs font-bold font-mono bg-transparent focus:outline-none"
+                              aria-label={`Количество: ${line.name}`}
+                            />
+                            <button type="button" onClick={() => setAccessoryQuantity(line.productId, line.quantity + 1)} disabled={isSubmitting || line.quantity >= line.available} className="h-8 w-7 flex items-center justify-center text-fg-subtle hover:text-fg disabled:opacity-40 cursor-pointer" aria-label="Больше">
+                              <Plus className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => setScannedAccessories((prev) => prev.filter((x) => x.productId !== line.productId))}
+                            disabled={isSubmitting}
+                            className="p-1.5 rounded-lg text-fg-subtle hover:text-danger hover:bg-danger/10 transition-colors cursor-pointer"
+                            title="Удалить из списка"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
                     {scannedItems.map((item, idx) => (
                       <div
                         key={item.imei}
@@ -409,12 +493,12 @@ export const StoreReceiptPage: React.FC = () => {
                       type="button"
                       variant="primary"
                       loading={isSubmitting}
-                      disabled={scannedItems.length === 0 || isSubmitting}
+                      disabled={intakeCount === 0 || isSubmitting}
                       onClick={handleCreateReceipt}
                       leftIcon={CheckCircle2}
                       className="w-full sm:w-auto h-11 px-6 font-bold cursor-pointer"
                     >
-                      Оприходовать ({scannedItems.length} шт.)
+                      Оприходовать ({intakeCount} шт.)
                     </Button>
                   </div>
                 </div>
@@ -442,7 +526,7 @@ export const StoreReceiptPage: React.FC = () => {
                     type="text"
                     value={historySearch}
                     onChange={(e) => setHistorySearch(e.target.value)}
-                    placeholder="Поиск по накладной, IMEI..."
+                    placeholder="Поиск по накладной, IMEI, штрихкоду..."
                     className="w-full h-9 pl-8 pr-3 rounded-xl border border-border bg-bg text-fg text-xs focus:outline-none focus:border-accent"
                   />
                 </div>
@@ -562,7 +646,7 @@ export const StoreReceiptPage: React.FC = () => {
                 <span className="font-semibold text-fg">{selectedReceipt.createdByName}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-fg-subtle">Количество устройств:</span>
+                <span className="text-fg-subtle">Количество товаров:</span>
                 <span className="font-bold text-fg">{selectedReceipt.itemCount} шт.</span>
               </div>
               <div className="flex justify-between">
@@ -579,7 +663,7 @@ export const StoreReceiptPage: React.FC = () => {
 
             {/* Items Table */}
             <div>
-              <h4 className="text-xs font-bold text-fg mb-2">Список принятых устройств:</h4>
+              <h4 className="text-xs font-bold text-fg mb-2">Список принятых товаров:</h4>
               <div className="max-h-[260px] overflow-auto rounded-xl border border-border">
                 <table className="w-full text-left text-xs border-collapse min-w-[340px]">
                   <thead className="bg-surface-raised border-b border-border sticky top-0">
@@ -587,7 +671,7 @@ export const StoreReceiptPage: React.FC = () => {
                       <th className="p-2 text-fg-subtle font-semibold">№</th>
                       <th className="p-2 text-fg-subtle font-semibold">Модель</th>
                       <th className="p-2 text-fg-subtle font-semibold">Память/Цвет</th>
-                      <th className="p-2 text-fg-subtle font-semibold">IMEI / SN</th>
+                      <th className="p-2 text-fg-subtle font-semibold">IMEI / SN / штрихкод</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border">
@@ -597,6 +681,14 @@ export const StoreReceiptPage: React.FC = () => {
                         <td className="p-2 font-bold text-fg">{item.brand} {item.model}</td>
                         <td className="p-2 text-fg-subtle">{item.storage || '—'} {item.color ? `• ${formatPhoneColor(item.color)}` : ''}</td>
                         <td className="p-2 font-mono font-bold text-accent">{item.imei}</td>
+                      </tr>
+                    ))}
+                    {(selectedReceipt.accessoryLines || []).map((line, idx) => (
+                      <tr key={line.id || line.productId} className="hover:bg-surface-raised/50">
+                        <td className="p-2 font-mono text-fg-subtle">{selectedReceipt.items.length + idx + 1}</td>
+                        <td className="p-2 font-bold text-fg">{line.brand} {line.name}</td>
+                        <td className="p-2 text-fg-subtle">аксессуар • {line.quantity} шт.</td>
+                        <td className="p-2 font-mono font-bold text-accent">{line.barcode}</td>
                       </tr>
                     ))}
                   </tbody>

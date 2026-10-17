@@ -10,8 +10,12 @@ export function registerReportRoutes(app: Express) {
   // filtering the FULL, ever-growing sales/expenses history fetched on every login.
   app.get('/api/reports/summary', authenticateJwt, requireRoles('ADMIN'), async (req: AuthenticatedRequest, res, next) => {
     try {
-      const startDate = typeof req.query.startDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(req.query.startDate) ? req.query.startDate : undefined;
-      const endDate = typeof req.query.endDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(req.query.endDate) ? req.query.endDate : undefined;
+      const startDate = typeof req.query.startDate === 'string' ? req.query.startDate : undefined;
+      const endDate = typeof req.query.endDate === 'string' ? req.query.endDate : undefined;
+      if ((req.query.startDate !== undefined && !startDate) || (req.query.endDate !== undefined && (!endDate || !startDate))) {
+        res.status(400).json({ message: 'Укажите корректные даты начала и окончания периода' });
+        return;
+      }
       let period = VALID_PERIODS.includes(req.query.period as ReportPeriod) ? (req.query.period as ReportPeriod) : 'TODAY';
       if (startDate) {
         period = 'CUSTOM_RANGE';

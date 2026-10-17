@@ -2,6 +2,7 @@ import 'dotenv/config';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { PrismaClient } from '@prisma/client';
+import { D } from '../server/src/common/decimal';
 
 const url = new URL(process.env.DATABASE_URL || '');
 assert(['localhost', '127.0.0.1'].includes(url.hostname), 'Disposable local database required');
@@ -32,6 +33,10 @@ try {
     return { status: r.status, data: await r.json().catch(() => null) };
   };
   token = (await api('POST', '/auth/login', { login: 'admin', password: 'admin123' })).data.token;
+  for (const query of ['startDate=2026-02-31', 'startDate=invalid', 'startDate=', 'startDate=2026-01-01&endDate=2026-04-31', 'endDate=2026-01-01']) {
+    assert.equal((await api('GET', `/reports/summary?${query}`)).status, 400, query);
+  }
+  pass('report rejects impossible, malformed and incomplete custom periods');
   assert.equal((await api('POST', '/exchange-rate/today', { rate: 10 })).status, 200);
   assert.equal((await api('POST', '/stores/store-siyoma/adjust-cash', { newBalanceTjs: 10000, reason: 'Test fixture' })).status, 200);
   assert.equal((await api('POST', '/stores/main-warehouse/adjust-cash', { newBalanceTjs: 10000, reason: 'Test fixture central' })).status, 200);
@@ -159,7 +164,59 @@ try {
   await api('POST', '/notifications/read-all');
   assert.equal((await db.notification.findUniqueOrThrow({ where: { id: 'scoped-notification' } })).read, false);
   pass('notification recipient and role restrictions are both enforced');
+  // Revision is evidence of a physical count; it must not silently adjust stock or money.
+  const revisionStore = (await api('POST', '/stores', { name: 'Ревизия аудита' })).data;
+  const accessoryReceipt = await api('POST', '/purchases', { supplierId: 'sup-china', invoiceNumber: 'REVISION-ACCESSORIES', groups: [{ category: 'ACCESSORY', barcode: 'REVISION-AUDIT', brand: 'Audit', name: 'Кабель', accessoryCategory: 'Кабели', quantity: 10, purchasePriceUsd: '1.23' }] });
+  assert.equal(accessoryReceipt.status, 201);
+  const product = await db.accessoryProduct.findUniqueOrThrow({ where: { barcode: 'REVISION-AUDIT' } });
+  assert.equal((await api('POST', '/store-receipts', { storeId: revisionStore.id, accessories: [{ productId: product.id, quantity: 10 }] })).status, 201);
+  const revisionBody = { storeId: revisionStore.id, checkedImeis: [], accessoryCounts: [{ productId: product.id, counted: 10 }] };
+  const matched = await api('POST', '/revisions', revisionBody, 'revision-match');
+  assert.equal(matched.status, 201);
+  assert.equal(matched.data.status, 'MATCH');
+  assert.equal(matched.data.totalExpected, 10);
+  assert.equal(matched.data.totalChecked, 10);
+  assert.equal((await api('POST', '/revisions', revisionBody, 'revision-match')).data.id, matched.data.id);
+  for (const [counted, missing, surplus] of [[7, 3, 0], [12, 0, 2]]) {
+    const revision = await api('POST', '/revisions', { ...revisionBody, accessoryCounts: [{ productId: product.id, counted }] });
+    assert.equal(revision.status, 201);
+    assert.equal(revision.data.status, 'DISCREPANCY');
+    assert.equal(revision.data.totalMissing, missing);
+    assert.equal(revision.data.totalSurplus, surplus);
+  }
+  assert.equal((await api('POST', '/revisions', { ...revisionBody, accessoryCounts: [{ productId: product.id, counted: -1 }] })).status, 400);
+  const remaining = await db.accessoryBatch.aggregate({ where: { storeId: revisionStore.id }, _sum: { quantityRemaining: true } });
+  assert.equal(remaining._sum.quantityRemaining, 10);
+  assert((await db.store.findUniqueOrThrow({ where: { id: revisionStore.id } })).cashBalanceUsd.eq(0));
+  assert.equal(await db.auditLog.count({ where: { action: 'STOCK_REVISION', targetId: matched.data.id } }), 1);
+  pass('accessory receipt and revision: match, shortage, surplus, validation, idempotency, audit; no stock/cash adjustment');
+  const ownerProfitBefore = (await db.owner.findMany()).reduce((s, o) => s.plus(o.availableProfitUsd), D(0));
+  const accessorySale = await api('POST', '/sales', { storeId: revisionStore.id, paymentMethod: 'CASH', accessories: [{ productId: product.id, quantity: 3, unitPriceTjs: 20 }] });
+  assert.equal(accessorySale.status, 201);
+  const lineId = accessorySale.data.accessoryItems[0].id;
+  const returned = await api('POST', `/sales/${accessorySale.data.id}/return-items`, { paymentMethod: 'CASH', reason: 'Тест частичного возврата', accessories: [{ lineId, quantity: 1, withheldTjs: 2 }] }, 'accessory-partial-return');
+  assert.equal(returned.status, 200, JSON.stringify(returned));
+  const exchangeBody = { saleId: accessorySale.data.id, returnedAccessory: { lineId, quantity: 1 }, withheldTjs: 0, replacementAccessory: { productId: product.id, quantity: 1, unitPriceTjs: 30 }, paymentMethod: 'CASH', reason: 'Тест обмена аксессуара' };
+  const exchanged = await api('POST', '/exchanges', exchangeBody, 'accessory-exchange');
+  assert.equal(exchanged.status, 200, JSON.stringify(exchanged));
+  assert.equal((await api('POST', '/exchanges', exchangeBody, 'accessory-exchange')).data.sale.id, exchanged.data.sale.id);
+  assert.equal((await api('POST', `/sales/${accessorySale.data.id}/return-items`, { paymentMethod: 'CASH', reason: 'Проверка превышения остатка', accessories: [{ lineId, quantity: 2, withheldTjs: 2 }] })).status, 400);
+  assert.equal((await db.saleAccessoryItem.findUniqueOrThrow({ where: { id: lineId } })).returnedQuantity, 2);
+  assert.equal((await db.accessoryBatch.aggregate({ where: { storeId: revisionStore.id }, _sum: { quantityRemaining: true } }))._sum.quantityRemaining, 8);
+  assert((await db.store.findUniqueOrThrow({ where: { id: revisionStore.id } })).cashBalanceUsd.eq('5.20'));
+  assert((await db.financialAccount.findUniqueOrThrow({ where: { storeId: revisionStore.id } })).balanceUsd.eq('5.20'));
+  const accessoryReport = await api('GET', `/reports/summary?period=ALL&storeId=${revisionStore.id}`);
+  assert.equal(accessoryReport.status, 200);
+  // Withheld $0.20 is a separate refund penalty, not merchandise revenue.
+  assert(D(accessoryReport.data.revenueUsd).eq('5.00'), JSON.stringify(accessoryReport.data));
+  assert(D(accessoryReport.data.periodRefundPenaltiesUsd).eq('0.20'));
+  assert(D(accessoryReport.data.cogsUsd).eq('2.46'));
+  assert(D(accessoryReport.data.netProfitUsd).eq('2.74'));
+  const ownerProfitAfter = (await db.owner.findMany()).reduce((s, o) => s.plus(o.availableProfitUsd), D(0));
+  assert(ownerProfitAfter.minus(ownerProfitBefore).eq('2.74'));
+  pass('accessory sale → partial return → exchange: FIFO units, cash, accounts, owner profit, report, retries and over-return rejection reconcile');
   token = (await api('POST', '/auth/login', { login: 'partner', password: 'partner123' })).data.token;
+  assert.equal((await api('POST', '/revisions', revisionBody)).status, 403);
   assert.equal((await purchase('FORBIDDEN', [{ imei: '350000000000021' }])).status, 403);
   pass('main warehouse purchase permission enforced on backend');
   console.log(`Functional regressions: ${passed} passed`);

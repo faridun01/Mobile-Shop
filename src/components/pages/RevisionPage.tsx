@@ -17,6 +17,9 @@ import { formatPhoneColor } from '../../utils/phoneSpecs';
 import { RevisionHistoryPanel } from '../revision/RevisionHistoryPanel';
 import { RestrictedAccess } from '../ui/RestrictedAccess';
 import { ClosePeriodDialog } from '../owners/ClosePeriodDialog';
+import { AccessoryCountPanel, type AccessoryCountRow } from '../revision/AccessoryCountPanel';
+import { useAccessoryStock } from '../../hooks/useAccessoryStock';
+import { findAccessoryByCode } from '../sale/AccessoryCart';
 import {
   CheckCircle2,
   RotateCcw,
@@ -92,6 +95,20 @@ export const RevisionPage: React.FC = () => {
 
   // Checked IMEIs set for current revision session
   const [checkedImeis, setCheckedImeis] = useState<Set<string>>(() => new Set());
+  // Accessories counted by units, per card (a scan of the barcode adds one).
+  const [accessoryCounts, setAccessoryCounts] = useState<Record<string, number>>({});
+  const { items: accessoryStock } = useAccessoryStock(effectiveStoreId || undefined);
+  // Cards on the books at this location, and any card counted here although not on its books.
+  const accessoryRows: AccessoryCountRow[] = useMemo(() => accessoryStock
+    .map((product) => ({
+      product,
+      expected: product.stores.filter((s) => s.storeId === effectiveStoreId).reduce((sum, s) => sum + s.quantity, 0),
+      counted: accessoryCounts[product.id] ?? 0,
+    }))
+    .filter((row) => row.expected > 0 || row.counted > 0), [accessoryStock, accessoryCounts, effectiveStoreId]);
+  const accessoryExpected = accessoryRows.reduce((sum, r) => sum + r.expected, 0);
+  const accessoryChecked = accessoryRows.reduce((sum, r) => sum + Math.min(r.expected, r.counted), 0);
+  const accessorySurplus = accessoryRows.reduce((sum, r) => sum + Math.max(0, r.counted - r.expected), 0);
   const [status, setStatus] = useState<StatusMessage | null>(null);
   // Scanned IMEIs that are not on this store's stock (излишки), with where they are registered.
   const [surplus, setSurplus] = useState<Array<{ code: string; note: string }>>([]);
@@ -119,16 +136,19 @@ export const RevisionPage: React.FC = () => {
   // Reset revision session when store changes
   React.useEffect(() => {
     setCheckedImeis(new Set());
+    setAccessoryCounts({});
     setSurplus([]);
     setRevisionComment('');
     setStatus(null);
     setExpandedGroups(new Set());
   }, [effectiveStoreId]);
 
-  // Stats
-  const totalCount = storeDevices.length;
-  const checkedCount = storeDevices.filter((d) => checkedImeis.has(d.imei) || (d.imei2 && checkedImeis.has(d.imei2))).length;
+  // Stats: devices one by one, accessories by units.
+  const deviceCheckedCount = storeDevices.filter((d) => checkedImeis.has(d.imei) || (d.imei2 && checkedImeis.has(d.imei2))).length;
+  const totalCount = storeDevices.length + accessoryExpected;
+  const checkedCount = deviceCheckedCount + accessoryChecked;
   const uncheckedCount = totalCount - checkedCount;
+  const surplusCount = surplus.length + accessorySurplus;
   const progressPercent = totalCount > 0 ? Math.round((checkedCount / totalCount) * 100) : 0;
   const isAllReconciled = totalCount > 0 && uncheckedCount === 0;
 
@@ -141,6 +161,11 @@ export const RevisionPage: React.FC = () => {
       if (d.imei2) next.add(d.imei2);
     });
     setCheckedImeis(next);
+    setAccessoryCounts((prev) => {
+      const counts = { ...prev };
+      for (const row of accessoryRows) counts[row.product.id] = Math.max(row.expected, prev[row.product.id] ?? 0);
+      return counts;
+    });
     setStatus({
       tone: 'success',
       text: `✓ Все товары склада (${totalCount} шт.) подтверждены как сверенные`,
@@ -166,6 +191,15 @@ export const RevisionPage: React.FC = () => {
         return next;
       });
       setStatus({ tone: 'success', text: `✓ ${own.brand} ${own.model}` });
+      return;
+    }
+    // An accessory's barcode: one more unit of it counted.
+    const accessory = findAccessoryByCode(accessoryStock, code);
+    if (accessory) {
+      const next = (accessoryCounts[accessory.id] ?? 0) + 1;
+      setAccessoryCounts((prev) => ({ ...prev, [accessory.id]: (prev[accessory.id] ?? 0) + 1 }));
+      soundEffects.playAddToCartSuccess();
+      setStatus({ tone: 'success', text: `✓ ${accessory.brand} ${accessory.name}: посчитано ${next} шт.` });
       return;
     }
     if (surplus.some((item) => item.code === code)) {
@@ -234,7 +268,7 @@ export const RevisionPage: React.FC = () => {
 
   // Open reset confirm dialog
   const handleOpenResetRevision = () => {
-    if (checkedImeis.size === 0 && surplus.length === 0) {
+    if (checkedImeis.size === 0 && surplus.length === 0 && Object.keys(accessoryCounts).length === 0) {
       setStatus({ tone: 'info', text: 'Сверка ещё не начата' });
       return;
     }
@@ -244,6 +278,7 @@ export const RevisionPage: React.FC = () => {
   // Perform reset
   const handleConfirmReset = () => {
     setCheckedImeis(new Set());
+    setAccessoryCounts({});
     setSurplus([]);
     setRevisionComment('');
     setIsResetConfirmOpen(false);
@@ -261,6 +296,7 @@ export const RevisionPage: React.FC = () => {
           comment: revisionComment.trim() || undefined,
           checkedImeis: Array.from(checkedImeis),
           surplusDevices: surplus,
+          accessoryCounts: accessoryRows.map((row) => ({ productId: row.product.id, counted: row.counted })),
         }),
       });
 
@@ -272,6 +308,7 @@ export const RevisionPage: React.FC = () => {
 
       // Clear current audit session
       setCheckedImeis(new Set());
+      setAccessoryCounts({});
       setSurplus([]);
       setRevisionComment('');
       setIsSummaryModalOpen(false);
@@ -608,6 +645,11 @@ export const RevisionPage: React.FC = () => {
             )}
           </div>
         </div>
+
+        <AccessoryCountPanel
+          rows={accessoryRows}
+          onChange={(productId, counted) => setAccessoryCounts((prev) => ({ ...prev, [productId]: counted }))}
+        />
 
         {surplus.length > 0 && (
           <div className="p-2 rounded-xl bg-danger/10 border border-danger/30 space-y-1" role="region" aria-label="Излишки">
@@ -1017,7 +1059,7 @@ export const RevisionPage: React.FC = () => {
             </div>
             <div className="flex justify-between">
               <span className="text-danger font-semibold">Излишки:</span>
-              <span className="font-bold font-mono text-danger">{surplus.length} шт.</span>
+              <span className="font-bold font-mono text-danger">{surplusCount} шт.</span>
             </div>
           </div>
 
@@ -1035,10 +1077,26 @@ export const RevisionPage: React.FC = () => {
             />
           </div>
 
-          {uncheckedCount > 0 && (
+          {accessoryRows.some((r) => r.counted !== r.expected) && (
+            <div>
+              <h4 className="text-xs font-bold text-fg mb-1.5">Аксессуары с расхождением:</h4>
+              <div className="max-h-[160px] overflow-y-auto rounded-xl border border-border divide-y divide-border text-xs">
+                {accessoryRows.filter((r) => r.counted !== r.expected).map((r) => (
+                  <div key={r.product.id} className="p-2 flex justify-between items-center gap-2 bg-surface">
+                    <span className="font-semibold text-fg truncate">{r.product.brand} {r.product.name}</span>
+                    <span className={`font-mono text-[11px] shrink-0 ${r.counted < r.expected ? 'text-amber-600 dark:text-amber-400' : 'text-danger'}`}>
+                      учёт {r.expected} · найдено {r.counted} ({r.counted < r.expected ? `−${r.expected - r.counted}` : `+${r.counted - r.expected}`})
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {uncheckedCount - (accessoryExpected - accessoryChecked) > 0 && (
             <div>
               <h4 className="text-xs font-bold text-amber-600 dark:text-amber-400 mb-1.5">
-                Недостача ({uncheckedCount} шт.):
+                Недостача устройств ({uncheckedCount - (accessoryExpected - accessoryChecked)} шт.):
               </h4>
               <div className="max-h-[160px] overflow-y-auto rounded-xl border border-border divide-y divide-border text-xs">
                 {storeDevices
