@@ -50,6 +50,15 @@ beforeEach(() => {
 afterEach(async () => { controller.abort(); await pending?.catch(() => {}); vi.unstubAllGlobals(); });
 
 describe('native camera ownership and permissions', () => {
+  it.each(['64548/05WX00022', '65577/W5SE65983', '72255/Y5XH00021'])('reads photographed tablet serial %s instead of adjacent EAN', async serial => {
+    scanModeState.setState({ mode: 'serial', allowSwitch: false });
+    start(); await ready();
+    mocks.callbacks.barcodesScanned({ barcodes: [
+      { format: 'EAN_13', rawValue: '6932554477035' },
+      { format: 'CODE_128', rawValue: serial },
+    ] });
+    expect(await pending).toBe(serial);
+  });
   it('tablet SN mode ignores retail barcodes and selects the SN in a mixed frame', async () => {
     scanModeState.setState({ mode: 'serial', allowSwitch: false });
     start(); await ready();

@@ -10,6 +10,7 @@ import { useStore } from 'zustand';
 import { CODE_SCAN_HINTS, recognizeScanCodes, SERIAL_SCAN_HINTS, SCAN_HINTS } from '../../services/scanner/imei';
 import { scanModeState, setScanMode } from '../../services/scanner/scannerService';
 import { cn } from '../../utils/cn';
+import { serialScanRegion } from '../../services/scanner/scanRegion';
 const DECODE_INTERVAL_MS = 60;
 // The aiming band is cropped at camera resolution, capped here to bound decode time.
 const MAX_DECODE_WIDTH = 1280;
@@ -204,7 +205,7 @@ export const ScannerModal: React.FC = () => {
       boundingBox?: DOMRectReadOnly;
       cornerPoints?: { x: number; y: number }[];
     };
-    let nativeDetector: { detect: (source: HTMLVideoElement) => Promise<BrowserBarcode[]> } | null = null;
+    let nativeDetector: { detect: (source: HTMLVideoElement | HTMLCanvasElement) => Promise<BrowserBarcode[]> } | null = null;
     if (typeof window !== 'undefined' && 'BarcodeDetector' in window) {
       try {
         const formats = ['code_128', 'code_39', 'code_93', 'qr_code', 'data_matrix',
@@ -225,14 +226,23 @@ export const ScannerModal: React.FC = () => {
       if (cancelled) return;
       if (video && video.readyState >= 2 && video.videoWidth && video.clientWidth) {
         let detected = false;
+        // A box may carry both the tablet and keyboard SN. Decode only the visible aiming
+        // band in serial mode, without reducing the thin bars to the old 1280px cap.
+        if (mode === 'serial' && context) {
+          const region = serialScanRegion(video.videoWidth, video.videoHeight, video.clientWidth, video.clientHeight || 280);
+          canvas.width = Math.round(region.width);
+          canvas.height = Math.round(region.height);
+          context.imageSmoothingEnabled = false;
+          context.drawImage(video, region.x, region.y, region.width, region.height, 0, 0, canvas.width, canvas.height);
+        }
 
         // Path 1: Native BarcodeDetector (Instant, full-frame GPU scan on Android Chrome)
         if (nativeDetector) {
           try {
-            const barcodes = await nativeDetector.detect(video);
+            const barcodes = await nativeDetector.detect(mode === 'serial' && context ? canvas : video);
             if (barcodes && barcodes.length > 0) {
-              const targetY = (video.videoHeight || video.clientHeight || 400) / 2;
-              const targetX = (video.videoWidth || video.clientWidth || 300) / 2;
+              const targetY = (mode === 'serial' && context ? canvas.height : video.videoHeight) / 2;
+              const targetX = (mode === 'serial' && context ? canvas.width : video.videoWidth) / 2;
               const candidates: { code: string; distance: number }[] = [];
 
               for (const b of barcodes) {
@@ -274,10 +284,12 @@ export const ScannerModal: React.FC = () => {
           const startY = Math.floor((vh - cropH) / 2);
 
           const outScale = Math.min(1, MAX_DECODE_WIDTH / cropW);
-          canvas.width = Math.round(cropW * outScale);
-          canvas.height = Math.round(cropH * outScale);
-          context.imageSmoothingEnabled = outScale < 1;
-          context.drawImage(video, startX, startY, cropW, cropH, 0, 0, canvas.width, canvas.height);
+          if (mode !== 'serial') {
+            canvas.width = Math.round(cropW * outScale);
+            canvas.height = Math.round(cropH * outScale);
+            context.imageSmoothingEnabled = outScale < 1;
+            context.drawImage(video, startX, startY, cropW, cropH, 0, 0, canvas.width, canvas.height);
+          }
 
           try {
             const result = await decoder.decodeAsync(canvas);
@@ -362,7 +374,7 @@ export const ScannerModal: React.FC = () => {
       open={isScannerOpen}
       onClose={closeScanner}
       title={mode === 'serial' ? 'Сканирование SN планшета' : codeMode ? 'Сканирование штрихкода' : 'Сканирование IMEI'}
-      subtitle={mode === 'serial' ? 'Наведите на код под надписью SN / S/N. Числовой SN можно ввести вручную.' : codeMode ? 'Наведите камеру на штрихкод товара' : 'Наведите камеру на штрихкод IMEI'}
+      subtitle={mode === 'serial' ? 'Поместите в рамку только штрихкод SN планшета целиком. Код товара и SN клавиатуры оставьте за рамкой.' : codeMode ? 'Наведите камеру на штрихкод товара' : 'Наведите камеру на штрихкод IMEI'}
       maxWidth="sm"
       compact
     >
