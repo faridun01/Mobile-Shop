@@ -94,6 +94,8 @@ export interface Store {
   isMainWarehouse?: boolean;
   /** Registers are kept in USD (TJS takings converted at the day's rate). */
   cashBalanceUsd: number;
+  /** The somoni the register holds, at the rates its money came in at (only from the stores list). */
+  cashBalanceTjs?: number;
   active: boolean;
 }
 

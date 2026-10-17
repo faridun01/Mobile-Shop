@@ -371,6 +371,7 @@ export function mapStore(s: any): Store {
     address: s.address ?? undefined,
     isMainWarehouse: s.isMainWarehouse,
     cashBalanceUsd: Number(s.cashBalanceUsd) || 0,
+    cashBalanceTjs: s.cashBalanceTjs != null ? Number(s.cashBalanceTjs) : undefined,
     active: s.active,
   };
 }

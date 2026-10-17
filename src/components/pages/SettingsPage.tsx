@@ -397,9 +397,9 @@ export const SettingsPage: React.FC = () => {
                             <span className="font-bold font-mono text-accent text-xs sm:text-sm">
                               ${formatMoney(s.cashBalanceUsd)}
                             </span>
-                            {todayRate?.rate && (
+                            {s.cashBalanceTjs != null && (
                               <span className="text-[10px] text-fg-subtle font-mono truncate">
-                                ≈ {formatMoney((s.cashBalanceUsd || 0) * todayRate.rate)} TJS
+                                ≈ {formatMoney(s.cashBalanceTjs)} TJS
                               </span>
                             )}
                           </div>

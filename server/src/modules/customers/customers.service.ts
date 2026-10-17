@@ -5,6 +5,7 @@ import { requirePositiveMoney, roundMoney } from '../../common/money';
 import { getStoreCashAccount } from '../finance/account.service';
 import { postTransaction } from '../finance/financial-transaction.service';
 import { assertShiftOpen } from '../finance/shift-guard';
+import { registerTjsBalances } from '../finance/cash-balance';
 import { currentOwnerAllocations, replaceOwnerAllocations } from '../finance/owner-allocations';
 import { bookedDebtUsd, type OwnerProfitAllocation } from '../sales/profit';
 import { allocateMoney } from '../../common/allocation';
@@ -587,8 +588,13 @@ export class CustomersService {
     // Главный склад — это место хранения товаров (денег там нет, касса не ведётся).
     // Все сданные средства и основной фонд хранятся в Центральной кассе.
     // В розничных магазинах отображаются остатки выручки до проведения инкассации.
+    // A register's TJS is the somoni its ledger rows froze on their own days (what the drawer
+    // holds), never today's rate applied to its dollars: a closed day keeps its somoni when the
+    // rate changes.
+    const registerTjs = await registerTjsBalances(prisma, stores.map((s) => s.id));
     const mainWarehouseStore = stores.find((s) => s.isMainWarehouse);
     const centralCashUsd = mainWarehouseStore ? D(mainWarehouseStore.cashBalanceUsd) : D(0);
+    const centralCashTjs = mainWarehouseStore ? registerTjs.get(mainWarehouseStore.id) ?? D(0) : D(0);
 
     const retailStores = stores.filter((s) => !s.isMainWarehouse);
     const retailStoresCash = retailStores.map((s) => ({
@@ -596,8 +602,9 @@ export class CustomersService {
       name: s.name,
       isMainWarehouse: false,
       cashUsd: Number(s.cashBalanceUsd),
-      cashTjs: Number(toTjs(s.cashBalanceUsd)),
+      cashTjs: Number(registerTjs.get(s.id) ?? 0),
       _cashUsd: D(s.cashBalanceUsd),
+      _cashTjs: registerTjs.get(s.id) ?? D(0),
     }));
 
     const isSpecificStore = Boolean(storeId && storeId !== 'all');
@@ -609,6 +616,9 @@ export class CustomersService {
     const totalCashUsd = selectedRetailStore
       ? selectedRetailStore._cashUsd
       : centralCashUsd.plus(retailStoresCash.reduce((sum, s) => sum.plus(s._cashUsd), D(0)));
+    const totalCashTjs = selectedRetailStore
+      ? selectedRetailStore._cashTjs
+      : centralCashTjs.plus(retailStoresCash.reduce((sum, s) => sum.plus(s._cashTjs), D(0)));
 
     // 2. Stock Inventory by Cost Price
     const totalStockCount = inStockDevices.length;
@@ -702,14 +712,14 @@ export class CustomersService {
       exchangeRate: rate ? Number(rate) : null,
       cash: {
         totalUsd: Number(roundMoney(totalCashUsd)),
-        totalTjs: Number(toTjs(totalCashUsd)),
+        totalTjs: Number(roundMoney(totalCashTjs)),
         central: {
           id: mainWarehouseStore?.id || 'central',
           name: 'Центральная касса',
           cashUsd: Number(roundMoney(centralCashUsd)),
-          cashTjs: Number(toTjs(centralCashUsd)),
+          cashTjs: Number(centralCashTjs),
         },
-        stores: (selectedRetailStore ? [selectedRetailStore] : retailStoresCash).map(({ _cashUsd, ...s }) => s),
+        stores: (selectedRetailStore ? [selectedRetailStore] : retailStoresCash).map(({ _cashUsd, _cashTjs, ...s }) => s),
       },
       inventory: {
         totalCount: totalStockCount,

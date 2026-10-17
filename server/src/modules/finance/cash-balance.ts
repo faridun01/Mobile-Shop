@@ -1,4 +1,6 @@
+import { Prisma } from '@prisma/client';
 import { D, type MoneyInput } from '../../common/decimal';
+import { roundMoney } from '../../common/money';
 import type { TransactionClient } from '../../prisma/prisma.service';
 
 interface LedgerRow {
@@ -50,4 +52,46 @@ export async function registerLedgerBalance(db: Pick<TransactionClient, 'financi
   const migration = await db.auditLog.findFirst({ where: { action: 'CASH_REGISTER_USD_MIGRATION', targetId: storeId }, orderBy: { createdAt: 'asc' } });
   const carried = (migration?.financialDetails ?? {}) as { cashBalanceTjs?: number; cashBalanceUsd?: number };
   return { tjs: D(ledger.tjs).plus(carried.cashBalanceTjs ?? 0), usd: D(ledger.usd).plus(carried.cashBalanceUsd ?? 0) };
+}
+
+/**
+ * The somoni held by each store register (rounded), summed in the database instead of loading
+ * every ledger row: the same figure as registerLedgerBalance().tjs, for several stores at once.
+ * A store without a register is 0.
+ */
+export async function registerTjsBalances(
+  db: Pick<TransactionClient, 'financialAccount' | 'auditLog' | '$queryRaw'>,
+  storeIds: string[],
+): Promise<Map<string, ReturnType<typeof D>>> {
+  const result = new Map(storeIds.map((id) => [id, D(0)]));
+  if (storeIds.length === 0) return result;
+  const accounts = await db.financialAccount.findMany({ where: { storeId: { in: storeIds } }, select: { id: true, storeId: true } });
+  if (accounts.length > 0) {
+    // Same signs as cashBalanceFromLedger: the account's own row counts by its direction, a
+    // transfer into it counts as money in.
+    const rows = await db.$queryRaw<{ accountId: string; tjs: Prisma.Decimal | null }[]>`
+      SELECT a.id AS "accountId",
+             SUM(CASE WHEN t."accountId" = a.id
+                      THEN CASE WHEN t.direction = 'IN' THEN t."amountTjs" ELSE -t."amountTjs" END
+                      ELSE t."amountTjs" END) AS tjs
+      FROM financial_accounts a
+      JOIN financial_transactions t
+        ON t."balanceCurrency" = 'USD' AND (t."accountId" = a.id OR t."destinationAccountId" = a.id)
+      WHERE a.id IN (${Prisma.join(accounts.map((a) => a.id))})
+      GROUP BY a.id`;
+    const storeOf = new Map(accounts.map((a) => [a.id, a.storeId!]));
+    for (const row of rows) result.set(storeOf.get(row.accountId)!, D(row.tjs ?? 0));
+  }
+  // Registers converted to USD carry their opening TJS in the migration's audit entry (the first one counts).
+  const migrations = await db.auditLog.findMany({
+    where: { action: 'CASH_REGISTER_USD_MIGRATION', targetId: { in: storeIds } },
+    orderBy: { createdAt: 'desc' },
+    select: { targetId: true, financialDetails: true },
+  });
+  const carried = new Map(migrations.map((m) => [m.targetId!, (m.financialDetails ?? {}) as { cashBalanceTjs?: number }]));
+  for (const [storeId, details] of carried) {
+    result.set(storeId, result.get(storeId)!.plus(details.cashBalanceTjs ?? 0));
+  }
+  for (const [storeId, tjs] of result) result.set(storeId, roundMoney(tjs));
+  return result;
 }

@@ -38,6 +38,7 @@ import { decorateTransactions } from './prisma/prisma.service';
 import { withAuditNotifications } from './modules/notifications/audit-notifications';
 import { requireNonNegativeMoney, requirePositiveMoney, roundMoney } from './common/money';
 import { getRateForDate, requireTodayRate } from './modules/exchange-rate/exchange-rate.service';
+import { registerTjsBalances } from './modules/finance/cash-balance';
 import { decimalJsonReplacer } from './common/decimal';
 import { operationContext } from './common/request-operation';
 import { lockCashRegister } from './modules/finance/account.service';
@@ -235,9 +236,13 @@ app.get('/api/stores', authenticateJwt, async (req: AuthenticatedRequest, res, n
       ? (storeId ? { active: true, OR: [{ id: storeId }, { isMainWarehouse: true }] } : { id: '__none__' })
       : { active: true };
     const stores = await prisma.store.findMany({ where, orderBy: { name: 'asc' } });
+    // The somoni each register actually holds, at the rates its money came in at — not its
+    // dollars at today's rate.
+    const registerTjs = await registerTjsBalances(prisma, stores.map((s) => s.id));
+    const withTjs = stores.map((s) => ({ ...s, cashBalanceTjs: registerTjs.get(s.id) ?? D(0) }));
     res.json(isStoreScoped
-      ? stores.map((s) => (s.isMainWarehouse ? { id: s.id, name: s.name, isMainWarehouse: true, active: s.active } : s))
-      : stores);
+      ? withTjs.map((s) => (s.isMainWarehouse ? { id: s.id, name: s.name, isMainWarehouse: true, active: s.active } : s))
+      : withTjs);
   } catch (error) {
     next(error);
   }
