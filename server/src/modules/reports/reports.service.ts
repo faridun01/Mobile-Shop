@@ -113,6 +113,7 @@ export async function computeReportsSummary(input: ReportsSummaryInput) {
     rateRow,
     periodSalesOnly,
     periodSaleItems,
+    periodAccessoryItems,
     periodExpensesAllStores,
     allBonuses,
     refundedSalesFetched,
@@ -141,6 +142,14 @@ export async function computeReportsSummary(input: ReportsSummaryInput) {
       select: {
         saleId: true, brand: true, model: true, salePriceUsd: true, salePriceTjs: true,
         costBasisUsd: true, purchaseCostUsd: true, returnId: true,
+      },
+    }),
+    // Accessory lines of the same sales, for the units and model statistics.
+    prisma.saleAccessoryItem.findMany({
+      where: { sale: periodSaleWhere },
+      select: {
+        saleId: true, brand: true, name: true, quantity: true, returnedQuantity: true,
+        salePriceUsd: true, returnedPriceUsd: true, costUsd: true, returnedCostUsd: true,
       },
     }),
     prisma.expense.findMany({
@@ -196,7 +205,20 @@ export async function computeReportsSummary(input: ReportsSummaryInput) {
     if (list) list.push(item);
     else itemsBySale.set(saleId, [item]);
   }
-  const periodSalesAllStores = periodSalesOnly.map((sale) => ({ ...sale, saleItems: itemsBySale.get(sale.id) ?? [] }));
+  // An accessory line counts in the statistics by the units still sold (returned ones are back in stock).
+  const accessoriesBySale = new Map<string, { name: string; units: number; revenueUsd: Prisma.Decimal; costUsd: Prisma.Decimal }[]>();
+  for (const line of periodAccessoryItems) {
+    const units = line.quantity - line.returnedQuantity;
+    if (units <= 0) continue;
+    const kept = {
+      name: `${line.brand} ${line.name}`.trim(), units,
+      revenueUsd: D(line.salePriceUsd).minus(line.returnedPriceUsd), costUsd: D(line.costUsd).minus(line.returnedCostUsd),
+    };
+    accessoriesBySale.set(line.saleId, [...(accessoriesBySale.get(line.saleId) ?? []), kept]);
+  }
+  const periodSalesAllStores = periodSalesOnly.map((sale) => ({
+    ...sale, saleItems: itemsBySale.get(sale.id) ?? [], accessoryLines: accessoriesBySale.get(sale.id) ?? [],
+  }));
   // A receipt whose phones were returned one by one is reported through those returns.
   const refundedSalesAllStores = refundedSalesFetched.filter((sale) => sale.returns.length === 0);
   // Today's (or the latest known) rate only values USD figures in TJS for display; every
@@ -416,6 +438,14 @@ export async function computeReportsSummary(input: ReportsSummaryInput) {
         giftDeviceProfitTjs = D(giftDeviceProfitTjs).plus(item.salePriceTjs || D(itemPriceUsd).mul(saleRate));
       }
     });
+    for (const line of sale.accessoryLines) {
+      unitsSold += line.units;
+      if (!modelCounts[line.name]) modelCounts[line.name] = { count: 0, revenueUsd: D(0), cogsUsd: D(0), profitUsd: D(0) };
+      modelCounts[line.name].count += line.units;
+      modelCounts[line.name].revenueUsd = D(modelCounts[line.name].revenueUsd).plus(line.revenueUsd);
+      modelCounts[line.name].cogsUsd = D(modelCounts[line.name].cogsUsd).plus(line.costUsd);
+      modelCounts[line.name].profitUsd = D(modelCounts[line.name].profitUsd).plus(line.revenueUsd).minus(line.costUsd);
+    }
   });
 
   const grossProfitUsd = D((D(revenueUsd).minus(cogsUsd)).toFixed(2));
@@ -580,6 +610,11 @@ export async function computeReportsSummary(input: ReportsSummaryInput) {
           const itemCostUsd = item.costBasisUsd ?? item.purchaseCostUsd ?? 0;
           const prev = storeModels.get(name) ?? { name, count: 0, revenueUsd: D(0), profitUsd: D(0) };
           storeModels.set(name, { name, count: prev.count + 1, revenueUsd: D(prev.revenueUsd).plus(itemPriceUsd), profitUsd: D(D(prev.profitUsd).plus(itemPriceUsd)).minus(itemCostUsd) });
+        }
+        for (const line of sale.accessoryLines) {
+          storeUnits += line.units;
+          const prev = storeModels.get(line.name) ?? { name: line.name, count: 0, revenueUsd: D(0), profitUsd: D(0) };
+          storeModels.set(line.name, { name: line.name, count: prev.count + line.units, revenueUsd: D(prev.revenueUsd).plus(line.revenueUsd), profitUsd: D(prev.profitUsd).plus(line.revenueUsd).minus(line.costUsd) });
         }
       });
       const storeExpenses = summarizeExpenses(expensesByStore.get(store.id) ?? []);

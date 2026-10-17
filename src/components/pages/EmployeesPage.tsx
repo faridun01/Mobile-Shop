@@ -142,7 +142,7 @@ export const EmployeesPage: React.FC = () => {
       const entry = map.get(s.sellerId);
       if (entry) {
         entry.salesRevTjs += s.totalTjs;
-        entry.unitsSold += s.items.length;
+        entry.unitsSold += s.items.length + (s.accessoryItems || []).reduce((sum, line) => sum + line.quantity, 0);
       }
     }
 

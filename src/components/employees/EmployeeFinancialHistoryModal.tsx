@@ -242,7 +242,7 @@ export const EmployeeFinancialHistoryModal: React.FC<EmployeeFinancialHistoryMod
                           </span>
                         </td>
                         <td className="py-1.5 px-2.5 text-fg truncate max-w-56 text-[11px]">
-                          {sale.items.map((i) => `${i.brand} ${i.model}`).join(', ')}
+                          {[...sale.items.map((i) => `${i.brand} ${i.model}`), ...(sale.accessoryItems || []).map((l) => `${l.brand} ${l.name} × ${l.quantity}`)].join(', ')}
                           {sale.customerName ? ` (${sale.customerName})` : ''}
                         </td>
                         <td className="py-1.5 px-2.5 text-right font-bold font-mono text-xs text-success whitespace-nowrap">

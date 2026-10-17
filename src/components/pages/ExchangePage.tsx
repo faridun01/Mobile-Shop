@@ -155,6 +155,11 @@ export const ExchangePage: React.FC = () => {
   const searchSalesFor = (list: Sale[], q: string): boolean => {
     for (const sale of list) {
       if (sale.receiptNumber.toString() === q) {
+        // Exchange swaps a phone or tablet; a receipt of accessories only is returned instead.
+        if (sale.items.length === 0) {
+          setStatus({ tone: 'error', text: `В чеке #${sale.receiptNumber} только аксессуары — обмен доступен для телефонов и планшетов. Аксессуары оформите возвратом в истории продаж` });
+          return true;
+        }
         const open = sale.items.filter(i => !i.returnId);
         if (open.length > 1) {
           setReceiptChoice(sale);

@@ -67,6 +67,7 @@ export interface BreakdownSale {
   status: string;
   itemsCount: number;
   items: BreakdownItem[];
+  accessoryItems?: { id: string; brand: string; name: string; quantity: number; salePriceTjs: number }[];
 }
 
 export interface BreakdownExpense {
@@ -652,6 +653,11 @@ export const CashReconciliationModal: React.FC<CashReconciliationModalProps> = (
                               <span>
                                 {it.brand} {it.model} {it.storage || ''}
                               </span>
+                            </span>
+                          ))}
+                          {(sale.accessoryItems || []).map((line) => (
+                            <span key={line.id} className="text-[11px] px-1.5 py-0.5 rounded-md border bg-surface-raised border-border text-fg">
+                              {line.brand} {line.name} × {line.quantity}
                             </span>
                           ))}
 

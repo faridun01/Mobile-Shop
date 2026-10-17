@@ -370,6 +370,8 @@ export interface CashCollectionBreakdownSale {
   status: string;
   itemsCount: number;
   items: CashCollectionBreakdownItem[];
+  /** Accessory lines of the receipt (no cost: the breakdown is shown to store staff too). */
+  accessoryItems: { id: string; brand: string; name: string; quantity: number; salePriceTjs: number }[];
 }
 
 export interface CashCollectionBreakdownExpense {
@@ -520,6 +522,7 @@ export class CashCollectionService {
             isBonus: true,
           },
         },
+        accessoryItems: { select: { id: true, brand: true, name: true, quantity: true, salePriceTjs: true } },
       },
       orderBy: { createdAt: 'desc' },
     });
@@ -607,7 +610,7 @@ export class CashCollectionService {
       cardAmountTjs: Number(s.cardAmountTjs),
       debtAmountTjs: Number(s.debtAmountTjs),
       status: s.status,
-      itemsCount: s.saleItems.length,
+      itemsCount: s.saleItems.length + s.accessoryItems.reduce((sum, line) => sum + line.quantity, 0),
       items: s.saleItems.map((item) => ({
         id: item.id,
         brand: item.brand,
@@ -617,6 +620,9 @@ export class CashCollectionService {
         salePriceTjs: Number(item.salePriceTjs),
         salePriceUsd: Number(item.salePriceUsd),
         isBonus: item.isBonus,
+      })),
+      accessoryItems: s.accessoryItems.map((line) => ({
+        id: line.id, brand: line.brand, name: line.name, quantity: line.quantity, salePriceTjs: Number(line.salePriceTjs),
       })),
     }));
 
