@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
+import { readSavedExpenseCategories } from '../../utils/savedExpenseCategories';
 import { useDataRefreshRevision } from '../../hooks/useDataRefreshRevision';
 import { currentBusinessMonth, getBusinessDateKey, monthBounds } from '../../utils/businessDate';
 import { formatMoney, sumMoney, moneyNumber } from '../../utils/money';
@@ -172,14 +173,7 @@ export const ExpensesPage: React.FC = () => {
     };
   }, [periodFilter, selectedStartDate, selectedEndDate, selectedMonth, selectedStoreFilter, fetchExpensesRange, dataRefreshRevision]);
 
-  const [customCategories, setCustomCategories] = useState<CustomCategory[]>(() => {
-    try {
-      const saved = localStorage.getItem('custom_expense_categories');
-      return saved ? JSON.parse(saved) : [];
-    } catch {
-      return [];
-    }
-  });
+  const [customCategories, setCustomCategories] = useState<CustomCategory[]>(readSavedExpenseCategories);
 
   const [isAddCategoryModalOpen, setIsAddCategoryModalOpen] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState('');

@@ -1,4 +1,6 @@
-import React, { lazy, Suspense } from 'react';
+import React, { Suspense } from 'react';
+import { lazyWithRetry as lazy } from '../utils/lazyWithRetry';
+import { ErrorBoundary } from '../components/common/ErrorBoundary';
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../stores/useAuthStore';
 import { useInactivityLock } from '../services/sessionLock';
@@ -146,6 +148,7 @@ export function MainLayout() {
       <div className="flex-1 flex flex-col min-w-0 min-h-0 overflow-hidden bg-bg relative">
         <TopBar />
         <main className="flex-1 flex flex-col min-w-0 max-w-full min-h-0 overflow-y-auto overflow-x-hidden relative bg-bg">
+          <ErrorBoundary resetKey={location.pathname}>
           <Suspense fallback={<LoadingFallback />}>
             <Routes>
               <Route path="/" element={currentUser?.role === 'ADMIN' ? <WelcomePage /> : <Navigate to="/sale" replace />} />
@@ -176,6 +179,7 @@ export function MainLayout() {
               <Route path="*" element={<Navigate to={currentUser?.role === 'ADMIN' ? "/" : "/sale"} replace />} />
             </Routes>
           </Suspense>
+          </ErrorBoundary>
         </main>
         {navigationLayout === 'mobile' && <MobileBottomNav />}
 

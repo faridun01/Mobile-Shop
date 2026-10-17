@@ -1,7 +1,7 @@
 import dotenv from 'dotenv';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import express from 'express';
+import { registerStaticFrontend } from './common/static-frontend';
 
 const currentFile = fileURLToPath(import.meta.url);
 const currentDirectory = path.dirname(currentFile);
@@ -15,26 +15,7 @@ import { RealtimeSyncGateway } from './websocket/websocket.gateway';
 
 const port = Number(process.env.PORT || 3001);
 
-// Vite hashes every filename under /assets (content changes -> new filename), so those
-// are safe to cache forever; everything else (index.html, sw.js, manifest) must stay
-// revalidated on every request so a new deploy is picked up immediately.
-app.use(express.static(path.join(projectRoot, 'dist'), {
-  setHeaders: (res, filePath) => {
-    if (filePath.includes(`${path.sep}assets${path.sep}`)) {
-      res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
-    } else {
-      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate, max-age=0');
-      res.setHeader('Pragma', 'no-cache');
-      res.setHeader('Expires', '0');
-    }
-  },
-}));
-app.get('*', (_req, res) => {
-  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate, max-age=0');
-  res.setHeader('Pragma', 'no-cache');
-  res.setHeader('Expires', '0');
-  res.sendFile(path.join(projectRoot, 'dist', 'index.html'));
-});
+registerStaticFrontend(app, path.join(projectRoot, 'dist'));
 
 import { RetentionService } from './modules/maintenance/retention.service';
 import { backfillCatalogFromDevices } from './modules/phone-catalog/phone-catalog.service';
@@ -86,4 +67,4 @@ const shutdown = (signal: string) => {
 };
 
 process.on('SIGINT', () => shutdown('SIGINT'));
-process.on('SIGTERM', () => shutdown('SIGTERM'));
+process.on('SIGTERM', () => shutdown('SIGTERM'));

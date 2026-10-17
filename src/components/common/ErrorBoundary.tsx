@@ -1,11 +1,15 @@
 import React from 'react';
+import { saveUiCrash } from '../../services/uiCrashDiagnostics';
+import { isChunkLoadError } from '../../utils/lazyWithRetry';
 
 interface Props {
   children: React.ReactNode;
+  resetKey?: string;
 }
 
 interface State {
   error: Error | null;
+  diagnosticId?: string;
 }
 
 /**
@@ -23,6 +27,13 @@ export class ErrorBoundary extends React.Component<Props, State> {
 
   componentDidCatch(error: Error, info: React.ErrorInfo) {
     console.error('Unhandled UI error:', error, info.componentStack);
+    this.setState({ diagnosticId: saveUiCrash(error, info.componentStack) });
+  }
+
+  componentDidUpdate(previous: Props) {
+    if (previous.resetKey !== this.props.resetKey && this.state.error) {
+      this.setState({ error: null, diagnosticId: undefined });
+    }
   }
 
   render() {
@@ -37,8 +48,11 @@ export class ErrorBoundary extends React.Component<Props, State> {
             Произошла ошибка
           </p>
           <p style={{ fontSize: '12px', color: '#9aa1ad', marginTop: '8px', maxWidth: '360px' }}>
-            Приложение столкнулось с непредвиденной ошибкой. Попробуйте обновить страницу.
+            {isChunkLoadError(this.state.error)
+              ? 'Не удалось загрузить раздел. Проверьте интернет и обновите страницу. Несохранённые данные могут быть потеряны.'
+              : 'Приложение столкнулось с непредвиденной ошибкой. Попробуйте обновить страницу.'}
           </p>
+          {this.state.diagnosticId && <p style={{ fontSize: '12px', marginTop: '8px' }}>Код ошибки: {this.state.diagnosticId}</p>}
           <button
             onClick={() => window.location.reload()}
             style={{

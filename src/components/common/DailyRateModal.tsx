@@ -15,8 +15,6 @@ interface DailyRateModalProps {
 export const DailyRateModal: React.FC<DailyRateModalProps> = ({ isOpen, onClose }) => {
   const { todayRate, setDailyRate, currentUser } = useAppFields('todayRate', 'setDailyRate', 'currentUser');
 
-  if (!currentUser) return null;
-
   const isMandatory = !hasCurrentDailyRate(todayRate);
 
   const [rateInput, setRateInput] = useState<string>('');
@@ -58,6 +56,8 @@ export const DailyRateModal: React.FC<DailyRateModalProps> = ({ isOpen, onClose 
       setIsSaving(false);
     }
   };
+
+  if (!currentUser) return null;
 
   return (
     <Dialog

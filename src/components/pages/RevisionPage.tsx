@@ -49,6 +49,14 @@ interface ModelGroup {
 }
 
 export const RevisionPage: React.FC = () => {
+  const { currentUser } = useAppFields('currentUser');
+  if (currentUser?.role !== 'ADMIN') {
+    return <RestrictedAccess message="Раздел ревизии склада доступен только администраторам." />;
+  }
+  return <AdminRevisionPage />;
+};
+
+const AdminRevisionPage: React.FC = () => {
   const {
     currentUser,
     stores,
@@ -64,10 +72,6 @@ export const RevisionPage: React.FC = () => {
     'setSelectedStoreId',
     'openScanner'
   );
-
-  if (currentUser?.role !== 'ADMIN') {
-    return <RestrictedAccess message="Раздел ревизии склада доступен только администраторам." />;
-  }
 
   const isAdmin = true;
 
