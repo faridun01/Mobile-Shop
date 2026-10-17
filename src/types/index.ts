@@ -380,6 +380,12 @@ export interface AccessoryProduct {
   attributes?: string;
 }
 
+/** A card found by barcode on the receipt form, with its stock and latest unit cost (ADMIN). */
+export interface AccessoryLookup extends AccessoryProduct {
+  stockQuantity: number;
+  lastUnitCostUsd?: number;
+}
+
 export interface InvoiceAccessoryBatch {
   id: string;
   quantityReceived: number;

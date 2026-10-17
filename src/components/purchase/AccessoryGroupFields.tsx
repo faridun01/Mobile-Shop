@@ -129,11 +129,31 @@ export const AccessoryGroupFields: React.FC<AccessoryGroupFieldsProps> = ({
 
       {/* 2. Card data: from the catalog (read-only) or entered for a new barcode */}
       {found && (
-        <div className="p-2 rounded-lg bg-surface-raised border border-border text-xs">
-          <p className="font-bold text-fg">{[group.brand, group.name].filter(Boolean).join(' ')}</p>
-          <p className="text-[11px] text-fg-muted mt-0.5">
-            {[group.accessoryCategory, group.model, group.attributes].filter(Boolean).join(' • ')}
-          </p>
+        <div className="p-2 rounded-lg bg-surface-raised border border-border text-xs space-y-1.5">
+          <dl className="grid grid-cols-2 sm:grid-cols-4 gap-x-3 gap-y-1">
+            <div className="col-span-2 sm:col-span-1 min-w-0">
+              <dt className={labelClass}>Название</dt>
+              <dd className="font-bold text-fg truncate">{group.name}</dd>
+            </div>
+            <div className="min-w-0">
+              <dt className={labelClass}>Категория</dt>
+              <dd className="font-semibold text-fg truncate">{group.accessoryCategory}</dd>
+            </div>
+            <div className="min-w-0">
+              <dt className={labelClass}>Бренд / производитель</dt>
+              <dd className="font-semibold text-fg truncate">{group.brand}</dd>
+            </div>
+            <div className="min-w-0">
+              <dt className={labelClass}>На складе сейчас</dt>
+              <dd className="font-bold font-mono text-accent">{group.stockQuantity ?? 0} шт.</dd>
+            </div>
+          </dl>
+          {(group.model || group.attributes || group.lastUnitCostUsd) && (
+            <p className="text-[11px] text-fg-muted">
+              {[group.model, group.attributes].filter(Boolean).join(' • ')}
+              {group.lastUnitCostUsd ? `${group.model || group.attributes ? ' • ' : ''}прошлая цена закупки $${formatMoney(group.lastUnitCostUsd)} за шт.` : ''}
+            </p>
+          )}
         </div>
       )}
       {isNew && (

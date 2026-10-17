@@ -34,6 +34,9 @@ export interface PurchaseItemGroup {
   productId?: string | null;
   /** Barcode lookup state: found in the catalog, new (to be filled by hand), or being checked. */
   barcodeStatus?: 'idle' | 'loading' | 'found' | 'new';
+  /** A found card: units on hand now and the unit cost of its latest batch. */
+  stockQuantity?: number;
+  lastUnitCostUsd?: number;
 }
 
 export interface PurchasePreviewGroup {

@@ -1,6 +1,6 @@
 import { apiClient } from '../api/client';
 import { mapAccessoryProduct } from '../api/mappers';
-import type { AccessoryProduct } from '../types';
+import type { AccessoryLookup } from '../types';
 
 export type SuggestKind = 'TABLET' | 'ACCESSORY';
 
@@ -16,9 +16,15 @@ export async function suggestCatalogValues(kind: SuggestKind, field: string, que
 }
 
 /** The saved accessory card behind a barcode, or null for a barcode never received. */
-export async function findAccessoryByBarcode(barcode: string): Promise<AccessoryProduct | null> {
-  const res = await apiClient<{ found: boolean; product?: unknown }>(`/accessories/by-barcode/${encodeURIComponent(barcode)}`);
-  return res?.found && res.product ? mapAccessoryProduct(res.product) : null;
+export async function findAccessoryByBarcode(barcode: string): Promise<AccessoryLookup | null> {
+  const res = await apiClient<{ found: boolean; product?: any }>(`/accessories/by-barcode/${encodeURIComponent(barcode)}`);
+  if (!res?.found || !res.product) return null;
+  const last = Number(res.product.lastUnitCostUsd);
+  return {
+    ...mapAccessoryProduct(res.product),
+    stockQuantity: Number(res.product.stockQuantity) || 0,
+    lastUnitCostUsd: Number.isFinite(last) && last > 0 ? last : undefined,
+  };
 }
 
 /** Common values offered while typing, before the shop's own catalog has them. */

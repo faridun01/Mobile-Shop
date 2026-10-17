@@ -159,7 +159,14 @@ export async function suggestValues(input: { kind: SuggestKind; field: string; q
 export async function findAccessoryByBarcode(raw: unknown) {
   const barcode = normalizeBarcode(raw);
   if (!barcode) return null;
-  return prisma.accessoryProduct.findUnique({ where: { barcode } });
+  const product = await prisma.accessoryProduct.findUnique({ where: { barcode } });
+  if (!product) return null;
+  // For the receipt form: units on hand in every location and the unit cost of the latest batch.
+  const [stock, last] = await Promise.all([
+    prisma.accessoryBatch.aggregate({ where: { productId: product.id }, _sum: { quantityRemaining: true } }),
+    prisma.accessoryBatch.findFirst({ where: { productId: product.id }, orderBy: [{ receivedAt: 'desc' }, { createdAt: 'desc' }], select: { unitCostUsd: true } }),
+  ]);
+  return { ...product, stockQuantity: stock._sum.quantityRemaining ?? 0, lastUnitCostUsd: last?.unitCostUsd ?? null };
 }
 
 /**

@@ -3,7 +3,7 @@ import { Headphones, Loader2, Search, X } from 'lucide-react';
 import { apiClient } from '../../api/client';
 import { mapAccessoryStockItem } from '../../api/mappers';
 import type { AccessoryStockItem } from '../../types';
-import { formatMoney } from '../../utils/money';
+import { decimal, formatMoney, moneyNumber } from '../../utils/money';
 import { useDataRefreshRevision } from '../../hooks/useDataRefreshRevision';
 import { EmptyState } from '../ui/EmptyState';
 
@@ -96,9 +96,10 @@ export const AccessoryStockList: React.FC<AccessoryStockListProps> = ({ location
           {inStock.map((item) => (
             <li key={item.id} className="p-2.5 rounded-xl bg-surface border border-border shadow-2xs flex items-start justify-between gap-3">
               <div className="min-w-0">
-                <p className="text-xs font-bold text-fg truncate">{item.brand} {item.name}</p>
+                <p className="text-xs font-bold text-fg truncate">{item.name}</p>
                 <p className="text-[11px] text-fg-muted truncate mt-0.5">
-                  {[item.category, item.model, item.attributes].filter(Boolean).join(' • ')}
+                  <span className="px-1.5 py-0.5 rounded-md bg-accent/10 border border-accent/20 text-accent font-semibold mr-1.5">{item.category}</span>
+                  {[item.brand, item.model, item.attributes].filter(Boolean).join(' • ')}
                 </p>
                 <p className="text-[10px] font-mono text-fg-subtle mt-0.5">Штрихкод: {item.barcode}</p>
                 {item.stores.length > 1 && (
@@ -110,8 +111,10 @@ export const AccessoryStockList: React.FC<AccessoryStockListProps> = ({ location
               <div className="text-right shrink-0">
                 <span className="text-sm font-black font-mono text-accent block">{item.quantity} шт.</span>
                 {item.stores.length === 1 && <span className="text-[10px] text-fg-subtle block">{item.stores[0].storeName}</span>}
-                {isAdmin && item.stockCostUsd !== undefined && (
-                  <span className="text-[10px] font-mono text-fg-subtle block">${formatMoney(item.stockCostUsd)}</span>
+                {isAdmin && item.stockCostUsd !== undefined && item.quantity > 0 && (
+                  <span className="text-[10px] font-mono text-fg-subtle block" title="Средняя цена закупки остатка (каждая партия по своей цене)">
+                    закупка ≈ ${formatMoney(moneyNumber(decimal(item.stockCostUsd).div(item.quantity)))}/шт • ${formatMoney(item.stockCostUsd)}
+                  </span>
                 )}
               </div>
             </li>

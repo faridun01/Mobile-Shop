@@ -732,8 +732,11 @@ export const PurchasePage: React.FC = () => {
             ...current, barcodeStatus: 'found', productId: product.id,
             brand: product.brand, name: product.name, accessoryCategory: product.category,
             model: product.model || '', attributes: product.attributes || '',
+            stockQuantity: product.stockQuantity, lastUnitCostUsd: product.lastUnitCostUsd,
+            // The last batch's cost is offered; this receipt's own cost stays editable.
+            purchasePriceUsd: current.purchasePriceUsd || product.lastUnitCostUsd || 0,
           }
-        : { ...current, barcodeStatus: 'new', productId: null };
+        : { ...current, barcodeStatus: 'new', productId: null, stockQuantity: undefined, lastUnitCostUsd: undefined };
       return next;
     });
     if (product) soundEffects.playAddToCartSuccess();
