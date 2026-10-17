@@ -34,6 +34,8 @@ export interface ComprehensiveReportSummary {
   refundPenaltiesUsd: number;
   /** Difference when a customer repays a TJS debt at another day's rate. */
   debtFxUsd: number;
+  /** Surpluses counted at shift closings: put into the registers as the store owners' income. */
+  cashSurplusUsd: number;
   /** Profit of sold free bonus phones: nobody's income, shown for reference and left out of profit. */
   bonusDeviceProfitUsd: number;
   profitUsd: number;
@@ -461,7 +463,7 @@ export async function buildComprehensiveReportWorkbook({
   const ops = (column: string) => `'Операции'!${column}${eventsTotalNumber}`;
   const salesProfitUsd = sumCents(events.map((e) => e.profitUsd));
   const penaltiesUsd = sumCents(events.map((e) => e.penaltyUsd));
-  const profitAfterReturns = Math.round((salesProfitUsd + penaltiesUsd + summary.debtFxUsd) * 100) / 100;
+  const profitAfterReturns = Math.round((salesProfitUsd + penaltiesUsd + summary.debtFxUsd + summary.cashSurplusUsd) * 100) / 100;
   const expensesUsd = sumCents(expenseUsd);
   const netUsd = Math.round((profitAfterReturns - expensesUsd + summary.expenseFxUsd) * 100) / 100;
 
@@ -473,15 +475,16 @@ export async function buildComprehensiveReportWorkbook({
     ['Прибыль от продаж (без бонусных телефонов)', cellFormula(ops('I'), salesProfitUsd)],             // 9
     ['Удержано при возвратах', cellFormula(ops('L'), penaltiesUsd)],                                    // 10
     ['Разница при погашении долгов (TJS по курсу дня оплаты)', summary.debtFxUsd],                     // 11
-    ['Прибыль с учётом возвратов', cellFormula('B9+B10+B11', profitAfterReturns)],                      // 12
-    ['Расходы (по курсу дня регистрации)', cellFormula(`'Расходы'!K${expenseTotalRowNumber}`, expensesUsd)], // 13
-    ['Разница при оплате расходов позже', summary.expenseFxUsd],                                        // 14
+    ['Излишки кассы при закрытии смен', summary.cashSurplusUsd],                                        // 12
+    ['Прибыль с учётом возвратов', cellFormula('B9+B10+B11+B12', profitAfterReturns)],                  // 13
+    ['Расходы (по курсу дня регистрации)', cellFormula(`'Расходы'!K${expenseTotalRowNumber}`, expensesUsd)], // 14
+    ['Разница при оплате расходов позже', summary.expenseFxUsd],                                        // 15
   ];
   for (const values of rows) summarySheet.addRow(values);
 
-  const netProfitRow = summarySheet.addRow(['ЧИСТАЯ ПРИБЫЛЬ']);                                          // 15
+  const netProfitRow = summarySheet.addRow(['ЧИСТАЯ ПРИБЫЛЬ']);                                          // 16
   const netProfitRowNumber = netProfitRow.number;
-  netProfitRow.getCell(2).value = cellFormula('B12-B13+B14', netUsd);
+  netProfitRow.getCell(2).value = cellFormula('B13-B14+B15', netUsd);
   styleTotalRow(netProfitRow, netUsd >= 0 ? XLSX_GREEN : XLSX_RED);
 
   const checkRow = summarySheet.addRow(['Контроль: расхождение с итогом программы (должно быть 0)']);

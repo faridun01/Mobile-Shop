@@ -46,6 +46,8 @@ interface ExpenseBreakdown {
 interface StoreBreakdown extends ExpenseBreakdown {
   storeId: string; storeName: string; revenueUsd: number; revenueTjs: number; cogsUsd: number; cogsTjs: number;
   profitUsd: number; profitTjs: number; refundPenaltiesUsd: number; netProfitUsd: number; netProfitTjs: number;
+  /** Surpluses counted at this store's shift closings, inside profitUsd. */
+  cashSurplusUsd?: number;
   /** Profit of sold free bonus phones: nobody's income, left out of profitUsd/netProfitUsd. */
   bonusDeviceProfitUsd?: number; bonusDeviceProfitTjs?: number;
   unitsSold: number; salesCount: number; cashUsd: number; cashTjs: number;
@@ -92,6 +94,8 @@ interface ReportsSummary {
    *  at another day's rate. A refund is reported by the dollars actually handed back. */
   periodDebtFxUsd?: number;
   periodExpenseFxUsd?: number;
+  /** Surpluses counted at shift closings: put into the registers as the owners' income, inside profit. */
+  periodCashSurplusUsd?: number;
   netProfitUsd: number;
   netProfitTjs: number;
   /** Supplier bonuses are nobody's income: shown for reference, never in profit or owner shares. */
@@ -379,6 +383,7 @@ export const ProfitReport: React.FC<ProfitReportProps> = ({
       cogsUsd: reportData.cogsUsd,
       refundPenaltiesUsd: reportData.periodRefundPenaltiesUsd,
       debtFxUsd: reportData.periodDebtFxUsd ?? 0,
+      cashSurplusUsd: reportData.periodCashSurplusUsd ?? 0,
       bonusDeviceProfitUsd: reportData.bonusDeviceProfitUsd ?? 0,
       profitUsd: reportData.profitUsd,
       cashBonusesUsd: salesReportStoreId === 'all' ? reportData.periodCashBonusesUsd : 0,
@@ -601,7 +606,9 @@ export const ProfitReport: React.FC<ProfitReportProps> = ({
                     <div className="p-2.5 rounded-xl bg-surface-raised/40 border border-border/80">
                       <p className="text-[10px] text-fg-subtle uppercase tracking-wider font-semibold">Прибыль с продаж</p>
                       <p className={`text-xs sm:text-sm font-bold mt-0.5 ${store.profitUsd >= 0 ? 'text-accent' : 'text-danger'}`}>{signedUsd(store.profitUsd)}</p>
-                      <p className="text-[10px] text-fg-subtle">до вычета расходов</p>
+                      <p className="text-[10px] text-fg-subtle">
+                        {(store.cashSurplusUsd ?? 0) > 0 ? `вкл. излишки кассы +${usd(store.cashSurplusUsd ?? 0)}` : 'до вычета расходов'}
+                      </p>
                     </div>
                     <div className="p-2.5 rounded-xl bg-surface-raised/40 border border-border/80">
                       <p className="text-[10px] text-fg-subtle uppercase tracking-wider font-semibold">Расходы точки</p>

@@ -284,6 +284,9 @@ model DailyCashClosing {
   comment            String?
   // A shortage is booked as a store expense (CASH_SHORTAGE) when the shift closes; cancelling the closing cancels it.
   shortageExpenseId  String?  @unique
+  // A surplus goes into the register (ledger source CASH_SURPLUS, sourceId = this closing) as the
+  // store owners' income; these are the owners' shares of it, reversed exactly when the closing is cancelled.
+  surplusOwnerAllocations Json?
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
 

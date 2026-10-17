@@ -1,10 +1,7 @@
-import { D } from '../../common/decimal';
-import { roundMoney } from '../../common/money';
 import type { Express } from 'express';
 import { authenticateJwt, requireRoles, type AuthenticatedRequest } from '../../auth/auth.middleware';
 import { StoresService } from './stores.service';
 import { RealtimeSyncGateway } from '../../websocket/websocket.gateway';
-import { getRateForDate } from '../exchange-rate/exchange-rate.service';
 
 export function registerStoreRoutes(app: Express) {
   app.post('/api/stores', authenticateJwt, requireRoles('ADMIN'), async (req: AuthenticatedRequest, res, next) => {
@@ -41,24 +38,17 @@ export function registerStoreRoutes(app: Express) {
   // store partner could erase a shortage right before a collection or a shift closing.
   app.post('/api/stores/:id/adjust-cash', authenticateJwt, requireRoles('ADMIN'), async (req: AuthenticatedRequest, res, next) => {
     try {
+      // A store register is corrected to the somoni counted in it (newBalanceTjs); Central Cash
+      // may also be set in dollars (newBalanceUsd). The service converts and validates.
       const { newBalanceUsd, newBalanceTjs, reason } = req.body ?? {};
-      let targetUsd: ReturnType<typeof D> | null = null;
-      if (newBalanceUsd !== undefined && newBalanceUsd !== null) {
-        targetUsd = D(newBalanceUsd);
-      } else if (newBalanceTjs !== undefined && newBalanceTjs !== null) {
-        const rate = await getRateForDate(new Date());
-        // Without a rate the TJS figure can't be converted — never fall back to zeroing the register.
-        if (!rate || D(rate).lte(0)) {
-          res.status(400).json({ message: 'Сначала задайте курс USD/TJS на сегодня' });
-          return;
-        }
-        targetUsd = roundMoney(D(newBalanceTjs).div(rate));
-      }
-      if (targetUsd === null) {
-        res.status(400).json({ message: 'Укажите новый остаток кассы в долларах (newBalanceUsd) или сомони (newBalanceTjs)' });
+      const amount = (v: unknown) => (typeof v === 'number' || (typeof v === 'string' && v.trim() !== '') ? v : undefined);
+      const tjs = amount(newBalanceTjs);
+      const usd = amount(newBalanceUsd);
+      if (tjs === undefined && usd === undefined) {
+        res.status(400).json({ message: 'Укажите пересчитанный остаток кассы в сомони (newBalanceTjs)' });
         return;
       }
-      const store = await StoresService.adjustCashBalance(req.params.id, targetUsd, reason, req.user!.userId);
+      const store = await StoresService.adjustCashBalance(req.params.id, { tjs, usd }, reason, req.user!.userId);
       RealtimeSyncGateway.broadcast('STORE_UPDATED', { storeId: store.id });
       res.json(store);
     } catch (error) {

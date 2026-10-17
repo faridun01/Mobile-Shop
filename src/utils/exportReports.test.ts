@@ -44,12 +44,13 @@ const fixture: ComprehensiveReportInput = {
     cogsUsd: 10,
     refundPenaltiesUsd: 9.52,
     debtFxUsd: 1.5,
+    cashSurplusUsd: 2,
     bonusDeviceProfitUsd: 15,
-    profitUsd: 10.78,
+    profitUsd: 12.78,
     cashBonusesUsd: 5,
     expensesUsd: 20,
     expenseFxUsd: 0.95,
-    netProfitUsd: -8.27,
+    netProfitUsd: -6.27,
   },
 };
 
@@ -68,11 +69,11 @@ describe('comprehensive Excel report', () => {
 
     const summarySheet = workbook.getWorksheet('Итого')!;
     expect(summarySheet.getCell('B7').value).toMatchObject({ result: 24.76 });
-    expect(summarySheet.getCell('B12').value).toMatchObject({ formula: 'B9+B10+B11', result: 10.78 });
-    expect(summarySheet.getCell('B15').value).toMatchObject({ formula: 'B12-B13+B14', result: -8.27 });
+    expect(summarySheet.getCell('B13').value).toMatchObject({ formula: 'B9+B10+B11+B12', result: 12.78 });
+    expect(summarySheet.getCell('B16').value).toMatchObject({ formula: 'B13-B14+B15', result: -6.27 });
     // Control row against the program's total: 0 (ExcelJS drops a zero cached result).
-    const control = summarySheet.getCell('B16').value as { formula: string; result?: number };
-    expect(control.formula).toBe('ROUND(B15-(-8.27),2)');
+    const control = summarySheet.getCell('B17').value as { formula: string; result?: number };
+    expect(control.formula).toBe('ROUND(B16-(-6.27),2)');
     expect(control.result ?? 0).toBe(0);
 
     const serialized = await workbook.xlsx.writeBuffer();
@@ -81,7 +82,7 @@ describe('comprehensive Excel report', () => {
     const ExcelJS = (await import('exceljs')).default;
     const reopened = new ExcelJS.Workbook();
     await reopened.xlsx.load(serialized);
-    expect(reopened.getWorksheet('Итого')?.getCell('B15').value).toMatchObject({ result: -8.27 });
+    expect(reopened.getWorksheet('Итого')?.getCell('B16').value).toMatchObject({ result: -6.27 });
   }, 60_000);
 
   it('values an expense paid later at the dollars it was registered at', () => {

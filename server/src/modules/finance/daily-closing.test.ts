@@ -3,10 +3,13 @@ import { DailyClosingService } from './daily-closing.service';
 import { prisma } from '../../prisma/prisma.service';
 import { resolveActor } from '../../common/actor';
 import { createExpense, cancelExpenseInTx } from '../expenses/expenses.service';
+import { postTransaction, cancelTransaction } from './financial-transaction.service';
+import { currentOwnerAllocations, readOwnerAllocations, replaceOwnerAllocations } from './owner-allocations';
+import { getStoreCashAccount } from './account.service';
 
 vi.mock('../../prisma/prisma.service', () => {
-  const store = { findUnique: vi.fn() };
-  const dailyCashClosing = { findUnique: vi.fn(), findFirst: vi.fn(), findMany: vi.fn(), create: vi.fn(), delete: vi.fn() };
+  const store = { findUnique: vi.fn(), update: vi.fn() };
+  const dailyCashClosing = { findUnique: vi.fn(), findFirst: vi.fn(), findMany: vi.fn(), create: vi.fn(), update: vi.fn(), delete: vi.fn() };
   const sale = { findMany: vi.fn() };
   const exchangeEvent = { findMany: vi.fn() };
   const saleReturn = { findMany: vi.fn().mockResolvedValue([]) };
@@ -14,7 +17,7 @@ vi.mock('../../prisma/prisma.service', () => {
   const cashHandover = { findMany: vi.fn(), findFirst: vi.fn() };
   const customerPayment = { findMany: vi.fn() };
   const financialAccount = { findUnique: vi.fn() };
-  const financialTransaction = { findMany: vi.fn() };
+  const financialTransaction = { findMany: vi.fn(), findFirst: vi.fn() };
   const exchangeRate = { findUnique: vi.fn(), findFirst: vi.fn() };
   const auditLog = { create: vi.fn() };
   const notification = { findUnique: vi.fn(), create: vi.fn().mockResolvedValue({ id: 'n1' }) };
@@ -46,6 +49,15 @@ vi.mock('../expenses/expenses.service', () => ({
   cancelExpenseInTx: vi.fn().mockResolvedValue({}),
 }));
 
+// The surplus posting: the register's account, the ledger row and the owners' shares.
+vi.mock('./account.service', () => ({ getStoreCashAccount: vi.fn().mockResolvedValue({ id: 'acc-1' }) }));
+vi.mock('./financial-transaction.service', () => ({ postTransaction: vi.fn(), cancelTransaction: vi.fn() }));
+vi.mock('./owner-allocations', () => ({
+  currentOwnerAllocations: vi.fn(),
+  replaceOwnerAllocations: vi.fn(),
+  readOwnerAllocations: vi.fn((rows: any) => rows),
+}));
+
 vi.mock('../../websocket/websocket.gateway', () => ({
   RealtimeSyncGateway: {
     broadcast: vi.fn(),
@@ -64,6 +76,7 @@ function openDay({
   collections = [] as any[],
   customerPayments = [] as any[],
   ledger = [] as any[],
+  refundPostings = [] as any[],
   rate = 10,
 } = {}) {
   db.store.findUnique.mockResolvedValue({ id: 'store-1', name: 'Сиёма', isMainWarehouse: false, active: true });
@@ -76,7 +89,8 @@ function openDay({
   db.financialAccount.findUnique.mockResolvedValue({ id: 'acc-1' });
   // Expenses are read from the register ledger (OUT rows); other moves come from the same table.
   const expenseRows = expenses.map((e: any) => ({ direction: 'OUT', amountTjs: e.amountTjs, amountUsd: e.amountUsd }));
-  db.financialTransaction.findMany.mockImplementation(async ({ where }: any) => (where.sourceType === 'EXPENSE' ? expenseRows : ledger));
+  db.financialTransaction.findMany.mockImplementation(async ({ where }: any) =>
+    (where.type === 'REFUND' ? refundPostings : where.sourceType === 'EXPENSE' ? expenseRows : ledger));
   db.exchangeRate.findUnique.mockResolvedValue({ rate });
   db.dailyCashClosing.create.mockImplementation(({ data }: any) => ({ id: 'dc-1', ...data }));
 }
@@ -89,6 +103,8 @@ describe('DailyClosingService', () => {
     vi.mocked(resolveActor).mockResolvedValue({ id: 'u1', name: 'Alisher', role: 'SELLER' } as any);
     vi.mocked(createExpense).mockResolvedValue({ id: 'exp-shortage' } as any);
     vi.mocked(cancelExpenseInTx).mockResolvedValue({} as any);
+    vi.mocked(getStoreCashAccount).mockResolvedValue({ id: 'acc-1' } as any);
+    vi.mocked(readOwnerAllocations).mockImplementation((rows: any) => rows);
   });
 
   it('a day starts from 0 and totals cash and bank less the store expenses paid that day', async () => {
@@ -148,6 +164,20 @@ describe('DailyClosingService', () => {
     expect(summary.refundsCashUsd).toBe('957.89');
     expect(summary.expectedCashTjs).toBe('-9100');
     expect(summary.expectedCashUsd).toBe('-957.89');
+  });
+
+  it('takes a refund in the dollars its register posting booked, not at a rate set later that day', async () => {
+    // 9300 TJS handed back at 9.35 booked $994.65; the rate was changed to 9.40 before closing.
+    openDay({
+      refunds: [{ id: 's1', actualRefundAmountTjs: 9300, penaltyFeeTjs: 50, penaltyFeeUsd: 5.35 }],
+      refundPostings: [{ sourceId: 's1', amountUsd: 994.65 }],
+      rate: 9.4,
+    });
+
+    const summary = await DailyClosingService.getSummary('store-1', '2026-10-06');
+
+    expect(summary.refundsCashTjs).toBe('9300');
+    expect(summary.refundsCashUsd).toBe('994.65');
   });
 
   it('counts exchange settlements on the day of the exchange, in the dollars the register moved', async () => {
@@ -231,19 +261,35 @@ describe('DailyClosingService', () => {
     expect(input).toMatchObject({ category: 'CASH_SHORTAGE', storeId: 'store-1', targetType: 'STORE', paidFromCashRegister: true, createdByUserId: 'u1' });
     expect(String(input.amountTjs)).toBe('20');
     expect(result.shortageExpenseId).toBe('exp-shortage');
-    // Booked while the shift is still open: before the closing row exists.
-    expect(vi.mocked(createExpense).mock.invocationCallOrder[0]).toBeLessThan(db.dailyCashClosing.create.mock.invocationCallOrder.at(-1));
+    // A past day's shortage is booked in that day, at that day's rate.
+    const closingDay = vi.mocked(createExpense).mock.calls[0][2]!;
+    expect(String(closingDay.rate)).toBe('10');
+    expect(closingDay.at.toISOString().slice(0, 10)).toBe('2026-10-06');
   });
 
-  it('books nothing for a surplus or an exact count', async () => {
-    vi.mocked(createExpense).mockClear();
+  it('puts a surplus into the register as the store owners income, in the closed day at its rate', async () => {
     openDay({ sales: [{ id: 's1', cashAmountTjs: 200, cardAmountTjs: 0, exchangeRate: 10, exchangeEvents: [] }] });
-    db.dailyCashClosing.create.mockImplementation(async ({ data }: any) => data);
+    vi.mocked(currentOwnerAllocations).mockResolvedValue([{ ownerId: 'o1', amountUsd: 3 }] as any);
+
     await DailyClosingService.closeDay('u1', { storeId: 'store-1', businessDate: '2026-10-06', actualCashTjs: 230 });
+
+    expect(createExpense).not.toHaveBeenCalled();
+    expect(db.store.update).toHaveBeenCalledWith({ where: { id: 'store-1' }, data: { cashBalanceUsd: { increment: expect.anything() } } });
+    expect(String(db.store.update.mock.calls[0][0].data.cashBalanceUsd.increment)).toBe('3');
+    const posting = vi.mocked(postTransaction).mock.calls[0][1];
+    expect(posting).toMatchObject({ type: 'INCOME', direction: 'IN', accountId: 'acc-1', sourceType: 'CASH_SURPLUS', sourceId: 'dc-1' });
+    expect([String(posting.amountTjs), String(posting.amountUsd), String(posting.exchangeRate)]).toEqual(['30', '3', '10']);
+    expect(posting.transactionDate!.toISOString().slice(0, 10)).toBe('2026-10-06');
+    expect(replaceOwnerAllocations).toHaveBeenCalledWith(expect.anything(), [], [{ ownerId: 'o1', amountUsd: 3 }], 1);
+    expect(db.dailyCashClosing.update).toHaveBeenCalledWith({ where: { id: 'dc-1' }, data: { surplusOwnerAllocations: [{ ownerId: 'o1', amountUsd: 3 }] } });
+  });
+
+  it('books nothing for an exact count', async () => {
     openDay({ sales: [{ id: 's1', cashAmountTjs: 200, cardAmountTjs: 0, exchangeRate: 10, exchangeEvents: [] }] });
-    db.dailyCashClosing.create.mockImplementation(async ({ data }: any) => data);
     await DailyClosingService.closeDay('u1', { storeId: 'store-1', businessDate: '2026-10-06' });
     expect(createExpense).not.toHaveBeenCalled();
+    expect(postTransaction).not.toHaveBeenCalled();
+    expect(db.store.update).not.toHaveBeenCalled();
   });
 
   it('confirms the day as calculated and stores the bank takings in dollars', async () => {
@@ -290,6 +336,20 @@ describe('DailyClosingService', () => {
     await DailyClosingService.delete('dc-2', 'u1');
     expect(cancelExpenseInTx).toHaveBeenCalledWith(expect.anything(), 'exp-shortage', 'u1', true);
     expect(vi.mocked(cancelExpenseInTx).mock.invocationCallOrder[0]).toBeGreaterThan(db.dailyCashClosing.delete.mock.invocationCallOrder.at(-1));
+  });
+
+  it('reopening a shift closed with a surplus takes it back out of the register and the owners income, in that day', async () => {
+    const allocations = [{ ownerId: 'o1', amountUsd: 3 }];
+    db.dailyCashClosing.findUnique.mockResolvedValue({ id: 'dc-3', storeId: 'store-1', businessDate: '2026-10-06', createdAt: new Date('2026-10-06T15:00:00Z'), actualCashTjs: 230, surplusOwnerAllocations: allocations, store: { id: 'store-1', name: 'Сиёма' } });
+    db.cashHandover.findFirst.mockResolvedValue(null);
+    db.financialTransaction.findFirst.mockResolvedValue({ id: 'ft-surplus', amountUsd: 3 });
+
+    await DailyClosingService.delete('dc-3', 'u1');
+
+    expect(db.financialTransaction.findFirst.mock.calls[0][0].where).toMatchObject({ sourceType: 'CASH_SURPLUS', sourceId: 'dc-3' });
+    expect(db.store.update).toHaveBeenCalledWith({ where: { id: 'store-1' }, data: { cashBalanceUsd: { decrement: 3 } } });
+    expect(cancelTransaction).toHaveBeenCalledWith(expect.anything(), 'ft-surplus', 'u1', { keepDate: true });
+    expect(replaceOwnerAllocations).toHaveBeenCalledWith(expect.anything(), allocations, [], 1);
   });
 
   it('refuses to close without a rate for the business day', async () => {

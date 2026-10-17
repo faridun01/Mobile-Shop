@@ -285,7 +285,8 @@ interface AppContextType {
   updateStore: (storeId: string, name: string, address?: string) => Promise<{ success: boolean; message?: string }>;
   deleteStore: (storeId: string) => Promise<{ success: boolean; message?: string }>;
   mergeStores: (sourceStoreId: string, targetStoreId: string) => Promise<{ success: boolean; message?: string }>;
-  adjustStoreCashBalance: (storeId: string, newBalanceUsd: number, reason: string) => Promise<{ success: boolean; message?: string }>;
+  /** Sets a store register to the somoni counted in it; its dollars follow at today's rate. */
+  adjustStoreCashBalance: (storeId: string, newBalanceTjs: string, reason: string) => Promise<{ success: boolean; message?: string }>;
   closeQuarterPeriod: (params: { quarterName: string; transferRemainingToCapital: boolean }) => Promise<{ success: boolean; message?: string }>;
   theme: ThemeMode;
   setTheme: (theme: ThemeMode) => void;
@@ -1614,9 +1615,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
-  const adjustStoreCashBalance: AppContextType['adjustStoreCashBalance'] = async (storeId, newBalanceUsd, reason) => {
+  const adjustStoreCashBalance: AppContextType['adjustStoreCashBalance'] = async (storeId, newBalanceTjs, reason) => {
     try {
-      await apiClient(`/stores/${storeId}/adjust-cash`, { method: 'POST', body: JSON.stringify({ newBalanceUsd, reason }) });
+      await apiClient(`/stores/${storeId}/adjust-cash`, { method: 'POST', body: JSON.stringify({ newBalanceTjs, reason }) });
       await refetchAll();
       return { success: true };
     } catch (err) {

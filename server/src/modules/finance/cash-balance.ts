@@ -3,6 +3,9 @@ import { D, type MoneyInput } from '../../common/decimal';
 import { roundMoney } from '../../common/money';
 import type { TransactionClient } from '../../prisma/prisma.service';
 
+/** Ledger source of a counted surplus put into the register when its shift closes. */
+export const SURPLUS_SOURCE = 'CASH_SURPLUS';
+
 interface LedgerRow {
   accountId: string;
   destinationAccountId?: string | null;

@@ -83,8 +83,17 @@ async function paidExpenseStoreId(tx: TransactionClient, expenseId: string) {
   return posted?.account.storeId ?? null;
 }
 
+/**
+ * A shift closing's own booking (its shortage): dated in the closed day at that day's rate. The
+ * closing already holds the store lock and is the shift being closed, so no open-shift check.
+ */
+export interface ClosingDayBooking {
+  rate: MoneyInput;
+  at: Date;
+}
+
 /** Runs inside a caller-supplied transaction so repair-cost bookings share one atomic unit. */
-export async function createExpense(tx: TransactionClient, input: CreateExpenseInput) {
+export async function createExpense(tx: TransactionClient, input: CreateExpenseInput, closingDay?: ClosingDayBooking) {
   if (input.employeeId) await tx.$queryRaw`SELECT id FROM users WHERE id = ${input.employeeId} FOR UPDATE`;
   const actor = await resolveActor(tx, input.createdByUserId);
   const amountTjs = requirePositiveMoney(input.amountTjs, 'Сумма расхода');
@@ -95,7 +104,7 @@ export async function createExpense(tx: TransactionClient, input: CreateExpenseI
   // An advance counts against the payroll month it is given for, which can differ from the
   // day it is handed out (a September advance paid on 1 October still belongs to September).
   const payrollMonth = isAdvance ? (input.payrollMonth || getBusinessDateKey().slice(0, 7)) : null;
-  const rate = await requireTodayRate(tx);
+  const rate = closingDay ? D(closingDay.rate) : await requireTodayRate(tx);
   const amountUsd = roundMoney(D(amountTjs).div(rate));
   const resolvedTargetType = input.targetType || (input.storeId ? 'STORE' : 'BUSINESS');
 
@@ -133,7 +142,8 @@ export async function createExpense(tx: TransactionClient, input: CreateExpenseI
       createdByUserId: actor.id,
       paidFromCashRegister: writesOffCash,
       status,
-      paidAt: writesOffCash ? new Date() : null,
+      paidAt: writesOffCash ? closingDay?.at ?? new Date() : null,
+      ...(closingDay ? { createdAt: closingDay.at } : {}),
       employeeId: input.employeeId,
       isEmployeeAdvance: input.isEmployeeAdvance ?? false,
       payrollMonth,
@@ -143,7 +153,7 @@ export async function createExpense(tx: TransactionClient, input: CreateExpenseI
   if (writesOffCash) {
     if (!cashStore) throw new Error('Касса для списания расхода не найдена');
     // A store register's closed day takes no more expenses (Central Cash has no shifts).
-    await assertShiftOpen(tx, cashStore.id);
+    if (!closingDay) await assertShiftOpen(tx, cashStore.id);
     const cashGuard = await tx.store.updateMany({
       where: { id: cashStore.id, cashBalanceUsd: { gte: amountUsd } },
       data: { cashBalanceUsd: { decrement: amountUsd } },
@@ -174,6 +184,7 @@ export async function createExpense(tx: TransactionClient, input: CreateExpenseI
       description: input.comment || input.description || `Расход: ${input.category}`,
       comment: input.comment,
       createdByUserId: actor.id,
+      transactionDate: closingDay?.at,
     });
   }
 
@@ -529,8 +540,9 @@ export async function cancelExpenseInTx(tx: TransactionClient, id: string, actor
       const isCentral = existing.sourceAccount === 'Центральная касса' || isSalaryOrAdvance || !existing.storeId;
       const targetStoreId = (await paidExpenseStoreId(tx, id)) ?? (isCentral ? centralStore?.id : existing.storeId);
       if (targetStoreId) {
-        // Cancelling a paid expense returns its money to that register today.
-        await assertShiftOpen(tx, targetStoreId);
+        // Cancelling a paid expense returns its money to that register today. A closing's
+        // shortage goes back into its own (reopened) day instead, under the closing's store lock.
+        if (!fromClosing) await assertShiftOpen(tx, targetStoreId);
         await tx.store.update({
           where: { id: targetStoreId },
           data: { cashBalanceUsd: { increment: existing.amountUsd ?? roundMoney(D(existing.amountTjs).div(existing.exchangeRate || (await requireTodayRate(tx)))) } },
@@ -545,7 +557,7 @@ export async function cancelExpenseInTx(tx: TransactionClient, id: string, actor
     // no more `ledgerEntry.deleteMany` here either, matching the same no-hard-delete rule.
     const existingTransaction = await tx.financialTransaction.findFirst({ where: { sourceType: 'EXPENSE', sourceId: id, status: 'POSTED', reversedTransactionId: null } });
     if (existingTransaction) {
-      await cancelTransaction(tx, existingTransaction.id, actor.id);
+      await cancelTransaction(tx, existingTransaction.id, actor.id, { keepDate: fromClosing });
     }
     await tx.ledgerEntry.create({
       data: {

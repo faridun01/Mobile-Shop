@@ -2,12 +2,16 @@ import type { DailyCashClosing, Prisma } from '@prisma/client';
 import { prisma, type TransactionClient } from '../../prisma/prisma.service';
 import { getBusinessDateKey, dateRangeForCustomDates } from '../../common/business-date';
 import { roundMoney } from '../../common/money';
-import { D, type MoneyInput } from '../../common/decimal';
+import { D, moneyJson, type MoneyInput } from '../../common/decimal';
 import { resolveActor } from '../../common/actor';
 import { onCommit } from '../../common/after-commit';
 import { notifyAdmins } from '../notifications/notification.service';
 import { RealtimeSyncGateway } from '../../websocket/websocket.gateway';
 import { createExpense, cancelExpenseInTx, SHORTAGE_CATEGORY } from '../expenses/expenses.service';
+import { getStoreCashAccount } from './account.service';
+import { postTransaction, cancelTransaction } from './financial-transaction.service';
+import { currentOwnerAllocations, readOwnerAllocations, replaceOwnerAllocations } from './owner-allocations';
+import { SURPLUS_SOURCE } from './cash-balance';
 
 type Db = TransactionClient;
 type Money = ReturnType<typeof D>;
@@ -15,6 +19,15 @@ type Money = ReturnType<typeof D>;
 // Ledger sources that move the store register's cash and are not already covered by the
 // sales / refunds / expenses / customer-payment queries below.
 const OTHER_LEDGER_SOURCES = ['OWNER_TRANSACTION', 'SUPPLIER_PAYMENT'];
+
+/**
+ * When a closing's own bookings (shortage, surplus) happen: now for today's shift; the last
+ * moment of the day for a past one, so they stay in that closed day and never reach today's.
+ */
+function closingMoment(businessDate: string): Date {
+  if (businessDate === getBusinessDateKey()) return new Date();
+  return new Date(dateRangeForCustomDates(businessDate, businessDate).lt.getTime() - 1);
+}
 
 export interface DailyClosingSummary {
   storeId: string;
@@ -212,13 +225,22 @@ export class DailyClosingService {
       salesCardUsd = salesCardUsd.plus(diffUsd.minus(cashUsd));
     }
 
-    // 2c. Refunds made today: the customer gets back the somoni they paid, less the penalty; in
-    // dollars that is the refund day's rate (the penalty is booked in dollars at the same rate).
+    // 2c. Refunds made today: the customer gets back the somoni they paid, less the penalty. In
+    // dollars it is exactly what the register booked for that refund, at the rate of the moment
+    // it was made — never recalculated at a rate set later the same day.
     const refunds = await db.sale.findMany({
       // A receipt whose phones were returned one by one is counted through those returns (2c').
       where: { storeId, refundedAt: dateRange, status: 'REFUNDED', returns: { none: {} } },
       select: { id: true, receiptNumber: true, actualRefundAmountTjs: true, penaltyFeeTjs: true, penaltyFeeUsd: true, refundReason: true },
     });
+    const refundPostings = refunds.length
+      ? await db.financialTransaction.findMany({
+          where: { type: 'REFUND', sourceType: 'SALE', sourceId: { in: refunds.map((r) => r.id) }, reversedTransactionId: null },
+          select: { sourceId: true, amountUsd: true },
+        })
+      : [];
+    const bookedRefundUsd = new Map<string, Money>();
+    for (const p of refundPostings) bookedRefundUsd.set(p.sourceId!, (bookedRefundUsd.get(p.sourceId!) ?? D(0)).plus(p.amountUsd));
     let refundsCashTjs = D(0);
     let refundsCashUsd = D(0);
     const refundedReceipts: { receiptNumber: number; amountTjs: string; amountUsd: string; reason?: string }[] = [];
@@ -227,7 +249,8 @@ export class DailyClosingService {
       if (refundTjs.isZero()) continue;
       const collectedTjs = refundTjs.plus(r.penaltyFeeTjs ?? 0);
       refundsCashTjs = refundsCashTjs.plus(refundTjs);
-      const refundUsd = roundMoney(usdAt(collectedTjs, dayRate)).minus(r.penaltyFeeUsd ?? 0);
+      // Refunds made before their register posting existed: the refund day's rate.
+      const refundUsd = bookedRefundUsd.get(r.id) ?? roundMoney(usdAt(collectedTjs, dayRate)).minus(r.penaltyFeeUsd ?? 0);
       refundsCashUsd = refundsCashUsd.plus(refundUsd);
       refundedReceipts.push({
         receiptNumber: r.receiptNumber,
@@ -391,11 +414,12 @@ export class DailyClosingService {
       const differenceUsd = roundMoney(differenceTjs.div(rate));
       const actualUsd = roundMoney(D(summary.expectedCashUsd).plus(differenceUsd));
 
-      // A shortage is a real loss of the store: it leaves the register as a store expense
-      // (CASH_SHORTAGE), so the register, the ledger, the owners' profit (by the store's shares)
-      // and the reports all show it. It is booked before the closing row, while the shift is
-      // still open. A surplus stays a recorded discrepancy for the admin to trace (usually a
-      // sale that was not entered), it is not profit until that sale is found.
+      // The register must hold exactly the somoni that were counted. A shortage is a real loss of
+      // the store: it leaves the register as a store expense (CASH_SHORTAGE); a surplus comes in
+      // as the store owners' income (below, once the closing row exists). Both are booked in the
+      // closed day at that day's rate, so they match the closing to the cent and never land in
+      // the next day's shift when a day is closed the morning after.
+      const at = closingMoment(businessDate);
       let shortageExpenseId: string | null = null;
       if (differenceTjs.isNegative()) {
         const shortage = await createExpense(tx, {
@@ -406,7 +430,7 @@ export class DailyClosingService {
           paidFromCashRegister: true,
           createdByUserId: actor.id,
           comment: `Недостача при закрытии смены ${businessDate}${input.comment?.trim() ? `: ${input.comment.trim()}` : ''}`,
-        });
+        }, { rate, at });
         shortageExpenseId = shortage.id;
       }
 
@@ -441,6 +465,33 @@ export class DailyClosingService {
           shortageExpenseId,
         },
       });
+
+      if (differenceTjs.gt(0)) {
+        const surplusAllocations = await currentOwnerAllocations(tx, differenceUsd, store.id);
+        await tx.store.update({ where: { id: store.id }, data: { cashBalanceUsd: { increment: differenceUsd } } });
+        const cashAccount = await getStoreCashAccount(tx, store.id, store.name);
+        await postTransaction(tx, {
+          type: 'INCOME',
+          direction: 'IN',
+          numberPrefix: 'CR',
+          accountId: cashAccount.id,
+          balanceCurrency: 'USD',
+          amount: differenceTjs,
+          currency: 'TJS',
+          exchangeRate: rate,
+          amountTjs: differenceTjs,
+          amountUsd: differenceUsd,
+          categoryName: 'Излишек кассы',
+          shopId: store.id,
+          sourceType: SURPLUS_SOURCE,
+          sourceId: closing.id,
+          description: `Излишек при закрытии смены ${businessDate}${input.comment?.trim() ? `: ${input.comment.trim()}` : ''}`,
+          createdByUserId: actor.id,
+          transactionDate: at,
+        });
+        await replaceOwnerAllocations(tx, [], surplusAllocations, 1);
+        await tx.dailyCashClosing.update({ where: { id: closing.id }, data: { surplusOwnerAllocations: moneyJson(surplusAllocations) } });
+      }
 
       // Audit Log
       await tx.auditLog.create({
@@ -573,6 +624,16 @@ export class DailyClosingService {
       await tx.dailyCashClosing.delete({ where: { id } });
       // The shortage this closing booked goes back into the register, and out of the owners' loss.
       if (closing.shortageExpenseId) await cancelExpenseInTx(tx, closing.shortageExpenseId, actor.id, true);
+      // The surplus it put into the register comes out again, and out of the owners' income —
+      // both in the reopened day, so that day's figures are as before the closing.
+      const surplus = await tx.financialTransaction.findFirst({
+        where: { sourceType: SURPLUS_SOURCE, sourceId: closing.id, status: 'POSTED', reversedTransactionId: null },
+      });
+      if (surplus) {
+        await tx.store.update({ where: { id: closing.storeId }, data: { cashBalanceUsd: { decrement: surplus.amountUsd } } });
+        await cancelTransaction(tx, surplus.id, actor.id, { keepDate: true });
+        await replaceOwnerAllocations(tx, readOwnerAllocations(closing.surplusOwnerAllocations ?? []), [], 1);
+      }
 
       await tx.auditLog.create({
         data: {

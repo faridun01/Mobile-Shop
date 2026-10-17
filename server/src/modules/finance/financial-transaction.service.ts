@@ -44,6 +44,8 @@ interface PostTransactionInput {
   createdByUserId: string;
   /** Reject the movement if it would take the account balance negative (default true). */
   guardBalance?: boolean;
+  /** The business moment the money moved (default now), e.g. the end of a shift closed the next day. */
+  transactionDate?: Date;
 }
 
 async function adjustBalance(tx: TransactionClient, accountId: string, currency: LedgerCurrency, delta: MoneyInput, guard: boolean) {
@@ -106,7 +108,7 @@ export async function postTransaction(tx: TransactionClient, input: PostTransact
       transactionNumber,
       type: input.type,
       direction: input.direction,
-      transactionDate: new Date(),
+      transactionDate: input.transactionDate ?? new Date(),
       accountId: input.accountId,
       destinationAccountId: input.destinationAccountId,
       balanceCurrency: input.balanceCurrency,
@@ -134,9 +136,10 @@ export async function postTransaction(tx: TransactionClient, input: PostTransact
  * Cancels a POSTED transaction: marks it CANCELLED (never deleted) and posts a new
  * reversal transaction with the opposite balance movement, linked via
  * `reversedTransactionId`. The reversal never blocks on insufficient funds — undoing
- * a transaction must always be possible.
+ * a transaction must always be possible. `keepDate` dates the reversal on the original's day,
+ * so a reopened shift nets that day's own booking (a closing's shortage or surplus) to zero.
  */
-export async function cancelTransaction(tx: TransactionClient, transactionId: string, actorId: string) {
+export async function cancelTransaction(tx: TransactionClient, transactionId: string, actorId: string, options: { keepDate?: boolean } = {}) {
   const original = await tx.financialTransaction.findUnique({ where: { id: transactionId } });
   if (!original) throw new Error('Финансовая операция не найдена');
   if (original.status === 'CANCELLED') throw new Error('Операция уже отменена');
@@ -173,5 +176,6 @@ export async function cancelTransaction(tx: TransactionClient, transactionId: st
     description: `Отмена: ${original.description}`,
     createdByUserId: actorId,
     guardBalance: false,
+    ...(options.keepDate ? { transactionDate: original.transactionDate } : {}),
   });
 }

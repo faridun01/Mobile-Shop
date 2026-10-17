@@ -1,4 +1,5 @@
-import { D, moneyJson, type MoneyInput } from '../../common/decimal';
+import type { Prisma } from '@prisma/client';
+import { D, decimalMax, moneyJson, type MoneyInput } from '../../common/decimal';
 import { prisma } from '../../prisma/prisma.service';
 import { resolveActor } from '../../common/actor';
 import { getStoreCashAccount, lockCashRegister } from '../finance/account.service';
@@ -88,14 +89,21 @@ export class StoresService {
   }
 
   /**
-   * Manually corrects a store's cash balance to an exact value — for reconciling
-   * drift from historical bugs/edge cases (e.g. legacy data inconsistencies) without
-   * needing direct database access. Logged to the audit trail with the reason and
-   * the old→new values. A distinct ADJUSTMENT preserves cash reconciliation without
-   * changing sales/expense-based profit reports.
+   * Corrects a register to the money actually in it, for reconciling drift from historical
+   * bugs/edge cases without direct database access. A store register is counted in somoni: its
+   * TJS is set to exactly the somoni counted and its dollars follow at today's rate (a register
+   * counted empty is emptied in both). Central Cash holds the owners' dollars and is corrected in
+   * dollars. Either way the register and its ledger account end equal — this also resolves a
+   * register/account mismatch reported by lockCashRegister. A distinct ADJUSTMENT keeps sales/
+   * expense-based profit reports unchanged; the reason and old→new values go to the audit trail.
    */
-  public static async adjustCashBalance(storeId: string, newBalanceUsd: MoneyInput, reason: string, userId: string) {
-    if (!D(newBalanceUsd).isFinite()) throw new Error('Укажите корректную сумму');
+  public static async adjustCashBalance(storeId: string, target: { tjs?: MoneyInput | null; usd?: MoneyInput | null }, reason: string, userId: string) {
+    const given = (v: MoneyInput | null | undefined): v is MoneyInput => v !== undefined && v !== null && v !== '';
+    const inTjs = given(target.tjs);
+    if (!inTjs && !given(target.usd)) throw new Error('Укажите новый остаток кассы');
+    const value = D(inTjs ? target.tjs! : target.usd!);
+    if (!value.isFinite()) throw new Error('Укажите корректную сумму');
+    if (inTjs && value.lt(0)) throw new Error('Пересчитанная сумма в кассе не может быть отрицательной');
     if (!reason?.trim()) throw new Error('Укажите причину корректировки');
 
     return prisma.$transaction(async (tx) => {
@@ -103,21 +111,43 @@ export class StoresService {
       await tx.$queryRaw`SELECT id FROM stores WHERE id = ${storeId} FOR UPDATE`;
       const store = await tx.store.findUnique({ where: { id: storeId } });
       if (!store) throw new Error('Магазин не найден');
-
-      // Sets both the register and its ledger account to the counted USD balance — this is
-      // also how a register/account mismatch reported by lockCashRegister gets resolved.
-      const roundedBalance = roundMoney(newBalanceUsd);
-      const account = await getStoreCashAccount(tx, storeId, store.name);
-      const delta = roundedBalance.minus(account.balanceUsd);
-      const updated = await tx.store.update({ where: { id: storeId }, data: { cashBalanceUsd: roundedBalance } });
-      if (!delta.isZero()) {
-        const rate = await requireTodayRate(tx);
-        await postTransaction(tx, { type: 'ADJUSTMENT', direction: delta.gt(0) ? 'IN' : 'OUT', numberPrefix: 'ADJ',
-          accountId: account.id, balanceCurrency: 'USD', amount: delta.abs(), currency: 'USD', exchangeRate: rate,
-          amountTjs: roundMoney(delta.abs().mul(rate)), amountUsd: delta.abs(), categoryName: 'Корректировка кассы',
-          shopId: storeId, sourceType: 'STORE_ADJUSTMENT', sourceId: storeId, guardBalance: false,
-          description: reason.trim(), createdByUserId: actor.id });
+      if (!store.isMainWarehouse && !inTjs) {
+        throw new Error('Кассу магазина корректируйте в сомони: укажите пересчитанную сумму наличных');
       }
+
+      const rate = await requireTodayRate(tx);
+      const account = await getStoreCashAccount(tx, storeId, store.name);
+      const { tjs: oldTjs } = await registerLedgerBalance(tx, storeId);
+      let newUsd: Prisma.Decimal;
+      let deltaTjs: Prisma.Decimal;
+      if (inTjs) {
+        const counted = roundMoney(value);
+        deltaTjs = counted.minus(oldTjs);
+        // The somoni counted are worth today's dollars on top of what the register booked.
+        newUsd = counted.isZero() ? D(0) : decimalMax(D(0), roundMoney(D(account.balanceUsd).plus(deltaTjs.div(rate))));
+      } else {
+        newUsd = roundMoney(value);
+        deltaTjs = roundMoney(newUsd.minus(account.balanceUsd).mul(rate));
+      }
+      const deltaUsd = newUsd.minus(account.balanceUsd);
+      const updated = await tx.store.update({ where: { id: storeId }, data: { cashBalanceUsd: newUsd } });
+
+      // One row when somoni and dollars move the same way; a row per currency when they don't
+      // (e.g. emptying a register whose somoni and dollars disagree in sign).
+      const post = (tjs: Prisma.Decimal, usd: Prisma.Decimal) => postTransaction(tx, {
+        type: 'ADJUSTMENT', direction: (usd.isZero() ? tjs : usd).gt(0) ? 'IN' : 'OUT', numberPrefix: 'ADJ',
+        accountId: account.id, balanceCurrency: 'USD', amount: inTjs ? tjs.abs() : usd.abs(), currency: inTjs ? 'TJS' : 'USD',
+        exchangeRate: rate, amountTjs: tjs.abs(), amountUsd: usd.abs(), categoryName: 'Корректировка кассы',
+        shopId: storeId, sourceType: 'STORE_ADJUSTMENT', sourceId: storeId, guardBalance: false,
+        description: reason.trim(), createdByUserId: actor.id,
+      });
+      if (deltaTjs.isZero() || deltaUsd.isZero() || deltaTjs.isNegative() === deltaUsd.isNegative()) {
+        if (!deltaTjs.isZero() || !deltaUsd.isZero()) await post(deltaTjs, deltaUsd);
+      } else {
+        await post(deltaTjs, D(0));
+        await post(D(0), deltaUsd);
+      }
+      const newTjs = roundMoney(D(oldTjs).plus(deltaTjs));
 
       await tx.auditLog.create({
         data: {
@@ -125,8 +155,11 @@ export class StoresService {
           userName: actor.name,
           userRole: actor.role,
           action: 'STORE_CASH_ADJUSTMENT',
-          details: `Корректировка кассы "${store.name}": $${store.cashBalanceUsd} → $${roundedBalance}. Причина: ${reason.trim()}`,
-          financialDetails: moneyJson({ oldBalanceUsd: store.cashBalanceUsd, newBalanceUsd: roundedBalance, previousAccountBalanceUsd: account.balanceUsd }),
+          details: `Корректировка кассы "${store.name}": ${roundMoney(oldTjs)} TJS ($${store.cashBalanceUsd}) → ${newTjs} TJS ($${newUsd}) по курсу ${rate}. Причина: ${reason.trim()}`,
+          financialDetails: moneyJson({
+            oldBalanceUsd: store.cashBalanceUsd, newBalanceUsd: newUsd, previousAccountBalanceUsd: account.balanceUsd,
+            oldBalanceTjs: roundMoney(oldTjs), newBalanceTjs: newTjs, exchangeRate: rate,
+          }),
           targetId: storeId,
         },
       });

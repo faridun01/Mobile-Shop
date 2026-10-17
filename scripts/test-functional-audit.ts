@@ -88,7 +88,7 @@ try {
   pass('concurrent cross-slot IMEI uniqueness');
 
   const store = await api('POST', '/stores', { name: 'Audit nonzero' });
-  await api('POST', `/stores/${store.data.id}/adjust-cash`, { newBalanceUsd: 100, reason: 'fixture' });
+  await api('POST', `/stores/${store.data.id}/adjust-cash`, { newBalanceTjs: 1000, reason: 'fixture' });
   assert.equal((await api('DELETE', `/stores/${store.data.id}`)).status, 400);
   assert.equal((await db.store.findUniqueOrThrow({ where: { id: store.data.id } })).cashBalanceUsd.toString(), '100');
   pass('nonzero cash register cannot be deleted');

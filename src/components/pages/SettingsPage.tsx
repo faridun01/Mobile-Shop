@@ -171,7 +171,7 @@ export const SettingsPage: React.FC = () => {
 
   const handleOpenAdjust = (store: StoreType) => {
     setAdjustingStore(store);
-    setAdjustNewBalance((store.cashBalanceUsd ?? 0).toFixed(2));
+    setAdjustNewBalance(store.cashBalanceTjs != null ? store.cashBalanceTjs.toFixed(2) : '');
     setAdjustReason('');
   };
 
@@ -182,17 +182,17 @@ export const SettingsPage: React.FC = () => {
       setStatusMessage({ type: 'error', text: 'Укажите причину корректировки' });
       return;
     }
-    const parsed = parseFloat(adjustNewBalance);
-    if (!Number.isFinite(parsed)) {
-      setStatusMessage({ type: 'error', text: 'Укажите корректную сумму' });
+    const counted = adjustNewBalance.trim().replace(',', '.');
+    if (!/^\d+(\.\d{1,2})?$/.test(counted)) {
+      setStatusMessage({ type: 'error', text: 'Укажите пересчитанную сумму в сомони (не больше 2 знаков после запятой)' });
       return;
     }
     setIsSubmittingAdjust(true);
     try {
-      const res = await adjustStoreCashBalance(adjustingStore.id, parsed, adjustReason.trim());
+      const res = await adjustStoreCashBalance(adjustingStore.id, counted, adjustReason.trim());
       if (res.success) {
         setAdjustingStore(null);
-        setStatusMessage({ type: 'success', text: `Касса «${adjustingStore.name}» установлена: $${formatMoney(parsed)}` });
+        setStatusMessage({ type: 'success', text: `Касса «${adjustingStore.name}» установлена: ${formatMoney(counted)} TJS` });
       } else {
         setStatusMessage({ type: 'error', text: res.message || 'Ошибка корректировки кассы' });
       }
@@ -830,11 +830,15 @@ export const SettingsPage: React.FC = () => {
             <div className="text-xs space-y-3">
               <div>
                 <label className="block text-fg-subtle mb-1 text-[11px] uppercase">Текущий остаток</label>
-                <p className="text-fg-muted">${formatMoney(adjustingStore.cashBalanceUsd)}</p>
+                <p className="text-fg-muted">
+                  {adjustingStore.cashBalanceTjs != null ? `${formatMoney(adjustingStore.cashBalanceTjs)} TJS · ` : ''}${formatMoney(adjustingStore.cashBalanceUsd)}
+                </p>
               </div>
               <div>
-                <label className="block text-fg-subtle mb-1 text-[11px] uppercase">Новый остаток (USD) *</label>
+                <label className="block text-fg-subtle mb-1 text-[11px] uppercase">Пересчитано в кассе (TJS) *</label>
                 <input step="0.01"
+                  min="0"
+                  inputMode="decimal"
                   type="number"
                   value={adjustNewBalance}
                   onChange={(e) => setAdjustNewBalance(e.target.value)}
@@ -854,7 +858,7 @@ export const SettingsPage: React.FC = () => {
                 />
               </div>
               <p className="text-[11px] text-fg-subtle">
-                Причина сохраняется в журнале аудита. Это прямая корректировка остатка, а не транзакция — в отчётах она не отражается как доход или расход.
+                Введите сомони, которые реально лежат в кассе: остаток в сомони станет ровно таким, а доллары пересчитаются по сегодняшнему курсу. Причина сохраняется в журнале аудита. В отчётах корректировка не отражается как доход или расход.
               </p>
             </div>
 

@@ -8,6 +8,7 @@ const db = vi.hoisted(() => ({
   supplier: { aggregate: vi.fn(), findMany: vi.fn() }, store: { findFirst: vi.fn(), findMany: vi.fn() },
   auditLog: { findMany: vi.fn() }, device: { findMany: vi.fn() }, customerPaymentAllocation: { findMany: vi.fn() },
   saleReturn: { findMany: vi.fn() }, saleItem: { findMany: vi.fn() },
+  financialTransaction: { findMany: vi.fn(async () => []) }, financialAccount: { findMany: vi.fn(async () => []) },
 }));
 vi.mock('../../prisma/prisma.service', () => ({ prisma: db }));
 const rates = vi.hoisted(() => ({ byDay: new Map<string, number>(), fallback: 10 }));
