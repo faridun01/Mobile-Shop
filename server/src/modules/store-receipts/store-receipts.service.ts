@@ -36,7 +36,7 @@ function nextReceiptNumber(): string {
 }
 
 /** Only these device fields ever reach store staff — never cost, supplier or warehouse data. */
-const SAFE_DEVICE = { id: true, imei: true, imei2: true, brand: true, model: true, ram: true, storage: true, color: true } as const;
+const SAFE_DEVICE = { id: true, category: true, imei: true, imei2: true, brand: true, model: true, ram: true, storage: true, color: true } as const;
 
 function requireStaffStore(user: StaffUser, bodyStoreId?: string): string {
   if (user.role === 'ADMIN') {

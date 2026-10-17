@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { Headphones, Loader2, Search, X } from 'lucide-react';
+import { Headphones, Loader2, Search, Scan, X } from 'lucide-react';
+import { useAppFields } from '../../context/AppContext';
 import { apiClient } from '../../api/client';
 import { mapAccessoryStockItem } from '../../api/mappers';
 import type { AccessoryStockItem } from '../../types';
@@ -19,6 +20,7 @@ interface AccessoryStockListProps {
  * shown to the admin only.
  */
 export const AccessoryStockList: React.FC<AccessoryStockListProps> = ({ locationId, isAdmin }) => {
+  const { openScanner } = useAppFields('openScanner');
   const refreshRevision = useDataRefreshRevision();
   const [items, setItems] = useState<AccessoryStockItem[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -73,6 +75,10 @@ export const AccessoryStockList: React.FC<AccessoryStockListProps> = ({ location
             </button>
           )}
         </div>
+        <button type="button" aria-label="Найти аксессуар по штрихкоду" onClick={() => openScanner(setSearch, { mode: 'code' })}
+          className="h-11 w-11 flex items-center justify-center rounded-xl border border-border text-accent bg-surface-raised cursor-pointer">
+          <Scan className="w-4 h-4" />
+        </button>
         <span className="text-xs text-fg-subtle">
           В наличии: <strong className="text-fg font-mono">{totalUnits} шт.</strong>
           {isAdmin && <> • себестоимость <strong className="text-fg font-mono">${formatMoney(totalCost)}</strong></>}

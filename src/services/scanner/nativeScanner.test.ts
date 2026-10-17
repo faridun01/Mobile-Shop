@@ -20,6 +20,7 @@ vi.mock('@capacitor-mlkit/barcode-scanning', () => ({
   },
 }));
 import { scanNativeCode, nativeScannerState, openNativeScannerSettings } from './nativeScanner';
+import { scanModeState } from './scannerService';
 
 let controller: AbortController;
 let pending: Promise<string | null> | undefined;
@@ -33,6 +34,7 @@ const at = (x: number, y: number): [number, number][] => [[x - 300, y - 40], [x 
 
 beforeEach(() => {
   vi.clearAllMocks();
+  scanModeState.setState({ mode: 'imei', allowSwitch: false });
   mocks.platform = 'ios'; mocks.callbacks = {};
   mocks.checkPermissions.mockResolvedValue({ camera: 'granted' });
   mocks.requestPermissions.mockResolvedValue({ camera: 'granted' });
@@ -48,6 +50,18 @@ beforeEach(() => {
 afterEach(async () => { controller.abort(); await pending?.catch(() => {}); vi.unstubAllGlobals(); });
 
 describe('native camera ownership and permissions', () => {
+  it('tablet SN mode ignores retail barcodes and selects the SN in a mixed frame', async () => {
+    scanModeState.setState({ mode: 'serial', allowSwitch: false });
+    start(); await ready();
+    emit('4601234567890');
+    expect(nativeScannerState.getState().phase).toBe('scanning');
+    mocks.callbacks.barcodesScanned({ barcodes: [
+      { format: 'EAN_13', rawValue: '4601234567890' },
+      { format: 'CODE_128', rawValue: 'R58N123ABCD' },
+    ] });
+    expect(await pending).toBe('R58N123ABCD');
+    expect(mocks.startScan.mock.calls[0][0].formats).not.toContain('EAN_13');
+  });
   it('checks OS permission on every opening, skips prompting when granted, returns the IMEI', async () => {
     start(); await ready(); emit(IMEI1);
     expect(await pending).toBe(IMEI1);

@@ -231,7 +231,7 @@ export const InventoryFiltersBar: React.FC<InventoryFiltersBarProps> = ({
             onChange={onSearchChange}
             onScan={onScan}
             onSubmit={onSubmitSearch}
-            placeholder="Поиск по IMEI, штрихкоду, модели, бренду, цвету..."
+            placeholder="Поиск по IMEI / SN, модели, бренду, цвету…"
           />
         </div>
 

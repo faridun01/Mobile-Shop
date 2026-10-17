@@ -50,6 +50,7 @@ interface AppContextType {
   // Every device (any status, including SOLD) from one purchase invoice — for the
   // invoice-detail "which units were sold" view, which the SOLD-excluded default misses.
   findDevicesByInvoice: (invoiceId: string) => Promise<Device[]>;
+  refreshInventory: () => Promise<void>;
   sales: Sale[];
   // `sales` only holds a recent, bounded window by default (see fetchSales). This reaches
   // further back — by receipt/IMEI search, by seller (full history), or by an explicit
@@ -464,6 +465,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const raw = await apiClient<any[]>('/devices?excludeSold=true');
     setDevices(raw.map(mapDevice));
   }), [coalesceFetch]);
+  const refreshInventory = useCallback(() => refreshAfterMutation([(async () => {
+    // A GET started before the receipt committed may still contain the old location.
+    await inFlightFetchers.current.get('devices')?.catch(() => {});
+    await fetchDevices();
+  })()]), [fetchDevices]);
 
   const mergeDevicesById = (mapped: Device[]) => {
     setDevices((prev) => {
@@ -1677,6 +1683,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         devices,
         findDeviceByImei,
         findDevicesByInvoice,
+        refreshInventory,
         sales,
         fetchSalesRange,
         transfers,

@@ -24,6 +24,7 @@
     "test:e2e": "tsx scripts/test-e2e-isolated.ts",
     "test:system": "tsx scripts/test-system-audit.ts",
     "test:quarter": "tsx scripts/test-quarter-simulation.ts",
+    "test:cycle200": "tsx scripts/test-business-cycle-200.ts",
     "test:profit-refund": "tsx scripts/test-profit-share-refund.ts",
     "test:audit-fixes": "tsx scripts/test-audit-fixes.ts",
     "test:functional": "tsx scripts/test-functional-audit.ts",

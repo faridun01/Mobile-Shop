@@ -6,7 +6,7 @@ import { scanWebCode, type WebScannerHost } from './webScanner';
  * What a scan looks for. `imei`: only a valid 15-digit IMEI (the other labels on a phone box
  * are ignored). `code`: any barcode — a tablet serial number or an accessory barcode.
  */
-export type ScanMode = 'imei' | 'code';
+export type ScanMode = 'imei' | 'serial' | 'code';
 
 export interface ScanOptions {
   mode?: ScanMode;

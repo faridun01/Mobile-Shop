@@ -1,5 +1,6 @@
 import { decimal, moneyNumber, sumMoney, formatMoney } from '../../utils/money';
 import { deviceCodeLabel } from '../../utils/deviceCode';
+import { ProductCategoryFilter, matchesProductCategory, type ProductCategoryFilterValue } from '../common/ProductCategoryFilter';
 import React, { useState, useMemo, useRef } from 'react';
 import { useAppFields } from '../../context/AppContext';
 import { Device, PaymentMethod } from '../../types';
@@ -60,6 +61,7 @@ export const SalePage: React.FC = () => {
   } = useAppFields('currentUser', 'devices', 'todayRate', 'selectedStoreId', 'stores', 'openScanner', 'createSale', 'isInitialLoading', 'sales');
 
   const [searchQuery, setSearchQuery] = useState('');
+  const [productCategory, setProductCategory] = useState<ProductCategoryFilterValue>('ALL');
   const [selectedBrand, setSelectedBrand] = useState<string>('ALL');
   const [cart, setCart] = useState<CartItem[]>([]);
   // Accessories in the receipt: a quantity of one card each, at a unit price.
@@ -138,8 +140,8 @@ export const SalePage: React.FC = () => {
   // Accessories are sold from one store's batches: another store starts an empty list.
   React.useEffect(() => { setAccessoryCart([]); }, [effectiveStoreId]);
   const visibleAccessories = useMemo(
-    () => filterAccessories(accessoryStock, searchQuery).filter((item) => selectedBrand === 'ALL' || item.brand === selectedBrand),
-    [accessoryStock, searchQuery, selectedBrand],
+    () => productCategory === 'ALL' || productCategory === 'ACCESSORY' ? filterAccessories(accessoryStock, searchQuery).filter((item) => selectedBrand === 'ALL' || item.brand === selectedBrand) : [],
+    [accessoryStock, searchQuery, selectedBrand, productCategory],
   );
   const maxOf = (product: AccessoryStockItem) => availableAt(product, effectiveStoreId || undefined);
   const addAccessoryToCart = (product: AccessoryStockItem) => {
@@ -156,6 +158,7 @@ export const SalePage: React.FC = () => {
 
   const availableDevices = useMemo(() => {
     return devices.filter(d => {
+      if (!matchesProductCategory(d, productCategory)) return false;
       const isAvailableStatus = d.status === 'STORE_STOCK' || d.status === 'IN_STOCK_AFTER_EXCHANGE';
       if (!isAvailableStatus) return false;
       if (effectiveStoreId && d.locationId !== effectiveStoreId) return false;
@@ -177,7 +180,7 @@ export const SalePage: React.FC = () => {
 
       return true;
     });
-  }, [devices, effectiveStoreId, searchQuery, selectedBrand, cart]);
+  }, [devices, effectiveStoreId, searchQuery, selectedBrand, cart, productCategory]);
 
   const brands = useMemo(() => {
     const set = new Set<string>();
@@ -306,7 +309,7 @@ export const SalePage: React.FC = () => {
   };
 
   const handleTriggerScanner = () => {
-    openScanner((scannedCode) => handleDeviceCode(scannedCode, 'camera'), { allowModeSwitch: true });
+    openScanner((scannedCode) => handleDeviceCode(scannedCode, 'camera'), { mode: productCategory === 'TABLET' ? 'serial' : productCategory === 'ACCESSORY' ? 'code' : 'imei', allowModeSwitch: true });
   };
 
   const handleAddMore = () => {
@@ -545,8 +548,9 @@ export const SalePage: React.FC = () => {
                 onChange={setSearchQuery}
                 onScan={handleTriggerScanner}
                 onSubmit={(value) => handleDeviceCode(value, 'enter')}
-                placeholder="Поиск по IMEI или модели..."
+                placeholder="IMEI / SN, штрихкод, название или модель…"
               />
+              <ProductCategoryFilter value={productCategory} onChange={(category) => { setProductCategory(category); setSelectedBrand('ALL'); }} />
 
               {brands.length > 2 && (
                 <div className="flex items-center justify-between gap-2 overflow-hidden pt-0.5">

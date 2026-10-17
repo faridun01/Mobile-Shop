@@ -73,7 +73,7 @@ try {
   const lookup = await call(seller, 'POST', '/store-receipts/lookup', { imei: ` ${imeis[0]} ` });
   assert.equal(lookup.status, 200, JSON.stringify(lookup));
   assert.equal(lookup.data.kind, 'DEVICE');
-  assert.deepEqual(Object.keys(lookup.data).sort(), ['kind', 'brand', 'color', 'id', 'imei', 'imei2', 'model', 'ram', 'storage'].sort());
+  assert.deepEqual(Object.keys(lookup.data).sort(), ['kind', 'category', 'brand', 'color', 'id', 'imei', 'imei2', 'model', 'ram', 'storage'].sort());
   for (const [imei, expected] of [['000000000000000', 404], [soldElsewhere.imei, 409]] as const) {
     const r = await call(seller, 'POST', '/store-receipts/lookup', { imei });
     assert.equal(r.status, expected, `${imei}: ${JSON.stringify(r)}`);

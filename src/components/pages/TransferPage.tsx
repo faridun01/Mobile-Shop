@@ -13,6 +13,7 @@ import { cn } from '../../utils/cn';
 
 import { TransferLocationSelector } from '../transfer/TransferLocationSelector';
 import { TransferDeviceGrid } from '../transfer/TransferDeviceGrid';
+import { ProductCategoryFilter, matchesProductCategory, type ProductCategoryFilterValue } from '../common/ProductCategoryFilter';
 import { TransferBottomBar } from '../transfer/TransferBottomBar';
 import { TransferHistoryList } from '../transfer/TransferHistoryList';
 import { ConfirmTransferModal } from '../transfer/ConfirmTransferModal';
@@ -68,6 +69,7 @@ export const TransferPage: React.FC = () => {
   const [fromLocationId, setFromLocationId] = useState<string>(defaultFromId);
   const [toLocationId, setToLocationId] = useState<string>(defaultToId);
   const [searchQuery, setSearchQuery] = useState<string>('');
+  const [productCategory, setProductCategory] = useState<ProductCategoryFilterValue>('ALL');
   const [selectionsByOrigin, setSelectionsByOrigin] = useState<Record<string, string[]>>({});
   const storedSelection = selectionsByOrigin[fromLocationId];
   const setSelectedDeviceIds = useCallback((next: string[] | ((prev: string[]) => string[])) => {
@@ -206,7 +208,7 @@ export const TransferPage: React.FC = () => {
   }, [rawAvailableAtLocation]);
 
   const availableDevicesAtFromLocation = useMemo(() => {
-    let list = rawAvailableAtLocation;
+    let list = rawAvailableAtLocation.filter(device => matchesProductCategory(device, productCategory));
 
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase().trim();
@@ -277,7 +279,7 @@ export const TransferPage: React.FC = () => {
 
       return 0;
     });
-  }, [rawAvailableAtLocation, searchQuery, selectedBrand, onlySelected, deviceSortBy, selectedIdSet]);
+  }, [rawAvailableAtLocation, searchQuery, selectedBrand, onlySelected, deviceSortBy, selectedIdSet, productCategory]);
 
   const selectedDevices = useMemo(() => {
     return devices.filter(d => selectedIdSet.has(d.id));
@@ -287,7 +289,7 @@ export const TransferPage: React.FC = () => {
   const { items: accessoryStock } = useAccessoryStock(fromLocationId || undefined);
   const [accessoryCart, setAccessoryCart] = useState<AccessoryCartItem[]>([]);
   useEffect(() => { setAccessoryCart([]); }, [fromLocationId]);
-  const visibleAccessories = useMemo(() => filterAccessories(accessoryStock, searchQuery), [accessoryStock, searchQuery]);
+  const visibleAccessories = useMemo(() => productCategory === 'ALL' || productCategory === 'ACCESSORY' ? filterAccessories(accessoryStock, searchQuery) : [], [accessoryStock, searchQuery, productCategory]);
   const accessoryUnits = accessoryCart.reduce((sum, line) => sum + line.quantity, 0);
   const maxOf = (product: AccessoryStockItem) => availableAt(product, fromLocationId || undefined);
   const addAccessory = (product: AccessoryStockItem) => {
@@ -365,7 +367,7 @@ export const TransferPage: React.FC = () => {
   };
 
   const handleScanDevice = () => {
-    openScanner((scannedCode) => handleDeviceCode(scannedCode, 'camera'), { allowModeSwitch: true });
+    openScanner((scannedCode) => handleDeviceCode(scannedCode, 'camera'), { mode: productCategory === 'TABLET' ? 'serial' : productCategory === 'ACCESSORY' ? 'code' : 'imei', allowModeSwitch: true });
   };
 
   const handleOpenConfirmModal = () => {
@@ -578,6 +580,7 @@ export const TransferPage: React.FC = () => {
               onDestinationChange={(id) => setToLocationId(id)}
             />
 
+            <div className="px-2 py-2"><ProductCategoryFilter value={productCategory} onChange={(category) => { setProductCategory(category); setSelectedBrand('ALL'); }} /></div>
             <TransferDeviceGrid
               availableDevices={availableDevicesAtFromLocation}
               totalAvailableCount={rawAvailableAtLocation.length}

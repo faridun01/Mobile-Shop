@@ -698,7 +698,7 @@ export const PurchasePage: React.FC = () => {
       handleUpdateSerial(groupIdx, itemIdx, slot, sn);
       // Main SN scanned: the additional one is next (it may be left empty).
       window.setTimeout(() => document.querySelector<HTMLInputElement>(`[data-sn="${groupIdx}-${itemIdx}-${slot === 1 ? 2 : 1}"]`)?.focus(), 0);
-    }, { mode: 'code' });
+    }, { mode: 'serial' });
   };
 
   // Accessories: a barcode is looked up in the catalog; a known one fills the card in by itself.
@@ -1327,7 +1327,7 @@ export const PurchasePage: React.FC = () => {
           : ' (в долг)';
         setStatusMessage({
           type: 'success',
-          text: `Приход по накладной ${savedNum} успешно сохранен (${previewInvoice.groups.reduce((a, b) => a + previewUnits(b), 0)} шт.)${paymentNote}!`,
+          text: `Приход по накладной ${savedNum} сохранён на главном складе (${previewInvoice.groups.reduce((a, b) => a + previewUnits(b), 0)} шт.)${paymentNote}. Для другой точки оформите перемещение или приход со склада.`,
         });
       } else {
         setStatusMessage({ type: 'error', text: res.message || 'Ошибка сохранения прихода' });

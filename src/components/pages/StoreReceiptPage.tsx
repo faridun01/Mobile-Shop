@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { useAppFields } from '../../context/AppContext';
 import { formatStoreDisplayTitle } from '../../utils/storeContext';
 import { apiClient } from '../../api/client';
+import { ProductCategoryFilter, type ProductCategoryFilterValue } from '../common/ProductCategoryFilter';
 import { StoreReceipt, StoreReceiptAccessoryLine, StoreReceiptItem } from '../../types';
 import { formatPhoneColor, normalizePhoneColor } from '../../utils/phoneSpecs';
 import { soundEffects } from '../../utils/sound';
@@ -35,12 +36,13 @@ interface IntakeAccessory extends StoreReceiptAccessoryLine {
 }
 
 export const StoreReceiptPage: React.FC = () => {
-  const { currentUser, stores, openScanner, selectedStoreId } = useAppFields(
+  const { currentUser, stores, openScanner, selectedStoreId, refreshInventory } = useAppFields(
     'currentUser',
     'stores',
     'openScanner',
-    'selectedStoreId'
+    'selectedStoreId', 'refreshInventory'
   );
+  const [intakeCategory, setIntakeCategory] = useState<ProductCategoryFilterValue>('ALL');
 
   const isAdmin = currentUser?.role === 'ADMIN';
   const isPartner = currentUser?.role === 'PARTNER';
@@ -142,6 +144,11 @@ export const StoreReceiptPage: React.FC = () => {
           storeId: effectiveStoreId || undefined,
         }),
       });
+      const category = res.kind === 'ACCESSORY' ? 'ACCESSORY' : res.category || 'PHONE';
+      if (intakeCategory !== 'ALL' && category !== intakeCategory) {
+        setStatus({ tone: 'warning', text: 'Код относится к другой категории. Выберите нужную категорию товара.' });
+        return;
+      }
 
       // An accessory's barcode: one more unit of it (up to what the main warehouse has free).
       if (res.kind === 'ACCESSORY') {
@@ -177,7 +184,7 @@ export const StoreReceiptPage: React.FC = () => {
       soundEffects.playAddToCartSuccess();
       setStatus({
         tone: 'success',
-        text: `Добавлен: ${res.brand} ${res.model} (${res.storage || ''} ${formatPhoneColor(res.color) || ''}) [IMEI: ${res.imei}]`,
+        text: `Добавлен: ${res.brand} ${res.model} (${res.storage || ''} ${formatPhoneColor(res.color) || ''}) [${res.category === 'TABLET' ? 'SN' : 'IMEI'}: ${res.imei}]`,
       });
 
       // Refocus input for continuous rapid scanning
@@ -240,6 +247,7 @@ export const StoreReceiptPage: React.FC = () => {
 
       loadHistory();
       window.dispatchEvent(new CustomEvent('business-data-changed'));
+      await refreshInventory();
     } catch (err: any) {
       soundEffects.playError();
       setStatus({
@@ -318,6 +326,7 @@ export const StoreReceiptPage: React.FC = () => {
       <div className="flex-1 overflow-y-auto p-3 sm:p-5">
         {activeTab === 'NEW' ? (
           <div className="max-w-4xl mx-auto space-y-3 sm:space-y-4">
+            <ProductCategoryFilter value={intakeCategory} onChange={setIntakeCategory} />
             {/* IMEI Input & Scanner Form */}
             <form onSubmit={handleInputSubmit} className="flex items-center gap-2">
               <div className="relative flex-1">
@@ -347,7 +356,7 @@ export const StoreReceiptPage: React.FC = () => {
                   )}
                   <button
                     type="button"
-                    onClick={() => openScanner((code) => handleLookupImei(code), { allowModeSwitch: true })}
+                    onClick={() => openScanner((code) => handleLookupImei(code), { mode: intakeCategory === 'TABLET' ? 'serial' : intakeCategory === 'ACCESSORY' ? 'code' : 'imei', allowModeSwitch: true })}
                     className="p-1.5 rounded-lg text-accent hover:bg-accent/15 border border-transparent hover:border-accent/25 cursor-pointer transition-colors"
                     title="Сканировать камерой"
                     aria-label="Сканировать камерой"

@@ -3,7 +3,7 @@ import { useStore } from 'zustand';
 import { Flashlight, FlashlightOff } from 'lucide-react';
 import { cancelScan, scanModeState, setScanMode, type ScanMode } from '../../services/scanner/scannerService';
 import { nativeScannerState, openNativeScannerSettings, toggleNativeTorch } from '../../services/scanner/nativeScanner';
-import { CODE_SCAN_HINTS, SCAN_HINTS } from '../../services/scanner/imei';
+import { CODE_SCAN_HINTS, SERIAL_SCAN_HINTS, SCAN_HINTS } from '../../services/scanner/imei';
 import '../../services/scanner/nativeScanner.css';
 
 export function NativeScannerOverlay() {
@@ -11,10 +11,10 @@ export function NativeScannerOverlay() {
   const { mode, allowSwitch } = useStore(scanModeState);
   if (phase === 'idle') return null;
   const preview = phase === 'starting' || phase === 'scanning' || phase === 'stopping';
-  const title = mode === 'code' ? 'Сканирование SN / штрихкода' : 'Сканирование IMEI';
+  const title = mode === 'serial' ? 'Сканирование SN планшета' : mode === 'code' ? 'Сканирование штрихкода' : 'Сканирование IMEI';
   const switchTo = (next: ScanMode) => {
     setScanMode(next);
-    nativeScannerState.setState({ hint: (next === 'code' ? CODE_SCAN_HINTS : SCAN_HINTS).aim });
+    nativeScannerState.setState({ hint: (next === 'serial' ? SERIAL_SCAN_HINTS : next === 'code' ? CODE_SCAN_HINTS : SCAN_HINTS).aim });
   };
   return createPortal(
     <div role="dialog" aria-modal="true" aria-label={title} className={`native-scanner-overlay fixed inset-0 z-100 flex flex-col justify-between ${preview ? 'text-white' : 'bg-bg text-fg'}`}>
@@ -39,7 +39,7 @@ export function NativeScannerOverlay() {
         {preview && allowSwitch && (
           <div className="flex justify-center">
             <div role="radiogroup" aria-label="Что сканировать" className="inline-flex rounded-xl bg-black/70 p-1 text-sm">
-              {(['imei', 'code'] as const).map((value) => (
+              {(['imei', 'serial', 'code'] as const).map((value) => (
                 <button
                   key={value}
                   type="button"
@@ -48,7 +48,7 @@ export function NativeScannerOverlay() {
                   onClick={() => switchTo(value)}
                   className={`min-h-9 rounded-lg px-4 font-semibold ${mode === value ? 'bg-white text-black' : 'text-white'}`}
                 >
-                  {value === 'imei' ? 'IMEI (телефон)' : 'SN / штрихкод'}
+                  {value === 'imei' ? 'IMEI' : value === 'serial' ? 'SN' : 'Штрихкод'}
                 </button>
               ))}
             </div>

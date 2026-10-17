@@ -56,3 +56,25 @@ export function extractScanCode(raw: string): string | null {
   if (!value || value.length > 128 || /[\u0000-\u001f\u007f]/.test(value)) return null;
   return value;
 }
+
+export const SERIAL_SCAN_HINTS = {
+  aim: 'Наведите рамку на код с подписью SN / S/N',
+  notImei: 'Это не SN — наведите на серийный номер, а не EAN/UPC или IMEI',
+  several: 'В кадре несколько SN — оставьте в рамке нужный',
+  hold: 'SN найден — держите камеру неподвижно',
+};
+
+/** A labelled numeric SN is unambiguous. Unlabelled EAN/UPC/IMEI must not become a SN. */
+export function extractSerialCode(raw: string): string | null {
+  const labelled = raw.match(/(?:^|[;\n\r\s])(?:S\/?N|SERIAL(?:\s*(?:NUMBER|NO\.?))?)\s*[:=]\s*([A-Za-z0-9][A-Za-z0-9_.\/-]{2,62}[A-Za-z0-9])(?=$|[;\s])/i);
+  const value = (labelled?.[1] ?? raw).trim().toUpperCase();
+  if (!/^[A-Z0-9][A-Z0-9_.\/-]{2,62}[A-Z0-9]$/.test(value)) return null;
+  if (!labelled && (!/[A-Z]/.test(value) || /\/[A-Z]$/.test(value))) return null;
+  return value;
+}
+
+export function recognizeScanCodes(raw: string, mode: 'imei' | 'serial' | 'code'): string[] {
+  if (mode === 'imei') return extractImeis(raw);
+  const code = mode === 'serial' ? extractSerialCode(raw) : extractScanCode(raw);
+  return code ? [code] : [];
+}

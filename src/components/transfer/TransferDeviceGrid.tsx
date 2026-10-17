@@ -343,7 +343,7 @@ export const TransferDeviceGrid: React.FC<TransferDeviceGridProps> = ({
                 }
               }}
               enterKeyHint="search"
-              placeholder="Поиск устройства (модель, IMEI, цвет)..."
+              placeholder="Поиск по модели, IMEI / SN, цвету…"
               className="w-full h-8 rounded-lg bg-surface-raised border border-border pl-8 pr-7 text-xs text-fg placeholder:text-fg-subtle focus:border-accent focus:outline-none transition-colors"
             />
             {searchQuery && (
@@ -363,7 +363,7 @@ export const TransferDeviceGrid: React.FC<TransferDeviceGridProps> = ({
             type="button"
             onClick={onScanDevice}
             className="h-8 px-2.5 rounded-lg bg-surface-raised hover:bg-surface border border-border hover:border-accent text-accent text-xs font-semibold flex items-center gap-1.5 shrink-0 transition-colors cursor-pointer"
-            title="Сканировать IMEI или штрихкод"
+            title="Сканировать IMEI, SN или штрихкод"
           >
             <Scan className="w-3.5 h-3.5" />
             <span className="hidden sm:inline">Сканер</span>
@@ -562,7 +562,7 @@ export const TransferDeviceGrid: React.FC<TransferDeviceGridProps> = ({
                 className="h-7.5 px-3 rounded-lg bg-surface-raised border border-border text-accent text-xs font-semibold hover:border-accent hover:bg-accent/10 transition-all cursor-pointer flex items-center gap-1.5"
               >
                 <Scan className="w-3 h-3" />
-                <span>Сканировать IMEI</span>
+                <span>Сканировать IMEI / SN</span>
               </button>
             </div>
           </div>

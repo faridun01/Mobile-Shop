@@ -35,6 +35,7 @@ import { InventoryVariantList } from '../inventory/InventoryVariantList';
 import { FlatDevicesTable } from '../inventory/FlatDevicesTable';
 import { DeviceDetailsModal } from '../inventory/DeviceDetailsModal';
 import { AccessoryStockList } from '../inventory/AccessoryStockList';
+import { ProductCategoryFilter, matchesProductCategory, type ProductCategoryFilterValue } from '../common/ProductCategoryFilter';
 import { CustomSelect, CustomSelectOption } from '../ui/CustomSelect';
 
 export const InventoryPage: React.FC = () => {
@@ -97,7 +98,7 @@ export const InventoryPage: React.FC = () => {
   const [viewTab, setViewTab] = useState<'DEVICES' | 'LOCATIONS' | 'ACCESSORIES'>('DEVICES');
   // Inside a store there is only that store's stock — no per-location overview.
   useEffect(() => {
-    if (storeCtx.mode === 'STORE') setViewTab('DEVICES');
+    if (storeCtx.mode === 'STORE') setViewTab(previous => previous === 'LOCATIONS' ? 'DEVICES' : previous);
   }, [storeCtx.mode]);
 
   // Selected location: 'ALL' (all goods in company), or specific store/warehouse ID
@@ -122,6 +123,7 @@ export const InventoryPage: React.FC = () => {
   }, [globalSelectedStoreId, isStoreScoped, currentUser?.storeId]);
 
   const [searchQuery, setSearchQuery] = useState('');
+  const [productCategory, setProductCategory] = useState<ProductCategoryFilterValue>('ALL');
   const [selectedBrand, setSelectedBrand] = useState<string>('ALL');
   const [selectedRam, setSelectedRam] = useState<string>('ALL');
   const [selectedStorage, setSelectedStorage] = useState<string>('ALL');
@@ -159,6 +161,7 @@ export const InventoryPage: React.FC = () => {
   // Filter devices according to the active location selection
   const devicesInActiveLocation = useMemo(() => {
     return devices.filter(d => {
+      if (!matchesProductCategory(d, productCategory)) return false;
       if (!IN_STOCK_STATUSES.includes(d.status)) return false;
       if (isStoreScoped) {
         return d.locationId === currentUser?.storeId;
@@ -168,7 +171,7 @@ export const InventoryPage: React.FC = () => {
       }
       return d.locationId === selectedLocationId;
     });
-  }, [devices, isSeller, currentUser?.storeId, selectedLocationId]);
+  }, [devices, isStoreScoped, currentUser?.storeId, selectedLocationId, productCategory]);
 
   const distinctBrandCount = useMemo(() => {
     const set = new Set<string>();
@@ -506,6 +509,7 @@ export const InventoryPage: React.FC = () => {
     if (!code) return;
     const inLocation = findDeviceByCode(devicesInActiveLocation, code);
     if (inLocation) {
+      setProductCategory(inLocation.category === 'TABLET' ? 'TABLET' : 'PHONE');
       setPageStatus(null);
       setSelectedDevice(inLocation);
       return;
@@ -525,8 +529,8 @@ export const InventoryPage: React.FC = () => {
       setPageStatus({
         tone: 'error',
         text: isStoreScoped
-          ? `Устройство с IMEI ${code} не найдено в вашем магазине`
-          : `Устройство с IMEI ${code} не найдено`
+          ? `Устройство с IMEI/SN ${code} не найдено в вашем магазине`
+          : `Устройство с IMEI/SN ${code} не найдено`
       });
       return;
     }
@@ -539,6 +543,7 @@ export const InventoryPage: React.FC = () => {
       return;
     }
     setSelectedLocationId(selectedLocationId === 'ALL' ? 'ALL' : found.locationId);
+    setProductCategory(found.category === 'TABLET' ? 'TABLET' : 'PHONE');
     setViewTab('DEVICES');
     setSelectedDevice(found);
     setPageStatus({
@@ -550,12 +555,13 @@ export const InventoryPage: React.FC = () => {
   const handleScanDevice = () => {
     openScanner((scannedCode) => {
       void openDeviceByCode(scannedCode, 'camera');
-    }, { allowModeSwitch: true });
+    }, { mode: productCategory === 'TABLET' ? 'serial' : 'imei', allowModeSwitch: true });
   };
 
   const handleSelectLocationAndSwitch = (storeId: string) => {
     setSelectedLocationId(storeId);
     setViewTab('DEVICES');
+    if (productCategory === 'ACCESSORY') setProductCategory('ALL');
     if (selectedStatusFilter === 'MAIN_WAREHOUSE' && storeId !== mainWarehouse?.id) {
       setSelectedStatusFilter('ALL');
     }
@@ -579,7 +585,7 @@ export const InventoryPage: React.FC = () => {
           <div className="flex-1 sm:flex-initial flex items-center gap-1 p-0.5 sm:p-1 rounded-xl bg-surface-raised border border-border">
               <button
                 type="button"
-                onClick={() => setViewTab('DEVICES')}
+                onClick={() => { setViewTab('DEVICES'); setProductCategory('ALL'); }}
                 className={`flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                   viewTab === 'DEVICES'
                     ? 'bg-accent text-accent-fg shadow-xs'
@@ -621,19 +627,7 @@ export const InventoryPage: React.FC = () => {
               </button>
               )}
 
-              {/* Accessories are counted by quantity, not by IMEI/SN: their own list */}
-              <button
-                type="button"
-                onClick={() => setViewTab('ACCESSORIES')}
-                className={`flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                  viewTab === 'ACCESSORIES'
-                    ? 'bg-accent text-accent-fg shadow-xs'
-                    : 'text-fg-subtle hover:text-fg-muted'
-                }`}
-              >
-                <Headphones className="w-3.5 h-3.5" />
-                <span>Аксессуары</span>
-              </button>
+
             </div>
 
           {/* Action buttons & Location Selector */}
@@ -658,6 +652,13 @@ export const InventoryPage: React.FC = () => {
             )}
           </div>
         </div>
+
+        <ProductCategoryFilter allLabel="Все устройства" value={viewTab === 'ACCESSORIES' ? 'ACCESSORY' : productCategory}
+          onChange={(category) => {
+            setProductCategory(category);
+            setViewTab(category === 'ACCESSORY' ? 'ACCESSORIES' : 'DEVICES');
+            handleResetAllFilters();
+          }} />
 
         {/* Desktop & Mobile Summary Stats Cards (devices; accessories show their own totals) */}
         {viewTab !== 'ACCESSORIES' && <InventoryStatsBar

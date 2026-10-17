@@ -7,7 +7,7 @@ import { useAppFields } from '../../context/AppContext';
 import { Dialog } from '../ui/Dialog';
 import { soundEffects } from '../../utils/sound';
 import { useStore } from 'zustand';
-import { CODE_SCAN_HINTS, extractImeis, extractScanCode, SCAN_HINTS } from '../../services/scanner/imei';
+import { CODE_SCAN_HINTS, recognizeScanCodes, SERIAL_SCAN_HINTS, SCAN_HINTS } from '../../services/scanner/imei';
 import { scanModeState, setScanMode } from '../../services/scanner/scannerService';
 import { cn } from '../../utils/cn';
 const DECODE_INTERVAL_MS = 60;
@@ -67,8 +67,8 @@ export const ScannerModal: React.FC = () => {
   const { isScannerOpen, scannerCallback, closeScanner } = useAppFields('isScannerOpen', 'scannerCallback', 'closeScanner');
   // IMEI only, or any code (a tablet SN, an accessory barcode); a lookup may switch between them.
   const { mode, allowSwitch } = useStore(scanModeState);
-  const codeMode = mode === 'code';
-  const hints = codeMode ? CODE_SCAN_HINTS : SCAN_HINTS;
+  const codeMode = mode !== 'imei';
+  const hints = mode === 'serial' ? SERIAL_SCAN_HINTS : codeMode ? CODE_SCAN_HINTS : SCAN_HINTS;
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const trackRef = useRef<MediaStreamTrack | null>(null);
   const stopCameraRef = useRef<() => void>(() => {});
@@ -106,7 +106,7 @@ export const ScannerModal: React.FC = () => {
   // Instant recognition for valid barcodes
   const confirmScan = (decodedText: string) => {
     if (scanLockedRef.current) return;
-    const codes = codeMode ? [extractScanCode(decodedText)].filter((c): c is string => Boolean(c)) : extractImeis(decodedText);
+    const codes = recognizeScanCodes(decodedText, mode);
     if (codes.length === 0) {
       setScanHint(hints.notImei);
       return;
@@ -207,8 +207,8 @@ export const ScannerModal: React.FC = () => {
     let nativeDetector: { detect: (source: HTMLVideoElement) => Promise<BrowserBarcode[]> } | null = null;
     if (typeof window !== 'undefined' && 'BarcodeDetector' in window) {
       try {
-        const formats = ['code_128', 'code_39', 'code_93', 'qr_code', 'data_matrix', 'ean_13', 'upc_a',
-          ...(codeMode ? ['ean_8', 'upc_e', 'itf', 'codabar'] : [])];
+        const formats = ['code_128', 'code_39', 'code_93', 'qr_code', 'data_matrix',
+          ...(mode === 'code' ? ['ean_13', 'upc_a', 'ean_8', 'upc_e', 'itf', 'codabar'] : [])];
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         nativeDetector = new (window as any).BarcodeDetector({ formats });
       } catch {
@@ -216,7 +216,7 @@ export const ScannerModal: React.FC = () => {
       }
     }
 
-    const decoder = new Html5QrcodeShim(codeMode ? CODE_FORMATS : SUPPORTED_FORMATS, true, false, new BaseLoggger(false));
+    const decoder = new Html5QrcodeShim(mode === 'code' ? CODE_FORMATS : [...SUPPORTED_FORMATS, Html5QrcodeSupportedFormats.CODE_93], true, false, new BaseLoggger(false));
     const canvas = document.createElement('canvas');
     const context = canvas.getContext('2d', { willReadFrequently: true });
 
@@ -236,9 +236,7 @@ export const ScannerModal: React.FC = () => {
               const candidates: { code: string; distance: number }[] = [];
 
               for (const b of barcodes) {
-                const codes = codeMode
-                  ? [extractScanCode(b.rawValue || '')].filter((c): c is string => Boolean(c))
-                  : extractImeis(b.rawValue || '');
+                const codes = recognizeScanCodes(b.rawValue || '', mode);
                 for (const imei of codes) {
                   let centerX = targetX;
                   let centerY = targetY;
@@ -355,7 +353,7 @@ export const ScannerModal: React.FC = () => {
       cameraRelease = startPromise.then(stopCamera);
     };
     // Switching IMEI / SN restarts the camera with that mode's decoders.
-  }, [isScannerOpen, codeMode]);
+  }, [isScannerOpen, mode]);
 
   const isHolding = scanHint === hints.hold;
 
@@ -363,15 +361,15 @@ export const ScannerModal: React.FC = () => {
     <Dialog
       open={isScannerOpen}
       onClose={closeScanner}
-      title={codeMode ? 'Сканирование SN / штрихкода' : 'Сканирование IMEI'}
-      subtitle={codeMode ? 'Наведите камеру на штрих-код серийного номера или товара' : 'Наведите камеру на штрих-код устройства'}
+      title={mode === 'serial' ? 'Сканирование SN планшета' : codeMode ? 'Сканирование штрихкода' : 'Сканирование IMEI'}
+      subtitle={mode === 'serial' ? 'Наведите на код под надписью SN / S/N. Числовой SN можно ввести вручную.' : codeMode ? 'Наведите камеру на штрихкод товара' : 'Наведите камеру на штрихкод IMEI'}
       maxWidth="sm"
       compact
     >
       <div className="space-y-2.5">
         {allowSwitch && (
-          <div role="radiogroup" aria-label="Что сканировать" className="grid grid-cols-2 gap-1 p-1 rounded-xl bg-surface-raised border border-border text-xs font-semibold">
-            {(['imei', 'code'] as const).map((value) => (
+          <div role="radiogroup" aria-label="Что сканировать" className="grid grid-cols-3 gap-1 p-1 rounded-xl bg-surface-raised border border-border text-xs font-semibold">
+            {(['imei', 'serial', 'code'] as const).map((value) => (
               <button
                 key={value}
                 type="button"
@@ -383,7 +381,7 @@ export const ScannerModal: React.FC = () => {
                   mode === value ? 'bg-accent text-accent-fg shadow-xs' : 'text-fg-muted hover:text-fg'
                 )}
               >
-                {value === 'imei' ? 'IMEI (телефон)' : 'SN / штрихкод'}
+                {value === 'imei' ? 'IMEI' : value === 'serial' ? 'SN' : 'Штрихкод'}
               </button>
             ))}
           </div>
@@ -546,7 +544,7 @@ export const ScannerModal: React.FC = () => {
               type="text"
               value={manualCode}
               onChange={(e) => setManualCode(e.target.value)}
-              placeholder={codeMode ? 'Или введите SN / штрихкод вручную...' : 'Или введите IMEI вручную...'}
+              placeholder={mode === 'serial' ? 'Введите SN вручную…' : codeMode ? 'Введите штрихкод вручную…' : 'Введите IMEI вручную…'}
               className="w-full h-9 pl-8 pr-7 bg-surface-raised border border-border rounded-xl text-xs font-mono text-fg placeholder:font-sans placeholder:text-fg-subtle focus:outline-none focus:border-accent transition-colors"
             />
             {manualCode && (
