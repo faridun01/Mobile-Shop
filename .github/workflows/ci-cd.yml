@@ -18,7 +18,7 @@ jobs:
   quality-checks:
     name: Quality Checks & Build
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
 
     # A real Postgres instance to run migrations, seed, and the e2e business-flow suite
     # against — those exercise auth, RBAC, store isolation, transfers, sales, refunds and
@@ -66,6 +66,9 @@ jobs:
       - name: TypeScript Type Check
         run: npm run lint
 
+      - name: Check UI Button Bindings and API Routes
+        run: npm run audit:ui-contracts
+
       - name: Run Unit Test Suite
         run: npm test
 
@@ -90,6 +93,11 @@ jobs:
 
       - name: Build Production Bundle
         run: npm run build
+
+      - name: Run UI and Backend Browser Regressions
+        env:
+          CHROME_PATH: /usr/bin/google-chrome
+        run: node --import tsx scripts/test-ui-audit.ts
 
       - name: Build Server Bundle
         run: npm run build:server

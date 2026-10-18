@@ -6,6 +6,7 @@ import { spawn, spawnSync } from 'node:child_process';
 import { PrismaClient } from '@prisma/client';
 
 export interface DisposableApi {
+  baseUrl: string;
   db: PrismaClient;
   env: NodeJS.ProcessEnv;
   /** Calls the API as `token` (default: admin) with a fresh Idempotency-Key unless one is given. */
@@ -48,7 +49,7 @@ export async function withDisposableApi(label: string, fn: (api: DisposableApi) 
     const login = async (l: string, p: string) => (await call('POST', '/auth/login', { login: l, password: p }, { token: '' })).data.token as string;
     admin = await login('admin', 'admin123');
     try {
-      await fn({ db, env, call, login });
+      await fn({ db, env, call, login, baseUrl: `http://127.0.0.1:${port}` });
     } finally {
       proc.kill();
     }

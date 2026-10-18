@@ -11,6 +11,7 @@ import { useAuthStore } from '../stores/useAuthStore';
 import { useUIStore } from '../stores/useUIStore';
 import { useNotificationsActions } from './NotificationsContext';
 import { apiClient } from '../api/client';
+import { needsStoreAssignment } from '../utils/storeAssignment';
 import { useRealtimeSync } from '../hooks/useRealtimeSync';
 import { scanCode, cancelScan, isNativeScanner, type ScanOptions } from '../services/scanner/scannerService';
 import { soundEffects } from '../utils/sound';
@@ -462,6 +463,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // stock, in transfer, in repair) is capped by real physical inventory. Old sold devices
   // are still reachable on demand via findDeviceByImei.
   const fetchDevices = useCallback(() => coalesceFetch('devices', async () => {
+    if (needsStoreAssignment(useAuthStore.getState().currentUser)) {
+      setDevices([]);
+      return;
+    }
     const raw = await apiClient<any[]>('/devices?excludeSold=true');
     setDevices(raw.map(mapDevice));
   }), [coalesceFetch]);
@@ -599,6 +604,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, []);
 
   const fetchSuppliers = useCallback(() => coalesceFetch('suppliers', async () => {
+    if (useAuthStore.getState().currentUser?.role !== 'ADMIN') { setSuppliers([]); return; }
     try {
       const raw = await apiClient<any[]>('/suppliers');
       setSuppliers(raw.map(mapSupplier));
@@ -611,6 +617,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // Bounded by default — PurchasePage's own period filter (defaults to the current month,
   // same shape as SalesHistoryPage) reaches further back on demand via fetchInvoicesRange.
   const fetchInvoices = useCallback(() => coalesceFetch('invoices', async () => {
+    if (useAuthStore.getState().currentUser?.role !== 'ADMIN') { setInvoices([]); return; }
     try {
       const raw = await apiClient<any[]>('/supplier-invoices?limit=500');
       setInvoices(raw.map(mapSupplierInvoice).sort(compareInvoicesDesc));
@@ -639,6 +646,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // Bounded — bonus campaigns are infrequent, nowhere near sale/device volume, so a
   // generous cap is enough (no search/widen infrastructure needed).
   const fetchBonuses = useCallback(() => coalesceFetch('bonuses', async () => {
+    if (useAuthStore.getState().currentUser?.role !== 'ADMIN') { setBonuses([]); return; }
     try {
       const raw = await fetchAllPages<any>('/supplier-bonuses');
       setBonuses(raw.map(mapSupplierBonus).sort((a, b) => new Date(b.dateReceived || b.date || 0).getTime() - new Date(a.dateReceived || a.date || 0).getTime()));
@@ -675,6 +683,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, []);
 
   const fetchOwners = useCallback(() => coalesceFetch('owners', async () => {
+    if (useAuthStore.getState().currentUser?.role !== 'ADMIN') {
+      ownerNamesRef.current.clear(); setOwners([]); setStoreProfitSharesState([]); return;
+    }
     try {
       const [raw, shares] = await Promise.all([
         apiClient<any[]>('/owners'),
@@ -702,6 +713,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }), [coalesceFetch]);
 
   const fetchAuditLogs = useCallback(() => coalesceFetch('auditLogs', async () => {
+    if (useAuthStore.getState().currentUser?.role !== 'ADMIN') { setAuditLogs([]); return; }
     try {
       const raw = await fetchAllPages<any>('/audit-logs');
       setAuditLogs(raw.map(mapAuditLog).sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()));

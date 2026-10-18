@@ -26,6 +26,8 @@ import { useNavigationLayout } from '../hooks/useNavigationLayout';
 import { cancelScan, isNativeScanner } from '../services/scanner/scannerService';
 import { useConnectionStatus } from '../services/connectionStatus';
 import { recordNavVisit } from '../utils/navUsage';
+import { needsStoreAssignment } from '../utils/storeAssignment';
+import { RestrictedAccess } from '../components/ui/RestrictedAccess';
 
 // Lazy-loaded so the ~3MB html5-qrcode dependency it pulls in only downloads the first
 // time a user actually opens the scanner, instead of riding along in the main chunk on
@@ -96,6 +98,7 @@ export function MainLayout() {
   const connection = useConnectionStatus();
   const location = useLocation();
   const { currentUser } = useAuthStore();
+  const { logout } = useAppFields('logout');
   // Locks after 10 minutes without user activity (all roles).
   useInactivityLock();
   const {
@@ -130,6 +133,12 @@ export function MainLayout() {
 
   if (!currentUser) {
     return <Navigate to="/login" replace />;
+  }
+  if (needsStoreAssignment(currentUser)) {
+    return <div className="app-safe-area app-viewport flex flex-col bg-bg text-fg">
+      <RestrictedAccess message="Магазин не назначен. Обратитесь к администратору, чтобы он назначил магазин в карточке сотрудника." />
+      <button type="button" className="h-11 mx-auto mb-8 px-6 rounded-xl bg-surface-raised" onClick={logout}>Выйти</button>
+    </div>;
   }
 
   // Sellers are pinned to their own store; for admin/partner this reflects whichever

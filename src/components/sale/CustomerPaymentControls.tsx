@@ -187,8 +187,8 @@ export const CustomerPaymentControls: React.FC<CustomerPaymentControlsProps> = (
                 <button
                   key={c.id}
                   type="button"
-                  onMouseDown={(e) => {
-                    e.preventDefault();
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => {
                     setCustomerNameInput(c.name);
                     setCustomerPhoneInput(c.phone || '');
                     setSelectedCustomerId(c.id);

@@ -82,9 +82,8 @@ export const Combobox: React.FC<ComboboxProps> = ({
         {value && clearable && (
           <button
             type="button"
-            tabIndex={-1}
-            onMouseDown={(e) => {
-              e.preventDefault();
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={(e) => {
               e.stopPropagation();
               onChange('');
               setOpen(false);
@@ -104,10 +103,10 @@ export const Combobox: React.FC<ComboboxProps> = ({
             <button
               key={opt}
               type="button"
-              // Selecting via mousedown (before the input's blur/click-outside fires) so the
-              // click isn't swallowed by the dropdown closing out from under it first.
-              onMouseDown={(e) => {
-                e.preventDefault();
+              // Preserve the input focus on pointer down; activate on click so Enter/Space
+              // and assistive-technology activation select the option as well.
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => {
                 onChange(opt);
                 setOpen(false);
               }}

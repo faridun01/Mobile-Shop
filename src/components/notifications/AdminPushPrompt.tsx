@@ -2,11 +2,13 @@ import React, { useEffect, useState } from 'react';
 import { BellRing, Check, X, Loader2, ShieldCheck } from 'lucide-react';
 import { WebPushService } from '../../services/webPushService';
 import { useAuthStore } from '../../stores/useAuthStore';
+import { useLocation } from 'react-router-dom';
 
 const STORAGE_KEY = 'admin_push_enabled';
 const DEFERRED_KEY = 'admin_push_deferred_session';
 
 export const AdminPushPrompt: React.FC = () => {
+  const location = useLocation();
   const { currentUser } = useAuthStore();
   const [visible, setVisible] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -60,7 +62,9 @@ export const AdminPushPrompt: React.FC = () => {
     };
   }, [currentUser?.role]);
 
-  if (!visible) return null;
+  // The floating prompt otherwise covers checkout/receipt buttons in the bottom right.
+  // Offer it on the admin welcome page; notifications can also be enabled in their section.
+  if (!visible || location.pathname !== '/') return null;
 
   const handleEnable = async () => {
     setLoading(true);
