@@ -1,4 +1,5 @@
 import React, { Suspense } from 'react';
+import { DataLoadGate, useDataLoadStatus } from '../context/DataLoadRecoveryContext';
 import { lazyWithRetry as lazy } from '../utils/lazyWithRetry';
 import { ErrorBoundary } from '../components/common/ErrorBoundary';
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
@@ -92,6 +93,7 @@ function LoadingFallback() {
 }
 
 export function MainLayout() {
+  const dataLoad = useDataLoadStatus();
   const native = isNativeScanner();
   React.useEffect(() => () => cancelScan(), []);
   const navigationLayout = useNavigationLayout();
@@ -158,6 +160,7 @@ export function MainLayout() {
         <TopBar />
         <main className="flex-1 flex flex-col min-w-0 max-w-full min-h-0 overflow-y-auto overflow-x-hidden relative bg-bg">
           <ErrorBoundary resetKey={location.pathname}>
+          <DataLoadGate>
           <Suspense fallback={<LoadingFallback />}>
             <Routes>
               <Route path="/" element={currentUser?.role === 'ADMIN' ? <WelcomePage /> : <Navigate to="/sale" replace />} />
@@ -188,6 +191,7 @@ export function MainLayout() {
               <Route path="*" element={<Navigate to={currentUser?.role === 'ADMIN' ? "/" : "/sale"} replace />} />
             </Routes>
           </Suspense>
+          </DataLoadGate>
           </ErrorBoundary>
         </main>
         {navigationLayout === 'mobile' && <MobileBottomNav />}
@@ -219,7 +223,7 @@ export function MainLayout() {
       </div>
 
       <DailyRateModal
-        isOpen={isDailyRateModalOpen || isRateModalOpen}
+        isOpen={dataLoad.failed === 0 && !dataLoad.retrying && (isDailyRateModalOpen || isRateModalOpen)}
         onClose={() => {
           setDailyRateModalOpen(false);
           closeDailyRateModal();

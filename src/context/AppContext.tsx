@@ -1,4 +1,6 @@
 import { fetchAllPages } from '../api/pagination';
+import { DataLoadRecovery } from '../services/dataLoadRecovery';
+import { DataLoadRecoveryContext } from './DataLoadRecoveryContext';
 import { getBusinessDateKey } from '../utils/businessDate';
 import { hasCurrentDailyRate } from '../utils/dailyRatePrompt';
 import { refreshAfterMutation } from '../utils/refreshAfterMutation';
@@ -321,6 +323,11 @@ function errorMessage(err: unknown, fallback: string): string {
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const authUser = useAuthStore((s) => s.currentUser);
   const authToken = useAuthStore((s) => s.token);
+  const [pageLoadRevision, setPageLoadRevision] = useState(0);
+  const [dataLoadRecovery] = useState(() => new DataLoadRecovery(() => {
+    setPageLoadRevision(value => value + 1);
+    window.dispatchEvent(new Event('business-data-changed'));
+  }));
   // notifications live in their own context now (see NotificationsContext.tsx) — this
   // provider only needs to trigger a refetch on realtime events / bulk-reload, never reads
   // the notification list itself.
@@ -423,14 +430,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const coalesceFetch = useCallback(<T,>(key: string, fn: () => Promise<T>): Promise<T> => {
     const existing = inFlightFetchers.current.get(key);
     if (existing) return existing as Promise<T>;
-    const task = fn().finally(() => {
+    const task = dataLoadRecovery.run(key, fn, () => coalesceFetch(key, fn)).finally(() => {
       if (inFlightFetchers.current.get(key) === task) {
         inFlightFetchers.current.delete(key);
       }
     });
     inFlightFetchers.current.set(key, task);
     return task;
-  }, []);
+  }, [dataLoadRecovery]);
 
   const localMutationTimestamps = useRef(new Map<string, number>());
   const MUTATION_ECHO_GRACE_MS = 2000;
@@ -782,6 +789,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }), [fetchStores, fetchUsers, fetchSales, fetchTransfers, fetchRepairs, fetchSuppliers, fetchInvoices, fetchBonuses, fetchExpenses, fetchOwners, fetchOwnerTransactions, fetchAuditLogs]);
 
   useLayoutEffect(() => {
+    dataLoadRecovery.reset();
+    inFlightFetchers.current.clear();
     loadedModules.current.clear();
     pendingModules.current.clear();
     if (!authToken || !authUser) return;
@@ -814,7 +823,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const fetcher = pageFetchers[key as keyof typeof pageFetchers];
       if (fetcher) void load(fetcher).catch((error) => console.error('Page data load failed', error));
     }
-  }, [authToken, pageFetchers, fetchOwnerTransactions, fetchOwners]);
+  }, [authToken, pageFetchers, fetchOwnerTransactions, fetchOwners, pageLoadRevision]);
 
   // Realtime: route each broadcast to only the data it actually touched instead of
   // reloading the entire app for every terminal on every change (same fix as
@@ -1808,9 +1817,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, [contextValue]);
 
   return (
+    <DataLoadRecoveryContext.Provider value={dataLoadRecovery}>
     <AppLoaderContext.Provider value={ensurePageData}>
       <AppContext.Provider value={storeRef.current}>{children}</AppContext.Provider>
     </AppLoaderContext.Provider>
+    </DataLoadRecoveryContext.Provider>
   );
 };
 

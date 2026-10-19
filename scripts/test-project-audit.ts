@@ -17,6 +17,8 @@ const suites: Array<[string, string[]]> = [
   ['retention', ['--import', 'tsx', 'scripts/test-retention-audit.ts']],
   ['page-loading', ['--import', 'tsx', 'scripts/test-page-loading.ts']],
   ['page-recovery', ['--import', 'tsx', 'scripts/test-page-recovery.ts']],
+  ['data-recovery', ['--import', 'tsx', 'scripts/test-data-load-recovery.ts']],
+  ['data-recovery-partial', ['--import', 'tsx', 'scripts/test-data-load-recovery.ts', '--partial']],
   ...Object.entries({ e2e: 'test-e2e-isolated', system: 'test-system-audit', functional: 'test-functional-audit', 'audit-fixes': 'test-audit-fixes', 'profit-refund': 'test-profit-share-refund', 'cash-collection': 'test-cash-collection', 'collection-split': 'test-collection-bonus-split', 'bonus-admin': 'test-bonus-admin', 'bonus-rules': 'test-bonus-rules', capital: 'test-capital-audit', shift: 'test-shift-cash-flow', 'store-receipt': 'test-store-receipt', 'store-merge': 'test-store-merge', 'supplier-cash': 'test-supplier-cash-audit', ui: 'test-ui-audit', 'sn-camera': 'test-sn-camera', quarter: 'test-quarter-business', load: 'test-audit-load' }).map(([name, file]): [string, string[]] => [name, ['--import', 'tsx', `scripts/${file}.ts`]]),
 ];
 const only = process.argv.find(a => a.startsWith('--only='))?.slice(7).split(',');

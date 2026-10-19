@@ -336,11 +336,8 @@ export const SalePage: React.FC = () => {
   // requires the rate on the server anyway).
   const usdLabel = rateReady ? `≈ $${formatMoney(totalUsd)}` : 'курс на сегодня не задан';
 
-  React.useEffect(() => {
-    if (!rateReady && !isCentralCashMode && currentUser) {
-      setDailyRateModalOpen(true);
-    }
-  }, [rateReady, isCentralCashMode, currentUser, setDailyRateModalOpen]);
+  // AppProvider opens the rate dialog after a successful server response.
+  // An initial null or a failed request does not mean today's rate is missing.
 
   // Store staff never get the cost: the server answers "below cost" as a yes/no for them.
   const serverBelowCost = useBelowCostCheck(isAdmin ? [] : cart.map((item) => ({ deviceId: item.device.id, priceTjs: item.salePriceTjs })));

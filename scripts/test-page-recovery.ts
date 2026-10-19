@@ -45,6 +45,7 @@ await withDisposableApi('page_recovery', async api => {
         results.push({ case: mode, fallback: 'visible' });
         await page.setOfflineMode(false);
       } else {
+        await page.waitForSelector('[data-testid="data-load-error"]', { visible: true });
         results.push({ case: mode, injected, text: await page.evaluate(() => document.body.innerText.slice(0, 2000)) });
       }
       fault = false;

@@ -38,8 +38,9 @@ await withDisposableApi('pageload', async api => {
       const login = await api.call('POST', '/auth/login', { login: role, password: role === 'admin' ? 'admin123' : role === 'partner' ? 'partner123' : 'seller123' }, { token: '' });
       assert.equal(login.status, 200); sessions.set(role, login.data);
     }
+    const contexts = new Map(await Promise.all(['admin', 'partner', 'ahmad'].map(async role => [role, await browser.createBrowserContext()] as const)));
     const newPage = async (role: string, width: number) => {
-      const page = await browser.newPage();
+      const page = await contexts.get(role)!.newPage();
       await page.setViewport({ width, height: 850 }); await page.setCacheEnabled(false);
       await page.setBypassServiceWorker(true);
       const session = sessions.get(role)!;
@@ -48,7 +49,8 @@ await withDisposableApi('pageload', async api => {
       }, session);
       return page;
     };
-    for (const role of smoke ? [process.argv.find(a => a.startsWith('--role='))?.slice(7) || 'admin'] : ['admin', 'partner', 'ahmad']) for (const width of [360, 768, 1280]) {
+    await Promise.all((smoke ? [process.argv.find(a => a.startsWith('--role='))?.slice(7) || 'admin'] : ['admin', 'partner', 'ahmad']).map(async role => {
+      for (const width of [360, 768, 1280]) {
       for (const route of smoke ? [process.argv.find(a => a.startsWith('--route='))?.slice(8) || '/'] : routes) {
         console.log('CHECK', role, width, route);
         const page = await newPage(role, width);
@@ -73,7 +75,8 @@ await withDisposableApi('pageload', async api => {
         finally { await page.close(); }
       }
       console.log(`PASS matrix ${role} ${width}: ${results.length} loads, ${failures.length} failures`);
-    }
+      }
+    }));
     if (smoke) { assert.equal(failures.length, 0, JSON.stringify(failures)); return; }
     // Same tab: SPA transitions and browser back/forward, without reloading the document.
     const navigation = await newPage('admin', 1280);
@@ -106,6 +109,7 @@ await withDisposableApi('pageload', async api => {
         const state = await inspect(page);
         faults.push({ mode, route, injected, ...state, crashes });
         assert(!state.crash && !state.loading && crashes.length === 0, JSON.stringify({ mode, route, state, crashes }));
+        if (mode === 'api503') assert(state.errorVisible, `${route}: отказ API не должен выглядеть как пустой список`);
       } catch (e) { failures.push({ mode, route, error: String(e) }); }
       finally { await page.close(); }
     }

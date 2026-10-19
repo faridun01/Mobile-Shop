@@ -29,6 +29,7 @@
     "test:audit-load": "tsx scripts/test-audit-load.ts",
     "test:auth-matrix": "tsx scripts/audit-ui-contracts.ts && tsx scripts/test-api-auth-matrix.ts",
     "test:page-loading": "npm run build && tsx scripts/test-page-loading.ts && tsx scripts/test-page-recovery.ts",
+    "test:data-load-recovery": "npm run build && tsx scripts/test-data-load-recovery.ts && tsx scripts/test-data-load-recovery.ts --partial",
     "test:cycle200": "tsx scripts/test-business-cycle-200.ts",
     "audit:ui-contracts": "tsx scripts/audit-ui-contracts.ts",
     "test:ui": "npm run build && tsx scripts/test-ui-audit.ts",
