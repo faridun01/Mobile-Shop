@@ -44,6 +44,7 @@ export interface TransferDeviceGridProps {
   onClearSelection: () => void;
   onDeviceCode: (rawCode: string, source: 'camera' | 'enter') => void;
   onScanDevice: () => void;
+  onScanSerial: () => void;
   isInitialLoading: boolean;
   fromStoreName: string;
   sortBy: TransferDeviceSortOption;

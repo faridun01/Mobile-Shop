@@ -370,6 +370,13 @@ export const TransferPage: React.FC = () => {
     openScanner((scannedCode) => handleDeviceCode(scannedCode, 'camera'), { mode: productCategory === 'TABLET' ? 'serial' : productCategory === 'ACCESSORY' ? 'code' : 'imei', allowModeSwitch: true });
   };
 
+  const handleScanSerial = () => {
+    openScanner((code) => {
+      setProductCategory('TABLET');
+      handleDeviceCode(code, 'camera');
+    }, { mode: 'serial', allowModeSwitch: false });
+  };
+
   const handleOpenConfirmModal = () => {
     const effectiveToId = isStoreScoped ? (mainWarehouse?.id || toLocationId) : toLocationId;
     const effectiveFromId = isStoreScoped ? (currentUser?.storeId || fromLocationId) : fromLocationId;
@@ -592,6 +599,7 @@ export const TransferPage: React.FC = () => {
               onClearSelection={handleClearSelection}
               onDeviceCode={handleDeviceCode}
               onScanDevice={handleScanDevice}
+              onScanSerial={handleScanSerial}
               isInitialLoading={isInitialLoading}
               fromStoreName={fromStoreName}
               sortBy={deviceSortBy}

@@ -3,11 +3,28 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 const runtime = vi.hoisted(() => ({ native: false, scan: vi.fn() }));
 vi.mock('@capacitor/core', () => ({ Capacitor: { isNativePlatform: () => runtime.native } }));
 vi.mock('./nativeScanner', () => ({ scanNativeCode: runtime.scan }));
-import { cancelScan, scanCode } from './scannerService';
+import { cancelScan, scanCode, scanModeState, setScanMode } from './scannerService';
+import { recognizeScanCodes } from './imei';
 
 afterEach(() => { cancelScan(); runtime.native = false; vi.clearAllMocks(); });
 
 describe('shared scanner boundary', () => {
+  it('opens the dedicated SN camera independently of the last IMEI/barcode choice', async () => {
+    let deliver!: (code: string) => void;
+    const host = { open: vi.fn(fn => { deliver = fn; }), close: vi.fn() };
+    scanModeState.setState({ mode: 'code', allowSwitch: true });
+    setScanMode('code');
+    const serial = scanCode(host, { mode: 'serial', allowModeSwitch: false });
+    expect(scanModeState.getState()).toEqual({ mode: 'serial', allowSwitch: false });
+    expect(recognizeScanCodes('6932554477035', scanModeState.getState().mode)).toEqual([]);
+    expect(recognizeScanCodes('72255/Y5XH00021', scanModeState.getState().mode)).toEqual(['72255/Y5XH00021']);
+    deliver('72255/Y5XH00021');
+    expect(await serial).toBe('72255/Y5XH00021');
+    const imei = scanCode(host, { mode: 'imei' });
+    expect(recognizeScanCodes('72255/Y5XH00021', scanModeState.getState().mode)).toEqual([]);
+    deliver('490154203237518');
+    expect(await imei).toBe('490154203237518');
+  });
   it('uses the web host for browser/PWA, preserves strings and ignores duplicate results', async () => {
     let deliver!: (code: string) => void;
     const host = { open: vi.fn((fn) => { deliver = fn; }), close: vi.fn() };

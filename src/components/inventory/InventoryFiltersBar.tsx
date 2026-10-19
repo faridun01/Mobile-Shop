@@ -27,6 +27,7 @@ interface InventoryFiltersBarProps {
   searchQuery: string;
   onSearchChange: (q: string) => void;
   onScan: () => void;
+  onScanSerial: () => void;
   onSubmitSearch: (val: string) => void;
   inventoryViewMode: InventoryViewMode;
   onViewModeChange: (mode: InventoryViewMode) => void;
@@ -66,6 +67,7 @@ export const InventoryFiltersBar: React.FC<InventoryFiltersBarProps> = ({
   searchQuery,
   onSearchChange,
   onScan,
+  onScanSerial,
   onSubmitSearch,
   inventoryViewMode,
   onViewModeChange,
@@ -230,6 +232,7 @@ export const InventoryFiltersBar: React.FC<InventoryFiltersBarProps> = ({
             value={searchQuery}
             onChange={onSearchChange}
             onScan={onScan}
+            onScanSerial={onScanSerial}
             onSubmit={onSubmitSearch}
             placeholder="Поиск по IMEI / SN, модели, бренду, цвету…"
           />

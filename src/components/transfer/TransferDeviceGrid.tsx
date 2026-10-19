@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useEffect, useSyncExternalStore } from 'react';
 import { deviceCodeLabel } from '../../utils/deviceCode';
+import { SerialScanButton } from '../common/SerialScanButton';
 import {
   Search,
   X,
@@ -59,6 +60,7 @@ export const TransferDeviceGrid: React.FC<TransferDeviceGridProps> = ({
   onClearSelection,
   onDeviceCode,
   onScanDevice,
+  onScanSerial,
   isInitialLoading,
   fromStoreName,
   sortBy = 'SELECTED_FIRST',
@@ -358,7 +360,7 @@ export const TransferDeviceGrid: React.FC<TransferDeviceGridProps> = ({
             )}
           </div>
 
-          {/* Single Scanner Button */}
+          {/* Keep the existing scanner and offer a separate fixed SN camera action. */}
           <button
             type="button"
             onClick={onScanDevice}
@@ -368,6 +370,7 @@ export const TransferDeviceGrid: React.FC<TransferDeviceGridProps> = ({
             <Scan className="w-3.5 h-3.5" />
             <span className="hidden sm:inline">Сканер</span>
           </button>
+          <SerialScanButton onClick={onScanSerial} />
         </div>
 
         {/* Brand & Selection Filter Pills (ONLY show when multiple brands exist or items are selected) */}

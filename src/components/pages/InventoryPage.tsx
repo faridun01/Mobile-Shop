@@ -558,6 +558,13 @@ export const InventoryPage: React.FC = () => {
     }, { mode: productCategory === 'TABLET' ? 'serial' : 'imei', allowModeSwitch: true });
   };
 
+  const handleScanSerial = () => {
+    openScanner((code) => {
+      setProductCategory('TABLET');
+      void openDeviceByCode(code, 'camera');
+    }, { mode: 'serial', allowModeSwitch: false });
+  };
+
   const handleSelectLocationAndSwitch = (storeId: string) => {
     setSelectedLocationId(storeId);
     setViewTab('DEVICES');
@@ -680,6 +687,7 @@ export const InventoryPage: React.FC = () => {
             searchQuery={searchQuery}
             onSearchChange={setSearchQuery}
             onScan={handleScanDevice}
+            onScanSerial={handleScanSerial}
             onSubmitSearch={(val) => {
               void openDeviceByCode(val, 'enter');
             }}

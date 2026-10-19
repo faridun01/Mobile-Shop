@@ -1,11 +1,13 @@
 import React from 'react';
 import { Search, X, Scan } from 'lucide-react';
 import { IconButton } from './IconButton';
+import { SerialScanButton } from '../common/SerialScanButton';
 
 interface SearchBarProps {
   value: string;
   onChange: (value: string) => void;
   onScan?: () => void;
+  onScanSerial?: () => void;
   /** Enter in the field — USB/Bluetooth barcode scanners type the code and press Enter. */
   onSubmit?: (value: string) => void;
   placeholder?: string;
@@ -15,7 +17,7 @@ interface SearchBarProps {
 }
 
 /** The search+scan input row duplicated near-verbatim across every list screen. */
-export const SearchBar: React.FC<SearchBarProps> = ({ value, onChange, onScan, onSubmit, placeholder = 'Поиск…', className, inputRef }) => (
+export const SearchBar: React.FC<SearchBarProps> = ({ value, onChange, onScan, onScanSerial, onSubmit, placeholder = 'Поиск…', className, inputRef }) => (
   <div className={`flex items-center gap-2 ${className || ''}`}>
     <div className="relative flex-1 min-w-0">
       <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-fg-subtle pointer-events-none" />
@@ -47,5 +49,6 @@ export const SearchBar: React.FC<SearchBarProps> = ({ value, onChange, onScan, o
       )}
     </div>
     {onScan && <IconButton icon={Scan} aria-label="Сканировать" onClick={onScan} tone="accent" />}
+    {onScanSerial && <SerialScanButton onClick={onScanSerial} />}
   </div>
 );

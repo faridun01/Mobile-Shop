@@ -9,6 +9,7 @@ import { soundEffects } from '../../utils/sound';
 import { StatusBanner, StatusMessage } from '../ui/StatusBanner';
 import { LoadingState } from '../ui/Skeleton';
 import { Button } from '../ui/Button';
+import { SerialScanButton } from '../common/SerialScanButton';
 import { Dialog } from '../ui/Dialog';
 import {
   PackagePlus,
@@ -123,7 +124,7 @@ export const StoreReceiptPage: React.FC = () => {
   }, [loadHistory]);
 
   // Handle IMEI lookup and addition
-  const handleLookupImei = useCallback(async (rawImei: string) => {
+  const handleLookupImei = useCallback(async (rawImei: string, expectedCategory: ProductCategoryFilterValue = intakeCategory) => {
     const cleanImei = rawImei.trim().replace(/\s+/g, '');
     if (!cleanImei) return;
 
@@ -145,7 +146,7 @@ export const StoreReceiptPage: React.FC = () => {
         }),
       });
       const category = res.kind === 'ACCESSORY' ? 'ACCESSORY' : res.category || 'PHONE';
-      if (intakeCategory !== 'ALL' && category !== intakeCategory) {
+      if (expectedCategory !== 'ALL' && category !== expectedCategory) {
         setStatus({ tone: 'warning', text: 'Код относится к другой категории. Выберите нужную категорию товара.' });
         return;
       }
@@ -200,7 +201,7 @@ export const StoreReceiptPage: React.FC = () => {
     } finally {
       setIsLookingUp(false);
     }
-  }, [scannedItems, scannedAccessories, effectiveStoreId]);
+  }, [scannedItems, scannedAccessories, effectiveStoreId, intakeCategory]);
 
   const setAccessoryQuantity = (productId: string, quantity: number) =>
     setScannedAccessories((prev) => prev.map((line) => (
@@ -329,7 +330,7 @@ export const StoreReceiptPage: React.FC = () => {
             <ProductCategoryFilter value={intakeCategory} onChange={setIntakeCategory} />
             {/* IMEI Input & Scanner Form */}
             <form onSubmit={handleInputSubmit} className="flex items-center gap-2">
-              <div className="relative flex-1">
+              <div className="relative flex-1 min-w-0">
                 <input
                   ref={imeiInputRef}
                   type="text"
@@ -366,6 +367,10 @@ export const StoreReceiptPage: React.FC = () => {
                 </div>
               </div>
 
+              <SerialScanButton disabled={isLookingUp || isSubmitting} onClick={() => openScanner((code) => {
+                setIntakeCategory('TABLET');
+                void handleLookupImei(code, 'TABLET');
+              }, { mode: 'serial', allowModeSwitch: false })} />
               <Button
                 type="submit"
                 loading={isLookingUp}

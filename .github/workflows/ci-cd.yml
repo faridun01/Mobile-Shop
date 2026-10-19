@@ -97,7 +97,9 @@ jobs:
       - name: Run UI and Backend Browser Regressions
         env:
           CHROME_PATH: /usr/bin/google-chrome
-        run: node --import tsx scripts/test-ui-audit.ts
+        run: |
+          node --import tsx scripts/test-ui-audit.ts
+          node --import tsx scripts/test-sn-camera.ts
 
       - name: Build Server Bundle
         run: npm run build:server

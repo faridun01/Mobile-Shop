@@ -312,6 +312,13 @@ export const SalePage: React.FC = () => {
     openScanner((scannedCode) => handleDeviceCode(scannedCode, 'camera'), { mode: productCategory === 'TABLET' ? 'serial' : productCategory === 'ACCESSORY' ? 'code' : 'imei', allowModeSwitch: true });
   };
 
+  const handleScanSerial = () => {
+    openScanner((code) => {
+      setProductCategory('TABLET');
+      handleDeviceCode(code, 'camera');
+    }, { mode: 'serial', allowModeSwitch: false });
+  };
+
   const handleAddMore = () => {
     setIsCartOpen(false);
   };
@@ -547,6 +554,7 @@ export const SalePage: React.FC = () => {
                 value={searchQuery}
                 onChange={setSearchQuery}
                 onScan={handleTriggerScanner}
+                onScanSerial={handleScanSerial}
                 onSubmit={(value) => handleDeviceCode(value, 'enter')}
                 placeholder="IMEI / SN, штрихкод, название или модель…"
               />

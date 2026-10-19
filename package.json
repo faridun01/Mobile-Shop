@@ -27,6 +27,7 @@
     "test:cycle200": "tsx scripts/test-business-cycle-200.ts",
     "audit:ui-contracts": "tsx scripts/audit-ui-contracts.ts",
     "test:ui": "npm run build && tsx scripts/test-ui-audit.ts",
+    "test:sn-camera": "npm run build && tsx scripts/test-sn-camera.ts",
     "test:profit-refund": "tsx scripts/test-profit-share-refund.ts",
     "test:audit-fixes": "tsx scripts/test-audit-fixes.ts",
     "test:functional": "tsx scripts/test-functional-audit.ts",
