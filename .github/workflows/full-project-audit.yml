@@ -1,0 +1,47 @@
+name: Full isolated project audit
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 2 * * 1'
+permissions:
+  contents: read
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: audit
+          POSTGRES_PASSWORD: isolated-audit-only
+          POSTGRES_DB: mobile_shop_audit
+        ports:
+          - 55439:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://audit:isolated-audit-only@127.0.0.1:55439/mobile_shop_audit?schema=public
+      JWT_SECRET: isolated-ci-audit-secret-no-production-access
+      SEED_TEST_DATA: 'true'
+      CHROME_PATH: /usr/bin/google-chrome
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run test:project-audit
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: isolated-audit-results
+          path: |
+            output/project-audit-*
+            output/ui-backend-audit
+            output/business-cycle-200
+            output/page-loading

@@ -1,7 +1,8 @@
 import puppeteer from 'puppeteer-core';
+import { disposableBrowserUrl } from './lib/disposable-browser';
 
 const CHROME_PATH = 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe';
-const APP_URL = 'http://localhost:3000';
+const APP_URL = disposableBrowserUrl(process.env.DATABASE_URL, process.env.UI_AUDIT_BASE_URL);
 
 async function runBrowserTest() {
   console.log('🚀 Starting Real Chrome Browser End-to-End Audit...');

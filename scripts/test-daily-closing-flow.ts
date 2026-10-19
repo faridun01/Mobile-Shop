@@ -1,6 +1,9 @@
 import { prisma } from '../server/src/prisma/prisma.service';
 import { DailyClosingService } from '../server/src/modules/finance/daily-closing.service';
 import { D } from '../server/src/common/decimal';
+import { requireDisposableDatabase } from './lib/disposable-db';
+
+requireDisposableDatabase('test-daily-closing-flow');
 
 async function main() {
   console.log('--- TESTING DAILY CLOSING DISCREPANCY & REOPEN FLOW ---');

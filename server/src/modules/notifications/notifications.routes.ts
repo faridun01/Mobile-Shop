@@ -18,7 +18,9 @@ export function registerNotificationRoutes(app: Express) {
       const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
       // A partner sees only notifications addressed to them (their store's minimum-stock alerts);
       // admin notifications never reach store staff.
-      const scope = user.role === 'PARTNER' ? { targetUserId: user.userId } : notificationScope(user);
+      const scope = user.role === 'PARTNER'
+        ? { AND: [notificationScope(user), { targetUserId: user.userId }] }
+        : notificationScope(user);
 
       // Notification Center history (ADMIN, PARTNER): only notifications from the last 24 hours to keep the list compact.
       if (req.query.view === 'history' && (user.role === 'ADMIN' || user.role === 'PARTNER')) {
