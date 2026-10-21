@@ -731,12 +731,16 @@ export async function computeReportsSummary(input: ReportsSummaryInput) {
     .map((s) => {
       const fixedRate = s.exchangeRate && D(s.exchangeRate).gt(0) ? D(s.exchangeRate) : rateOn(s.refundedAt ?? s.createdAt);
       const refundTjs = D(s.actualRefundAmountTjs ?? s.totalTjs);
+      // The dollars that left the register on the refund day, as its REFUND log recorded them;
+      // only refunds logged before that amount existed fall back to TJS ÷ the sale's rate.
+      const refundLog = (profitsBySale.get(s.id) ?? []).find((log) => log.action === 'REFUND');
+      const refundUsd = detailNumber(refundLog?.financialDetails, 'amountUsd') ?? toUsd(refundTjs, fixedRate);
       return {
         saleId: s.id,
         receiptNumber: s.receiptNumber,
         date: (s.refundedAt ?? new Date()).toISOString(),
         amountTjs: roundMoney(refundTjs).toNumber(),
-        amountUsd: roundMoney(toUsd(refundTjs, fixedRate)).toNumber(),
+        amountUsd: roundMoney(refundUsd).toNumber(),
         penaltyFeeTjs: roundMoney(D(s.penaltyFeeTjs ?? 0)).toNumber(),
         penaltyFeeUsd: roundMoney(D(s.penaltyFeeUsd ?? 0)).toNumber(),
         reason: s.refundReason ?? undefined,

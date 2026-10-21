@@ -137,6 +137,25 @@ describe('a refund is reported by fact, on its own day', () => {
     expect(Number(summary.events![0].amountUsd)).toBe(-181.82);
     expect(Number(summary.events![0].amountTjs)).toBe(-2000);
   });
+
+  it('lists a refunded receipt with the dollars that left the register, not TJS ÷ the sale rate', async () => {
+    const refundDay = new Date('2026-09-10T08:00:00Z');
+    const refunded = { id: 'refunded-1', storeId: 'store-0', status: 'REFUNDED', totalTjs: 1000, totalUsd: 100, exchangeRate: 10, returns: [],
+      actualRefundAmountTjs: 1000, penaltyFeeUsd: 0, penaltyFeeTjs: 0, receiptNumber: 5,
+      createdAt: new Date('2026-09-01T08:00:00Z'), refundedAt: refundDay, saleItems: [] };
+    db.sale.findMany.mockImplementation(async ({ where, select }) => (where.status === 'REFUNDED' ? [refunded] : []).map((row) => project(row, select)));
+    db.auditLog.findMany.mockImplementation(async ({ where, select }) => {
+      const actions: string[] = where.action.in ?? [where.action];
+      const rows = actions.includes('REFUND')
+        ? [{ targetId: 'refunded-1', action: 'REFUND', createdAt: refundDay, financialDetails: { amountTjs: 1000, amountUsd: 90.91, exchangeRate: 11, fxGainUsd: 9.09 } }]
+        : [];
+      return rows.map((row) => project(row, select));
+    });
+    const summary = await computeReportsSummary({ period: 'SPECIFIC_MONTH', month: '2026-09' });
+    // 1000 TJS sold at 10 ($100), refunded at 11: $90.91 left the register.
+    expect(summary.refundedReceipts).toHaveLength(1);
+    expect(summary.refundedReceipts[0]).toMatchObject({ receiptNumber: 5, amountTjs: 1000, amountUsd: 90.91 });
+  });
 });
 
 
