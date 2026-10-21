@@ -26,6 +26,9 @@ services:
     image: ghcr.io/${GITHUB_REPOSITORY:-faridun01/mobile-shop}:latest
     container_name: mobile_shop_app_prod
     restart: always
+    # A tiny init (tini) as PID 1: it forwards stop signals to node and reaps exited child
+    # processes (e.g. left by `prisma migrate deploy` at start), which node as PID 1 never does.
+    init: true
     environment:
       DATABASE_URL: "postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set for production}@db:5432/${POSTGRES_DB:-mobile_shop_db}?schema=public"
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET must be set for production}
