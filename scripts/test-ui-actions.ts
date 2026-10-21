@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { readFileSync, writeFileSync } from 'node:fs';
-import puppeteer from 'puppeteer-core';
+import puppeteer, { type ElementHandle } from 'puppeteer-core';
 import { browserExecutable } from './lib/browser-executable';
 
 const fixture = JSON.parse(readFileSync('output/ui-backend-audit/fixture.json', 'utf8'));
@@ -20,10 +20,28 @@ page.on('response', r => {
   }
 });
 const idle = () => page.waitForNetworkIdle({ idleTime: 150, timeout: 10000 });
+// A mouse click lands on the button's centre: wait until the button itself is there (not covered
+// by another layer, not inert) and has stopped moving, e.g. after a viewport change re-lays out the page.
+const waitClickable = async (button: ElementHandle<Element>, label: string) => {
+  await button.evaluate(b => b.scrollIntoView({ block: 'center', inline: 'center' }));
+  let previousBox = '', state = { box: '', blocker: '' };
+  for (let attempt = 0; attempt < 50; attempt++) {
+    state = await button.evaluate(b => {
+      const r = b.getBoundingClientRect();
+      const top = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2);
+      const blocker = b.closest('[inert]') ? 'inert ancestor' : top && !b.contains(top) ? top.outerHTML.slice(0, 200) : !top ? 'nothing at the centre' : '';
+      return { box: [r.x, r.y, r.width, r.height].map(Math.round).join(','), blocker };
+    });
+    if (!state.blocker && state.box === previousBox) return;
+    previousBox = state.box;
+    await new Promise(resolve => setTimeout(resolve, 100));
+  }
+  throw new Error(`Button ${route}: ${label} is not clickable (box ${state.box}; blocked by: ${state.blocker || 'moving'})`);
+};
 const click = async (text: string, scope = 'main') => {
   for (const button of await page.$$(`${scope} button`)) {
     const match = await button.evaluate((b, text) => !!b.getClientRects().length && !b.disabled && ((text.endsWith('*') ? b.textContent?.trim().startsWith(text.slice(0, -1)) : b.textContent?.trim() === text) || b.getAttribute('title') === text || b.getAttribute('aria-label') === text), text);
-    if (match) { await button.click(); await idle(); actions.push({ route, action: 'click', text }); return; }
+    if (match) { await waitClickable(button, text); await button.click(); await idle(); actions.push({ route, action: 'click', text }); return; }
   }
   throw new Error(`Missing enabled button ${route}: ${text}; ${await page.evaluate(() => document.body.innerText.slice(-2200))}; invalid: ${await page.evaluate(() => [...document.querySelectorAll('input:invalid,select:invalid')].map(i => (i as HTMLInputElement).placeholder + ':' + (i as HTMLInputElement).validationMessage).join(';'))}`);
 };

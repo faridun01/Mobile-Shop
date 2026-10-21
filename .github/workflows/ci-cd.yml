@@ -104,6 +104,15 @@ jobs:
           node --import tsx scripts/test-ui-audit.ts
           node --import tsx scripts/test-sn-camera.ts
 
+      # The failure screenshot, actions.json and per-script logs, to diagnose a browser regression.
+      - name: Upload UI Audit Output
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ui-backend-audit
+          path: output/ui-backend-audit/
+          if-no-files-found: ignore
+
       - name: Build Server Bundle
         run: npm run build:server
 
