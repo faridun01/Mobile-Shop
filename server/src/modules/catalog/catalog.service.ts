@@ -54,6 +54,21 @@ export async function linkTabletVariants(tx: Db, units: TabletUnit[]) {
 }
 
 /**
+ * A new card's category in the spelling the catalog already uses, so one category never splits
+ * into several for filtering: spaces are collapsed and "чехол" becomes an existing "Чехол".
+ */
+async function canonicalAccessoryCategory(tx: Db, raw: string) {
+  const category = raw.trim().replace(/\s+/g, ' ');
+  if (!category) return category;
+  const existing = await tx.accessoryProduct.findFirst({
+    where: { category: { equals: category, mode: 'insensitive' } },
+    orderBy: { createdAt: 'asc' },
+    select: { category: true },
+  });
+  return existing?.category ?? category;
+}
+
+/**
  * Receives accessory lines into a store: an existing barcode keeps its card (no duplicate is
  * created), a new barcode creates the card from the entered fields; each line becomes a batch
  * with its own quantity and unit cost.
@@ -72,7 +87,7 @@ export async function receiveAccessories(
       }
       product = await tx.accessoryProduct.create({
         data: {
-          barcode: line.barcode, brand: line.brand, name: line.name, category: line.category,
+          barcode: line.barcode, brand: line.brand, name: line.name, category: await canonicalAccessoryCategory(tx, line.category),
           model: line.model, attributes: line.attributes,
         },
       });

@@ -38,6 +38,7 @@ import { preferredInsteadOf } from '../sale/sellGuidance';
 import { useBelowCostCheck } from '../../hooks/useBelowCostCheck';
 import { availableAt, useAccessoryStock } from '../../hooks/useAccessoryStock';
 import { AccessoryCartLine, AccessoryPickList, addAccessoryUnit, filterAccessories, findAccessoryByCode, type AccessoryCartItem } from '../sale/AccessoryCart';
+import { accessoryCategoryOptions, matchesAccessoryCategory } from '../../utils/accessoryCategories';
 import type { AccessoryStockItem } from '../../types';
 
 interface CartItem {
@@ -63,6 +64,7 @@ export const SalePage: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [productCategory, setProductCategory] = useState<ProductCategoryFilterValue>('ALL');
   const [selectedBrand, setSelectedBrand] = useState<string>('ALL');
+  const [selectedAccessoryCategory, setSelectedAccessoryCategory] = useState<string>('ALL');
   const [cart, setCart] = useState<CartItem[]>([]);
   // Accessories in the receipt: a quantity of one card each, at a unit price.
   const [accessoryCart, setAccessoryCart] = useState<AccessoryCartItem[]>([]);
@@ -139,9 +141,17 @@ export const SalePage: React.FC = () => {
   const { items: accessoryStock } = useAccessoryStock(effectiveStoreId || undefined);
   // Accessories are sold from one store's batches: another store starts an empty list.
   React.useEffect(() => { setAccessoryCart([]); }, [effectiveStoreId]);
+  // The category filter is offered on the accessories tab, for the categories this store holds.
+  const accessoryCategories = useMemo(() => accessoryCategoryOptions(accessoryStock), [accessoryStock]);
+  const activeAccessoryCategory = productCategory === 'ACCESSORY' && accessoryCategories.some((option) => option.value === selectedAccessoryCategory)
+    ? selectedAccessoryCategory
+    : 'ALL';
   const visibleAccessories = useMemo(
-    () => productCategory === 'ALL' || productCategory === 'ACCESSORY' ? filterAccessories(accessoryStock, searchQuery).filter((item) => selectedBrand === 'ALL' || item.brand === selectedBrand) : [],
-    [accessoryStock, searchQuery, selectedBrand, productCategory],
+    () => productCategory === 'ALL' || productCategory === 'ACCESSORY'
+      ? filterAccessories(accessoryStock, searchQuery).filter((item) =>
+          (selectedBrand === 'ALL' || item.brand.trim() === selectedBrand) && matchesAccessoryCategory(item, activeAccessoryCategory))
+      : [],
+    [accessoryStock, searchQuery, selectedBrand, productCategory, activeAccessoryCategory],
   );
   const maxOf = (product: AccessoryStockItem) => availableAt(product, effectiveStoreId || undefined);
   const addAccessoryToCart = (product: AccessoryStockItem) => {
@@ -182,16 +192,22 @@ export const SalePage: React.FC = () => {
     });
   }, [devices, effectiveStoreId, searchQuery, selectedBrand, cart, productCategory]);
 
+  // What the list shows as still sellable: the devices plus the accessory units not yet in the cart.
+  const inStockCount = availableDevices.length + visibleAccessories.reduce((sum, item) =>
+    sum + Math.max(0, maxOf(item) - (accessoryCart.find((line) => line.product.id === item.id)?.quantity ?? 0)), 0);
+
+  // Brands of the goods on the open tab: devices of that category, accessories on their own tab.
   const brands = useMemo(() => {
     const set = new Set<string>();
-    devices.forEach(d => {
+    if (productCategory !== 'ACCESSORY') devices.forEach(d => {
       const isAvailableStatus = d.status === 'STORE_STOCK' || d.status === 'IN_STOCK_AFTER_EXCHANGE';
-      if (!isAvailableStatus) return false;
-      if (effectiveStoreId && d.locationId !== effectiveStoreId) return false;
+      if (!isAvailableStatus || !matchesProductCategory(d, productCategory)) return;
+      if (effectiveStoreId && d.locationId !== effectiveStoreId) return;
       if (d.brand?.trim()) set.add(d.brand.trim());
     });
+    if (productCategory === 'ALL' || productCategory === 'ACCESSORY') accessoryStock.forEach(a => { if (a.brand?.trim()) set.add(a.brand.trim()); });
     return [{ value: 'ALL', label: 'Все бренды' }, ...Array.from(set).sort().map(b => ({ value: b, label: b }))];
-  }, [devices, effectiveStoreId]);
+  }, [devices, effectiveStoreId, productCategory, accessoryStock]);
 
   const defaultPriceFor = retailPriceOf;
 
@@ -555,7 +571,11 @@ export const SalePage: React.FC = () => {
                 onSubmit={(value) => handleDeviceCode(value, 'enter')}
                 placeholder="IMEI / SN, штрихкод, название или модель…"
               />
-              <ProductCategoryFilter value={productCategory} onChange={(category) => { setProductCategory(category); setSelectedBrand('ALL'); }} />
+              <ProductCategoryFilter value={productCategory} onChange={(category) => { setProductCategory(category); setSelectedBrand('ALL'); setSelectedAccessoryCategory('ALL'); }} />
+
+              {productCategory === 'ACCESSORY' && accessoryCategories.length > 2 && (
+                <FilterPillGroup options={accessoryCategories} value={activeAccessoryCategory} onChange={setSelectedAccessoryCategory} scrollable />
+              )}
 
               {brands.length > 2 && (
                 <div className="flex items-center justify-between gap-2 overflow-hidden pt-0.5">
@@ -563,7 +583,7 @@ export const SalePage: React.FC = () => {
                     <FilterPillGroup options={brands} value={selectedBrand} onChange={setSelectedBrand} scrollable />
                   </div>
                   <span className="text-[11px] text-fg-subtle tabular-nums font-medium shrink-0 hidden sm:inline">
-                    В наличии: <strong className="text-fg-muted font-semibold">{availableDevices.length}</strong> шт.
+                    В наличии: <strong className="text-fg-muted font-semibold">{inStockCount}</strong> шт.
                   </span>
                 </div>
               )}
@@ -599,7 +619,7 @@ export const SalePage: React.FC = () => {
               ) : (
                 <>
                   <div className="px-3.5 py-1.5 bg-surface-raised/40 border-b border-border text-[11px] text-fg-subtle flex items-center justify-between sticky top-0 backdrop-blur-xs z-10">
-                    <span className="font-semibold text-fg-muted">В наличии: <strong className="text-accent font-bold">{availableDevices.length}</strong> шт.</span>
+                    <span className="font-semibold text-fg-muted">В наличии: <strong className="text-accent font-bold">{inStockCount}</strong> шт.</span>
                     {selectedBrand !== 'ALL' && (
                       <span className="text-[10px] font-bold text-accent bg-accent/10 px-2 py-0.5 rounded-full border border-accent/20">
                         {selectedBrand}

@@ -5,8 +5,10 @@ import { apiClient } from '../../api/client';
 import { mapAccessoryStockItem } from '../../api/mappers';
 import type { AccessoryStockItem } from '../../types';
 import { decimal, formatMoney, moneyNumber } from '../../utils/money';
+import { accessoryCategoryOptions, matchesAccessoryCategory } from '../../utils/accessoryCategories';
 import { useDataRefreshRevision } from '../../hooks/useDataRefreshRevision';
 import { EmptyState } from '../ui/EmptyState';
+import { FilterPillGroup } from '../ui/FilterPillGroup';
 
 interface AccessoryStockListProps {
   /** A location id, or 'ALL'/'all' for every location (ADMIN); store staff always get their own store. */
@@ -26,6 +28,7 @@ export const AccessoryStockList: React.FC<AccessoryStockListProps> = ({ location
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [query, setQuery] = useState('');
+  const [category, setCategory] = useState('ALL');
 
   useEffect(() => {
     const timer = window.setTimeout(() => setQuery(search.trim()), 250);
@@ -47,7 +50,11 @@ export const AccessoryStockList: React.FC<AccessoryStockListProps> = ({ location
     return () => { cancelled = true; };
   }, [locationId, query, refreshRevision]);
 
-  const inStock = (items ?? []).filter((item) => item.quantity > 0);
+  const available = (items ?? []).filter((item) => item.quantity > 0);
+  const categoryOptions = accessoryCategoryOptions(available);
+  // A category the search no longer finds falls back to all of them.
+  const activeCategory = categoryOptions.some((option) => option.value === category) ? category : 'ALL';
+  const inStock = available.filter((item) => matchesAccessoryCategory(item, activeCategory));
   const totalUnits = inStock.reduce((sum, item) => sum + item.quantity, 0);
   const totalCost = inStock.reduce((sum, item) => sum + (item.stockCostUsd ?? 0), 0);
 
@@ -85,6 +92,10 @@ export const AccessoryStockList: React.FC<AccessoryStockListProps> = ({ location
         </span>
       </div>
 
+      {categoryOptions.length > 2 && (
+        <FilterPillGroup options={categoryOptions} value={activeCategory} onChange={setCategory} scrollable />
+      )}
+
       {error ? (
         <p className="text-xs text-danger bg-danger/10 border border-danger/30 rounded-xl p-3" role="alert">{error}</p>
       ) : items === null ? (
@@ -94,8 +105,8 @@ export const AccessoryStockList: React.FC<AccessoryStockListProps> = ({ location
       ) : inStock.length === 0 ? (
         <EmptyState
           icon={Headphones}
-          title={query ? 'Ничего не найдено' : 'Аксессуаров нет в наличии'}
-          description={query ? 'Измените запрос поиска' : 'Аксессуары появятся здесь после прихода по штрихкоду'}
+          title={query || activeCategory !== 'ALL' ? 'Ничего не найдено' : 'Аксессуаров нет в наличии'}
+          description={query || activeCategory !== 'ALL' ? 'Измените запрос поиска или категорию' : 'Аксессуары появятся здесь после прихода по штрихкоду'}
         />
       ) : (
         <ul className="space-y-1.5">
