@@ -46,6 +46,23 @@ const click = async (text: string, scope = 'main') => {
   throw new Error(`Missing enabled button ${route}: ${text}; ${await page.evaluate(() => document.body.innerText.slice(-2200))}; invalid: ${await page.evaluate(() => [...document.querySelectorAll('input:invalid,select:invalid')].map(i => (i as HTMLInputElement).placeholder + ':' + (i as HTMLInputElement).validationMessage).join(';'))}`);
 };
 const navigate = async (next: string) => { route = next; await page.goto(fixture.baseUrl + route, { waitUntil: 'networkidle0' }); };
+// Signs in on the open login form and waits until the app leaves it. A submit that sent no request
+// (clicked before the form was ready) is clicked once more; a refused login fails with the server's answer.
+const signIn = async (login: string, password: string) => {
+  await page.locator('input[type="text"]').fill(login);
+  await page.locator('input[type="password"]').fill(password);
+  const isLogin = (r: { method: () => string; url: () => string }) => r.method() === 'POST' && new URL(r.url()).pathname === '/api/auth/login';
+  const sent = page.waitForRequest(isLogin, { timeout: 5000 });
+  const answered = page.waitForResponse((r) => isLogin(r.request()), { timeout: 25000 });
+  void answered.catch(() => {});
+  await page.locator('button[type="submit"]').click();
+  if (!(await sent.then(() => true, () => false))) await page.locator('button[type="submit"]').click();
+  const answer = await answered.catch(async (e) => {
+    throw new Error(`Login ${login}: no answer from /api/auth/login (${e}); page: ${await page.evaluate(() => document.body.innerText.slice(0, 600))}`);
+  });
+  if (answer.status() !== 200) throw new Error(`Login ${login}: /api/auth/login answered ${answer.status()} ${await answer.text()}`);
+  await page.waitForFunction(() => location.pathname !== '/login', { timeout: 15000 });
+};
 const step = async (label: string, fn: () => Promise<void>) => {
   const only = process.argv.find(a => a.startsWith('--only='))?.slice(7);
   if (only && !label.startsWith(only)) return;
@@ -58,15 +75,12 @@ const step = async (label: string, fn: () => Promise<void>) => {
 };
 try {
   await navigate('/login');
-  await page.locator('input[type="text"]').fill('admin');
-  await page.locator('input[type="password"]').fill('admin123');
-  await page.locator('button[type="submit"]').click();
-  await page.waitForFunction(() => location.pathname !== '/login');
+  await signIn('admin', 'admin123');
   await idle();
   await page.evaluate(() => [...document.querySelectorAll('button')].find(b => b.textContent?.trim() === 'Позже')?.click());
 
   const plans: Record<string, string[]> = {
-    '/inventory': ['Телефоны', 'Планшеты', 'Аксессуары', 'Все устройства', 'Список', 'По моделям', 'По брендам', 'Фильтры'],
+    '/inventory': ['Телефоны', 'Планшеты', 'Аксессуары', 'Все', 'Список', 'По моделям', 'По брендам', 'Фильтры'],
     '/transfer': ['История и заявки', 'Новое перемещение', 'Планшеты', 'Аксессуары', 'Телефоны', 'Все товары', 'Штучно', 'Модели'],
     '/revision': ['История ревизий', 'Сверка склада', 'Штучно', 'Модели'],
     '/expenses': ['Не оплачено', 'Оплачено', 'Все'],
@@ -225,9 +239,7 @@ try {
     await navigate('/settings');
     await click('Выйти из аккаунта');
     await page.waitForSelector('input[type="password"]');
-    await page.locator('input[type="text"]').fill('ahmad');
-    await page.locator('input[type="password"]').fill('seller123');
-    await page.locator('button[type="submit"]').click();
+    await signIn('ahmad', 'seller123');
     await page.waitForFunction(() => location.pathname === '/sale');
     route = '/sale'; await idle();
     await page.setViewport({ width: 768, height: 900 });

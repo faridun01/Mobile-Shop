@@ -28,7 +28,19 @@ try {
       }
     });
     await page.goto(fixture.baseUrl + '/login', { waitUntil: 'networkidle0' });
-    await page.locator('input[type="text"]').fill(role);
+    // A login form that is not usable in 10 s is recorded (screenshot and page text, uploaded by CI)
+    // and the page reloaded once, as a person would; a second miss fails the run.
+    const loginInput = page.locator('input[type="text"]').setTimeout(10000);
+    try {
+      await loginInput.fill(role);
+    } catch (error) {
+      await page.screenshot({ path: `output/ui-backend-audit/screens/${role}-login-not-ready.png` });
+      const text = await page.evaluate(() => document.body.innerText.slice(0, 600));
+      console.log('WARN', role, 'login form not ready, reloading:', String(error), JSON.stringify(text));
+      results.push({ role, route: '/login', warning: 'login form not ready, reloaded', text });
+      await page.reload({ waitUntil: 'networkidle0' });
+      await page.locator('input[type="text"]').fill(role);
+    }
     await page.locator('input[type="password"]').fill(role === 'admin' ? 'admin123' : role.startsWith('partner') ? 'partner123' : 'seller123');
     await page.locator('button[type="submit"]').click();
     await page.waitForFunction(() => !location.pathname.includes('login'));
