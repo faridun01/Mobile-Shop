@@ -660,7 +660,7 @@ export const InventoryPage: React.FC = () => {
           </div>
         </div>
 
-        <ProductCategoryFilter allLabel="Все устройства" value={viewTab === 'ACCESSORIES' ? 'ACCESSORY' : productCategory}
+        <ProductCategoryFilter allLabel="Все" value={viewTab === 'ACCESSORIES' ? 'ACCESSORY' : productCategory}
           onChange={(category) => {
             setProductCategory(category);
             setViewTab(category === 'ACCESSORY' ? 'ACCESSORIES' : 'DEVICES');
