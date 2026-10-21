@@ -12,6 +12,7 @@ async function main() {
     prisma.sale.findMany({
       include: {
         saleItems: { select: { deviceId: true, salePriceTjs: true, costBasisUsd: true, returnId: true } },
+        accessoryItems: { select: { salePriceTjs: true } },
         exchangeEvents: { select: { id: true } },
         paymentAllocations: { select: { allocatedAmountTjs: true } },
       },
@@ -49,12 +50,16 @@ async function main() {
       .plus((sale.paymentAllocations || []).reduce((sum, a) => D(sum).plus(a.allocatedAmountTjs), D(0)));
     return !close(paidOrDebt, sale.totalTjs);
   }).map((sale) => sale.id));
-  add('COMPLETED_SALE_ITEM_TOTAL_MISMATCH', sales.filter((sale) => (sale.status === 'COMPLETED' || sale.status === 'EXCHANGED') && !close(sale.saleItems.reduce((sum, item) => D(sum).plus(item.salePriceTjs), D(0)), sale.totalTjs)).map((sale) => sale.id));
+  // Phones and accessory lines add up to the receipt. An old-model exchange (exchange event on the
+  // receipt) put the new phone's price on the line but kept the receipt's original total, so it is left out.
+  add('COMPLETED_SALE_ITEM_TOTAL_MISMATCH', sales.filter((sale) => (sale.status === 'COMPLETED' || sale.status === 'EXCHANGED') && sale.exchangeEvents.length === 0 &&
+    !close([...sale.saleItems, ...sale.accessoryItems].reduce((sum, line) => D(sum).plus(line.salePriceTjs), D(0)), sale.totalTjs)).map((sale) => sale.id));
   // A whole-receipt refund hands back what the customer actually paid (cash, bank, exchange credit
   // and debt repayments) less the penalty; any unpaid debt is forgiven, not refunded. Receipts
-  // emptied phone by phone (returns, exchanges) carry no refund amount and are left out.
+  // emptied phone by phone (returns, exchanges) carry no refund amount and are left out, and so is
+  // an annulled receipt: annulment zeroes its refund and reverses its postings instead.
   add('REFUND_TOTAL_MISMATCH', sales.filter((sale) => {
-    if (sale.status !== 'REFUNDED' || sale.actualRefundAmountTjs === null) return false;
+    if (sale.status !== 'REFUNDED' || sale.actualRefundAmountTjs === null || sale.annulledAt) return false;
     const paid = D(sale.cashAmountTjs).plus(sale.cardAmountTjs).plus(sale.exchangeTradeInCreditTjs ?? 0)
       .plus((sale.paymentAllocations || []).reduce((sum, a) => D(sum).plus(a.allocatedAmountTjs), D(0)));
     return !close(D(sale.actualRefundAmountTjs).plus(sale.penaltyFeeTjs ?? 0), paid);
