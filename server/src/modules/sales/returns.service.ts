@@ -18,7 +18,7 @@ import { allocationsCostUsd, readAllocations, restoreAllocations, type BatchAllo
  * The next `count` units of a line to come back, taken from the end of its allocations (the units
  * sold last come back first) after the `alreadyReturned` units that came back before.
  */
-function unitsFromEnd(allocations: BatchAllocation[], alreadyReturned: number, count: number): BatchAllocation[] {
+export function unitsFromEnd(allocations: BatchAllocation[], alreadyReturned: number, count: number): BatchAllocation[] {
   const taken: BatchAllocation[] = [];
   let skip = alreadyReturned;
   let left = count;
@@ -106,6 +106,7 @@ export class ReturnsService {
     await tx.$queryRaw`SELECT id FROM sales WHERE id = ${input.saleId} FOR UPDATE`;
     const sale = await tx.sale.findUnique({ where: { id: input.saleId }, include: { saleItems: true, accessoryItems: true, exchangeEvents: { select: { id: true } } } });
     if (!sale) throw new Error('Чек не найден');
+      if (sale.annulledAt) throw new Error('Чек аннулирован — оформите новую продажу');
     if (sale.status === 'REFUNDED') throw new Error('Этот чек уже полностью возвращён');
     if (D(sale.debtAmountTjs).gt(0)) {
       throw new Error('По чеку есть непогашенный долг: оформите возврат всего чека или сначала примите оплату долга');
@@ -246,7 +247,9 @@ export class ReturnsService {
     const booked: OwnerProfitAllocation[] = Array.isArray(saleDetails.ownerProfitAllocations)
       ? (saleDetails.ownerProfitAllocations as { ownerId: string; amountUsd: number }[]).map((row) => ({ ownerId: row.ownerId, amountUsd: D(row.amountUsd) }))
       : [];
-    const earlierReturns = await tx.auditLog.findMany({ where: { targetId: sale.id, action: 'SALE_RETURN' }, select: { financialDetails: true } });
+    const liveReturnIds = new Set((await tx.saleReturn.findMany({ where: { saleId: sale.id }, select: { id: true } })).map((row) => row.id));
+    const earlierReturns = (await tx.auditLog.findMany({ where: { targetId: sale.id, action: 'SALE_RETURN' }, select: { financialDetails: true } }))
+      .filter((log) => liveReturnIds.has(String((log.financialDetails as { saleReturnId?: string } | null)?.saleReturnId)));
     const reversedBefore = new Map<string, Prisma.Decimal>();
     for (const log of earlierReturns) {
       const rows = (log.financialDetails as { reversedAllocations?: { ownerId: string; amountUsd: number }[] } | null)?.reversedAllocations ?? [];

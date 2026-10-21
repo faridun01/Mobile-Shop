@@ -1,6 +1,17 @@
 import { describe, it, expect } from 'vitest';
-import { computeSaleProfit, computeSaleItemProfit } from './saleProfit';
+import { computeSaleProfit, computeSaleItemProfit, saleWithheldTjs } from './saleProfit';
 import type { Sale, SaleItem } from '../types';
+
+describe('saved return withholding', () => {
+  it('displays the exact 7480 TJS rather than 804.30 USD converted back to 7479.99', () => {
+    expect(saleWithheldTjs({ penaltyFeeTjs: 7480 })).toBe(7480);
+    expect(saleWithheldTjs({ penaltyFeeTjs: 0 })).toBe(0);
+  });
+
+  it('adds saved return amounts cent-exactly when the receipt total is unavailable', () => {
+    expect(saleWithheldTjs({ returns: [{ withheldTjs: 0.1 }, { withheldTjs: 0.2 }] as Sale['returns'] })).toBe(0.3);
+  });
+});
 
 describe('computeSaleItemProfit', () => {
   it('calculates profit and margin for a normal device sale', () => {
@@ -177,6 +188,49 @@ describe('computeSaleProfit with phones returned one by one', () => {
       { id: 'i2', deviceId: 'd2', imei: '2', brand: 'A', model: 'Two', storage: '', color: '', salePriceUsd: 300, salePriceTjs: 3000, purchaseCostUsd: 100, costBasisUsd: 100 },
     ],
   };
+
+  it('calculates the somoni margin before displaying its dollar equivalent', () => {
+    const receipt: Sale = {
+      ...base, status: 'COMPLETED', totalTjs: 10550, totalUsd: 1134.41, exchangeRate: 9.3, recognizedProfitUsd: 384.41,
+      items: [{ ...base.items[1], salePriceTjs: 10550, salePriceUsd: 1134.41, costBasisUsd: 750, purchaseCostUsd: 750 }],
+    };
+    const result = computeSaleProfit(receipt, 15);
+    expect(result.profitTjs).toBe(3575);
+    expect(result.profitUsd).toBe(384.41);
+    expect(computeSaleItemProfit(receipt.items[0], 9.3).profitTjs).toBe(3575);
+  });
+
+  it('keeps the actual withheld somoni after a complete return', () => {
+    const receipt: Sale = {
+      ...base, status: 'REFUNDED', exchangeRate: 9.3, penaltyFeeTjs: 7480, penaltyFeeUsd: 804.3, recognizedProfitUsd: 804.3,
+      returns: [{ id: 'r1', withheldTjs: 7480, withheldUsd: 804.3 } as NonNullable<Sale['returns']>[number]],
+    };
+    expect(computeSaleProfit(receipt).profitTjs).toBe(7480);
+    expect(computeSaleProfit(receipt).profitUsd).toBe(804.3);
+  });
+
+  it('uses the remaining accessory price, restored cost and saved withholding in somoni', () => {
+    const receipt: Sale = {
+      ...base, status: 'COMPLETED', exchangeRate: 9.3, items: [], recognizedProfitUsd: 88.61,
+      accessoryItems: [{
+        id: 'a1', productId: 'p1', barcode: '123', brand: 'Test', name: 'Cable', category: 'Cable',
+        quantity: 3, unitPriceTjs: 500, salePriceTjs: 1500, salePriceUsd: 161.29, costUsd: 40,
+        returnedQuantity: 1, returnedPriceTjs: 500, returnedPriceUsd: 53.76, returnedCostUsd: 20,
+      }],
+      returns: [{ id: 'r1', withheldTjs: 10, withheldUsd: 1.08 } as NonNullable<Sale['returns']>[number]],
+    };
+    expect(computeSaleProfit(receipt).profitTjs).toBe(824);
+    expect(computeSaleProfit(receipt).profitUsd).toBe(88.61);
+  });
+
+  it('has zero retained profit for a full return without withholding at the original rate', () => {
+    const receipt: Sale = {
+      ...base, status: 'REFUNDED', penaltyFeeTjs: 0, penaltyFeeUsd: 0, recognizedProfitUsd: 0,
+      returns: [{ id: 'r1', withheldTjs: 0, withheldUsd: 0 } as NonNullable<Sale['returns']>[number]],
+    };
+    expect(computeSaleProfit(receipt).profitTjs).toBe(0);
+    expect(computeSaleProfit(receipt).profitUsd).toBe(0);
+  });
 
   it('leaves the returned phone out of the cost and uses the server profit', () => {
     const res = computeSaleProfit({ ...base, status: 'COMPLETED', recognizedProfitUsd: 220, returns: [{ id: 'r1' } as any] } as Sale);

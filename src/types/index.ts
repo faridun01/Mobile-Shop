@@ -192,6 +192,7 @@ export interface SaleAccessoryLine {
   /** Units of the line already returned, with their price and cost. */
   returnedQuantity: number;
   returnedPriceTjs: number;
+  returnedPriceUsd?: number;
   returnedCostUsd: number;
 }
 
@@ -262,7 +263,7 @@ export interface Sale {
   /** Returns of phones from this receipt. */
   returns?: SaleReturnInfo[];
   /** For a receipt opened by an exchange: the receipt the returned phone came from. */
-  exchangeFrom?: { saleId: string; receiptNumber: number; creditTjs: number; creditUsd: number };
+  exchangeFrom?: { saleId: string; receiptNumber: number; creditTjs: number; creditUsd: number; withheldTjs: number };
   status: 'COMPLETED' | 'EXCHANGED' | 'REFUNDED';
   hasBelowCostItem?: boolean;
   exchangeEvents?: ExchangeEvent[];
@@ -274,7 +275,15 @@ export interface Sale {
   actualRefundAmountTjs?: number;
   /** Dollars handed back on the refund, at the refund day's rate. */
   actualRefundUsd?: number;
+  isCancelled?: boolean;
 }
+
+/** An admin correction of a past operation (POST /sales/:id/edit), recalculated at its own rate and day. */
+export type SaleEditParams =
+  | { saleId: string; kind: 'SALE'; items?: { saleItemId: string; salePriceTjs: number }[]; accessories?: { lineId: string; unitPriceTjs: number }[]; cashAmountTjs?: number; cardAmountTjs?: number }
+  | { saleId: string; kind: 'RETURN'; returnId: string; items?: { saleItemId: string; withheldTjs: number }[]; accessories?: { lineId: string; withheldTjs: number }[]; payoutMethod?: 'CASH' | 'CARD' }
+  | { saleId: string; kind: 'REFUND'; penaltyFeeTjs: number }
+  | { saleId: string; kind: 'EXCHANGE'; items?: { saleItemId: string; salePriceTjs: number }[]; accessories?: { lineId: string; unitPriceTjs: number }[]; cashAmountTjs?: number; cardAmountTjs?: number; returnWithheldTjs?: number };
 
 export interface TransferRequest {
   id: string;
@@ -697,6 +706,8 @@ export interface DailyCashClosing {
   expensesCashUsd: number | string;
   refundsCashTjs: number | string;
   refundsCashUsd: number | string;
+  refundsCardTjs?: number | string | null;
+  refundsCardUsd?: number | string | null;
   collectionsCashTjs: number | string;
   collectionsCashUsd: number | string;
   // Net of other register cash moves: customer debt repayments, owner deposits/withdrawals, supplier payments.
@@ -736,6 +747,8 @@ export interface DailyClosingSummary {
   expensesCount: number;
   refundsCashTjs: string;
   refundsCashUsd: string;
+  refundsCardTjs?: string;
+  refundsCardUsd?: string;
   refundsCount: number;
   refundedReceipts?: { receiptNumber: number; amountTjs: string; amountUsd: string; reason?: string }[];
   collectionsCashTjs: string;

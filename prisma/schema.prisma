@@ -299,6 +299,9 @@ model DailyCashClosing {
   expensesCashUsd    Decimal  @db.Decimal(14, 2)
   refundsCashTjs     Decimal  @db.Decimal(14, 2)
   refundsCashUsd     Decimal  @db.Decimal(14, 2)
+  // Of the total refunds above, the part paid back to a bank/card rather than physical cash.
+  refundsCardTjs     Decimal? @db.Decimal(14, 2)
+  refundsCardUsd     Decimal? @db.Decimal(14, 2)
   collectionsCashTjs Decimal  @db.Decimal(14, 2)
   collectionsCashUsd Decimal  @db.Decimal(14, 2)
   // Net of customer cash debt repayments, owner deposits/withdrawals and supplier payments.
@@ -670,6 +673,10 @@ model Sale {
   penaltyFeeTjs            Decimal?      @db.Decimal(14, 2)
   penaltyFeeUsd            Decimal?      @db.Decimal(14, 2)
   actualRefundAmountTjs    Decimal?      @db.Decimal(14, 2)
+  // Administrative annulment removes the entire receipt from operational screens/reports.
+  // The receipt, audit snapshot and compensating ledger entries remain for reconciliation.
+  annulledAt               DateTime?
+  annulledByUserId         String?
   createdAt                DateTime      @default(now())
 
   store              Store                       @relation(fields: [storeId], references: [id])

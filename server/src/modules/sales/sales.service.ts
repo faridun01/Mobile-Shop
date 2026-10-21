@@ -40,6 +40,24 @@ export interface TradeInCredit {
   fromReceiptNumber: number;
 }
 
+/** How a receipt was paid, as its register posting describes it (also used when a receipt is corrected). */
+export function salePaymentDescription(input: {
+  paymentMethod: string; cashAmountTjs: MoneyInput; cardAmountTjs: MoneyInput; debtAmountTjs: MoneyInput;
+  customerName?: string | null; tradeInReceiptNumber?: number;
+}) {
+  const cash = D(input.cashAmountTjs);
+  const card = D(input.cardAmountTjs);
+  return input.paymentMethod === 'DEBT'
+    ? `продажа в долг (первый взнос: нал. ${cash} TJS, карта ${card} TJS; долг: ${D(input.debtAmountTjs)} TJS, клиент: ${input.customerName})`
+    : input.tradeInReceiptNumber !== undefined
+      ? `доплата по обмену (чек #${input.tradeInReceiptNumber}): нал. ${cash} TJS, карта ${card} TJS`
+      : input.paymentMethod === 'CASH'
+        ? 'продажа наличными'
+        : input.paymentMethod === 'CARD'
+          ? 'продажа (перевод / карта)'
+          : `смешанная оплата (наличные ${cash} TJS, перевод/карта ${card} TJS)`;
+}
+
 export class SalesService {
   /**
    * Atomic Sale Execution using PostgreSQL Prisma Transaction.
@@ -379,15 +397,10 @@ export class SalesService {
     if (!upfrontPaidTjs.isZero()) {
       await tx.store.update({ where: { id: input.storeId }, data: { cashBalanceUsd: { increment: upfrontPaidUsd } } });
       const cashAccount = await getStoreCashAccount(tx, input.storeId, store.name);
-      const paymentDescription = input.paymentMethod === 'DEBT'
-        ? `продажа в долг (первый взнос: нал. ${cashAmountTjs} TJS, карта ${cardAmountTjs} TJS; долг: ${debtAmountTjs} TJS, клиент: ${finalCustomerName})`
-        : tradeIn
-          ? `доплата по обмену (чек #${tradeIn.fromReceiptNumber}): нал. ${cashAmountTjs} TJS, карта ${cardAmountTjs} TJS`
-        : input.paymentMethod === 'CASH'
-          ? 'продажа наличными'
-          : input.paymentMethod === 'CARD'
-            ? 'продажа (перевод / карта)'
-            : `смешанная оплата (наличные ${cashAmountTjs} TJS, перевод/карта ${cardAmountTjs} TJS)`;
+      const paymentDescription = salePaymentDescription({
+        paymentMethod: input.paymentMethod, cashAmountTjs, cardAmountTjs, debtAmountTjs,
+        customerName: finalCustomerName, tradeInReceiptNumber: tradeIn?.fromReceiptNumber,
+      });
       await postTransaction(tx, {
         type: 'INCOME',
         direction: 'IN',

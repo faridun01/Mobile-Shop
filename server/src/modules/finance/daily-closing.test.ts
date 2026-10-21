@@ -71,7 +71,6 @@ function openDay({
   sales = [] as any[],
   refunds = [] as any[],
   exchanges = [] as any[],
-  returns = [] as any[],
   expenses = [] as any[],
   collections = [] as any[],
   customerPayments = [] as any[],
@@ -81,16 +80,20 @@ function openDay({
 } = {}) {
   db.store.findUnique.mockResolvedValue({ id: 'store-1', name: 'Сиёма', isMainWarehouse: false, active: true });
   db.dailyCashClosing.findUnique.mockResolvedValue(null);
-  db.sale.findMany.mockResolvedValueOnce(sales).mockResolvedValueOnce(refunds);
+  // The day's sales; full refunds of that day (only used when they have no register posting);
+  // receipt numbers of refund postings (taken from their descriptions here).
+  db.sale.findMany.mockImplementation(async ({ where }: any) => (where.refundedAt ? refunds : where.id ? [] : sales));
   db.exchangeEvent.findMany.mockResolvedValue(exchanges);
-  db.saleReturn.findMany.mockResolvedValue(returns);
   db.cashHandover.findMany.mockResolvedValue(collections);
   db.customerPayment.findMany.mockResolvedValue(customerPayments);
   db.financialAccount.findUnique.mockResolvedValue({ id: 'acc-1' });
-  // Expenses are read from the register ledger (OUT rows); other moves come from the same table.
+  // Expenses are read from the register ledger (OUT rows); refunds and their cancellations too;
+  // other moves come from the same table.
   const expenseRows = expenses.map((e: any) => ({ direction: 'OUT', amountTjs: e.amountTjs, amountUsd: e.amountUsd }));
   db.financialTransaction.findMany.mockImplementation(async ({ where }: any) =>
-    (where.type === 'REFUND' ? refundPostings : where.sourceType === 'EXPENSE' ? expenseRows : ledger));
+    (where.OR?.some((c: any) => c.type === 'REFUND') ? refundPostings
+      : where.type === 'REFUND' ? refundPostings.filter((p: any) => p.sourceType === 'SALE')
+        : where.sourceType === 'EXPENSE' ? expenseRows : ledger));
   db.exchangeRate.findUnique.mockResolvedValue({ rate });
   db.dailyCashClosing.create.mockImplementation(({ data }: any) => ({ id: 'dc-1', ...data }));
 }
@@ -170,7 +173,7 @@ describe('DailyClosingService', () => {
     // 9300 TJS handed back at 9.35 booked $994.65; the rate was changed to 9.40 before closing.
     openDay({
       refunds: [{ id: 's1', actualRefundAmountTjs: 9300, penaltyFeeTjs: 50, penaltyFeeUsd: 5.35 }],
-      refundPostings: [{ sourceId: 's1', amountUsd: 994.65 }],
+      refundPostings: [{ sourceType: 'SALE', sourceId: 's1', amountTjs: 9300, amountUsd: 994.65, description: 'Возврат по чеку #7 (наличными): брак' }],
       rate: 9.4,
     });
 
@@ -178,6 +181,56 @@ describe('DailyClosingService', () => {
 
     expect(summary.refundsCashTjs).toBe('9300');
     expect(summary.refundsCashUsd).toBe('994.65');
+    expect(summary.refundsCount).toBe(1);
+    expect(summary.refundedReceipts).toEqual([{ receiptNumber: 7, amountTjs: '9300', amountUsd: '994.65', reason: 'брак' }]);
+  });
+
+  it('a refund cancelled the same day nets out its own posting, and the refund made again counts once', async () => {
+    openDay({
+      sales: [{ id: 's1', cashAmountTjs: 10550, cardAmountTjs: 0, exchangeRate: 9.3, exchangeEvents: [] }],
+      refundPostings: [
+        { sourceType: 'SALE', sourceId: 's1', amountTjs: 3070, amountUsd: 330.11, description: 'Возврат по чеку #1 (наличными): первый' },
+        { sourceType: 'RETURN_CANCEL', sourceId: 'log-1', amountTjs: 3070, amountUsd: 330.11, description: 'Отмена возврата по чеку #1 (наличными): ошибка' },
+        { sourceType: 'SALE', sourceId: 's1', amountTjs: 7480, amountUsd: 804.3, description: 'Возврат по чеку #1 (наличными): повторный' },
+      ],
+      rate: 9.3,
+    });
+    const summary = await DailyClosingService.getSummary('store-1', '2026-10-06');
+    expect(summary.refundsCashUsd).toBe('804.3');
+    expect(summary.refundsCount).toBe(2);
+    expect(summary.expectedCashTjs).toBe('3070');
+    expect(summary.expectedCashUsd).toBe('330.11');
+    const query = db.financialTransaction.findMany.mock.calls.find(([args]: any[]) => args.where.OR?.some((c: any) => c.type === 'REFUND'))[0];
+    expect(query.where).toMatchObject({ accountId: 'acc-1', status: 'POSTED', transactionDate: expect.anything(), reversedTransactionId: null });
+  });
+
+  it('a refund of an earlier day cancelled today brings its money back into today, by its channel', async () => {
+    openDay({
+      refundPostings: [{ sourceType: 'RETURN_CANCEL', sourceId: 'ret-1', amountTjs: 3070, amountUsd: 330.11, description: 'Отмена возврата по чеку #5 (переводом / картой): передумал' }],
+      rate: 9.4,
+    });
+    const summary = await DailyClosingService.getSummary('store-1', '2026-10-06');
+    expect(summary.refundsCashTjs).toBe('-3070');
+    expect(summary.refundsCardTjs).toBe('-3070');
+    expect(summary.refundsCardUsd).toBe('-330.11');
+    expect(summary.refundsCount).toBe(0);
+    expect(summary.expectedCashTjs).toBe('3070');
+    expect(summary.expectedCashUsd).toBe('330.11');
+    expect(summary.refundedReceipts).toEqual([{ receiptNumber: 5, amountTjs: '-3070', amountUsd: '-330.11', reason: 'отмена возврата: передумал' }]);
+  });
+
+  it('stores the card refund portion separately when closing a day', async () => {
+    openDay({
+      sales: [{ id: 's1', cashAmountTjs: 0, cardAmountTjs: 10550, exchangeRate: 9.3, exchangeEvents: [] }],
+      refundPostings: [{ sourceType: 'SALE', sourceId: 's1', amountTjs: 3070, amountUsd: 330.11, description: 'Возврат по чеку #32 (переводом / картой): Возврат' }],
+      rate: 9.3,
+    });
+    const closing = await DailyClosingService.closeDay('u1', { storeId: 'store-1', businessDate: '2026-10-06' });
+    expect(closing.refundsCardTjs).toBe('3070');
+    expect(closing.refundsCardUsd).toBe('330.11');
+    expect(closing.actualCashTjs).toBe('7480');
+    expect(closing.actualCashUsd).toBe('804.3');
+    expect(db.notification.create.mock.calls[0][0].data.message).toContain('Наличные: 0 TJS, банк: 7480 TJS');
   });
 
   it('counts exchange settlements on the day of the exchange, in the dollars the register moved', async () => {

@@ -19,7 +19,9 @@ import {
   Headphones,
   User,
   X,
+  Pencil,
 } from 'lucide-react';
+import { SaleEditForm, type SaleEditTarget } from '../sale/SaleEditForm';
 import { CustomSelect, CustomSelectOption } from '../ui/CustomSelect';
 import { formatRam, formatStorage, getPhoneColorHex, formatPhoneColor } from '../../utils/phoneSpecs';
 import { SearchBar } from '../ui/SearchBar';
@@ -37,7 +39,7 @@ import { StatusBanner, StatusMessage } from '../ui/StatusBanner';
 
 import { currentBusinessMonth, getBusinessDateKey, monthBounds } from '../../utils/businessDate';
 import { summarizeSales } from '../../utils/salesSummary';
-import { computeSaleProfit, computeSaleItemProfit } from '../../utils/saleProfit';
+import { computeSaleProfit, computeSaleItemProfit, saleWithheldTjs } from '../../utils/saleProfit';
 import { looksLikeDeviceCode, normalizeScanCode } from '../../utils/scanLookup';
 import { useStoreContext, formatStoreName } from '../../utils/storeContext';
 
@@ -52,7 +54,7 @@ const saleContents = (sale: Sale) => [
 const RECEIPT_TIME = new Intl.DateTimeFormat('ru-RU', { hour: '2-digit', minute: '2-digit' });
 const RECEIPT_DAY = new Intl.DateTimeFormat('ru-RU', { day: '2-digit', month: '2-digit' });
 
-type DialogView = 'details' | 'refund' | 'pick-exchange' | 'pick-repair';
+type DialogView = 'cancel-operation' | 'details' | 'refund' | 'pick-exchange' | 'pick-repair' | 'edit';
 
 export const getSaleRate = (sale: { exchangeRate?: number; totalUsd?: number; totalTjs?: number }, fallbackRate: number): number => {
   return Number(sale.exchangeRate) > 0
@@ -94,6 +96,8 @@ export const SalesHistoryPage: React.FC = () => {
     setActivePage,
     processRefund,
     processReturnItems,
+    cancelSaleOperation,
+    editSaleOperation,
     isInitialLoading,
     selectedStoreId: globalSelectedStoreId,
     todayRate,
@@ -107,6 +111,8 @@ export const SalesHistoryPage: React.FC = () => {
     'setActivePage',
     'processRefund',
     'processReturnItems',
+    'cancelSaleOperation',
+    'editSaleOperation',
     'isInitialLoading',
     'selectedStoreId',
     'todayRate'
@@ -161,6 +167,9 @@ export const SalesHistoryPage: React.FC = () => {
   const [refundMethod, setRefundMethod] = useState<'CASH' | 'CARD'>('CASH');
   const [status, setStatus] = useState<StatusMessage | null>(null);
   const [isSubmittingRefund, setIsSubmittingRefund] = useState(false);
+  const [cancelTarget, setCancelTarget] = useState<{ kind: 'ANNUL'; returnId?: string } | null>(null);
+  const [editTarget, setEditTarget] = useState<SaleEditTarget | null>(null);
+  const [isCancelling, setIsCancelling] = useState(false);
 
   const isSeller = currentUser?.role === 'SELLER';
   const isPartner = currentUser?.role === 'PARTNER';
@@ -340,6 +349,7 @@ export const SalesHistoryPage: React.FC = () => {
   };
 
   const closeDialog = () => {
+    if (isCancelling || isSubmittingRefund) return;
     setSelectedSaleId(null);
   };
 
@@ -359,7 +369,7 @@ export const SalesHistoryPage: React.FC = () => {
   };
 
   const handlePickAction = (page: 'EXCHANGE' | 'REPAIR') => {
-    if (!selectedSale) return;
+    if (!selectedSale || selectedSale.status === 'REFUNDED') return;
     // A receipt with accessories opens the exchange screen on the receipt, which lists every
     // phone, tablet and accessory line still to hand back.
     if (page === 'EXCHANGE' && (selectedSale.accessoryItems || []).some((line) => line.quantity > line.returnedQuantity)) {
@@ -381,21 +391,14 @@ export const SalesHistoryPage: React.FC = () => {
   // What the customer actually paid (an unpaid debt is written off, not returned) and the penalty.
   const refundCollectedTjs = selectedSale ? Math.max(0, selectedSale.totalTjs - (selectedSale.debtAmountTjs ?? 0)) : 0;
   const penaltyVal = Math.max(0, parseFloat(penaltyFeeTjs.replace(',', '.')) || 0);
-  // Every refund withholds a penalty; only a receipt with nothing paid has nothing to withhold.
-  const penaltyRequired = refundCollectedTjs > 0;
   const penaltyError = penaltyVal > refundCollectedTjs + 0.001
     ? `Удержание не может быть больше оплаченной суммы (${formatMoney(refundCollectedTjs)} TJS)`
     : null;
-  const penaltyMissing = penaltyRequired && penaltyVal <= 0;
 
   const handleExecuteRefund = async () => {
     if (!selectedSale || isSubmittingRefund || penaltyError) return;
     if (!refundReason.trim()) {
       setStatus({ tone: 'error', text: 'Укажите причину возврата' });
-      return;
-    }
-    if (penaltyMissing) {
-      setStatus({ tone: 'error', text: 'Укажите удержание при возврате' });
       return;
     }
 
@@ -422,6 +425,39 @@ export const SalesHistoryPage: React.FC = () => {
     } finally {
       setIsSubmittingRefund(false);
     }
+  };
+
+  const startCancellation = () => {
+    setStatus(null);
+    setCancelTarget({ kind: 'ANNUL' });
+    setDialogView('cancel-operation');
+  };
+  const startEdit = (target: SaleEditTarget) => {
+    setStatus(null);
+    setEditTarget(target);
+    setDialogView('edit');
+  };
+  // What the admin can correct on the open receipt: the receipt itself (or its exchange) while
+  // nothing followed it, or its whole-receipt refund. Returns are corrected from their own rows.
+  const receiptEditTarget: SaleEditTarget | null = !selectedSale || !isAdmin || selectedSale.isCancelled
+    ? null
+    : selectedSale.status !== 'REFUNDED' && !(selectedSale.returns?.length) && !(selectedSale.exchangeEvents?.length)
+      ? (selectedSale.exchangeFrom ? { kind: 'EXCHANGE' } : { kind: 'SALE' })
+      : selectedSale.status === 'REFUNDED' && !(selectedSale.returns?.length)
+        ? { kind: 'REFUND' }
+        : null;
+
+  const handleCancelOperation = async () => {
+    if (!selectedSale || !cancelTarget || isCancelling) return;
+    setIsCancelling(true);
+    try {
+      const result = await cancelSaleOperation({ saleId: selectedSale.id, ...cancelTarget, reason: 'Исправление ошибочного чека' });
+      if (result.success) {
+        setSelectedSaleId(null);
+        setDialogView('details');
+        setStatus({ tone: 'success', text: 'Чек аннулирован. Товары на складе магазина.' });
+      } else setStatus({ tone: 'error', text: result.message || 'Не удалось отменить операцию' });
+    } finally { setIsCancelling(false); }
   };
 
   const canRefund = currentUser?.role === 'ADMIN' || currentUser?.role === 'PARTNER';
@@ -471,10 +507,6 @@ export const SalesHistoryPage: React.FC = () => {
     }
     if (returnHasTooBig) {
       setStatus({ tone: 'error', text: 'Удержание не может быть больше цены товара' });
-      return;
-    }
-    if (returnWithheldTotal <= 0) {
-      setStatus({ tone: 'error', text: 'Укажите удержание за возврат' });
       return;
     }
     setIsSubmittingRefund(true);
@@ -839,7 +871,7 @@ export const SalesHistoryPage: React.FC = () => {
                                       +${profit.profitUsd}
                                     </span>
                                     <span className="text-[10px] text-warning block">
-                                      удержано {formatMoney(profit.profitTjs)} TJS
+                                      удержано {formatMoney(saleWithheldTjs(sale))} TJS
                                     </span>
                                   </div>
                                 ) : (
@@ -863,7 +895,7 @@ export const SalesHistoryPage: React.FC = () => {
                         })()}
                         <td className="py-1.5 px-2.5 text-center whitespace-nowrap">
                           {(sale.status === 'EXCHANGED' || sale.exchangeFrom) && <Badge tone="accent">Обмен</Badge>}
-                          {sale.status === 'REFUNDED' && <Badge tone="danger">Возврат</Badge>}
+                          {sale.status === 'REFUNDED' && <Badge tone="danger">{sale.isCancelled ? 'Отменён' : 'Возврат'}</Badge>}
                           {sale.status === 'COMPLETED' && (sale.items.some((i) => i.returnId) || (sale.accessoryItems || []).some((l) => l.returnedQuantity > 0)) && <Badge tone="warning">Частичный возврат</Badge>}
                           {sale.status === 'COMPLETED' && !sale.exchangeFrom && !sale.items.some((i) => i.returnId) && !(sale.accessoryItems || []).some((l) => l.returnedQuantity > 0) && <Badge tone="neutral">Оплачен</Badge>}
                         </td>
@@ -901,7 +933,7 @@ export const SalesHistoryPage: React.FC = () => {
                           <Badge tone="warning" className="!text-[10px] !px-1.5 !py-0 shrink-0">Частичный возврат</Badge>
                         )}
                         {sale.status === 'REFUNDED' && (
-                          <Badge tone="danger" className="!text-[10px] !px-1.5 !py-0 shrink-0">Возврат</Badge>
+                          <Badge tone="danger" className="!text-[10px] !px-1.5 !py-0 shrink-0">{sale.isCancelled ? 'Отменён' : 'Возврат'}</Badge>
                         )}
                         <span className="text-xs font-bold text-fg truncate group-hover:text-accent transition-colors">
                           {saleContents(sale)}
@@ -1055,8 +1087,8 @@ export const SalesHistoryPage: React.FC = () => {
         footer={
           !selectedSale ? undefined : dialogView === 'details' ? (
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 w-full">
-              <Button variant="secondary" leftIcon={RefreshCw} onClick={() => handlePickAction('EXCHANGE')}>Обмен</Button>
-              {selectedSale.items.length > 0 && <Button variant="secondary" leftIcon={Wrench} onClick={() => handlePickAction('REPAIR')}>Ремонт</Button>}
+              {selectedSale.status !== 'REFUNDED' && !selectedSale.isCancelled && <Button variant="secondary" leftIcon={RefreshCw} onClick={() => handlePickAction('EXCHANGE')}>Обмен</Button>}
+              {selectedSale.status !== 'REFUNDED' && !selectedSale.isCancelled && selectedSale.items.length > 0 && <Button variant="secondary" leftIcon={Wrench} onClick={() => handlePickAction('REPAIR')}>Ремонт</Button>}
               {canRefund && selectedSale.status !== 'REFUNDED' && (
                 <Button
                   variant="danger"
@@ -1067,14 +1099,27 @@ export const SalesHistoryPage: React.FC = () => {
                   Возврат
                 </Button>
               )}
+              {receiptEditTarget && (
+                <Button variant="secondary" leftIcon={Pencil} className="col-span-2 sm:col-span-3 min-h-11" onClick={() => startEdit(receiptEditTarget)}>
+                  {receiptEditTarget.kind === 'EXCHANGE' ? 'Исправить обмен' : receiptEditTarget.kind === 'REFUND' ? 'Исправить возврат' : 'Исправить чек'}
+                </Button>
+              )}
+              {canRefund && (
+                <Button variant="secondary" leftIcon={X} className="col-span-2 sm:col-span-3 min-h-11" onClick={startCancellation}>Аннулировать чек</Button>
+              )}
             </div>
+          ) : dialogView === 'edit' ? undefined : dialogView === 'cancel-operation' ? (
+            <>
+              <Button variant="secondary" fullWidth disabled={isCancelling} onClick={() => setDialogView('details')}>Назад</Button>
+              <Button variant="danger" fullWidth loading={isCancelling} onClick={handleCancelOperation}>Аннулировать чек</Button>
+            </>
           ) : dialogView === 'refund' ? (
             <>
               <Button variant="secondary" fullWidth disabled={isSubmittingRefund} onClick={() => setDialogView('details')}>Отмена</Button>
               {itemReturnMode ? (
-                <Button variant="danger" fullWidth loading={isSubmittingRefund} disabled={!returnCount || returnHasTooBig || returnWithheldTotal <= 0} onClick={handleExecuteReturnItems}>Подтвердить возврат</Button>
+                <Button variant="danger" fullWidth loading={isSubmittingRefund} disabled={!returnCount || returnHasTooBig} onClick={handleExecuteReturnItems}>Подтвердить возврат</Button>
               ) : (
-                <Button variant="danger" fullWidth loading={isSubmittingRefund} disabled={Boolean(penaltyError) || penaltyMissing} onClick={handleExecuteRefund}>Подтвердить возврат</Button>
+                <Button variant="danger" fullWidth loading={isSubmittingRefund} disabled={Boolean(penaltyError)} onClick={handleExecuteRefund}>Подтвердить возврат</Button>
               )}
             </>
           ) : (
@@ -1082,7 +1127,26 @@ export const SalesHistoryPage: React.FC = () => {
           )
         }
       >
-        {!selectedSale ? null : dialogView === 'details' ? (
+        {!selectedSale ? null : dialogView === 'edit' && editTarget ? (
+          <SaleEditForm
+            key={`${selectedSale.id}:${JSON.stringify(editTarget)}`}
+            sale={selectedSale}
+            target={editTarget}
+            onSubmit={editSaleOperation}
+            onBack={() => setDialogView('details')}
+            onDone={() => {
+              setDialogView('details');
+              setStatus({ tone: 'success', text: 'Операция исправлена: касса, прибыль и смена пересчитаны.' });
+            }}
+          />
+        ) : dialogView === 'cancel-operation' ? (
+          <div className="space-y-4">
+            <p className="text-base font-bold text-fg">Аннулировать чек #{selectedSale.receiptNumber}?</p>
+            <p className="text-sm text-fg-muted">Продажа и все возвраты по этому чеку будут аннулированы. Товары останутся на складе магазина. Оплата, прибыль и долг по чеку будут отменены.</p>
+            <p className="text-sm text-fg-muted">Администратор получит уведомление.</p>
+            {status?.tone === 'error' && <p role="alert" className="text-sm text-danger">{status.text}</p>}
+          </div>
+        ) : dialogView === 'details' ? (
           <div className="space-y-3.5">
             <div className="bg-surface p-3.5 rounded-xl border border-border space-y-2 text-sm shadow-2xs">
               <div className="flex items-center justify-between gap-2 flex-wrap">
@@ -1192,7 +1256,7 @@ export const SalesHistoryPage: React.FC = () => {
                                 <span>Закупка:</span>
                                 <span className="font-mono text-fg-muted font-medium">${itemProfit.costUsd}</span>
                               </div>
-                              <div className={cn(
+                              {!item.returnId && selectedSale.status !== 'REFUNDED' && <div className={cn(
                                 "text-xs font-bold font-mono mt-0.5",
                                 itemProfit.profitUsd >= 0 ? "text-emerald-400" : "text-danger"
                               )}>
@@ -1200,7 +1264,7 @@ export const SalesHistoryPage: React.FC = () => {
                                 <span className="text-[10px] font-normal opacity-80 ml-1">
                                   ({itemProfit.marginPercent >= 0 ? `+${itemProfit.marginPercent}` : itemProfit.marginPercent}%)
                                 </span>
-                              </div>
+                              </div>}
                             </div>
                           );
                         })()}
@@ -1307,6 +1371,15 @@ export const SalesHistoryPage: React.FC = () => {
                             className="text-accent font-semibold underline underline-offset-2 cursor-pointer"
                           >
                             Новый чек #{ret.exchangeReceiptNumber ?? ''} (обмен) →
+                          </button>
+                        )}
+                        {isAdmin && !ret.exchangeSaleId && (
+                          <button
+                            type="button"
+                            onClick={() => startEdit({ kind: 'RETURN', returnId: ret.id })}
+                            className="inline-flex items-center gap-1 min-h-8 text-accent font-semibold underline underline-offset-2 cursor-pointer"
+                          >
+                            <Pencil className="w-3 h-3" /> Исправить возврат
                           </button>
                         )}
                       </div>
@@ -1542,7 +1615,7 @@ export const SalesHistoryPage: React.FC = () => {
                               +${saleProfit.profitUsd}
                             </span>
                             <span className="text-[11px] text-warning font-mono block">
-                              удержано {formatMoney(saleProfit.profitTjs)} TJS
+                              удержано {formatMoney(saleWithheldTjs(selectedSale))} TJS
                             </span>
                           </div>
                         ) : (
@@ -1570,7 +1643,7 @@ export const SalesHistoryPage: React.FC = () => {
             {selectedSale.status === 'REFUNDED' && !selectedSale.returns?.length && (
               <div className="bg-danger/10 border border-danger/30 p-3 rounded-lg space-y-1.5 text-sm">
                 <p className="text-xs font-semibold text-danger tracking-wide">
-                  Возврат {selectedSale.refundedAt ? `от ${new Date(selectedSale.refundedAt).toLocaleString('ru-RU')}` : ''}
+                  {selectedSale.isCancelled ? 'Продажа отменена' : 'Возврат'} {selectedSale.refundedAt ? `от ${new Date(selectedSale.refundedAt).toLocaleString('ru-RU')}` : ''}
                 </p>
                 {selectedSale.refundReason && (
                   <p className="text-xs text-fg-subtle">Причина: {selectedSale.refundReason}</p>
@@ -1613,7 +1686,7 @@ export const SalesHistoryPage: React.FC = () => {
           </div>
         ) : dialogView === 'refund' && itemReturnMode ? (
           <div className="space-y-3.5">
-            <p className="text-xs text-fg-subtle">Отметьте товары, которые возвращает клиент, и укажите удержание за каждый. Телефоны, планшеты и аксессуары вернутся на склад по своей себестоимости.</p>
+            <p className="text-xs text-fg-subtle">Отметьте товары, которые возвращает клиент. Удержание 0 — полный возврат денег без удержания. Телефоны, планшеты и аксессуары вернутся на склад по своей себестоимости.</p>
 
             <div className="space-y-2">
               {openReturnItems.map((item) => {
@@ -1719,7 +1792,7 @@ export const SalesHistoryPage: React.FC = () => {
               <div className="flex justify-between"><span className="text-fg-subtle">Цена возвращаемых товаров</span><span className="font-mono font-medium text-fg-muted">{formatMoney(returnPriceTotal)} TJS</span></div>
               <div className="flex justify-between text-warning font-semibold"><span>Удержание</span><span className="font-mono">−{formatMoney(returnWithheldTotal)} TJS</span></div>
               <div className="flex justify-between pt-1 border-t border-border font-bold"><span className="text-fg-muted">Выдать клиенту</span><span className="font-mono text-accent">{formatMoney(returnCreditTotal)} TJS</span></div>
-              {returnWithheldTotal <= 0 && returnCount > 0 && <p className="text-danger pt-1">Укажите удержание хотя бы по одному товару</p>}
+              {returnWithheldTotal === 0 && returnCount > 0 && <p className="text-fg-subtle pt-1">Без удержания — клиенту возвращается вся сумма выбранных товаров.</p>}
             </div>
 
             <div>
@@ -1747,7 +1820,7 @@ export const SalesHistoryPage: React.FC = () => {
 
             <div>
               <label className="flex items-center justify-between text-xs font-medium text-fg-muted mb-1">
-                <span>Удержание при возврате (TJS) {penaltyRequired && <span className="text-danger">*</span>}</span>
+                <span>Удержание при возврате (TJS)</span>
                 <span className="text-warning font-normal">100% в чистую прибыль</span>
               </label>
               <div className="mb-2">

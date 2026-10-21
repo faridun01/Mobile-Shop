@@ -84,6 +84,33 @@ describe('financial report query optimization preserves all totals', () => {
   });
 });
 
+describe('cancelled returns preserve dated financial history', () => {
+  it.each([
+    ['2026-09', -1134.41, 419.89, 7480],
+    ['2026-10', 1134.41, -419.89, -7480],
+  ])('reports the original return and its cancellation in their own month: %s', async (month, revenue, profit, withheld) => {
+    db.sale.findMany.mockResolvedValue([]);
+    db.saleItem.findMany.mockResolvedValue([]);
+    db.expense.findMany.mockResolvedValue([]);
+    db.auditLog.findMany.mockImplementation(async ({ where }) => {
+      const actions: string[] = where.action.in ?? [where.action];
+      return actions.includes('SALE_RETURN_CANCEL') ? [{
+        createdAt: new Date('2026-10-21T03:55:00Z'), financialDetails: { reportEvent: {
+          storeId: 'store-0', saleId: 'cancelled-return-sale', receiptNumber: 32,
+          originalDate: '2026-09-20T03:55:00Z', reason: 'Растаможка',
+          revenueUsd: -1134.41, revenueTjs: -10550, profitUsd: -384.41, bonusUsd: 0,
+          rate: 9.3, penaltyTjs: 7480, penaltyUsd: 804.3,
+        } },
+      }] : [];
+    });
+    const result = await computeReportsSummary({ period: 'SPECIFIC_MONTH', month: String(month), storeId: 'store-0', includeEvents: true });
+    expect(Number(result.revenueUsd)).toBe(revenue);
+    expect(Number(result.profitUsd)).toBe(profit);
+    expect(Number(result.periodRefundPenaltiesTjs)).toBe(withheld);
+    expect(result.events).toHaveLength(1);
+  });
+});
+
 describe('a refund is reported by fact, on its own day', () => {
   it('reverses the dollars actually handed back, not the dollars the sale booked', async () => {
     const refundDay = new Date('2026-09-10T08:00:00Z');

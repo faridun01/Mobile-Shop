@@ -90,6 +90,9 @@ jobs:
         run: |
           npm run test:audit-fixes
           npm run test:profit-refund
+          npm run test:sales-cancellation
+          npm run test:shift-corrections
+          npm run test:sale-edits
 
       - name: Build Production Bundle
         run: npm run build

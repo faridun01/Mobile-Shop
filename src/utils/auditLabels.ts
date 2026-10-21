@@ -3,7 +3,7 @@ import { translateExpenseText } from './expenseCategories';
 const actions: Record<string, string> = {
   LOGIN: 'Вход в систему', LOGOUT: 'Выход из системы', RATE_SET: 'Установлен курс доллара',
   USER_CREATE: 'Добавлен сотрудник', USER_UPDATE: 'Изменены данные сотрудника', USER_DELETE: 'Удалён сотрудник', USER_STATUS_CHANGE: 'Изменён статус сотрудника',
-  SALE: 'Оформлена продажа', SALE_BELOW_COST: 'Продажа ниже себестоимости', REFUND: 'Возврат продажи', SALE_RETURN: 'Возврат телефонов по чеку', SALE_EXCHANGE: 'Обмен: возврат и новый чек', PURCHASE: 'Приход товара', EXCHANGE: 'Обмен устройства',
+  SALE: 'Оформлена продажа', SALE_BELOW_COST: 'Продажа ниже себестоимости', REFUND: 'Возврат продажи', SALE_RETURN: 'Возврат телефонов по чеку', SALE_EXCHANGE: 'Обмен: возврат и новый чек', SALE_EDITED: 'Исправлена операция по чеку', PURCHASE: 'Приход товара', EXCHANGE: 'Обмен устройства',
   TRANSFER: 'Перемещение товара', TRANSFER_REQUEST: 'Запрос на перемещение', TRANSFER_APPROVAL: 'Перемещение одобрено', TRANSFER_REJECT: 'Перемещение отклонено',
   REPAIR_INTAKE: 'Устройство принято в ремонт', REPAIR_STATUS_CHANGE: 'Изменён статус ремонта',
   EXPENSE: 'Добавлен расход', EXPENSE_EDIT: 'Изменён расход', EXPENSE_DELETE: 'Удалён расход', EXPENSE_PAID: 'Оплачен расход', PAYROLL_PAYOUT: 'Выплачена зарплата',

@@ -123,6 +123,7 @@ export class CustomersService {
       where: { id },
       include: {
         sales: {
+          where: { annulledAt: null },
           orderBy: { createdAt: 'desc' },
           include: {
             store: { select: { id: true, name: true } },
@@ -286,7 +287,7 @@ export class CustomersService {
 
       // Find unpaid debt sales for this customer, ordered chronologically (oldest first)
       const unpaidSales = await tx.sale.findMany({
-        where: { customerId: customer.id, debtAmountTjs: { gt: 0 } },
+        where: { customerId: customer.id, debtAmountTjs: { gt: 0 }, annulledAt: null },
         orderBy: { createdAt: 'asc' },
       });
 

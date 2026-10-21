@@ -5,7 +5,7 @@ import { StoreSelector } from '../common/StoreSelector';
 import { apiClient } from '../../api/client';
 import { useAppFields } from '../../context/AppContext';
 import { DailyClosingSummary, DailyCashClosing } from '../../types';
-import { formatTjs, formatUsd } from '../../utils/money';
+import { formatTjs, formatUsd, decimal, moneyNumber } from '../../utils/money';
 import { soundEffects } from '../../utils/sound';
 import { ConfirmDialog } from '../ui/ConfirmDialog';
 import {
@@ -25,6 +25,7 @@ import {
 } from 'lucide-react';
 import { formatStoreName, formatStoreDisplayTitle, useStoreContext } from '../../utils/storeContext';
 import { useUIStore } from '../../stores/useUIStore';
+import { useDataRefreshRevision } from '../../hooks/useDataRefreshRevision';
 
 interface DailyCashClosingModalProps {
   isOpen: boolean;
@@ -50,6 +51,7 @@ type DayFigures = {
   bankTjs: number; bankUsd: number;
   otherTjs: number; otherUsd: number;
   refundsTjs: number; refundsUsd: number;
+  refundsCardTjs: number; refundsCardUsd: number;
   expensesTjs: number; expensesUsd: number;
   totalTjs: number; totalUsd: number;
 };
@@ -64,6 +66,7 @@ const dayFigures = (source: (DailyClosingSummary | DailyCashClosing) | undefined
     bankTjs: num(source.salesCardTjs), bankUsd: num(source.salesCardUsd),
     otherTjs: num(source.otherCashTjs), otherUsd: num(source.otherCashUsd),
     refundsTjs: num(source.refundsCashTjs), refundsUsd: num(source.refundsCashUsd),
+    refundsCardTjs: num(source.refundsCardTjs), refundsCardUsd: num(source.refundsCardUsd),
     expensesTjs: num(source.expensesCashTjs), expensesUsd: num(source.expensesCashUsd),
     totalTjs: num(total === 'actual' ? (source as DailyCashClosing).actualCashTjs : source.expectedCashTjs),
     totalUsd: num(total === 'actual' ? (source as DailyCashClosing).actualCashUsd : source.expectedCashUsd),
@@ -88,14 +91,22 @@ const DayBreakdown: React.FC<{
       tjs: figures.refundsTjs,
       usd: figures.refundsUsd,
       sign: '−' as const,
-      details: refundedReceipts && refundedReceipts.length > 0 ? (
+      details: (refundedReceipts?.length || figures.refundsCardTjs || figures.refundsCardUsd) ? (
         <div className="mt-1 pl-2 border-l-2 border-danger/40 space-y-0.5 text-[11px] text-fg-subtle">
-          {refundedReceipts.map((r, i) => (
-            <div key={i} className="flex items-center justify-between font-mono">
-              <span>Чек № {r.receiptNumber}{r.reason ? ` (${r.reason})` : ''}</span>
-              <span className="text-danger font-semibold">−{formatTjs(r.amountTjs)}</span>
-            </div>
-          ))}
+          {(figures.refundsCardTjs !== 0 || figures.refundsCardUsd !== 0) && <>
+            <div className="flex justify-between gap-2"><span>Наличными</span><span className="font-mono">{formatTjs(moneyNumber(decimal(figures.refundsTjs).minus(figures.refundsCardTjs)))}</span></div>
+            <div className="flex justify-between gap-2"><span>На карту</span><span className="font-mono">{formatTjs(figures.refundsCardTjs)}</span></div>
+          </>}
+          {(refundedReceipts ?? []).map((r, i) => {
+            // A cancelled refund brings its money back on the day of the cancellation.
+            const back = decimal(r.amountTjs).lt(0);
+            return (
+              <div key={i} className="flex items-center justify-between font-mono">
+                <span>Чек № {r.receiptNumber}{r.reason ? ` (${r.reason})` : ''}</span>
+                <span className={`${back ? 'text-success' : 'text-danger'} font-semibold`}>{back ? '+' : '−'}{formatTjs(moneyNumber(decimal(r.amountTjs).abs()))}</span>
+              </div>
+            );
+          })}
         </div>
       ) : undefined,
     }] : []),
@@ -160,6 +171,7 @@ export const DailyCashClosingModal: React.FC<DailyCashClosingModalProps> = ({
   onClosed,
   onReopened,
 }) => {
+  const dataRefreshRevision = useDataRefreshRevision();
   const { currentUser, stores, selectedStoreId, setSelectedStoreId } = useAppFields(
     'currentUser',
     'stores',
@@ -291,7 +303,7 @@ export const DailyCashClosingModal: React.FC<DailyCashClosingModalProps> = ({
     if (isOpen && effectiveStoreId) {
       void fetchSummary(selectedDateState || explicitBusinessDate);
     }
-  }, [isOpen, effectiveStoreId, selectedDateState, explicitBusinessDate]);
+  }, [isOpen, effectiveStoreId, selectedDateState, explicitBusinessDate, dataRefreshRevision]);
 
   // The seller/partner/admin confirms the calculated day; no counted amount is sent.
   const handleCloseShift = async () => {

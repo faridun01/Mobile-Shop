@@ -33,6 +33,8 @@ export const AUDIT_NOTIFICATION_RULES: Record<string, Rule> = {
   // Regular sales do not notify the admin to prevent spamming.
   // Below-cost sales remain enabled as a warning for losses/fraud.
   SALE_BELOW_COST: { title: 'Продажа ниже себестоимости', route: '/sales-history', subject: 'sale', amounts: fromFd },
+  SALE_ANNULLED: { title: 'Чек аннулирован', route: '/notifications', subject: 'sale' },
+  SALE_EDITED: { title: 'Операция по чеку исправлена', route: '/sales-history', subject: 'sale' },
   REFUND: { title: 'Возврат', route: '/sales-history', subject: 'sale', amounts: fromFd },
   EXCHANGE: { title: 'Обмен', route: '/sales-history', subject: 'sale', amounts: (fd) => ({ tjs: fd.differenceTjs }) },
   EXPENSE: { title: 'Новый расход', route: '/expenses', subject: 'expense', amounts: fromFd },

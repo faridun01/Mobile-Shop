@@ -20,6 +20,16 @@ type Money = ReturnType<typeof D>;
 // sales / refunds / expenses / customer-payment queries below.
 const OTHER_LEDGER_SOURCES = ['OWNER_TRANSACTION', 'SUPPLIER_PAYMENT'];
 
+/** Ledger source of the money a cancelled refund brings back into the register. */
+export const REFUND_CANCEL_SOURCE = 'RETURN_CANCEL';
+
+/** "Возврат по чеку #12 (наличными): причина" / "Отмена возврата по чеку #12 (переводом / картой): причина". */
+const REFUND_DESCRIPTION = /^(?:Отмена возврата|Возврат) по чеку #(\d+)(?: \((?:наличными|переводом \/ картой)\))?: ([\s\S]*)$/;
+
+/** Refund postings record their payout channel in this fixed prefix; a cancellation keeps the refund's. */
+export const isCardRefund = (description: string | null | undefined) =>
+  /^(?:Отмена возврата|Возврат) по чеку #\d+ \(переводом \/ картой\):/.test(description ?? '');
+
 /**
  * When a closing's own bookings (shortage, surplus) happen: now for today's shift; the last
  * moment of the day for a past one, so they stay in that closed day and never reach today's.
@@ -48,6 +58,8 @@ export interface DailyClosingSummary {
   expensesCount: number;
   refundsCashTjs: string;
   refundsCashUsd: string;
+  refundsCardTjs: string;
+  refundsCardUsd: string;
   refundsCount: number;
   refundedReceipts?: { receiptNumber: number; amountTjs: string; amountUsd: string; reason?: string }[];
   collectionsCashTjs: string;
@@ -108,6 +120,8 @@ export class DailyClosingService {
     businessDateInput?: string,
     db: Db = prisma,
     closingRate?: Money,
+    recompute = false,
+    excludeShortageExpenseId?: string | null,
   ): Promise<DailyClosingSummary> {
     const businessDate = businessDateInput || getBusinessDateKey();
     const store = await db.store.findUnique({
@@ -122,19 +136,26 @@ export class DailyClosingService {
     }
 
     // 1. Check if already closed
-    const existing = await db.dailyCashClosing.findUnique({
+    const existing = recompute ? null : await db.dailyCashClosing.findUnique({
       where: {
         storeId_businessDate: { storeId, businessDate },
       },
     });
 
     if (existing) {
+      // Old snapshots predate refund channel columns. Resolve those from the original
+      // business day's records, never by dividing a bank amount by today's rate.
+      const source = existing.refundsCardTjs == null || existing.refundsCardUsd == null
+        ? await DailyClosingService.getSummary(storeId, businessDate, db, closingRate, true)
+        : undefined;
+      const closing = { ...existing, refundsCardTjs: D(existing.refundsCardTjs ?? source?.refundsCardTjs ?? 0),
+        refundsCardUsd: D(existing.refundsCardUsd ?? source?.refundsCardUsd ?? 0) };
       return {
         storeId: store.id,
         storeName: store.name,
         businessDate,
         alreadyClosed: true,
-        closing: existing,
+        closing,
         openingCashTjs: existing.openingCashTjs.toString(),
         openingCashUsd: existing.openingCashUsd.toString(),
         salesCashTjs: existing.salesCashTjs.toString(),
@@ -147,6 +168,9 @@ export class DailyClosingService {
         expensesCount: 0,
         refundsCashTjs: existing.refundsCashTjs.toString(),
         refundsCashUsd: existing.refundsCashUsd.toString(),
+        refundsCardTjs: closing.refundsCardTjs.toString(),
+        refundsCardUsd: closing.refundsCardUsd.toString(),
+        refundedReceipts: source?.refundedReceipts,
         refundsCount: 0,
         collectionsCashTjs: existing.collectionsCashTjs.toString(),
         collectionsCashUsd: existing.collectionsCashUsd.toString(),
@@ -171,7 +195,7 @@ export class DailyClosingService {
     // to the sale's cash/card columns, so that part is taken back out here and counted on the day
     // the exchange happened (2b).
     const sales = await db.sale.findMany({
-      where: { storeId, createdAt: dateRange },
+      where: { storeId, createdAt: dateRange, annulledAt: null },
       select: {
         id: true,
         cashAmountTjs: true,
@@ -210,7 +234,7 @@ export class DailyClosingService {
     // 2b. Exchange settlements made today (negative when the customer was paid out). The register
     // moved by the new price minus the trade-in credit, each in dollars at the exchange's rate.
     const exchanges = await db.exchangeEvent.findMany({
-      where: { date: dateRange, sale: { storeId } },
+      where: { date: dateRange, sale: { storeId, annulledAt: null } },
       select: { cashAmountTjs: true, cardAmountTjs: true, paymentMethod: true, differenceTjs: true, newPriceUsd: true, exchangeInValueUsd: true },
     });
     for (const ev of exchanges) {
@@ -225,33 +249,73 @@ export class DailyClosingService {
       salesCardUsd = salesCardUsd.plus(diffUsd.minus(cashUsd));
     }
 
-    // 2c. Refunds made today: the customer gets back the somoni they paid, less the penalty. In
-    // dollars it is exactly what the register booked for that refund, at the rate of the moment
-    // it was made — never recalculated at a rate set later the same day.
-    const refunds = await db.sale.findMany({
-      // A receipt whose phones were returned one by one is counted through those returns (2c').
-      where: { storeId, refundedAt: dateRange, status: 'REFUNDED', returns: { none: {} } },
-      select: { id: true, receiptNumber: true, actualRefundAmountTjs: true, penaltyFeeTjs: true, penaltyFeeUsd: true, refundReason: true },
-    });
-    const refundPostings = refunds.length
+    // 2c. Money handed back today, read from the register's own postings: every refund paid from it
+    // (a whole receipt or chosen goods), at the somoni and dollars it booked, less every cancelled
+    // refund brought back today. A refund stays on the day it was paid and its cancellation counts
+    // on its own day, so each day matches its drawer even when the two days differ. Postings an
+    // annulment reversed are left out together with their reversal.
+    const cashAccount = await db.financialAccount.findUnique({ where: { storeId }, select: { id: true } });
+    const refundRows = cashAccount
       ? await db.financialTransaction.findMany({
-          where: { type: 'REFUND', sourceType: 'SALE', sourceId: { in: refunds.map((r) => r.id) }, reversedTransactionId: null },
-          select: { sourceId: true, amountUsd: true },
+          where: {
+            accountId: cashAccount.id, transactionDate: dateRange, status: 'POSTED', reversedTransactionId: null,
+            OR: [
+              { type: 'REFUND', direction: 'OUT', sourceType: 'SALE' },
+              { sourceType: REFUND_CANCEL_SOURCE, direction: 'IN' },
+            ],
+          },
+          orderBy: [{ transactionDate: 'asc' }, { id: 'asc' }],
+          select: { sourceType: true, sourceId: true, amountTjs: true, amountUsd: true, description: true },
         })
       : [];
-    const bookedRefundUsd = new Map<string, Money>();
-    for (const p of refundPostings) bookedRefundUsd.set(p.sourceId!, (bookedRefundUsd.get(p.sourceId!) ?? D(0)).plus(p.amountUsd));
+    const refundSales = new Map((await db.sale.findMany({
+      where: { id: { in: refundRows.filter((row) => row.sourceType === 'SALE' && row.sourceId).map((row) => row.sourceId!) } },
+      select: { id: true, receiptNumber: true },
+    })).map((sale) => [sale.id, sale.receiptNumber]));
     let refundsCashTjs = D(0);
     let refundsCashUsd = D(0);
+    let refundsCardTjs = D(0);
+    let refundsCardUsd = D(0);
+    let refundsCount = 0;
     const refundedReceipts: { receiptNumber: number; amountTjs: string; amountUsd: string; reason?: string }[] = [];
-    for (const r of refunds) {
+    for (const row of refundRows) {
+      const cancel = row.sourceType === REFUND_CANCEL_SOURCE;
+      const sign = cancel ? -1 : 1;
+      const amountTjs = D(row.amountTjs).mul(sign);
+      const amountUsd = D(row.amountUsd).mul(sign);
+      refundsCashTjs = refundsCashTjs.plus(amountTjs);
+      refundsCashUsd = refundsCashUsd.plus(amountUsd);
+      if (isCardRefund(row.description)) {
+        refundsCardTjs = refundsCardTjs.plus(amountTjs);
+        refundsCardUsd = refundsCardUsd.plus(amountUsd);
+      }
+      if (!cancel) refundsCount++;
+      const parsed = REFUND_DESCRIPTION.exec(row.description);
+      refundedReceipts.push({
+        receiptNumber: (row.sourceId && refundSales.get(row.sourceId)) || Number(parsed?.[1] ?? 0),
+        amountTjs: roundMoney(amountTjs).toString(),
+        amountUsd: roundMoney(amountUsd).toString(),
+        reason: parsed?.[2] ? `${cancel ? 'отмена возврата: ' : ''}${parsed[2]}` : cancel ? 'отмена возврата' : undefined,
+      });
+    }
+
+    // 2c'. Full refunds made before refunds were posted to the register: the refund day's rate.
+    const legacyRefunds = await db.sale.findMany({
+      where: { storeId, annulledAt: null, refundedAt: dateRange, status: 'REFUNDED', returns: { none: {} }, actualRefundAmountTjs: { gt: 0 } },
+      select: { id: true, receiptNumber: true, actualRefundAmountTjs: true, penaltyFeeTjs: true, penaltyFeeUsd: true, refundReason: true },
+    });
+    const postedRefunds = legacyRefunds.length
+      ? new Set((await db.financialTransaction.findMany({
+          where: { type: 'REFUND', sourceType: 'SALE', sourceId: { in: legacyRefunds.map((r) => r.id) } },
+          select: { sourceId: true },
+        })).map((row) => row.sourceId))
+      : new Set<string | null>();
+    for (const r of legacyRefunds.filter((sale) => !postedRefunds.has(sale.id))) {
       const refundTjs = D(r.actualRefundAmountTjs ?? 0);
-      if (refundTjs.isZero()) continue;
-      const collectedTjs = refundTjs.plus(r.penaltyFeeTjs ?? 0);
+      const refundUsd = roundMoney(usdAt(refundTjs.plus(r.penaltyFeeTjs ?? 0), dayRate)).minus(r.penaltyFeeUsd ?? 0);
       refundsCashTjs = refundsCashTjs.plus(refundTjs);
-      // Refunds made before their register posting existed: the refund day's rate.
-      const refundUsd = bookedRefundUsd.get(r.id) ?? roundMoney(usdAt(collectedTjs, dayRate)).minus(r.penaltyFeeUsd ?? 0);
       refundsCashUsd = refundsCashUsd.plus(refundUsd);
+      refundsCount++;
       refundedReceipts.push({
         receiptNumber: r.receiptNumber,
         amountTjs: roundMoney(refundTjs).toString(),
@@ -260,30 +324,14 @@ export class DailyClosingService {
       });
     }
 
-    // 2c'. Phones returned today: only the money handed back left the register — an exchange's
-    // credit paid for its new receipt instead (counted with that sale above).
-    const returns = await db.saleReturn.findMany({
-      where: { storeId, createdAt: dateRange, payoutTjs: { gt: 0 } },
-      select: { payoutTjs: true, payoutUsd: true, reason: true, sale: { select: { receiptNumber: true } } },
-    });
-    for (const r of returns) {
-      refundsCashTjs = refundsCashTjs.plus(r.payoutTjs);
-      refundsCashUsd = refundsCashUsd.plus(r.payoutUsd);
-      refundedReceipts.push({
-        receiptNumber: r.sale.receiptNumber,
-        amountTjs: roundMoney(r.payoutTjs).toString(),
-        amountUsd: roundMoney(r.payoutUsd).toString(),
-        reason: r.reason,
-      });
-    }
-
     // 2d. Expenses that actually left THIS register (a partner's paid store expense, or one the
     // admin paid from it). Read from the register's own ledger, not from Expense.storeId: unpaid
     // expenses and salaries are paid from Central Cash. A cancellation posts its own reversal (IN).
-    const cashAccount = await db.financialAccount.findUnique({ where: { storeId }, select: { id: true } });
     const expenseRows = cashAccount
       ? await db.financialTransaction.findMany({
-          where: { accountId: cashAccount.id, sourceType: 'EXPENSE', transactionDate: dateRange },
+          where: { accountId: cashAccount.id, sourceType: 'EXPENSE', transactionDate: dateRange,
+            ...(excludeShortageExpenseId ? { NOT: { sourceId: excludeShortageExpenseId } } : {}),
+          },
           select: { direction: true, amountTjs: true, amountUsd: true },
         })
       : [];
@@ -347,7 +395,9 @@ export class DailyClosingService {
       expensesCount,
       refundsCashTjs: roundMoney(refundsCashTjs).toString(),
       refundsCashUsd: roundMoney(refundsCashUsd).toString(),
-      refundsCount: refunds.length,
+      refundsCardTjs: roundMoney(refundsCardTjs).toString(),
+      refundsCardUsd: roundMoney(refundsCardUsd).toString(),
+      refundsCount,
       refundedReceipts,
       collectionsCashTjs: '0',
       collectionsCashUsd: '0',
@@ -450,6 +500,8 @@ export class DailyClosingService {
           expensesCashUsd: summary.expensesCashUsd,
           refundsCashTjs: summary.refundsCashTjs,
           refundsCashUsd: summary.refundsCashUsd,
+          refundsCardTjs: summary.refundsCardTjs,
+          refundsCardUsd: summary.refundsCardUsd,
           collectionsCashTjs: summary.collectionsCashTjs,
           collectionsCashUsd: summary.collectionsCashUsd,
           otherCashTjs: summary.otherCashTjs,
@@ -528,7 +580,7 @@ export class DailyClosingService {
 
       const statusMsg = hasDiscrepancy
         ? `${actor.name} закрыл день ${businessDate}. Факт: ${actualTjs} TJS. Расхождение: ${differenceTjs} TJS (≈ $${differenceUsd}).${input.comment ? ` Примечание: «${input.comment}»` : ''}`
-        : `${actor.name} закрыл день ${businessDate}. Наличные: ${actualTjs} TJS, банк: ${summary.salesCardTjs} TJS.`;
+        : `${actor.name} закрыл день ${businessDate}. Итог: ${actualTjs} TJS. Наличные: ${actualTjs.minus(D(summary.salesCardTjs).minus(summary.refundsCardTjs))} TJS, банк: ${D(summary.salesCardTjs).minus(summary.refundsCardTjs)} TJS.`;
 
       await notifyAdmins(tx, {
         actionType: 'DAILY_CASH_CLOSING',
@@ -561,6 +613,42 @@ export class DailyClosingService {
   }
 
   /**
+   * Annulment removes its flows from their original days. Refresh saved closings atomically
+   * with that correction, preserving the discrepancy already booked for each counted day.
+   */
+  public static async refreshClosedDays(db: Db, days: { storeId: string; businessDate: string }[]) {
+    const changes: { before: DailyCashClosing; after: DailyCashClosing }[] = [];
+    for (const day of new Map(days.map((day) => [`${day.storeId}:${day.businessDate}`, day])).values()) {
+      const closing = await db.dailyCashClosing.findUnique({ where: { storeId_businessDate: day } });
+      if (!closing) continue;
+      const summary = await DailyClosingService.getSummary(day.storeId, day.businessDate, db,
+        closing.exchangeRate ? D(closing.exchangeRate) : undefined, true, closing.shortageExpenseId);
+      const legacy = closing.salesCardUsd == null;
+      const expectedTjs = D(summary.expectedCashTjs)
+        .plus(legacy ? closing.openingCashTjs : 0)
+        .minus(legacy ? D(summary.salesCardTjs).minus(summary.refundsCardTjs) : 0)
+        .minus(legacy ? closing.collectionsCashTjs : 0);
+      const expectedUsd = D(summary.expectedCashUsd)
+        .plus(legacy ? closing.openingCashUsd : 0)
+        .minus(legacy ? D(summary.salesCardUsd ?? 0).minus(summary.refundsCardUsd) : 0)
+        .minus(legacy ? closing.collectionsCashUsd : 0);
+      const after = await db.dailyCashClosing.update({ where: { id: closing.id }, data: {
+        salesCashTjs: summary.salesCashTjs, salesCashUsd: summary.salesCashUsd,
+        salesCardTjs: summary.salesCardTjs, salesCardUsd: legacy ? null : summary.salesCardUsd,
+        expensesCashTjs: summary.expensesCashTjs, expensesCashUsd: summary.expensesCashUsd,
+        refundsCashTjs: summary.refundsCashTjs, refundsCashUsd: summary.refundsCashUsd,
+        refundsCardTjs: summary.refundsCardTjs, refundsCardUsd: summary.refundsCardUsd,
+        otherCashTjs: summary.otherCashTjs, otherCashUsd: summary.otherCashUsd,
+        expectedCashTjs: roundMoney(expectedTjs), expectedCashUsd: roundMoney(expectedUsd),
+        actualCashTjs: roundMoney(expectedTjs.plus(closing.differenceTjs)),
+        actualCashUsd: roundMoney(expectedUsd.plus(closing.differenceUsd)),
+      } });
+      changes.push({ before: closing, after });
+    }
+    return changes;
+  }
+
+  /**
    * Retrieves closing records with optional filters.
    */
   public static async list(filter: {
@@ -580,7 +668,7 @@ export class DailyClosingService {
       };
     }
 
-    return prisma.dailyCashClosing.findMany({
+    const rows = await prisma.dailyCashClosing.findMany({
       where,
       orderBy: [{ businessDate: 'desc' }, { createdAt: 'desc' }],
       take: filter.limit || 100,
@@ -590,6 +678,11 @@ export class DailyClosingService {
         },
       },
     });
+    return Promise.all(rows.map(async (closing) => {
+      if (closing.refundsCardTjs != null && closing.refundsCardUsd != null) return closing;
+      const source = await DailyClosingService.getSummary(closing.storeId, closing.businessDate, prisma, undefined, true);
+      return { ...closing, refundsCardTjs: D(source.refundsCardTjs), refundsCardUsd: D(source.refundsCardUsd) };
+    }));
   }
 
   /**

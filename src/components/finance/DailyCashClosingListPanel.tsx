@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { apiClient } from '../../api/client';
 import { DailyCashClosing } from '../../types';
-import { formatTjs, formatMoney } from '../../utils/money';
+import { splitClosingAmounts } from '../../utils/dailyClosing';
+import { formatTjs, formatMoney, sumMoney } from '../../utils/money';
 import { Button } from '../ui/Button';
 import { EmptyState } from '../ui/EmptyState';
 import { DailyCashClosingModal } from './DailyCashClosingModal';
@@ -35,40 +36,6 @@ const formatDayChip = (businessDate: string): string => {
   } catch {
     return businessDate;
   }
-};
-
-const getClosingCardUsd = (c: DailyCashClosing): number => {
-  // Day-total closings keep the bank takings in dollars as the register booked them.
-  if (c.salesCardUsd !== null && c.salesCardUsd !== undefined) return Number(c.salesCardUsd) || 0;
-  const cardTjs = Number(c.salesCardTjs) || 0;
-  if (cardTjs <= 0) return 0;
-  if (c.exchangeRate && Number(c.exchangeRate) > 0) {
-    return cardTjs / Number(c.exchangeRate);
-  }
-  const cashTjs = Number(c.actualCashTjs) || 0;
-  const cashUsd = Number(c.actualCashUsd) || 0;
-  if (cashTjs > 0 && cashUsd > 0) {
-    return cardTjs / (cashTjs / cashUsd);
-  }
-  return 0;
-};
-
-/**
- * Cash and bank of a closed day. A day-total closing's actual amount is cash and bank together;
- * a closing made before those rules held cash only.
- */
-const closingSplit = (c: DailyCashClosing) => {
-  const dayTotal = c.salesCardUsd !== null && c.salesCardUsd !== undefined;
-  const bankTjs = Number(c.salesCardTjs) || 0;
-  const bankUsd = getClosingCardUsd(c);
-  const actualTjs = Number(c.actualCashTjs) || 0;
-  const actualUsd = Number(c.actualCashUsd) || 0;
-  return {
-    cashTjs: dayTotal ? actualTjs - bankTjs : actualTjs,
-    cashUsd: dayTotal ? actualUsd - bankUsd : actualUsd,
-    bankTjs,
-    bankUsd,
-  };
 };
 
 /** Closed shifts for the month: cash and bank per day, day sorting, and day filtering. */
@@ -202,30 +169,13 @@ export const DailyCashClosingListPanel: React.FC<DailyCashClosingListPanelProps>
 
   // Sums for displayed closings (USD primary, TJS secondary)
   const totals = useMemo(() => {
-    let cashTjs = 0;
-    let cashUsd = 0;
-    let bankTjs = 0;
-    let bankUsd = 0;
-
-    for (const c of displayedClosings) {
-      const split = closingSplit(c);
-      const cTjs = split.cashTjs;
-      const cUsd = split.cashUsd;
-      const bTjs = split.bankTjs;
-      const bUsd = split.bankUsd;
-
-      cashTjs += cTjs;
-      cashUsd += cUsd;
-      bankTjs += bTjs;
-      bankUsd += bUsd;
-    }
-
+    const splits = displayedClosings.map(splitClosingAmounts);
     return {
       count: displayedClosings.length,
-      cashTjs,
-      cashUsd,
-      bankTjs,
-      bankUsd,
+      cashTjs: sumMoney(splits.map((split) => split.cashTjs)),
+      cashUsd: sumMoney(splits.map((split) => split.cashUsd)),
+      bankTjs: sumMoney(splits.map((split) => split.bankTjs)),
+      bankUsd: sumMoney(splits.map((split) => split.bankUsd)),
     };
   }, [displayedClosings]);
 
@@ -420,7 +370,7 @@ export const DailyCashClosingListPanel: React.FC<DailyCashClosingListPanelProps>
           {/* Phones */}
           <div className="md:hidden space-y-2">
             {displayedClosings.map((c) => {
-              const split = closingSplit(c);
+              const split = splitClosingAmounts(c);
                     const cardUsd = split.bankUsd;
               return (
                 <button
@@ -452,7 +402,7 @@ export const DailyCashClosingListPanel: React.FC<DailyCashClosingListPanelProps>
                         ${formatMoney(cardUsd)}
                       </span>
                       <span className="text-[10px] text-fg-subtle font-mono block">
-                        ≈ {formatTjs(c.salesCardTjs)}
+                        ≈ {formatTjs(split.bankTjs)}
                       </span>
                     </div>
                   </div>
@@ -476,7 +426,7 @@ export const DailyCashClosingListPanel: React.FC<DailyCashClosingListPanelProps>
                 </thead>
                 <tbody className="divide-y divide-border/60">
                   {displayedClosings.map((c) => {
-                    const split = closingSplit(c);
+                    const split = splitClosingAmounts(c);
                     const cardUsd = split.bankUsd;
                     return (
                       <tr
@@ -518,7 +468,7 @@ export const DailyCashClosingListPanel: React.FC<DailyCashClosingListPanelProps>
                             ${formatMoney(cardUsd)}
                           </div>
                           <div className="text-[10px] text-fg-subtle font-normal">
-                            ≈ {formatTjs(c.salesCardTjs)}
+                            ≈ {formatTjs(split.bankTjs)}
                           </div>
                         </td>
                       </tr>

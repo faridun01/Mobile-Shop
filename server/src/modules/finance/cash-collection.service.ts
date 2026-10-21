@@ -93,7 +93,7 @@ async function bonusDue(db: Db, storeId: string) {
  * Account to the Central Cash at once (never more than the account holds), instead of waiting
  * for the store's next bonus phones. Called inside the refund's transaction.
  */
-export async function returnOvercollectedBonus(tx: TransactionClient, storeId: string, actor: { id: string; name: string; role: string }, reason: string) {
+export async function returnOvercollectedBonus(tx: TransactionClient, storeId: string, actor: { id: string; name: string; role: string }, reason: string, options: { audit?: boolean } = {}) {
   const due = await bonusDue(tx, storeId);
   if (!due.usd.lt(0)) return null;
   const bonusAccount = await lockBonusAccount(tx);
@@ -112,7 +112,7 @@ export async function returnOvercollectedBonus(tx: TransactionClient, storeId: s
     description: `Бонусный счёт → ${central.name}: возврат бонусного телефона после инкассации (${reason})`,
     createdByUserId: actor.id, guardBalance: true,
   });
-  await tx.auditLog.create({
+  if (options.audit !== false) await tx.auditLog.create({
     data: {
       userId: actor.id, userName: actor.name, userRole: actor.role,
       action: 'BONUS_ACCOUNT_TRANSFER', targetId: posting.id,
@@ -158,6 +158,9 @@ export function splitPaymentBreakdown(totalCashTjs: MoneyInput, cardSumTjs: Mone
 /**
  * Informational breakdown of how much of a store's uncollected cash balance
  * was received via digital cards / bank transfers versus physical cash in drawer.
+ * The bank part is the same figure the shifts since the last collection show: each day's card
+ * takings less its refunds paid to a card (a closed day as its closing froze it, an open day as
+ * its closing will count it), so the collection screen and the Z-reports always agree.
  */
 async function paymentBreakdown(db: Db, storeId: string, totalCashTjs: Money): Promise<{ cashOnlyTjs: string; cardOnlyTjs: string }> {
   if (totalCashTjs.lte(0)) {
@@ -170,25 +173,25 @@ async function paymentBreakdown(db: Db, storeId: string, totalCashTjs: Money): P
     select: { createdAt: true },
   });
   const cutoff = lastHandover?.createdAt ?? null;
+  const fullDb = db as unknown as TransactionClient;
 
-  const sales = await db.sale.findMany({
-    where: {
-      storeId,
-      status: { in: ['COMPLETED', 'EXCHANGED'] },
-      cardAmountTjs: { gt: 0 },
-      ...(cutoff ? { createdAt: { gt: cutoff } } : {}),
-    },
-    select: {
-      cardAmountTjs: true,
-    },
+  const closings = await db.dailyCashClosing.findMany({
+    where: { storeId, ...(cutoff ? { createdAt: { gt: cutoff } } : {}) },
+    select: { businessDate: true, salesCardTjs: true, refundsCardTjs: true },
   });
-
-  let cardSum = D(0);
-  for (const s of sales) {
-    cardSum = cardSum.plus(s.cardAmountTjs);
+  let bankTjs = D(0);
+  for (const c of closings) {
+    // Closings made before refund channels were stored: that day's own card refunds.
+    const refundsCardTjs = c.refundsCardTjs ?? (await DailyClosingService.getSummary(storeId, c.businessDate, fullDb, undefined, true)).refundsCardTjs;
+    bankTjs = bankTjs.plus(c.salesCardTjs).minus(refundsCardTjs);
+  }
+  const { unclosedDates } = await checkStoreShiftStatus(db, storeId, cutoff);
+  for (const date of unclosedDates) {
+    const live = await DailyClosingService.getSummary(storeId, date, fullDb);
+    bankTjs = bankTjs.plus(live.salesCardTjs).minus(live.refundsCardTjs);
   }
 
-  return splitPaymentBreakdown(totalCashTjs, cardSum);
+  return splitPaymentBreakdown(totalCashTjs, bankTjs);
 }
 
 /**
@@ -209,6 +212,8 @@ async function registerActivityDates(db: Db | TransactionClient, storeId: string
     where: {
       accountId: account.id,
       sourceType: { notIn: NON_DAY_SOURCES },
+      status: 'POSTED',
+      reversedTransactionId: null,
       ...(cutoff ? { transactionDate: { gt: cutoff } } : {}),
     },
     select: { transactionDate: true },
@@ -228,6 +233,7 @@ export async function checkStoreShiftStatus(
     db.sale.findMany({
       where: {
         storeId,
+        annulledAt: null,
         ...(cutoff ? { createdAt: { gt: cutoff } } : {}),
       },
       select: { createdAt: true },
@@ -506,6 +512,7 @@ export class CashCollectionService {
     const sales = await prisma.sale.findMany({
       where: {
         storeId,
+        annulledAt: null,
         ...(cutoff ? { createdAt: { gt: cutoff } } : {}),
       },
       include: {

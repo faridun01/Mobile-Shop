@@ -5,7 +5,7 @@ import { getBusinessDateKey } from '../utils/businessDate';
 import { hasCurrentDailyRate } from '../utils/dailyRatePrompt';
 import { refreshAfterMutation } from '../utils/refreshAfterMutation';
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, useRef, useLayoutEffect } from 'react';
-import { User, Store, Device, Sale, Supplier, SupplierInvoice, SupplierBonus, Expense, Owner, OwnerTransaction, StoreProfitShare, RepairTicket, RepairStatus, TransferRequest, AuditLogEntry, DailyRate, PageId, PaymentMethod, ExpenseCategory, ThemeMode } from '../types';
+import { User, Store, Device, Sale, SaleEditParams, Supplier, SupplierInvoice, SupplierBonus, Expense, Owner, OwnerTransaction, StoreProfitShare, RepairTicket, RepairStatus, TransferRequest, AuditLogEntry, DailyRate, PageId, PaymentMethod, ExpenseCategory, ThemeMode } from '../types';
 import { useSharedState } from '../hooks/useSharedState';
 import { createStore as createContextStore, useStore, type StoreApi } from 'zustand';
 import { useShallow } from 'zustand/react/shallow';
@@ -154,6 +154,10 @@ interface AppContextType {
     reason: string;
     paymentMethod: 'CASH' | 'CARD';
   }) => Promise<{ success: boolean; message?: string }>;
+
+  cancelSaleOperation: (params: { saleId: string; kind: 'SALE' | 'RETURN' | 'REFUND' | 'ANNUL'; returnId?: string; reason: string }) => Promise<{ success: boolean; message?: string }>;
+  /** Admin correction of a receipt's prices, a return's or refund's withheld amount, or an exchange. */
+  editSaleOperation: (params: SaleEditParams) => Promise<{ success: boolean; message?: string }>;
 
   processRefund: (params: {
     saleId: string;
@@ -546,9 +550,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // Bounded by default — the background/startup load used to fetch every sale ever, which
   // only gets slower as the shop's history grows. Anything outside this recent window is
   // reached on demand via fetchSalesRange (search/sellerId/explicit period) instead.
+  const annulledSaleIdsRef = useRef(new Set<string>());
   const fetchSales = useCallback(() => coalesceFetch('sales', async () => {
     const raw = await apiClient<any[]>('/sales?limit=500');
-    setSales(raw.map((s) => mapSale(s, namesRef.current)).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
+    setSales(raw.filter((s) => !annulledSaleIdsRef.current.has(s.id)).map((s) => mapSale(s, namesRef.current)).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
   }), [coalesceFetch]);
 
   const fetchSalesRange: AppContextType['fetchSalesRange'] = useCallback(async (params) => {
@@ -564,10 +569,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const mapped = raw.map((s) => mapSale(s, namesRef.current));
     setSales((prev) => {
       const byId = new Map(prev.map((s) => [s.id, s]));
-      for (const s of mapped) byId.set(s.id, s);
+      for (const s of mapped) if (!annulledSaleIdsRef.current.has(s.id)) byId.set(s.id, s);
+      for (const id of annulledSaleIdsRef.current) byId.delete(id);
       return Array.from(byId.values()).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
     });
-    return mapped;
+    return mapped.filter((sale) => !annulledSaleIdsRef.current.has(sale.id));
   }, []);
 
   // Bounded — the last TRANSFER_WINDOW_DAYS plus every transfer still waiting for approval.
@@ -928,7 +934,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     });
   }, [refetchAll, pageFetchers, fetcherKeyMap]);
 
-  useRealtimeSync(authToken, (type: string) => {
+  useRealtimeSync(authToken, (type: string, payload: unknown) => {
+    const annulledIds = (payload as { annulledSaleIds?: unknown } | null)?.annulledSaleIds;
+    if (Array.isArray(annulledIds)) {
+      for (const id of annulledIds) if (typeof id === 'string') annulledSaleIdsRef.current.add(id);
+      setSales((prev) => prev.filter((sale) => !annulledSaleIdsRef.current.has(sale.id)));
+      if (currentUser?.role === 'ADMIN') {
+        pendingRealtimeTasks.current.add(fetchBonuses);
+        pendingRealtimeTasks.current.add(fetchAuditLogs);
+      }
+    }
     window.dispatchEvent(new Event('business-data-changed'));
     const tasks = tasksForRealtimeEvent(type);
     if (tasks) {
@@ -1119,6 +1134,30 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return { success: true };
     } catch (err) {
       return { success: false, message: errorMessage(err, 'Не удалось выполнить возврат') };
+    }
+  };
+
+  const cancelSaleOperation: AppContextType['cancelSaleOperation'] = async ({ saleId, ...params }) => {
+    try {
+      const result = await apiClient<{ annulledSaleIds?: string[] }>(`/sales/${saleId}/cancel-operation`, { method: 'POST', body: JSON.stringify(params) });
+      for (const id of result.annulledSaleIds ?? []) annulledSaleIdsRef.current.add(id);
+      if (params.kind === 'ANNUL') setSales((prev) => prev.filter((sale) => !annulledSaleIdsRef.current.has(sale.id)));
+      markLocalMutation(['sales', 'devices', 'stores', 'owners', 'customers', 'bonuses', 'catalog']);
+      await refreshAfterMutation([fetchSales(), fetchDevices(), fetchStores(), fetchOwners(), fetchBonuses()]);
+      return { success: true };
+    } catch (err) {
+      return { success: false, message: errorMessage(err, 'Не удалось отменить операцию') };
+    }
+  };
+
+  const editSaleOperation: AppContextType['editSaleOperation'] = async ({ saleId, ...params }) => {
+    try {
+      await apiClient(`/sales/${saleId}/edit`, { method: 'POST', body: JSON.stringify(params) });
+      markLocalMutation(['sales', 'stores', 'owners', 'customers', 'bonuses']);
+      await refreshAfterMutation([fetchSales(), fetchStores(), fetchOwners(), fetchBonuses()]);
+      return { success: true };
+    } catch (err) {
+      return { success: false, message: errorMessage(err, 'Не удалось исправить операцию') };
     }
   };
 
@@ -1744,6 +1783,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         processExchange,
         processReturnItems,
         processRefund,
+        cancelSaleOperation,
+        editSaleOperation,
         createPurchase,
         createSupplier,
         updateSupplier,

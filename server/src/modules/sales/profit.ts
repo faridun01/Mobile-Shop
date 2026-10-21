@@ -138,7 +138,7 @@ export function calculateRecognizedProfit(logs: ProfitAuditRecord[], fallbackPro
     }
     // A return of some phones: their profit is reversed, the withheld part kept.
     const returnDelta = details.profitDeltaUsd;
-    if (log.action === 'SALE_RETURN' && typeof returnDelta === 'number' && Number.isFinite(returnDelta)) {
+    if (['SALE_RETURN', 'SALE_RETURN_CANCEL'].includes(log.action) && typeof returnDelta === 'number' && Number.isFinite(returnDelta)) {
       amount = D(amount).plus(returnDelta);
     }
   }

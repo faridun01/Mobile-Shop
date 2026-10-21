@@ -3,6 +3,7 @@ import type { Prisma } from '@prisma/client';
 import { prisma } from '../../prisma/prisma.service';
 import { getRateForDate } from '../exchange-rate/exchange-rate.service';
 import { getBusinessDateKey } from '../../common/business-date';
+import { activeRefundLogs, type CancelledReturnEvent } from '../sales/cancellation-audit';
 import { calculateRecognizedProfit } from '../sales/profit';
 import { roundMoney } from '../../common/money';
 import { registerTjsBalances, SURPLUS_SOURCE } from '../finance/cash-balance';
@@ -106,6 +107,7 @@ export async function computeReportsSummary(input: ReportsSummaryInput) {
   // sequential `await`, and that latency only compounds as the dataset (and DB round-trip
   // time) grows.
   const periodSaleWhere = {
+    annulledAt: null,
     ...(storeFilter ? { storeId: storeFilter } : {}),
     ...(dateRange ? { createdAt: dateRange } : {}),
   };
@@ -119,6 +121,8 @@ export async function computeReportsSummary(input: ReportsSummaryInput) {
     refundedSalesFetched,
     periodExchangeLogs,
     periodReturns,
+    cancelledReturns,
+    annulledSales,
     supplierDebtAgg,
     topSuppliersByDebt,
     mainWarehouseStore,
@@ -164,6 +168,7 @@ export async function computeReportsSummary(input: ReportsSummaryInput) {
     prisma.sale.findMany({
       where: {
         status: 'REFUNDED',
+        annulledAt: null,
         ...(storeFilter ? { storeId: storeFilter } : {}),
         ...(dateRange ? { refundedAt: dateRange } : {}),
       },
@@ -183,7 +188,7 @@ export async function computeReportsSummary(input: ReportsSummaryInput) {
     // Phones returned in the period (on their own or as the old phone of an exchange), whenever
     // they were sold: each return is reported on its own day, like a refund.
     prisma.saleReturn.findMany({
-      where: { ...(storeFilter ? { storeId: storeFilter } : {}), ...(dateRange ? { createdAt: dateRange } : {}) },
+      where: { sale: { annulledAt: null }, ...(storeFilter ? { storeId: storeFilter } : {}), ...(dateRange ? { createdAt: dateRange } : {}) },
       select: {
         id: true, storeId: true, createdAt: true, exchangeRate: true, reason: true, bookedUsd: true, fxUsd: true, accessoryLines: true,
         withheldTjs: true, withheldUsd: true, creditTjs: true, creditUsd: true, exchangeSaleId: true,
@@ -192,6 +197,15 @@ export async function computeReportsSummary(input: ReportsSummaryInput) {
       },
       orderBy: { createdAt: 'asc' },
     }),
+    // Cancellation snapshots preserve the original event in its own period even after the
+    // live return is removed. Both the original and its reversal are filtered by date below.
+    prisma.auditLog.findMany({
+      where: { action: { in: ['SALE_RETURN_CANCEL', 'REFUND_CANCEL'] },
+        ...(storeFilter ? { financialDetails: { path: ['reportEvent', 'storeId'], equals: storeFilter } } : {}),
+      },
+      select: { createdAt: true, financialDetails: true },
+    }),
+    prisma.sale.findMany({ where: { annulledAt: { not: null } }, select: { id: true } }),
     prisma.supplier.aggregate({ _sum: { totalDebtUsd: true } }),
     prisma.supplier.findMany({ where: { totalDebtUsd: { gt: 0 } }, orderBy: { totalDebtUsd: 'desc' }, take: 8,
       select: { id: true, name: true, totalPurchasedUsd: true, totalPaidUsd: true, totalDebtUsd: true } }),
@@ -242,12 +256,12 @@ export async function computeReportsSummary(input: ReportsSummaryInput) {
   const [profitLogs, exchangeSales, mainWarehouseStock, retailStock, surplusRows, registerTjs] = await Promise.all([
     logSaleIds.length
       ? prisma.auditLog.findMany({
-          where: { targetId: { in: logSaleIds }, action: { in: ['SALE', 'SALE_BELOW_COST', 'EXCHANGE', 'REFUND'] } },
-          select: { targetId: true, action: true, financialDetails: true, createdAt: true },
+          where: { targetId: { in: logSaleIds }, action: { in: ['SALE', 'SALE_BELOW_COST', 'EXCHANGE', 'REFUND', 'REFUND_CANCEL'] } },
+          select: { id: true, targetId: true, action: true, financialDetails: true, createdAt: true },
         })
       : Promise.resolve([]),
     exchangeSaleIds.length
-      ? prisma.sale.findMany({ where: { id: { in: exchangeSaleIds } }, select: { id: true, storeId: true, receiptNumber: true } })
+      ? prisma.sale.findMany({ where: { id: { in: exchangeSaleIds }, annulledAt: null }, select: { id: true, storeId: true, receiptNumber: true } })
       : Promise.resolve([]),
     mainWarehouseStore
       ? prisma.device.findMany({ where: { storeId: mainWarehouseStore.id, status: 'MAIN_WAREHOUSE' }, select: { costBasisUsd: true, purchasePriceUsd: true } })
@@ -284,7 +298,7 @@ export async function computeReportsSummary(input: ReportsSummaryInput) {
   const rateOn = (d: Date | null | undefined) => (d ? dayRates.get(getBusinessDateKey(d)) : null) || rate;
 
   const profitsBySale = new Map<string, typeof profitLogs>();
-  for (const log of profitLogs) {
+  for (const log of activeRefundLogs(profitLogs)) {
     if (log.targetId) profitsBySale.set(log.targetId, [...(profitsBySale.get(log.targetId) ?? []), log]);
   }
   const originalSaleProfit = (saleId: string) => {
@@ -401,6 +415,26 @@ export async function computeReportsSummary(input: ReportsSummaryInput) {
     if (ret.exchangeSaleId) exchangesCount++;
   }
 
+  const annulledIds = new Set(annulledSales.map((sale) => sale.id));
+  for (const cancellation of cancelledReturns) {
+    const saved = (cancellation.financialDetails as { reportEvent?: CancelledReturnEvent } | null)?.reportEvent;
+    if (!saved || annulledIds.has(saved.saleId) || (storeFilter && saved.storeId !== storeFilter)) continue;
+    const original: ProfitEvent = {
+      kind: 'REFUND', storeId: saved.storeId, saleId: saved.saleId, receiptNumber: saved.receiptNumber,
+      date: new Date(saved.originalDate), refundReason: saved.reason,
+      revenueUsd: D(saved.revenueUsd), revenueTjs: D(saved.revenueTjs), profitUsd: D(saved.profitUsd),
+      bonusUsd: D(saved.bonusUsd), rate: D(saved.rate), penaltyTjs: D(saved.penaltyTjs), penaltyUsd: D(saved.penaltyUsd),
+    };
+    if (dateWithinRange(original.date, dateRange)) profitEvents.push(original);
+    if (dateWithinRange(cancellation.createdAt, dateRange)) profitEvents.push({
+      ...original, date: cancellation.createdAt, refundReason: `Отмена возврата: ${saved.reason ?? ''}`,
+      revenueUsd: original.revenueUsd.negated(), revenueTjs: original.revenueTjs.negated(),
+      profitUsd: original.profitUsd.negated(), bonusUsd: original.bonusUsd.negated(),
+      penaltyTjs: original.penaltyTjs!.negated(), penaltyUsd: original.penaltyUsd!.negated(),
+    });
+  }
+  refundsRevenueUsd = profitEvents.filter((event) => event.kind === 'REFUND').reduce((sum, event) => sum.minus(event.revenueUsd), D(0));
+
   // Unit/receipt/model statistics count only sales that stayed sold: a refunded device goes
   // back to stock and is counted again when it is resold. (Money is handled by profitEvents.)
   const keptSalesAllStores = periodSalesAllStores.filter((s) => s.status !== 'REFUNDED');
@@ -479,19 +513,13 @@ export async function computeReportsSummary(input: ReportsSummaryInput) {
   const freeDeviceBonusesInStock = allBonuses.filter((b) => b.bonusType === 'FREE_DEVICES' && b.status !== 'SOLD').length;
 
   const refundedSales = storeFilter ? refundedSalesAllStores.filter((s) => s.storeId === storeFilter) : refundedSalesAllStores;
-  const periodRefundPenaltiesUsd = refundedSales.reduce((acc, s) => D(acc).plus((s.penaltyFeeUsd || 0)), D(0))
-    .plus(periodReturns.reduce((acc, r) => acc.plus(r.withheldUsd), D(0)));
-  const periodRefundPenaltiesTjs = refundedSales.reduce((acc, s) => D(acc).plus((s.penaltyFeeTjs || 0)), D(0))
-    .plus(periodReturns.reduce((acc, r) => acc.plus(r.withheldTjs), D(0)));
+  const refundEvents = profitEvents.filter((event) => event.kind === 'REFUND');
+  const periodRefundPenaltiesUsd = refundEvents.reduce((sum, event) => sum.plus(event.penaltyUsd ?? 0), D(0));
+  const periodRefundPenaltiesTjs = refundEvents.reduce((sum, event) => sum.plus(event.penaltyTjs ?? 0), D(0));
   const refundPenaltiesByStore = new Map<string, { usd: MoneyInput; tjs: MoneyInput }>();
-  for (const s of refundedSalesAllStores) {
-    if (!s.storeId) continue;
-    const prev = refundPenaltiesByStore.get(s.storeId) || { usd: D(0), tjs: D(0) };
-    refundPenaltiesByStore.set(s.storeId, { usd: D(prev.usd).plus((s.penaltyFeeUsd || 0)), tjs: D(prev.tjs).plus((s.penaltyFeeTjs || 0)) });
-  }
-  for (const r of periodReturns) {
-    const prev = refundPenaltiesByStore.get(r.storeId) || { usd: D(0), tjs: D(0) };
-    refundPenaltiesByStore.set(r.storeId, { usd: D(prev.usd).plus(r.withheldUsd), tjs: D(prev.tjs).plus(r.withheldTjs) });
+  for (const event of refundEvents) {
+    const prev = refundPenaltiesByStore.get(event.storeId) || { usd: D(0), tjs: D(0) };
+    refundPenaltiesByStore.set(event.storeId, { usd: D(prev.usd).plus(event.penaltyUsd ?? 0), tjs: D(prev.tjs).plus(event.penaltyTjs ?? 0) });
   }
 
   // Exchange-rate result of customer debt repaid in the period at a rate other than the sale's
@@ -500,7 +528,7 @@ export async function computeReportsSummary(input: ReportsSummaryInput) {
     where: {
       fxGainUsd: { not: 0 },
       ...(dateRange ? { payment: { createdAt: dateRange } } : {}),
-      ...(storeFilter ? { sale: { storeId: storeFilter } } : {}),
+      sale: { annulledAt: null, ...(storeFilter ? { storeId: storeFilter } : {}) },
     },
     select: { fxGainUsd: true, payment: { select: { exchangeRate: true } }, sale: { select: { storeId: true } } },
   });

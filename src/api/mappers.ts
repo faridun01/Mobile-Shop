@@ -130,6 +130,7 @@ export function mapSale(s: any, names: NameLookup): Sale {
       isBelowCost: l.isBelowCost ?? undefined,
       returnedQuantity: Number(l.returnedQuantity) || 0,
       returnedPriceTjs: Number(l.returnedPriceTjs) || 0,
+      returnedPriceUsd: Number(l.returnedPriceUsd) || 0,
       returnedCostUsd: Number(l.returnedCostUsd) || 0,
     })),
     totalTjs: s.totalTjs,
@@ -166,7 +167,7 @@ export function mapSale(s: any, names: NameLookup): Sale {
         : undefined,
     })),
     exchangeFrom: s.exchangeReturn?.sale
-      ? { saleId: s.exchangeReturn.sale.id, receiptNumber: s.exchangeReturn.sale.receiptNumber, creditTjs: s.exchangeReturn.creditTjs, creditUsd: s.exchangeReturn.creditUsd }
+      ? { saleId: s.exchangeReturn.sale.id, receiptNumber: s.exchangeReturn.sale.receiptNumber, creditTjs: s.exchangeReturn.creditTjs, creditUsd: s.exchangeReturn.creditUsd, withheldTjs: s.exchangeReturn.withheldTjs ?? 0 }
       : undefined,
     status: s.status,
     hasBelowCostItem: s.hasBelowCostItem,
@@ -178,6 +179,7 @@ export function mapSale(s: any, names: NameLookup): Sale {
     penaltyFeeUsd: s.penaltyFeeUsd ?? undefined,
     actualRefundAmountTjs: s.actualRefundAmountTjs ?? undefined,
     actualRefundUsd: s.actualRefundUsd ?? undefined,
+    isCancelled: Boolean(s.isCancelled),
   };
 }
 
