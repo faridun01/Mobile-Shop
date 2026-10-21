@@ -12,6 +12,7 @@ playwright-report/
 !.env.native.example
 
 # Local artifacts: DB backups, perf/QA outputs, Playwright CLI snapshots
+backups/
 output/
 .playwright-cli/
 
