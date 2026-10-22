@@ -24,6 +24,7 @@ import {
 } from 'lucide-react';
 import { SaleEditForm, type SaleEditTarget } from '../sale/SaleEditForm';
 import { ExchangeBreakdownCard, ReceiptProfitTimeline } from '../sale/ExchangeBreakdownCard';
+import { originalSaleProfitUsd } from '../../utils/exchangeBreakdown';
 import { CustomSelect, CustomSelectOption } from '../ui/CustomSelect';
 import { formatRam, formatStorage, getPhoneColorHex, formatPhoneColor } from '../../utils/phoneSpecs';
 import { SearchBar } from '../ui/SearchBar';
@@ -324,6 +325,9 @@ export const SalesHistoryPage: React.FC = () => {
     revision: dataRefreshRevision,
   });
   const stripProfit = reportProfit ?? periodProfitSummary;
+
+  /** A record's business day as «23 окт» — the shift its money belongs to. */
+  const businessDay = (date: string) => formatBusinessDate(getBusinessDateKey(new Date(date)), false);
 
   const findByReceiptOrImei = (list: typeof sales, code: string) =>
     list.find(s => s.receiptNumber.toString() === code
@@ -1405,7 +1409,7 @@ export const SalesHistoryPage: React.FC = () => {
               <ExchangeBreakdownCard
                 sale={selectedSale}
                 isAdmin={isAdmin}
-                newSaleProfitUsd={isAdmin ? computeSaleProfit(selectedSale, Number(todayRate?.rate) || 0).profitUsd : undefined}
+                newSaleProfitUsd={isAdmin ? originalSaleProfitUsd(selectedSale) ?? computeSaleProfit(selectedSale, Number(todayRate?.rate) || 0).profitUsd : undefined}
                 onOpenReceipt={(receiptNumber) => { void openSaleByCode(String(receiptNumber), 'camera'); }}
               />
             )}
@@ -1432,9 +1436,16 @@ export const SalesHistoryPage: React.FC = () => {
                             <span className="font-mono font-semibold text-danger">{formatMoney(ret.payoutTjs)} TJS</span>
                           </div>
                         )}
-                        {ret.exchangeSaleId && (
+                        {(ret.exchangeSaleId || ret.payoutTjs > 0) && (
+                          // Which shift each sum belongs to: the payout leaves the register on the
+                          // return's day, while this receipt's own payment stays on its sale day.
                           <p className="text-fg-subtle leading-snug">
-                            Деньги клиенту не возвращались{ret.payoutTjs > 0 ? ` (кроме сдачи ${formatMoney(ret.payoutTjs)} TJS)` : ''}: {formatMoney(moneyNumber(decimal(ret.creditTjs).minus(ret.payoutTjs)))} TJS зачтены в новый чек. Оплата этого чека остаётся в смене {formatBusinessDate(getBusinessDateKey(new Date(selectedSale.date)), false)}.
+                            {ret.exchangeSaleId
+                              ? ret.payoutTjs > 0
+                                ? `Клиенту выдано ${formatMoney(ret.payoutTjs)} TJS из кассы смены ${businessDay(ret.date)}, ${formatMoney(moneyNumber(decimal(ret.creditTjs).minus(ret.payoutTjs)))} TJS зачтены в новый чек.`
+                                : `Деньги клиенту не возвращались: ${formatMoney(ret.creditTjs)} TJS зачтены в новый чек.`
+                              : `${formatMoney(ret.payoutTjs)} TJS выданы из кассы смены ${businessDay(ret.date)}.`}
+                            {` Оплата этого чека остаётся в смене ${businessDay(selectedSale.date)}.`}
                           </p>
                         )}
                         {ret.exchangeSaleId && (
@@ -1715,8 +1726,6 @@ export const SalesHistoryPage: React.FC = () => {
               })()}
             </div>
 
-            {isAdmin && <ReceiptProfitTimeline sale={selectedSale} />}
-
             {selectedSale.status === 'REFUNDED' && !selectedSale.returns?.length && (
               <div className="bg-danger/10 border border-danger/30 p-3 rounded-lg space-y-1.5 text-sm">
                 <p className="text-xs font-semibold text-danger tracking-wide">
@@ -1758,8 +1767,15 @@ export const SalesHistoryPage: React.FC = () => {
                     )}
                   </div>
                 </div>
+                {(selectedSale.actualRefundAmountTjs ?? selectedSale.totalTjs) > 0 && selectedSale.refundedAt && (
+                  <p className="text-xs text-fg-subtle leading-snug">
+                    {formatMoney(selectedSale.actualRefundAmountTjs ?? selectedSale.totalTjs)} TJS выданы из кассы смены {businessDay(selectedSale.refundedAt)}. Оплата этого чека остаётся в смене {businessDay(selectedSale.date)}.
+                  </p>
+                )}
               </div>
             )}
+
+            {isAdmin && <ReceiptProfitTimeline sale={selectedSale} />}
           </div>
         ) : dialogView === 'refund' && itemReturnMode ? (
           <div className="space-y-3.5">

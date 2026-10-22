@@ -69,6 +69,10 @@ export function computeSaleProfit(sale: Sale, fallbackExchangeRate: number = 0):
   if (hasReturns && recognized !== undefined) {
     // Returned phone by phone: the server's profit already reverses them and keeps what was withheld.
     profitUsd = recognized;
+  } else if (sale.status === 'REFUNDED' && recognized !== undefined && sale.refundProfitUsd !== undefined && sale.refundProfitUsd !== null) {
+    // A whole receipt refunded: its booked profit plus the refund day's change (the profit taken
+    // back, what was withheld and the rate result) — what the owners kept.
+    profitUsd = moneyNumber(decimal(recognized).plus(sale.refundProfitUsd));
   } else if (sale.status === 'REFUNDED') {
     profitUsd = Number(sale.penaltyFeeUsd) || 0;
   } else if (recognized !== undefined) {

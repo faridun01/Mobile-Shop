@@ -204,6 +204,7 @@ export function mapSale(s: any, names: NameLookup): Sale {
     penaltyFeeUsd: s.penaltyFeeUsd ?? undefined,
     actualRefundAmountTjs: s.actualRefundAmountTjs ?? undefined,
     actualRefundUsd: s.actualRefundUsd ?? undefined,
+    refundProfitUsd: s.refundProfitUsd ?? undefined,
     isCancelled: Boolean(s.isCancelled),
   };
 }

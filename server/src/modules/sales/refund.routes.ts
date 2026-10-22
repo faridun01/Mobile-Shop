@@ -1,4 +1,5 @@
 import { D } from '../../common/decimal';
+import { roundMoney } from '../../common/money';
 import type { Express } from 'express';
 import type { Prisma } from '@prisma/client';
 import { authenticateJwt, requireRoles, enforceStoreScope, type AuthenticatedRequest } from '../../auth/auth.middleware';
@@ -124,9 +125,16 @@ export function registerRefundRoutes(app: Express) {
         const liveLogs = activeRefundLogs(profits.get(sale.id) ?? []);
         const refundDetails = liveLogs.find((log) => log.action === 'REFUND')?.financialDetails as Record<string, unknown> | undefined;
         const actualRefundUsd = typeof refundDetails?.amountUsd === 'number' ? refundDetails.amountUsd : undefined;
+        // The owners' profit change on the day the whole receipt was refunded (its profit taken
+        // back, plus what was withheld and the rate result), as posted; ADMIN-only like all profit.
+        const refundAllocations = refundDetails?.ownerProfitAllocations;
+        const refundProfitUsd = showCost && Array.isArray(refundAllocations)
+          ? roundMoney(refundAllocations.reduce((sum: ReturnType<typeof D>, row: { amountUsd?: unknown }) => sum.plus(typeof row?.amountUsd === 'number' ? row.amountUsd : 0), D(0)))
+          : undefined;
         return hideSaleCosts({
           ...sale,
           actualRefundUsd,
+          refundProfitUsd,
           isCancelled: refundDetails?.isCancellation === true,
           saleItems: sale.saleItems.map((item: any) => ({
             ...item,

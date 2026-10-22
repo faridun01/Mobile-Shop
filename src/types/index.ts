@@ -304,6 +304,8 @@ export interface Sale {
   actualRefundAmountTjs?: number;
   /** Dollars handed back on the refund, at the refund day's rate. */
   actualRefundUsd?: number;
+  /** ADMIN-only: the owners' profit change on the day the whole receipt was refunded. */
+  refundProfitUsd?: number;
   isCancelled?: boolean;
 }
 

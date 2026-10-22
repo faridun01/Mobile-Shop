@@ -94,29 +94,52 @@ export function exchangeBreakdown(sale: Sale, newSaleProfitUsd?: number): Exchan
 }
 
 /**
+ * The profit a receipt booked on its own day, before any return took some of it back (ADMIN-only
+ * data). The server's recognized profit already includes each return's change (its goods' profit
+ * taken back, what was withheld and the rate result), so those are added back; a whole-receipt
+ * refund is not part of it.
+ */
+export function originalSaleProfitUsd(sale: Sale): number | undefined {
+  if (sale.recognizedProfitUsd === undefined || sale.recognizedProfitUsd === null) return undefined;
+  const returns = sale.returns ?? [];
+  if (returns.some((ret) => ret.reversedProfitUsd === undefined)) return undefined;
+  return moneyNumber(returns.reduce(
+    (acc, ret) => acc.plus(ret.reversedProfitUsd!).minus(ret.withheldUsd || 0).minus(ret.fxUsd || 0),
+    decimal(sale.recognizedProfitUsd),
+  ));
+}
+
+/**
  * A receipt's profit day by day once goods came back from it (ADMIN-only): the sale on its own
- * day, then each return taking its goods' profit back on the return's day, keeping what was
- * withheld and the rate result. The lines add up to the receipt's recognized profit.
+ * day, then each return — or the refund of the whole receipt — taking that profit back on its own
+ * day, keeping what was withheld and the rate result. The lines add up to what the owners kept.
  */
 export function receiptProfitTimeline(sale: Sale): { lines: ProfitLine[]; totalUsd: number } | null {
+  const original = originalSaleProfitUsd(sale);
+  if (original === undefined) return null;
   const returns = sale.returns ?? [];
-  if (!returns.length || sale.recognizedProfitUsd === undefined || sale.recognizedProfitUsd === null) return null;
-  if (returns.some((ret) => ret.reversedProfitUsd === undefined)) return null;
-  const recognized = moneyNumber(sale.recognizedProfitUsd);
-  const original = moneyNumber(returns.reduce(
-    (acc, ret) => acc.plus(ret.reversedProfitUsd!).minus(ret.withheldUsd || 0).minus(ret.fxUsd || 0),
-    decimal(recognized),
-  ));
   const lines: ProfitLine[] = [{ day: dayOf(sale.date, getBusinessDateKey()), label: 'Продажа', usd: original }];
-  for (const ret of returns) {
-    const day = dayOf(ret.date, getBusinessDateKey());
-    lines.push({
-      day,
-      label: ret.exchangeSaleId ? `Обмен (чек #${ret.exchangeReceiptNumber ?? ''}): прибыль отменена` : 'Возврат: прибыль отменена',
-      usd: -moneyNumber(ret.reversedProfitUsd!),
-    });
-    if ((ret.withheldUsd || 0) !== 0) lines.push({ day, label: 'Удержано с клиента', usd: moneyNumber(ret.withheldUsd) });
-    if ((ret.fxUsd || 0) !== 0) lines.push({ day, label: 'Разница курса при возврате', usd: moneyNumber(ret.fxUsd!) });
+  if (returns.length) {
+    for (const ret of returns) {
+      const day = dayOf(ret.date, getBusinessDateKey());
+      lines.push({
+        day,
+        label: ret.exchangeSaleId ? `Обмен (чек #${ret.exchangeReceiptNumber ?? ''}): прибыль отменена` : 'Возврат: прибыль отменена',
+        usd: -moneyNumber(ret.reversedProfitUsd!),
+      });
+      if ((ret.withheldUsd || 0) !== 0) lines.push({ day, label: 'Удержано с клиента', usd: moneyNumber(ret.withheldUsd) });
+      if ((ret.fxUsd || 0) !== 0) lines.push({ day, label: 'Разница курса при возврате', usd: moneyNumber(ret.fxUsd!) });
+    }
+    return { lines, totalUsd: moneyNumber(sale.recognizedProfitUsd!) };
   }
-  return { lines, totalUsd: recognized };
+  if (sale.status !== 'REFUNDED' || sale.refundProfitUsd === undefined || sale.refundProfitUsd === null) return null;
+  // The whole receipt refunded: its profit taken back on the refund's day, with what was withheld
+  // and whatever else the refund booked (the rate result).
+  const day = dayOf(sale.refundedAt, getBusinessDateKey());
+  const penalty = moneyNumber(sale.penaltyFeeUsd || 0);
+  const rest = moneyNumber(decimal(sale.refundProfitUsd).plus(original).minus(penalty));
+  lines.push({ day, label: sale.isCancelled ? 'Продажа отменена: прибыль отменена' : 'Возврат всего чека: прибыль отменена', usd: -original });
+  if (penalty !== 0) lines.push({ day, label: 'Удержано с клиента', usd: penalty });
+  if (rest !== 0) lines.push({ day, label: 'Разница курса при возврате', usd: rest });
+  return { lines, totalUsd: moneyNumber(decimal(original).plus(sale.refundProfitUsd)) };
 }

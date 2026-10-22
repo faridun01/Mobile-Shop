@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Sale } from '../types';
-import { exchangeBreakdown, receiptProfitTimeline } from './exchangeBreakdown';
+import { exchangeBreakdown, originalSaleProfitUsd, receiptProfitTimeline } from './exchangeBreakdown';
 
 const phone = (brand: string, model: string, salePriceTjs: number, salePriceUsd: number, costBasisUsd: number) => ({
   deviceId: model, imei: '1', brand, model, storage: '256 GB', color: 'Black', salePriceTjs, salePriceUsd, purchaseCostUsd: costBasisUsd, costBasisUsd,
@@ -79,5 +79,37 @@ describe('receipt profit timeline', () => {
     }))!;
     expect(t.lines.map((l) => l.usd)).toEqual([100, -100, 47.62, 26.14]);
     expect(t.totalUsd).toBe(73.76);
+  });
+});
+
+describe('whole-receipt refund and repeated exchange', () => {
+  it('a whole receipt refunded the next day: profit back on the refund day, withheld and rate result kept', () => {
+    // Sold 22 Oct for 5000 TJS at 10 ($500, profit $100); refunded 23 Oct at 10.5 with 500 TJS withheld.
+    const t = receiptProfitTimeline(sale({
+      date: '2026-10-22T06:00:00Z', status: 'REFUNDED', refundedAt: '2026-10-23T06:00:00Z',
+      recognizedProfitUsd: 100, refundProfitUsd: -28.57, penaltyFeeUsd: 47.62,
+    }))!;
+    expect(t.lines.map((l) => [l.day, l.label, l.usd])).toEqual([
+      ['2026-10-22', 'Продажа', 100],
+      ['2026-10-23', 'Возврат всего чека: прибыль отменена', -100],
+      ['2026-10-23', 'Удержано с клиента', 47.62],
+      ['2026-10-23', 'Разница курса при возврате', 23.81],
+    ]);
+    expect(t.totalUsd).toBe(71.43);
+  });
+
+  it('an exchange receipt exchanged again still shows its own sale at the profit it booked', () => {
+    // #42 (Poco, profit $65.83) was itself exchanged later: its recognized profit is now $0.
+    const chained = sale({
+      receiptNumber: 42, status: 'REFUNDED', items: [{ ...phone('Poco', 'M8', 2900, 311.83, 246), returnId: 'r2' }],
+      totalTjs: 2900, totalUsd: 311.83, cashAmountTjs: 200, exchangeTradeInCreditTjs: 2700, exchangeTradeInCreditUsd: 290.32,
+      recognizedProfitUsd: 0,
+      returns: [{ id: 'r2', date: '2026-10-24T06:00:00Z', reason: 'Обмен', withheldTjs: 0, withheldUsd: 0, creditTjs: 2900, creditUsd: 311.83,
+        payoutTjs: 0, payoutUsd: 0, exchangeSaleId: 'n3', exchangeReceiptNumber: 50, fxUsd: 0, reversedProfitUsd: 65.83 }],
+      exchangeFrom: { saleId: 'old', receiptNumber: 33, saleDate: '2026-10-21T06:10:03Z', date: '2026-10-22T06:59:32Z', goods: 'Honor X8d',
+        creditTjs: 2700, creditUsd: 290.32, withheldTjs: 0, withheldUsd: 0, bookedUsd: 290.32, fxUsd: 0, payoutTjs: 0, payoutUsd: 0, reversedProfitUsd: 15.32 },
+    });
+    expect(originalSaleProfitUsd(chained)).toBe(65.83);
+    expect(exchangeBreakdown(chained, originalSaleProfitUsd(chained))!.profit!.totalUsd).toBe(65.83);
   });
 });
