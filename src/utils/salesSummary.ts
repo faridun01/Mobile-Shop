@@ -10,10 +10,14 @@ export interface SalesSummary {
   totalUsd: number;
   cashUsd: number;
   cardUsd: number;
+  /** Part of the receipts' total paid with goods handed back in an exchange — no money moved for it that day. */
+  tradeInTjs: number;
+  tradeInUsd: number;
   refunded: number;
 }
 
-type SummarizedSale = Pick<Sale, 'status' | 'totalTjs' | 'cashAmountTjs' | 'cardAmountTjs'> & Partial<Pick<Sale, 'totalUsd' | 'exchangeRate'>>;
+type SummarizedSale = Pick<Sale, 'status' | 'totalTjs' | 'cashAmountTjs' | 'cardAmountTjs'>
+  & Partial<Pick<Sale, 'totalUsd' | 'exchangeRate' | 'exchangeTradeInCreditTjs' | 'exchangeTradeInCreditUsd'>>;
 
 /** A receipt's own rate: the one it was rung up at, or the one implied by its TJS and USD totals. */
 function saleRate(sale: SummarizedSale): number {
@@ -40,6 +44,8 @@ export function summarizeSales(sales: SummarizedSale[]): SalesSummary {
     totalUsd: moneyNumber(sumMoney(kept.map((s) => (s.totalUsd !== undefined && s.totalUsd !== null ? s.totalUsd : atOwnRate(s, s.totalTjs))))),
     cashUsd: moneyNumber(sumMoney(kept.map((s) => atOwnRate(s, s.cashAmountTjs)))),
     cardUsd: moneyNumber(sumMoney(kept.map((s) => atOwnRate(s, s.cardAmountTjs)))),
+    tradeInTjs: moneyNumber(sumMoney(kept.map((s) => s.exchangeTradeInCreditTjs || 0))),
+    tradeInUsd: moneyNumber(sumMoney(kept.map((s) => s.exchangeTradeInCreditUsd || 0))),
     refunded: sales.length - kept.length,
   };
 }

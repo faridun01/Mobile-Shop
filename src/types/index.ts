@@ -210,8 +210,37 @@ export interface SaleReturnInfo {
   payoutMethod?: 'CASH' | 'CARD';
   exchangeSaleId?: string;
   exchangeReceiptNumber?: number;
+  /** The return's own rate, the dollars the sale booked for these goods, and today's-rate result. */
+  exchangeRate?: number;
+  bookedUsd?: number;
+  fxUsd?: number;
+  /** ADMIN-only: the owner profit this return took back (booked on the sale's day). */
+  reversedProfitUsd?: number;
   /** Accessory units returned by this return. */
   accessoryLines?: { lineId: string; name: string; quantity: number; priceTjs: number; withheldTjs: number }[];
+}
+
+/** The return half of an exchange, as seen from the new receipt it paid for. */
+export interface ExchangeFromInfo {
+  saleId: string;
+  receiptNumber: number;
+  /** When the old receipt was sold, and when the exchange happened (the return's date). */
+  saleDate?: string;
+  date?: string;
+  /** The returned goods, e.g. "Honor X8d". */
+  goods?: string;
+  creditTjs: number;
+  creditUsd: number;
+  withheldTjs: number;
+  withheldUsd?: number;
+  /** Dollars the old receipt booked for the returned goods, and the rate result of taking them back. */
+  bookedUsd?: number;
+  fxUsd?: number;
+  /** Change handed to the customer when the new goods were cheaper. */
+  payoutTjs?: number;
+  payoutUsd?: number;
+  /** ADMIN-only: the returned goods' profit booked on the old day and taken back on the exchange. */
+  reversedProfitUsd?: number;
 }
 
 export interface ExchangeEvent {
@@ -263,7 +292,7 @@ export interface Sale {
   /** Returns of phones from this receipt. */
   returns?: SaleReturnInfo[];
   /** For a receipt opened by an exchange: the receipt the returned phone came from. */
-  exchangeFrom?: { saleId: string; receiptNumber: number; creditTjs: number; creditUsd: number; withheldTjs: number };
+  exchangeFrom?: ExchangeFromInfo;
   status: 'COMPLETED' | 'EXCHANGED' | 'REFUNDED';
   hasBelowCostItem?: boolean;
   exchangeEvents?: ExchangeEvent[];

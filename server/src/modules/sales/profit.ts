@@ -118,6 +118,31 @@ export function refundOwnerProfit(
   return Array.from(deltas, ([ownerId, amountUsd]) => ({ ownerId, amountUsd }));
 }
 
+/**
+ * The owner profit a return (or an exchange's return) took back, by its SALE_RETURN log id: the
+ * returned goods' profit booked on the sale's day. Read from the reversal actually posted (edits
+ * keep it current); a log without one falls back to the goods' booked profit.
+ */
+export function reversedProfitByReturn(logs: ProfitAuditRecord[]): Map<string, MoneyInput> {
+  const result = new Map<string, MoneyInput>();
+  for (const log of logs) {
+    if (log.action !== 'SALE_RETURN') continue;
+    const details = (log.financialDetails ?? {}) as {
+      saleReturnId?: unknown;
+      reversedAllocations?: { amountUsd?: unknown }[];
+      items?: { bookedProfitUsd?: unknown }[];
+      accessories?: { bookedProfitUsd?: unknown }[];
+    };
+    if (typeof details.saleReturnId !== 'string') continue;
+    const sum = (rows: { [key: string]: unknown }[] | undefined, key: string) =>
+      (rows ?? []).reduce((acc, row) => acc.plus(typeof row?.[key] === 'number' ? (row[key] as number) : 0), D(0));
+    result.set(details.saleReturnId, roundMoney(Array.isArray(details.reversedAllocations)
+      ? sum(details.reversedAllocations, 'amountUsd')
+      : sum(details.items, 'bookedProfitUsd').plus(sum(details.accessories, 'bookedProfitUsd'))));
+  }
+  return result;
+}
+
 export function calculateRecognizedProfit(logs: ProfitAuditRecord[], fallbackProfitUsd: MoneyInput) {
   let amount = D(0);
   let hasOriginal = false;

@@ -128,9 +128,10 @@ describe('PWAUpdateService', () => {
   it('a new version activated by another tab does not reload over unfinished work; it reloads once safe', () => {
     const reload = vi.fn();
     vi.stubGlobal('window', { location: { reload } });
-    const service = pwaUpdateService as unknown as { state: { isUpdating: boolean; hasUpdate: boolean; waitingWorker: unknown }; handleControllerChange: () => void };
+    const service = pwaUpdateService as unknown as { state: { isUpdating: boolean; hasUpdate: boolean; waitingWorker: unknown }; hadController: boolean; handleControllerChange: () => void };
     service.state.isUpdating = false;
     service.state.waitingWorker = null;
+    service.hadController = true;
     const safety = vi.spyOn(safetyModule, 'getUpdateSafetyAssessment').mockReturnValue({ safe: false, reason: 'Выполняется операция: Незавершённая продажа' });
 
     service.handleControllerChange();
@@ -139,6 +140,25 @@ describe('PWAUpdateService', () => {
 
     safety.mockReturnValue({ safe: true });
     expect(pwaUpdateService.trySafeAutoUpdate()).toBe(true);
+    expect(reload).toHaveBeenCalledTimes(1);
+  });
+
+  it('the first service worker claiming the page does not reload it (login form keeps what was typed)', () => {
+    const reload = vi.fn();
+    vi.stubGlobal('window', { location: { reload } });
+    const service = pwaUpdateService as unknown as { state: { isUpdating: boolean; hasUpdate: boolean }; hadController: boolean; reloadedForController: boolean; handleControllerChange: () => void };
+    service.state.isUpdating = false;
+    service.state.hasUpdate = false;
+    service.hadController = false;
+    service.reloadedForController = false;
+    vi.spyOn(safetyModule, 'getUpdateSafetyAssessment').mockReturnValue({ safe: true });
+
+    service.handleControllerChange();
+    expect(reload).not.toHaveBeenCalled();
+    expect(pwaUpdateService.getState().hasUpdate).toBe(false);
+
+    // A later version replacing that worker reloads as before.
+    service.handleControllerChange();
     expect(reload).toHaveBeenCalledTimes(1);
   });
 });

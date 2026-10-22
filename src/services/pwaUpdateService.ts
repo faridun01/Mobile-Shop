@@ -79,6 +79,7 @@ class PWAUpdateService {
 
     // 2. Hook into Service Worker registration if available
     if ('serviceWorker' in navigator) {
+      this.hadController = Boolean(navigator.serviceWorker.controller);
       this.setupServiceWorker();
     }
 
@@ -112,13 +113,20 @@ class PWAUpdateService {
   }
 
   private reloadedForController = false;
+  private hadController = false;
 
   /**
    * A new version took control of this page. Reload into it when this tab asked for the update
    * or holds no unfinished work; if another tab activated it while this one has a cart or form
    * in progress, keep the update pending and apply it once that work is done.
+   * The first worker ever installed (clientsClaim) only takes over a page that already runs its
+   * build, so that takeover reloads nothing: it would wipe what is being typed on the login form.
    */
   public handleControllerChange() {
+    if (!this.hadController) {
+      this.hadController = true;
+      return;
+    }
     if (this.reloadedForController) return;
     if (this.state.isUpdating || getUpdateSafetyAssessment().safe) {
       this.reloadedForController = true;

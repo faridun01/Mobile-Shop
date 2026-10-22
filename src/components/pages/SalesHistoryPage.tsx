@@ -1,6 +1,7 @@
 import { useDataRefreshRevision } from '../../hooks/useDataRefreshRevision';
+import { useSalesPeriodTotals } from '../../hooks/useSalesPeriodTotals';
 import { deviceCodeLabel } from '../../utils/deviceCode';
-import { formatMoney, splitUsdByTjs, sumMoney } from '../../utils/money';
+import { decimal, formatMoney, moneyNumber, splitUsdByTjs, sumMoney } from '../../utils/money';
 import { accessoryReturnPrice } from '../../utils/accessoryReturn';
 import React, { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -22,6 +23,7 @@ import {
   Pencil,
 } from 'lucide-react';
 import { SaleEditForm, type SaleEditTarget } from '../sale/SaleEditForm';
+import { ExchangeBreakdownCard, ReceiptProfitTimeline } from '../sale/ExchangeBreakdownCard';
 import { CustomSelect, CustomSelectOption } from '../ui/CustomSelect';
 import { formatRam, formatStorage, getPhoneColorHex, formatPhoneColor } from '../../utils/phoneSpecs';
 import { SearchBar } from '../ui/SearchBar';
@@ -37,7 +39,7 @@ import { useNavigationLayout } from '../../hooks/useNavigationLayout';
 import { Dialog } from '../ui/Dialog';
 import { StatusBanner, StatusMessage } from '../ui/StatusBanner';
 
-import { currentBusinessMonth, getBusinessDateKey, monthBounds } from '../../utils/businessDate';
+import { currentBusinessMonth, formatBusinessDate, getBusinessDateKey, monthBounds } from '../../utils/businessDate';
 import { summarizeSales } from '../../utils/salesSummary';
 import { computeSaleProfit, computeSaleItemProfit, saleWithheldTjs } from '../../utils/saleProfit';
 import { looksLikeDeviceCode, normalizeScanCode } from '../../utils/scanLookup';
@@ -299,6 +301,29 @@ export const SalesHistoryPage: React.FC = () => {
       costUsd: Math.round(totalCostUsd * 100) / 100,
     };
   }, [filteredSales, isAdmin, todayRate?.rate]);
+
+  // The shift's register total (one store, one day) and the period's profit as the report books
+  // it, so the totals above the list match the closing and the profit report.
+  const singleDay = periodFilter === 'TODAY'
+    ? getBusinessDateKey()
+    : periodFilter === 'CUSTOM' && selectedStartDate && (!selectedEndDate || selectedEndDate === selectedStartDate) ? selectedStartDate : undefined;
+  const [rangeStart, rangeEnd] = [selectedStartDate, selectedEndDate || selectedStartDate].sort();
+  const reportPeriodQuery = periodFilter === 'TODAY'
+    ? 'period=TODAY'
+    : periodFilter === 'MONTH' && selectedMonth
+      ? `period=SPECIFIC_MONTH&month=${selectedMonth}`
+      : periodFilter === 'CUSTOM' && selectedStartDate
+        ? `startDate=${rangeStart}&endDate=${rangeEnd}`
+        : undefined;
+  const { shift: shiftCash, profit: reportProfit } = useSalesPeriodTotals({
+    storeId: effectiveFetchStoreId,
+    businessDate: singleDay,
+    reportQuery: isAdmin && !searchQuery.trim() && reportPeriodQuery
+      ? `${reportPeriodQuery}${effectiveFetchStoreId ? `&storeId=${encodeURIComponent(effectiveFetchStoreId)}` : ''}`
+      : undefined,
+    revision: dataRefreshRevision,
+  });
+  const stripProfit = reportProfit ?? periodProfitSummary;
 
   const findByReceiptOrImei = (list: typeof sales, code: string) =>
     list.find(s => s.receiptNumber.toString() === code
@@ -623,70 +648,105 @@ export const SalesHistoryPage: React.FC = () => {
           ) : null}
         </div>
 
-        {filteredSales.length > 0 ? (
+        {filteredSales.length > 0 || (shiftCash && shiftCash.total.tjs !== 0) ? (
           <div className="flex items-center gap-1.5 text-[11px] text-fg-subtle overflow-x-auto pb-0.5 scrollbar-none" aria-label="Итоги за период">
-            <span className="px-2 py-0.5 rounded-md bg-surface-raised border border-border text-fg-muted font-medium shrink-0">
-              Чеков: <strong className="text-fg font-semibold">{periodSummary.receipts}</strong>
-            </span>
             {(() => {
               // Each receipt at its own day's dollars, as booked — never the period's TJS over today's rate.
               const { totalUsd, cashUsd, cardUsd } = periodSummary;
-
-              return isAdmin ? (
+              const chip = 'px-2 py-0.5 rounded-md bg-surface-raised border border-border shrink-0 font-mono';
+              const money = (tjs: number, usd: number, sign: '' | '−' = '') => isAdmin ? (
                 <>
-                  <span className="px-2 py-0.5 rounded-md bg-accent/10 border border-accent/20 text-accent font-bold shrink-0 font-mono">
-                    <span>${formatMoney(totalUsd)}</span>
-                    <span className="opacity-80 font-normal text-[10px] ml-1 font-sans">
-                      ({formatMoney(periodSummary.totalTjs)} TJS)
-                    </span>
-                  </span>
-
-                  <span className={cn(
-                    "px-2 py-0.5 rounded-md border font-bold shrink-0 font-mono flex items-center gap-1.5",
-                    periodProfitSummary.profitUsd >= 0
-                      ? "bg-emerald-500/15 border-emerald-500/30 text-emerald-400"
-                      : "bg-danger/15 border-danger/30 text-danger"
-                  )}>
-                    <span className="text-[10px] text-fg-subtle font-sans font-semibold">Прибыль:</span>
-                    <span>{periodProfitSummary.profitUsd >= 0 ? '+' : ''}${periodProfitSummary.profitUsd.toLocaleString()}</span>
-                    <span className="opacity-80 font-normal text-[10px]">({formatMoney(periodProfitSummary.profitTjs)} TJS)</span>
-                  </span>
-
-                  <span className="px-2 py-0.5 rounded-md bg-surface-raised border border-border shrink-0 font-mono">
-                    Нал: <strong className="text-fg-muted font-medium">${formatMoney(cashUsd)}</strong>
-                    <span className="text-[10px] opacity-75 font-normal ml-1 font-sans">
-                      ({formatMoney(periodSummary.cashTjs)} TJS)
-                    </span>
-                  </span>
-
-                  <span className="px-2 py-0.5 rounded-md bg-surface-raised border border-border shrink-0 font-mono">
-                    Банк: <strong className="text-fg-muted font-medium">${formatMoney(cardUsd)}</strong>
-                    <span className="text-[10px] opacity-75 font-normal ml-1 font-sans">
-                      ({formatMoney(periodSummary.cardTjs)} TJS)
-                    </span>
-                  </span>
+                  <strong className="font-medium">{sign}${formatMoney(Math.abs(usd))}</strong>
+                  <span className="text-[10px] opacity-75 font-normal ml-1 font-sans">({sign}{formatMoney(Math.abs(tjs))} TJS)</span>
                 </>
               ) : (
+                <strong className="font-medium">{sign}{formatMoney(Math.abs(tjs))} TJS</strong>
+              );
+              // One store and one day: the shift's own split, so the chips add up to the register
+              // total the closing will count. Otherwise the receipts' own cash and bank.
+              const parts = shiftCash?.parts;
+              return (
                 <>
+                  <span className="px-2 py-0.5 rounded-md bg-surface-raised border border-border text-fg-muted font-medium shrink-0">
+                    Чеков: <strong className="text-fg font-semibold">{periodSummary.receipts}</strong>
+                  </span>
+
+                  {shiftCash && (
+                    <span
+                      className="px-2 py-0.5 rounded-md bg-info/10 border border-info/25 text-info font-bold shrink-0 font-mono"
+                      title="Столько посчитает закрытие смены: наличные и банк, погашения долгов, минус возвраты и расходы из кассы. Деньги по чекам прошлых дней остаются в сменах тех дней."
+                    >
+                      <span className="text-[10px] font-sans font-semibold">Касса смены{shiftCash.closed ? ' (закрыта)' : ''}: </span>
+                      {money(shiftCash.total.tjs, shiftCash.total.usd, shiftCash.total.tjs < 0 ? '−' : '')}
+                    </span>
+                  )}
+
+                  <span className={cn(chip, 'text-fg-muted')} title={parts ? 'Наличные за смену магазина' : undefined}>
+                    Нал: {money(parts ? parts.cash.tjs : periodSummary.cashTjs, parts ? parts.cash.usd : cashUsd)}
+                  </span>
+                  <span className={cn(chip, 'text-fg-muted')} title={parts ? 'Банк и карты за смену магазина' : undefined}>
+                    Банк: {money(parts ? parts.bank.tjs : periodSummary.cardTjs, parts ? parts.bank.usd : cardUsd)}
+                  </span>
+                  {parts && parts.other.tjs !== 0 && (
+                    <span className={cn(chip, 'text-fg-muted')} title="Погашения долгов покупателей и другие поступления в кассу за смену">
+                      Погашения долгов: {money(parts.other.tjs, parts.other.usd)}
+                    </span>
+                  )}
+                  {parts && parts.refunds.tjs !== 0 && (
+                    <span
+                      className="px-2 py-0.5 rounded-md bg-danger/10 border border-danger/20 text-danger shrink-0 font-mono"
+                      title="Деньги, выданные покупателям за смену, в том числе по чекам прошлых дней. Список чеков — в закрытии смены."
+                    >
+                      Возвраты: {money(parts.refunds.tjs, parts.refunds.usd, parts.refunds.tjs > 0 ? '−' : '')}
+                      {parts.refundCount ? <span className="font-sans ml-1">({parts.refundCount} чек.)</span> : null}
+                    </span>
+                  )}
+                  {parts && parts.expenses.tjs !== 0 && (
+                    <span className="px-2 py-0.5 rounded-md bg-warning/10 border border-warning/25 text-warning shrink-0 font-mono" title="Расходы, оплаченные из кассы магазина за смену">
+                      Расходы: {money(parts.expenses.tjs, parts.expenses.usd, '−')}
+                    </span>
+                  )}
+
+                  {isAdmin && (
+                    <span
+                      className={cn(
+                        "px-2 py-0.5 rounded-md border font-bold shrink-0 font-mono flex items-center gap-1.5",
+                        stripProfit.profitUsd >= 0
+                          ? "bg-emerald-500/15 border-emerald-500/30 text-emerald-400"
+                          : "bg-danger/15 border-danger/30 text-danger"
+                      )}
+                      title={reportProfit
+                        ? 'Как в отчёте о прибыли: продажи периода, а также возвраты и обмены, сделанные в этот период, даже по чекам прошлых дней.'
+                        : 'Прибыль найденных чеков.'}
+                    >
+                      <span className="text-[10px] text-fg-subtle font-sans font-semibold">Прибыль:</span>
+                      <span>{stripProfit.profitUsd >= 0 ? '+' : '−'}${formatMoney(Math.abs(stripProfit.profitUsd))}</span>
+                      <span className="opacity-80 font-normal text-[10px]">({formatMoney(stripProfit.profitTjs)} TJS)</span>
+                    </span>
+                  )}
+
                   <span className="px-2 py-0.5 rounded-md bg-accent/10 border border-accent/20 text-accent font-bold shrink-0 font-mono">
-                    <span>{formatMoney(periodSummary.totalTjs)} TJS</span>
+                    <span className="text-[10px] font-sans font-semibold">Сумма чеков: </span>
+                    {money(periodSummary.totalTjs, totalUsd)}
                   </span>
 
-                  <span className="px-2 py-0.5 rounded-md bg-surface-raised border border-border shrink-0 font-mono">
-                    Нал: <strong className="text-fg-muted font-medium">{formatMoney(periodSummary.cashTjs)} TJS</strong>
-                  </span>
+                  {periodSummary.tradeInTjs > 0 && (
+                    <span
+                      className={cn(chip, 'text-fg-muted')}
+                      title="Часть суммы чеков оплачена сданным при обмене товаром. Эти деньги клиент заплатил раньше, в день старого чека."
+                    >
+                      Зачёт обменов: {money(periodSummary.tradeInTjs, periodSummary.tradeInUsd)}
+                    </span>
+                  )}
 
-                  <span className="px-2 py-0.5 rounded-md bg-surface-raised border border-border shrink-0 font-mono">
-                    Банк: <strong className="text-fg-muted font-medium">{formatMoney(periodSummary.cardTjs)} TJS</strong>
-                  </span>
+                  {periodSummary.refunded > 0 && (
+                    <span className="px-2 py-0.5 rounded-md bg-danger/10 border border-danger/20 text-danger font-medium shrink-0" title="Чеки из этого списка, по которым позже оформлен возврат">
+                      Чеков с возвратом: <strong>{periodSummary.refunded}</strong>
+                    </span>
+                  )}
                 </>
               );
             })()}
-            {periodSummary.refunded > 0 && (
-              <span className="px-2 py-0.5 rounded-md bg-danger/10 border border-danger/20 text-danger font-medium shrink-0">
-                Возвратов: <strong>{periodSummary.refunded}</strong>
-              </span>
-            )}
           </div>
         ) : null}
       </div>
@@ -1143,6 +1203,14 @@ export const SalesHistoryPage: React.FC = () => {
           <div className="space-y-4">
             <p className="text-base font-bold text-fg">Аннулировать чек #{selectedSale.receiptNumber}?</p>
             <p className="text-sm text-fg-muted">Продажа и все возвраты по этому чеку будут аннулированы. Товары останутся на складе магазина. Оплата, прибыль и долг по чеку будут отменены.</p>
+            {(selectedSale.exchangeFrom || selectedSale.returns?.some((ret) => ret.exchangeSaleId)) && (
+              <p className="text-sm font-semibold text-warning">
+                Чек связан с обменом: вместе с ним будет аннулирован {selectedSale.exchangeFrom
+                  ? `исходный чек #${selectedSale.exchangeFrom.receiptNumber}`
+                  : `чек обмена #${selectedSale.returns!.filter((ret) => ret.exchangeSaleId).map((ret) => ret.exchangeReceiptNumber).join(', #')}`}.
+                Все телефоны этих чеков вернутся на склад, а закрытые смены тех дней будут пересчитаны.
+              </p>
+            )}
             <p className="text-sm text-fg-muted">Администратор получит уведомление.</p>
             {status?.tone === 'error' && <p role="alert" className="text-sm text-danger">{status.text}</p>}
           </div>
@@ -1334,12 +1402,12 @@ export const SalesHistoryPage: React.FC = () => {
             })()}
 
             {selectedSale.exchangeFrom && (
-              <div className="p-3 rounded-xl border border-accent/30 bg-accent/10 text-xs flex items-center justify-between gap-2">
-                <span className="text-fg-muted">
-                  Обмен: оплачено зачётом по возврату из <strong>чека #{selectedSale.exchangeFrom.receiptNumber}</strong>
-                </span>
-                <span className="font-mono font-bold text-accent shrink-0">{formatMoney(selectedSale.exchangeFrom.creditTjs)} TJS</span>
-              </div>
+              <ExchangeBreakdownCard
+                sale={selectedSale}
+                isAdmin={isAdmin}
+                newSaleProfitUsd={isAdmin ? computeSaleProfit(selectedSale, Number(todayRate?.rate) || 0).profitUsd : undefined}
+                onOpenReceipt={(receiptNumber) => { void openSaleByCode(String(receiptNumber), 'camera'); }}
+              />
             )}
 
             {selectedSale.returns && selectedSale.returns.length > 0 && (
@@ -1363,6 +1431,11 @@ export const SalesHistoryPage: React.FC = () => {
                             <span className="text-fg-subtle">Выдано клиенту {ret.payoutMethod === 'CARD' ? 'на карту' : 'наличными'}</span>
                             <span className="font-mono font-semibold text-danger">{formatMoney(ret.payoutTjs)} TJS</span>
                           </div>
+                        )}
+                        {ret.exchangeSaleId && (
+                          <p className="text-fg-subtle leading-snug">
+                            Деньги клиенту не возвращались{ret.payoutTjs > 0 ? ` (кроме сдачи ${formatMoney(ret.payoutTjs)} TJS)` : ''}: {formatMoney(moneyNumber(decimal(ret.creditTjs).minus(ret.payoutTjs)))} TJS зачтены в новый чек. Оплата этого чека остаётся в смене {formatBusinessDate(getBusinessDateKey(new Date(selectedSale.date)), false)}.
+                          </p>
                         )}
                         {ret.exchangeSaleId && (
                           <button
@@ -1604,7 +1677,9 @@ export const SalesHistoryPage: React.FC = () => {
                         Чистая прибыль
                       </span>
                       <span className="text-[10px] text-fg-subtle">
-                        Себестоимость: ${saleProfit.costUsd.toLocaleString()}
+                        {selectedSale.status === 'REFUNDED'
+                          ? 'Товар вернулся на склад'
+                          : `Себестоимость: $${saleProfit.costUsd.toLocaleString()}${selectedSale.exchangeFrom ? ' · только этот чек' : ''}`}
                       </span>
                     </div>
                     <div className="text-right">
@@ -1639,6 +1714,8 @@ export const SalesHistoryPage: React.FC = () => {
                 );
               })()}
             </div>
+
+            {isAdmin && <ReceiptProfitTimeline sale={selectedSale} />}
 
             {selectedSale.status === 'REFUNDED' && !selectedSale.returns?.length && (
               <div className="bg-danger/10 border border-danger/30 p-3 rounded-lg space-y-1.5 text-sm">

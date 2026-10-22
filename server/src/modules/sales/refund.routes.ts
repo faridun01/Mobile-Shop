@@ -10,12 +10,17 @@ import { RefundService } from './refund.service';
 import { SaleEditService } from './edit.service';
 import { ReturnsService } from './returns.service';
 import { RealtimeSyncGateway } from '../../websocket/websocket.gateway';
-import { calculateRecognizedProfit } from './profit';
+import { calculateRecognizedProfit, reversedProfitByReturn } from './profit';
 import { hideSaleCosts } from './sale-visibility';
 import { deviceCodeCandidates } from '../../common/device-code';
 import { dateRangeForPeriod, dateRangeForCustomDates, type ReportPeriod } from '../reports/reports.service';
 
 const VALID_PERIODS: ReportPeriod[] = ['TODAY', 'MONTH', 'SPECIFIC_MONTH', 'ALL'];
+
+/** The names and quantities of accessory units an exchange took back, without their prices or costs. */
+const returnedLineNames = (lines: Prisma.JsonValue) => (Array.isArray(lines)
+  ? lines.map((line) => ({ name: String((line as { name?: unknown })?.name ?? ''), quantity: Number((line as { quantity?: unknown })?.quantity) || 0 }))
+  : []);
 
 export function registerRefundRoutes(app: Express) {
   app.get('/api/sales', authenticateJwt, enforceStoreScope, async (req: AuthenticatedRequest, res, next) => {
@@ -79,7 +84,14 @@ export function registerRefundRoutes(app: Express) {
           // Returns from this receipt (with the receipt an exchange went on to), and, for a
           // receipt opened by an exchange, the receipt the returned phone came from.
           returns: { orderBy: { createdAt: 'asc' }, include: { exchangeSale: { select: { id: true, receiptNumber: true } } } },
-          exchangeReturn: { select: { id: true, creditTjs: true, creditUsd: true, withheldTjs: true, createdAt: true, sale: { select: { id: true, receiptNumber: true } } } },
+          exchangeReturn: {
+            select: {
+              id: true, createdAt: true, exchangeRate: true, bookedUsd: true, fxUsd: true, accessoryLines: true,
+              creditTjs: true, creditUsd: true, withheldTjs: true, withheldUsd: true, payoutTjs: true, payoutUsd: true,
+              items: { select: { brand: true, model: true } },
+              sale: { select: { id: true, receiptNumber: true, createdAt: true, exchangeRate: true } },
+            },
+          },
           // Only the store's name is read (receipt header); not its full row with the cash balance.
           store: { select: { id: true, name: true, isMainWarehouse: true } },
           user: { select: { id: true, name: true, role: true } }
@@ -88,9 +100,11 @@ export function registerRefundRoutes(app: Express) {
         ...(search ? { take: 20 } : limit ? { take: limit } : {}),
       });
       const saleIds = sales.map((sale) => sale.id);
-      const profitLogs = saleIds.length
+      // An exchange receipt also needs the return log of the receipt its old goods came from.
+      const logSaleIds = [...new Set([...saleIds, ...sales.flatMap((sale) => (sale.exchangeReturn ? [sale.exchangeReturn.sale.id] : []))])];
+      const profitLogs = logSaleIds.length
         ? await prisma.auditLog.findMany({
-            where: { targetId: { in: saleIds }, action: { in: ['SALE', 'SALE_BELOW_COST', 'EXCHANGE', 'REFUND', 'SALE_RETURN', 'SALE_RETURN_CANCEL', 'REFUND_CANCEL'] } },
+            where: { targetId: { in: logSaleIds }, action: { in: ['SALE', 'SALE_BELOW_COST', 'EXCHANGE', 'REFUND', 'SALE_RETURN', 'SALE_RETURN_CANCEL', 'REFUND_CANCEL'] } },
             select: { id: true, targetId: true, action: true, financialDetails: true },
           })
         : [];
@@ -99,6 +113,10 @@ export function registerRefundRoutes(app: Express) {
       // Purchase cost and profit are ADMIN-only, the same rule /api/devices applies; store
       // staff get the receipt itself without them.
       const showCost = req.user!.role === 'ADMIN';
+      // The profit each return took back (booked on the sale's day), so a receipt can show its
+      // profit day by day; derived from cost, so ADMIN-only too.
+      const reversedByReturn = showCost ? reversedProfitByReturn(profitLogs) : new Map();
+      const reversedProfitUsd = (returnId: string) => reversedByReturn.get(returnId);
       res.json(sales.map((sale) => {
         const fallbackCost = sale.saleItems.reduce((sum, item) => D(sum).plus(item.costBasisUsd), D(0))
           .plus(sale.accessoryItems.reduce((sum, line) => D(sum).plus(line.costUsd), D(0)));
@@ -117,6 +135,10 @@ export function registerRefundRoutes(app: Express) {
           recognizedProfitUsd: showCost
             ? calculateRecognizedProfit(liveLogs, D(sale.totalUsd).minus(fallbackCost))
             : undefined,
+          returns: sale.returns.map((ret) => ({ ...ret, reversedProfitUsd: reversedProfitUsd(ret.id) })),
+          exchangeReturn: sale.exchangeReturn
+            ? { ...sale.exchangeReturn, accessoryLines: returnedLineNames(sale.exchangeReturn.accessoryLines), reversedProfitUsd: reversedProfitUsd(sale.exchangeReturn.id) }
+            : null,
         }, req.user!.role);
       }));
     } catch (error) {

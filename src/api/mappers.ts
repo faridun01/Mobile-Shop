@@ -1,4 +1,4 @@
-import type { AccessoryProduct, AccessoryStockItem, Device, DeviceTimelineEvent, Sale, SaleItem, ExchangeEvent, Supplier, SupplierInvoice, SupplierBonus, Expense, Owner, OwnerTransaction, TransferRequest, RepairTicket, User, Store, NotificationItem, AuditLogEntry, DailyRate, StoreReceipt } from '../types';
+import type { AccessoryProduct, AccessoryStockItem, Device, DeviceTimelineEvent, Sale, SaleItem, ExchangeEvent, ExchangeFromInfo, Supplier, SupplierInvoice, SupplierBonus, Expense, Owner, OwnerTransaction, TransferRequest, RepairTicket, User, Store, NotificationItem, AuditLogEntry, DailyRate, StoreReceipt } from '../types';
 import { translateExpenseText } from '../utils/expenseCategories';
 
 type NameLookup = Map<string, string>;
@@ -101,6 +101,29 @@ function mapExchangeEvent(e: any, names: NameLookup): ExchangeEvent {
   };
 }
 
+function mapExchangeFrom(r: any): ExchangeFromInfo {
+  const goods = [
+    ...(r.items || []).map((i: any) => `${i.brand ?? ''} ${i.model ?? ''}`.trim()),
+    ...(Array.isArray(r.accessoryLines) ? r.accessoryLines : []).map((l: any) => `${l.name} × ${l.quantity}`),
+  ].filter(Boolean).join(', ');
+  return {
+    saleId: r.sale.id,
+    receiptNumber: r.sale.receiptNumber,
+    saleDate: r.sale.createdAt ?? undefined,
+    date: r.createdAt ?? undefined,
+    goods: goods || undefined,
+    creditTjs: r.creditTjs,
+    creditUsd: r.creditUsd,
+    withheldTjs: r.withheldTjs ?? 0,
+    withheldUsd: r.withheldUsd ?? undefined,
+    bookedUsd: r.bookedUsd ?? undefined,
+    fxUsd: r.fxUsd ?? undefined,
+    payoutTjs: r.payoutTjs ?? undefined,
+    payoutUsd: r.payoutUsd ?? undefined,
+    reversedProfitUsd: r.reversedProfitUsd ?? undefined,
+  };
+}
+
 export function mapSale(s: any, names: NameLookup): Sale {
   return {
     id: s.id,
@@ -156,6 +179,10 @@ export function mapSale(s: any, names: NameLookup): Sale {
       payoutMethod: r.payoutMethod ?? undefined,
       exchangeSaleId: r.exchangeSaleId ?? undefined,
       exchangeReceiptNumber: r.exchangeSale?.receiptNumber ?? undefined,
+      exchangeRate: r.exchangeRate ?? undefined,
+      bookedUsd: r.bookedUsd ?? undefined,
+      fxUsd: r.fxUsd ?? undefined,
+      reversedProfitUsd: r.reversedProfitUsd ?? undefined,
       accessoryLines: Array.isArray(r.accessoryLines)
         ? r.accessoryLines.map((l: any) => ({
             lineId: l.lineId,
@@ -166,9 +193,7 @@ export function mapSale(s: any, names: NameLookup): Sale {
           }))
         : undefined,
     })),
-    exchangeFrom: s.exchangeReturn?.sale
-      ? { saleId: s.exchangeReturn.sale.id, receiptNumber: s.exchangeReturn.sale.receiptNumber, creditTjs: s.exchangeReturn.creditTjs, creditUsd: s.exchangeReturn.creditUsd, withheldTjs: s.exchangeReturn.withheldTjs ?? 0 }
-      : undefined,
+    exchangeFrom: s.exchangeReturn?.sale ? mapExchangeFrom(s.exchangeReturn) : undefined,
     status: s.status,
     hasBelowCostItem: s.hasBelowCostItem,
     exchangeEvents: (s.exchangeEvents || []).map((e: any) => mapExchangeEvent(e, names)),

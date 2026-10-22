@@ -22,7 +22,15 @@ describe('summarizeSales', () => {
     expect(summary).toMatchObject({ totalUsd: 2000, cashUsd: 1000, cardUsd: 1000 });
   });
 
+  it('separates the part of an exchange receipt paid with the returned goods', () => {
+    // Poco M8 for 2900 TJS: 2700 TJS credit for the Honor handed back, 200 TJS in cash.
+    const summary = summarizeSales([
+      { status: 'COMPLETED', totalTjs: 2900, totalUsd: 311.83, exchangeRate: 9.3, cashAmountTjs: 200, cardAmountTjs: 0, exchangeTradeInCreditTjs: 2700, exchangeTradeInCreditUsd: 290.32 },
+    ]);
+    expect(summary).toMatchObject({ totalTjs: 2900, cashTjs: 200, tradeInTjs: 2700, tradeInUsd: 290.32 });
+  });
+
   it('is all zero for an empty period', () => {
-    expect(summarizeSales([])).toEqual({ receipts: 0, totalTjs: 0, cashTjs: 0, cardTjs: 0, totalUsd: 0, cashUsd: 0, cardUsd: 0, refunded: 0 });
+    expect(summarizeSales([])).toEqual({ receipts: 0, totalTjs: 0, cashTjs: 0, cardTjs: 0, totalUsd: 0, cashUsd: 0, cardUsd: 0, tradeInTjs: 0, tradeInUsd: 0, refunded: 0 });
   });
 });

@@ -1,7 +1,19 @@
 import { D, moneyJson } from '../../common/decimal';
 import '../../common/decimal-test-setup';
 import { describe, expect, it } from 'vitest';
-import { allocateLikeBooked, allocateOwnerProfit, calculateRecognizedProfit, exchangeCostRestorations, refundOwnerProfit } from './profit';
+import { allocateLikeBooked, allocateOwnerProfit, calculateRecognizedProfit, exchangeCostRestorations, refundOwnerProfit, reversedProfitByReturn } from './profit';
+
+describe('profit a return took back', () => {
+  it('sums the posted reversal, falling back to the goods\' booked profit', () => {
+    const reversed = reversedProfitByReturn([
+      { action: 'SALE_RETURN', financialDetails: { saleReturnId: 'r1', reversedAllocations: [{ ownerId: 'a', amountUsd: 7.66 }, { ownerId: 'b', amountUsd: 7.66 }], items: [{ bookedProfitUsd: 99 }] } },
+      { action: 'SALE_RETURN', financialDetails: { saleReturnId: 'r2', items: [{ bookedProfitUsd: 10.5 }], accessories: [{ bookedProfitUsd: 2.25 }] } },
+      { action: 'SALE', financialDetails: { saleReturnId: 'r3', recognizedProfitUsd: 1 } },
+      { action: 'SALE_RETURN', financialDetails: { reversedAllocations: [] } },
+    ]);
+    expect(Object.fromEntries([...reversed].map(([id, usd]) => [id, D(usd).toNumber()]))).toEqual({ r1: 15.32, r2: 12.75 });
+  });
+});
 
 describe('recognized sale profit', () => {
   it('adds original sale and every exchange profit impact', () => {
