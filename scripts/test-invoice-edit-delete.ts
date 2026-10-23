@@ -156,6 +156,50 @@ await withDisposableApi('invoice_edit', async ({ db, call, env, login }) => {
   assert.equal(await db.supplierInvoice.count({ where: { id: c.id } }), 0);
   console.log('PASS: an unpaid invoice is repriced and deleted after a transfer; only the supplier debt changes');
 
+  // 7. A name typed wrong at receipt: "Samsung A5" instead of "A55", "Чехл" instead of "Чехол".
+  // Unsold units take the right name, a sold one keeps it on its receipt; no money moves.
+  prev = await snap();
+  const d = ok(await call('POST', '/purchases', {
+    supplierId: supplier.id, invoiceNumber: 'INV-D',
+    groups: [
+      { brand: 'Samsung', model: 'A5', ram: '8GB', storage: '256GB', color: 'Black', purchasePriceUsd: 300, items: [30, 31].map((i) => ({ imei: imei(i) })) },
+      { category: 'ACCESSORY', barcode: 'CASE-D', brand: 'Generic', name: 'Чехл', accessoryCategory: 'Чехлы', quantity: 5, purchasePriceUsd: 3 },
+    ],
+  }), 'purchase D').invoice;
+  const [soldA5, keptA5] = await db.device.findMany({ where: { purchaseInvoiceId: d.id }, orderBy: { imei: 'asc' } });
+  ok(await call('POST', '/transfers', { fromStoreId: central.id, toStoreId: 'store-siyoma', deviceIds: [soldA5.id] }), 'transfer D');
+  const saleD = ok(await call('POST', '/sales', { storeId: 'store-siyoma', paymentMethod: 'CASH', items: [{ deviceId: soldA5.id, salePriceTjs: 3500 }] }, { token: seller }), 'sale D');
+  const spec = (id: string, model: string) => ({ deviceId: id, brand: 'Samsung', model, ram: '8GB', storage: '256GB', color: 'Black' });
+  refused(await call('PUT', `/supplier-invoices/${d.id}`, { specs: [spec(soldA5.id, 'A55'), spec(keptA5.id, 'A55')] }), /уже продавался.*название/, 'renaming a sold phone');
+  refused(await call('PUT', `/supplier-invoices/${d.id}`, { specs: [spec(keptA5.id, '')] }), /бренд, модель/, 'an empty model');
+  const productD = await db.accessoryProduct.findUniqueOrThrow({ where: { barcode: 'CASE-D' } });
+  const contentsD = ok(await call('GET', `/supplier-invoices/${d.id}/contents`), 'contents D');
+  assert.equal(contentsD.accessories[0].nameEditable, true, 'the card only this invoice brought in can be renamed');
+  ok(await call('PUT', `/supplier-invoices/${d.id}`, {
+    specs: [spec(keptA5.id, 'A55')],
+    accessoryNames: [{ productId: productD.id, brand: 'Generic', name: 'Чехол A55', category: 'Чехлы' }],
+  }), 'rename');
+  assert.equal((await db.device.findUniqueOrThrow({ where: { id: keptA5.id } })).model, 'A55', 'the unsold phone has the right name');
+  assert.equal((await db.device.findUniqueOrThrow({ where: { id: soldA5.id } })).model, 'A5', 'the sold phone keeps its name');
+  assert.equal((await db.saleItem.findFirstOrThrow({ where: { saleId: saleD.id } })).model, 'A5', 'the receipt is unchanged');
+  assert.equal((await db.phoneCatalog.findUniqueOrThrow({ where: { tac: imei(31).slice(0, 8) } })).model, 'A55', 'the IMEI autofill learns the right name');
+  assert.deepEqual((await db.invoiceGroup.findMany({ where: { invoiceId: d.id }, orderBy: { model: 'asc' } })).map((g) => [g.model, g.quantity]), [['A5', 1], ['A55', 1]]);
+  assert.equal((await db.accessoryProduct.findUniqueOrThrow({ where: { id: productD.id } })).name, 'Чехол A55');
+  s = await snap(d.id);
+  assert.equal(s.total, 615, 'renaming does not change the invoice total');
+  assert.equal(s.cash, prev.cash);
+  assert.equal(s.debt.minus(prev.debt), 615);
+  // The same card received again on another invoice: its name is no longer this invoice's alone.
+  ok(await call('POST', '/purchases', {
+    supplierId: supplier.id, invoiceNumber: 'INV-E',
+    groups: [{ category: 'ACCESSORY', barcode: 'CASE-D', brand: 'Generic', name: 'Чехол A55', accessoryCategory: 'Чехлы', quantity: 2, purchasePriceUsd: 3 }],
+  }), 'purchase E');
+  assert.equal(ok(await call('GET', `/supplier-invoices/${d.id}/contents`), 'contents D again').accessories[0].nameEditable, false);
+  refused(await call('PUT', `/supplier-invoices/${d.id}`, { accessoryNames: [{ productId: productD.id, brand: 'Generic', name: 'Чехол', category: 'Чехлы' }] }), /других приходах/, 'renaming a shared card');
+  const renameLog = await db.auditLog.findFirstOrThrow({ where: { action: 'INVOICE_EDIT', targetId: d.id }, orderBy: { createdAt: 'desc' } });
+  assert.match(renameLog.details, /названия: .*A5 .*→ .*A55/);
+  console.log('PASS: a name typed wrong is fixed on unsold phones and on the invoice\'s own accessory card; receipts and money stay');
+
   // 6. Everything reconciles: owners, capital, customer debt.
   const audit = spawnSync(process.execPath, ['--import', 'tsx', 'scripts/check-owner-balances.ts'], { env, encoding: 'utf8', timeout: 60000 });
   assert.equal(audit.status, 0, audit.stdout + audit.stderr);

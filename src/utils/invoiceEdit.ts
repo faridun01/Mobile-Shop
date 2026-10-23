@@ -28,8 +28,13 @@ export interface InvoiceContentDevice {
 
 export interface InvoiceContentBatch {
   id: string;
+  /** The accessory card (one per barcode); a move to a store makes another batch of the same card. */
+  productId: string;
   brand: string;
   name: string;
+  category?: string;
+  /** Only this invoice brought the card in, so a typo in its name can be fixed here. */
+  nameEditable?: boolean;
   barcode: string;
   quantityReceived: number;
   quantityRemaining: number;
@@ -154,4 +159,50 @@ export function invoiceEditResult(
     debtAfter: moneyNumber(decimal(newTotal).minus(sumMoney([paid, -refund]))),
     prices, accessoryCosts, invalid,
   };
+}
+
+/** A model's name and specs as typed in the editor. */
+export interface DeviceSpecDraft { brand: string; model: string; ram: string; storage: string; color: string }
+export interface AccessoryNameDraft { brand: string; name: string; category: string }
+
+export const specDraftOf = (g: PriceGroup): DeviceSpecDraft => ({ brand: g.brand, model: g.model, ram: g.ram ?? '', storage: g.storage, color: g.color });
+
+const clean = (value: string) => value.trim().replace(/\s+/g, ' ');
+
+/**
+ * The renames to save: each edited model's new name on its units not sold yet (a sold one keeps
+ * its name on the receipt), each edited accessory card's new name. `invalid` lists the group keys
+ * or product ids missing a required field — the receipt's own rules for a phone or a tablet.
+ */
+export function renameChanges(
+  groups: PriceGroup[],
+  specDrafts: Record<string, DeviceSpecDraft>,
+  accessories: InvoiceContentBatch[],
+  nameDrafts: Record<string, AccessoryNameDraft>,
+) {
+  const specs: { deviceId: string; brand: string; model: string; ram: string | null; storage: string; color: string }[] = [];
+  const accessoryNames: { productId: string; brand: string; name: string; category: string }[] = [];
+  const invalid: string[] = [];
+  for (const group of groups) {
+    const draft = specDrafts[group.key];
+    if (!draft || !group.editable.length) continue;
+    const next = { brand: clean(draft.brand), model: clean(draft.model), ram: clean(draft.ram), storage: clean(draft.storage), color: clean(draft.color) };
+    const isTablet = group.devices[0]?.category === 'TABLET';
+    const missing = isTablet ? !next.brand || !next.model || !next.storage || !next.color : !next.brand || !next.model || !next.ram || !next.storage;
+    if (missing) { invalid.push(group.key); continue; }
+    const before = specDraftOf(group);
+    if ((Object.keys(next) as (keyof DeviceSpecDraft)[]).every((k) => next[k] === clean(before[k]))) continue;
+    for (const d of group.editable) specs.push({ deviceId: d.id, ...next, ram: next.ram || null });
+  }
+  const seen = new Set<string>();
+  for (const batch of accessories) {
+    const draft = nameDrafts[batch.productId];
+    if (!draft || !batch.nameEditable || seen.has(batch.productId)) continue;
+    seen.add(batch.productId);
+    const next = { brand: clean(draft.brand), name: clean(draft.name), category: clean(draft.category) };
+    if (!next.name || !next.category) { invalid.push(batch.productId); continue; }
+    if (next.brand === batch.brand && next.name === batch.name && next.category === (batch.category ?? '')) continue;
+    accessoryNames.push({ productId: batch.productId, ...next });
+  }
+  return { specs, accessoryNames, invalid };
 }

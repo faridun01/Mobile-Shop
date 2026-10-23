@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { groupInvoiceDevices, invoiceEditResult, parseUsd, type InvoiceContents, type InvoiceContentDevice } from './invoiceEdit';
+import { groupInvoiceDevices, invoiceEditResult, parseUsd, renameChanges, specDraftOf, type InvoiceContents, type InvoiceContentDevice } from './invoiceEdit';
 
 const device = (id: string, model: string, price: number, extra: Partial<InvoiceContentDevice> = {}): InvoiceContentDevice => ({
   id, brand: 'Samsung', model, ram: '8GB', storage: '256GB', color: 'Black', imei: `35${id}`, purchasePriceUsd: price,
@@ -15,7 +15,7 @@ const contents: InvoiceContents = {
     device('4', 'X8d', 300),
     device('5', 'X8d', 300),
   ],
-  accessories: [{ id: 'b1', brand: 'Generic', name: 'Чехол', barcode: 'C1', quantityReceived: 10, quantityRemaining: 10, unitCostUsd: 20, locked: null }],
+  accessories: [{ id: 'b1', productId: 'p1', brand: 'Generic', name: 'Чехол', category: 'Чехлы', nameEditable: true, barcode: 'C1', quantityReceived: 10, quantityRemaining: 10, unitCostUsd: 20, locked: null }],
   canDelete: false,
   deleteBlockReason: 'Часть телефонов из накладной уже продана',
 };
@@ -54,5 +54,31 @@ describe('invoice price editing', () => {
     expect(invoiceEditResult(contents, { [a55.key]: '0' }, { b1: 'abc' }).invalid).toEqual([a55.key, 'b1']);
     expect(parseUsd('12,5')).toBe(12.5);
     expect(parseUsd('1.234')).toBeNull();
+  });
+});
+
+describe('fixing names typed wrong at receipt', () => {
+  it('renames the unsold units of a model only, and only when something changed', () => {
+    const groups = groupInvoiceDevices(contents.devices);
+    const [a55] = groups;
+    expect(renameChanges(groups, { [a55.key]: specDraftOf(a55) }, contents.accessories, {}).specs).toEqual([]);
+    const r = renameChanges(groups, { [a55.key]: { ...specDraftOf(a55), model: ' A56  5G ' } }, contents.accessories, {});
+    // The sold unit (id 1) keeps its name on the receipt.
+    expect(r.specs.map((s) => [s.deviceId, s.model])).toEqual([['2', 'A56 5G'], ['3', 'A56 5G']]);
+    expect(r.invalid).toEqual([]);
+  });
+
+  it('asks for the fields a receipt requires', () => {
+    const groups = groupInvoiceDevices(contents.devices);
+    const [a55] = groups;
+    expect(renameChanges(groups, { [a55.key]: { ...specDraftOf(a55), ram: '' } }, contents.accessories, {}).invalid).toEqual([a55.key]);
+    expect(renameChanges(groups, {}, contents.accessories, { p1: { brand: '', name: '', category: 'Чехлы' } }).invalid).toEqual(['p1']);
+  });
+
+  it('renames an accessory card this invoice brought in, not one other invoices share', () => {
+    const draft = { p1: { brand: 'Generic', name: 'Чехол A55', category: 'Чехлы' } };
+    expect(renameChanges([], {}, contents.accessories, draft).accessoryNames).toEqual([{ productId: 'p1', brand: 'Generic', name: 'Чехол A55', category: 'Чехлы' }]);
+    const shared = contents.accessories.map((b) => ({ ...b, nameEditable: false }));
+    expect(renameChanges([], {}, shared, draft).accessoryNames).toEqual([]);
   });
 });

@@ -11,6 +11,7 @@ import type { OwnerProfitAllocation } from '../sales/profit';
 import { cancelTransaction, postTransaction } from '../finance/financial-transaction.service';
 import { allocateMoney } from '../../common/allocation';
 import { rememberPhones } from '../phone-catalog/phone-catalog.service';
+import { canonicalAccessoryCategory, linkTabletVariants } from '../catalog/catalog.service';
 import { syncStockAlerts } from '../stock-thresholds/stock-alerts';
 
 /** True if any of these devices has a sale, transfer, or repair record referencing it (hard FK, no cascade). */
@@ -150,6 +151,84 @@ async function recordSupplierAudit(tx: TransactionClient, actorId: string | unde
   const actor = await resolveActor(tx, actorId);
   await tx.auditLog.create({ data: { userId: actor.id, userName: actor.name, userRole: actor.role, action, targetId,
     details: action, financialDetails: moneyJson({ before, after }) } });
+}
+
+export interface DeviceSpecInput { deviceId: string; brand: string; model: string; ram?: string | null; storage: string; color: string }
+export interface AccessoryNameInput { productId: string; brand: string; name: string; category: string }
+
+const specText = (value: unknown) => String(value ?? '').trim().replace(/\s+/g, ' ');
+const specLabel = (d: { brand: string; model: string; ram?: string | null; storage: string; color: string }) =>
+  [d.brand, d.model, d.ram, d.storage, d.color].filter(Boolean).join(' ');
+
+/** The name and specs as typed, checked by the receipt's own rules for a phone or a tablet. */
+function deviceSpec(entry: DeviceSpecInput, category: string) {
+  const spec = { brand: specText(entry.brand), model: specText(entry.model), ram: specText(entry.ram) || null, storage: specText(entry.storage), color: specText(entry.color) };
+  if (category === 'TABLET') {
+    if (!spec.brand || !spec.model || !spec.storage || !spec.color) throw new Error('У планшета должны быть бренд, модель, встроенная память и цвет');
+  } else if (!spec.brand || !spec.model || !spec.ram || !spec.storage) {
+    throw new Error('У телефона должны быть бренд, модель, RAM и память');
+  }
+  return spec;
+}
+
+/** Accessory cards that some other invoice (or a receipt without one) also brought in. */
+async function productsOnOtherInvoices(tx: TransactionClient, invoiceId: string, productIds: string[]) {
+  if (!productIds.length) return new Set<string>();
+  const other = await tx.accessoryBatch.findMany({
+    where: { productId: { in: productIds }, OR: [{ purchaseInvoiceId: { not: invoiceId } }, { purchaseInvoiceId: null }] },
+    select: { productId: true },
+    distinct: ['productId'],
+  });
+  return new Set(other.map((b) => b.productId));
+}
+
+/**
+ * Fixes names typed wrong at receipt. A device that was ever sold keeps the name on its receipt
+ * and in the reports, so only units not sold yet change (as with prices); the IMEI catalog and
+ * the tablet variants learn the right name. An accessory card is renamed only when this invoice
+ * alone brought it in. Money does not move. Returns the changes for the audit log.
+ */
+async function renameInvoiceItems(tx: TransactionClient, invoiceId: string, specs: DeviceSpecInput[], accessoryNames: AccessoryNameInput[]) {
+  const renames = new Set<string>();
+  if (specs.length) {
+    const devices = await tx.device.findMany({ where: { purchaseInvoiceId: invoiceId } });
+    const byId = new Map(devices.map((d) => [d.id, d]));
+    const sold = await everSoldDevices(tx, devices.map((d) => d.id));
+    const renamed: (typeof devices)[number][] = [];
+    for (const entry of specs) {
+      const device = byId.get(entry.deviceId);
+      if (!device) throw new Error('Устройство не относится к этой накладной');
+      const spec = deviceSpec(entry, device.category);
+      if (specLabel(spec) === specLabel(device)) continue;
+      if (sold.has(device.id)) throw new Error(`${device.brand} ${device.model} (${device.category === 'TABLET' ? 'SN' : 'IMEI'} ${device.imei}) уже продавался — его название в чеке не меняется`);
+      await tx.device.update({ where: { id: device.id }, data: spec });
+      renamed.push({ ...device, ...spec });
+      renames.add(`${specLabel(device)} → ${specLabel(spec)}`);
+    }
+    if (renamed.length) {
+      await rememberPhones(tx, renamed);
+      await linkTabletVariants(tx, renamed);
+      await rebuildInvoiceGroups(tx, invoiceId);
+      // A minimum-stock rule is per model: the counts move to the right name.
+      await syncStockAlerts(tx, [...new Set(renamed.map((d) => d.storeId).filter((s): s is string => Boolean(s)))]);
+    }
+  }
+  if (accessoryNames.length) {
+    const own = new Set((await tx.accessoryBatch.findMany({ where: { purchaseInvoiceId: invoiceId }, select: { productId: true } })).map((b) => b.productId));
+    const shared = await productsOnOtherInvoices(tx, invoiceId, [...own]);
+    for (const entry of accessoryNames) {
+      if (!own.has(entry.productId)) throw new Error('Аксессуар не относится к этой накладной');
+      const product = await tx.accessoryProduct.findUniqueOrThrow({ where: { id: entry.productId } });
+      const next = { brand: specText(entry.brand), name: specText(entry.name), category: await canonicalAccessoryCategory(tx, specText(entry.category)) };
+      if (!next.name) throw new Error('Укажите название аксессуара');
+      if (!next.category) throw new Error('Укажите категорию аксессуара');
+      if (next.brand === product.brand && next.name === product.name && next.category === product.category) continue;
+      if (shared.has(entry.productId)) throw new Error(`«${product.name}» (штрихкод ${product.barcode}) есть и в других приходах — его название здесь не меняется`);
+      await tx.accessoryProduct.update({ where: { id: product.id }, data: next });
+      renames.add(`${[product.brand, product.name].filter(Boolean).join(' ')} → ${[next.brand, next.name].filter(Boolean).join(' ')}`);
+    }
+  }
+  return [...renames];
 }
 
 export class SuppliersService {
@@ -694,9 +773,10 @@ export class SuppliersService {
     // A move to another store splits a batch: the units go to a new batch there, same invoice and cost.
     const batches = await prisma.accessoryBatch.findMany({
       where: { purchaseInvoiceId: id },
-      include: { product: { select: { brand: true, name: true, barcode: true } }, store: { select: { name: true } } },
+      include: { product: { select: { id: true, brand: true, name: true, barcode: true, category: true } }, store: { select: { name: true } } },
       orderBy: { createdAt: 'asc' },
     });
+    const sharedProducts = await productsOnOtherInvoices(prisma as unknown as TransactionClient, id, batches.map((b) => b.productId));
     const deleteBlock = sold.size
       ? 'Часть телефонов из накладной уже продана'
       : repaired.size || devices.some((d) => d.status === 'IN_REPAIR')
@@ -718,7 +798,9 @@ export class SuppliersService {
         locked: sold.has(d.id) ? 'SOLD' : d.isBonus ? 'BONUS' : null,
       })),
       accessories: batches.map((b) => ({
-        id: b.id, brand: b.product.brand, name: b.product.name, barcode: b.product.barcode,
+        id: b.id, productId: b.productId, brand: b.product.brand, name: b.product.name, barcode: b.product.barcode, category: b.product.category,
+        // Its card is this invoice's own: a typo in its name can be fixed here.
+        nameEditable: !sharedProducts.has(b.productId),
         quantityReceived: b.quantityReceived, quantityRemaining: b.quantityRemaining, unitCostUsd: b.unitCostUsd,
         storeName: b.store.name,
         locked: batchUntouched(b) ? null : 'MOVED',
@@ -743,6 +825,10 @@ export class SuppliersService {
       totalAmountUsd?: MoneyInput;
       prices?: { deviceId: string; purchasePriceUsd: MoneyInput }[];
       accessoryCosts?: { batchId: string; unitCostUsd: MoneyInput }[];
+      /** A wrong brand, model or specs typed at receipt, fixed on the units not sold yet. */
+      specs?: DeviceSpecInput[];
+      /** A wrong accessory card name: only for a card that only this invoice brought in. */
+      accessoryNames?: AccessoryNameInput[];
     },
     actorId?: string,
   ) {
@@ -828,6 +914,8 @@ export class SuppliersService {
         }
       }
 
+      const renames = await renameInvoiceItems(tx, id, input.specs ?? [], input.accessoryNames ?? []);
+
       let refundUsd = D(0);
       if (!diff.isZero()) {
         const oldTotal = D(invoice.totalAmountUsd);
@@ -870,9 +958,10 @@ export class SuppliersService {
             details: `Изменена накладная ${updated.invoiceNumber} (${invoice.supplier.name})`
               + (diff.isZero() ? '' : `: сумма $${invoice.totalAmountUsd} → $${updated.totalAmountUsd}`)
               + (priceChanges.length ? `; цены: ${priceChanges.map((c) => `${c.name} $${c.from} → $${c.to}`).join(', ')}` : '')
+              + (renames.length ? `; названия: ${renames.join(', ')}` : '')
               + (refundUsd.gt(0) ? `; переплата $${refundUsd} возвращена в Центральную кассу` : '')
               + (!diff.isZero() && refundUsd.isZero() ? `; долг по накладной $${debtNow}` : ''),
-            financialDetails: moneyJson({ before: invoice, after: updated, diffUsd: diff, refundUsd, priceChanges }),
+            financialDetails: moneyJson({ before: invoice, after: updated, diffUsd: diff, refundUsd, priceChanges, renames }),
           },
         });
       }

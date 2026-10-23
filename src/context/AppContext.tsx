@@ -196,6 +196,9 @@ interface AppContextType {
     invoiceNumber?: string; date?: string; totalAmountUsd?: number;
     prices?: { deviceId: string; purchasePriceUsd: number }[];
     accessoryCosts?: { batchId: string; unitCostUsd: number }[];
+    /** Names typed wrong at receipt (units not sold yet; accessory cards of this invoice only). */
+    specs?: { deviceId: string; brand: string; model: string; ram: string | null; storage: string; color: string }[];
+    accessoryNames?: { productId: string; brand: string; name: string; category: string }[];
   }) => Promise<{ success: boolean; message?: string; refundUsd?: number }>;
   deleteSupplierInvoice: (id: string) => Promise<{ success: boolean; message?: string; refundUsd?: number }>;
 

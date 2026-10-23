@@ -57,7 +57,7 @@ export async function linkTabletVariants(tx: Db, units: TabletUnit[]) {
  * A new card's category in the spelling the catalog already uses, so one category never splits
  * into several for filtering: spaces are collapsed and "чехол" becomes an existing "Чехол".
  */
-async function canonicalAccessoryCategory(tx: Db, raw: string) {
+export async function canonicalAccessoryCategory(tx: Db, raw: string) {
   const category = raw.trim().replace(/\s+/g, ' ');
   if (!category) return category;
   const existing = await tx.accessoryProduct.findFirst({

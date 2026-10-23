@@ -240,6 +240,13 @@ export function registerSupplierRoutes(app: Express) {
         totalAmountUsd: body.totalAmountUsd,
         prices: Array.isArray(body.prices) ? body.prices.map((p: any) => ({ deviceId: String(p?.deviceId ?? ''), purchasePriceUsd: p?.purchasePriceUsd })) : undefined,
         accessoryCosts: Array.isArray(body.accessoryCosts) ? body.accessoryCosts.map((a: any) => ({ batchId: String(a?.batchId ?? ''), unitCostUsd: a?.unitCostUsd })) : undefined,
+        specs: Array.isArray(body.specs) ? body.specs.map((x: any) => ({
+          deviceId: String(x?.deviceId ?? ''), brand: String(x?.brand ?? ''), model: String(x?.model ?? ''),
+          ram: x?.ram == null ? null : String(x.ram), storage: String(x?.storage ?? ''), color: String(x?.color ?? ''),
+        })) : undefined,
+        accessoryNames: Array.isArray(body.accessoryNames) ? body.accessoryNames.map((x: any) => ({
+          productId: String(x?.productId ?? ''), brand: String(x?.brand ?? ''), name: String(x?.name ?? ''), category: String(x?.category ?? ''),
+        })) : undefined,
       }, req.user!.userId);
       RealtimeSyncGateway.broadcast('INVENTORY_UPDATE', {});
       // A repriced invoice can move the supplier's debt and the Central Cash.
