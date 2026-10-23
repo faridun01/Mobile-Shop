@@ -691,7 +691,12 @@ export class SuppliersService {
     });
     const sold = await everSoldDevices(prisma as unknown as TransactionClient, devices.map((d) => d.id));
     const repaired = new Set((await prisma.repairTicket.findMany({ where: { deviceId: { in: devices.map((d) => d.id) } }, select: { deviceId: true } })).map((r) => r.deviceId));
-    const batches = await prisma.accessoryBatch.findMany({ where: { purchaseInvoiceId: id }, include: { product: { select: { brand: true, name: true, barcode: true } } } });
+    // A move to another store splits a batch: the units go to a new batch there, same invoice and cost.
+    const batches = await prisma.accessoryBatch.findMany({
+      where: { purchaseInvoiceId: id },
+      include: { product: { select: { brand: true, name: true, barcode: true } }, store: { select: { name: true } } },
+      orderBy: { createdAt: 'asc' },
+    });
     const deleteBlock = sold.size
       ? 'Часть телефонов из накладной уже продана'
       : repaired.size || devices.some((d) => d.status === 'IN_REPAIR')
@@ -715,6 +720,7 @@ export class SuppliersService {
       accessories: batches.map((b) => ({
         id: b.id, brand: b.product.brand, name: b.product.name, barcode: b.product.barcode,
         quantityReceived: b.quantityReceived, quantityRemaining: b.quantityRemaining, unitCostUsd: b.unitCostUsd,
+        storeName: b.store.name,
         locked: batchUntouched(b) ? null : 'MOVED',
       })),
       canDelete: deleteBlock === null,

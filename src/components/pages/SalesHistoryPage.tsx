@@ -295,8 +295,8 @@ export const SalesHistoryPage: React.FC = () => {
     };
   }, [filteredSales, isAdmin, todayRate?.rate]);
 
-  // The shift's register total (one store, one day) and the period's profit as the report books
-  // it, so the totals above the list match the closing and the profit report.
+  // The shift's register total for one day (one store, or every store added up) and the period's
+  // profit as the report books it, so the totals above the list match the closing and the report.
   const singleDay = periodFilter === 'TODAY'
     ? getBusinessDateKey()
     : periodFilter === 'CUSTOM' && selectedStartDate && (!selectedEndDate || selectedEndDate === selectedStartDate) ? selectedStartDate : undefined;
@@ -308,8 +308,10 @@ export const SalesHistoryPage: React.FC = () => {
       : periodFilter === 'CUSTOM' && selectedStartDate
         ? `startDate=${rangeStart}&endDate=${rangeEnd}`
         : undefined;
+  const retailStoreIds = useMemo(() => retailStores.map((s) => s.id), [retailStores]);
   const { shift: shiftCash, profit: reportProfit } = useSalesPeriodTotals({
     storeId: effectiveFetchStoreId,
+    allStoreIds: effectiveFetchStoreId ? undefined : retailStoreIds,
     businessDate: singleDay,
     reportQuery: isAdmin && !searchQuery.trim() && reportPeriodQuery
       ? `${reportPeriodQuery}${effectiveFetchStoreId ? `&storeId=${encodeURIComponent(effectiveFetchStoreId)}` : ''}`
@@ -658,8 +660,9 @@ export const SalesHistoryPage: React.FC = () => {
               ) : (
                 <strong className="font-medium">{sign}{formatMoney(Math.abs(tjs))} TJS</strong>
               );
-              // One store and one day: the shift's own split, so the chips add up to the register
-              // total the closing will count. Otherwise the receipts' own cash and bank.
+              // One day: the shift's own split (one store, or all stores added up), so the chips add up
+              // to the register total the closings will count. Several days: the receipts' own cash
+              // and bank, named so — they are not what a closing counts.
               const parts = shiftCash?.parts;
               return (
                 <>
@@ -672,16 +675,20 @@ export const SalesHistoryPage: React.FC = () => {
                       className="px-2 py-0.5 rounded-md bg-info/10 border border-info/25 text-info font-bold shrink-0 font-mono"
                       title="Столько посчитает закрытие смены: наличные и банк, погашения долгов, минус возвраты и расходы из кассы. Деньги по чекам прошлых дней остаются в сменах тех дней."
                     >
-                      <span className="text-[10px] font-sans font-semibold">Касса смены{shiftCash.closed ? ' (закрыта)' : ''}: </span>
+                      <span className="text-[10px] font-sans font-semibold">
+                        {shiftCash.stores > 1
+                          ? `Кассы смен (${shiftCash.stores} маг.${shiftCash.closed ? ', закрыты' : ''}): `
+                          : `Касса смены${shiftCash.closed ? ' (закрыта)' : ''}: `}
+                      </span>
                       {money(shiftCash.total.tjs, shiftCash.total.usd, shiftCash.total.tjs < 0 ? '−' : '')}
                     </span>
                   )}
 
-                  <span className={cn(chip, 'text-fg-muted')} title={parts ? 'Наличные за смену магазина' : undefined}>
-                    Нал: {money(parts ? parts.cash.tjs : periodSummary.cashTjs, parts ? parts.cash.usd : cashUsd)}
+                  <span className={cn(chip, 'text-fg-muted')} title={parts ? 'Наличные за смену' : 'Наличные, полученные по этим чекам (без возвратов и выдач по чекам прошлых дней)'}>
+                    {parts ? 'Нал' : 'Нал по чекам'}: {money(parts ? parts.cash.tjs : periodSummary.cashTjs, parts ? parts.cash.usd : cashUsd)}
                   </span>
-                  <span className={cn(chip, 'text-fg-muted')} title={parts ? 'Банк и карты за смену магазина' : undefined}>
-                    Банк: {money(parts ? parts.bank.tjs : periodSummary.cardTjs, parts ? parts.bank.usd : cardUsd)}
+                  <span className={cn(chip, 'text-fg-muted')} title={parts ? 'Банк и карты за смену' : 'Банк и карты по этим чекам'}>
+                    {parts ? 'Банк' : 'Банк по чекам'}: {money(parts ? parts.bank.tjs : periodSummary.cardTjs, parts ? parts.bank.usd : cardUsd)}
                   </span>
                   {parts && parts.other.tjs !== 0 && (
                     <span className={cn(chip, 'text-fg-muted')} title="Погашения долгов покупателей и другие поступления в кассу за смену">

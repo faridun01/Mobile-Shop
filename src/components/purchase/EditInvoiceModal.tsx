@@ -140,7 +140,7 @@ export const EditInvoiceModal: React.FC<EditInvoiceModalProps> = ({ invoice, onC
                         <p className="text-[11px] text-fg-subtle">{g.locations.map((l) => `${formatStoreName(l.name)} ${l.count} шт.`).join(' · ')}</p>
                       )}
                       {g.soldCount > 0 && (
-                        <p className="text-[11px] text-warning flex items-center gap-1"><Lock className="w-3 h-3" />Продано {g.soldCount} шт. — их цена ${formatMoney(g.price)} не меняется</p>
+                        <p className="text-[11px] text-warning flex items-center gap-1"><Lock className="w-3 h-3" />Уже продавались {g.soldCount} шт. — их цена ${formatMoney(g.price)} не меняется</p>
                       )}
                     </div>
                     {g.isBonus ? (
@@ -168,6 +168,7 @@ export const EditInvoiceModal: React.FC<EditInvoiceModalProps> = ({ invoice, onC
                   <div key={b.id} className="p-3 rounded-xl bg-surface-raised border border-border flex items-center justify-between gap-3">
                     <div className="min-w-0">
                       <p className="font-bold text-fg truncate">{[b.brand, b.name].filter(Boolean).join(' ')} <span className="font-normal text-fg-subtle">× {b.quantityReceived}</span></p>
+                      <p className="text-[11px] text-fg-subtle">{b.storeName ? `${formatStoreName(b.storeName)} · ` : ''}осталось {b.quantityRemaining} из {b.quantityReceived} шт.</p>
                       {b.locked && <p className="text-[11px] text-warning flex items-center gap-1"><Lock className="w-3 h-3" />Часть продана или перемещена — цена не меняется</p>}
                     </div>
                     {b.locked ? (

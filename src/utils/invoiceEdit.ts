@@ -34,6 +34,8 @@ export interface InvoiceContentBatch {
   quantityReceived: number;
   quantityRemaining: number;
   unitCostUsd: number;
+  /** Where this batch is: a move to another store makes a new batch there, same invoice and cost. */
+  storeName?: string;
   /** MOVED: some units were sold or moved, the cost stays. */
   locked: 'MOVED' | null;
 }
@@ -59,6 +61,7 @@ export interface PriceGroup {
   devices: InvoiceContentDevice[];
   /** Those whose price can still change. */
   editable: InvoiceContentDevice[];
+  /** Ever sold (also when returned since): the cost is in a booked sale. */
   soldCount: number;
   /** Where the units are now, e.g. Главный склад × 1, Сиёма × 2. */
   locations: { name: string; count: number }[];
