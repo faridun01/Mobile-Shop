@@ -61,6 +61,8 @@ describe('comprehensive Excel report', () => {
     expect(workbook.worksheets.map((sheet) => sheet.name)).toEqual(['Операции', 'Расходы', 'Итого']);
     const operations = workbook.getWorksheet('Операции')!;
     expect(operations.getCell('B5').value).toBe('Продажа');
+    // Written as the Dushanbe wall clock (10:00 UTC = 15:00), since Excel shows a date cell as is.
+    expect((operations.getCell('A5').value as Date).toISOString()).toBe('2026-09-09T15:00:00.000Z');
     expect(operations.getCell('C5').value).toBe(101);
     expect(operations.getCell('B6').value).toBe('Возврат (чек № 90)');
     expect(operations.getCell('G6').value).toBe(-95.24);
@@ -87,6 +89,17 @@ describe('comprehensive Excel report', () => {
 
   it('values an expense paid later at the dollars it was registered at', () => {
     expect(expenseRegisteredUsd(fixture.expenses[0])).toBe(20);
+  });
+});
+
+describe('exchange rows', () => {
+  it('names both halves of an exchange with the other receipt', async () => {
+    const { eventOperationLabel } = await import('./exportReports');
+    const base = fixture.events[0];
+    expect(eventOperationLabel({ ...base, kind: 'REFUND', receiptNumber: 3, exchangeReceiptNumber: 8 })).toBe('Обмен: возврат по чеку № 3 (новый чек № 8)');
+    expect(eventOperationLabel({ ...base, kind: 'SALE', receiptNumber: 8, exchangeReceiptNumber: 3 })).toBe('Обмен: новый чек (взамен № 3)');
+    expect(eventOperationLabel({ ...base, kind: 'REFUND', receiptNumber: 2, exchangeReceiptNumber: null })).toBe('Возврат (чек № 2)');
+    expect(eventOperationLabel(base)).toBe('Продажа');
   });
 });
 

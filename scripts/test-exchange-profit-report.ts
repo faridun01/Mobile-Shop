@@ -69,13 +69,15 @@ try {
   const ownersAccrued = async () => (await prisma.owner.findMany()).reduce((sum, o) => sum.plus(o.totalAccruedProfitUsd), D(0));
   const owners0 = await ownersAccrued();
 
-  // Yesterday (rate 10): Honor 5000 TJS ($500, cost $400 → +$100), Redmi 3000 TJS ($300, cost $250 → +$50). Shift closed.
+  // Yesterday (rate 10): Honor 5000 TJS ($500, cost $400 → +$100), Redmi 3000 TJS ($300, cost $250 → +$50),
+  // Galaxy 5000 TJS ($500, cost $400 → +$100). Shift closed.
   const honor = await yesterdaySale('Honor X8d', 5000, 400);
   const redmi = await yesterdaySale('Redmi 14', 3000, 250);
+  const galaxy = await yesterdaySale('Galaxy A35', 5000, 400);
   await DailyClosingService.closeDay(userId, { storeId, businessDate: yesterdayKey });
   const y0 = await report(yesterdayKey, yesterdayKey);
-  assert.equal(y0.profitUsd, 150);
-  assert.equal(await ownersAccrued(), owners0.plus(150));
+  assert.equal(y0.profitUsd, 250);
+  assert.equal(await ownersAccrued(), owners0.plus(250));
 
   // Today: 1) Honor → Poco 6000 TJS ($600, cost $480 → +$120).
   //        2) Redmi → Redmi C 3000 TJS (cost $260), 300 TJS withheld ($30): the new phone +$40, withheld +$30.
@@ -83,32 +85,45 @@ try {
   const poco = await exchange(honor, 'Poco M8', 6000, 480);
   await exchange(redmi, 'Redmi 14C', 3000, 260, 300);
   await exchange(poco, 'Samsung A55', 6500, 500);
+  // 4) A cheaper phone: Galaxy (5000 TJS) → Tecno 4000 TJS ($400, cost $300 → +$100); 1000 TJS change back.
+  const shiftBefore = await DailyClosingService.getSummary(storeId, todayKey);
+  const tecno = await exchange(galaxy, 'Tecno Camon', 4000, 300);
+  const shiftAfter = await DailyClosingService.getSummary(storeId, todayKey);
+  assert.equal(D(shiftAfter.refundsCashTjs).minus(shiftBefore.refundsCashTjs), 1000, 'the change leaves the register today');
+  assert.equal(D(shiftAfter.expectedCashTjs).minus(shiftBefore.expectedCashTjs), -1000);
+  assert.equal(D(shiftAfter.expectedCashUsd).minus(shiftBefore.expectedCashUsd), -100);
 
   // Yesterday is unchanged: its sales keep their profit.
   const y = await report(yesterdayKey, yesterdayKey);
-  assert.equal(y.profitUsd, 150, 'yesterday keeps its +$150');
-  assert.equal(y.revenueUsd, 800);
+  assert.equal(y.profitUsd, 250, 'yesterday keeps its +$250');
+  assert.equal(y.revenueUsd, 1300);
 
-  // Today: Honor −100, Poco +120, Poco −120, Samsung +150; Redmi −50, Redmi C +40, withheld +30 → +70.
+  // Today: Honor −100, Poco +120, Poco −120, Samsung +150; Redmi −50, Redmi C +40, withheld +30;
+  // Galaxy −100, Tecno +100 → +70.
   const t = await report(todayKey, todayKey);
   assert.equal(t.profitUsd, 70, 'today: what changed today, nothing twice');
+  // The cheaper exchange alone: the Galaxy's $100 taken back, the Tecno's $100 booked; revenue −$100 (the change).
+  const cheaper = t.events!.filter((e) => e.receiptNumber === galaxy.receiptNumber || e.receiptNumber === tecno.receiptNumber);
+  assert.deepEqual(cheaper.map((e) => [e.kind, D(e.profitUsd).toNumber(), D(e.amountUsd).toNumber()]), [['REFUND', -100, -500], ['SALE', 100, 400]]);
+  // Both halves name the other receipt, so the export labels them as one exchange.
+  assert.deepEqual(cheaper.map((e) => [e.receiptNumber, e.exchangeReceiptNumber]), [[galaxy.receiptNumber, tecno.receiptNumber], [tecno.receiptNumber, galaxy.receiptNumber]]);
   const todayEvents = t.events!.map((e) => `${e.kind} #${e.receiptNumber} ${e.profitUsd}`);
   console.log('today events:', todayEvents.join(' | '));
 
-  // Both days: only the phones still sold (Samsung +$150, Redmi C +$40) and the $30 withheld.
+  // Both days: only the phones still sold (Samsung +$150, Redmi C +$40, Tecno +$100) and the $30 withheld.
   const both = await report(yesterdayKey, todayKey);
-  assert.equal(both.profitUsd, 220, 'both days: +150 Samsung +40 Redmi C +30 withheld');
+  assert.equal(both.profitUsd, 320, 'both days: +150 Samsung +40 Redmi C +100 Tecno +30 withheld');
   assert.equal(both.profitUsd, D(y.profitUsd).plus(t.profitUsd), 'the two days add up to the period');
-  assert.equal(both.events!.reduce((s, e) => s.plus(e.profitUsd).plus(e.penaltyUsd), D(0)), 220, 'the events behind the report add up to it');
+  assert.equal(both.events!.reduce((s, e) => s.plus(e.profitUsd).plus(e.penaltyUsd), D(0)), 320, 'the events behind the report add up to it');
   const card = both.storeBreakdown.find((s: { storeId: string }) => s.storeId === storeId)!;
-  assert.equal(card.profitUsd, 220, 'the store card shows the same profit');
-  assert.equal(both.unitsSold, 2, 'two phones are still sold: Samsung and Redmi C');
+  assert.equal(card.profitUsd, 320, 'the store card shows the same profit');
+  assert.equal(both.unitsSold, 3, 'three phones are still sold: Samsung, Redmi C and Tecno');
   const models = Object.fromEntries(both.modelCounts.map((m: { name: string; count: number; profitUsd: unknown }) => [m.name, [m.count, D(m.profitUsd as number).toNumber()]]));
-  assert.deepEqual(models, { 'Тест Samsung A55': [1, 150], 'Тест Redmi 14C': [1, 40] }, 'returned phones are not in the model table');
+  assert.deepEqual(models, { 'Тест Samsung A55': [1, 150], 'Тест Tecno Camon': [1, 100], 'Тест Redmi 14C': [1, 40] }, 'returned phones are not in the model table');
   assert.equal(both.periodRefundPenaltiesUsd, 30);
 
-  // Owners got exactly the same: +$150 yesterday, +$70 today.
-  assert.equal(await ownersAccrued(), owners0.plus(220), 'owners accrued = report');
+  // Owners got exactly the same: +$250 yesterday, +$70 today.
+  assert.equal(await ownersAccrued(), owners0.plus(320), 'owners accrued = report');
   console.log(JSON.stringify({ yesterday: y.profitUsd, today: t.profitUsd, bothDays: both.profitUsd, owners: (await ownersAccrued()).minus(owners0) }));
   console.log('PASS: an exchange of yesterday\'s phone counts profit once — report, events, store card, models and owners agree');
 

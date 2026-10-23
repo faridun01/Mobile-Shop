@@ -1,4 +1,5 @@
 import { Expense } from '../types';
+import { BUSINESS_TIME_ZONE, businessWallClock } from './businessDate';
 
 /**
  * One dated row behind the report totals, as the server returns it (/reports/summary?events=1):
@@ -10,6 +11,8 @@ export interface ReportEventRow {
   date: string;
   saleId: string;
   receiptNumber: number | null;
+  /** Set on both halves of an exchange: the new receipt on the return, the old receipt on the new sale. */
+  exchangeReceiptNumber?: number | null;
   refundReason?: string | null;
   storeId: string;
   storeName: string;
@@ -71,6 +74,17 @@ const EVENT_LABELS: Record<ReportEventRow['kind'], string> = {
   EXCHANGE: 'Обмен',
   REFUND: 'Возврат',
 };
+
+/** What a row is: an exchange shows both its receipts, so it is not taken for a plain return. */
+export function eventOperationLabel(event: ReportEventRow): string {
+  const exchangeWith = event.exchangeReceiptNumber;
+  if (event.kind === 'REFUND') {
+    if (exchangeWith) return `Обмен: возврат по чеку № ${event.receiptNumber} (новый чек № ${exchangeWith})`;
+    return event.receiptNumber ? `Возврат (чек № ${event.receiptNumber})` : 'Возврат';
+  }
+  if (event.kind === 'SALE' && exchangeWith) return `Обмен: новый чек (взамен № ${exchangeWith})`;
+  return EVENT_LABELS[event.kind];
+}
 
 export interface ReportTable {
   headers: string[];
@@ -166,14 +180,11 @@ export function buildEventsReportTable(events: ReportEventRow[], cashBonusesUsd:
   ];
 
   const rows: (string | number)[][] = events.map((event) => {
-    const isRefund = event.kind === 'REFUND';
-    const operationLabel = isRefund
-      ? (event.receiptNumber ? `Возврат (чек № ${event.receiptNumber})` : 'Возврат')
-      : EVENT_LABELS[event.kind];
+    const operationLabel = eventOperationLabel(event);
     const receiptLabel = event.receiptNumber ? `Чек № ${event.receiptNumber}` : '';
 
     return [
-      new Date(event.date).toLocaleString('ru-RU'),
+      new Date(event.date).toLocaleString('ru-RU', { timeZone: BUSINESS_TIME_ZONE }),
       operationLabel,
       receiptLabel,
       event.storeName,
@@ -219,6 +230,7 @@ const XLSX_LIGHT = 'FFF1F5F9';
 const XLSX_BORDER = 'FFE2E8F0';
 const XLSX_WHITE = 'FFFFFFFF';
 const XLSX_RED = 'FFDC2626';
+const XLSX_BLUE = 'FF2563EB';
 const XLSX_MONEY_FORMAT = '#,##0.00;[Red](#,##0.00);-';
 /** A rate always has 2 decimals (it is set that way). */
 const RATE_FORMAT = '0.00';
@@ -337,7 +349,7 @@ export async function buildComprehensiveReportWorkbook({
   // OPERATIONS: sales, exchanges and refunds, each a fact of its own day.
   styleTitle(eventsSheet, 'L', 'Продажи, обмены и возвраты');
   eventsSheet.columns = [
-    { width: 19 }, { width: 12 }, { width: 10 }, { width: 20 }, { width: 11 }, { width: 17 },
+    { width: 19 }, { width: 44 }, { width: 10 }, { width: 20 }, { width: 11 }, { width: 17 },
     { width: 16 }, { width: 18 }, { width: 16 }, { width: 20 }, { width: 17 }, { width: 16 },
   ];
   const eventsHeader = eventsSheet.getRow(4);
@@ -348,11 +360,9 @@ export async function buildComprehensiveReportWorkbook({
   styleHeader(eventsHeader);
 
   for (const event of events) {
-    const isRefund = event.kind === 'REFUND';
-    const operationName = isRefund && event.receiptNumber ? `Возврат (чек № ${event.receiptNumber})` : EVENT_LABELS[event.kind];
     const row = eventsSheet.addRow([
-      new Date(event.date),
-      operationName,
+      businessWallClock(new Date(event.date)),
+      eventOperationLabel(event),
       event.receiptNumber ?? '',
       safeWorksheetText(event.storeName),
       Math.round(Number(event.rate) * 100) / 100,
@@ -373,6 +383,7 @@ export async function buildComprehensiveReportWorkbook({
     row.getCell(5).numFmt = RATE_FORMAT;
     for (let column = 6; column <= 12; column += 1) row.getCell(column).numFmt = XLSX_MONEY_FORMAT;
     if (event.kind === 'REFUND') row.getCell(2).font = { name: 'Calibri', size: 10, bold: true, color: { argb: XLSX_RED } };
+    else if (event.exchangeReceiptNumber) row.getCell(2).font = { name: 'Calibri', size: 10, bold: true, color: { argb: XLSX_BLUE } };
   }
   eventsSheet.autoFilter = { from: 'A4', to: 'L4' };
 
@@ -409,7 +420,7 @@ export async function buildComprehensiveReportWorkbook({
   expenses.forEach((expense, index) => {
     const amountUsd = expenseUsd[index];
     const row = expensesSheet.addRow([
-      new Date(expense.date),
+      businessWallClock(new Date(expense.date)),
       EXPENSE_CATEGORY_LABELS[expense.category] || expense.category,
       expense.targetType === 'BUSINESS' ? 'Бизнес' : 'Магазин',
       safeWorksheetText(expense.storeName, 'Весь бизнес'),
@@ -514,11 +525,11 @@ export async function buildComprehensiveReportWorkbook({
     row.font = { color: { argb: XLSX_MUTED } };
   }
   const noteRowNumber = reference[reference.length - 1].number + 2;
-  summarySheet.getCell(`A${noteRowNumber}`).value = 'Каждая операция записана по курсу своего дня и не пересчитывается. Возврат отражён в день возврата отдельной строкой. Чистая прибыль = прибыль с учётом возвратов − расходы. Бонусы — справочно: это не доход, их деньги хранятся на Бонусном счёте.';
+  summarySheet.getCell(`A${noteRowNumber}`).value = 'Каждая операция записана по курсу своего дня и не пересчитывается. Возврат отражён в день возврата отдельной строкой. Обмен — это две строки в день обмена: возврат старого чека (минус) и новый чек (плюс); прибыль старого телефона остаётся в дне продажи. Чистая прибыль = прибыль с учётом возвратов − расходы. Бонусы — справочно: это не доход, их деньги хранятся на Бонусном счёте.';
   summarySheet.mergeCells(`A${noteRowNumber}:B${noteRowNumber}`);
   summarySheet.getCell(`A${noteRowNumber}`).font = { italic: true, size: 9, color: { argb: XLSX_MUTED } };
   summarySheet.getCell(`A${noteRowNumber}`).alignment = { wrapText: true, vertical: 'top' };
-  summarySheet.getRow(noteRowNumber).height = 48;
+  summarySheet.getRow(noteRowNumber).height = 72;
 
   return workbook;
 }

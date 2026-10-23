@@ -37,6 +37,8 @@ type ProfitEvent = {
   storeId: string; revenueUsd: Prisma.Decimal; revenueTjs: Prisma.Decimal; profitUsd: Prisma.Decimal; bonusUsd: Prisma.Decimal; rate: MoneyInput;
   // What the row is, for the itemized export: each is a fact of its own day, never restated.
   kind: 'SALE' | 'EXCHANGE' | 'REFUND'; date: Date; saleId: string; receiptNumber?: number;
+  // The other receipt of an exchange: the new one on the old phone's return, the old one on the new sale.
+  exchangeReceiptNumber?: number;
   refundReason?: string | null;
   penaltyTjs?: Prisma.Decimal; penaltyUsd?: Prisma.Decimal;
 };
@@ -47,6 +49,8 @@ export interface ReportEvent {
   date: string;
   saleId: string;
   receiptNumber: number | null;
+  /** Set on both halves of an exchange: the new receipt on the return, the old receipt on the new sale. */
+  exchangeReceiptNumber: number | null;
   refundReason?: string | null;
   storeId: string;
   storeName: string;
@@ -193,6 +197,7 @@ export async function computeReportsSummary(input: ReportsSummaryInput) {
         id: true, storeId: true, createdAt: true, exchangeRate: true, reason: true, bookedUsd: true, fxUsd: true, accessoryLines: true,
         withheldTjs: true, withheldUsd: true, creditTjs: true, creditUsd: true, exchangeSaleId: true,
         sale: { select: { id: true, receiptNumber: true } },
+        exchangeSale: { select: { receiptNumber: true } },
         items: { select: { brand: true, model: true, salePriceTjs: true, salePriceUsd: true, costBasisUsd: true, isBonus: true } },
       },
       orderBy: { createdAt: 'asc' },
@@ -311,6 +316,8 @@ export async function computeReportsSummary(input: ReportsSummaryInput) {
   // Owners page and a closed month never changes when a sale is refunded later. Bonus-phone
   // profit is carried separately (bonusUsd) and is nobody's income: it is left out of profit.
   const profitEvents: ProfitEvent[] = [];
+  // An exchange's new receipt and its return are made together, so both are in the period.
+  const exchangedFromReceipt = new Map(periodReturns.filter((ret) => ret.exchangeSaleId).map((ret) => [ret.exchangeSaleId!, ret.sale.receiptNumber]));
   for (const sale of periodSalesAllStores) {
     const saleRate = sale.exchangeRate && D(sale.exchangeRate).gt(0) ? D(sale.exchangeRate) : rateOn(sale.createdAt);
     const original = originalSaleProfit(sale.id);
@@ -318,10 +325,12 @@ export async function computeReportsSummary(input: ReportsSummaryInput) {
       // Legacy sale without an audited original: reported whole (exchanges included), as before.
       const cost = sale.saleItems.reduce((sum, item) => D(sum).plus(item.costBasisUsd), D(0));
       profitEvents.push({ storeId: sale.storeId, revenueUsd: D(sale.totalUsd), revenueTjs: D(sale.totalTjs), profitUsd: roundMoney(D(sale.totalUsd).minus(cost)), bonusUsd: D(0), rate: saleRate,
-        kind: 'SALE', date: sale.createdAt, saleId: sale.id, receiptNumber: sale.receiptNumber });
+        kind: 'SALE', date: sale.createdAt, saleId: sale.id, receiptNumber: sale.receiptNumber,
+        exchangeReceiptNumber: exchangedFromReceipt.get(sale.id) });
     } else {
       profitEvents.push({
         kind: 'SALE', date: sale.createdAt, saleId: sale.id, receiptNumber: sale.receiptNumber,
+        exchangeReceiptNumber: exchangedFromReceipt.get(sale.id),
         storeId: sale.storeId,
         revenueUsd: D(detailNumber(original.details, 'amountUsd') ?? sale.totalUsd),
         revenueTjs: D(detailNumber(original.details, 'amountTjs') ?? sale.totalTjs),
@@ -403,6 +412,7 @@ export async function computeReportsSummary(input: ReportsSummaryInput) {
     refundsRevenueUsd = refundsRevenueUsd.plus(reversedRevenueUsd);
     profitEvents.push({
       kind: 'REFUND', date: ret.createdAt, saleId: ret.sale.id, receiptNumber: ret.sale.receiptNumber,
+      exchangeReceiptNumber: ret.exchangeSale?.receiptNumber,
       refundReason: ret.reason,
       penaltyTjs: D(ret.withheldTjs), penaltyUsd: D(ret.withheldUsd),
       storeId: ret.storeId,
@@ -706,6 +716,7 @@ export async function computeReportsSummary(input: ReportsSummaryInput) {
           date: event.date.toISOString(),
           saleId: event.saleId,
           receiptNumber: event.receiptNumber ?? null,
+          exchangeReceiptNumber: event.exchangeReceiptNumber ?? null,
           refundReason: event.refundReason ?? null,
           storeId: event.storeId,
           storeName: storeNames.get(event.storeId) ?? '',

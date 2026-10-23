@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { addMonths, currentBusinessMonth, getBusinessDateKey, monthBounds, resolveTimeZone, wholeMonthOf } from './businessDate';
+import { addMonths, businessWallClock, currentBusinessMonth, getBusinessDateKey, monthBounds, resolveTimeZone, wholeMonthOf } from './businessDate';
 
 describe('business month helpers', () => {
   it('gives the first and last day of any month, including leap February', () => {
@@ -34,5 +34,14 @@ describe('resolveTimeZone', () => {
     expect(resolveTimeZone('Europe/Moscow')).toBe('Europe/Moscow');
     expect(resolveTimeZone(undefined)).toBe('Asia/Tashkent');
     expect(resolveTimeZone('Not/AZone')).toBe('Asia/Tashkent');
+  });
+});
+
+describe('businessWallClock', () => {
+  it('holds the business zone wall-clock time in UTC fields, for Excel', () => {
+    // 11:57 UTC is 16:57 in Asia/Tashkent (UTC+5).
+    expect(businessWallClock(new Date('2026-10-22T11:57:00.000Z')).toISOString()).toBe('2026-10-22T16:57:00.000Z');
+    // A sale at 20:30 UTC already belongs to the next business day.
+    expect(businessWallClock(new Date('2026-10-22T20:30:00.000Z')).toISOString()).toBe('2026-10-23T01:30:00.000Z');
   });
 });

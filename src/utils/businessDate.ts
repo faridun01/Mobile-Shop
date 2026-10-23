@@ -30,6 +30,27 @@ export function getBusinessDateKey(date: Date = new Date()): string {
   return `${value('year')}-${value('month')}-${value('day')}`;
 }
 
+const BUSINESS_CLOCK_FORMAT = new Intl.DateTimeFormat('en-US', {
+  timeZone: BUSINESS_TIME_ZONE,
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+  hour: '2-digit',
+  minute: '2-digit',
+  second: '2-digit',
+  hourCycle: 'h23',
+});
+
+/**
+ * The business zone's wall-clock time as a Date whose UTC fields hold it. Excel has no time zones
+ * and shows a date cell's UTC time, so a 16:57 sale in Dushanbe must be written as 16:57 UTC.
+ */
+export function businessWallClock(date: Date): Date {
+  const parts = BUSINESS_CLOCK_FORMAT.formatToParts(date);
+  const value = (type: Intl.DateTimeFormatPartTypes) => Number(parts.find((part) => part.type === type)?.value);
+  return new Date(Date.UTC(value('year'), value('month') - 1, value('day'), value('hour'), value('minute'), value('second')));
+}
+
 /** 'YYYY-MM' of the current business day. */
 export function currentBusinessMonth(date: Date = new Date()): string {
   return getBusinessDateKey(date).slice(0, 7);

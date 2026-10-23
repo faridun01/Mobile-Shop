@@ -372,7 +372,7 @@ export const DailyCashClosingModal: React.FC<DailyCashClosingModalProps> = ({
         maxWidth="sm"
         footer={
           <div className="w-full flex flex-wrap items-center justify-between gap-2">
-            <div>
+            <div className="empty:hidden">
               {isAdmin && summary?.alreadyClosed && closing?.id && (
                 <Button
                   type="button"
@@ -388,7 +388,7 @@ export const DailyCashClosingModal: React.FC<DailyCashClosingModalProps> = ({
                 </Button>
               )}
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-1 sm:flex-none items-center justify-end gap-2">
               {canCloseShift && summary && !noRetailStores ? (
                 <>
                   <Button variant="secondary" onClick={onClose} disabled={submitting || reopening} className="flex-1 sm:flex-initial">
@@ -399,7 +399,7 @@ export const DailyCashClosingModal: React.FC<DailyCashClosingModalProps> = ({
                     loading={submitting}
                     disabled={loading || submitting || reopening}
                     leftIcon={CheckCircle2}
-                    className="flex-1 sm:flex-initial font-bold"
+                    className="flex-1 sm:flex-initial font-bold whitespace-nowrap"
                   >
                     Закрыть смену
                   </Button>
@@ -531,7 +531,7 @@ export const DailyCashClosingModal: React.FC<DailyCashClosingModalProps> = ({
                     <div className="space-y-0.5 flex-1">
                       <p className="font-bold">Повторное закрытие заблокировано</p>
                       <p className="text-[11px] opacity-90 leading-relaxed">
-                        Касса на сегодня уже закрыта. Повторное закрытие недоступно. Только администратор может отменить закрытие и переоткрыть смену.
+                        Смена за этот день уже закрыта. Повторное закрытие недоступно. Только администратор может отменить закрытие и переоткрыть смену.
                       </p>
                     </div>
                   </div>
