@@ -438,11 +438,18 @@ export async function computeReportsSummary(input: ReportsSummaryInput) {
   for (const cancellation of cancelledReturns) {
     const saved = (cancellation.financialDetails as { reportEvent?: CancelledReturnEvent } | null)?.reportEvent;
     if (!saved || annulledIds.has(saved.saleId) || (storeFilter && saved.storeId !== storeFilter)) continue;
+    // What the cancelled return handed out; the cancellation brought it back into the register.
+    const fd = cancellation.financialDetails as {
+      originalReturn?: { payoutTjs?: number };
+      originalRefund?: { actualRefundAmountTjs?: number | null; refundDetails?: { amountTjs?: number } };
+    } | null;
+    const payoutTjs = fd?.originalReturn?.payoutTjs ?? fd?.originalRefund?.refundDetails?.amountTjs ?? fd?.originalRefund?.actualRefundAmountTjs;
     const original: ProfitEvent = {
       kind: 'REFUND', storeId: saved.storeId, saleId: saved.saleId, receiptNumber: saved.receiptNumber,
       date: new Date(saved.originalDate), refundReason: saved.reason,
       revenueUsd: D(saved.revenueUsd), revenueTjs: D(saved.revenueTjs), profitUsd: D(saved.profitUsd),
       bonusUsd: D(saved.bonusUsd), rate: D(saved.rate), penaltyTjs: D(saved.penaltyTjs), penaltyUsd: D(saved.penaltyUsd),
+      cashTjs: payoutTjs == null ? null : D(payoutTjs).negated(),
     };
     if (dateWithinRange(original.date, dateRange)) profitEvents.push(original);
     if (dateWithinRange(cancellation.createdAt, dateRange)) profitEvents.push({
@@ -450,6 +457,7 @@ export async function computeReportsSummary(input: ReportsSummaryInput) {
       revenueUsd: original.revenueUsd.negated(), revenueTjs: original.revenueTjs.negated(),
       profitUsd: original.profitUsd.negated(), bonusUsd: original.bonusUsd.negated(),
       penaltyTjs: original.penaltyTjs!.negated(), penaltyUsd: original.penaltyUsd!.negated(),
+      cashTjs: original.cashTjs == null ? null : original.cashTjs.negated(),
     });
   }
   refundsRevenueUsd = profitEvents.filter((event) => event.kind === 'REFUND').reduce((sum, event) => sum.minus(event.revenueUsd), D(0));

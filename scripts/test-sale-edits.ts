@@ -260,6 +260,18 @@ try {
 
   // 11. Reports, owner balances, customer debt and capital all agree after every correction.
   const finalReport = await computeReportsSummary({ period: 'ALL', storeId, includeEvents: true });
+  // The report's «money of the customer» of each day, after every edit and cancellation, with the
+  // debts repaid and the expenses, is the day's shift total.
+  const { getBusinessDateKey } = await import('../server/src/common/business-date');
+  const days = [...new Set(finalReport.events!.map((e) => getBusinessDateKey(new Date(e.date))))];
+  for (const day of days) {
+    const events = finalReport.events!.filter((e) => getBusinessDateKey(new Date(e.date)) === day);
+    assert(events.every((e) => e.cashTjs !== null), `${day}: every row knows its money`);
+    const closingRow = await prisma.dailyCashClosing.findUnique({ where: { storeId_businessDate: { storeId, businessDate: day } } });
+    const shift = await DailyClosingService.getSummary(storeId, day, prisma, closingRow ? D(closingRow.exchangeRate!) : undefined, true, closingRow?.shortageExpenseId);
+    const money = events.reduce((sum, e) => sum.plus(e.cashTjs ?? 0), D(0));
+    assert.equal(money.plus(shift.otherCashTjs).minus(shift.expensesCashTjs), D(shift.expectedCashTjs), `${day}: customers' money + repaid − expenses = the shift`);
+  }
   const ownersProfit = (await prisma.owner.findMany()).reduce((sum, row) => sum.plus(row.totalAccruedProfitUsd), D(0));
   assert.equal(finalReport.profitUsd, ownersProfit);
   const audit = spawnSync(process.execPath, ['--import', 'tsx', 'scripts/check-owner-balances.ts'], { env: process.env, encoding: 'utf8', timeout: 60000 });
