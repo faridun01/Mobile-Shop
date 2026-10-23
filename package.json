@@ -40,6 +40,7 @@
     "test:sale-edits": "tsx scripts/test-sale-edits.ts",
     "test:exchange-closed-shift": "tsx scripts/test-exchange-after-closed-shift.ts",
     "test:invoice-edit": "tsx scripts/test-invoice-edit-delete.ts",
+    "test:exchange-profit": "tsx scripts/test-exchange-profit-report.ts",
     "test:audit-fixes": "tsx scripts/test-audit-fixes.ts",
     "test:functional": "tsx scripts/test-functional-audit.ts",
     "test:cash-collection": "tsx scripts/test-cash-collection.ts",
