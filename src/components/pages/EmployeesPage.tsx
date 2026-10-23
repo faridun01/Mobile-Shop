@@ -433,6 +433,7 @@ export const EmployeesPage: React.FC = () => {
             onClick={() => setIsPayrollReportModalOpen(true)}
             className="flex-1 sm:flex-none justify-center h-8 px-2.5 sm:px-3 rounded-xl bg-surface-raised hover:bg-surface border border-border text-fg text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
             title="Ежемесячная ведомость зарплат продавцов"
+            aria-label="Зарплатный отчёт"
           >
             <Briefcase className="w-3.5 h-3.5 text-fg-subtle" />
             <span className="min-[360px]:hidden">Отчёт</span><span className="hidden min-[360px]:inline">Зарплатный отчёт</span>
@@ -445,6 +446,7 @@ export const EmployeesPage: React.FC = () => {
                 setEditingUser(null);
                 setIsModalOpen(true);
               }}
+              aria-label="Добавить сотрудника"
               className="flex-1 sm:flex-none justify-center h-8 px-2.5 sm:px-3.5 rounded-xl bg-accent hover:bg-accent-strong text-accent-fg text-xs font-semibold flex items-center gap-1 transition-all shadow-xs cursor-pointer"
             >
               <Plus className="w-3.5 h-3.5" />
