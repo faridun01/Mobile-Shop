@@ -1,6 +1,7 @@
 import React from 'react';
 import { SupplierInvoice } from '../../types';
 import { AlertCircle, Loader2 } from 'lucide-react';
+import { formatMoney } from '../../utils/money';
 
 interface DeleteSupplierInvoiceModalProps {
   invoice: SupplierInvoice | null;
@@ -25,7 +26,9 @@ export const DeleteSupplierInvoiceModal: React.FC<DeleteSupplierInvoiceModalProp
           <h3 className="text-sm font-bold text-fg-muted">Удаление накладной</h3>
         </div>
         <p className="text-xs text-fg-muted leading-relaxed">
-          Вы действительно хотите удалить накладную <strong className="text-fg-muted">#{invoice.invoiceNumber}</strong>? Все привязанные к этой накладной устройства и расчеты будут удалены из системы.
+          Накладная <strong className="text-fg-muted">#{invoice.invoiceNumber}</strong> будет удалена полностью: её товары уберутся со склада и из магазинов, долг поставщику уменьшится.
+          {(invoice.paidAmountUsd || 0) > 0 && <> Оплаченные <strong className="text-fg-muted">${formatMoney(invoice.paidAmountUsd)}</strong> вернутся в Центральную кассу.</>}
+          {' '}Если что-то из накладной уже продано, удалить её нельзя — можно изменить цены непроданных позиций.
         </p>
         <div className="flex items-center justify-end space-x-2 pt-2">
           <button

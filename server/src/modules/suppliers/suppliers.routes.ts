@@ -222,10 +222,28 @@ export function registerSupplierRoutes(app: Express) {
     }
   });
 
+  // What the invoice holds and what of it can still be repriced or deleted (the edit screen).
+  app.get('/api/supplier-invoices/:id/contents', authenticateJwt, requireRoles('ADMIN'), async (req: AuthenticatedRequest, res, next) => {
+    try {
+      res.json(await SuppliersService.getInvoiceContents(req.params.id));
+    } catch (error) {
+      next(error);
+    }
+  });
+
   app.put('/api/supplier-invoices/:id', authenticateJwt, requireRoles('ADMIN'), async (req: AuthenticatedRequest, res, next) => {
     try {
-      const invoice = await SuppliersService.updateInvoice(req.params.id, req.body ?? {}, req.user!.userId);
+      const body = req.body ?? {};
+      const invoice = await SuppliersService.updateInvoice(req.params.id, {
+        invoiceNumber: body.invoiceNumber,
+        date: body.date,
+        totalAmountUsd: body.totalAmountUsd,
+        prices: Array.isArray(body.prices) ? body.prices.map((p: any) => ({ deviceId: String(p?.deviceId ?? ''), purchasePriceUsd: p?.purchasePriceUsd })) : undefined,
+        accessoryCosts: Array.isArray(body.accessoryCosts) ? body.accessoryCosts.map((a: any) => ({ batchId: String(a?.batchId ?? ''), unitCostUsd: a?.unitCostUsd })) : undefined,
+      }, req.user!.userId);
       RealtimeSyncGateway.broadcast('INVENTORY_UPDATE', {});
+      // A repriced invoice can move the supplier's debt and the Central Cash.
+      RealtimeSyncGateway.broadcast('SUPPLIER_PAYMENT', {});
       res.json(invoice);
     } catch (error) {
       next(error);
@@ -236,6 +254,8 @@ export function registerSupplierRoutes(app: Express) {
     try {
       const result = await SuppliersService.deleteInvoice(req.params.id, req.user!.userId);
       RealtimeSyncGateway.broadcast('INVENTORY_UPDATE', {});
+      // What was paid on it is back in the Central Cash.
+      RealtimeSyncGateway.broadcast('SUPPLIER_PAYMENT', {});
       res.json(result);
     } catch (error) {
       next(error);

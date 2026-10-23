@@ -1,578 +1,216 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { SupplierInvoice, Device, Supplier, Store } from '../../types';
+import React, { useEffect, useMemo, useState } from 'react';
+import { AlertTriangle, Check, Lock, Package, Receipt, Smartphone } from 'lucide-react';
+import type { SupplierInvoice } from '../../types';
+import { apiClient } from '../../api/client';
+import { Dialog } from '../ui/Dialog';
+import { Button } from '../ui/Button';
+import { cn } from '../../utils/cn';
 import { formatMoney } from '../../utils/money';
-import { getPhoneColorHex, formatRam, formatStorage, formatPhoneColor } from '../../utils/phoneSpecs';
+import { formatPhoneColor, formatRam, formatStorage } from '../../utils/phoneSpecs';
 import { formatStoreName } from '../../utils/storeContext';
-import {
-  Receipt,
-  X,
-  Hash,
-  Calendar,
-  DollarSign,
-  Check,
-  Loader2,
-  Package,
-  Building2,
-  CheckCircle2,
-  Clock,
-  AlertCircle,
-  Copy,
-  Sparkles,
-  Smartphone,
-} from 'lucide-react';
+import { groupInvoiceDevices, invoiceEditResult, type InvoiceContents } from '../../utils/invoiceEdit';
+
+export interface InvoiceSaveData {
+  invoiceNumber: string;
+  date: string;
+  prices: { deviceId: string; purchasePriceUsd: number }[];
+  accessoryCosts: { batchId: string; unitCostUsd: number }[];
+}
 
 interface EditInvoiceModalProps {
   invoice: SupplierInvoice | null;
-  devices?: Device[];
-  suppliers?: Supplier[];
-  stores?: Store[];
   onClose: () => void;
-  onSave: (id: string, data: { invoiceNumber: string; date: string; totalAmountUsd: number }) => Promise<{ success: boolean; message?: string }>;
+  onSave: (id: string, data: InvoiceSaveData) => Promise<{ success: boolean; message?: string; refundUsd?: number }>;
   onSuccess: (msg: string) => void;
   onError: (msg: string) => void;
 }
 
-interface GoodsGroup {
-  brand: string;
-  model: string;
-  ram?: string;
-  storage: string;
-  color: string;
-  unitPriceUsd: number;
-  isBonus?: boolean;
-  bonusCampaign?: string;
-  quantity: number;
-  totalPriceUsd: number;
-  devices: Device[];
-}
+const priceInput = 'w-24 h-9 px-2 rounded-lg bg-surface border border-border text-right font-mono font-bold text-sm text-fg focus:border-accent focus:outline-none';
 
-export const EditInvoiceModal: React.FC<EditInvoiceModalProps> = ({
-  invoice,
-  devices = [],
-  suppliers = [],
-  stores = [],
-  onClose,
-  onSave,
-  onSuccess,
-  onError,
-}) => {
-  const [editInvoiceNum, setEditInvoiceNum] = useState('');
-  const [editInvoiceDateStr, setEditInvoiceDateStr] = useState('');
-  const [editInvoiceAmountUsd, setEditInvoiceAmountUsd] = useState('');
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [copiedImei, setCopiedImei] = useState<string | null>(null);
+/**
+ * Edits a purchase invoice: its number, date and the purchase price of each model or accessory
+ * batch still in stock (moved to a store or not). A sold phone keeps its price. The summary shows
+ * what saving does: the change is owed to the supplier, or the part paid above the new total comes
+ * back to the Central Cash.
+ */
+export const EditInvoiceModal: React.FC<EditInvoiceModalProps> = ({ invoice, onClose, onSave, onSuccess, onError }) => {
+  const [contents, setContents] = useState<InvoiceContents | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [number, setNumber] = useState('');
+  const [date, setDate] = useState('');
+  const [groupPrices, setGroupPrices] = useState<Record<string, string>>({});
+  const [batchCosts, setBatchCosts] = useState<Record<string, string>>({});
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    if (invoice) {
-      setEditInvoiceNum(invoice.invoiceNumber);
-      setEditInvoiceDateStr(invoice.date ? invoice.date.split('T')[0] : '');
-      setEditInvoiceAmountUsd((invoice.totalAmountUsd || 0).toString());
-    }
+    setContents(null);
+    setLoadError(null);
+    if (!invoice) return;
+    setNumber(invoice.invoiceNumber);
+    setDate(invoice.date ? invoice.date.split('T')[0] : '');
+    let cancelled = false;
+    apiClient<InvoiceContents>(`/supplier-invoices/${invoice.id}/contents`)
+      .then((data) => {
+        if (cancelled) return;
+        const normalized: InvoiceContents = {
+          ...data,
+          invoice: { ...data.invoice, totalAmountUsd: Number(data.invoice.totalAmountUsd), paidAmountUsd: Number(data.invoice.paidAmountUsd) },
+          devices: data.devices.map((d) => ({ ...d, purchasePriceUsd: Number(d.purchasePriceUsd) })),
+          accessories: data.accessories.map((b) => ({ ...b, unitCostUsd: Number(b.unitCostUsd) })),
+        };
+        setContents(normalized);
+        setGroupPrices(Object.fromEntries(groupInvoiceDevices(normalized.devices).map((g) => [g.key, String(g.price)])));
+        setBatchCosts(Object.fromEntries(normalized.accessories.map((b) => [b.id, String(b.unitCostUsd)])));
+      })
+      .catch((e) => { if (!cancelled) setLoadError(e instanceof Error ? e.message : 'Не удалось загрузить накладную'); });
+    return () => { cancelled = true; };
   }, [invoice]);
 
-  const containedDevices = useMemo(() => {
-    if (!invoice || !devices) return [];
-    return devices.filter(
-      (d) =>
-        (invoice.id && d.purchaseInvoiceId === invoice.id) ||
-        (d.invoiceNumber && d.invoiceNumber === invoice.invoiceNumber)
-    );
-  }, [invoice, devices]);
-
-  const goodsGroups = useMemo<GoodsGroup[]>(() => {
-    if (!invoice) return [];
-
-    if (containedDevices.length > 0) {
-      const map = new Map<string, GoodsGroup>();
-      for (const dev of containedDevices) {
-        const isBonus = Boolean(dev.isBonus || dev.purchaseCostUsd === 0);
-        const cost = isBonus ? 0 : dev.purchaseCostUsd || 0;
-        const normColor = formatPhoneColor(dev.color);
-        const key = `${dev.brand}|${dev.model}|${dev.ram || ''}|${dev.storage}|${normColor}|${cost}`;
-        let g = map.get(key);
-        if (!g) {
-          g = {
-            brand: dev.brand,
-            model: dev.model,
-            ram: dev.ram,
-            storage: dev.storage,
-            color: normColor,
-            unitPriceUsd: cost,
-            isBonus,
-            bonusCampaign: dev.bonusCampaign,
-            quantity: 0,
-            totalPriceUsd: 0,
-            devices: [],
-          };
-          map.set(key, g);
-        }
-        g.devices.push(dev);
-        g.quantity += 1;
-        g.totalPriceUsd += cost;
-      }
-      return Array.from(map.values());
-    }
-
-    if (Array.isArray(invoice.groups) && invoice.groups.length > 0) {
-      return invoice.groups.map((g) => ({
-        brand: g.brand,
-        model: g.model,
-        ram: g.ram,
-        storage: g.storage,
-        color: g.color,
-        unitPriceUsd: g.purchasePriceUsd,
-        isBonus: g.purchasePriceUsd === 0,
-        quantity: g.quantity,
-        totalPriceUsd: g.purchasePriceUsd * g.quantity,
-        devices: [],
-      }));
-    }
-
-    return [];
-  }, [invoice, containedDevices]);
-
-  const totalGoodsCostUsd = useMemo(() => {
-    return goodsGroups.reduce((sum, g) => sum + g.totalPriceUsd, 0);
-  }, [goodsGroups]);
-
-  const totalDevicesCount = useMemo(() => {
-    if (containedDevices.length > 0) return containedDevices.length;
-    if (goodsGroups.length > 0) return goodsGroups.reduce((sum, g) => sum + g.quantity, 0);
-    return invoice?.devicesCount || 0;
-  }, [containedDevices, goodsGroups, invoice]);
+  const groups = useMemo(() => (contents ? groupInvoiceDevices(contents.devices) : []), [contents]);
+  const result = useMemo(() => (contents ? invoiceEditResult(contents, groupPrices, batchCosts) : null), [contents, groupPrices, batchCosts]);
 
   if (!invoice) return null;
 
-  const supplierName =
-    invoice.supplierName ||
-    suppliers.find((s) => s.id === invoice.supplierId)?.name ||
-    'Поставщик';
-  const store = stores.find((s) => s.id === invoice.storeId);
-  const storeName = store
-    ? store.name
-    : invoice.isStorePurchase
-    ? 'Розничный магазин'
-    : 'Главный склад';
-
-  const handleCopyImei = (imei: string) => {
-    if (!imei) return;
-    navigator.clipboard?.writeText(imei);
-    setCopiedImei(imei);
-    setTimeout(() => {
-      setCopiedImei((prev) => (prev === imei ? null : prev));
-    }, 2000);
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (isSubmitting) return;
-    setIsSubmitting(true);
+  const handleSave = async () => {
+    if (!result || saving) return;
+    if (result.invalid.length) { onError('Укажите корректные цены (больше нуля, до двух знаков после точки)'); return; }
+    if (!number.trim()) { onError('Укажите номер накладной'); return; }
+    setSaving(true);
     try {
-      const res = await onSave(invoice.id, {
-        invoiceNumber: editInvoiceNum.trim(),
-        date: editInvoiceDateStr,
-        totalAmountUsd: parseFloat(editInvoiceAmountUsd) || 0,
-      });
+      const res = await onSave(invoice.id, { invoiceNumber: number.trim(), date, prices: result.prices, accessoryCosts: result.accessoryCosts });
       if (res.success) {
-        onSuccess('Накладная успешно обновлена!');
+        onSuccess(res.refundUsd ? `Накладная обновлена. $${formatMoney(res.refundUsd)} возвращено в Центральную кассу` : 'Накладная обновлена');
         onClose();
       } else {
-        onError(res.message || 'Ошибка обновления накладной');
+        onError(res.message || 'Не удалось обновить накладную');
       }
     } finally {
-      setIsSubmitting(false);
+      setSaving(false);
     }
   };
 
+  const changed = Boolean(result && result.diff !== 0);
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-xs p-3 sm:p-4 animate-in fade-in duration-150">
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="edit-invoice-title"
-        className="modal-card w-full max-w-2xl lg:max-w-4xl rounded-2xl bg-surface border border-border shadow-2xl flex flex-col max-h-[min(92vh,var(--visual-viewport-height,92vh))] text-fg font-sans text-xs"
-      >
-        {/* Header */}
-        <div className="p-3.5 sm:p-4 border-b border-border/80 flex items-center justify-between shrink-0">
-          <div className="flex items-center gap-2.5 min-w-0">
-            <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-accent/15 border border-accent/30 text-accent flex items-center justify-center shrink-0 shadow-2xs">
-              <Receipt className="w-4 h-4 sm:w-4.5 sm:h-4.5" />
-            </div>
-            <div className="min-w-0">
-              <div className="flex items-center gap-2 flex-wrap">
-                <h3
-                  id="edit-invoice-title"
-                  className="text-xs sm:text-sm font-bold text-fg uppercase tracking-wide truncate"
-                >
-                  Редактировать накладную #{invoice.invoiceNumber}
-                </h3>
-                {invoice.status === 'PAID' ? (
-                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-accent/15 text-accent border border-accent/30 font-bold flex items-center gap-1">
-                    <CheckCircle2 className="w-3 h-3" />
-                    Оплачена
-                  </span>
-                ) : invoice.status === 'PARTIALLY_PAID' ? (
-                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-warning/15 text-warning border border-warning/30 font-bold flex items-center gap-1">
-                    <Clock className="w-3 h-3" />
-                    Частично (${formatMoney(invoice.paidAmountUsd || 0)})
-                  </span>
-                ) : (
-                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-danger/15 text-danger border border-danger/30 font-bold flex items-center gap-1">
-                    <AlertCircle className="w-3 h-3" />
-                    Не оплачена (долг)
-                  </span>
-                )}
-              </div>
-              <p className="text-[10px] sm:text-[11px] text-fg-subtle truncate">
-                Просмотр состава партии, устройств в чеке и изменение параметров
-              </p>
-            </div>
-          </div>
-          <button
-            type="button"
-            disabled={isSubmitting}
-            onClick={onClose}
-            className="p-1.5 rounded-lg text-fg-subtle hover:text-fg hover:bg-surface-raised transition-colors disabled:opacity-50 cursor-pointer shrink-0"
-            title="Закрыть"
-          >
-            <X className="w-4 h-4" />
-          </button>
+    <Dialog
+      open
+      onClose={saving ? () => {} : onClose}
+      title={`Накладная ${invoice.invoiceNumber}`}
+      subtitle={contents ? contents.invoice.supplierName : invoice.supplierName}
+      icon={Receipt}
+      maxWidth="xl"
+      footer={
+        <div className="grid grid-cols-2 gap-2 w-full">
+          <Button variant="secondary" fullWidth onClick={onClose} disabled={saving}>Отмена</Button>
+          <Button fullWidth leftIcon={Check} loading={saving} disabled={!contents || Boolean(result?.invalid.length)} onClick={handleSave}>
+            Сохранить
+          </Button>
+        </div>
+      }
+    >
+      <div className="space-y-4 text-sm">
+        <div className="grid grid-cols-2 gap-2">
+          <label className="space-y-1">
+            <span className="text-xs font-semibold text-fg-muted">Номер накладной</span>
+            <input value={number} onChange={(e) => setNumber(e.target.value)} className="w-full h-10 px-3 rounded-xl bg-surface-raised border border-border font-mono font-bold text-fg focus:border-accent focus:outline-none" />
+          </label>
+          <label className="space-y-1">
+            <span className="text-xs font-semibold text-fg-muted">Дата</span>
+            <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="w-full h-10 px-3 rounded-xl bg-surface-raised border border-border font-semibold text-fg focus:border-accent focus:outline-none" />
+          </label>
         </div>
 
-        {/* Scrollable Body */}
-        <div className="p-3.5 sm:p-5 space-y-4 overflow-y-auto">
-          {/* Two-column layout on desktop, stacked on mobile */}
-          <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
-            {/* LEFT COLUMN: Parameters Form */}
-            <div className="md:col-span-5 space-y-3.5">
-              <div className="flex items-center gap-1.5 text-xs font-bold text-fg uppercase tracking-wider">
-                <Receipt className="w-3.5 h-3.5 text-accent" />
-                <span>Параметры накладной</span>
-              </div>
+        {loadError && <p className="p-3 rounded-xl bg-danger/10 border border-danger/25 text-danger text-xs">{loadError}</p>}
+        {!contents && !loadError && <p className="text-xs text-fg-subtle">Загрузка состава накладной…</p>}
 
-              {/* Context Summary Box */}
-              <div className="p-3 rounded-xl bg-surface-raised border border-border space-y-2 text-xs">
-                <div className="flex items-center justify-between text-[11px]">
-                  <span className="text-fg-subtle">Поставщик:</span>
-                  <strong className="text-fg truncate max-w-44 text-right">{supplierName}</strong>
-                </div>
-                <div className="flex items-center justify-between text-[11px]">
-                  <span className="text-fg-subtle">Склад приёма:</span>
-                  <span className="text-accent font-semibold flex items-center gap-1">
-                    <Building2 className="w-3 h-3 shrink-0" />
-                    <span>{formatStoreName(storeName)}</span>
-                  </span>
-                </div>
-                <div className="pt-2 border-t border-border/70 flex items-center justify-between text-[11px]">
-                  <span className="text-fg-subtle">Оплачено:</span>
-                  <span className="font-mono font-bold text-accent">
-                    ${formatMoney(invoice.paidAmountUsd || 0)}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between text-[11px]">
-                  <span className="text-fg-subtle">Остаток долга:</span>
-                  <span
-                    className={`font-mono font-bold ${
-                      (invoice.remainingAmountUsd || 0) > 0 ? 'text-danger' : 'text-fg-subtle'
-                    }`}
-                  >
-                    ${formatMoney(invoice.remainingAmountUsd || 0)}
-                  </span>
-                </div>
-              </div>
-
-              <form id="edit-invoice-form" onSubmit={handleSubmit} className="space-y-3">
-                {/* Invoice Number */}
-                <div>
-                  <label className="block text-xs font-semibold text-fg-muted mb-1 flex items-center justify-between">
-                    <span>Номер накладной</span>
-                    <span className="text-[10px] text-accent font-semibold font-mono">Обязательно</span>
-                  </label>
-                  <div className="relative">
-                    <div className="w-9 h-full absolute left-0 top-0 flex items-center justify-center text-fg-subtle pointer-events-none">
-                      <Hash className="w-4 h-4 text-accent" />
-                    </div>
-                    <input
-                      type="text"
-                      required
-                      value={editInvoiceNum}
-                      onChange={(e) => setEditInvoiceNum(e.target.value)}
-                      placeholder="Например, INV-0022"
-                      className="w-full pl-9 pr-3 py-2 rounded-xl bg-surface-raised border border-border text-base sm:text-sm font-bold font-mono text-fg placeholder:text-fg-subtle focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent transition-all"
-                    />
-                  </div>
-                </div>
-
-                {/* Invoice Date */}
-                <div>
-                  <label className="block text-xs font-semibold text-fg-muted mb-1 flex items-center justify-between">
-                    <span>Дата накладной</span>
-                    <span className="text-[10px] text-fg-subtle font-mono">ГГГГ-ММ-ДД</span>
-                  </label>
-                  <div className="relative">
-                    <div className="w-9 h-full absolute left-0 top-0 flex items-center justify-center text-fg-subtle pointer-events-none">
-                      <Calendar className="w-4 h-4 text-accent" />
-                    </div>
-                    <input
-                      type="date"
-                      required
-                      value={editInvoiceDateStr}
-                      onChange={(e) => setEditInvoiceDateStr(e.target.value)}
-                      className="w-full pl-9 pr-3 py-2 rounded-xl bg-surface-raised border border-border text-base sm:text-sm font-semibold text-fg focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent transition-all"
-                    />
-                  </div>
-                </div>
-
-                {/* Invoice Amount */}
-                <div>
-                  <div className="flex items-center justify-between mb-1">
-                    <label className="text-xs font-semibold text-fg-muted">Сумма накладной ($ USD)</label>
-                    {totalGoodsCostUsd > 0 &&
-                      Math.abs((parseFloat(editInvoiceAmountUsd) || 0) - totalGoodsCostUsd) > 0.01 && (
-                        <button
-                          type="button"
-                          onClick={() => setEditInvoiceAmountUsd(String(totalGoodsCostUsd))}
-                          className="text-[10px] font-bold text-accent hover:underline cursor-pointer"
-                          title="Подставить точную сумму по всем товарам в чеке"
-                        >
-                          По товарам: ${formatMoney(totalGoodsCostUsd)}
-                        </button>
+        {contents && (
+          <>
+            <section className="space-y-2">
+              <h4 className="text-xs font-bold text-fg-muted flex items-center gap-1.5"><Smartphone className="w-3.5 h-3.5 text-accent" />Цена за штуку, $</h4>
+              {groups.length === 0 && <p className="text-xs text-fg-subtle">Телефонов в накладной нет</p>}
+              {groups.map((g) => {
+                const specs = [formatRam(g.ram ?? undefined), formatStorage(g.storage), formatPhoneColor(g.color)].filter(Boolean).join(' · ');
+                const bad = result?.invalid.includes(g.key);
+                return (
+                  <div key={g.key} className="p-3 rounded-xl bg-surface-raised border border-border flex items-center justify-between gap-3">
+                    <div className="min-w-0 space-y-0.5">
+                      <p className="font-bold text-fg truncate">{g.brand} {g.model} <span className="font-normal text-fg-subtle">× {g.devices.length}</span></p>
+                      <p className="text-xs text-fg-subtle truncate">{specs}</p>
+                      {g.locations.length > 0 && (
+                        <p className="text-[11px] text-fg-subtle">{g.locations.map((l) => `${formatStoreName(l.name)} ${l.count} шт.`).join(' · ')}</p>
                       )}
-                  </div>
-                  <div className="relative">
-                    <div className="w-9 h-full absolute left-0 top-0 flex items-center justify-center text-fg-subtle pointer-events-none">
-                      <DollarSign className="w-4 h-4 text-accent" />
+                      {g.soldCount > 0 && (
+                        <p className="text-[11px] text-warning flex items-center gap-1"><Lock className="w-3 h-3" />Продано {g.soldCount} шт. — их цена ${formatMoney(g.price)} не меняется</p>
+                      )}
                     </div>
-                    <input
-                      type="number"
-                      step="0.01"
-                      required
-                      min="0"
-                      value={editInvoiceAmountUsd}
-                      onChange={(e) => setEditInvoiceAmountUsd(e.target.value)}
-                      placeholder="0.00"
-                      className="w-full pl-9 pr-14 py-2 rounded-xl bg-surface-raised border border-border text-base sm:text-sm font-bold font-mono text-accent focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent transition-all"
-                    />
-                    <div className="absolute right-3 top-1/2 -translate-y-1/2 px-1.5 py-0.5 rounded-md bg-surface border border-border text-[10px] font-bold font-mono text-fg-subtle pointer-events-none">
-                      USD
-                    </div>
+                    {g.isBonus ? (
+                      <span className="text-xs font-bold text-highlight shrink-0">Подарок · $0</span>
+                    ) : g.editable.length ? (
+                      <input
+                        inputMode="decimal"
+                        aria-label={`Цена ${g.brand} ${g.model}`}
+                        value={groupPrices[g.key] ?? ''}
+                        onChange={(e) => setGroupPrices((p) => ({ ...p, [g.key]: e.target.value }))}
+                        className={cn(priceInput, bad && 'border-danger text-danger')}
+                      />
+                    ) : (
+                      <span className="text-sm font-mono font-bold text-fg-subtle shrink-0 flex items-center gap-1"><Lock className="w-3 h-3" />${formatMoney(g.price)}</span>
+                    )}
                   </div>
-                </div>
-              </form>
-            </div>
+                );
+              })}
+            </section>
 
-            {/* RIGHT COLUMN: Goods in receipt */}
-            <div className="md:col-span-7 space-y-3">
-              <div className="flex items-center justify-between gap-2 pb-1 border-b border-border/80">
-                <div className="flex items-center gap-1.5 text-xs font-bold text-fg uppercase tracking-wider">
-                  <Package className="w-3.5 h-3.5 text-accent" />
-                  <span>Товары в чеке</span>
-                </div>
-                <div className="flex items-center gap-1.5 text-[11px]">
-                  <span className="px-2 py-0.5 rounded-md bg-surface-raised border border-border font-mono font-bold text-accent">
-                    {totalDevicesCount} шт.
-                  </span>
-                  <span className="font-mono font-bold text-fg">
-                    ${formatMoney(totalGoodsCostUsd || parseFloat(editInvoiceAmountUsd) || 0)}
-                  </span>
-                </div>
-              </div>
+            {contents.accessories.length > 0 && (
+              <section className="space-y-2">
+                <h4 className="text-xs font-bold text-fg-muted flex items-center gap-1.5"><Package className="w-3.5 h-3.5 text-accent" />Аксессуары, $ за штуку</h4>
+                {contents.accessories.map((b) => (
+                  <div key={b.id} className="p-3 rounded-xl bg-surface-raised border border-border flex items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="font-bold text-fg truncate">{[b.brand, b.name].filter(Boolean).join(' ')} <span className="font-normal text-fg-subtle">× {b.quantityReceived}</span></p>
+                      {b.locked && <p className="text-[11px] text-warning flex items-center gap-1"><Lock className="w-3 h-3" />Часть продана или перемещена — цена не меняется</p>}
+                    </div>
+                    {b.locked ? (
+                      <span className="text-sm font-mono font-bold text-fg-subtle shrink-0">${formatMoney(b.unitCostUsd)}</span>
+                    ) : (
+                      <input
+                        inputMode="decimal"
+                        aria-label={`Цена ${b.name}`}
+                        value={batchCosts[b.id] ?? ''}
+                        onChange={(e) => setBatchCosts((p) => ({ ...p, [b.id]: e.target.value }))}
+                        className={cn(priceInput, result?.invalid.includes(b.id) && 'border-danger text-danger')}
+                      />
+                    )}
+                  </div>
+                ))}
+              </section>
+            )}
 
-              {/* Items List */}
-              {goodsGroups.length === 0 ? (
-                <div className="p-6 text-center text-fg-subtle rounded-xl bg-surface-raised/40 border border-border/60 space-y-1.5">
-                  <Smartphone className="w-7 h-7 mx-auto opacity-30 text-fg-subtle" />
-                  <p className="font-semibold text-fg text-xs">Список устройств в памяти не найден</p>
-                  <p className="text-[11px]">
-                    Накладная содержит {invoice.devicesCount || 0} шт. на общую сумму $
-                    {formatMoney(invoice.totalAmountUsd)}.
+            {result && (
+              <section className="p-3 rounded-xl border border-border bg-surface space-y-1.5 text-xs" aria-live="polite">
+                <div className="flex justify-between"><span className="text-fg-subtle">Сумма накладной</span>
+                  <span className="font-mono font-bold text-fg">{changed ? <>${formatMoney(result.oldTotal)} → ${formatMoney(result.newTotal)}</> : <>${formatMoney(result.oldTotal)}</>}</span></div>
+                <div className="flex justify-between"><span className="text-fg-subtle">Оплачено поставщику</span><span className="font-mono font-semibold text-fg">${formatMoney(result.paid)}</span></div>
+                <div className="flex justify-between pt-1.5 border-t border-border">
+                  <span className="font-semibold text-fg">Долг поставщику</span>
+                  <span className={cn('font-mono font-bold', result.debtAfter > 0 ? 'text-danger' : 'text-fg-subtle')}>
+                    {changed && result.debtAfter !== result.debtBefore ? <>${formatMoney(result.debtBefore)} → ${formatMoney(result.debtAfter)}</> : <>${formatMoney(result.debtAfter)}</>}
+                  </span>
+                </div>
+                {result.refund > 0 && (
+                  <p className="p-2 rounded-lg bg-warning/10 border border-warning/25 text-warning font-semibold flex items-start gap-1.5">
+                    <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-px" />
+                    Оплачено больше новой суммы: ${formatMoney(result.refund)} вернётся в Центральную кассу.
                   </p>
-                </div>
-              ) : (
-                <div className="space-y-2.5 max-h-[340px] md:max-h-[420px] overflow-y-auto pr-0.5 scrollbar-thin">
-                  {goodsGroups.map((group, gIdx) => {
-                    const colorHex = getPhoneColorHex(group.color);
-                    const formattedR = formatRam(group.ram);
-                    const formattedS = formatStorage(group.storage);
-
-                    return (
-                      <div
-                        key={gIdx}
-                        className="p-3 rounded-xl bg-surface-raised border border-border hover:border-accent/40 transition-colors shadow-2xs space-y-2 text-xs"
-                      >
-                        {/* Group Header */}
-                        <div className="flex items-start justify-between gap-2">
-                          <div className="min-w-0">
-                            <div className="flex items-center gap-1.5 flex-wrap">
-                              <span className="text-[10px] font-mono text-fg-subtle font-bold">
-                                #{gIdx + 1}
-                              </span>
-                              <strong className="text-fg font-bold text-xs sm:text-sm">
-                                {group.brand} {group.model}
-                              </strong>
-                              {group.isBonus && (
-                                <span className="text-[9px] px-1.5 py-0.2 rounded-full bg-highlight/20 text-highlight border border-highlight/40 font-bold flex items-center gap-0.5">
-                                  <Sparkles className="w-2.5 h-2.5" />
-                                  Подарок
-                                </span>
-                              )}
-                            </div>
-
-                            {/* Specs Chips */}
-                            <div className="flex items-center gap-1.5 flex-wrap mt-1 text-[10px]">
-                              {formattedS && (
-                                <span className="px-1.5 py-0.2 rounded bg-surface border border-border font-bold font-mono text-fg">
-                                  {formattedS}
-                                </span>
-                              )}
-                              {formattedR && (
-                                <span className="px-1.5 py-0.2 rounded bg-accent/10 border border-accent/25 font-bold font-mono text-accent">
-                                  ОЗУ {formattedR}
-                                </span>
-                              )}
-                              {group.color && (
-                                <span className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded bg-surface border border-border/70 text-fg-muted">
-                                  {colorHex && (
-                                    <span
-                                      className="w-2 h-2 rounded-full border border-black/20 shrink-0"
-                                      style={{ backgroundColor: colorHex }}
-                                    />
-                                  )}
-                                  <span>{formatPhoneColor(group.color)}</span>
-                                </span>
-                              )}
-                            </div>
-                          </div>
-
-                          <div className="text-right shrink-0">
-                            <div className="text-xs sm:text-sm font-bold font-mono text-accent">
-                              {group.isBonus ? '$0' : `$${formatMoney(group.totalPriceUsd)}`}
-                            </div>
-                            <span className="text-[10px] text-fg-subtle block font-mono">
-                              {group.quantity} шт.{' '}
-                              {group.isBonus ? '' : `× $${formatMoney(group.unitPriceUsd)}`}
-                            </span>
-                          </div>
-                        </div>
-
-                        {/* List of Device IMEIs in this group */}
-                        {group.devices.length > 0 && (
-                          <div className="pt-2 border-t border-border/70 space-y-1.5">
-                            <span className="text-[10px] uppercase font-semibold text-fg-subtle block">
-                              IMEI устройств ({group.devices.length}):
-                            </span>
-                            <div className="flex flex-wrap gap-1.5">
-                              {group.devices.map((d, dIdx) => (
-                                <div
-                                  key={d.id || dIdx}
-                                  className="inline-flex items-center gap-1.5 px-2 py-1 rounded-lg bg-surface border border-border/80 text-[10px] font-mono text-fg-muted"
-                                >
-                                  <button
-                                    type="button"
-                                    onClick={() => handleCopyImei(d.imei)}
-                                    className="hover:text-accent flex items-center gap-1 cursor-pointer transition-colors"
-                                    title="Нажмите чтобы скопировать IMEI"
-                                  >
-                                    <span className="text-fg-subtle text-[9px] font-sans">IMEI:</span>
-                                    <strong className="text-fg">{d.imei}</strong>
-                                    {copiedImei === d.imei ? (
-                                      <span className="text-accent flex items-center gap-0.5 text-[9px] font-sans font-bold">
-                                        <Check className="w-2.5 h-2.5" />
-                                      </span>
-                                    ) : (
-                                      <Copy className="w-2.5 h-2.5 text-fg-subtle opacity-60 hover:opacity-100" />
-                                    )}
-                                  </button>
-
-                                  {d.imei2 && (
-                                    <button
-                                      type="button"
-                                      onClick={() => handleCopyImei(d.imei2!)}
-                                      className="hover:text-accent flex items-center gap-1 cursor-pointer transition-colors border-l border-border/60 pl-1.5"
-                                      title="Нажмите чтобы скопировать IMEI 2"
-                                    >
-                                      <span className="text-fg-subtle text-[9px] font-sans">2:</span>
-                                      <strong className="text-fg">{d.imei2}</strong>
-                                      {copiedImei === d.imei2 ? (
-                                        <Check className="w-2.5 h-2.5 text-accent" />
-                                      ) : (
-                                        <Copy className="w-2.5 h-2.5 text-fg-subtle opacity-60 hover:opacity-100" />
-                                      )}
-                                    </button>
-                                  )}
-
-                                  <span
-                                    className={`text-[9px] font-bold px-1 rounded ${
-                                      d.status === 'SOLD'
-                                        ? 'bg-warning/15 text-warning'
-                                        : 'bg-accent/15 text-accent'
-                                    }`}
-                                  >
-                                    {d.status === 'SOLD' ? 'Продан' : 'В наличии'}
-                                  </span>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* Actions Footer */}
-        <div className="p-3.5 sm:p-4 border-t border-border/80 bg-surface flex items-center justify-between gap-3 shrink-0">
-          <div className="text-[11px] text-fg-subtle hidden sm:block">
-            {totalDevicesCount > 0 ? (
-              <span>
-                В чеке:{' '}
-                <strong className="text-fg font-mono font-bold">
-                  {totalDevicesCount} устройств
-                </strong>{' '}
-                на сумму{' '}
-                <strong className="text-accent font-mono font-bold">
-                  $
-                  {formatMoney(
-                    totalGoodsCostUsd || parseFloat(editInvoiceAmountUsd) || 0
-                  )}
-                </strong>
-              </span>
-            ) : null}
-          </div>
-          <div className="flex items-center gap-2 w-full sm:w-auto">
-            <button
-              type="button"
-              disabled={isSubmitting}
-              onClick={onClose}
-              className="flex-1 sm:flex-initial px-4 py-2 rounded-xl bg-surface-raised hover:bg-surface border border-border text-xs font-bold text-fg-muted hover:text-fg transition-all cursor-pointer min-h-[38px] disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center uppercase"
-            >
-              Отмена
-            </button>
-            <button
-              type="submit"
-              form="edit-invoice-form"
-              disabled={isSubmitting}
-              className="flex-1 sm:flex-initial px-5 py-2 rounded-xl bg-accent hover:bg-accent-strong text-xs font-bold text-accent-fg shadow-xs hover:shadow-md transition-all cursor-pointer min-h-[38px] disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-1.5 uppercase"
-            >
-              {isSubmitting ? (
-                <>
-                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                  <span>Сохранение…</span>
-                </>
-              ) : (
-                <>
-                  <Check className="w-3.5 h-3.5" />
-                  <span>Сохранить</span>
-                </>
-              )}
-            </button>
-          </div>
-        </div>
+                )}
+                {changed && result.refund === 0 && result.diff > 0 && (
+                  <p className="text-fg-subtle">Разница ${formatMoney(result.diff)} добавится к долгу поставщику.</p>
+                )}
+              </section>
+            )}
+          </>
+        )}
       </div>
-    </div>
+    </Dialog>
   );
 };

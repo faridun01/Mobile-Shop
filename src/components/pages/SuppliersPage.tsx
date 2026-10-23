@@ -16,7 +16,8 @@ import { PaySupplierInvoiceModal } from '../suppliers/PaySupplierInvoiceModal';
 import { SupplierModal } from '../suppliers/SupplierModal';
 import { DeleteSupplierConfirmModal } from '../suppliers/DeleteSupplierConfirmModal';
 import { SupplierInvoiceDetailsModal } from '../suppliers/SupplierInvoiceDetailsModal';
-import { EditSupplierInvoiceModal } from '../suppliers/EditSupplierInvoiceModal';
+import { EditInvoiceModal } from '../purchase/EditInvoiceModal';
+import { invoiceDeleteBlock } from '../../utils/invoiceEdit';
 import { DeleteSupplierInvoiceModal } from '../suppliers/DeleteSupplierInvoiceModal';
 import { compareInvoicesDesc } from '../purchase/types';
 
@@ -212,23 +213,15 @@ export const SuppliersPage: React.FC = () => {
     setEditingInvoice(inv);
   };
 
-  const handleSaveEditInvoice = async (data: { invoiceNumber: string; date: string; totalAmountUsd: number }) => {
-    if (!editingInvoice || isSubmitting) return;
-    setIsSubmitting(true);
-    try {
-      const res = await updateSupplierInvoice(editingInvoice.id, data);
-      if (res.success) {
-        setEditingInvoice(null);
-      } else {
-        setStatusMessage({ type: 'error', text: res.message || 'Ошибка обновления накладной' });
-      }
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
 
-  const handleStartDeleteInvoice = (inv: SupplierInvoice, e?: React.MouseEvent) => {
+  // Checked first, so an invoice with sold goods says why instead of asking to confirm.
+  const handleStartDeleteInvoice = async (inv: SupplierInvoice, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
+    const block = await invoiceDeleteBlock(inv.id).catch(() => null);
+    if (block) {
+      setStatusMessage({ type: 'error', text: `${block}. Удалить накладную нельзя — измените цены непроданных позиций.` });
+      return;
+    }
     setDeletingInvoice(inv);
   };
 
@@ -243,6 +236,7 @@ export const SuppliersPage: React.FC = () => {
         if (selectedInvoiceId === invId) {
           setSelectedInvoiceId(null);
         }
+        setStatusMessage({ type: 'success', text: res.refundUsd ? `Накладная удалена. $${formatMoney(res.refundUsd)} возвращено в Центральную кассу` : 'Накладная удалена' });
       } else {
         setStatusMessage({ type: 'error', text: res.message || 'Ошибка удаления накладной' });
       }
@@ -280,8 +274,8 @@ export const SuppliersPage: React.FC = () => {
         </button>
       </div>
 
-      {statusMessage && statusMessage.type === 'error' && (
-        <div className="mx-3 mt-2.5 p-2.5 rounded-lg text-xs flex items-center justify-between shrink-0 bg-danger/10 text-danger border border-danger/30">
+      {statusMessage && (
+        <div className={`mx-3 mt-2.5 p-2.5 rounded-lg text-xs flex items-center justify-between shrink-0 border ${statusMessage.type === 'error' ? 'bg-danger/10 text-danger border-danger/30' : 'bg-accent/10 text-accent border-accent/30'}`}>
           <div className="flex items-center space-x-2">
             <AlertCircle className="w-4 h-4 shrink-0" />
             <span>{statusMessage.text}</span>
@@ -413,15 +407,12 @@ export const SuppliersPage: React.FC = () => {
       />
 
       {/* MODAL: Edit Invoice */}
-      <EditSupplierInvoiceModal
+      <EditInvoiceModal
         invoice={editingInvoice}
-        devices={devices}
-        stores={stores}
-        supplierName={selectedSupplier?.name}
-        rateNumber={rateNumber}
         onClose={() => setEditingInvoice(null)}
-        onSubmit={handleSaveEditInvoice}
-        isSubmitting={isSubmitting}
+        onSave={updateSupplierInvoice}
+        onSuccess={(text) => setStatusMessage({ type: 'success', text })}
+        onError={(text) => setStatusMessage({ type: 'error', text })}
       />
 
       {/* MODAL: Delete Invoice Confirmation */}

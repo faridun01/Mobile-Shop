@@ -46,7 +46,8 @@ export function registerCatalogRoutes(app: Express) {
       const requested = typeof req.query.storeId === 'string' && req.query.storeId !== 'all' ? req.query.storeId : undefined;
       const products = await listAccessoryStock({
         storeId: isStoreScoped ? req.user!.storeId! : requested,
-        includeCost: req.user!.role === 'ADMIN',
+        // Cost of stock: the admin and partners (the warehouse shows it), never sellers.
+        includeCost: req.user!.role === 'ADMIN' || req.user!.role === 'PARTNER',
         search: typeof req.query.search === 'string' ? req.query.search.slice(0, 100) : undefined,
       });
       res.json(products);

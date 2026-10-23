@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { useDataRefreshRevision } from '../../hooks/useDataRefreshRevision';
 import { apiClient } from '../../api/client';
-import { decimal, moneyNumber } from '../../utils/money';
+import { decimal, moneyNumber, formatMoney } from '../../utils/money';
 import { useAppFields } from '../../context/AppContext';
 import { SupplierInvoice } from '../../types';
 import { soundEffects } from '../../utils/sound';
@@ -24,7 +24,9 @@ import { DEVICE_STATUS_LABELS, findDeviceByCode } from '../../utils/scanLookup';
 import { isValidSerial, normalizeSerial } from '../../utils/deviceCode';
 import { findAccessoryByBarcode } from '../../services/catalog';
 import { AddSupplierModal } from '../purchase/AddSupplierModal';
-import { EditInvoiceModal } from '../purchase/EditInvoiceModal';
+import { EditInvoiceModal, type InvoiceSaveData } from '../purchase/EditInvoiceModal';
+import { invoiceDeleteBlock } from '../../utils/invoiceEdit';
+import { StatusBanner } from '../ui/StatusBanner';
 import { ReceiptPreviewModal } from '../purchase/ReceiptPreviewModal';
 import { InvoiceDetailsModal } from '../purchase/InvoiceDetailsModal';
 import { PurchaseHistoryList } from '../purchase/PurchaseHistoryList';
@@ -354,10 +356,7 @@ export const PurchasePage: React.FC = () => {
     }, { allowModeSwitch: true });
   };
 
-  const handleSaveEditInvoice = async (
-    id: string,
-    data: { invoiceNumber: string; date: string; totalAmountUsd: number }
-  ) => {
+  const handleSaveEditInvoice = async (id: string, data: InvoiceSaveData) => {
     const res = await updateSupplierInvoice(id, data);
     if (res.success) {
       setEditingInvoiceModal(null);
@@ -368,7 +367,13 @@ export const PurchasePage: React.FC = () => {
 
   const [deletingInvoiceId, setDeletingInvoiceId] = useState<string | null>(null);
 
-  const handleDeleteInvoiceModal = (id: string) => {
+  // Checked first, so an invoice with sold goods says why instead of asking to confirm.
+  const handleDeleteInvoiceModal = async (id: string) => {
+    const block = await invoiceDeleteBlock(id).catch(() => null);
+    if (block) {
+      setStatusMessage({ type: 'error', text: `${block}. Удалить накладную нельзя — измените цены непроданных позиций.` });
+      return;
+    }
     setDeletingInvoiceId(id);
   };
 
@@ -380,7 +385,7 @@ export const PurchasePage: React.FC = () => {
       if (res.success) {
         setSelectedInvoiceId(null);
         setDeletingInvoiceId(null);
-        setStatusMessage({ type: 'success', text: 'Накладная успешно удалена!' });
+        setStatusMessage({ type: 'success', text: res.refundUsd ? `Накладная удалена. $${formatMoney(res.refundUsd)} возвращено в Центральную кассу` : 'Накладная удалена' });
       } else {
         setStatusMessage({ type: 'error', text: res.message || 'Ошибка удаления накладной' });
       }
@@ -1348,6 +1353,11 @@ export const PurchasePage: React.FC = () => {
 
   return (
     <>
+      {/* The invoice list's own results (edit, delete): the new-purchase form shows its messages inline. */}
+      <StatusBanner
+        message={viewMode === 'list' && statusMessage ? { tone: statusMessage.type, text: statusMessage.text } : null}
+        onDismiss={() => setStatusMessage(null)}
+      />
       {viewMode === 'list' ? (
         <PurchaseHistoryList
           filteredInvoices={filteredInvoices}
@@ -1441,9 +1451,6 @@ export const PurchasePage: React.FC = () => {
       {/* Edit Invoice Modal */}
       <EditInvoiceModal
         invoice={editingInvoiceModal}
-        devices={devices}
-        suppliers={suppliers}
-        stores={stores}
         onClose={() => setEditingInvoiceModal(null)}
         onSave={handleSaveEditInvoice}
         onSuccess={(msg) => {
@@ -1478,7 +1485,13 @@ export const PurchasePage: React.FC = () => {
       <ConfirmDialog
         open={Boolean(deletingInvoiceId)}
         title="Удалить накладную прихода?"
-        message="Вы действительно хотите удалить эту накладную и все её незапроданные устройства? Это действие необратимо."
+        message={(() => {
+          const inv = supplierInvoices.find((i) => i.id === deletingInvoiceId);
+          const paid = inv?.paidAmountUsd || 0;
+          return `Накладная ${inv?.invoiceNumber ?? ''} будет удалена полностью: её товары уберутся со склада и из магазинов, долг поставщику уменьшится.`
+            + (paid > 0 ? ` Оплаченные $${formatMoney(paid)} вернутся в Центральную кассу.` : '')
+            + ' Если что-то из накладной уже продано, удалить её нельзя — можно изменить цены непроданных позиций.';
+        })()}
         confirmLabel="Удалить накладную"
         cancelLabel="Отмена"
         tone="danger"

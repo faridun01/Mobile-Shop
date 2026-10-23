@@ -1,4 +1,5 @@
-import { D, decimalMin, moneyJson, type MoneyInput } from '../../common/decimal';
+import type { Prisma } from '@prisma/client';
+import { D, decimalMax, decimalMin, moneyJson, type MoneyInput } from '../../common/decimal';
 import { prisma } from '../../prisma/prisma.service';
 import type { TransactionClient } from '../../prisma/prisma.service';
 import { resolveActor } from '../../common/actor';
@@ -20,6 +21,78 @@ async function deviceHasTransactionHistory(tx: TransactionClient, deviceIds: str
     tx.repairTicket.findFirst({ where: { deviceId: { in: deviceIds } } }),
   ]);
   return Boolean(saleItem || transferItem || repairTicket);
+}
+
+/** Devices of an invoice that were ever sold: their cost is part of a booked sale's profit. */
+async function everSoldDevices(tx: TransactionClient, deviceIds: string[]): Promise<Set<string>> {
+  if (!deviceIds.length) return new Set();
+  const rows = await tx.saleItem.findMany({ where: { deviceId: { in: deviceIds } }, select: { deviceId: true } });
+  return new Set(rows.map((row) => row.deviceId));
+}
+
+/** An accessory batch can change only while every unit it received is still in it, unreserved. */
+const batchUntouched = (batch: { quantityReceived: number; quantityRemaining: number; quantityReserved: number }) =>
+  batch.quantityRemaining === batch.quantityReceived && batch.quantityReserved === 0;
+
+/**
+ * Money paid on an invoice that no longer stands (deleted, or now cheaper than what was paid)
+ * comes back into the Central Cash today: the register and its ledger account move together by
+ * one incoming supplier-payment posting, in the dollars it was paid in.
+ */
+async function refundToCentralCash(
+  tx: TransactionClient,
+  invoice: { id: string; invoiceNumber: string; supplierId: string },
+  supplierName: string,
+  amountUsd: Prisma.Decimal,
+  actor: Awaited<ReturnType<typeof resolveActor>>,
+  reason: string,
+) {
+  const central = await tx.store.findFirst({ where: { isMainWarehouse: true }, select: { id: true } });
+  if (!central) throw new Error('Центральная касса (Главный склад) не найдена');
+  const rate = await requireTodayRate(tx);
+  const { store, account } = await lockCashRegister(tx, central.id, actor, 'возврат оплаты поставщика');
+  await tx.store.update({ where: { id: store.id }, data: { cashBalanceUsd: { increment: amountUsd } } });
+  const description = `${reason}: $${amountUsd} возвращено в Центральную кассу (${supplierName}, накладная ${invoice.invoiceNumber})`;
+  await postTransaction(tx, {
+    type: 'SUPPLIER_PAYMENT', direction: 'IN', numberPrefix: 'SR',
+    accountId: account.id, balanceCurrency: 'USD',
+    amount: amountUsd, currency: 'USD', exchangeRate: rate,
+    amountTjs: roundMoney(amountUsd.mul(rate)), amountUsd,
+    categoryName: 'Возврат оплаты поставщика',
+    counterpartyType: 'SUPPLIER', counterpartyId: invoice.supplierId, counterpartyName: supplierName,
+    shopId: store.id, sourceType: 'SUPPLIER_REFUND', sourceId: invoice.id,
+    description, createdByUserId: actor.id,
+  });
+  await tx.ledgerEntry.create({
+    data: { type: 'SUPPLIER_PAYMENT', description, amountUsd, exchangeRate: rate, storeId: store.id, storeName: store.name, userName: actor.name, referenceId: invoice.id },
+  });
+}
+
+/** Takes `amountUsd` off the payments allocated to an invoice, the latest payments first. */
+async function releaseInvoiceAllocations(tx: TransactionClient, invoiceId: string, amountUsd: Prisma.Decimal) {
+  let left = amountUsd;
+  const rows = await tx.supplierPaymentAllocation.findMany({ where: { invoiceId }, orderBy: { payment: { createdAt: 'desc' } } });
+  for (const row of rows) {
+    if (left.lte(0)) break;
+    const take = decimalMin(row.allocatedAmountUsd, left);
+    if (D(take).eq(row.allocatedAmountUsd)) await tx.supplierPaymentAllocation.delete({ where: { id: row.id } });
+    else await tx.supplierPaymentAllocation.update({ where: { id: row.id }, data: { allocatedAmountUsd: { decrement: take } } });
+    left = roundMoney(left.minus(take));
+  }
+}
+
+/** The invoice's phone/tablet lines, rebuilt from its devices: one line per model, colour and price. */
+async function rebuildInvoiceGroups(tx: TransactionClient, invoiceId: string) {
+  const devices = await tx.device.findMany({ where: { purchaseInvoiceId: invoiceId }, orderBy: { id: 'asc' } });
+  const groups = new Map<string, { brand: string; model: string; ram: string | null; storage: string; color: string; purchasePriceUsd: Prisma.Decimal; quantity: number }>();
+  for (const d of devices) {
+    const key = [d.brand, d.model, d.ram ?? '', d.storage, d.color, D(d.purchasePriceUsd).toFixed(2)].join('|');
+    const group = groups.get(key);
+    if (group) group.quantity += 1;
+    else groups.set(key, { brand: d.brand, model: d.model, ram: d.ram, storage: d.storage, color: d.color, purchasePriceUsd: D(d.purchasePriceUsd), quantity: 1 });
+  }
+  await tx.invoiceGroup.deleteMany({ where: { invoiceId } });
+  for (const group of groups.values()) await tx.invoiceGroup.create({ data: { invoiceId, ...group } });
 }
 
 /**
@@ -603,14 +676,77 @@ export class SuppliersService {
     }, { maxWait: 10000, timeout: 25000 });
   }
 
-  public static async updateInvoice(id: string, input: { invoiceNumber?: string; date?: string; totalAmountUsd?: MoneyInput }, actorId?: string) {
+  /**
+   * What an invoice holds, for editing it: each device with where it is and whether its price can
+   * still change (never sold, not a free bonus phone), each accessory batch with whether its unit
+   * cost can change (every unit still in it), and whether the whole invoice can be deleted.
+   */
+  public static async getInvoiceContents(id: string) {
+    const invoice = await prisma.supplierInvoice.findUnique({ where: { id }, include: { supplier: { select: { name: true } } } });
+    if (!invoice) throw new Error('Накладная не найдена');
+    const devices = await prisma.device.findMany({
+      where: { purchaseInvoiceId: id },
+      orderBy: [{ brand: 'asc' }, { model: 'asc' }, { imei: 'asc' }],
+      include: { store: { select: { name: true } } },
+    });
+    const sold = await everSoldDevices(prisma as unknown as TransactionClient, devices.map((d) => d.id));
+    const repaired = new Set((await prisma.repairTicket.findMany({ where: { deviceId: { in: devices.map((d) => d.id) } }, select: { deviceId: true } })).map((r) => r.deviceId));
+    const batches = await prisma.accessoryBatch.findMany({ where: { purchaseInvoiceId: id }, include: { product: { select: { brand: true, name: true, barcode: true } } } });
+    const deleteBlock = sold.size
+      ? 'Часть телефонов из накладной уже продана'
+      : repaired.size || devices.some((d) => d.status === 'IN_REPAIR')
+        ? 'Телефон из накладной был в ремонте'
+        : devices.some((d) => d.status === 'TRANSFER_PENDING')
+          ? 'Телефон из накладной в незавершённом перемещении — сначала подтвердите или отклоните его'
+          : batches.some((b) => !batchUntouched(b))
+            ? 'Часть аксессуаров из накладной уже продана или перемещена'
+            : null;
+    return {
+      invoice: {
+        id: invoice.id, invoiceNumber: invoice.invoiceNumber, supplierName: invoice.supplier.name,
+        totalAmountUsd: invoice.totalAmountUsd, paidAmountUsd: invoice.paidAmountUsd,
+      },
+      devices: devices.map((d) => ({
+        id: d.id, brand: d.brand, model: d.model, ram: d.ram, storage: d.storage, color: d.color, category: d.category,
+        imei: d.imei, imei2: d.imei2, purchasePriceUsd: d.purchasePriceUsd, isBonus: d.isBonus, status: d.status,
+        storeName: d.store?.name ?? null,
+        locked: sold.has(d.id) ? 'SOLD' : d.isBonus ? 'BONUS' : null,
+      })),
+      accessories: batches.map((b) => ({
+        id: b.id, brand: b.product.brand, name: b.product.name, barcode: b.product.barcode,
+        quantityReceived: b.quantityReceived, quantityRemaining: b.quantityRemaining, unitCostUsd: b.unitCostUsd,
+        locked: batchUntouched(b) ? null : 'MOVED',
+      })),
+      canDelete: deleteBlock === null,
+      deleteBlockReason: deleteBlock,
+    };
+  }
+
+  /**
+   * Edits an invoice: its number and date, and the purchase price of each device or accessory
+   * batch that never left it (a sold phone keeps the cost its profit was booked at). The invoice
+   * total follows the prices. When it grows, the difference is owed to the supplier; when it
+   * drops below what was already paid, the overpaid part goes back into the Central Cash.
+   * (A bare `totalAmountUsd` — the older way — spreads a new total over untouched devices.)
+   */
+  public static async updateInvoice(
+    id: string,
+    input: {
+      invoiceNumber?: string;
+      date?: string;
+      totalAmountUsd?: MoneyInput;
+      prices?: { deviceId: string; purchasePriceUsd: MoneyInput }[];
+      accessoryCosts?: { batchId: string; unitCostUsd: MoneyInput }[];
+    },
+    actorId?: string,
+  ) {
     return prisma.$transaction(async (tx) => {
       await tx.$queryRaw`SELECT id FROM supplier_invoices WHERE id = ${id} FOR UPDATE`;
       await tx.$queryRaw`SELECT id FROM devices WHERE "purchaseInvoiceId" = ${id} ORDER BY id FOR UPDATE`;
-      const invoice = await tx.supplierInvoice.findUnique({ where: { id } });
+      const invoice = await tx.supplierInvoice.findUnique({ where: { id }, include: { supplier: { select: { name: true } } } });
       if (!invoice) throw new Error('Накладная не найдена');
 
-      const data: any = {};
+      const data: Prisma.SupplierInvoiceUpdateInput = {};
       if (input.invoiceNumber !== undefined && input.invoiceNumber.trim()) {
         data.invoiceNumber = input.invoiceNumber.trim();
       }
@@ -627,117 +763,206 @@ export class SuppliersService {
         data.date = updatedDate;
       }
 
-      if (input.totalAmountUsd !== undefined) {
+      const byItem = Boolean(input.prices?.length || input.accessoryCosts?.length);
+      let diff = D(0);
+      const priceChanges: { name: string; from: Prisma.Decimal; to: Prisma.Decimal }[] = [];
+      if (byItem) {
+        // Price by device / accessory batch: only what never left the invoice can change.
+        const devices = await tx.device.findMany({ where: { purchaseInvoiceId: id } });
+        const byId = new Map(devices.map((d) => [d.id, d]));
+        const sold = await everSoldDevices(tx, devices.map((d) => d.id));
+        for (const entry of input.prices ?? []) {
+          const device = byId.get(entry.deviceId);
+          if (!device) throw new Error('Устройство не относится к этой накладной');
+          const price = roundMoney(device.isBonus ? requireNonNegativeMoney(entry.purchasePriceUsd, 'Цена') : requirePositiveMoney(entry.purchasePriceUsd, `Цена ${device.brand} ${device.model}`));
+          if (price.eq(device.purchasePriceUsd)) continue;
+          if (device.isBonus) throw new Error(`${device.brand} ${device.model} — подарочный телефон, его цена всегда $0`);
+          if (sold.has(device.id)) throw new Error(`${device.brand} ${device.model} (${device.category === 'TABLET' ? 'SN' : 'IMEI'} ${device.imei}) уже продавался — его закупочную цену изменить нельзя`);
+          const change = price.minus(device.purchasePriceUsd);
+          diff = diff.plus(change);
+          // The cost basis moves by the same amount, keeping any later adjustment it carries.
+          await tx.device.update({ where: { id: device.id }, data: { purchasePriceUsd: price, costBasisUsd: { increment: change } } });
+          priceChanges.push({ name: `${device.brand} ${device.model} ${device.imei}`, from: D(device.purchasePriceUsd), to: price });
+        }
+        if (input.accessoryCosts?.length) {
+          await tx.$queryRaw`SELECT id FROM accessory_batches WHERE "purchaseInvoiceId" = ${id} ORDER BY id FOR UPDATE`;
+          const batches = await tx.accessoryBatch.findMany({ where: { purchaseInvoiceId: id }, include: { product: { select: { name: true } } } });
+          for (const entry of input.accessoryCosts) {
+            const batch = batches.find((b) => b.id === entry.batchId);
+            if (!batch) throw new Error('Партия аксессуаров не относится к этой накладной');
+            const cost = roundMoney(requirePositiveMoney(entry.unitCostUsd, `Цена ${batch.product.name}`));
+            if (cost.eq(batch.unitCostUsd)) continue;
+            if (!batchUntouched(batch)) throw new Error(`${batch.product.name}: часть партии уже продана или перемещена — цену изменить нельзя`);
+            diff = diff.plus(cost.minus(batch.unitCostUsd).mul(batch.quantityReceived));
+            await tx.accessoryBatch.update({ where: { id: batch.id }, data: { unitCostUsd: cost } });
+            priceChanges.push({ name: `${batch.product.name} × ${batch.quantityReceived}`, from: D(batch.unitCostUsd), to: cost });
+          }
+        }
+        if (priceChanges.some((c) => !c.name.includes(' × '))) await rebuildInvoiceGroups(tx, id);
+      } else if (input.totalAmountUsd !== undefined) {
         const oldTotal = invoice.totalAmountUsd;
         const newTotal = requireNonNegativeMoney(input.totalAmountUsd, 'Сумма накладной');
-        if (newTotal.lt(invoice.paidAmountUsd)) throw new Error('Сумма накладной не может быть меньше уже оплаченной суммы');
-        const diff = D(newTotal).minus(oldTotal);
-
-        data.totalAmountUsd = newTotal;
-
+        diff = roundMoney(D(newTotal).minus(oldTotal));
         if (!diff.isZero()) {
           // An accessory batch's unit cost was fixed at receipt; a new total can't be spread over
-          // its units to the cent, so such an invoice keeps its sum (delete and re-enter it instead).
+          // its units to the cent — such an invoice is edited by price.
           if (await tx.accessoryBatch.count({ where: { purchaseInvoiceId: id } })) {
-            throw new Error('Сумму накладной с аксессуарами изменить нельзя: себестоимость партий зафиксирована при приходе. Удалите накладную и оформите приход заново');
+            throw new Error('Для накладной с аксессуарами измените цены позиций, а не общую сумму');
           }
-          const invoiceDevices = await tx.device.findMany({ where: { purchaseInvoiceId: id }, select: { id: true } });
-          if (await deviceHasTransactionHistory(tx, invoiceDevices.map((device) => device.id))) {
-            throw new Error('Нельзя менять сумму накладной после продажи, перемещения или ремонта её устройств');
+          const invoiceDevices = await tx.device.findMany({ where: { purchaseInvoiceId: id }, orderBy: { id: 'asc' } });
+          if ((await everSoldDevices(tx, invoiceDevices.map((device) => device.id))).size) {
+            throw new Error('Часть телефонов уже продана: измените цены непроданных позиций, а не общую сумму');
           }
-          if (D(oldTotal).lte(0) && invoiceDevices.length > 0) throw new Error('Для изменения нулевой накладной отредактируйте состав прихода');
-          const devices = await tx.device.findMany({ where: { purchaseInvoiceId: id }, orderBy: { id: 'asc' } });
-          const costs = devices.length ? allocateMoney(newTotal, devices.map(d => d.purchasePriceUsd)) : [];
-          await tx.invoiceGroup.deleteMany({ where: { invoiceId: id } });
-          for (const [index, device] of devices.entries()) {
-            const adjustedCost = costs[index];
-            await tx.device.update({ where: { id: device.id }, data: { purchasePriceUsd: adjustedCost, costBasisUsd: adjustedCost } });
-            await tx.invoiceGroup.create({ data: { invoiceId: id, brand: device.brand, model: device.model,
-              ram: device.ram, storage: device.storage, color: device.color, quantity: 1, purchasePriceUsd: adjustedCost } });
+          if (D(oldTotal).lte(0) && invoiceDevices.length > 0) throw new Error('Для изменения нулевой накладной измените цены позиций');
+          const costs = invoiceDevices.length ? allocateMoney(newTotal, invoiceDevices.map((d) => d.purchasePriceUsd)) : [];
+          for (const [index, device] of invoiceDevices.entries()) {
+            await tx.device.update({ where: { id: device.id }, data: { purchasePriceUsd: costs[index], costBasisUsd: { increment: D(costs[index]).minus(device.purchasePriceUsd) } } });
           }
-          await tx.supplier.update({
-            where: { id: invoice.supplierId },
-            data: {
-              totalPurchasedUsd: { increment: diff },
-              totalDebtUsd: { increment: diff },
-            },
-          });
+          await rebuildInvoiceGroups(tx, id);
         }
       }
 
-      const updated = await tx.supplierInvoice.update({
-        where: { id },
-        data,
-      });
-
-      if (input.invoiceNumber && input.invoiceNumber.trim() !== invoice.invoiceNumber) {
-        await tx.device.updateMany({
-          where: { purchaseInvoiceId: id },
-          data: { invoiceNumber: input.invoiceNumber.trim() },
+      let refundUsd = D(0);
+      if (!diff.isZero()) {
+        const oldTotal = D(invoice.totalAmountUsd);
+        const paid = D(invoice.paidAmountUsd);
+        const newTotal = roundMoney(oldTotal.plus(diff));
+        if (newTotal.lt(0)) throw new Error('Сумма накладной не может стать отрицательной');
+        // Paid more than the invoice is now worth: the overpaid part comes back to the Central Cash.
+        refundUsd = decimalMax(D(0), roundMoney(paid.minus(newTotal)));
+        const newPaid = roundMoney(paid.minus(refundUsd));
+        const debtChange = roundMoney(newTotal.minus(newPaid).minus(oldTotal.minus(paid)));
+        data.totalAmountUsd = newTotal;
+        data.paidAmountUsd = newPaid;
+        await tx.supplier.update({
+          where: { id: invoice.supplierId },
+          data: {
+            totalPurchasedUsd: { increment: diff },
+            totalDebtUsd: { increment: debtChange },
+            ...(refundUsd.gt(0) ? { totalPaidUsd: { decrement: refundUsd } } : {}),
+          },
         });
+        if (refundUsd.gt(0)) {
+          if (!actorId) throw new Error('Не указан пользователь для возврата денег в кассу');
+          const actor = await resolveActor(tx, actorId);
+          await releaseInvoiceAllocations(tx, id, refundUsd);
+          await refundToCentralCash(tx, invoice, invoice.supplier.name, refundUsd, actor, `Цена по накладной ${invoice.invoiceNumber} снижена`);
+        }
       }
 
-      await recordSupplierAudit(tx, actorId, 'INVOICE_EDIT', id, invoice, updated);
-      return updated;
+      const updated = await tx.supplierInvoice.update({ where: { id }, data });
+      if (input.invoiceNumber && input.invoiceNumber.trim() !== invoice.invoiceNumber) {
+        await tx.device.updateMany({ where: { purchaseInvoiceId: id }, data: { invoiceNumber: input.invoiceNumber.trim() } });
+      }
+
+      if (actorId) {
+        const actor = await resolveActor(tx, actorId);
+        const debtNow = roundMoney(D(updated.totalAmountUsd).minus(updated.paidAmountUsd));
+        await tx.auditLog.create({
+          data: {
+            userId: actor.id, userName: actor.name, userRole: actor.role, action: 'INVOICE_EDIT', targetId: id,
+            details: `Изменена накладная ${updated.invoiceNumber} (${invoice.supplier.name})`
+              + (diff.isZero() ? '' : `: сумма $${invoice.totalAmountUsd} → $${updated.totalAmountUsd}`)
+              + (priceChanges.length ? `; цены: ${priceChanges.map((c) => `${c.name} $${c.from} → $${c.to}`).join(', ')}` : '')
+              + (refundUsd.gt(0) ? `; переплата $${refundUsd} возвращена в Центральную кассу` : '')
+              + (!diff.isZero() && refundUsd.isZero() ? `; долг по накладной $${debtNow}` : ''),
+            financialDetails: moneyJson({ before: invoice, after: updated, diffUsd: diff, refundUsd, priceChanges }),
+          },
+        });
+      }
+      return { ...updated, refundUsd };
     }, { maxWait: 10000, timeout: 25000 });
   }
 
+  /**
+   * Deletes an invoice whose goods were never sold, wherever they are now: its devices leave
+   * stock (with the transfer and store-receipt lines that moved them), its untouched accessory
+   * batches go, the supplier's totals drop by it, and what was paid on it comes back into the
+   * Central Cash.
+   */
   public static async deleteInvoice(id: string, actorId?: string) {
     return prisma.$transaction(async (tx) => {
       await tx.$queryRaw`SELECT id FROM supplier_invoices WHERE id = ${id} FOR UPDATE`;
       await tx.$queryRaw`SELECT id FROM devices WHERE "purchaseInvoiceId" = ${id} ORDER BY id FOR UPDATE`;
-      const invoice = await tx.supplierInvoice.findUnique({ where: { id } });
+      const invoice = await tx.supplierInvoice.findUnique({ where: { id }, include: { supplier: { select: { name: true } } } });
       if (!invoice) throw new Error('Накладная не найдена');
-      if (D(invoice.paidAmountUsd).gt(0)) throw new Error('Нельзя удалить уже оплаченную или частично оплаченную накладную');
 
       // purchaseInvoiceId is the only reliable link — invoiceNumber has no uniqueness
-      // constraint (two invoices, even from different suppliers, can share one), so
-      // matching by it too would risk sweeping up and deleting another invoice's devices.
-      const invoiceDevices = await tx.device.findMany({
-        where: { purchaseInvoiceId: id },
-        select: { id: true }
-      });
-      const invoiceDeviceIds = invoiceDevices.map((d) => d.id);
-      if (invoiceDeviceIds.length > 0) {
-        const hasHistory = await deviceHasTransactionHistory(tx, invoiceDeviceIds);
-        if (hasHistory) {
-          throw new Error('Нельзя удалить накладную: устройства из неё уже проданы, перемещены или отправлены в ремонт');
-        }
+      // constraint (two invoices, even from different suppliers, can share one).
+      const devices = await tx.device.findMany({ where: { purchaseInvoiceId: id }, select: { id: true, status: true, storeId: true } });
+      const deviceIds = devices.map((d) => d.id);
+      if ((await everSoldDevices(tx, deviceIds)).size) {
+        throw new Error('Нельзя удалить накладную: часть телефонов из неё уже продана');
+      }
+      if (deviceIds.length && (devices.some((d) => d.status === 'IN_REPAIR') || await tx.repairTicket.findFirst({ where: { deviceId: { in: deviceIds } } }))) {
+        throw new Error('Нельзя удалить накладную: телефон из неё был в ремонте');
+      }
+      if (devices.some((d) => d.status === 'TRANSFER_PENDING')) {
+        throw new Error('Телефон из накладной в незавершённом перемещении — сначала подтвердите или отклоните перемещение');
       }
 
       // Accessories leave with the invoice only while every unit of its batches is still in stock.
       await tx.$queryRaw`SELECT id FROM accessory_batches WHERE "purchaseInvoiceId" = ${id} ORDER BY id FOR UPDATE`;
       const batches = await tx.accessoryBatch.findMany({ where: { purchaseInvoiceId: id }, select: { id: true, quantityReceived: true, quantityRemaining: true, quantityReserved: true } });
-      if (batches.some((batch) => batch.quantityRemaining !== batch.quantityReceived || batch.quantityReserved > 0)) {
+      if (batches.some((batch) => !batchUntouched(batch))) {
         throw new Error('Нельзя удалить накладную: часть аксессуаров из неё уже продана или перемещена');
       }
 
-      const remainingDebtOnInvoice = D(invoice.totalAmountUsd).minus(invoice.paidAmountUsd);
+      const paid = D(invoice.paidAmountUsd);
+      const remainingDebtOnInvoice = roundMoney(D(invoice.totalAmountUsd).minus(paid));
 
       await tx.invoiceGroup.deleteMany({ where: { invoiceId: id } });
       if (batches.length) await tx.accessoryBatch.deleteMany({ where: { id: { in: batches.map((batch) => batch.id) } } });
       await tx.supplierPaymentAllocation.deleteMany({ where: { invoiceId: id } });
-      if (invoiceDeviceIds.length > 0) {
-        await tx.deviceTimelineEvent.deleteMany({ where: { deviceId: { in: invoiceDeviceIds } } });
-        await tx.device.deleteMany({ where: { id: { in: invoiceDeviceIds } } });
-        await syncStockAlerts(tx, [invoice.storeId]);
+      const storeIds = new Set<string>([...(invoice.storeId ? [invoice.storeId] : []), ...devices.map((d) => d.storeId).filter((s): s is string => Boolean(s))]);
+      if (deviceIds.length > 0) {
+        // Completed moves of these devices go with them; a move or receipt left empty goes too.
+        const transferIds = [...new Set((await tx.transferItem.findMany({ where: { deviceId: { in: deviceIds } }, select: { transferId: true } })).map((t) => t.transferId))];
+        const receiptIds = [...new Set((await tx.storeReceiptItem.findMany({ where: { deviceId: { in: deviceIds } }, select: { receiptId: true } })).map((r) => r.receiptId))];
+        await tx.transferItem.deleteMany({ where: { deviceId: { in: deviceIds } } });
+        await tx.storeReceiptItem.deleteMany({ where: { deviceId: { in: deviceIds } } });
+        for (const transferId of transferIds) {
+          const left = await tx.transferRequest.findUnique({ where: { id: transferId }, select: { _count: { select: { items: true, accessoryLines: true } } } });
+          if (left && left._count.items === 0 && left._count.accessoryLines === 0) await tx.transferRequest.delete({ where: { id: transferId } });
+        }
+        for (const receiptId of receiptIds) {
+          const left = await tx.storeReceipt.findUnique({ where: { id: receiptId }, select: { _count: { select: { items: true, accessoryLines: true } } } });
+          if (left && left._count.items === 0 && left._count.accessoryLines === 0) await tx.storeReceipt.delete({ where: { id: receiptId } });
+          else if (left) await tx.storeReceipt.update({ where: { id: receiptId }, data: { itemCount: left._count.items } });
+        }
+        await tx.deviceTimelineEvent.deleteMany({ where: { deviceId: { in: deviceIds } } });
+        await tx.device.deleteMany({ where: { id: { in: deviceIds } } });
       }
+      await syncStockAlerts(tx, [...storeIds]);
 
-      // Atomic guarded decrement, not a read-then-write — matches create's atomic
-      // increment of these same fields (app.ts) and avoids a lost update if another
-      // change to this supplier's totals lands between the read and the write.
+      // Atomic guarded decrement, not a read-then-write — matches create's atomic increment.
       const supplierGuard = await tx.supplier.updateMany({
-        where: { id: invoice.supplierId, totalPurchasedUsd: { gte: invoice.totalAmountUsd }, totalDebtUsd: { gte: remainingDebtOnInvoice } },
+        where: { id: invoice.supplierId, totalPurchasedUsd: { gte: invoice.totalAmountUsd }, totalDebtUsd: { gte: remainingDebtOnInvoice }, totalPaidUsd: { gte: paid } },
         data: {
           totalPurchasedUsd: { decrement: invoice.totalAmountUsd },
           totalDebtUsd: { decrement: remainingDebtOnInvoice },
+          totalPaidUsd: { decrement: paid },
         },
       });
       if (supplierGuard.count !== 1) throw new Error('Данные поставщика изменились, обновите страницу и повторите удаление');
 
       const result = await tx.supplierInvoice.delete({ where: { id } });
-      await recordSupplierAudit(tx, actorId, 'INVOICE_DELETE', id, invoice, null);
-      return result;
+      if (paid.gt(0)) {
+        if (!actorId) throw new Error('Не указан пользователь для возврата денег в кассу');
+        await refundToCentralCash(tx, invoice, invoice.supplier.name, paid, await resolveActor(tx, actorId), `Удалена накладная ${invoice.invoiceNumber}`);
+      }
+      if (actorId) {
+        const actor = await resolveActor(tx, actorId);
+        await tx.auditLog.create({
+          data: {
+            userId: actor.id, userName: actor.name, userRole: actor.role, action: 'INVOICE_DELETE', targetId: id,
+            details: `Удалена накладная ${invoice.invoiceNumber} (${invoice.supplier.name}) на $${invoice.totalAmountUsd}: ${deviceIds.length} устройств и ${batches.length} партий аксессуаров убраны с остатков`
+              + (paid.gt(0) ? `, оплата $${paid} возвращена в Центральную кассу` : ''),
+            financialDetails: moneyJson({ before: invoice, refundUsd: paid, deviceIds }),
+          },
+        });
+      }
+      return { ...result, refundUsd: paid };
     }, { maxWait: 10000, timeout: 25000 });
   }
 }

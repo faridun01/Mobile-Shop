@@ -107,12 +107,12 @@ async function run() {
     if (!adminHasSuppliersNav) throw new Error('Admin should see "Поставщики" in sidebar');
 
     // ----------------------------------------------------
-    // TEST 2: PARTNER RESTRICTIONS
+    // TEST 2: PARTNER — sees the cost of stock in the warehouse, still no purchases or suppliers
     // ----------------------------------------------------
     console.log('\n--- 2. Testing PARTNER role (partner_sadbarg) ---');
     await loginAs(page, 'partner_sadbarg', 'partner123');
 
-    // Verify /api/devices API response does not leak purchasePriceUsd
+    // A partner gets the purchase cost of their store's stock (the warehouse shows it)
     const apiDevicesResponse = await page.evaluate(async () => {
       const token = localStorage.getItem('ms_jwt_token');
       const res = await fetch('/api/devices', {
@@ -123,9 +123,9 @@ async function run() {
     if (!Array.isArray(apiDevicesResponse)) {
       throw new Error(`Expected array from /api/devices, got: ${JSON.stringify(apiDevicesResponse)}`);
     }
-    const hasLeakedPrice = apiDevicesResponse.some((d: any) => (d.purchasePriceUsd && d.purchasePriceUsd > 0) || (d.costBasisUsd && d.costBasisUsd > 0));
-    console.log('   Partner /api/devices leaked prices > 0:', hasLeakedPrice);
-    if (hasLeakedPrice) throw new Error('CRITICAL: /api/devices returned positive purchasePriceUsd or costBasisUsd to PARTNER!');
+    const partnerGetsCost = apiDevicesResponse.some((d: any) => d.purchasePriceUsd > 0 || d.costBasisUsd > 0);
+    console.log('   Partner /api/devices has purchase costs:', partnerGetsCost);
+    if (apiDevicesResponse.length && !partnerGetsCost) throw new Error('Partner should get the purchase cost of stock from /api/devices');
 
     // Click "Склад товаров" in sidebar
     await page.evaluate(() => {
@@ -139,7 +139,7 @@ async function run() {
     const partnerMainText = await page.evaluate(() => document.querySelector('main')?.innerText || '');
     const partnerSeesStockValuation = partnerMainText.toLowerCase().includes('стоимость склада');
     console.log('   Partner sees "Стоимость склада":', partnerSeesStockValuation);
-    if (partnerSeesStockValuation) throw new Error('Partner must NOT see "Стоимость склада"');
+    if (!partnerSeesStockValuation) throw new Error('Partner should see "Стоимость склада" in the warehouse');
 
     // Check sidebar navigation for Partner
     const partnerHasPurchaseNav = await page.evaluate(() => {

@@ -300,7 +300,7 @@ app.get('/api/devices', authenticateJwt, async (req: AuthenticatedRequest, res, 
     });
 
     // Which unit of identical phones should be sold first (the dearest one) — told to everyone,
-    // while the cost itself stays ADMIN-only.
+    // while the cost itself is for the admin and partners (who see it in the warehouse).
     const storeIds = [...new Set(devices.map((d) => d.storeId).filter(Boolean))];
     const sellable = storeIds.length
       ? await prisma.device.findMany({
@@ -312,7 +312,7 @@ app.get('/api/devices', authenticateJwt, async (req: AuthenticatedRequest, res, 
 
     const sanitizedDevices = devices.map((d) => ({
       ...d,
-      ...(req.user!.role === 'ADMIN' ? {} : { purchasePriceUsd: 0, costBasisUsd: 0 }),
+      ...(req.user!.role === 'ADMIN' || req.user!.role === 'PARTNER' ? {} : { purchasePriceUsd: 0, costBasisUsd: 0 }),
       preferredToSell: preferred.has(d.id),
     }));
 

@@ -66,8 +66,10 @@ export const InventoryPage: React.FC = () => {
   // No fallback rate: a TJS equivalent is only shown when today's rate is actually set.
   const rate = todayRate?.rate || undefined;
   const isSeller = currentUser?.role === 'SELLER';
-  const isAdmin = currentUser?.role === 'ADMIN';
   const isAdminOrPartner = currentUser?.role === 'ADMIN' || currentUser?.role === 'PARTNER';
+  // Purchase cost and stock value: the admin and partners see them in the warehouse, sellers do not.
+  // (The inventory components take it through their `isAdmin` prop, which only gates money there.)
+  const canSeeCost = isAdminOrPartner;
   const isStoreScoped = currentUser?.role === 'SELLER' || currentUser?.role === 'PARTNER';
   // Admin inside a store sees only that store; Central Cash shows every store.
   const storeCtx = useStoreContext();
@@ -290,7 +292,7 @@ export const InventoryPage: React.FC = () => {
         const isWh = stores.find(s => s.id === d.locationId)?.isMainWarehouse || d.status === 'MAIN_WAREHOUSE';
         if (isWh) return false;
       } else if (selectedStatusFilter === 'BONUS_ONLY') {
-        if (!d.isBonus && !(isAdmin && d.purchaseCostUsd === 0)) return false;
+        if (!d.isBonus && !(canSeeCost && d.purchaseCostUsd === 0)) return false;
       } else if (selectedStatusFilter === 'EXCHANGE_ONLY') {
         if (d.status !== 'IN_STOCK_AFTER_EXCHANGE') return false;
       }
@@ -676,7 +678,7 @@ export const InventoryPage: React.FC = () => {
           distinctBrandCount={distinctBrandCount}
           filteredDistinctModelsCount={filteredDistinctModelsCount}
           distinctModelCount={distinctModelCount}
-          isAdmin={isAdmin}
+          isAdmin={canSeeCost}
           filteredStockValueUsd={filteredStockValueUsd}
           stockValueUsd={stockValueUsd}
         />}
@@ -718,7 +720,7 @@ export const InventoryPage: React.FC = () => {
             onMaxPriceChange={setMaxPriceUsd}
             sortBy={sortBy}
             onSortByChange={setSortBy}
-            isAdmin={isAdmin}
+            isAdmin={canSeeCost}
             filteredDevicesCount={filteredDevices.length}
             brandGroupsCount={brandGroups.length}
             filteredStockValueUsd={filteredStockValueUsd}
@@ -730,7 +732,7 @@ export const InventoryPage: React.FC = () => {
       {/* Main Content Area */}
       <div className="flex-none md:flex-1 md:min-h-0 md:overflow-y-auto">
         {viewTab === 'ACCESSORIES' ? (
-          <AccessoryStockList locationId={isStoreScoped ? undefined : selectedLocationId} isAdmin={isAdmin} />
+          <AccessoryStockList locationId={isStoreScoped ? undefined : selectedLocationId} isAdmin={canSeeCost} />
         ) : isInitialLoading ? (
           <LoadingState label="Загрузка склада товаров…" />
         ) : viewTab === 'LOCATIONS' ? (
@@ -740,7 +742,7 @@ export const InventoryPage: React.FC = () => {
             retailStores={retailStores}
             storeStats={storeStats}
             selectedLocationId={selectedLocationId}
-            isAdmin={isAdmin}
+            isAdmin={canSeeCost}
             rate={rate}
             onSelectLocationAndSwitch={handleSelectLocationAndSwitch}
           />
@@ -765,7 +767,7 @@ export const InventoryPage: React.FC = () => {
             stores={stores}
             selectedLocationId={selectedLocationId}
             activeStore={activeStore}
-            isAdmin={isAdmin}
+            isAdmin={canSeeCost}
             rate={rate}
             totalFilteredDevicesCount={filteredDevices.length}
             onSelectDevice={(device) => setSelectedDevice(device)}
@@ -778,7 +780,7 @@ export const InventoryPage: React.FC = () => {
             sortBy={sortBy}
             stores={stores}
             selectedLocationId={selectedLocationId}
-            isAdmin={isAdmin}
+            isAdmin={canSeeCost}
             rate={rate}
             onSelectDevice={(device) => setSelectedDevice(device)}
           />
@@ -789,7 +791,7 @@ export const InventoryPage: React.FC = () => {
             flatRows={flatRows}
             stores={stores}
             selectedLocationId={selectedLocationId}
-            isAdmin={isAdmin}
+            isAdmin={canSeeCost}
             rate={rate}
             onSelectDevice={(device) => setSelectedDevice(device)}
           />
@@ -801,7 +803,7 @@ export const InventoryPage: React.FC = () => {
         device={selectedDevice}
         stores={stores}
         rate={rate}
-        isAdmin={isAdmin}
+        isAdmin={canSeeCost}
         isAdminOrPartner={isAdminOrPartner}
         allDevices={devices}
         onClose={() => setSelectedDevice(null)}

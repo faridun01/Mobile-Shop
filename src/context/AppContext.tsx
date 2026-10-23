@@ -191,8 +191,13 @@ interface AppContextType {
   }) => Promise<{ success: boolean; message?: string }>;
   updateSupplier: (id: string, data: { name?: string; phone?: string; contactPerson?: string }) => Promise<{ success: boolean; message?: string }>;
   deleteSupplier: (id: string) => Promise<{ success: boolean; message?: string }>;
-  updateSupplierInvoice: (id: string, data: { invoiceNumber?: string; date?: string; totalAmountUsd?: number }) => Promise<{ success: boolean; message?: string }>;
-  deleteSupplierInvoice: (id: string) => Promise<{ success: boolean; message?: string }>;
+  /** Prices by device / accessory batch; `refundUsd` is what came back to the Central Cash. */
+  updateSupplierInvoice: (id: string, data: {
+    invoiceNumber?: string; date?: string; totalAmountUsd?: number;
+    prices?: { deviceId: string; purchasePriceUsd: number }[];
+    accessoryCosts?: { batchId: string; unitCostUsd: number }[];
+  }) => Promise<{ success: boolean; message?: string; refundUsd?: number }>;
+  deleteSupplierInvoice: (id: string) => Promise<{ success: boolean; message?: string; refundUsd?: number }>;
 
   createSupplierBonus: (params: {
     supplierId: string;
@@ -1234,10 +1239,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const updateSupplierInvoice: AppContextType['updateSupplierInvoice'] = async (id, data) => {
     try {
-      await apiClient(`/supplier-invoices/${id}`, { method: 'PUT', body: JSON.stringify(data) });
-      markLocalMutation(['devices', 'suppliers', 'invoices', 'bonuses']);
-      await refreshAfterMutation([fetchDevices(), fetchSuppliers(), fetchInvoices(), fetchBonuses()]);
-      return { success: true };
+      const result = await apiClient<{ refundUsd?: number }>(`/supplier-invoices/${id}`, { method: 'PUT', body: JSON.stringify(data) });
+      // A repriced invoice can return money to the Central Cash: the registers refresh too.
+      markLocalMutation(['devices', 'suppliers', 'invoices', 'bonuses', 'stores']);
+      await refreshAfterMutation([fetchDevices(), fetchSuppliers(), fetchInvoices(), fetchBonuses(), fetchStores()]);
+      return { success: true, refundUsd: Number(result?.refundUsd) || 0 };
     } catch (err) {
       return { success: false, message: errorMessage(err, 'Не удалось обновить накладную') };
     }
@@ -1245,10 +1251,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const deleteSupplierInvoice: AppContextType['deleteSupplierInvoice'] = async (id) => {
     try {
-      await apiClient(`/supplier-invoices/${id}`, { method: 'DELETE' });
-      markLocalMutation(['devices', 'suppliers', 'invoices', 'bonuses']);
-      await refreshAfterMutation([fetchDevices(), fetchSuppliers(), fetchInvoices(), fetchBonuses()]);
-      return { success: true };
+      const result = await apiClient<{ refundUsd?: number }>(`/supplier-invoices/${id}`, { method: 'DELETE' });
+      // What was paid on it is back in the Central Cash.
+      markLocalMutation(['devices', 'suppliers', 'invoices', 'bonuses', 'stores']);
+      await refreshAfterMutation([fetchDevices(), fetchSuppliers(), fetchInvoices(), fetchBonuses(), fetchStores()]);
+      return { success: true, refundUsd: Number(result?.refundUsd) || 0 };
     } catch (err) {
       return { success: false, message: errorMessage(err, 'Не удалось удалить накладную') };
     }
