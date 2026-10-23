@@ -41,6 +41,8 @@ type ProfitEvent = {
   exchangeReceiptNumber?: number;
   refundReason?: string | null;
   penaltyTjs?: Prisma.Decimal; penaltyUsd?: Prisma.Decimal;
+  // Money the customer paid (+) or was handed (−) at this moment; null when not known (a cancelled return).
+  cashTjs?: Prisma.Decimal | null;
 };
 
 /** One dated row of the report: a sale, an exchange or a refund, in its own day's TJS, rate and USD. */
@@ -63,6 +65,8 @@ export interface ReportEvent {
   bonusUsd: Prisma.Decimal;
   penaltyTjs: Prisma.Decimal;
   penaltyUsd: Prisma.Decimal;
+  /** Money that changed hands with the customer: paid at the sale (not the debt, not an exchange's credit), handed back on a return. */
+  cashTjs: Prisma.Decimal | null;
 }
 
 function detailNumber(details: unknown, key: string): number | undefined {
@@ -142,7 +146,7 @@ export async function computeReportsSummary(input: ReportsSummaryInput) {
     // the rows together itself, which took more than twice as long for a long period.
     prisma.sale.findMany({
       where: periodSaleWhere,
-      select: { id: true, storeId: true, status: true, totalTjs: true, totalUsd: true, exchangeRate: true, receiptNumber: true, createdAt: true },
+      select: { id: true, storeId: true, status: true, totalTjs: true, totalUsd: true, exchangeRate: true, receiptNumber: true, createdAt: true, cashAmountTjs: true, cardAmountTjs: true },
       orderBy: { createdAt: 'desc' },
     }),
     prisma.saleItem.findMany({
@@ -195,7 +199,7 @@ export async function computeReportsSummary(input: ReportsSummaryInput) {
       where: { sale: { annulledAt: null }, ...(storeFilter ? { storeId: storeFilter } : {}), ...(dateRange ? { createdAt: dateRange } : {}) },
       select: {
         id: true, storeId: true, createdAt: true, exchangeRate: true, reason: true, bookedUsd: true, fxUsd: true, accessoryLines: true,
-        withheldTjs: true, withheldUsd: true, creditTjs: true, creditUsd: true, exchangeSaleId: true,
+        withheldTjs: true, withheldUsd: true, creditTjs: true, creditUsd: true, payoutTjs: true, exchangeSaleId: true,
         sale: { select: { id: true, receiptNumber: true } },
         exchangeSale: { select: { receiptNumber: true } },
         items: { select: { brand: true, model: true, salePriceTjs: true, salePriceUsd: true, costBasisUsd: true, isBonus: true } },
@@ -326,11 +330,12 @@ export async function computeReportsSummary(input: ReportsSummaryInput) {
       const cost = sale.saleItems.reduce((sum, item) => D(sum).plus(item.costBasisUsd), D(0));
       profitEvents.push({ storeId: sale.storeId, revenueUsd: D(sale.totalUsd), revenueTjs: D(sale.totalTjs), profitUsd: roundMoney(D(sale.totalUsd).minus(cost)), bonusUsd: D(0), rate: saleRate,
         kind: 'SALE', date: sale.createdAt, saleId: sale.id, receiptNumber: sale.receiptNumber,
-        exchangeReceiptNumber: exchangedFromReceipt.get(sale.id) });
+        exchangeReceiptNumber: exchangedFromReceipt.get(sale.id), cashTjs: D(sale.cashAmountTjs).plus(sale.cardAmountTjs) });
     } else {
       profitEvents.push({
         kind: 'SALE', date: sale.createdAt, saleId: sale.id, receiptNumber: sale.receiptNumber,
         exchangeReceiptNumber: exchangedFromReceipt.get(sale.id),
+        cashTjs: D(sale.cashAmountTjs).plus(sale.cardAmountTjs),
         storeId: sale.storeId,
         revenueUsd: D(detailNumber(original.details, 'amountUsd') ?? sale.totalUsd),
         revenueTjs: D(detailNumber(original.details, 'amountTjs') ?? sale.totalTjs),
@@ -353,6 +358,7 @@ export async function computeReportsSummary(input: ReportsSummaryInput) {
     exchangesCount++;
     profitEvents.push({
       kind: 'EXCHANGE', date: log.createdAt, saleId: log.targetId!, receiptNumber: exchangeReceiptBySale.get(log.targetId!),
+      cashTjs: D(detailNumber(log.financialDetails, 'differenceTjs') ?? 0),
       storeId,
       revenueUsd: D(newPriceUsd).minus(detailNumber(log.financialDetails, 'exchangeInValueUsd') ?? 0),
       revenueTjs: D(newPriceTjs).minus(detailNumber(log.financialDetails, 'exchangeInValueTjs') ?? 0),
@@ -386,6 +392,7 @@ export async function computeReportsSummary(input: ReportsSummaryInput) {
     profitEvents.push({
       kind: 'REFUND', date: sale.refundedAt ?? new Date(), saleId: sale.id, receiptNumber: sale.receiptNumber,
       refundReason: sale.refundReason,
+      cashTjs: D(sale.actualRefundAmountTjs ?? 0).negated(),
       penaltyTjs: D(sale.penaltyFeeTjs ?? 0), penaltyUsd: D(sale.penaltyFeeUsd ?? 0),
       storeId: sale.storeId,
       revenueUsd: reversedRevenueUsd.negated(),
@@ -414,6 +421,8 @@ export async function computeReportsSummary(input: ReportsSummaryInput) {
       kind: 'REFUND', date: ret.createdAt, saleId: ret.sale.id, receiptNumber: ret.sale.receiptNumber,
       exchangeReceiptNumber: ret.exchangeSale?.receiptNumber,
       refundReason: ret.reason,
+      // Only what left the register: on an exchange the rest of the credit paid the new receipt.
+      cashTjs: D(ret.payoutTjs).negated(),
       penaltyTjs: D(ret.withheldTjs), penaltyUsd: D(ret.withheldUsd),
       storeId: ret.storeId,
       revenueUsd: reversedRevenueUsd.negated(),
@@ -727,6 +736,7 @@ export async function computeReportsSummary(input: ReportsSummaryInput) {
           profitUsd: roundMoney(profitUsd.minus(bonusUsd)),
           bonusUsd,
           penaltyTjs: roundMoney(event.penaltyTjs ?? 0),
+          cashTjs: event.cashTjs == null ? null : roundMoney(event.cashTjs),
           penaltyUsd: roundMoney(event.penaltyUsd ?? 0),
         };
       });

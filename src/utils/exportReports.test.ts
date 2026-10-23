@@ -8,13 +8,13 @@ const fixture: ComprehensiveReportInput = {
       // Sold for 1200 TJS at 10: $120, of which $15 is bonus-phone profit (nobody's income).
       kind: 'SALE', date: '2026-09-09T10:00:00.000Z', saleId: 'sale-1', receiptNumber: 101,
       storeId: 'store-1', storeName: 'Сиёма', rate: 10, amountTjs: 1200, amountUsd: 120,
-      costUsd: 70, profitUsd: 35, bonusUsd: 15, penaltyTjs: 0, penaltyUsd: 0,
+      costUsd: 70, profitUsd: 35, bonusUsd: 15, penaltyTjs: 0, penaltyUsd: 0, cashTjs: 1200,
     },
     {
       // An older 1100 TJS sale refunded at 10.5: 1000 TJS handed back = $95.24, 100 TJS withheld.
       kind: 'REFUND', date: '2026-09-10T12:00:00.000Z', saleId: 'sale-0', receiptNumber: 90,
       storeId: 'store-1', storeName: 'Сиёма', rate: 10, amountTjs: -1000, amountUsd: -95.24,
-      costUsd: -60, profitUsd: -35.24, bonusUsd: 0, penaltyTjs: 100, penaltyUsd: 9.52,
+      costUsd: -60, profitUsd: -35.24, bonusUsd: 0, penaltyTjs: 100, penaltyUsd: 9.52, cashTjs: -1000,
     },
   ],
   expenses: [
@@ -66,6 +66,10 @@ describe('comprehensive Excel report', () => {
     expect(operations.getCell('C5').value).toBe(101);
     expect(operations.getCell('B6').value).toBe('Возврат (чек № 90)');
     expect(operations.getCell('G6').value).toBe(-95.24);
+    // The money that changed hands: 1200 TJS paid, 1000 TJS handed back (100 were withheld).
+    expect(operations.getCell('M5').value).toBe(1200);
+    expect(operations.getCell('M6').value).toBe(-1000);
+    expect(operations.getCell('M7').value).toMatchObject({ formula: 'SUM(M5:M6)', result: 200 });
     // The expense keeps the dollars it was registered at.
     expect(workbook.getWorksheet('Расходы')?.getCell('K5').value).toBe(20);
 

@@ -107,6 +107,11 @@ try {
   assert.deepEqual(cheaper.map((e) => [e.kind, D(e.profitUsd).toNumber(), D(e.amountUsd).toNumber()]), [['REFUND', -100, -500], ['SALE', 100, 400]]);
   // Both halves name the other receipt, so the export labels them as one exchange.
   assert.deepEqual(cheaper.map((e) => [e.receiptNumber, e.exchangeReceiptNumber]), [[galaxy.receiptNumber, tecno.receiptNumber], [tecno.receiptNumber, galaxy.receiptNumber]]);
+  // The money that changed hands: the 1000 TJS change handed back on the return, nothing paid on the new receipt.
+  assert.deepEqual(cheaper.map((e) => D(e.cashTjs ?? NaN).toNumber()), [-1000, 0]);
+  // The withheld exchange: the old Redmi's 2700 credit and a 300 TJS top-up pay the 3000 TJS Redmi C.
+  const redmiC = t.events!.find((e) => e.kind === 'SALE' && e.exchangeReceiptNumber === redmi.receiptNumber)!;
+  assert.equal(redmiC.cashTjs, 300, 'the new receipt shows only the top-up');
   const todayEvents = t.events!.map((e) => `${e.kind} #${e.receiptNumber} ${e.profitUsd}`);
   console.log('today events:', todayEvents.join(' | '));
 
