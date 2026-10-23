@@ -427,15 +427,15 @@ export const EmployeesPage: React.FC = () => {
     <div className="work-screen flex-1 flex flex-col h-full overflow-hidden bg-bg text-fg-muted">
       {/* Header Bar */}
       <div className="p-2.5 sm:p-3 md:px-5 border-b border-border bg-surface flex items-center justify-end gap-2 shrink-0">
-        <div className="flex items-center gap-1.5 shrink-0">
+        <div className="flex items-center gap-1.5 flex-1 sm:flex-none sm:shrink-0">
           <button
             type="button"
             onClick={() => setIsPayrollReportModalOpen(true)}
-            className="h-8 px-2.5 sm:px-3 rounded-xl bg-surface-raised hover:bg-surface border border-border text-fg text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
+            className="flex-1 sm:flex-none justify-center h-8 px-2.5 sm:px-3 rounded-xl bg-surface-raised hover:bg-surface border border-border text-fg text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
             title="Ежемесячная ведомость зарплат продавцов"
           >
             <Briefcase className="w-3.5 h-3.5 text-fg-subtle" />
-            <span><span className="hidden sm:inline">Зарплатный </span>отчёт</span>
+            <span className="min-[360px]:hidden">Отчёт</span><span className="hidden min-[360px]:inline">Зарплатный отчёт</span>
           </button>
 
           {currentUser?.role === 'ADMIN' && (
@@ -445,10 +445,10 @@ export const EmployeesPage: React.FC = () => {
                 setEditingUser(null);
                 setIsModalOpen(true);
               }}
-              className="h-8 px-2.5 sm:px-3.5 rounded-xl bg-accent hover:bg-accent-strong text-accent-fg text-xs font-semibold flex items-center gap-1 transition-all shadow-xs shrink-0 cursor-pointer"
+              className="flex-1 sm:flex-none justify-center h-8 px-2.5 sm:px-3.5 rounded-xl bg-accent hover:bg-accent-strong text-accent-fg text-xs font-semibold flex items-center gap-1 transition-all shadow-xs cursor-pointer"
             >
               <Plus className="w-3.5 h-3.5" />
-              <span><span className="hidden sm:inline">Добавить </span>сотрудника</span>
+              <span className="min-[360px]:hidden">Сотрудник</span><span className="hidden min-[360px]:inline">Добавить сотрудника</span>
             </button>
           )}
         </div>

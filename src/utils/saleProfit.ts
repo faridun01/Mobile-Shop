@@ -60,8 +60,8 @@ export function computeSaleProfit(sale: Sale, fallbackExchangeRate: number = 0):
   const keptItems = sale.status === 'REFUNDED' ? [] : (sale.items || []).filter((item) => !item.returnId);
   const hasReturns = (sale.returns?.length ?? 0) > 0;
   // Accessories: the cost of the units still sold (returned units are back in their batches).
-  const accessoryCostUsd = sale.status === 'REFUNDED' ? 0 : (sale.accessoryItems || []).reduce((acc, line) => acc + (line.costUsd - line.returnedCostUsd), 0);
-  const costUsd = keptItems.reduce((acc, item) => acc + (Number(item.costBasisUsd) || 0), 0) + accessoryCostUsd;
+  const accessoryCostUsd = sale.status === 'REFUNDED' ? 0 : sumMoney((sale.accessoryItems || []).map((line) => moneyNumber(decimal(line.costUsd).minus(line.returnedCostUsd))));
+  const costUsd = sumMoney([...keptItems.map((item) => Number(item.costBasisUsd) || 0), accessoryCostUsd]);
   const revenueUsd = Number(sale.totalUsd) || 0;
   const recognized = sale.recognizedProfitUsd !== undefined && sale.recognizedProfitUsd !== null ? Number(sale.recognizedProfitUsd) : undefined;
 
@@ -78,10 +78,13 @@ export function computeSaleProfit(sale: Sale, fallbackExchangeRate: number = 0):
   } else if (recognized !== undefined) {
     profitUsd = recognized;
   } else {
-    profitUsd = keptItems.reduce(
-      (acc, item) => acc + ((Number(item.salePriceUsd) || 0) - (Number(item.costBasisUsd) || 0)),
-      0
-    ) + (sale.accessoryItems || []).reduce((acc, line) => acc + (line.salePriceUsd - line.costUsd), 0);
+    profitUsd = moneyNumber(decimal(sumMoney([
+      ...keptItems.map((item) => Number(item.salePriceUsd) || 0),
+      ...(sale.accessoryItems || []).map((line) => line.salePriceUsd),
+    ])).minus(sumMoney([
+      ...keptItems.map((item) => Number(item.costBasisUsd) || 0),
+      ...(sale.accessoryItems || []).map((line) => line.costUsd),
+    ])));
   }
 
   const roundedProfitUsd = Math.round(profitUsd * 100) / 100;

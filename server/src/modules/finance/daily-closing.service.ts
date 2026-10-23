@@ -93,13 +93,15 @@ function usdAt(tjs: Money, rate: MoneyInput | null | undefined): Money {
 async function rateForBusinessDate(db: Db, businessDate: string, strict: boolean): Promise<Money | null> {
   const exact = await db.exchangeRate.findUnique({ where: { date: businessDate } });
   if (exact?.rate && D(exact.rate).gt(0)) return D(exact.rate);
-  const latest = await db.exchangeRate.findFirst({ where: { date: { lte: businessDate } }, orderBy: { date: 'desc' } })
-    ?? await db.exchangeRate.findFirst({ orderBy: { date: 'desc' } });
-  if (latest?.rate && D(latest.rate).gt(0)) return D(latest.rate);
+  const earlier = await db.exchangeRate.findFirst({ where: { date: { lte: businessDate } }, orderBy: { date: 'desc' } });
+  if (earlier?.rate && D(earlier.rate).gt(0)) return D(earlier.rate);
+  // A closing books its counted difference at that day's rate, never at a later day's.
   if (strict) {
     throw new Error(`Сначала задайте курс USD/TJS на ${businessDate}`);
   }
-  return null;
+  // Only for showing a summary: a later rate when no earlier one exists.
+  const latest = await db.exchangeRate.findFirst({ orderBy: { date: 'desc' } });
+  return latest?.rate && D(latest.rate).gt(0) ? D(latest.rate) : null;
 }
 
 type ExchangeSettlement = { cashAmountTjs: MoneyInput | null; cardAmountTjs: MoneyInput | null; paymentMethod: string | null; differenceTjs: MoneyInput };

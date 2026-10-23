@@ -485,7 +485,7 @@ export const CustomersPage: React.FC = () => {
                     <div
                       key={c.id}
                       onClick={() => setDetailCustomer(c)}
-                      className="px-2.5 sm:px-3 py-1.5 sm:py-2 hover:bg-surface-raised/50 transition-colors flex items-center justify-between gap-2 cursor-pointer group"
+                      className="px-2.5 sm:px-3 py-1.5 sm:py-2 hover:bg-surface-raised/50 transition-colors flex flex-wrap sm:flex-nowrap items-center justify-between gap-x-2 gap-y-1 cursor-pointer group"
                     >
                       {/* Left: Avatar + Name + Badges + Note */}
                       <div className="flex items-center gap-2 sm:gap-2.5 min-w-0 flex-1">
@@ -529,8 +529,8 @@ export const CustomersPage: React.FC = () => {
                         </div>
                       </div>
 
-                      {/* Middle: Phone + Quick actions */}
-                      <div className="flex items-center gap-1.5 shrink-0">
+                      {/* Middle: Phone + Quick actions — on a phone, its own line under the name */}
+                      <div className={`${c.phone ? 'flex' : 'hidden sm:flex'} items-center gap-1.5 shrink-0 order-last sm:order-none w-full sm:w-auto pl-9.5 sm:pl-0`}>
                         {c.phone ? (
                           <div className="flex items-center gap-1 bg-surface-raised px-2 py-0.5 rounded-lg border border-border">
                             <a
@@ -541,10 +541,10 @@ export const CustomersPage: React.FC = () => {
                             >
                               {c.phone}
                             </a>
-                            <button
+                            <button data-compact
                               type="button"
                               onClick={(e) => handleCopyPhone(c.id, c.phone!, e)}
-                              className="p-0.5 text-fg-subtle hover:text-fg transition-colors rounded cursor-pointer"
+                              className="p-1.5 -my-1 text-fg-subtle hover:text-fg transition-colors rounded cursor-pointer"
                               title="Скопировать номер"
                             >
                               {isCopied ? <Check className="w-3 h-3 text-success" /> : <Copy className="w-3 h-3" />}
@@ -555,7 +555,7 @@ export const CustomersPage: React.FC = () => {
                                 target="_blank"
                                 rel="noreferrer"
                                 onClick={(e) => e.stopPropagation()}
-                                className="p-0.5 text-fg-subtle hover:text-emerald-500 transition-colors rounded"
+                                className="p-1.5 -my-1 text-fg-subtle hover:text-emerald-500 transition-colors rounded"
                                 title="Написать в WhatsApp"
                               >
                                 <MessageCircle className="w-3 h-3" />
@@ -571,10 +571,10 @@ export const CustomersPage: React.FC = () => {
                       <div className="flex items-center justify-end gap-1 shrink-0">
                         {/* КНОПКА ПРИЕМА ОПЛАТЫ ДОЛГА */}
                         {hasDebt && (
-                          <button
+                          <button data-compact
                             type="button"
                             onClick={(e) => handleOpenPaymentModal(c, e)}
-                            className="h-6.5 px-2 text-[11px] font-bold flex items-center gap-1 cursor-pointer bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg shadow-2xs transition-colors"
+                            className="h-6.5 px-2 text-[11px] font-bold flex items-center gap-1 cursor-pointer bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg shadow-2xs transition-colors hit-area"
                             title="Принять оплату долга в кассу"
                           >
                             <HandCoins className="w-3 h-3" />
@@ -582,23 +582,23 @@ export const CustomersPage: React.FC = () => {
                           </button>
                         )}
 
-                        <button
+                        <button data-compact
                           type="button"
                           onClick={(e) => handleOpenEdit(c, e)}
-                          className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-surface-raised text-fg-subtle hover:text-fg transition-colors cursor-pointer"
+                          className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-surface-raised text-fg-subtle hover:text-fg transition-colors cursor-pointer hit-area"
                           title="Редактировать контакт"
                         >
                           <Edit2 className="w-3 h-3" />
                         </button>
 
                         {isAdmin && (
-                          <button
+                          <button data-compact
                             type="button"
                             onClick={(e) => {
                               e.stopPropagation();
                               setDeletingCustomer(c);
                             }}
-                            className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-danger/10 text-fg-subtle hover:text-danger transition-colors cursor-pointer"
+                            className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-danger/10 text-fg-subtle hover:text-danger transition-colors cursor-pointer hit-area"
                             title="Удалить"
                           >
                             <Trash2 className="w-3 h-3" />

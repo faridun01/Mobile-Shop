@@ -271,9 +271,9 @@ export const AuditLogPage: React.FC = () => {
       {/* Compact Top Action Bar: Search, Date Filter, and Essential Controls */}
       <div className="border-b border-border bg-surface shrink-0 shadow-2xs">
         {/* Row 1: Search, Date Filter & Main Action Buttons */}
-        <div className="p-2 sm:px-3 sm:py-2 flex items-center gap-1.5">
-          {/* Search bar */}
-          <div className="relative flex-1 min-w-0">
+        <div className="p-2 sm:px-3 sm:py-2 flex flex-wrap sm:flex-nowrap items-center gap-1.5">
+          {/* Search bar: its own full-width line on a phone */}
+          <div className="relative w-full sm:w-auto sm:flex-1 min-w-0">
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-fg-subtle pointer-events-none" />
             <input
               type="text"
@@ -294,11 +294,11 @@ export const AuditLogPage: React.FC = () => {
           </div>
 
           {/* Period selector dropdown */}
-          <div className="flex items-center gap-1 shrink-0">
+          <div className="flex items-center gap-1 flex-1 sm:flex-none sm:shrink-0 min-w-0">
             <select
               value={dateFilterMode}
               onChange={(e) => setDateFilterMode(e.target.value as DateFilterMode)}
-              className="h-8 bg-surface-raised border border-border text-fg text-xs font-medium rounded-lg px-2 focus:outline-none focus:border-accent cursor-pointer"
+              className="h-8 flex-1 sm:flex-none min-w-0 bg-surface-raised border border-border text-fg text-xs font-medium rounded-lg px-2 focus:outline-none focus:border-accent cursor-pointer"
             >
               <option value="TODAY">Сегодня</option>
               <option value="ALL">Все время</option>
@@ -322,10 +322,10 @@ export const AuditLogPage: React.FC = () => {
             )}
 
             {/* Sort order toggle button */}
-            <button
+            <button data-compact
               type="button"
               onClick={() => setSortOrder(prev => (prev === 'DESC' ? 'ASC' : 'DESC'))}
-              className="h-8 w-8 rounded-lg border border-border bg-surface-raised hover:bg-surface text-fg flex items-center justify-center transition-colors cursor-pointer shrink-0"
+              className="h-8 w-8 rounded-lg border border-border bg-surface-raised hover:bg-surface text-fg flex items-center justify-center transition-colors cursor-pointer shrink-0 hit-area"
               title={sortOrder === 'DESC' ? 'Сначала новые' : 'Сначала старые'}
             >
               {sortOrder === 'DESC' ? (
@@ -355,7 +355,7 @@ export const AuditLogPage: React.FC = () => {
             </button>
 
             {/* Export CSV button */}
-            <button
+            <button data-compact
               type="button"
               onClick={() =>
                 exportAuditLogsReport(
@@ -368,7 +368,7 @@ export const AuditLogPage: React.FC = () => {
                 )
               }
               disabled={filteredLogs.length === 0}
-              className="h-8 w-8 rounded-lg border border-border bg-surface-raised hover:bg-surface text-fg flex items-center justify-center transition-colors disabled:opacity-40 cursor-pointer shrink-0"
+              className="h-8 w-8 rounded-lg border border-border bg-surface-raised hover:bg-surface text-fg flex items-center justify-center transition-colors disabled:opacity-40 cursor-pointer shrink-0 hit-area"
               title="Экспорт в CSV"
             >
               <Download className="w-3.5 h-3.5 text-accent" />

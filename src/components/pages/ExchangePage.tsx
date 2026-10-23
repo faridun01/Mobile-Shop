@@ -365,7 +365,7 @@ export const ExchangePage: React.FC = () => {
       <StatusBanner message={status} onDismiss={() => setStatus(null)} />
 
       <form onSubmit={handleSubmitExchange} className="flex-1 flex flex-col overflow-hidden">
-        <div className="flex-1 grid grid-cols-1 lg:grid-cols-2 divide-y lg:divide-y-0 lg:divide-x divide-border overflow-y-auto">
+        <div className="flex-1 grid grid-cols-1 content-start lg:content-stretch lg:grid-cols-2 divide-y lg:divide-y-0 lg:divide-x divide-border overflow-y-auto">
           {/* STEP 1: the goods the customer returns */}
           <div className="p-3 sm:p-4 space-y-3 bg-bg">
             <div className="flex items-center justify-between border-b border-border pb-2.5">

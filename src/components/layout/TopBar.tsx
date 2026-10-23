@@ -119,7 +119,7 @@ export const TopBar: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setStoreSwitchModalOpen(true)}
-                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-surface-raised hover:bg-accent hover:text-accent-fg border border-border text-xs font-semibold text-fg transition-all shadow-2xs active:scale-95 cursor-pointer"
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1 min-h-8.5 md:min-h-9 hit-area-y rounded-xl bg-surface-raised hover:bg-accent hover:text-accent-fg border border-border text-xs font-semibold text-fg transition-all shadow-2xs active:scale-95 cursor-pointer"
                   title="Перейти в режим розничных продаж"
                 >
                   <Store className="w-3.5 h-3.5 text-accent" />
@@ -133,7 +133,7 @@ export const TopBar: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setStoreSwitchModalOpen(true)}
-                  className="inline-flex items-center gap-1 px-2 sm:px-2.5 py-1 rounded-xl bg-warning/15 hover:bg-warning/25 text-warning border border-warning/30 text-xs font-bold transition-all shadow-2xs active:scale-95 cursor-pointer shrink-0"
+                  className="inline-flex items-center gap-1 px-2 sm:px-2.5 py-1 min-h-8.5 md:min-h-9 hit-area-y rounded-xl bg-warning/15 hover:bg-warning/25 text-warning border border-warning/30 text-xs font-bold transition-all shadow-2xs active:scale-95 cursor-pointer shrink-0"
                   title="Сменить магазин"
                 >
                   <Store className="w-3.5 h-3.5 shrink-0" />
@@ -152,7 +152,7 @@ export const TopBar: React.FC = () => {
                     setActivePage('WELCOME');
                     navigate('/');
                   }}
-                  className="inline-flex items-center gap-1 px-2 sm:px-2.5 py-1 rounded-xl bg-surface-raised hover:bg-accent hover:text-accent-fg border border-border text-xs font-semibold text-fg transition-all shadow-2xs active:scale-95 cursor-pointer shrink-0"
+                  className="inline-flex items-center gap-1 px-2 sm:px-2.5 py-1 min-h-8.5 md:min-h-9 hit-area-y rounded-xl bg-surface-raised hover:bg-accent hover:text-accent-fg border border-border text-xs font-semibold text-fg transition-all shadow-2xs active:scale-95 cursor-pointer shrink-0"
                   title="Вернуться в Центральную кассу"
                 >
                   <Landmark className="w-3.5 h-3.5 text-accent shrink-0" />
@@ -177,7 +177,7 @@ export const TopBar: React.FC = () => {
               }
             }}
             aria-label={activePage === 'NOTIFICATIONS' ? 'Закрыть уведомления' : 'Уведомления'}
-            className={`relative inline-flex items-center justify-center w-8.5 h-8.5 md:w-9 md:h-9 rounded-lg transition-colors active:scale-95 border cursor-pointer ${
+            className={`relative hit-area-y inline-flex items-center justify-center w-8.5 h-8.5 md:w-9 md:h-9 rounded-lg transition-colors active:scale-95 border cursor-pointer ${
               activePage === 'NOTIFICATIONS'
                 ? 'bg-accent/15 text-accent border-accent/40'
                 : 'text-fg-muted hover:text-fg hover:bg-surface-raised border-border'
@@ -185,7 +185,7 @@ export const TopBar: React.FC = () => {
           >
             <Bell className="w-4 h-4" />
             {unreadNotifsCount > 0 && (
-              <span className="absolute top-1 right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-danger px-1 text-[9px] font-bold text-white shadow-xs ring-2 ring-surface pointer-events-none">
+              <span className="absolute -top-1.5 -right-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-danger px-1 text-[9px] font-bold text-white shadow-xs ring-2 ring-surface pointer-events-none">
                 {unreadNotifsCount > 99 ? '99+' : unreadNotifsCount}
               </span>
             )}

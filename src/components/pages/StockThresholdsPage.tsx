@@ -135,7 +135,7 @@ const ThresholdController: React.FC<{
           disabled={currentDisplayNumber <= 0}
           onClick={() => handleStep(-1)}
           className={`text-fg-subtle hover:text-fg hover:bg-surface active:bg-surface active:scale-90 transition-all disabled:opacity-20 cursor-pointer select-none touch-manipulation flex items-center justify-center shrink-0 ${
-            compact ? 'w-6 h-7 sm:w-8 sm:h-8' : 'w-8 h-8 sm:w-9 sm:h-9'
+            compact ? 'w-8 h-8' : 'w-8 h-8 sm:w-9 sm:h-9'
           }`}
           title="Уменьшить минимум на 1"
           aria-label="Уменьшить минимум на 1"
@@ -179,7 +179,7 @@ const ThresholdController: React.FC<{
           type="button"
           onClick={() => handleStep(1)}
           className={`text-fg-subtle hover:text-fg hover:bg-surface active:bg-surface active:scale-90 transition-all cursor-pointer select-none touch-manipulation flex items-center justify-center shrink-0 ${
-            compact ? 'w-6 h-7 sm:w-8 sm:h-8' : 'w-8 h-8 sm:w-9 sm:h-9'
+            compact ? 'w-8 h-8' : 'w-8 h-8 sm:w-9 sm:h-9'
           }`}
           title="Увеличить минимум на 1"
           aria-label="Увеличить минимум на 1"
@@ -714,7 +714,7 @@ export const StockThresholdsPage: React.FC = () => {
           <button
             type="button"
             onClick={() => setStatusFilter('ALL')}
-            className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap cursor-pointer shrink-0 ${
+            className={`hit-area-y px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap cursor-pointer shrink-0 ${
               statusFilter === 'ALL'
                 ? 'bg-accent text-accent-fg shadow-xs'
                 : 'bg-surface-raised text-fg-muted hover:text-fg border border-border/60'
@@ -725,7 +725,7 @@ export const StockThresholdsPage: React.FC = () => {
           <button
             type="button"
             onClick={() => setStatusFilter('DEFICIT')}
-            className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap flex items-center gap-1.5 cursor-pointer shrink-0 ${
+            className={`hit-area-y px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap flex items-center gap-1.5 cursor-pointer shrink-0 ${
               statusFilter === 'DEFICIT'
                 ? 'bg-danger text-white shadow-xs'
                 : 'bg-surface-raised border border-border text-fg-muted hover:text-fg'
@@ -748,7 +748,7 @@ export const StockThresholdsPage: React.FC = () => {
           <button
             type="button"
             onClick={() => setStatusFilter('AT_RISK')}
-            className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap flex items-center gap-1.5 cursor-pointer shrink-0 ${
+            className={`hit-area-y px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap flex items-center gap-1.5 cursor-pointer shrink-0 ${
               statusFilter === 'AT_RISK'
                 ? 'bg-amber-500 text-white shadow-xs'
                 : 'bg-surface-raised border border-border text-fg-muted hover:text-fg'
@@ -770,7 +770,7 @@ export const StockThresholdsPage: React.FC = () => {
           <button
             type="button"
             onClick={() => setStatusFilter('NORMAL')}
-            className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap flex items-center gap-1.5 cursor-pointer shrink-0 ${
+            className={`hit-area-y px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap flex items-center gap-1.5 cursor-pointer shrink-0 ${
               statusFilter === 'NORMAL'
                 ? 'bg-emerald-600 text-white shadow-xs'
                 : 'bg-surface-raised border border-border text-fg-muted hover:text-fg'
@@ -790,7 +790,7 @@ export const StockThresholdsPage: React.FC = () => {
           <button
             type="button"
             onClick={() => setStatusFilter('NONE')}
-            className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap cursor-pointer shrink-0 ${
+            className={`hit-area-y px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap cursor-pointer shrink-0 ${
               statusFilter === 'NONE'
                 ? 'bg-fg text-surface shadow-xs'
                 : 'bg-surface-raised border border-border text-fg-subtle hover:text-fg'

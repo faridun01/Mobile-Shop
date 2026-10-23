@@ -686,9 +686,9 @@ const AdminRevisionPage: React.FC = () => {
         {/* Devices Checklist & Tabs */}
         <div className="rounded-xl bg-surface border border-border shadow-2xs overflow-hidden">
           {/* Controls Bar: Tabs & View Toggle (Search removed, single compact row) */}
-          <div className="px-2 py-1.5 border-b border-border bg-surface-raised flex items-center justify-between gap-1.5">
-            {/* Filter Tabs */}
-            <div className="flex items-center gap-1 overflow-x-auto scrollbar-none text-xs">
+          <div className="px-2 py-1.5 border-b border-border bg-surface-raised flex flex-wrap items-center justify-between gap-1.5">
+            {/* Filter Tabs (the view toggle moves to the next line when both do not fit) */}
+            <div className="flex items-center gap-1 text-xs">
               <button
                 type="button"
                 data-compact="true"

@@ -112,10 +112,10 @@ export const CashDeskPanel: React.FC<CashDeskPanelProps> = ({ storeId }) => {
               <Banknote className="w-4 h-4" />
             </div>
             {isAdmin && isCentral && (
-              <button
+              <button data-compact
                 type="button"
                 onClick={() => navigate('/cash-collection')}
-                className="p-1.5 rounded-lg bg-accent/10 border border-accent/20 text-accent hover:bg-accent/20 transition-colors cursor-pointer shrink-0"
+                className="p-1.5 rounded-lg bg-accent/10 border border-accent/20 text-accent hover:bg-accent/20 transition-colors cursor-pointer shrink-0 hit-area"
                 title="Перейти к инкассации"
               >
                 <HandCoins className="w-3.5 h-3.5" />
@@ -146,10 +146,10 @@ export const CashDeskPanel: React.FC<CashDeskPanelProps> = ({ storeId }) => {
             <div className="w-8 h-8 rounded-lg bg-indigo-500/15 border border-indigo-500/25 flex items-center justify-center text-indigo-600 dark:text-indigo-400 shrink-0">
               <Package className="w-4 h-4" />
             </div>
-            <button
+            <button data-compact
               type="button"
               onClick={() => navigate('/inventory')}
-              className="p-1.5 rounded-lg bg-surface-raised border border-border hover:bg-surface text-fg transition-colors cursor-pointer shrink-0"
+              className="p-1.5 rounded-lg bg-surface-raised border border-border hover:bg-surface text-fg transition-colors cursor-pointer shrink-0 hit-area"
               title="Перейти на склад"
             >
               <ArrowUpRight className="w-3.5 h-3.5 text-accent" />
@@ -177,10 +177,10 @@ export const CashDeskPanel: React.FC<CashDeskPanelProps> = ({ storeId }) => {
               <Users className="w-4 h-4" />
             </div>
             {(isAdmin || currentUser?.role === 'PARTNER') && (
-              <button
+              <button data-compact
                 type="button"
                 onClick={() => navigate('/customers')}
-                className="p-1.5 rounded-lg bg-surface-raised border border-border hover:bg-surface text-fg transition-colors cursor-pointer shrink-0"
+                className="p-1.5 rounded-lg bg-surface-raised border border-border hover:bg-surface text-fg transition-colors cursor-pointer shrink-0 hit-area"
                 title="Перейти к клиентам"
               >
                 <ArrowUpRight className="w-3.5 h-3.5 text-accent" />
@@ -212,10 +212,10 @@ export const CashDeskPanel: React.FC<CashDeskPanelProps> = ({ storeId }) => {
             <div className="w-8 h-8 rounded-lg bg-danger/15 border border-danger/25 flex items-center justify-center text-danger shrink-0">
               <Truck className="w-4 h-4" />
             </div>
-            <button
+            <button data-compact
               type="button"
               onClick={() => navigate('/suppliers')}
-              className="p-1.5 rounded-lg bg-surface-raised border border-border hover:bg-surface text-fg transition-colors cursor-pointer shrink-0"
+              className="p-1.5 rounded-lg bg-surface-raised border border-border hover:bg-surface text-fg transition-colors cursor-pointer shrink-0 hit-area"
               title="Перейти к поставщикам"
             >
               <ArrowUpRight className="w-3.5 h-3.5 text-accent" />
@@ -249,10 +249,10 @@ export const CashDeskPanel: React.FC<CashDeskPanelProps> = ({ storeId }) => {
         </div>
 
         <div className="flex items-center gap-1">
-          <button
+          <button data-compact
             type="button"
             onClick={handlePrevMonth}
-            className="p-1 rounded-lg bg-surface-raised border border-border hover:bg-surface text-fg transition-colors cursor-pointer active:scale-95"
+            className="p-1 rounded-lg bg-surface-raised border border-border hover:bg-surface text-fg transition-colors cursor-pointer active:scale-95 hit-area"
             title="Предыдущий месяц"
           >
             <ChevronLeft className="w-4 h-4" />
@@ -270,11 +270,11 @@ export const CashDeskPanel: React.FC<CashDeskPanelProps> = ({ storeId }) => {
           >
             Текущий месяц
           </button>
-          <button
+          <button data-compact
             type="button"
             onClick={handleNextMonth}
             disabled={isCurrentMonth}
-            className="p-1 rounded-lg bg-surface-raised border border-border text-fg transition-colors disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer hover:not-disabled:bg-surface active:not-disabled:scale-95"
+            className="p-1 rounded-lg bg-surface-raised border border-border text-fg transition-colors disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer hover:not-disabled:bg-surface active:not-disabled:scale-95 hit-area"
             title={isCurrentMonth ? 'Текущий месяц (будущие месяцы недоступны)' : 'Следующий месяц'}
             aria-disabled={isCurrentMonth}
           >

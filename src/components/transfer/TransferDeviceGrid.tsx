@@ -459,11 +459,11 @@ export const TransferDeviceGrid: React.FC<TransferDeviceGridProps> = ({
           <div className="flex items-center gap-1.5 shrink-0">
             {/* View mode toggle: By model vs Individual */}
             <div className="inline-flex rounded-lg bg-surface-raised border border-border p-0.5 shrink-0">
-              <button
+              <button data-compact
                 type="button"
                 onClick={() => setViewMode('BY_MODEL')}
                 className={cn(
-                  'h-6 px-1.5 sm:px-2 rounded text-[11px] font-semibold flex items-center gap-1 transition-all cursor-pointer',
+                  'h-6 px-1.5 sm:px-2 rounded text-[11px] font-semibold flex items-center gap-1 transition-all cursor-pointer hit-area',
                   viewMode === 'BY_MODEL'
                     ? 'bg-accent text-accent-fg shadow-2xs font-bold'
                     : 'text-fg-subtle hover:text-fg'
@@ -473,11 +473,11 @@ export const TransferDeviceGrid: React.FC<TransferDeviceGridProps> = ({
                 <Layers className="w-3 h-3" />
                 <span className="hidden xs:inline sm:inline">Модели</span>
               </button>
-              <button
+              <button data-compact
                 type="button"
                 onClick={() => setViewMode('BY_DEVICE')}
                 className={cn(
-                  'h-6 px-1.5 sm:px-2 rounded text-[11px] font-semibold flex items-center gap-1 transition-all cursor-pointer',
+                  'h-6 px-1.5 sm:px-2 rounded text-[11px] font-semibold flex items-center gap-1 transition-all cursor-pointer hit-area',
                   viewMode === 'BY_DEVICE'
                     ? 'bg-accent text-accent-fg shadow-2xs font-bold'
                     : 'text-fg-subtle hover:text-fg'
@@ -596,14 +596,14 @@ export const TransferDeviceGrid: React.FC<TransferDeviceGridProps> = ({
                       onClick={() => toggleExpandGroup(group.key)}
                     >
                       {/* Checkbox for whole group */}
-                      <button
+                      <button data-compact
                         type="button"
                         onClick={(e) => {
                           e.stopPropagation();
                           handleToggleGroupSelect(group);
                         }}
                         className={cn(
-                          'w-4.5 h-4.5 rounded-md border flex items-center justify-center transition-all shrink-0 cursor-pointer',
+                          'w-4.5 h-4.5 rounded-md border flex items-center justify-center transition-all shrink-0 cursor-pointer hit-area',
                           allSelected
                             ? 'bg-accent border-accent text-accent-fg shadow-2xs scale-105'
                             : someSelected
@@ -692,10 +692,10 @@ export const TransferDeviceGrid: React.FC<TransferDeviceGridProps> = ({
                         {allSelected ? 'Снять' : `Выбрать (${group.totalCount})`}
                       </button>
 
-                      <button
+                      <button data-compact
                         type="button"
                         onClick={() => toggleExpandGroup(group.key)}
-                        className="w-6.5 h-6.5 rounded-lg hover:bg-surface-raised text-fg-subtle hover:text-fg flex items-center justify-center transition-colors cursor-pointer"
+                        className="w-6.5 h-6.5 rounded-lg hover:bg-surface-raised text-fg-subtle hover:text-fg flex items-center justify-center transition-colors cursor-pointer hit-area"
                         title={isExpanded ? 'Свернуть' : 'Развернуть список устройств'}
                       >
                         <ChevronDown className={cn('w-3.5 h-3.5 transition-transform duration-200', isExpanded && 'rotate-180 text-accent')} />

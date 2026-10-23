@@ -158,7 +158,9 @@ export function MainLayout() {
 
       <div className="flex-1 flex flex-col min-w-0 min-h-0 overflow-hidden bg-bg relative">
         <TopBar />
-        <main className="flex-1 flex flex-col min-w-0 max-w-full min-h-0 overflow-y-auto overflow-x-hidden relative bg-bg">
+        {/* On phones the bottom bar's round home button rises 1rem above the bar: the page ends
+            above it, so the last row of any list is never hidden under the button. */}
+        <main className={`flex-1 flex flex-col min-w-0 max-w-full min-h-0 overflow-y-auto overflow-x-hidden relative bg-bg ${navigationLayout === 'mobile' ? 'pb-4' : ''}`}>
           <ErrorBoundary resetKey={location.pathname}>
           <DataLoadGate>
           <Suspense fallback={<LoadingFallback />}>

@@ -195,7 +195,7 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
                 aria-checked={paidFromCashRegister}
                 onClick={() => setPaidFromCashRegister(!paidFromCashRegister)}
                 className={cn(
-                  "relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none",
+                  "relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none hit-area",
                   paidFromCashRegister ? "bg-accent" : "bg-border"
                 )}
               >

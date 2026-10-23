@@ -126,9 +126,9 @@ export const ExpensesHeaderBar: React.FC<ExpensesHeaderBarProps> = ({
         )}
 
         {/* Row 2: Search + Quick Dates + Quick Reset in a single unified line */}
-        <div className="flex items-center gap-1.5">
-          {/* SearchBar Input */}
-          <div className="relative flex-1 min-w-[100px]">
+        <div className="flex flex-wrap sm:flex-nowrap items-center gap-1.5">
+          {/* SearchBar Input: its own full-width line on a phone */}
+          <div className="relative basis-full sm:basis-auto flex-1 min-w-[100px]">
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-fg-subtle pointer-events-none" />
             <input
               type="search"

@@ -46,18 +46,6 @@ export async function lockCentralCashRegister(tx: TransactionClient, actor: Acto
   return lockCashRegister(tx, mainWarehouse.id, actor, purpose);
 }
 
-/** Takes cash out of the central register, refusing to overdraw it. The caller posts the
- * matching ledger transaction on the returned account. */
-export async function withdrawFromCentralCash(tx: TransactionClient, amountUsd: MoneyInput, actor: Actor, purpose: string) {
-  const register = await lockCentralCashRegister(tx, actor, purpose);
-  const guard = await tx.store.updateMany({
-    where: { id: register.store.id, cashBalanceUsd: { gte: amountUsd } },
-    data: { cashBalanceUsd: { decrement: amountUsd } },
-  });
-  if (guard.count !== 1) throw new Error(`В центральной кассе недостаточно наличных: ${purpose}`);
-  return register;
-}
-
 /** Stable identity of the Bonus Account (never looked up by name once adopted). */
 export const BONUS_ACCOUNT_KEY = 'BONUS_ACCOUNT';
 const BONUS_ACCOUNT_NAME = 'Бонусный счёт';

@@ -593,7 +593,7 @@ export const InventoryPage: React.FC = () => {
               <button
                 type="button"
                 onClick={() => { setViewTab('DEVICES'); setProductCategory('ALL'); }}
-                className={`flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                className={`flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap transition-all cursor-pointer ${
                   viewTab === 'DEVICES'
                     ? 'bg-accent text-accent-fg shadow-xs'
                     : 'text-fg-subtle hover:text-fg-muted'
@@ -615,7 +615,7 @@ export const InventoryPage: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setViewTab('LOCATIONS')}
-                className={`flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                className={`flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap transition-all cursor-pointer ${
                   viewTab === 'LOCATIONS'
                     ? 'bg-accent text-accent-fg shadow-xs'
                     : 'text-fg-subtle hover:text-fg-muted'

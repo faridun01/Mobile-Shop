@@ -101,7 +101,7 @@ export const AdminPushPrompt: React.FC = () => {
   };
 
   return (
-    <div className="fixed bottom-4 left-3 right-3 sm:left-auto sm:right-6 sm:bottom-6 z-50 max-w-sm w-full mx-auto animate-in fade-in slide-in-from-bottom-5 duration-300">
+    <div className="fixed bottom-[calc(5.75rem+var(--bottom-nav-pb))] md:bottom-[calc(1.5rem+var(--sa-bottom))] left-[calc(0.75rem+var(--sa-left))] right-[calc(0.75rem+var(--sa-right))] sm:left-auto sm:right-6 z-30 max-w-sm mx-auto animate-in fade-in slide-in-from-bottom-5 duration-300">
       <div className="p-3.5 sm:p-4 rounded-2xl bg-surface/95 backdrop-blur-md border border-accent/30 shadow-xl space-y-3">
         {success ? (
           <div className="flex items-center gap-3 py-1">
@@ -147,7 +147,7 @@ export const AdminPushPrompt: React.FC = () => {
                 type="button"
                 onClick={handleEnable}
                 disabled={loading}
-                className="flex-1 h-8 px-3 rounded-xl bg-accent hover:opacity-90 active:scale-95 text-accent-fg text-xs font-semibold flex items-center justify-center gap-1.5 transition-all shadow-xs cursor-pointer disabled:opacity-50"
+                className="flex-1 h-9 px-3 rounded-xl bg-accent hover:opacity-90 active:scale-95 text-accent-fg text-xs font-semibold flex items-center justify-center gap-1.5 transition-all shadow-xs cursor-pointer disabled:opacity-50"
               >
                 {loading ? (
                   <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -160,7 +160,7 @@ export const AdminPushPrompt: React.FC = () => {
                 type="button"
                 onClick={handleDismiss}
                 disabled={loading}
-                className="h-8 px-2.5 rounded-xl bg-surface-raised hover:bg-surface border border-border text-fg-subtle hover:text-fg text-xs font-medium transition-colors cursor-pointer"
+                className="h-9 px-2.5 rounded-xl bg-surface-raised hover:bg-surface border border-border text-fg-subtle hover:text-fg text-xs font-medium transition-colors cursor-pointer"
               >
                 Позже
               </button>

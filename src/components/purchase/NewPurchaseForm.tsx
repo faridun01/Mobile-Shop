@@ -507,10 +507,10 @@ export const NewPurchaseForm: React.FC<NewPurchaseFormProps> = ({
                             </div>
 
                             {group.items.length > 1 && (
-                              <button
+                              <button data-compact
                                 type="button"
                                 onClick={() => onRemoveImeiFromGroup(groupIdx, itemIdx)}
-                                className="w-7 h-7 flex items-center justify-center rounded-lg text-fg-subtle hover:text-danger hover:bg-danger/10 transition-colors cursor-pointer shrink-0"
+                                className="w-7 h-7 flex items-center justify-center rounded-lg text-fg-subtle hover:text-danger hover:bg-danger/10 transition-colors cursor-pointer shrink-0 hit-area"
                                 title="Удалить устройство"
                                 aria-label="Удалить устройство"
                               >

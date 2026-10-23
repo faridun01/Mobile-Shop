@@ -15,6 +15,7 @@ import {
 import { CustomSelect, CustomSelectOption } from '../ui/CustomSelect';
 import { MonthPicker } from '../ui/MonthPicker';
 import { getBusinessDateKey } from '../../utils/businessDate';
+import { decimal, formatMoney, moneyNumber } from '../../utils/money';
 import { OwnerTransaction, Owner, Store as StoreType } from '../../types';
 
 interface OwnerTransactionsTableProps {
@@ -214,7 +215,7 @@ export const OwnerTransactionsTable: React.FC<OwnerTransactionsTableProps> = ({
               <button
                 type="button"
                 onClick={() => setPeriodFilter('ALL')}
-                className={`px-2 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                className={`hit-area-y px-2 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
                   periodFilter === 'ALL'
                     ? 'bg-surface text-accent shadow-xs font-bold'
                     : 'text-fg-subtle hover:text-fg'
@@ -225,7 +226,7 @@ export const OwnerTransactionsTable: React.FC<OwnerTransactionsTableProps> = ({
               <button
                 type="button"
                 onClick={() => setPeriodFilter('SPECIFIC_MONTH')}
-                className={`px-2 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                className={`hit-area-y px-2 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
                   periodFilter === 'SPECIFIC_MONTH'
                     ? 'bg-surface text-accent shadow-xs font-bold'
                     : 'text-fg-subtle hover:text-fg'
@@ -278,7 +279,7 @@ export const OwnerTransactionsTable: React.FC<OwnerTransactionsTableProps> = ({
               <button
                 key={pill.id}
                 onClick={() => setTypeFilter(pill.id as typeof typeFilter)}
-                className={`px-2 py-1 rounded-xl text-xs whitespace-nowrap transition-all flex items-center gap-1.5 shrink-0 cursor-pointer ${
+                className={`hit-area-y px-2 py-1 rounded-xl text-xs whitespace-nowrap transition-all flex items-center gap-1.5 shrink-0 cursor-pointer ${
                   isActive
                     ? 'bg-accent text-accent-fg font-bold shadow-xs'
                     : 'bg-surface-raised border border-border text-fg-subtle hover:text-fg font-medium'
@@ -329,7 +330,7 @@ export const OwnerTransactionsTable: React.FC<OwnerTransactionsTableProps> = ({
                     const isReinvest = tx.type === 'REINVEST';
                     const isPayout = tx.type === 'PROFIT_PAYOUT';
                     const isCapitalIncrease = isDeposit || isReinvest;
-                    const tjsVal = Math.round((tx.amountUsd || 0) * (tx.exchangeRate || rate));
+                    const tjsVal = Number(tx.exchangeRate) > 0 ? moneyNumber(decimal(tx.amountUsd || 0).mul(tx.exchangeRate!)) : null;
 
                     return (
                       <tr key={tx.id} className="hover:bg-surface-raised/70 transition-colors">
@@ -398,8 +399,12 @@ export const OwnerTransactionsTable: React.FC<OwnerTransactionsTableProps> = ({
                           </span>
                         </td>
                         <td className="py-2.5 px-3 text-right whitespace-nowrap font-mono text-[11px] text-fg-subtle">
-                          ≈ {isCapitalIncrease ? '+' : '-'}{tjsVal.toLocaleString()} TJS
-                          <span className="text-[10px] text-fg-subtle/70 ml-1">({tx.exchangeRate})</span>
+                          {tjsVal !== null ? (
+                            <>
+                              ≈ {isCapitalIncrease ? '+' : '-'}{formatMoney(tjsVal)} TJS
+                              <span className="text-[10px] text-fg-subtle/70 ml-1">({tx.exchangeRate})</span>
+                            </>
+                          ) : '—'}
                         </td>
                         <td className="py-2.5 px-3 whitespace-nowrap text-fg-subtle text-[11px]">
                           {tx.createdByName || 'Администратор'}
@@ -421,7 +426,7 @@ export const OwnerTransactionsTable: React.FC<OwnerTransactionsTableProps> = ({
                 const isReinvest = tx.type === 'REINVEST';
                 const isPayout = tx.type === 'PROFIT_PAYOUT';
                 const isCapitalIncrease = isDeposit || isReinvest;
-                const tjsVal = Math.round((tx.amountUsd || 0) * (tx.exchangeRate || rate));
+                const tjsVal = Number(tx.exchangeRate) > 0 ? moneyNumber(decimal(tx.amountUsd || 0).mul(tx.exchangeRate!)) : null;
 
                 return (
                   <div
@@ -516,9 +521,11 @@ export const OwnerTransactionsTable: React.FC<OwnerTransactionsTableProps> = ({
                       >
                         {isCapitalIncrease ? '+' : '-'}${tx.amountUsd?.toLocaleString()} USD
                       </span>
-                      <span className="text-[10px] text-fg-subtle block font-mono">
-                        ≈ {isCapitalIncrease ? '+' : '-'}{tjsVal.toLocaleString()} TJS (курс {tx.exchangeRate})
-                      </span>
+                      {tjsVal !== null && (
+                        <span className="text-[10px] text-fg-subtle block font-mono">
+                          ≈ {isCapitalIncrease ? '+' : '-'}{formatMoney(tjsVal)} TJS (курс {tx.exchangeRate})
+                        </span>
+                      )}
                     </div>
                   </div>
                 );

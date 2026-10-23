@@ -35,6 +35,11 @@ try {
   const storeId = 'store-siyoma';
   const userId = 'user-admin';
   await setTodayRate(9.3, userId);
+  // Receipts below are moved to earlier days, which (as in real use) had their own rate set.
+  for (const daysAgo of [1, 2]) {
+    const date = getBusinessDateKey(new Date(Date.now() - daysAgo * 24 * 60 * 60 * 1000));
+    await prisma.exchangeRate.upsert({ where: { date }, update: { rate: D(9.3) }, create: { date, rate: D(9.3), createdByUserId: userId } });
+  }
   let serial = 0;
   const sale = async (paymentMethod: 'CASH' | 'CARD') => {
     const device = await prisma.device.create({ data: {

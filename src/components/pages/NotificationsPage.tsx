@@ -385,14 +385,14 @@ export const NotificationsPage: React.FC = () => {
                           {dateLabel}
                         </span>
                         {unread && (
-                          <button
+                          <button data-compact
                             type="button"
                             onClick={(e) => {
                               e.stopPropagation();
                               void markRead(n);
                             }}
                             title="Отметить прочитанным"
-                            className="w-4.5 h-4.5 rounded hover:bg-accent/20 text-fg-subtle hover:text-accent flex items-center justify-center transition-colors cursor-pointer shrink-0 ml-0.5"
+                            className="w-4.5 h-4.5 rounded hover:bg-accent/20 text-fg-subtle hover:text-accent flex items-center justify-center transition-colors cursor-pointer shrink-0 ml-0.5 hit-area"
                           >
                             <Check className="w-3 h-3" />
                           </button>

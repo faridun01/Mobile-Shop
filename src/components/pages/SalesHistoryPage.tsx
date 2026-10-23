@@ -286,20 +286,12 @@ export const SalesHistoryPage: React.FC = () => {
 
   const periodProfitSummary = useMemo(() => {
     if (!isAdmin) return { profitUsd: 0, profitTjs: 0, costUsd: 0 };
-    let totalProfitUsd = 0;
-    let totalProfitTjs = 0;
-    let totalCostUsd = 0;
     const fallbackRate = Number(todayRate?.rate) || 0;
-    for (const sale of filteredSales) {
-      const res = computeSaleProfit(sale, fallbackRate);
-      totalProfitUsd += res.profitUsd;
-      totalProfitTjs += res.profitTjs;
-      totalCostUsd += res.costUsd;
-    }
+    const profits = filteredSales.map((sale) => computeSaleProfit(sale, fallbackRate));
     return {
-      profitUsd: Math.round(totalProfitUsd * 100) / 100,
-      profitTjs: Math.round(totalProfitTjs),
-      costUsd: Math.round(totalCostUsd * 100) / 100,
+      profitUsd: moneyNumber(sumMoney(profits.map((p) => p.profitUsd))),
+      profitTjs: moneyNumber(sumMoney(profits.map((p) => p.profitTjs))),
+      costUsd: moneyNumber(sumMoney(profits.map((p) => p.costUsd))),
     };
   }, [filteredSales, isAdmin, todayRate?.rate]);
 
@@ -1064,8 +1056,8 @@ export const SalesHistoryPage: React.FC = () => {
                     </div>
 
                     {/* Row 2: Metadata (Date · Store · Seller · Customer) | Profit + Payment Method Badges */}
-                    <div className="flex items-center justify-between gap-2 w-full min-w-0 text-[10.5px]">
-                      <div className="flex items-center gap-1 text-fg-subtle min-w-0 flex-1 truncate">
+                    <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1 w-full min-w-0 text-[10.5px]">
+                      <div className="flex flex-wrap items-center gap-x-1 text-fg-subtle min-w-0 flex-1">
                         <span className="font-mono shrink-0">{dateStr} {timeStr}</span>
                         {!isStoreScoped && (
                           <>
@@ -1083,7 +1075,7 @@ export const SalesHistoryPage: React.FC = () => {
                         )}
                       </div>
 
-                      <div className="flex items-center gap-1.5 shrink-0">
+                      <div className="flex items-center gap-1.5 shrink-0 ml-auto">
                         {isAdmin && (() => {
                           const profit = computeSaleProfit(sale, Number(todayRate?.rate) || 0);
                           if (sale.status === 'REFUNDED') {
@@ -1127,8 +1119,8 @@ export const SalesHistoryPage: React.FC = () => {
                             ? 'Банк'
                             : sale.paymentMethod === 'DEBT'
                             ? (sale.debtAmountTjs ?? 0) > 0
-                              ? `В долг (${formatMoney(sale.debtAmountTjs ?? 0)} TJS)`
-                              : 'В долг (погашено)'
+                              ? `Долг ${formatMoney(sale.debtAmountTjs ?? 0)} TJS`
+                              : 'Долг погашен'
                             : 'Смешанная'}
                         </span>
                       </div>

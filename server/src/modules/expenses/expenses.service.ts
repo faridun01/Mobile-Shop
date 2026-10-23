@@ -385,9 +385,11 @@ export async function updateExpense(
       if (oldCashStoreId) {
         // Editing a paid expense moves money in the registers today.
         await assertShiftOpen(tx, oldCashStoreId);
+        // The dollars its posting took out — exactly what the reversal above credits the account —
+        // so register and account stay equal; old unposted expenses fall back to their own figures.
         await tx.store.update({
           where: { id: oldCashStoreId },
-          data: { cashBalanceUsd: { increment: existing.amountUsd ?? roundMoney(D(existing.amountTjs).div(rate)) } },
+          data: { cashBalanceUsd: { increment: existingTransaction ? existingTransaction.amountUsd : existing.amountUsd ?? roundMoney(D(existing.amountTjs).div(rate)) } },
         });
       }
     }
@@ -532,6 +534,7 @@ export async function cancelExpenseInTx(tx: TransactionClient, id: string, actor
     }
 
     const actor = await resolveActor(tx, actorId);
+    const existingTransaction = await tx.financialTransaction.findFirst({ where: { sourceType: 'EXPENSE', sourceId: id, status: 'POSTED', reversedTransactionId: null } });
 
     // Revert cash balance
     if (existing.status === 'PAID' && existing.paidFromCashRegister) {
@@ -543,9 +546,11 @@ export async function cancelExpenseInTx(tx: TransactionClient, id: string, actor
         // Cancelling a paid expense returns its money to that register today. A closing's
         // shortage goes back into its own (reopened) day instead, under the closing's store lock.
         if (!fromClosing) await assertShiftOpen(tx, targetStoreId);
+        // The dollars its posting took out, which the reversal below credits back to the account;
+        // old unposted expenses fall back to their own figures.
         await tx.store.update({
           where: { id: targetStoreId },
-          data: { cashBalanceUsd: { increment: existing.amountUsd ?? roundMoney(D(existing.amountTjs).div(existing.exchangeRate || (await requireTodayRate(tx)))) } },
+          data: { cashBalanceUsd: { increment: existingTransaction ? existingTransaction.amountUsd : existing.amountUsd ?? roundMoney(D(existing.amountTjs).div(existing.exchangeRate || (await requireTodayRate(tx)))) } },
         });
       }
     }
@@ -555,7 +560,6 @@ export async function cancelExpenseInTx(tx: TransactionClient, id: string, actor
 
     // Reverse (never hard-delete) the financial ledger transaction, if one was posted —
     // no more `ledgerEntry.deleteMany` here either, matching the same no-hard-delete rule.
-    const existingTransaction = await tx.financialTransaction.findFirst({ where: { sourceType: 'EXPENSE', sourceId: id, status: 'POSTED', reversedTransactionId: null } });
     if (existingTransaction) {
       await cancelTransaction(tx, existingTransaction.id, actor.id, { keepDate: fromClosing });
     }

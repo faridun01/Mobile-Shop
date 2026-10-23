@@ -272,7 +272,7 @@ export const SuppliersPage: React.FC = () => {
         <button
           type="button"
           onClick={handleStartAddSupplier}
-          className="px-3 py-1.5 rounded-xl bg-accent hover:bg-accent-strong text-xs font-bold text-accent-fg flex items-center gap-1.5 shrink-0 transition-all active:scale-95 shadow-xs cursor-pointer"
+          className="px-3 py-2 rounded-xl bg-accent hover:bg-accent-strong text-xs font-bold text-accent-fg flex items-center gap-1.5 shrink-0 transition-all active:scale-95 shadow-xs cursor-pointer"
           title="Добавить поставщика"
         >
           <Plus className="w-3.5 h-3.5" />
@@ -305,7 +305,7 @@ export const SuppliersPage: React.FC = () => {
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Поиск по имени или телефону..."
-                className="w-full h-8 pl-8 pr-7 rounded-lg bg-surface border border-border text-xs text-fg placeholder:text-fg-subtle focus:outline-hidden focus:border-accent transition-colors"
+                className="w-full h-9 pl-8 pr-7 rounded-lg bg-surface border border-border text-xs text-fg placeholder:text-fg-subtle focus:outline-hidden focus:border-accent transition-colors"
               />
               {searchQuery && (
                 <button

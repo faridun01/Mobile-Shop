@@ -251,7 +251,7 @@ export const PurchaseHistoryList: React.FC<PurchaseHistoryListProps> = ({
                     <span>•</span>
                     <span className="shrink-0">{formatInvoiceDate(inv.date)}</span>
                     <span>•</span>
-                    <span className="flex items-center gap-0.5 text-fg-muted shrink-0 truncate">
+                    <span className="flex items-center gap-0.5 text-fg-muted min-w-0">
                       <StoreIcon className="w-3 h-3 text-fg-subtle" />
                       <span className="truncate max-w-[110px] sm:max-w-none">{locationLabel}</span>
                     </span>
@@ -263,18 +263,18 @@ export const PurchaseHistoryList: React.FC<PurchaseHistoryListProps> = ({
                     {/* Quick Edit/Delete */}
                     {(currentUser?.role === 'ADMIN' || currentUser?.role === 'PARTNER') && (
                       <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
-                        <button
+                        <button data-compact
                           type="button"
                           onClick={() => onEditInvoice(inv)}
-                          className="p-1 rounded-lg bg-surface-raised hover:bg-surface text-fg-subtle hover:text-accent border border-border transition-colors cursor-pointer"
+                          className="p-1 rounded-lg bg-surface-raised hover:bg-surface text-fg-subtle hover:text-accent border border-border transition-colors cursor-pointer hit-area"
                           title="Редактировать накладную"
                         >
                           <Edit2 className="w-3 h-3" />
                         </button>
-                        <button
+                        <button data-compact
                           type="button"
                           onClick={() => onDeleteInvoice(inv.id)}
-                          className="p-1 rounded-lg bg-surface-raised hover:bg-danger/20 text-fg-subtle hover:text-danger border border-border transition-colors cursor-pointer"
+                          className="p-1 rounded-lg bg-surface-raised hover:bg-danger/20 text-fg-subtle hover:text-danger border border-border transition-colors cursor-pointer hit-area"
                           title="Удалить накладную"
                         >
                           <Trash2 className="w-3 h-3" />

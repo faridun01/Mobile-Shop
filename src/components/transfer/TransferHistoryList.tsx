@@ -344,11 +344,11 @@ export const TransferHistoryList: React.FC<TransferHistoryListProps> = ({
                       </span>
                     )}
 
-                    <button
+                    <button data-compact
                       type="button"
                       onClick={() => onOpenInvoice(tr)}
                       title="Накладная"
-                      className="h-6 px-1.5 rounded-md bg-surface-raised hover:bg-surface border border-border text-accent text-[11px] font-semibold flex items-center gap-1 cursor-pointer"
+                      className="h-6 px-1.5 rounded-md bg-surface-raised hover:bg-surface border border-border text-accent text-[11px] font-semibold flex items-center gap-1 cursor-pointer hit-area"
                     >
                       <FileText className="w-3 h-3" />
                       <span>Накладная</span>
