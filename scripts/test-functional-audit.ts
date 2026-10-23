@@ -84,8 +84,12 @@ try {
   const payments = await Promise.all([api('POST', `/supplier-invoices/${invoiceId}/payments`, paymentBody, 'same-payment'), api('POST', `/supplier-invoices/${invoiceId}/payments`, paymentBody, 'same-payment')]);
   assert(payments.every(r => r.status === 201));
   assert.equal(await db.supplierPayment.count(), 1);
-  assert.equal((await api('PUT', `/supplier-invoices/${invoiceId}`, { totalAmountUsd: 0.49 })).status, 400);
-  pass('supplier payment retry and below-paid invoice boundary');
+  // Below what was paid: the overpaid cent comes back to the Central Cash, the invoice is paid in full.
+  assert.equal((await api('PUT', `/supplier-invoices/${invoiceId}`, { totalAmountUsd: 0.49 })).status, 200);
+  const below = await db.supplierInvoice.findUniqueOrThrow({ where: { id: invoiceId } });
+  assert.equal(below.paidAmountUsd.toString(), '0.49');
+  assert.equal((await db.supplier.findUniqueOrThrow({ where: { id: 'sup-dubai' } })).totalDebtUsd.toString(), '0');
+  pass('supplier payment retry; an invoice cut below what was paid gives the overpayment back');
 
   const imeiRace = await Promise.all([purchase('IMEI-A', [{ imei: '350000000000011', imei2: '350000000000012' }]), purchase('IMEI-B', [{ imei: '350000000000012', imei2: '350000000000011' }])]);
   assert.equal(imeiRace.filter(r => r.status === 201).length, 1);
@@ -207,8 +211,9 @@ try {
   assert((await db.financialAccount.findUniqueOrThrow({ where: { storeId: revisionStore.id } })).balanceUsd.eq('5.20'));
   const accessoryReport = await api('GET', `/reports/summary?period=ALL&storeId=${revisionStore.id}`);
   assert.equal(accessoryReport.status, 200);
-  // Withheld $0.20 is a separate refund penalty, not merchandise revenue.
-  assert(D(accessoryReport.data.revenueUsd).eq('5.00'), JSON.stringify(accessoryReport.data));
+  // A return takes back only what was handed out: the $0.20 withheld stays in the revenue, which equals
+  // the store's register ($5.20); periodRefundPenaltiesUsd says how much of it was withheld.
+  assert(D(accessoryReport.data.revenueUsd).eq('5.20'), JSON.stringify(accessoryReport.data));
   assert(D(accessoryReport.data.periodRefundPenaltiesUsd).eq('0.20'));
   assert(D(accessoryReport.data.cogsUsd).eq('2.46'));
   assert(D(accessoryReport.data.netProfitUsd).eq('2.74'));

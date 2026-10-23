@@ -41,8 +41,6 @@ type ProfitEvent = {
   exchangeReceiptNumber?: number;
   refundReason?: string | null;
   penaltyTjs?: Prisma.Decimal; penaltyUsd?: Prisma.Decimal;
-  // Money the customer paid (+) or was handed (−) at this moment; null when not known (a cancelled return).
-  cashTjs?: Prisma.Decimal | null;
 };
 
 /** One dated row of the report: a sale, an exchange or a refund, in its own day's TJS, rate and USD. */
@@ -65,8 +63,6 @@ export interface ReportEvent {
   bonusUsd: Prisma.Decimal;
   penaltyTjs: Prisma.Decimal;
   penaltyUsd: Prisma.Decimal;
-  /** Money that changed hands with the customer: paid at the sale (not the debt, not an exchange's credit), handed back on a return. */
-  cashTjs: Prisma.Decimal | null;
 }
 
 function detailNumber(details: unknown, key: string): number | undefined {
@@ -146,7 +142,7 @@ export async function computeReportsSummary(input: ReportsSummaryInput) {
     // the rows together itself, which took more than twice as long for a long period.
     prisma.sale.findMany({
       where: periodSaleWhere,
-      select: { id: true, storeId: true, status: true, totalTjs: true, totalUsd: true, exchangeRate: true, receiptNumber: true, createdAt: true, cashAmountTjs: true, cardAmountTjs: true },
+      select: { id: true, storeId: true, status: true, totalTjs: true, totalUsd: true, exchangeRate: true, receiptNumber: true, createdAt: true },
       orderBy: { createdAt: 'desc' },
     }),
     prisma.saleItem.findMany({
@@ -199,7 +195,7 @@ export async function computeReportsSummary(input: ReportsSummaryInput) {
       where: { sale: { annulledAt: null }, ...(storeFilter ? { storeId: storeFilter } : {}), ...(dateRange ? { createdAt: dateRange } : {}) },
       select: {
         id: true, storeId: true, createdAt: true, exchangeRate: true, reason: true, bookedUsd: true, fxUsd: true, accessoryLines: true,
-        withheldTjs: true, withheldUsd: true, creditTjs: true, creditUsd: true, payoutTjs: true, exchangeSaleId: true,
+        withheldTjs: true, withheldUsd: true, creditTjs: true, creditUsd: true, exchangeSaleId: true,
         sale: { select: { id: true, receiptNumber: true } },
         exchangeSale: { select: { receiptNumber: true } },
         items: { select: { brand: true, model: true, salePriceTjs: true, salePriceUsd: true, costBasisUsd: true, isBonus: true } },
@@ -330,12 +326,11 @@ export async function computeReportsSummary(input: ReportsSummaryInput) {
       const cost = sale.saleItems.reduce((sum, item) => D(sum).plus(item.costBasisUsd), D(0));
       profitEvents.push({ storeId: sale.storeId, revenueUsd: D(sale.totalUsd), revenueTjs: D(sale.totalTjs), profitUsd: roundMoney(D(sale.totalUsd).minus(cost)), bonusUsd: D(0), rate: saleRate,
         kind: 'SALE', date: sale.createdAt, saleId: sale.id, receiptNumber: sale.receiptNumber,
-        exchangeReceiptNumber: exchangedFromReceipt.get(sale.id), cashTjs: D(sale.cashAmountTjs).plus(sale.cardAmountTjs) });
+        exchangeReceiptNumber: exchangedFromReceipt.get(sale.id) });
     } else {
       profitEvents.push({
         kind: 'SALE', date: sale.createdAt, saleId: sale.id, receiptNumber: sale.receiptNumber,
         exchangeReceiptNumber: exchangedFromReceipt.get(sale.id),
-        cashTjs: D(sale.cashAmountTjs).plus(sale.cardAmountTjs),
         storeId: sale.storeId,
         revenueUsd: D(detailNumber(original.details, 'amountUsd') ?? sale.totalUsd),
         revenueTjs: D(detailNumber(original.details, 'amountTjs') ?? sale.totalTjs),
@@ -358,7 +353,6 @@ export async function computeReportsSummary(input: ReportsSummaryInput) {
     exchangesCount++;
     profitEvents.push({
       kind: 'EXCHANGE', date: log.createdAt, saleId: log.targetId!, receiptNumber: exchangeReceiptBySale.get(log.targetId!),
-      cashTjs: D(detailNumber(log.financialDetails, 'differenceTjs') ?? 0),
       storeId,
       revenueUsd: D(newPriceUsd).minus(detailNumber(log.financialDetails, 'exchangeInValueUsd') ?? 0),
       revenueTjs: D(newPriceTjs).minus(detailNumber(log.financialDetails, 'exchangeInValueTjs') ?? 0),
@@ -392,7 +386,6 @@ export async function computeReportsSummary(input: ReportsSummaryInput) {
     profitEvents.push({
       kind: 'REFUND', date: sale.refundedAt ?? new Date(), saleId: sale.id, receiptNumber: sale.receiptNumber,
       refundReason: sale.refundReason,
-      cashTjs: D(sale.actualRefundAmountTjs ?? 0).negated(),
       penaltyTjs: D(sale.penaltyFeeTjs ?? 0), penaltyUsd: D(sale.penaltyFeeUsd ?? 0),
       storeId: sale.storeId,
       revenueUsd: reversedRevenueUsd.negated(),
@@ -421,8 +414,6 @@ export async function computeReportsSummary(input: ReportsSummaryInput) {
       kind: 'REFUND', date: ret.createdAt, saleId: ret.sale.id, receiptNumber: ret.sale.receiptNumber,
       exchangeReceiptNumber: ret.exchangeSale?.receiptNumber,
       refundReason: ret.reason,
-      // Only what left the register: on an exchange the rest of the credit paid the new receipt.
-      cashTjs: D(ret.payoutTjs).negated(),
       penaltyTjs: D(ret.withheldTjs), penaltyUsd: D(ret.withheldUsd),
       storeId: ret.storeId,
       revenueUsd: reversedRevenueUsd.negated(),
@@ -438,18 +429,11 @@ export async function computeReportsSummary(input: ReportsSummaryInput) {
   for (const cancellation of cancelledReturns) {
     const saved = (cancellation.financialDetails as { reportEvent?: CancelledReturnEvent } | null)?.reportEvent;
     if (!saved || annulledIds.has(saved.saleId) || (storeFilter && saved.storeId !== storeFilter)) continue;
-    // What the cancelled return handed out; the cancellation brought it back into the register.
-    const fd = cancellation.financialDetails as {
-      originalReturn?: { payoutTjs?: number };
-      originalRefund?: { actualRefundAmountTjs?: number | null; refundDetails?: { amountTjs?: number } };
-    } | null;
-    const payoutTjs = fd?.originalReturn?.payoutTjs ?? fd?.originalRefund?.refundDetails?.amountTjs ?? fd?.originalRefund?.actualRefundAmountTjs;
     const original: ProfitEvent = {
       kind: 'REFUND', storeId: saved.storeId, saleId: saved.saleId, receiptNumber: saved.receiptNumber,
       date: new Date(saved.originalDate), refundReason: saved.reason,
       revenueUsd: D(saved.revenueUsd), revenueTjs: D(saved.revenueTjs), profitUsd: D(saved.profitUsd),
       bonusUsd: D(saved.bonusUsd), rate: D(saved.rate), penaltyTjs: D(saved.penaltyTjs), penaltyUsd: D(saved.penaltyUsd),
-      cashTjs: payoutTjs == null ? null : D(payoutTjs).negated(),
     };
     if (dateWithinRange(original.date, dateRange)) profitEvents.push(original);
     if (dateWithinRange(cancellation.createdAt, dateRange)) profitEvents.push({
@@ -457,8 +441,15 @@ export async function computeReportsSummary(input: ReportsSummaryInput) {
       revenueUsd: original.revenueUsd.negated(), revenueTjs: original.revenueTjs.negated(),
       profitUsd: original.profitUsd.negated(), bonusUsd: original.bonusUsd.negated(),
       penaltyTjs: original.penaltyTjs!.negated(), penaltyUsd: original.penaltyUsd!.negated(),
-      cashTjs: original.cashTjs == null ? null : original.cashTjs.negated(),
     });
+  }
+  // A return takes back only what the customer was handed: the withheld part stays in the revenue
+  // and the profit of the return's day. penaltyTjs/penaltyUsd still say how much of it was withheld.
+  for (const event of profitEvents) {
+    if (event.kind !== 'REFUND') continue;
+    event.revenueUsd = event.revenueUsd.plus(event.penaltyUsd ?? 0);
+    event.revenueTjs = event.revenueTjs.plus(event.penaltyTjs ?? 0);
+    event.profitUsd = event.profitUsd.plus(event.penaltyUsd ?? 0);
   }
   refundsRevenueUsd = profitEvents.filter((event) => event.kind === 'REFUND').reduce((sum, event) => sum.minus(event.revenueUsd), D(0));
 
@@ -588,8 +579,8 @@ export async function computeReportsSummary(input: ReportsSummaryInput) {
   // reported separately (periodCashBonuses*, bonusDeviceProfit*).
   const bonusDeviceProfitUsd = roundMoney(totals.bonusUsd);
   const bonusDeviceProfitTjs = roundMoney(totals.bonusTjs);
-  const netProfitUsd = roundMoney(D(grossProfitUsd).minus(bonusDeviceProfitUsd).minus(expensesUsd).plus(periodRefundPenaltiesUsd).plus(periodDebtFxUsd).plus(periodExpenseFxUsd).plus(periodCashSurplusUsd));
-  const netProfitTjs = roundMoney(D(grossProfitTjs).minus(bonusDeviceProfitTjs).minus(expensesTjs).plus(periodRefundPenaltiesTjs).plus(periodDebtFxTjs).plus(periodCashSurplusTjs));
+  const netProfitUsd = roundMoney(D(grossProfitUsd).minus(bonusDeviceProfitUsd).minus(expensesUsd).plus(periodDebtFxUsd).plus(periodExpenseFxUsd).plus(periodCashSurplusUsd));
+  const netProfitTjs = roundMoney(D(grossProfitTjs).minus(bonusDeviceProfitTjs).minus(expensesTjs).plus(periodDebtFxTjs).plus(periodCashSurplusTjs));
 
   const totalSupplierDebtUsd = D(supplierDebtAgg._sum.totalDebtUsd ?? 0);
   const totalSupplierDebtTjs = roundMoney(D(totalSupplierDebtUsd).mul(rate));
@@ -690,8 +681,8 @@ export async function computeReportsSummary(input: ReportsSummaryInput) {
         revenueTjs: roundMoney(storeRevenueTjs),
         cogsUsd: D(storeCogsUsd.toFixed(2)),
         cogsTjs: roundMoney(storeCogsTjs),
-        profitUsd: roundMoney(D(storeProfitUsd).plus(storePenalty.usd).plus(storeFx.usd).plus(storeSurplus.usd)),
-        profitTjs: roundMoney(D(storeProfitTjs).plus(storePenalty.tjs).plus(storeFx.tjs).plus(storeSurplus.tjs)),
+        profitUsd: roundMoney(D(storeProfitUsd).plus(storeFx.usd).plus(storeSurplus.usd)),
+        profitTjs: roundMoney(D(storeProfitTjs).plus(storeFx.tjs).plus(storeSurplus.tjs)),
         refundPenaltiesUsd: roundMoney(storePenalty.usd),
         cashSurplusUsd: roundMoney(storeSurplus.usd),
         cashSurplusTjs: roundMoney(storeSurplus.tjs),
@@ -700,8 +691,8 @@ export async function computeReportsSummary(input: ReportsSummaryInput) {
         bonusDeviceProfitUsd: roundMoney(storeTotals.bonusUsd),
         bonusDeviceProfitTjs: roundMoney(storeTotals.bonusTjs),
         ...storeExpenses,
-        netProfitUsd: roundMoney(D(storeProfitUsd).plus(storePenalty.usd).plus(storeFx.usd).plus(storeSurplus.usd).plus(storeExpenseFxUsd).minus(storeExpenses.expensesUsd)),
-        netProfitTjs: roundMoney(D(storeProfitTjs).plus(storePenalty.tjs).plus(storeFx.tjs).plus(storeSurplus.tjs).minus(storeExpenses.expensesTjs)),
+        netProfitUsd: roundMoney(D(storeProfitUsd).plus(storeFx.usd).plus(storeSurplus.usd).plus(storeExpenseFxUsd).minus(storeExpenses.expensesUsd)),
+        netProfitTjs: roundMoney(D(storeProfitTjs).plus(storeFx.tjs).plus(storeSurplus.tjs).minus(storeExpenses.expensesTjs)),
         topModels: [...storeModels.values()]
           .map((m) => ({ ...m, revenueUsd: D(D(m.revenueUsd).toFixed(2)), profitUsd: D(D(m.profitUsd).toFixed(2)) }))
           .sort((a, b) => b.count - a.count || D(b.profitUsd).comparedTo(a.profitUsd))
@@ -744,7 +735,6 @@ export async function computeReportsSummary(input: ReportsSummaryInput) {
           profitUsd: roundMoney(profitUsd.minus(bonusUsd)),
           bonusUsd,
           penaltyTjs: roundMoney(event.penaltyTjs ?? 0),
-          cashTjs: event.cashTjs == null ? null : roundMoney(event.cashTjs),
           penaltyUsd: roundMoney(event.penaltyUsd ?? 0),
         };
       });
@@ -811,8 +801,8 @@ export async function computeReportsSummary(input: ReportsSummaryInput) {
     // "Прибыль (с учетом возвратов)" — the single recognized-profit figure the summary card,
     // the per-store cards (storeBreakdown.profitUsd/Tjs below) and netProfitUsd/Tjs all build
     // on, so they can no longer disagree the way the old client-side per-item calc did.
-    profitUsd: roundMoney(D(grossProfitUsd).minus(bonusDeviceProfitUsd).plus(periodRefundPenaltiesUsd).plus(periodDebtFxUsd).plus(periodCashSurplusUsd)),
-    profitTjs: roundMoney(D(grossProfitTjs).minus(bonusDeviceProfitTjs).plus(periodRefundPenaltiesTjs).plus(periodDebtFxTjs).plus(periodCashSurplusTjs)),
+    profitUsd: roundMoney(D(grossProfitUsd).minus(bonusDeviceProfitUsd).plus(periodDebtFxUsd).plus(periodCashSurplusUsd)),
+    profitTjs: roundMoney(D(grossProfitTjs).minus(bonusDeviceProfitTjs).plus(periodDebtFxTjs).plus(periodCashSurplusTjs)),
     expensesTjs: roundMoney(expensesTjs),
     expensesUsd,
     periodRefundPenaltiesUsd: roundMoney(periodRefundPenaltiesUsd),

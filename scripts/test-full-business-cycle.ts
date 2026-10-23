@@ -189,8 +189,8 @@ await withDisposableApi('full_cycle', async ({ db, call, env, login, baseUrl }) 
   for (const e of rt.events) {
     console.log(`   ${eventOperationLabel(e).padEnd(43)}| ${String(e.amountTjs).padStart(9)} | ${String(e.amountUsd).padStart(9)} | ${String(e.costUsd).padStart(9)} | ${String(e.profitUsd).padStart(9)} | ${String(e.penaltyUsd).padStart(7)}`);
   }
-  // 520 − 300 + 550 − 500 + 280 − 200 + 180 + 12 + 8 − 8
-  assert.equal(rt.revenueUsd, 542, 'выручка сегодня');
+  // 520 − 300 + 550 − 500 + 280 − 180 (Redmi: 200 less the 20 withheld) + 180 + 12 + 8 − 8
+  assert.equal(rt.revenueUsd, 562, 'выручка сегодня: возврат уменьшает её только на выданное клиенту');
   assert.equal(rt.cogsUsd, 426, 'себестоимость сегодня');
   assert.equal(rt.periodRefundPenaltiesUsd, 20, 'удержание');
   // 100 − 50 + 130 − 80 + 30 − 60 + 20 + 40 + 6 + 4 − 4
@@ -199,7 +199,7 @@ await withDisposableApi('full_cycle', async ({ db, call, env, login, baseUrl }) 
   assert.equal(rt.netProfitUsd, 86, 'чистая прибыль сегодня');
   assert.equal(rt.events.reduce((s: any, e: any) => s.plus(e.amountUsd), D(0)), rt.revenueUsd, 'строки = выручка');
   assert.equal(rt.events.reduce((s: any, e: any) => s.plus(e.costUsd), D(0)), rt.cogsUsd, 'строки = себестоимость');
-  assert.equal(rt.events.reduce((s: any, e: any) => s.plus(e.profitUsd).plus(e.penaltyUsd), D(0)), rt.profitUsd, 'строки = прибыль');
+  assert.equal(rt.events.reduce((s: any, e: any) => s.plus(e.profitUsd), D(0)), rt.profitUsd, 'строки = прибыль (удержание уже в строке возврата)');
   const labels = rt.events.map(eventOperationLabel);
   assert(labels.includes(`Обмен: возврат по чеку № ${h1.receiptNumber} (новый чек № ${ex1.sale.receiptNumber})`), 'обмен дороже подписан');
   assert(labels.includes(`Обмен: новый чек (взамен № ${s1.receiptNumber})`), 'обмен дешевле подписан');
@@ -235,7 +235,7 @@ await withDisposableApi('full_cycle', async ({ db, call, env, login, baseUrl }) 
   const result = (sheet: string, cell: string) => { const v = xlsx.getWorksheet(sheet)!.getCell(cell).value as any; return v && typeof v === 'object' && 'formula' in v ? (v.result ?? 0) : v; };
   assert.equal(result('Итого', 'B16'), 276, 'Excel: чистая прибыль');
   assert.equal(result('Итого', 'B17'), 0, 'Excel: контроль = 0');
-  assert.equal(result('Итого', 'B9'), D(rb.profitUsd).minus(rb.periodRefundPenaltiesUsd), 'Excel: прибыль от продаж');
+  assert.equal(result('Итого', 'B9'), rb.profitUsd, 'Excel: прибыль от продаж и возвратов');
   assert.equal(result('Итого', 'B14'), 50, 'Excel: расходы');
   console.log(`   ${path.relative(process.cwd(), file)}: чистая прибыль $276, контрольная строка 0`);
 

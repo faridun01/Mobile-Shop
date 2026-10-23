@@ -107,11 +107,10 @@ try {
   assert.deepEqual(cheaper.map((e) => [e.kind, D(e.profitUsd).toNumber(), D(e.amountUsd).toNumber()]), [['REFUND', -100, -500], ['SALE', 100, 400]]);
   // Both halves name the other receipt, so the export labels them as one exchange.
   assert.deepEqual(cheaper.map((e) => [e.receiptNumber, e.exchangeReceiptNumber]), [[galaxy.receiptNumber, tecno.receiptNumber], [tecno.receiptNumber, galaxy.receiptNumber]]);
-  // The money that changed hands: the 1000 TJS change handed back on the return, nothing paid on the new receipt.
-  assert.deepEqual(cheaper.map((e) => D(e.cashTjs ?? NaN).toNumber()), [-1000, 0]);
-  // The withheld exchange: the old Redmi's 2700 credit and a 300 TJS top-up pay the 3000 TJS Redmi C.
-  const redmiC = t.events!.find((e) => e.kind === 'SALE' && e.exchangeReceiptNumber === redmi.receiptNumber)!;
-  assert.equal(redmiC.cashTjs, 300, 'the new receipt shows only the top-up');
+  // The Redmi returned with 300 TJS withheld takes back only the 2700 TJS credited ($270); its row's profit
+  // holds the $30 withheld: −$50 booked + $30 = −$20.
+  const redmiBack = t.events!.find((e) => e.kind === 'REFUND' && e.receiptNumber === redmi.receiptNumber)!;
+  assert.deepEqual([D(redmiBack.amountTjs).toNumber(), D(redmiBack.amountUsd).toNumber(), D(redmiBack.profitUsd).toNumber(), D(redmiBack.penaltyTjs).toNumber()], [-2700, -270, -20, 300]);
   const todayEvents = t.events!.map((e) => `${e.kind} #${e.receiptNumber} ${e.profitUsd}`);
   console.log('today events:', todayEvents.join(' | '));
 
@@ -119,7 +118,7 @@ try {
   const both = await report(yesterdayKey, todayKey);
   assert.equal(both.profitUsd, 320, 'both days: +150 Samsung +40 Redmi C +100 Tecno +30 withheld');
   assert.equal(both.profitUsd, D(y.profitUsd).plus(t.profitUsd), 'the two days add up to the period');
-  assert.equal(both.events!.reduce((s, e) => s.plus(e.profitUsd).plus(e.penaltyUsd), D(0)), 320, 'the events behind the report add up to it');
+  assert.equal(both.events!.reduce((s, e) => s.plus(e.profitUsd), D(0)), 320, 'the events behind the report add up to it (withheld included)');
   const card = both.storeBreakdown.find((s: { storeId: string }) => s.storeId === storeId)!;
   assert.equal(card.profitUsd, 320, 'the store card shows the same profit');
   assert.equal(both.unitsSold, 3, 'three phones are still sold: Samsung, Redmi C and Tecno');

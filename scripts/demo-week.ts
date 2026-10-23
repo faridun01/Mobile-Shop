@@ -324,12 +324,9 @@ try {
       const s = await call(admin, 'GET', `/daily-closings/summary?storeId=${shop.id}&businessDate=${dayKey(day)}`);
       const receipts = await prisma.sale.count({ where: { storeId: shop.id, createdAt: { gte: new Date(`${dayKey(day)}T00:00:00+05:00`), lt: new Date(new Date(`${dayKey(day)}T00:00:00+05:00`).getTime() + 86_400_000) } } });
       const events = r.events as any[];
-      // The day's profit = its rows (sales, returns, exchanges, withheld) + the rate difference of debts repaid + shift surpluses.
-      const fromRows = events.reduce((a: any, e: any) => a.plus(e.profitUsd).plus(e.penaltyUsd), D(0)).plus(r.periodDebtFxUsd ?? 0).plus(r.periodCashSurplusUsd ?? 0);
+      // The day's profit = its rows (sales, returns with what they withheld, exchanges) + the rate difference of debts repaid + shift surpluses.
+      const fromRows = events.reduce((a: any, e: any) => a.plus(e.profitUsd), D(0)).plus(r.periodDebtFxUsd ?? 0).plus(r.periodCashSurplusUsd ?? 0);
       check(fromRows.eq(r.profitUsd), `${shop.name} ${dayKey(day)}: строки отчёта $${fromRows} ≠ прибыль $${r.profitUsd}`);
-      // The customers' money of the day's rows, with the debts repaid, less the expenses = the shift's day.
-      const customersMoney = events.reduce((a: any, e: any) => a.plus(e.cashTjs ?? 0), D(0));
-      check(customersMoney.plus(s.otherCashTjs).minus(s.expensesCashTjs).eq(s.expectedCashTjs), `${shop.name} ${dayKey(day)}: деньги клиентов ${customersMoney} + погашения ${s.otherCashTjs} ≠ касса дня ${s.expectedCashTjs}`);
       console.log(`  ${dayKey(day)}  ${RATES[day].toFixed(2)}  ${String(receipts).padStart(6)}  ${D(r.revenueUsd).toFixed(2).padStart(9)}  ${D(r.cogsUsd).toFixed(2).padStart(9)}  ${D(r.profitUsd).toFixed(2).padStart(9)}  ${D(r.periodRefundPenaltiesUsd).toFixed(2).padStart(8)}  ${D(s.expectedCashTjs).toFixed(2).padStart(13)}  ${s.alreadyClosed ? 'закрыта' : 'открыта'}`);
     }
     const w = await call(admin, 'GET', `/reports/summary?${week}&storeId=${shop.id}&events=1`);

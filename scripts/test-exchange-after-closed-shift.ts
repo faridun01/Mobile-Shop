@@ -226,7 +226,8 @@ try {
     cashUsd: '-428.57', ownersUsd: '-28.57',
     salesCashTjs: '0', salesCashUsd: '0', refundsCashTjs: '4500', refundsCashUsd: '428.57',
     expectedCashTjs: '-4500', expectedCashUsd: '-428.57',
-    revenueUsd: '-476.19', profitUsd: '-28.57',
+    // The return takes back only what was handed out (4500 TJS = $428.57); the 500 withheld stay revenue.
+    revenueUsd: '-428.57', profitUsd: '-28.57',
   });
   assert.equal((await prisma.sale.findUniqueOrThrow({ where: { id: saleG.id } })).status, 'REFUNDED');
   assert.equal((await prisma.device.findUniqueOrThrow({ where: { id: saleG.saleItems[0].deviceId } })).status, 'STORE_STOCK');

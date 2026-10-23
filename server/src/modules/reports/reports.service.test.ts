@@ -86,8 +86,9 @@ describe('financial report query optimization preserves all totals', () => {
 
 describe('cancelled returns preserve dated financial history', () => {
   it.each([
-    ['2026-09', -1134.41, 419.89, 7480],
-    ['2026-10', 1134.41, -419.89, -7480],
+    // The return takes back only what was handed out: $1134.41 less the $804.30 withheld.
+    ['2026-09', -330.11, 419.89, 7480],
+    ['2026-10', 330.11, -419.89, -7480],
   ])('reports the original return and its cancellation in their own month: %s', async (month, revenue, profit, withheld) => {
     db.sale.findMany.mockResolvedValue([]);
     db.saleItem.findMany.mockResolvedValue([]);

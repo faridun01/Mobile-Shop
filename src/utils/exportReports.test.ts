@@ -8,13 +8,14 @@ const fixture: ComprehensiveReportInput = {
       // Sold for 1200 TJS at 10: $120, of which $15 is bonus-phone profit (nobody's income).
       kind: 'SALE', date: '2026-09-09T10:00:00.000Z', saleId: 'sale-1', receiptNumber: 101,
       storeId: 'store-1', storeName: 'Сиёма', rate: 10, amountTjs: 1200, amountUsd: 120,
-      costUsd: 70, profitUsd: 35, bonusUsd: 15, penaltyTjs: 0, penaltyUsd: 0, cashTjs: 1200,
+      costUsd: 70, profitUsd: 35, bonusUsd: 15, penaltyTjs: 0, penaltyUsd: 0,
     },
     {
-      // An older 1100 TJS sale refunded at 10.5: 1000 TJS handed back = $95.24, 100 TJS withheld.
+      // An older 1100 TJS sale refunded at 10.5: 1000 TJS handed back = $95.24, 100 TJS ($9.52) withheld.
+      // The row takes back only what was handed back; the withheld part is in its profit already.
       kind: 'REFUND', date: '2026-09-10T12:00:00.000Z', saleId: 'sale-0', receiptNumber: 90,
       storeId: 'store-1', storeName: 'Сиёма', rate: 10, amountTjs: -1000, amountUsd: -95.24,
-      costUsd: -60, profitUsd: -35.24, bonusUsd: 0, penaltyTjs: 100, penaltyUsd: 9.52, cashTjs: -1000,
+      costUsd: -60, profitUsd: -35.24, bonusUsd: 0, penaltyTjs: 100, penaltyUsd: 9.52,
     },
   ],
   expenses: [
@@ -46,11 +47,11 @@ const fixture: ComprehensiveReportInput = {
     debtFxUsd: 1.5,
     cashSurplusUsd: 2,
     bonusDeviceProfitUsd: 15,
-    profitUsd: 12.78,
+    profitUsd: 3.26,
     cashBonusesUsd: 5,
     expensesUsd: 20,
     expenseFxUsd: 0.95,
-    netProfitUsd: -6.27,
+    netProfitUsd: -15.79,
   },
 };
 
@@ -65,21 +66,23 @@ describe('comprehensive Excel report', () => {
     expect((operations.getCell('A5').value as Date).toISOString()).toBe('2026-09-09T15:00:00.000Z');
     expect(operations.getCell('C5').value).toBe(101);
     expect(operations.getCell('B6').value).toBe('Возврат (чек № 90)');
+    expect(operations.getCell('F6').value).toBe(-1000);
     expect(operations.getCell('G6').value).toBe(-95.24);
-    // The money that changed hands: 1200 TJS paid, 1000 TJS handed back (100 were withheld).
-    expect(operations.getCell('M5').value).toBe(1200);
-    expect(operations.getCell('M6').value).toBe(-1000);
-    expect(operations.getCell('M7').value).toMatchObject({ formula: 'SUM(M5:M6)', result: 200 });
+    // The withheld part is shown for reference; it is inside the row's profit.
+    expect(operations.getCell('K6').value).toBe(100);
+    expect(operations.getCell('L4').value).toBe('в т.ч. удержано ($)');
     // The expense keeps the dollars it was registered at.
     expect(workbook.getWorksheet('Расходы')?.getCell('K5').value).toBe(20);
 
     const summarySheet = workbook.getWorksheet('Итого')!;
     expect(summarySheet.getCell('B7').value).toMatchObject({ result: 24.76 });
-    expect(summarySheet.getCell('B13').value).toMatchObject({ formula: 'B9+B10+B11+B12', result: 12.78 });
-    expect(summarySheet.getCell('B16').value).toMatchObject({ formula: 'B13-B14+B15', result: -6.27 });
+    // Profit of the rows (−0.24, withheld included) + debt rate difference 1.5 + surplus 2; the withheld 9.52 is not added again.
+    expect(summarySheet.getCell('B10').value).toMatchObject({ result: 9.52 });
+    expect(summarySheet.getCell('B13').value).toMatchObject({ formula: 'B9+B11+B12', result: 3.26 });
+    expect(summarySheet.getCell('B16').value).toMatchObject({ formula: 'B13-B14+B15', result: -15.79 });
     // Control row against the program's total: 0 (ExcelJS drops a zero cached result).
     const control = summarySheet.getCell('B17').value as { formula: string; result?: number };
-    expect(control.formula).toBe('ROUND(B16-(-6.27),2)');
+    expect(control.formula).toBe('ROUND(B16-(-15.79),2)');
     expect(control.result ?? 0).toBe(0);
 
     const serialized = await workbook.xlsx.writeBuffer();
@@ -88,7 +91,7 @@ describe('comprehensive Excel report', () => {
     const ExcelJS = (await import('exceljs')).default;
     const reopened = new ExcelJS.Workbook();
     await reopened.xlsx.load(serialized);
-    expect(reopened.getWorksheet('Итого')?.getCell('B16').value).toMatchObject({ result: -6.27 });
+    expect(reopened.getWorksheet('Итого')?.getCell('B16').value).toMatchObject({ result: -15.79 });
   }, 60_000);
 
   it('values an expense paid later at the dollars it was registered at', () => {
