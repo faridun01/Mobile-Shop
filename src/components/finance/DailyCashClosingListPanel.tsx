@@ -8,6 +8,7 @@ import { EmptyState } from '../ui/EmptyState';
 import { DailyCashClosingModal } from './DailyCashClosingModal';
 import { useUIStore } from '../../stores/useUIStore';
 import { useAppFields } from '../../context/AppContext';
+import { useDeepLink } from '../../hooks/useDeepLink';
 import {
   AlertCircle,
   FileCheck2,
@@ -108,6 +109,15 @@ export const DailyCashClosingListPanel: React.FC<DailyCashClosingListPanelProps>
   }, [closings, todayStr, storeId]);
 
   const refresh = useCallback(() => setRevision((v) => v + 1), []);
+
+  // A notification about a shift closing opens it (?closing=<id>); notifications are recent, so
+  // the latest closings hold it.
+  useDeepLink('closing', async (id) => {
+    const found = closings.find((c) => c.id === id)
+      ?? (await apiClient<DailyCashClosing[]>('/daily-closings?limit=500').catch(() => [] as DailyCashClosing[])).find((c) => c.id === id);
+    if (found) setInspectClosing(found);
+    else setError('Закрытие смены из уведомления не найдено');
+  }, !loading);
 
   useEffect(() => {
     window.addEventListener('business-data-changed', refresh);

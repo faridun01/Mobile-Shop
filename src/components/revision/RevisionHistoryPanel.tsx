@@ -24,11 +24,16 @@ import { formatUserName } from '../../utils/formatUser';
 interface RevisionHistoryPanelProps {
   storeId?: string | null;
   isAdmin?: boolean;
+  /** A revision to open once the list has loaded (from a notification); onOpened clears it. */
+  openRevisionId?: string | null;
+  onOpened?: () => void;
 }
 
 export const RevisionHistoryPanel: React.FC<RevisionHistoryPanelProps> = ({
   storeId,
   isAdmin = false,
+  openRevisionId,
+  onOpened,
 }) => {
   const [revisions, setRevisions] = useState<StockRevision[]>([]);
   const [loading, setLoading] = useState(false);
@@ -57,6 +62,21 @@ export const RevisionHistoryPanel: React.FC<RevisionHistoryPanelProps> = ({
   useEffect(() => {
     fetchRevisions();
   }, [fetchRevisions]);
+
+  useEffect(() => {
+    if (!openRevisionId || loading) return;
+    let cancelled = false;
+    // Outside the chosen store's list, looked up among all the revisions the user may see.
+    const listed = revisions.find((r) => r.id === openRevisionId);
+    (listed ? Promise.resolve(listed) : apiClient<StockRevision[]>('/revisions').then((all) => all.find((r) => r.id === openRevisionId)).catch(() => undefined))
+      .then((found) => {
+        if (cancelled) return;
+        if (found) setSelectedRevision(found);
+        else setError('Ревизия из уведомления не найдена');
+        onOpened?.();
+      });
+    return () => { cancelled = true; };
+  }, [openRevisionId, loading, revisions, onOpened]);
 
   useEffect(() => {
     const handleSync = () => {

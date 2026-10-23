@@ -16,6 +16,7 @@ import { TransferDeviceGrid } from '../transfer/TransferDeviceGrid';
 import { ProductCategoryFilter, matchesProductCategory, type ProductCategoryFilterValue } from '../common/ProductCategoryFilter';
 import { TransferBottomBar } from '../transfer/TransferBottomBar';
 import { TransferHistoryList } from '../transfer/TransferHistoryList';
+import { revealElement, useDeepLink } from '../../hooks/useDeepLink';
 import { ConfirmTransferModal } from '../transfer/ConfirmTransferModal';
 import { RejectTransferModal } from '../transfer/RejectTransferModal';
 import { TransferInvoiceModal } from '../transfer/TransferInvoiceModal';
@@ -124,6 +125,18 @@ export const TransferPage: React.FC = () => {
   const [historyStatusFilter, setHistoryStatusFilter] = useState<'ALL' | 'PENDING' | 'APPROVED' | 'REJECTED'>('ALL');
   const [copiedImei, setCopiedImei] = useState<string | null>(null);
   const [expandedTransferIds, setExpandedTransferIds] = useState<Set<string>>(new Set());
+
+  // A notification about a transfer opens it (?transfer=<id>): the history tab with no filters,
+  // the transfer expanded and in view. One older than the loaded window is fetched first.
+  useDeepLink('transfer', async (id) => {
+    setActiveTab('list');
+    setHistoryStatusFilter('ALL');
+    setHistorySearchQuery('');
+    if (!isStoreScoped) setHistoryFilterStoreId('ALL');
+    if (!transfers.some((t: TransferRequest) => t.id === id) && !transfersAllLoaded) await fetchOlderTransfers();
+    setExpandedTransferIds((prev) => new Set(prev).add(id));
+    revealElement(`transfer-${id}`);
+  }, !isInitialLoading);
 
   const handleCopyText = (text: string) => {
     if (!text || text === '—') return;

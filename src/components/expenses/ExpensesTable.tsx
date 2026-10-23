@@ -46,7 +46,7 @@ export const ExpensesTable: React.FC<ExpensesTableProps> = ({
             const storeCleanName = formatStoreName(exp.storeName);
 
             return (
-              <tr key={exp.id} className="hover:bg-surface-raised/40 transition-colors">
+              <tr key={exp.id} data-deep-link={`expense-${exp.id}`} className="hover:bg-surface-raised/40 transition-colors">
                 <td className="py-2 px-3 whitespace-nowrap font-mono text-[11px] text-fg-subtle">
                   {formattedDate}
                 </td>

@@ -11,6 +11,7 @@ import { LoadingState } from '../ui/Skeleton';
 import { Button } from '../ui/Button';
 import { SerialScanButton } from '../common/SerialScanButton';
 import { Dialog } from '../ui/Dialog';
+import { useDeepLink } from '../../hooks/useDeepLink';
 import {
   PackagePlus,
   Barcode,
@@ -116,6 +117,16 @@ export const StoreReceiptPage: React.FC = () => {
   useEffect(() => {
     loadHistory();
   }, [loadHistory]);
+
+  // A notification about a store receipt opens it (?receipt=<id>) on the history tab.
+  useDeepLink('receipt', async (id) => {
+    setActiveTab('HISTORY');
+    try {
+      setSelectedReceipt(await apiClient<StoreReceipt>(`/store-receipts/${encodeURIComponent(id)}`));
+    } catch (e: any) {
+      setStatus({ tone: 'error', text: e?.message || 'Приход из уведомления не найден' });
+    }
+  });
 
   useEffect(() => {
     const handleUpdate = () => loadHistory();

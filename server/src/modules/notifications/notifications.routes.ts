@@ -3,6 +3,7 @@ import { authenticateJwt, requireRoles, type AuthenticatedRequest } from '../../
 import { prisma } from '../../prisma/prisma.service';
 import { RealtimeSyncGateway } from '../../websocket/websocket.gateway';
 import { PushNotificationService } from './push.service';
+import { notificationLink } from './notification-links';
 
 const notificationScope = (user: NonNullable<AuthenticatedRequest['user']>) => ({
   AND: [
@@ -10,6 +11,9 @@ const notificationScope = (user: NonNullable<AuthenticatedRequest['user']>) => (
     { OR: [{ targetRole: null }, { targetRole: user.role }] },
   ],
 });
+
+/** Older notifications were stored with a page only: they open their record too. */
+const withLink = <T extends { targetRoute: string | null }>(row: T) => ({ ...row, targetRoute: notificationLink(row) });
 
 export function registerNotificationRoutes(app: Express) {
   app.get('/api/notifications', authenticateJwt, async (req: AuthenticatedRequest, res, next) => {
@@ -39,7 +43,7 @@ export function registerNotificationRoutes(app: Express) {
           take: limit + 1,
           ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
         });
-        res.json({ items: rows.slice(0, limit), nextCursor: rows.length > limit ? rows[limit - 1].id : null });
+        res.json({ items: rows.slice(0, limit).map(withLink), nextCursor: rows.length > limit ? rows[limit - 1].id : null });
         return;
       }
 
@@ -54,7 +58,7 @@ export function registerNotificationRoutes(app: Express) {
         orderBy: { createdAt: 'desc' },
         take: 200,
       });
-      res.json(notifications);
+      res.json(notifications.map(withLink));
     } catch (error) {
       next(error);
     }

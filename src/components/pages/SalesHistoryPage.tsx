@@ -1,5 +1,6 @@
 import { useDataRefreshRevision } from '../../hooks/useDataRefreshRevision';
 import { useSalesPeriodTotals } from '../../hooks/useSalesPeriodTotals';
+import { useDeepLink } from '../../hooks/useDeepLink';
 import { deviceCodeLabel } from '../../utils/deviceCode';
 import { decimal, formatMoney, moneyNumber, splitUsdByTjs, sumMoney } from '../../utils/money';
 import { accessoryReturnPrice } from '../../utils/accessoryReturn';
@@ -370,6 +371,10 @@ export const SalesHistoryPage: React.FC = () => {
     setDialogView('details');
     setStatus(null);
   };
+
+  // A notification about a sale, return or exchange opens its receipt (?receipt=42), loaded from
+  // the server when it is older than the list; a missing one says so.
+  useDeepLink('receipt', (receipt) => openSaleByCode(receipt, 'camera'));
 
   const closeDialog = () => {
     if (isCancelling || isSubmittingRefund) return;

@@ -25,6 +25,7 @@ import { AddExpenseModal } from '../expenses/AddExpenseModal';
 import { EditExpenseModal } from '../expenses/EditExpenseModal';
 import { PayExpenseModal } from '../expenses/PayExpenseModal';
 import { AddCategoryModal } from '../expenses/AddCategoryModal';
+import { revealElement, useDeepLink } from '../../hooks/useDeepLink';
 
 export const ExpensesPage: React.FC = () => {
   const dataRefreshRevision = useDataRefreshRevision();
@@ -172,6 +173,27 @@ export const ExpensesPage: React.FC = () => {
       cancelled = true;
     };
   }, [periodFilter, selectedStartDate, selectedEndDate, selectedMonth, selectedStoreFilter, fetchExpensesRange, dataRefreshRevision]);
+
+  // A notification about an expense opens it (?expense=<id>): its month, every status and store,
+  // the row in view. A cancelled one is no longer listed, which the banner says.
+  useDeepLink('expense', async (id) => {
+    const expense = expenses.find((e) => e.id === id)
+      ?? (await fetchExpensesRange({ period: 'ALL' }).catch(() => [] as Expense[])).find((e) => e.id === id);
+    if (!expense) {
+      setStatus({ tone: 'error', text: 'Расход из уведомления не найден: возможно, он отменён' });
+      return;
+    }
+    const month = getBusinessDateKey(new Date(expense.date)).slice(0, 7);
+    const { start, end } = monthBounds(month);
+    setPeriodFilter('MONTH');
+    setSelectedMonth(month);
+    setSelectedStartDate(start);
+    setSelectedEndDate(end);
+    setStatusFilter('ALL');
+    setSearchQuery('');
+    if (!isStoreScoped) setSelectedStoreFilter('ALL');
+    revealElement(`expense-${id}`);
+  }, !isInitialLoading);
 
   const [customCategories, setCustomCategories] = useState<CustomCategory[]>(readSavedExpenseCategories);
 

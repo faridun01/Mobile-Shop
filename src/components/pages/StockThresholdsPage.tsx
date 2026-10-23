@@ -23,6 +23,7 @@ import { StatCard } from '../ui/StatCard';
 import { LoadingState } from '../ui/Skeleton';
 import { EmptyState } from '../ui/EmptyState';
 import { useStoreContext } from '../../utils/storeContext';
+import { revealElement, useDeepLink } from '../../hooks/useDeepLink';
 
 /** A minimum set for every capacity of a model together (the server's ALL_STORAGE). */
 const ALL_STORAGE = 'ALL';
@@ -235,6 +236,15 @@ export const StockThresholdsPage: React.FC = () => {
       setSelectedStoreId(currentUser.storeId);
     }
   }, [isSeller, isPartner, currentUser?.storeId]);
+
+  // A minimum-stock notification opens its model (?threshold=<id>&store=<id>) in that store.
+  useDeepLink('threshold', (id, params) => {
+    const store = params.get('store');
+    if (store && !(isSeller || isPartner)) setSelectedStoreId(store);
+    setSearchQuery('');
+    setStatusFilter('ALL');
+    revealElement(`threshold-${id}`);
+  }, true, ['store']);
 
   const currentStore = useMemo(() => {
     return activeStores.find((s) => s.id === selectedStoreId) || mainWarehouse;
@@ -842,6 +852,7 @@ export const StockThresholdsPage: React.FC = () => {
               return (
                 <div
                   key={row.key}
+                  data-deep-link={row.thresholdId ? `threshold-${row.thresholdId}` : undefined}
                   className={`p-3 rounded-xl border transition-all w-full max-w-full min-w-0 overflow-hidden ${
                     row.status === 'DEFICIT'
                       ? 'bg-surface border-danger/40 border-l-4 border-l-danger shadow-xs'
@@ -943,6 +954,7 @@ export const StockThresholdsPage: React.FC = () => {
                 return (
                   <div
                     key={row.key}
+                    data-deep-link={row.thresholdId ? `threshold-${row.thresholdId}` : undefined}
                     className={`p-3.5 sm:p-4 transition-colors hover:bg-surface-raised/40 ${
                       row.status === 'DEFICIT' ? 'bg-danger/5 dark:bg-danger/10' : ''
                     }`}

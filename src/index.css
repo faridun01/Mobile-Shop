@@ -810,3 +810,28 @@ select optgroup,
 /* The same for a chip in a row of chips: taller tap area only, so neighbours never overlap. */
 .hit-area-y:not(.absolute):not(.fixed):not(.sticky) { position: relative; }
 .hit-area-y::after { content: ""; position: absolute; inset: -8px 0; }
+
+/* =========================================================================
+   NOTIFICATION DEEP LINK
+   The record a notification opened is outlined for a moment, so the eye finds it in the list.
+   ========================================================================= */
+/* The tint also shows on a table row, where a box-shadow does not. */
+@keyframes deepLinkFlash {
+  0%, 60% {
+    box-shadow: 0 0 0 3px var(--color-accent);
+    background-color: color-mix(in srgb, var(--color-accent) 16%, transparent);
+  }
+  100% { box-shadow: 0 0 0 3px transparent; }
+}
+
+.deep-link-flash {
+  animation: deepLinkFlash 2.6s ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .deep-link-flash {
+    animation: none;
+    box-shadow: 0 0 0 3px var(--color-accent);
+    background-color: color-mix(in srgb, var(--color-accent) 16%, transparent);
+  }
+}

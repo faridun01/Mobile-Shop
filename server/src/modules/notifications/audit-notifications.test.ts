@@ -20,7 +20,7 @@ describe('buildAuditNotification', () => {
       dedupeKey: 'AUDIT:audit-1',
       store,
       actor: { id: 'u1', name: 'Ахмад' },
-      targetRoute: '/sales-history',
+      targetRoute: '/sales-history?receipt=12',
     });
   });
 

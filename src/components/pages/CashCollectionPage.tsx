@@ -4,6 +4,7 @@ import { CashCollectionPanel } from '../finance/CashCollectionPanel';
 import { DateRangePicker } from '../ui/DateRangePicker';
 import { StoreSelector } from '../common/StoreSelector';
 import { getBusinessDateKey, currentBusinessMonth } from '../../utils/businessDate';
+import { revealElement, useDeepLink } from '../../hooks/useDeepLink';
 
 export const CashCollectionPage: React.FC = () => {
   const { stores } = useAppFields('stores');
@@ -14,6 +15,16 @@ export const CashCollectionPage: React.FC = () => {
   const [startDate, setStartDate] = useState<string>('');
   const [endDate, setEndDate] = useState<string>('');
   const [selectedStoreId, setSelectedStoreId] = useState<string>('all');
+
+  // A notification about a collection opens it (?collection=<id>&store=<id>): that store's whole
+  // history, the row in view.
+  useDeepLink('collection', (id, params) => {
+    setSelectedStoreId(params.get('store') || 'all');
+    setSelectedMonth('');
+    setStartDate('');
+    setEndDate('');
+    revealElement(`collection-${id}`);
+  }, true, ['store']);
 
   const handleDateChange = (start: string, end: string, monthStr?: string) => {
     setStartDate(start);

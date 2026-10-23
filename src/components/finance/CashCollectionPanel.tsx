@@ -587,6 +587,7 @@ export const CashCollectionPanel: React.FC<CashCollectionPanelProps> = ({
                   return (
                     <div
                       key={item.id}
+                      data-deep-link={`collection-${item.id}`}
                       className="p-3 sm:p-3.5 flex items-center justify-between gap-3 text-xs hover:bg-surface-raised/40 transition-colors"
                     >
                       <div className="min-w-0">

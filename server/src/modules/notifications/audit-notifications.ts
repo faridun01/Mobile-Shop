@@ -1,5 +1,6 @@
 import type { TransactionClient } from '../../prisma/prisma.service';
 import { notifyAdmins, type AdminNotificationInput } from './notification.service';
+import { notificationLink } from './notification-links';
 
 interface AuditRow {
   id: string;
@@ -17,7 +18,7 @@ interface Rule {
   title: string;
   route: string;
   /** Which record the notification opens; also how the store is found. */
-  subject?: 'sale' | 'expense' | 'transfer' | 'repair' | 'store';
+  subject?: 'sale' | 'expense' | 'transfer' | 'repair' | 'store' | 'supplierPayment';
   when?: (row: AuditRow) => boolean;
   amounts?: (fd: Record<string, unknown>) => Amounts;
 }
@@ -42,7 +43,7 @@ export const AUDIT_NOTIFICATION_RULES: Record<string, Rule> = {
   EXPENSE_EDIT: { title: 'Расход изменён', route: '/expenses', subject: 'expense', amounts: fromFd },
   EXPENSE_DELETE: { title: 'Расход отменён', route: '/expenses', subject: 'expense', amounts: fromFd },
   PAYROLL_PAYOUT: { title: 'Выплата зарплаты', route: '/employees', subject: 'expense', amounts: (fd) => ({ tjs: fd.paidNowTjs }) },
-  SUPPLIER_PAYMENT: { title: 'Оплата поставщику', route: '/suppliers', amounts: fromFd },
+  SUPPLIER_PAYMENT: { title: 'Оплата поставщику', route: '/suppliers', subject: 'supplierPayment', amounts: fromFd },
   SUPPLIER_BONUS: { title: 'Бонус поставщика', route: '/bonuses', amounts: fromFd },
   BONUS_EDIT: { title: 'Бонус поставщика изменён', route: '/bonuses' },
   BONUS_DELETE: { title: 'Бонус поставщика удалён', route: '/bonuses' },
@@ -89,12 +90,20 @@ function translateExpenseCategoryText(text: string): string {
 }
 
 /** The notification for one audited business event, or null when the admin is not notified. */
-export function buildAuditNotification(row: AuditRow, ctx: { store?: { id: string; name: string } | null; actorName?: string | null }): AdminNotificationInput | null {
+export function buildAuditNotification(row: AuditRow, ctx: {
+  store?: { id: string; name: string } | null;
+  actorName?: string | null;
+  /** The sale's receipt when the audit row does not carry it. */
+  receiptNumber?: number | null;
+  supplierId?: string | null;
+}): AdminNotificationInput | null {
   const rule = AUDIT_NOTIFICATION_RULES[row.action];
   if (!rule || (rule.when && !rule.when(row))) return null;
   const fd = row.financialDetails && typeof row.financialDetails === 'object' ? (row.financialDetails as Record<string, unknown>) : {};
   const amounts = rule.amounts ? rule.amounts(fd) : {};
   const actorName = row.userName || ctx.actorName || null;
+  const receiptNumber = row.receiptNumber ?? ctx.receiptNumber;
+  const documentRef = receiptNumber ? `Чек #${receiptNumber}` : null;
   return {
     actionType: row.action,
     title: rule.title,
@@ -104,32 +113,43 @@ export function buildAuditNotification(row: AuditRow, ctx: { store?: { id: strin
     actor: row.userId && actorName ? { id: row.userId, name: actorName } : null,
     amountTjs: money(amounts.tjs),
     amountUsd: money(amounts.usd),
-    documentRef: row.receiptNumber ? `Чек #${row.receiptNumber}` : null,
+    documentRef,
     targetType: row.action,
     targetId: row.targetId ?? undefined,
-    targetRoute: rule.route,
+    // Opens the record itself: the receipt, the expense, the transfer.
+    targetRoute: notificationLink({ targetType: row.action, targetId: row.targetId, targetRoute: rule.route, documentRef, supplierId: ctx.supplierId }),
   };
 }
 
-async function storeOf(tx: TransactionClient, subject: Rule['subject'], targetId: string | null | undefined) {
-  if (!subject || !targetId) return null;
+/** The record behind an audit row: its store, and what the notification opens it by. */
+async function subjectOf(tx: TransactionClient, subject: Rule['subject'], targetId: string | null | undefined) {
+  const none = { store: null, receiptNumber: null, supplierId: null };
+  if (!subject || !targetId) return none;
+  if (subject === 'supplierPayment') {
+    const payment = await tx.supplierPayment.findUnique({ where: { id: targetId }, select: { supplierId: true } });
+    return { ...none, supplierId: payment?.supplierId ?? null };
+  }
   let storeId: string | null | undefined;
-  if (subject === 'sale') storeId = (await tx.sale.findUnique({ where: { id: targetId }, select: { storeId: true } }))?.storeId;
-  else if (subject === 'expense') storeId = (await tx.expense.findUnique({ where: { id: targetId }, select: { storeId: true } }))?.storeId;
+  let receiptNumber: number | null = null;
+  if (subject === 'sale') {
+    const sale = await tx.sale.findUnique({ where: { id: targetId }, select: { storeId: true, receiptNumber: true } });
+    storeId = sale?.storeId;
+    receiptNumber = sale?.receiptNumber ?? null;
+  } else if (subject === 'expense') storeId = (await tx.expense.findUnique({ where: { id: targetId }, select: { storeId: true } }))?.storeId;
   else if (subject === 'transfer') storeId = (await tx.transferRequest.findUnique({ where: { id: targetId }, select: { toStoreId: true } }))?.toStoreId;
   else if (subject === 'repair') storeId = (await tx.repairTicket.findUnique({ where: { id: targetId }, select: { storeId: true } }))?.storeId;
   else storeId = targetId;
-  if (!storeId) return null;
-  return tx.store.findUnique({ where: { id: storeId }, select: { id: true, name: true } });
+  const store = storeId ? await tx.store.findUnique({ where: { id: storeId }, select: { id: true, name: true } }) : null;
+  return { ...none, store, receiptNumber };
 }
 
 /** Creates the admin notification for an audit row written inside a business transaction. */
 export async function notifyFromAudit(tx: TransactionClient, row: AuditRow) {
   const rule = AUDIT_NOTIFICATION_RULES[row.action];
   if (!rule || (rule.when && !rule.when(row))) return;
-  const store = await storeOf(tx, rule.subject, row.targetId);
+  const { store, receiptNumber, supplierId } = await subjectOf(tx, rule.subject, row.targetId);
   const actorName = row.userName || (row.userId ? (await tx.user.findUnique({ where: { id: row.userId }, select: { name: true } }))?.name : null);
-  const input = buildAuditNotification(row, { store, actorName });
+  const input = buildAuditNotification(row, { store, actorName, receiptNumber, supplierId });
   if (input) await notifyAdmins(tx, input);
 }
 

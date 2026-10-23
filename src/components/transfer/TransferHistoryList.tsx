@@ -282,6 +282,7 @@ export const TransferHistoryList: React.FC<TransferHistoryListProps> = ({
             return (
               <div
                 key={tr.id}
+                data-deep-link={`transfer-${tr.id}`}
                 className={cn(
                   'p-2.5 sm:p-3 rounded-xl bg-surface border transition-all duration-200 space-y-2 shadow-2xs hover:shadow-xs',
                   tr.status === 'PENDING_APPROVAL'

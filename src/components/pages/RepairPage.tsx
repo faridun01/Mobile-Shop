@@ -14,6 +14,7 @@ import { RepairTicketsList } from '../repair/RepairTicketsList';
 import { NewRepairForm } from '../repair/NewRepairForm';
 import { IssueRepairModal } from '../repair/IssueRepairModal';
 import { ViewRepairModal } from '../repair/ViewRepairModal';
+import { useDeepLink } from '../../hooks/useDeepLink';
 
 export const RepairPage: React.FC = () => {
   const dataRefreshRevision = useDataRefreshRevision();
@@ -127,6 +128,14 @@ export const RepairPage: React.FC = () => {
       setSelectedStoreId('ALL');
     }
   }, [globalSelectedStoreId, isStoreScoped, currentUser?.storeId]);
+
+  // A notification about a repair opens its card (?repair=<id>), fetched when older than the month.
+  useDeepLink('repair', async (id) => {
+    const ticket = repairs.find((r) => r.id === id)
+      ?? (await fetchRepairsRange({ period: 'ALL' }).catch(() => [] as RepairTicket[])).find((r) => r.id === id);
+    if (ticket) setViewingTicket(ticket);
+    else setStatusBanner({ tone: 'error', text: 'Ремонт из уведомления не найден' });
+  }, listLoad !== 'loading');
 
   const [createTicketStoreId, setCreateTicketStoreId] = useState<string>(() => {
     if (isStoreScoped) return currentUser?.storeId || '';

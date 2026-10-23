@@ -20,6 +20,7 @@ import { EditInvoiceModal } from '../purchase/EditInvoiceModal';
 import { invoiceDeleteBlock } from '../../utils/invoiceEdit';
 import { DeleteSupplierInvoiceModal } from '../suppliers/DeleteSupplierInvoiceModal';
 import { compareInvoicesDesc } from '../purchase/types';
+import { useDeepLink } from '../../hooks/useDeepLink';
 
 export const SuppliersPage: React.FC = () => {
   const {
@@ -58,6 +59,8 @@ export const SuppliersPage: React.FC = () => {
 
   const [selectedSupplierId, setSelectedSupplierId] = useState<string | null>(null);
   const [selectedInvoiceId, setSelectedInvoiceId] = useState<string | null>(null);
+  // A notification about a supplier payment opens that supplier (?supplier=<id>).
+  useDeepLink('supplier', (id) => setSelectedSupplierId(id));
 
   const selectedSupplier = suppliers.find(s => s.id === selectedSupplierId) || null;
   const selectedInvoice = supplierInvoices.find(inv => inv.id === selectedInvoiceId) || null;

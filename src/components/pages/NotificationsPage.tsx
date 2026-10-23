@@ -142,7 +142,7 @@ const TONE_BADGE_STYLES: Record<string, string> = {
   purple: 'bg-purple-500/10 border-purple-500/25 text-purple-400',
 };
 
-/** Where a notification leads: an app path ('/receipts?receipt=…') or an older page id. */
+/** Where a notification leads: the record it is about ('/transfer?transfer=…', built by the server), or an older page id. */
 function targetPath(n: NotificationItem): string | null {
   const target = n.targetRoute || n.linkPage;
   if (!target) return null;
@@ -234,8 +234,9 @@ export const NotificationsPage: React.FC = () => {
     if (!path) return;
     const pageId = pageIdFor(path);
     if (pageId) setActivePage(pageId);
-    if (n.targetType === 'TRANSFER_REQUEST') navigate('/transfer', { state: { tab: 'list' } });
-    else navigate(path);
+    // The path opens the record itself (?transfer=…, ?receipt=…); a transfer request also lands
+    // on the requests tab when an older notification has no record in its link.
+    navigate(path, n.targetType === 'TRANSFER_REQUEST' ? { state: { tab: 'list' } } : undefined);
   };
 
   const retailStores = stores.filter((s) => !s.isMainWarehouse);

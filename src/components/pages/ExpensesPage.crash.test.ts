@@ -1,16 +1,19 @@
 import React from 'react';
 import { renderToString, renderToPipeableStream } from 'react-dom/server';
+import { MemoryRouter } from 'react-router-dom';
 import { afterEach, expect, it, vi } from 'vitest';
 vi.mock('../../context/AppContext', () => ({ useAppFields: () => ({ currentUser: { id: 'diagnostic', role: 'ADMIN', name: 'Диагностика' }, stores: [], users: [], expenses: [], todayRate: { rate: 10 }, selectedStoreId: 'all', isInitialLoading: false, fetchExpensesRange: async () => [] }) }));
 import { ExpensesPage } from './ExpensesPage';
+// A page lives inside the app's router (it reads notification links from the address).
+const page = () => React.createElement(MemoryRouter, null, React.createElement(ExpensesPage));
 afterEach(() => vi.unstubAllGlobals());
 it('control: expense page renders with a valid saved category array', () => {
  vi.stubGlobal('localStorage', { getItem: () => '[]' });
- expect(() => renderToString(React.createElement(ExpensesPage))).not.toThrow();
+ expect(() => renderToString(page())).not.toThrow();
 });
 it.each(['null', '{}', '123'])('renders safely with invalid saved categories %s', (value) => {
  vi.stubGlobal('localStorage', { getItem: () => value });
- expect(() => renderToString(React.createElement(ExpensesPage))).not.toThrow();
+ expect(() => renderToString(page())).not.toThrow();
 });
 it('reproduces rejected lazy chunk as a React rendering error', async () => {
  const reason = new TypeError('Failed to fetch dynamically imported module');

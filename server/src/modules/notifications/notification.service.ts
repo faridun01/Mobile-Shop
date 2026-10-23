@@ -4,6 +4,7 @@ import type { TransactionClient } from '../../prisma/prisma.service';
 import { onCommit } from '../../common/after-commit';
 import { RealtimeSyncGateway } from '../../websocket/websocket.gateway';
 import { PushNotificationService } from './push.service';
+import { notificationLink } from './notification-links';
 
 export interface AdminNotificationInput {
   /** Stable machine name of the business event, e.g. 'STORE_RECEIPT', 'CASH_COLLECTION'. */
@@ -25,13 +26,16 @@ export interface AdminNotificationInput {
   details?: unknown;
 }
 
+/** The path that opens the notified record (the receipt, the transfer…), also sent with the push. */
+const linkOf = (input: AdminNotificationInput) => notificationLink({ ...input, targetType: input.targetType ?? input.actionType, storeId: input.store?.id });
+
 function notificationData(input: AdminNotificationInput) {
   return {
     title: input.title,
     message: input.message,
     targetType: input.targetType ?? input.actionType,
     targetId: input.targetId,
-    targetRoute: input.targetRoute,
+    targetRoute: linkOf(input),
     actionType: input.actionType,
     storeId: input.store?.id,
     storeName: input.store?.name,
@@ -63,7 +67,7 @@ export async function notifyStorePartners(tx: TransactionClient, storeId: string
       PushNotificationService.sendPushToUser(partner.id, {
         title: input.title,
         message: input.message,
-        targetRoute: input.targetRoute || '/notifications',
+        targetRoute: linkOf(input),
         dedupeKey: `${input.dedupeKey}:user:${partner.id}`,
       }).catch((err) => console.error('[Push] Failed to send push to a partner:', err));
     }
@@ -90,7 +94,7 @@ export async function notifyAdmins(tx: TransactionClient, input: AdminNotificati
     PushNotificationService.sendPushToRole('ADMIN', {
       title: input.title,
       message: input.message,
-      targetRoute: input.targetRoute || '/notifications',
+      targetRoute: linkOf(input),
       dedupeKey: input.dedupeKey,
     }).catch((err) => console.error('[Push] Failed to send push to admins:', err));
   });

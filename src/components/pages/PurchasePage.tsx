@@ -32,6 +32,7 @@ import { InvoiceDetailsModal } from '../purchase/InvoiceDetailsModal';
 import { PurchaseHistoryList } from '../purchase/PurchaseHistoryList';
 import { NewPurchaseForm } from '../purchase/NewPurchaseForm';
 import { ConfirmDialog } from '../ui/ConfirmDialog';
+import { useDeepLink } from '../../hooks/useDeepLink';
 
 export const PurchasePage: React.FC = () => {
   const dataRefreshRevision = useDataRefreshRevision();
@@ -104,6 +105,14 @@ export const PurchasePage: React.FC = () => {
       cancelled = true;
     };
   }, [selectedMonth, fetchInvoicesRange, dataRefreshRevision]);
+
+  // A notification about a purchase opens its invoice (?invoice=<id>), fetched when not in the month.
+  useDeepLink('invoice', async (id) => {
+    const known = supplierInvoices.some((inv) => inv.id === id)
+      || (await fetchInvoicesRange({ period: 'ALL' }).catch(() => [])).some((inv) => inv.id === id);
+    if (known) setSelectedInvoiceId(id);
+    else setStatusMessage({ type: 'error', text: 'Накладная из уведомления не найдена: возможно, она удалена' });
+  });
 
   // Form states - no default supplier, must be selected explicitly
   const [selectedSupplierId, setSelectedSupplierId] = useState<string>('');

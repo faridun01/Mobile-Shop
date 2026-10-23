@@ -15,6 +15,7 @@ import { SearchBar } from '../ui/SearchBar';
 import { DEVICE_STATUS_LABELS, findDeviceByCode, normalizeScanCode } from '../../utils/scanLookup';
 import { formatPhoneColor } from '../../utils/phoneSpecs';
 import { RevisionHistoryPanel } from '../revision/RevisionHistoryPanel';
+import { useDeepLink } from '../../hooks/useDeepLink';
 import { RestrictedAccess } from '../ui/RestrictedAccess';
 import { ClosePeriodDialog } from '../owners/ClosePeriodDialog';
 import { AccessoryCountPanel, type AccessoryCountRow } from '../revision/AccessoryCountPanel';
@@ -131,6 +132,12 @@ const AdminRevisionPage: React.FC = () => {
 
   // Active page tab: 'AUDIT' (live scanning) vs 'HISTORY' (past revisions)
   const [pageTab, setPageTab] = useState<'AUDIT' | 'HISTORY'>('AUDIT');
+  // A notification about a stock revision opens it on the history tab (?revision=<id>).
+  const [linkedRevisionId, setLinkedRevisionId] = useState<string | null>(null);
+  useDeepLink('revision', (id) => {
+    setPageTab('HISTORY');
+    setLinkedRevisionId(id);
+  });
   const [revisionComment, setRevisionComment] = useState('');
   const [isSavingRevision, setIsSavingRevision] = useState(false);
   // The month ends with a stock count, then the financial period is closed from here.
@@ -1001,7 +1008,7 @@ const AdminRevisionPage: React.FC = () => {
       </div>
       ) : (
         <div className="p-2 sm:p-4 max-w-5xl mx-auto w-full">
-          <RevisionHistoryPanel storeId={effectiveStoreId} isAdmin={isAdmin} />
+          <RevisionHistoryPanel storeId={effectiveStoreId} isAdmin={isAdmin} openRevisionId={linkedRevisionId} onOpened={() => setLinkedRevisionId(null)} />
         </div>
       )}
 

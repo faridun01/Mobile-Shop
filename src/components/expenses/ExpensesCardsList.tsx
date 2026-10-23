@@ -42,7 +42,7 @@ export const ExpensesCardsList: React.FC<ExpensesCardsListProps> = ({
         const expText = isRedundant ? null : rawDesc;
 
         return (
-          <div key={exp.id} className="p-2 sm:p-2.5 flex items-center justify-between gap-2 hover:bg-surface-raised/40 transition-colors">
+          <div key={exp.id} data-deep-link={`expense-${exp.id}`} className="p-2 sm:p-2.5 flex items-center justify-between gap-2 hover:bg-surface-raised/40 transition-colors">
             <div className="flex items-center gap-2 min-w-0 flex-1">
               <div className="w-7 h-7 rounded-lg bg-surface-raised border border-border/80 text-fg-subtle flex items-center justify-center shrink-0">
                 <Icon className="w-3.5 h-3.5" />
