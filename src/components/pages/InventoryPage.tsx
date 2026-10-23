@@ -67,9 +67,11 @@ export const InventoryPage: React.FC = () => {
   const rate = todayRate?.rate || undefined;
   const isSeller = currentUser?.role === 'SELLER';
   const isAdminOrPartner = currentUser?.role === 'ADMIN' || currentUser?.role === 'PARTNER';
-  // Purchase cost and stock value: the admin and partners see them in the warehouse, sellers do not.
-  // (The inventory components take it through their `isAdmin` prop, which only gates money there.)
+  // The cost of each unit: the admin and partners see it in the warehouse, sellers do not. The
+  // inventory components take it through their `isAdmin` prop, which only gates money there.
   const canSeeCost = isAdminOrPartner;
+  // Totals of stock value (the warehouse, a brand, a model, a location): the admin only.
+  const isAdmin = currentUser?.role === 'ADMIN';
   const isStoreScoped = currentUser?.role === 'SELLER' || currentUser?.role === 'PARTNER';
   // Admin inside a store sees only that store; Central Cash shows every store.
   const storeCtx = useStoreContext();
@@ -678,7 +680,7 @@ export const InventoryPage: React.FC = () => {
           distinctBrandCount={distinctBrandCount}
           filteredDistinctModelsCount={filteredDistinctModelsCount}
           distinctModelCount={distinctModelCount}
-          isAdmin={canSeeCost}
+          isAdmin={isAdmin}
           filteredStockValueUsd={filteredStockValueUsd}
           stockValueUsd={stockValueUsd}
         />}
@@ -721,6 +723,7 @@ export const InventoryPage: React.FC = () => {
             sortBy={sortBy}
             onSortByChange={setSortBy}
             isAdmin={canSeeCost}
+            showStockValue={isAdmin}
             filteredDevicesCount={filteredDevices.length}
             brandGroupsCount={brandGroups.length}
             filteredStockValueUsd={filteredStockValueUsd}
@@ -732,7 +735,7 @@ export const InventoryPage: React.FC = () => {
       {/* Main Content Area */}
       <div className="flex-none md:flex-1 md:min-h-0 md:overflow-y-auto">
         {viewTab === 'ACCESSORIES' ? (
-          <AccessoryStockList locationId={isStoreScoped ? undefined : selectedLocationId} isAdmin={canSeeCost} />
+          <AccessoryStockList locationId={isStoreScoped ? undefined : selectedLocationId} isAdmin={canSeeCost} showStockValue={isAdmin} />
         ) : isInitialLoading ? (
           <LoadingState label="Загрузка склада товаров…" />
         ) : viewTab === 'LOCATIONS' ? (
@@ -742,7 +745,7 @@ export const InventoryPage: React.FC = () => {
             retailStores={retailStores}
             storeStats={storeStats}
             selectedLocationId={selectedLocationId}
-            isAdmin={canSeeCost}
+            isAdmin={isAdmin}
             rate={rate}
             onSelectLocationAndSwitch={handleSelectLocationAndSwitch}
           />
@@ -768,6 +771,7 @@ export const InventoryPage: React.FC = () => {
             selectedLocationId={selectedLocationId}
             activeStore={activeStore}
             isAdmin={canSeeCost}
+            showStockValue={isAdmin}
             rate={rate}
             totalFilteredDevicesCount={filteredDevices.length}
             onSelectDevice={(device) => setSelectedDevice(device)}

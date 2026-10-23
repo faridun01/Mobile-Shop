@@ -57,6 +57,8 @@ interface InventoryFiltersBarProps {
   sortBy: 'COUNT_DESC' | 'COUNT_ASC' | 'NAME_ASC' | 'NAME_DESC' | 'PRICE_DESC' | 'PRICE_ASC';
   onSortByChange: (sort: 'COUNT_DESC' | 'COUNT_ASC' | 'NAME_ASC' | 'NAME_DESC' | 'PRICE_DESC' | 'PRICE_ASC') => void;
   isAdmin: boolean;
+  /** Totals of stock value (sums over many units): the admin only; `isAdmin` here gates the cost of each unit. */
+  showStockValue?: boolean;
   filteredDevicesCount: number;
   brandGroupsCount: number;
   filteredStockValueUsd: number;
@@ -97,6 +99,7 @@ export const InventoryFiltersBar: React.FC<InventoryFiltersBarProps> = ({
   sortBy,
   onSortByChange,
   isAdmin,
+  showStockValue = isAdmin,
   filteredDevicesCount,
   brandGroupsCount,
   filteredStockValueUsd,
@@ -405,7 +408,7 @@ export const InventoryFiltersBar: React.FC<InventoryFiltersBarProps> = ({
                   {' '}· {brandGroupsCount} {brandGroupsCount === 1 ? 'бренд' : 'брендов'}
                 </span>
               )}
-              {isAdmin && filteredDevicesCount > 0 && (
+              {showStockValue && filteredDevicesCount > 0 && (
                 <span className="opacity-80"> · {formatUsd(filteredStockValueUsd)}</span>
               )}
             </span>

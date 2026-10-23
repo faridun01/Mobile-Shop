@@ -14,14 +14,16 @@ interface AccessoryStockListProps {
   /** A location id, or 'ALL'/'all' for every location (ADMIN); store staff always get their own store. */
   locationId?: string;
   isAdmin: boolean;
+  /** Totals of stock value (sums over many units): the admin only; `isAdmin` here gates the cost of each unit. */
+  showStockValue?: boolean;
 }
 
 /**
  * Accessories on hand: one row per card (barcode) with its quantity by location. Quantities are
- * the units left in its receipt batches; the stock cost (each batch at its own unit cost) is
- * shown to the admin only.
+ * the units left in its receipt batches. The average unit cost is shown with `isAdmin`; the stock
+ * value (each batch at its own unit cost) only with `showStockValue`.
  */
-export const AccessoryStockList: React.FC<AccessoryStockListProps> = ({ locationId, isAdmin }) => {
+export const AccessoryStockList: React.FC<AccessoryStockListProps> = ({ locationId, isAdmin, showStockValue = isAdmin }) => {
   const { openScanner } = useAppFields('openScanner');
   const refreshRevision = useDataRefreshRevision();
   const [items, setItems] = useState<AccessoryStockItem[] | null>(null);
@@ -88,7 +90,7 @@ export const AccessoryStockList: React.FC<AccessoryStockListProps> = ({ location
         </button>
         <span className="text-xs text-fg-subtle">
           В наличии: <strong className="text-fg font-mono">{totalUnits} шт.</strong>
-          {isAdmin && <> • себестоимость <strong className="text-fg font-mono">${formatMoney(totalCost)}</strong></>}
+          {showStockValue && <> • себестоимость <strong className="text-fg font-mono">${formatMoney(totalCost)}</strong></>}
         </span>
       </div>
 
@@ -130,7 +132,7 @@ export const AccessoryStockList: React.FC<AccessoryStockListProps> = ({ location
                 {item.stores.length === 1 && <span className="text-[10px] text-fg-subtle block">{item.stores[0].storeName}</span>}
                 {isAdmin && item.stockCostUsd !== undefined && item.quantity > 0 && (
                   <span className="text-[10px] font-mono text-fg-subtle block" title="Средняя цена закупки остатка (каждая партия по своей цене)">
-                    закупка ≈ ${formatMoney(moneyNumber(decimal(item.stockCostUsd).div(item.quantity)))}/шт • ${formatMoney(item.stockCostUsd)}
+                    закупка ≈ ${formatMoney(moneyNumber(decimal(item.stockCostUsd).div(item.quantity)))}/шт{showStockValue && <> • ${formatMoney(item.stockCostUsd)}</>}
                   </span>
                 )}
               </div>

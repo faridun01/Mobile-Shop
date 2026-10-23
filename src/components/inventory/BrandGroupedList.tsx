@@ -58,6 +58,8 @@ interface BrandGroupedListProps {
   selectedLocationId: string;
   activeStore: StoreType | null;
   isAdmin: boolean;
+  /** Totals of stock value (sums over many units): the admin only; `isAdmin` here gates the cost of each unit. */
+  showStockValue?: boolean;
   rate?: number;
   totalFilteredDevicesCount: number;
   onSelectDevice: (device: Device) => void;
@@ -76,6 +78,7 @@ export const BrandGroupedList: React.FC<BrandGroupedListProps> = ({
   selectedLocationId,
   activeStore,
   isAdmin,
+  showStockValue = isAdmin,
   rate,
   totalFilteredDevicesCount,
   onSelectDevice,
@@ -171,7 +174,7 @@ export const BrandGroupedList: React.FC<BrandGroupedListProps> = ({
                       {bGroup.totalCount === 1 ? 'телефон' : bGroup.totalCount < 5 ? 'телефона' : 'телефонов'}
                     </span>
                   </div>
-                  {isAdmin && (
+                  {showStockValue && (
                     <div className="text-[11px] text-fg-subtle font-mono mt-0.5">
                       <span className="font-bold text-fg-muted">{formatUsd(bGroup.totalValueUsd)}</span>
                     </div>
@@ -230,7 +233,7 @@ export const BrandGroupedList: React.FC<BrandGroupedListProps> = ({
                             <span className="inline-block px-2 py-0.5 rounded-lg text-xs font-bold font-mono bg-accent/10 text-accent border border-accent/20">
                               {line.devices.length} шт.
                             </span>
-                            {isAdmin && line.valueUsd > 0 && (
+                            {showStockValue && line.valueUsd > 0 && (
                               <span className="block text-[10px] text-fg-subtle font-mono leading-none mt-0.5 font-medium">
                                 {formatUsd(line.valueUsd)}
                               </span>

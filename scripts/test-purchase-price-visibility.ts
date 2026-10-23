@@ -107,7 +107,7 @@ async function run() {
     if (!adminHasSuppliersNav) throw new Error('Admin should see "Поставщики" in sidebar');
 
     // ----------------------------------------------------
-    // TEST 2: PARTNER — sees the cost of stock in the warehouse, still no purchases or suppliers
+    // TEST 2: PARTNER — sees each unit's cost in the warehouse, not the stock value; no purchases or suppliers
     // ----------------------------------------------------
     console.log('\n--- 2. Testing PARTNER role (partner_sadbarg) ---');
     await loginAs(page, 'partner_sadbarg', 'partner123');
@@ -139,7 +139,7 @@ async function run() {
     const partnerMainText = await page.evaluate(() => document.querySelector('main')?.innerText || '');
     const partnerSeesStockValuation = partnerMainText.toLowerCase().includes('стоимость склада');
     console.log('   Partner sees "Стоимость склада":', partnerSeesStockValuation);
-    if (!partnerSeesStockValuation) throw new Error('Partner should see "Стоимость склада" in the warehouse');
+    if (partnerSeesStockValuation) throw new Error('Partner must NOT see "Стоимость склада" (stock value is for the admin only)');
 
     // Check sidebar navigation for Partner
     const partnerHasPurchaseNav = await page.evaluate(() => {
