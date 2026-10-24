@@ -84,6 +84,108 @@ async function releaseInvoiceAllocations(tx: TransactionClient, invoiceId: strin
   }
 }
 
+/**
+ * Takes devices that were never sold out of stock for good: the completed moves and store
+ * receipts that carried them go with them (a move or receipt left empty goes too). Returns the
+ * stores they were in. The caller has checked they were never sold, repaired or are being moved.
+ */
+async function deleteReceivedDevices(tx: TransactionClient, deviceIds: string[]) {
+  if (!deviceIds.length) return [];
+  const devices = await tx.device.findMany({ where: { id: { in: deviceIds } }, select: { storeId: true } });
+  const transferIds = [...new Set((await tx.transferItem.findMany({ where: { deviceId: { in: deviceIds } }, select: { transferId: true } })).map((t) => t.transferId))];
+  const receiptIds = [...new Set((await tx.storeReceiptItem.findMany({ where: { deviceId: { in: deviceIds } }, select: { receiptId: true } })).map((r) => r.receiptId))];
+  await tx.transferItem.deleteMany({ where: { deviceId: { in: deviceIds } } });
+  await tx.storeReceiptItem.deleteMany({ where: { deviceId: { in: deviceIds } } });
+  for (const transferId of transferIds) {
+    const left = await tx.transferRequest.findUnique({ where: { id: transferId }, select: { _count: { select: { items: true, accessoryLines: true } } } });
+    if (left && left._count.items === 0 && left._count.accessoryLines === 0) await tx.transferRequest.delete({ where: { id: transferId } });
+  }
+  for (const receiptId of receiptIds) {
+    const left = await tx.storeReceipt.findUnique({ where: { id: receiptId }, select: { _count: { select: { items: true, accessoryLines: true } } } });
+    if (left && left._count.items === 0 && left._count.accessoryLines === 0) await tx.storeReceipt.delete({ where: { id: receiptId } });
+    else if (left) await tx.storeReceipt.update({ where: { id: receiptId }, data: { itemCount: left._count.items } });
+  }
+  await tx.deviceTimelineEvent.deleteMany({ where: { deviceId: { in: deviceIds } } });
+  await tx.device.deleteMany({ where: { id: { in: deviceIds } } });
+  return [...new Set(devices.map((d) => d.storeId))];
+}
+
+/** Why a device can't leave its invoice (sold, repaired, being moved), or null when it can. */
+function deviceRemoveBlock(device: { id: string; status: string }, sold: Set<string>, repaired: Set<string>) {
+  if (sold.has(device.id)) return 'Уже продавался';
+  if (repaired.has(device.id) || device.status === 'IN_REPAIR') return 'Был в ремонте';
+  if (device.status === 'TRANSFER_PENDING') return 'В незавершённом перемещении';
+  return null;
+}
+
+async function repairedDevices(tx: TransactionClient, deviceIds: string[]) {
+  if (!deviceIds.length) return new Set<string>();
+  const rows = await tx.repairTicket.findMany({ where: { deviceId: { in: deviceIds } }, select: { deviceId: true } });
+  return new Set(rows.map((r) => r.deviceId).filter((v): v is string => Boolean(v)));
+}
+
+/**
+ * Takes devices received by mistake off an invoice (an extra unit, one of another invoice): each
+ * leaves stock as if it was never received. A unit that was sold, repaired or is being moved
+ * stays. Returns what they cost, to come off the invoice total, and their names for the audit log.
+ */
+async function removeInvoiceDevices(tx: TransactionClient, invoiceId: string, deviceIds: string[]) {
+  const ids = [...new Set(deviceIds)];
+  if (!ids.length) return { costUsd: D(0), labels: [] as string[] };
+  const devices = await tx.device.findMany({ where: { id: { in: ids }, purchaseInvoiceId: invoiceId }, orderBy: [{ brand: 'asc' }, { model: 'asc' }, { imei: 'asc' }] });
+  if (devices.length !== ids.length) throw new Error('Устройство не относится к этой накладной');
+  const sold = await everSoldDevices(tx, ids);
+  const repaired = await repairedDevices(tx, ids);
+  for (const device of devices) {
+    const block = deviceRemoveBlock(device, sold, repaired);
+    if (!block) continue;
+    const name = `${device.brand} ${device.model} (${device.category === 'TABLET' ? 'SN' : 'IMEI'} ${device.imei})`;
+    if (block === 'Уже продавался') throw new Error(`${name} уже продавался — убрать его из накладной нельзя`);
+    if (block === 'Был в ремонте') throw new Error(`${name} был в ремонте — убрать его из накладной нельзя`);
+    throw new Error(`${name} в незавершённом перемещении — сначала подтвердите или отклоните его`);
+  }
+  const storeIds = await deleteReceivedDevices(tx, ids);
+  await syncStockAlerts(tx, storeIds);
+  await tx.supplierInvoice.update({ where: { id: invoiceId }, data: { devicesCount: { decrement: devices.length } } });
+  return {
+    costUsd: devices.reduce((sum, d) => sum.plus(d.purchasePriceUsd), D(0)),
+    labels: devices.map((d) => `${d.brand} ${d.model} ${d.category === 'TABLET' ? 'SN' : 'IMEI'} ${d.imei} ($${D(d.purchasePriceUsd).toFixed(2)})`),
+  };
+}
+
+/**
+ * Corrects how many units of an accessory batch the invoice brought in. More units are owed at the
+ * batch's unit cost; fewer can only come out of the units still free in it (not sold, moved out or
+ * held by a transfer). A batch set to 0 leaves the invoice. Returns the change in the invoice total.
+ */
+async function changeBatchQuantities(tx: TransactionClient, invoiceId: string, quantities: { batchId: string; quantity: unknown }[]) {
+  let diff = D(0);
+  const labels: string[] = [];
+  const storeIds = new Set<string>();
+  if (!quantities.length) return { diff, labels };
+  await tx.$queryRaw`SELECT id FROM accessory_batches WHERE "purchaseInvoiceId" = ${invoiceId} ORDER BY id FOR UPDATE`;
+  const batches = await tx.accessoryBatch.findMany({ where: { purchaseInvoiceId: invoiceId }, include: { product: { select: { name: true } } } });
+  for (const entry of quantities) {
+    const batch = batches.find((b) => b.id === entry.batchId);
+    if (!batch) throw new Error('Партия аксессуаров не относится к этой накладной');
+    const quantity = Number(entry.quantity);
+    if (!Number.isInteger(quantity) || quantity < 0 || quantity > 1_000_000) throw new Error(`${batch.product.name}: укажите количество целым числом`);
+    const change = quantity - batch.quantityReceived;
+    if (change === 0) continue;
+    const free = batch.quantityRemaining - batch.quantityReserved;
+    if (-change > free) {
+      throw new Error(`${batch.product.name}: меньше ${batch.quantityReceived - free} шт. указать нельзя — остальные уже проданы, перемещены или в перемещении`);
+    }
+    if (quantity === 0) await tx.accessoryBatch.delete({ where: { id: batch.id } });
+    else await tx.accessoryBatch.update({ where: { id: batch.id }, data: { quantityReceived: quantity, quantityRemaining: { increment: change } } });
+    diff = diff.plus(D(batch.unitCostUsd).mul(change));
+    labels.push(`${batch.product.name} ${batch.quantityReceived} → ${quantity} шт.`);
+    storeIds.add(batch.storeId);
+  }
+  await syncStockAlerts(tx, [...storeIds]);
+  return { diff, labels };
+}
+
 /** The invoice's phone/tablet lines, rebuilt from its devices: one line per model, colour and price. */
 async function rebuildInvoiceGroups(tx: TransactionClient, invoiceId: string) {
   const devices = await tx.device.findMany({ where: { purchaseInvoiceId: invoiceId }, orderBy: { id: 'asc' } });
@@ -839,7 +941,7 @@ export class SuppliersService {
       include: { store: { select: { name: true } } },
     });
     const sold = await everSoldDevices(prisma as unknown as TransactionClient, devices.map((d) => d.id));
-    const repaired = new Set((await prisma.repairTicket.findMany({ where: { deviceId: { in: devices.map((d) => d.id) } }, select: { deviceId: true } })).map((r) => r.deviceId));
+    const repaired = await repairedDevices(prisma as unknown as TransactionClient, devices.map((d) => d.id));
     // A move to another store splits a batch: the units go to a new batch there, same invoice and cost.
     const batches = await prisma.accessoryBatch.findMany({
       where: { purchaseInvoiceId: id },
@@ -866,12 +968,16 @@ export class SuppliersService {
         imei: d.imei, imei2: d.imei2, purchasePriceUsd: d.purchasePriceUsd, isBonus: d.isBonus, status: d.status,
         storeName: d.store?.name ?? null,
         locked: sold.has(d.id) ? 'SOLD' : d.isBonus ? 'BONUS' : null,
+        // Why it can't be taken off the invoice, or null when it can.
+        removeBlock: deviceRemoveBlock(d, sold, repaired),
       })),
       accessories: batches.map((b) => ({
         id: b.id, productId: b.productId, brand: b.product.brand, name: b.product.name, barcode: b.product.barcode, category: b.product.category,
         // Its card is this invoice's own: a typo in its name can be fixed here.
         nameEditable: !sharedProducts.has(b.productId),
         quantityReceived: b.quantityReceived, quantityRemaining: b.quantityRemaining, unitCostUsd: b.unitCostUsd,
+        // Units sold, moved out or held by a transfer: the quantity can't go below them.
+        minQuantity: b.quantityReceived - (b.quantityRemaining - b.quantityReserved),
         storeName: b.store.name,
         locked: batchUntouched(b) ? null : 'MOVED',
       })),
@@ -885,6 +991,8 @@ export class SuppliersService {
    * batch that never left it (a sold phone keeps the cost its profit was booked at). The invoice
    * total follows the prices. When it grows, the difference is owed to the supplier; when it
    * drops below what was already paid, the overpaid part goes back into the Central Cash.
+   * Devices received by mistake can be taken off it, and an accessory batch's quantity corrected;
+   * the total follows the same way.
    * (A bare `totalAmountUsd` — the older way — spreads a new total over untouched devices.)
    */
   public static async updateInvoice(
@@ -901,6 +1009,10 @@ export class SuppliersService {
       codes?: DeviceCodeInput[];
       /** A wrong accessory card name: only for a card that only this invoice brought in. */
       accessoryNames?: AccessoryNameInput[];
+      /** Devices received by mistake (never sold, repaired or being moved): they leave stock. */
+      removeDeviceIds?: string[];
+      /** An accessory batch's corrected quantity; 0 takes it off the invoice. */
+      accessoryQuantities?: { batchId: string; quantity: unknown }[];
     },
     actorId?: string,
   ) {
@@ -927,8 +1039,11 @@ export class SuppliersService {
         data.date = updatedDate;
       }
 
-      const byItem = Boolean(input.prices?.length || input.accessoryCosts?.length);
-      let diff = D(0);
+      // Devices received by mistake leave first: nothing below can reprice or rename them.
+      const removal = await removeInvoiceDevices(tx, id, input.removeDeviceIds ?? []);
+      const byItem = Boolean(input.prices?.length || input.accessoryCosts?.length || input.removeDeviceIds?.length || input.accessoryQuantities?.length);
+      let diff = D(0).minus(removal.costUsd);
+      let quantityChanges: string[] = [];
       const priceChanges: { name: string; from: Prisma.Decimal; to: Prisma.Decimal }[] = [];
       if (byItem) {
         // Price by device / accessory batch: only what never left the invoice can change.
@@ -962,7 +1077,15 @@ export class SuppliersService {
             priceChanges.push({ name: `${batch.product.name} × ${batch.quantityReceived}`, from: D(batch.unitCostUsd), to: cost });
           }
         }
-        if (priceChanges.some((c) => !c.name.includes(' × '))) await rebuildInvoiceGroups(tx, id);
+        // After a new unit cost: added units are owed at it.
+        const quantities = await changeBatchQuantities(tx, id, input.accessoryQuantities ?? []);
+        diff = diff.plus(quantities.diff);
+        quantityChanges = quantities.labels;
+        if (removal.labels.length || priceChanges.some((c) => !c.name.includes(' × '))) await rebuildInvoiceGroups(tx, id);
+        if (removal.labels.length || quantityChanges.length) {
+          const left = await tx.device.count({ where: { purchaseInvoiceId: id } }) + await tx.accessoryBatch.count({ where: { purchaseInvoiceId: id } });
+          if (!left) throw new Error('В накладной не останется товара — удалите накладную целиком');
+        }
       } else if (input.totalAmountUsd !== undefined) {
         const oldTotal = invoice.totalAmountUsd;
         const newTotal = requireNonNegativeMoney(input.totalAmountUsd, 'Сумма накладной');
@@ -1029,11 +1152,13 @@ export class SuppliersService {
             userId: actor.id, userName: actor.name, userRole: actor.role, action: 'INVOICE_EDIT', targetId: id,
             details: `Изменена накладная ${updated.invoiceNumber} (${invoice.supplier.name})`
               + (diff.isZero() ? '' : `: сумма $${invoice.totalAmountUsd} → $${updated.totalAmountUsd}`)
+              + (removal.labels.length ? `; убраны из накладной: ${removal.labels.join(', ')}` : '')
+              + (quantityChanges.length ? `; количество: ${quantityChanges.join(', ')}` : '')
               + (priceChanges.length ? `; цены: ${priceChanges.map((c) => `${c.name} $${c.from} → $${c.to}`).join(', ')}` : '')
               + (renames.length ? `; названия: ${renames.join(', ')}` : '')
               + (refundUsd.gt(0) ? `; переплата $${refundUsd} возвращена в Центральную кассу` : '')
               + (!diff.isZero() && refundUsd.isZero() ? `; долг по накладной $${debtNow}` : ''),
-            financialDetails: moneyJson({ before: invoice, after: updated, diffUsd: diff, refundUsd, priceChanges, renames }),
+            financialDetails: moneyJson({ before: invoice, after: updated, diffUsd: diff, refundUsd, priceChanges, renames, removedDevices: removal.labels, quantityChanges }),
           },
         });
       }
@@ -1082,24 +1207,7 @@ export class SuppliersService {
       if (batches.length) await tx.accessoryBatch.deleteMany({ where: { id: { in: batches.map((batch) => batch.id) } } });
       await tx.supplierPaymentAllocation.deleteMany({ where: { invoiceId: id } });
       const storeIds = new Set<string>([...(invoice.storeId ? [invoice.storeId] : []), ...devices.map((d) => d.storeId).filter((s): s is string => Boolean(s))]);
-      if (deviceIds.length > 0) {
-        // Completed moves of these devices go with them; a move or receipt left empty goes too.
-        const transferIds = [...new Set((await tx.transferItem.findMany({ where: { deviceId: { in: deviceIds } }, select: { transferId: true } })).map((t) => t.transferId))];
-        const receiptIds = [...new Set((await tx.storeReceiptItem.findMany({ where: { deviceId: { in: deviceIds } }, select: { receiptId: true } })).map((r) => r.receiptId))];
-        await tx.transferItem.deleteMany({ where: { deviceId: { in: deviceIds } } });
-        await tx.storeReceiptItem.deleteMany({ where: { deviceId: { in: deviceIds } } });
-        for (const transferId of transferIds) {
-          const left = await tx.transferRequest.findUnique({ where: { id: transferId }, select: { _count: { select: { items: true, accessoryLines: true } } } });
-          if (left && left._count.items === 0 && left._count.accessoryLines === 0) await tx.transferRequest.delete({ where: { id: transferId } });
-        }
-        for (const receiptId of receiptIds) {
-          const left = await tx.storeReceipt.findUnique({ where: { id: receiptId }, select: { _count: { select: { items: true, accessoryLines: true } } } });
-          if (left && left._count.items === 0 && left._count.accessoryLines === 0) await tx.storeReceipt.delete({ where: { id: receiptId } });
-          else if (left) await tx.storeReceipt.update({ where: { id: receiptId }, data: { itemCount: left._count.items } });
-        }
-        await tx.deviceTimelineEvent.deleteMany({ where: { deviceId: { in: deviceIds } } });
-        await tx.device.deleteMany({ where: { id: { in: deviceIds } } });
-      }
+      await deleteReceivedDevices(tx, deviceIds);
       await syncStockAlerts(tx, [...storeIds]);
 
       // Atomic guarded decrement, not a read-then-write — matches create's atomic increment.

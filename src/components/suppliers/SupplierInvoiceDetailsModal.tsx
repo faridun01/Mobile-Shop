@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Supplier, SupplierInvoice, Device } from '../../types';
 import { formatMoney } from '../../utils/money';
 import { formatDateStr } from './types';
+import { unitPriceLabel } from '../purchase/types';
 import { getPhoneColorHex, formatRam, formatStorage, formatPhoneColor } from '../../utils/phoneSpecs';
 import {
   Receipt,
@@ -11,7 +12,6 @@ import {
   Calendar,
   X,
   DollarSign,
-  Package,
   Smartphone,
   Sparkles,
   MapPin,
@@ -302,77 +302,6 @@ export const SupplierInvoiceDetailsModal: React.FC<SupplierInvoiceDetailsModalPr
           </div>
         )}
 
-        {/* Invoice Groups (Summary of positions) */}
-        {invoice.groups && invoice.groups.length > 0 && (
-          <div className="p-3.5 sm:p-4 bg-surface-raised/30 border-b border-border/70 space-y-2 shrink-0">
-            <div className="flex items-center justify-between text-xs font-bold text-fg-muted">
-              <span className="flex items-center gap-1.5">
-                <Package className="w-3.5 h-3.5 text-accent" />
-                <span>Позиции по накладной</span>
-              </span>
-              <span className="text-[11px] font-mono text-fg-subtle">
-                Всего: {invoice.groups.reduce((acc: number, g: any) => acc + (g.quantity || 0), 0)} шт.
-              </span>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-xs">
-              {invoice.groups.map((grp: any, gIdx: number) => {
-                const colorHex = getPhoneColorHex(grp.color);
-                const formattedR = formatRam(grp.ram);
-                const formattedS = formatStorage(grp.storage);
-                return (
-                  <div
-                    key={gIdx}
-                    className="p-3 rounded-xl bg-surface border border-border/80 shadow-2xs hover:border-accent/40 transition-colors flex items-center justify-between gap-3"
-                  >
-                    <div className="flex items-center gap-2.5 min-w-0">
-                      <div className="w-8 h-8 rounded-lg bg-surface-raised border border-border flex items-center justify-center text-accent shrink-0">
-                        <Smartphone className="w-4 h-4" />
-                      </div>
-                      <div className="min-w-0">
-                        <div className="font-bold text-fg text-xs truncate">
-                          {grp.brand} {grp.model}
-                        </div>
-                        <div className="flex items-center gap-1.5 flex-wrap mt-0.5">
-                          {formattedS && (
-                            <span className="px-1.5 py-0.2 rounded-md bg-surface-raised border border-border text-[10px] font-bold font-mono text-fg">
-                              {formattedS}
-                            </span>
-                          )}
-                          {formattedR && (
-                            <span className="px-1.5 py-0.2 rounded-md bg-accent/10 border border-accent/25 text-[10px] font-bold font-mono text-accent">
-                              ОЗУ {formattedR}
-                            </span>
-                          )}
-                          {grp.color && (
-                            <span className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded-md bg-surface-raised border border-border/60 text-[10px] text-fg-muted">
-                              {colorHex && (
-                                <span
-                                  className="w-2 h-2 rounded-full border border-black/20 shrink-0"
-                                  style={{ backgroundColor: colorHex }}
-                                />
-                              )}
-                              <span>{formatPhoneColor(grp.color)}</span>
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                    <div className="text-right shrink-0">
-                      <span className="font-bold font-mono text-accent text-xs block">
-                        {grp.quantity} шт.
-                      </span>
-                      <span className="text-[10px] font-mono text-fg-subtle block">
-                        ${formatMoney(grp.purchasePriceUsd)} / шт.
-                      </span>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
-
         {/* Contained Devices List */}
         <div className="p-3 sm:p-3.5 bg-surface-raised/50 border-b border-border/70 flex items-center justify-between text-xs font-bold text-fg-muted shrink-0">
           <span className="flex items-center gap-2">
@@ -436,7 +365,10 @@ export const SupplierInvoiceDetailsModal: React.FC<SupplierInvoiceDetailsModalPr
                       </div>
                     </div>
                     <div className="flex items-center gap-2.5 shrink-0 ml-2">
-                      <span className="text-accent font-bold font-mono text-xs">{group.devices.length} шт.</span>
+                      <span className="text-right">
+                        <span className="text-accent font-bold font-mono text-xs block">{group.devices.length} шт.</span>
+                        <span className="text-[10px] font-mono text-fg-subtle block">{unitPriceLabel(group.devices)}</span>
+                      </span>
                       {soldCount > 0 && (
                         <span className="text-[10px] px-1.5 py-0.2 rounded-md bg-warning/15 text-warning font-semibold">
                           {soldCount} продано

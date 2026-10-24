@@ -239,6 +239,82 @@ await withDisposableApi('invoice_edit', async ({ db, call, env, login }) => {
   assert.equal(await db.device.count({ where: { purchaseInvoiceId: f.id } }), 0);
   console.log('PASS: IMEIs (swapped too), a tablet SN and a barcode are fixed on unsold units; duplicates and sold phones refused; the unpaid invoice is deleted');
 
+  // 9. Goods received by mistake: 3 iPhone 15 at $1000, 3 iPhone 17 Pro at $1300, an iPad at $400
+  // and 10 cases at $5 = $7350, $5000 paid. One iPhone 15 moved to a store, another sold there,
+  // 3 cases moved. One iPhone 15 (the moved one), one 17 Pro and the iPad are taken off and the cases
+  // set to 7: −$2715 → $4635 < $5000 paid → $365 back to the Central Cash.
+  prev = await snap();
+  const g = ok(await call('POST', '/purchases', {
+    supplierId: supplier.id, invoiceNumber: 'INV-G', paidAmountUsd: 5000,
+    groups: [
+      { brand: 'Apple', model: 'iPhone 15', ram: '6GB', storage: '128GB', color: 'Black', purchasePriceUsd: 1000, items: [60, 61, 62].map((i) => ({ imei: imei(i) })) },
+      { brand: 'Apple', model: 'iPhone 17 Pro', ram: '12GB', storage: '256GB', color: 'Silver', purchasePriceUsd: 1300, items: [63, 64, 65].map((i) => ({ imei: imei(i) })) },
+      { category: 'TABLET', brand: 'Apple', model: 'iPad 11', storage: '128GB', color: 'Blue', purchasePriceUsd: 400, items: [{ imei: 'DMPGX0001' }] },
+      { category: 'ACCESSORY', barcode: 'CASE-G', brand: 'Generic', name: 'Чехол iPhone 15', accessoryCategory: 'Чехлы', quantity: 10, purchasePriceUsd: 5 },
+    ],
+  }), 'purchase G').invoice;
+  const g15 = await db.device.findMany({ where: { purchaseInvoiceId: g.id, model: 'iPhone 15' }, orderBy: { imei: 'asc' } });
+  const g17 = await db.device.findMany({ where: { purchaseInvoiceId: g.id, model: 'iPhone 17 Pro' }, orderBy: { imei: 'asc' } });
+  const ipad = await db.device.findFirstOrThrow({ where: { purchaseInvoiceId: g.id, category: 'TABLET' } });
+  const caseG = await db.accessoryProduct.findUniqueOrThrow({ where: { barcode: 'CASE-G' } });
+  const batchG = await db.accessoryBatch.findFirstOrThrow({ where: { purchaseInvoiceId: g.id, storeId: central.id } });
+  ok(await call('POST', '/transfers', { fromStoreId: central.id, toStoreId: 'store-siyoma', deviceIds: [g15[0].id, g15[1].id], accessories: [{ productId: caseG.id, quantity: 3 }] }), 'transfer G');
+  ok(await call('POST', '/sales', { storeId: 'store-siyoma', paymentMethod: 'CASH', items: [{ deviceId: g15[1].id, salePriceTjs: 12000 }] }, { token: seller }), 'sale G');
+  const contentsG = ok(await call('GET', `/supplier-invoices/${g.id}/contents`), 'contents G');
+  assert.equal(contentsG.devices.find((x: any) => x.id === g15[1].id).removeBlock, 'Уже продавался');
+  assert.equal(contentsG.devices.find((x: any) => x.id === g15[0].id).removeBlock, null, 'a phone moved to a store can be removed');
+  assert.equal(contentsG.accessories.find((x: any) => x.id === batchG.id).minQuantity, 3);
+  refused(await call('PUT', `/supplier-invoices/${g.id}`, { removeDeviceIds: [g15[1].id] }), /уже продавался.*убрать/, 'removing a sold phone');
+  refused(await call('PUT', `/supplier-invoices/${g.id}`, { removeDeviceIds: [samsung[1].id] }), /не относится/, 'a device of another invoice');
+  refused(await call('PUT', `/supplier-invoices/${g.id}`, { accessoryQuantities: [{ batchId: batchG.id, quantity: 2 }] }), /меньше 3 шт/, 'fewer cases than already moved');
+  s = await snap(g.id);
+  assert.equal(s.total, 7350, 'refused edits change nothing');
+  prev = s;
+  ok(await call('PUT', `/supplier-invoices/${g.id}`, {
+    removeDeviceIds: [g15[0].id, g17[2].id, ipad.id],
+    accessoryQuantities: [{ batchId: batchG.id, quantity: 7 }],
+  }), 'remove G');
+  s = await snap(g.id);
+  assert.equal(s.total, 4635);
+  assert.equal(s.invPaid, 4635);
+  assert.equal(s.cash.minus(prev.cash), 365, 'the overpaid part is back in the Central Cash');
+  assert.equal(s.debt, prev.debt.minus(2350), 'the invoice owes nothing now');
+  assert.equal(await db.device.count({ where: { id: { in: [g15[0].id, g17[2].id, ipad.id] } } }), 0, 'removed devices left stock');
+  assert.equal(await db.transferItem.count({ where: { deviceId: g15[0].id } }), 0, 'the move of the removed phone went with it');
+  assert.equal((await db.supplierInvoice.findUniqueOrThrow({ where: { id: g.id } })).devicesCount, 4);
+  assert.deepEqual((await db.invoiceGroup.findMany({ where: { invoiceId: g.id }, orderBy: { model: 'asc' } })).map((x) => [x.model, x.quantity]), [['iPhone 15', 2], ['iPhone 17 Pro', 2]]);
+  const casesLeft = await db.accessoryBatch.findUniqueOrThrow({ where: { id: batchG.id } });
+  assert.deepEqual([casesLeft.quantityReceived, casesLeft.quantityRemaining], [7, 4], 'three cases are gone, the three moved ones stay counted');
+  const removeLog = await db.auditLog.findFirstOrThrow({ where: { action: 'INVOICE_EDIT', targetId: g.id }, orderBy: { createdAt: 'desc' } });
+  assert.match(removeLog.details, /убраны из накладной: Apple iPad 11 SN DMPGX0001 \(\$400\.00\), Apple iPhone 15 IMEI \d+ \(\$1000\.00\), Apple iPhone 17 Pro IMEI \d+ \(\$1300\.00\)/);
+  assert.match(removeLog.details, /количество: Чехол iPhone 15 10 → 7 шт\./);
+  console.log('PASS: devices received by mistake leave the invoice and stock; cases recounted; the overpaid $365 back in the Central Cash');
+
+  // More cases than received: owed to the supplier at the batch's cost.
+  prev = s;
+  ok(await call('PUT', `/supplier-invoices/${g.id}`, { accessoryQuantities: [{ batchId: batchG.id, quantity: 9 }] }), 'more cases');
+  s = await snap(g.id);
+  assert.equal(s.total, 4645);
+  assert.equal(s.debt.minus(prev.debt), 10);
+  assert.equal(s.cash, prev.cash);
+  console.log('PASS: more units of a batch are owed to the supplier');
+
+  // 10. Taking everything off an invoice is deleting it.
+  const h = ok(await call('POST', '/purchases', {
+    supplierId: supplier.id, invoiceNumber: 'INV-H',
+    groups: [
+      { brand: 'Xiaomi', model: 'Redmi 15', ram: '8GB', storage: '256GB', color: 'Black', purchasePriceUsd: 180, items: [{ imei: imei(70) }] },
+      { category: 'ACCESSORY', barcode: 'CASE-H', brand: 'Generic', name: 'Чехол Redmi 15', accessoryCategory: 'Чехлы', quantity: 2, purchasePriceUsd: 2 },
+    ],
+  }), 'purchase H').invoice;
+  const hPhone = await db.device.findFirstOrThrow({ where: { purchaseInvoiceId: h.id } });
+  const hBatch = await db.accessoryBatch.findFirstOrThrow({ where: { purchaseInvoiceId: h.id } });
+  refused(await call('PUT', `/supplier-invoices/${h.id}`, { removeDeviceIds: [hPhone.id], accessoryQuantities: [{ batchId: hBatch.id, quantity: 0 }] }), /удалите накладную целиком/, 'emptying an invoice');
+  ok(await call('PUT', `/supplier-invoices/${h.id}`, { removeDeviceIds: [hPhone.id] }), 'only the phone');
+  assert.equal((await snap(h.id)).total, 4, 'only the cases are left');
+  ok(await call('DELETE', `/supplier-invoices/${h.id}`), 'delete H');
+  console.log('PASS: an invoice can\'t be emptied by editing; what is left of it is deleted as usual');
+
   // 6. Everything reconciles: owners, capital, customer debt.
   const audit = spawnSync(process.execPath, ['--import', 'tsx', 'scripts/check-owner-balances.ts'], { env, encoding: 'utf8', timeout: 60000 });
   assert.equal(audit.status, 0, audit.stdout + audit.stderr);

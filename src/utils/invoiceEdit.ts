@@ -25,6 +25,8 @@ export interface InvoiceContentDevice {
   storeName: string | null;
   /** SOLD: its cost is in a booked sale; BONUS: a free phone, always $0. */
   locked: 'SOLD' | 'BONUS' | null;
+  /** Why it can't be taken off the invoice (sold, repaired, being moved), or null when it can. */
+  removeBlock?: string | null;
 }
 
 export interface InvoiceContentBatch {
@@ -39,6 +41,8 @@ export interface InvoiceContentBatch {
   barcode: string;
   quantityReceived: number;
   quantityRemaining: number;
+  /** Units sold, moved out or held by a transfer: the quantity can't go below them. */
+  minQuantity?: number;
   unitCostUsd: number;
   /** Where this batch is: a move to another store makes a new batch there, same invoice and cost. */
   storeName?: string;
@@ -113,42 +117,78 @@ export interface InvoiceEditResult {
   debtAfter: number;
   prices: { deviceId: string; purchasePriceUsd: number }[];
   accessoryCosts: { batchId: string; unitCostUsd: number }[];
-  /** A typed price that is not a valid amount, by group key or batch id. */
+  /** Devices taken off the invoice. */
+  removeDeviceIds: string[];
+  accessoryQuantities: { batchId: string; quantity: number }[];
+  /** A typed price that is not a valid amount, by group key or batch id; a bad quantity as `qty:<batch id>`. */
   invalid: string[];
+  /** Every device and accessory would leave: the invoice is deleted instead. */
+  empty: boolean;
+}
+
+/** A quantity as typed: a whole number of units, or null. */
+export function parseQuantity(value: string): number | null {
+  const text = value.trim();
+  return /^\d{1,7}$/.test(text) ? Number(text) : null;
 }
 
 /**
- * What saving the typed prices does: the new invoice total, and whether the change is owed to the
- * supplier or (below what was paid) comes back to the Central Cash. Mirrors the server's rules.
+ * What saving the edits does: the new invoice total, and whether the change is owed to the
+ * supplier or (below what was paid) comes back to the Central Cash. Removed devices take their
+ * price off; a batch's new quantity counts at its (new) unit cost. Mirrors the server's rules.
  */
 export function invoiceEditResult(
   contents: InvoiceContents,
   groupPrices: Record<string, string>,
   batchCosts: Record<string, string>,
+  removed: ReadonlySet<string> = new Set(),
+  batchQuantities: Record<string, string> = {},
 ): InvoiceEditResult {
   const invalid: string[] = [];
   const prices: InvoiceEditResult['prices'] = [];
   const accessoryCosts: InvoiceEditResult['accessoryCosts'] = [];
+  const accessoryQuantities: InvoiceEditResult['accessoryQuantities'] = [];
+  const removeDeviceIds = contents.devices.filter((d) => removed.has(d.id) && !d.removeBlock).map((d) => d.id);
+  const removing = new Set(removeDeviceIds);
   let diff = decimal(0);
+  for (const d of contents.devices) if (removing.has(d.id)) diff = diff.minus(d.purchasePriceUsd);
   for (const group of groupInvoiceDevices(contents.devices)) {
     const typed = groupPrices[group.key];
-    if (typed === undefined || !group.editable.length) continue;
+    const kept = group.editable.filter((d) => !removing.has(d.id));
+    if (typed === undefined || !kept.length) continue;
     const price = parseUsd(typed);
     if (price === null) { invalid.push(group.key); continue; }
     if (price === group.price) continue;
-    for (const d of group.editable) {
+    for (const d of kept) {
       prices.push({ deviceId: d.id, purchasePriceUsd: price });
       diff = diff.plus(decimal(price).minus(d.purchasePriceUsd));
     }
   }
+  let batchesLeft = 0;
   for (const batch of contents.accessories) {
+    let cost = moneyNumber(batch.unitCostUsd);
     const typed = batchCosts[batch.id];
-    if (typed === undefined || batch.locked) continue;
-    const cost = parseUsd(typed);
-    if (cost === null) { invalid.push(batch.id); continue; }
-    if (cost === moneyNumber(batch.unitCostUsd)) continue;
-    accessoryCosts.push({ batchId: batch.id, unitCostUsd: cost });
-    diff = diff.plus(decimal(cost).minus(batch.unitCostUsd).mul(batch.quantityReceived));
+    if (typed !== undefined && !batch.locked) {
+      const parsed = parseUsd(typed);
+      if (parsed === null) invalid.push(batch.id);
+      else if (parsed !== cost) {
+        accessoryCosts.push({ batchId: batch.id, unitCostUsd: parsed });
+        diff = diff.plus(decimal(parsed).minus(batch.unitCostUsd).mul(batch.quantityReceived));
+        cost = parsed;
+      }
+    }
+    let quantity = batch.quantityReceived;
+    const typedQuantity = batchQuantities[batch.id];
+    if (typedQuantity !== undefined) {
+      const parsed = parseQuantity(typedQuantity);
+      if (parsed === null || parsed < (batch.minQuantity ?? 0)) invalid.push(`qty:${batch.id}`);
+      else if (parsed !== quantity) {
+        accessoryQuantities.push({ batchId: batch.id, quantity: parsed });
+        diff = diff.plus(decimal(cost).mul(parsed - quantity));
+        quantity = parsed;
+      }
+    }
+    if (quantity > 0) batchesLeft += 1;
   }
   const oldTotal = moneyNumber(contents.invoice.totalAmountUsd);
   const paid = moneyNumber(contents.invoice.paidAmountUsd);
@@ -158,7 +198,8 @@ export function invoiceEditResult(
     oldTotal, newTotal, diff: moneyNumber(diff), paid, refund,
     debtBefore: moneyNumber(decimal(oldTotal).minus(paid)),
     debtAfter: moneyNumber(decimal(newTotal).minus(sumMoney([paid, -refund]))),
-    prices, accessoryCosts, invalid,
+    prices, accessoryCosts, removeDeviceIds, accessoryQuantities, invalid,
+    empty: removeDeviceIds.length + accessoryQuantities.length > 0 && removeDeviceIds.length === contents.devices.length && batchesLeft === 0,
   };
 }
 

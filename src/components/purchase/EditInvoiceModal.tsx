@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { AlertTriangle, Barcode, Check, Lock, Package, Pencil, Receipt, Scan, Smartphone, X } from 'lucide-react';
+import { AlertTriangle, Barcode, Check, Lock, Package, Pencil, Receipt, Scan, Smartphone, Trash2, Undo2, X } from 'lucide-react';
 import type { SupplierInvoice } from '../../types';
 import { apiClient } from '../../api/client';
 import { Dialog } from '../ui/Dialog';
@@ -9,7 +9,7 @@ import { formatMoney } from '../../utils/money';
 import { formatPhoneColor, formatRam, formatStorage } from '../../utils/phoneSpecs';
 import { formatStoreName } from '../../utils/storeContext';
 import {
-  codeChanges, groupInvoiceDevices, invoiceEditResult, renameChanges, specDraftOf,
+  codeChanges, groupInvoiceDevices, invoiceEditResult, parseQuantity, renameChanges, specDraftOf,
   type AccessoryNameDraft, type DeviceCodeDraft, type DeviceSpecDraft, type InvoiceContents,
 } from '../../utils/invoiceEdit';
 import { deviceCodeLabel, imeiDigits, imeiProblem } from '../../utils/deviceCode';
@@ -25,6 +25,10 @@ export interface InvoiceSaveData {
   accessoryNames: { productId: string; brand: string; name: string; category: string; barcode: string }[];
   /** IMEIs / SNs typed wrong at receipt, on units not sold, repaired or being moved. */
   codes: { deviceId: string; imei: string; imei2: string | null }[];
+  /** Devices received by mistake: they leave stock and the invoice. */
+  removeDeviceIds: string[];
+  /** An accessory batch's corrected quantity; 0 takes it off the invoice. */
+  accessoryQuantities: { batchId: string; quantity: number }[];
 }
 
 interface EditInvoiceModalProps {
@@ -38,6 +42,7 @@ interface EditInvoiceModalProps {
 const priceInput = 'w-24 h-9 px-2 rounded-lg bg-surface border border-border text-right font-mono font-bold text-sm text-fg focus:border-accent focus:outline-none';
 const nameInput = 'w-full h-9 px-2.5 rounded-lg bg-surface border border-border text-sm font-semibold text-fg focus:border-accent focus:outline-none';
 const renameButton = 'inline-flex items-center gap-1 text-[11px] font-semibold text-accent hover:underline cursor-pointer hit-area-y';
+const quantityInput = 'w-16 h-8 px-2 rounded-lg bg-surface border border-border text-right font-mono font-bold text-sm text-fg focus:border-accent focus:outline-none';
 
 /** One labelled field of a name form. */
 /** One labelled field of a name or code form; with `onScan`, a camera button beside it fills it. */
@@ -69,9 +74,10 @@ const NameField: React.FC<{ label: string; value: string; onChange: (value: stri
  * Edits a purchase invoice: its number, date and the purchase price of each model or accessory
  * batch still in stock (moved to a store or not). A sold phone keeps its price. A name typed wrong
  * at receipt is fixed on the units not sold yet, and on an accessory card only this invoice brought
- * in (a sold unit keeps its name on the receipt); so is an IMEI / SN or an accessory barcode. The summary shows
- * what saving does: the change is owed to the supplier, or the part paid above the new total comes
- * back to the Central Cash.
+ * in (a sold unit keeps its name on the receipt); so is an IMEI / SN or an accessory barcode. A
+ * device received by mistake is taken off (unless sold, repaired or being moved), and an accessory
+ * batch's quantity corrected. The summary shows what saving does: the change is owed to the
+ * supplier, or the part paid above the new total comes back to the Central Cash.
  */
 export const EditInvoiceModal: React.FC<EditInvoiceModalProps> = ({ invoice, onClose, onSave, onSuccess, onError }) => {
   const { openScanner } = useAppFields('openScanner');
@@ -87,6 +93,10 @@ export const EditInvoiceModal: React.FC<EditInvoiceModalProps> = ({ invoice, onC
   // A model's codes form is open (group key) with a draft per unit (device id).
   const [codeGroups, setCodeGroups] = useState<Set<string>>(new Set());
   const [codeDrafts, setCodeDrafts] = useState<Record<string, DeviceCodeDraft>>({});
+  // A model's remove list is open (group key); the devices marked to leave the invoice on save.
+  const [removeGroups, setRemoveGroups] = useState<Set<string>>(new Set());
+  const [removed, setRemoved] = useState<Set<string>>(new Set());
+  const [batchQuantities, setBatchQuantities] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -108,22 +118,35 @@ export const EditInvoiceModal: React.FC<EditInvoiceModalProps> = ({ invoice, onC
         setContents(normalized);
         setGroupPrices(Object.fromEntries(groupInvoiceDevices(normalized.devices).map((g) => [g.key, String(g.price)])));
         setBatchCosts(Object.fromEntries(normalized.accessories.map((b) => [b.id, String(b.unitCostUsd)])));
+        setBatchQuantities(Object.fromEntries(normalized.accessories.map((b) => [b.id, String(b.quantityReceived)])));
         setSpecDrafts({});
         setNameDrafts({});
         setCodeGroups(new Set());
         setCodeDrafts({});
+        setRemoveGroups(new Set());
+        setRemoved(new Set());
       })
       .catch((e) => { if (!cancelled) setLoadError(e instanceof Error ? e.message : 'Не удалось загрузить накладную'); });
     return () => { cancelled = true; };
   }, [invoice]);
 
   const groups = useMemo(() => (contents ? groupInvoiceDevices(contents.devices) : []), [contents]);
-  const result = useMemo(() => (contents ? invoiceEditResult(contents, groupPrices, batchCosts) : null), [contents, groupPrices, batchCosts]);
-  const renames = useMemo(
-    () => renameChanges(groups, specDrafts, contents?.accessories ?? [], nameDrafts),
-    [groups, specDrafts, contents, nameDrafts],
+  const result = useMemo(
+    () => (contents ? invoiceEditResult(contents, groupPrices, batchCosts, removed, batchQuantities) : null),
+    [contents, groupPrices, batchCosts, removed, batchQuantities],
   );
-  const codes = useMemo(() => codeChanges(contents?.devices ?? [], codeDrafts), [contents, codeDrafts]);
+  // A device leaving the invoice is neither renamed nor recoded.
+  const renames = useMemo(() => {
+    const r = renameChanges(groups, specDrafts, contents?.accessories ?? [], nameDrafts);
+    return { ...r, specs: r.specs.filter((s) => !removed.has(s.deviceId)) };
+  }, [groups, specDrafts, contents, nameDrafts, removed]);
+  const codes = useMemo(() => codeChanges((contents?.devices ?? []).filter((d) => !removed.has(d.id)), codeDrafts), [contents, codeDrafts, removed]);
+  const toggleRemoved = (deviceId: string) =>
+    setRemoved((all) => { const next = new Set(all); if (next.has(deviceId)) next.delete(deviceId); else next.add(deviceId); return next; });
+  const closeRemove = (key: string, units: { id: string }[]) => {
+    setRemoveGroups((open) => { const next = new Set(open); next.delete(key); return next; });
+    setRemoved((all) => { const next = new Set(all); for (const d of units) next.delete(d.id); return next; });
+  };
   const setCode = (deviceId: string, field: keyof DeviceCodeDraft, value: string) =>
     setCodeDrafts((all) => ({ ...all, [deviceId]: { ...all[deviceId], [field]: value } }));
   const openCodes = (key: string, units: { id: string; imei: string; imei2?: string | null }[]) => {
@@ -145,7 +168,9 @@ export const EditInvoiceModal: React.FC<EditInvoiceModalProps> = ({ invoice, onC
 
   const handleSave = async () => {
     if (!result || saving) return;
+    if (result.invalid.some((k) => k.startsWith('qty:'))) { onError('Проверьте количество аксессуаров: целое число, не меньше уже проданного или перемещённого'); return; }
     if (result.invalid.length) { onError('Укажите корректные цены (больше нуля, до двух знаков после точки)'); return; }
+    if (result.empty) { onError('В накладной не останется товара — удалите накладную целиком'); return; }
     if (renames.invalid.length) { onError('Заполните название: бренд, модель и характеристики (у аксессуара — название, категорию и штрихкод)'); return; }
     if (codes.invalid.length) { onError('Проверьте коды: IMEI — ровно 15 цифр, SN — 4–64 буквы и цифры, без повторов'); return; }
     if (!number.trim()) { onError('Укажите номер накладной'); return; }
@@ -154,6 +179,7 @@ export const EditInvoiceModal: React.FC<EditInvoiceModalProps> = ({ invoice, onC
       const res = await onSave(invoice.id, {
         invoiceNumber: number.trim(), date, prices: result.prices, accessoryCosts: result.accessoryCosts,
         specs: renames.specs, accessoryNames: renames.accessoryNames, codes: codes.codes,
+        removeDeviceIds: result.removeDeviceIds, accessoryQuantities: result.accessoryQuantities,
       });
       if (res.success) {
         onSuccess(res.refundUsd ? `Накладная обновлена. $${formatMoney(res.refundUsd)} возвращено в Центральную кассу` : 'Накладная обновлена');
@@ -179,7 +205,7 @@ export const EditInvoiceModal: React.FC<EditInvoiceModalProps> = ({ invoice, onC
       footer={
         <div className="grid grid-cols-2 gap-2 w-full">
           <Button variant="secondary" fullWidth onClick={onClose} disabled={saving}>Отмена</Button>
-          <Button fullWidth leftIcon={Check} loading={saving} disabled={!contents || Boolean(result?.invalid.length) || renames.invalid.length > 0 || codes.invalid.length > 0} onClick={handleSave}>
+          <Button fullWidth leftIcon={Check} loading={saving} disabled={!contents || Boolean(result?.invalid.length) || Boolean(result?.empty) || renames.invalid.length > 0 || codes.invalid.length > 0} onClick={handleSave}>
             Сохранить
           </Button>
         </div>
@@ -212,11 +238,20 @@ export const EditInvoiceModal: React.FC<EditInvoiceModalProps> = ({ invoice, onC
                 const isTablet = g.devices[0]?.category === 'TABLET';
                 const category = g.devices[0]?.category === 'TABLET' ? 'TABLET' as const : 'PHONE' as const;
                 const codesOpen = codeGroups.has(g.key);
+                const removeOpen = removeGroups.has(g.key);
+                const removedHere = g.devices.filter((d) => removed.has(d.id)).length;
+                const kept = g.editable.filter((d) => !removed.has(d.id));
+                const showRename = kept.length > 0 && !draft;
+                const showCodes = kept.length > 0 && !codesOpen;
+                const showRemove = g.devices.some((d) => !d.removeBlock) && !removeOpen;
                 return (
                   <div key={g.key} className="p-3 rounded-xl bg-surface-raised border border-border space-y-2.5">
                   <div className="flex items-center justify-between gap-3">
                     <div className="min-w-0 space-y-0.5">
-                      <p className="font-bold text-fg truncate">{g.brand} {g.model} <span className="font-normal text-fg-subtle">× {g.devices.length}</span></p>
+                      <p className="font-bold text-fg truncate">
+                        {g.brand} {g.model} <span className="font-normal text-fg-subtle">× {g.devices.length}</span>
+                        {removedHere > 0 && <span className="font-semibold text-danger"> → {g.devices.length - removedHere}</span>}
+                      </p>
                       <p className="text-xs text-fg-subtle truncate">{specs}</p>
                       {g.locations.length > 0 && (
                         <p className="text-[11px] text-fg-subtle">{g.locations.map((l) => `${formatStoreName(l.name)} ${l.count} шт.`).join(' · ')}</p>
@@ -224,16 +259,21 @@ export const EditInvoiceModal: React.FC<EditInvoiceModalProps> = ({ invoice, onC
                       {g.soldCount > 0 && (
                         <p className="text-[11px] text-warning flex items-center gap-1"><Lock className="w-3 h-3" />Уже продавались {g.soldCount} шт. — их цена ${formatMoney(g.price)} не меняется</p>
                       )}
-                      {g.editable.length > 0 && (!draft || !codesOpen) && (
+                      {(showRename || showCodes || showRemove) && (
                         <div className="flex flex-wrap gap-x-3 gap-y-1">
-                          {!draft && (
+                          {showRename && (
                             <button type="button" data-compact className={renameButton} onClick={() => setSpecDrafts((all) => ({ ...all, [g.key]: specDraftOf(g) }))}>
                               <Pencil className="w-3 h-3" />Изменить название
                             </button>
                           )}
-                          {!codesOpen && (
+                          {showCodes && (
                             <button type="button" data-compact className={renameButton} onClick={() => openCodes(g.key, g.editable)}>
                               <Barcode className="w-3 h-3" />Изменить {deviceCodeLabel(category)}
+                            </button>
+                          )}
+                          {showRemove && (
+                            <button type="button" data-compact className={cn(renameButton, 'text-danger')} onClick={() => setRemoveGroups((open) => new Set(open).add(g.key))}>
+                              <Trash2 className="w-3 h-3" />Удалить из накладной
                             </button>
                           )}
                         </div>
@@ -241,7 +281,7 @@ export const EditInvoiceModal: React.FC<EditInvoiceModalProps> = ({ invoice, onC
                     </div>
                     {g.isBonus ? (
                       <span className="text-xs font-bold text-highlight shrink-0">Подарок · $0</span>
-                    ) : g.editable.length ? (
+                    ) : kept.length ? (
                       <input
                         inputMode="decimal"
                         aria-label={`Цена ${g.brand} ${g.model}`}
@@ -264,7 +304,7 @@ export const EditInvoiceModal: React.FC<EditInvoiceModalProps> = ({ invoice, onC
                       </div>
                       <div className="flex items-start justify-between gap-2">
                         <p className="text-[11px] text-fg-subtle">
-                          Новое название получат {g.editable.length} шт.{g.soldCount > 0 ? ` Проданные ${g.soldCount} шт. сохранят прежнее название в чеках.` : ''}
+                          Новое название получат {kept.length} шт.{g.soldCount > 0 ? ` Проданные ${g.soldCount} шт. сохранят прежнее название в чеках.` : ''}
                         </p>
                         <button type="button" data-compact className={cn(renameButton, 'text-fg-muted shrink-0')} onClick={() => closeDraft(setSpecDrafts, g.key)}>
                           <X className="w-3 h-3" />Отменить
@@ -272,9 +312,9 @@ export const EditInvoiceModal: React.FC<EditInvoiceModalProps> = ({ invoice, onC
                       </div>
                     </div>
                   )}
-                  {codesOpen && (
+                  {codesOpen && kept.length > 0 && (
                     <div className="pt-2.5 border-t border-border space-y-2">
-                      {g.editable.map((d) => (
+                      {kept.map((d) => (
                         <div key={d.id} className="grid grid-cols-1 sm:grid-cols-2 gap-2 pb-2 border-b border-border/60 last:border-b-0 last:pb-0">
                           <NameField label={deviceCodeLabel(category)} value={codeDrafts[d.id]?.imei ?? ''}
                             onChange={(v) => setCode(d.id, 'imei', isTablet ? v : imeiDigits(v))}
@@ -290,9 +330,46 @@ export const EditInvoiceModal: React.FC<EditInvoiceModalProps> = ({ invoice, onC
                       ))}
                       <div className="flex items-start justify-between gap-2">
                         <p className="text-[11px] text-fg-subtle">
-                          {isTablet ? 'SN — 4–64 буквы и цифры.' : 'IMEI — ровно 15 цифр.'} Меняются только непроданные {g.editable.length} шт.{g.soldCount > 0 ? ' У проданных код остаётся в чеках.' : ''}
+                          {isTablet ? 'SN — 4–64 буквы и цифры.' : 'IMEI — ровно 15 цифр.'} Меняются только непроданные {kept.length} шт.{g.soldCount > 0 ? ' У проданных код остаётся в чеках.' : ''}
                         </p>
                         <button type="button" data-compact className={cn(renameButton, 'text-fg-muted shrink-0')} onClick={() => closeCodes(g.key, g.editable)}>
+                          <X className="w-3 h-3" />Отменить
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                  {removeOpen && (
+                    <div className="pt-2.5 border-t border-border space-y-1.5">
+                      {g.devices.map((d) => {
+                        const marked = removed.has(d.id);
+                        const code = [d.imei, d.imei2].filter(Boolean).join(' / ');
+                        return (
+                          <div key={d.id} className="flex items-center justify-between gap-2 py-1 border-b border-border/60 last:border-b-0">
+                            <div className="min-w-0">
+                              <p className={cn('font-mono text-xs font-semibold truncate', marked ? 'line-through text-fg-subtle' : 'text-fg')}>{code}</p>
+                              <p className={cn('text-[11px] truncate', marked ? 'text-danger' : 'text-fg-subtle')}>
+                                {d.removeBlock ?? (marked ? 'Будет удалено при сохранении' : formatStoreName(d.storeName || 'Склад'))}
+                              </p>
+                            </div>
+                            {d.removeBlock ? (
+                              <Lock className="w-3.5 h-3.5 text-fg-subtle shrink-0" aria-hidden />
+                            ) : marked ? (
+                              <button type="button" data-compact className={cn(renameButton, 'shrink-0')} onClick={() => toggleRemoved(d.id)} aria-label={`Вернуть ${code}`}>
+                                <Undo2 className="w-3 h-3" />Вернуть
+                              </button>
+                            ) : (
+                              <button type="button" data-compact className={cn(renameButton, 'text-danger shrink-0')} onClick={() => toggleRemoved(d.id)} aria-label={`Удалить ${code}`}>
+                                <Trash2 className="w-3 h-3" />Удалить
+                              </button>
+                            )}
+                          </div>
+                        );
+                      })}
+                      <div className="flex items-start justify-between gap-2">
+                        <p className="text-[11px] text-fg-subtle">
+                          Удалённые уйдут с остатков, их цена — из суммы накладной. Проданные, бывшие в ремонте и в перемещении удалить нельзя.
+                        </p>
+                        <button type="button" data-compact className={cn(renameButton, 'text-fg-muted shrink-0')} onClick={() => closeRemove(g.key, g.devices)}>
                           <X className="w-3 h-3" />Отменить
                         </button>
                       </div>
@@ -310,13 +387,36 @@ export const EditInvoiceModal: React.FC<EditInvoiceModalProps> = ({ invoice, onC
                   // A card moved to a store has another batch: its name form is shown once.
                   const firstOfCard = contents.accessories.findIndex((x) => x.productId === b.productId) === index;
                   const draft = firstOfCard ? nameDrafts[b.productId] : undefined;
+                  const minQuantity = b.minQuantity ?? 0;
+                  const quantity = parseQuantity(batchQuantities[b.id] ?? '');
+                  const badQuantity = Boolean(result?.invalid.includes(`qty:${b.id}`));
                   return (
                   <div key={b.id} className="p-3 rounded-xl bg-surface-raised border border-border space-y-2.5">
                   <div className="flex items-center justify-between gap-3">
                     <div className="min-w-0">
-                      <p className="font-bold text-fg truncate">{[b.brand, b.name].filter(Boolean).join(' ')} <span className="font-normal text-fg-subtle">× {b.quantityReceived}</span></p>
+                      <p className="font-bold text-fg truncate">
+                        {[b.brand, b.name].filter(Boolean).join(' ')} <span className="font-normal text-fg-subtle">× {b.quantityReceived}</span>
+                        {quantity !== null && !badQuantity && quantity !== b.quantityReceived && <span className="font-semibold text-danger"> → {quantity}</span>}
+                      </p>
                       <p className="text-[11px] text-fg-subtle">{b.storeName ? `${formatStoreName(b.storeName)} · ` : ''}осталось {b.quantityRemaining} из {b.quantityReceived} шт. · <span className="font-mono">{b.barcode}</span></p>
                       {b.locked && <p className="text-[11px] text-warning flex items-center gap-1"><Lock className="w-3 h-3" />Часть продана или перемещена — цена не меняется</p>}
+                      <label className="flex items-center gap-1.5 pt-1 text-[11px] font-semibold text-fg-muted">
+                        Количество
+                        <input
+                          inputMode="numeric"
+                          aria-label={`Количество ${b.name}`}
+                          aria-invalid={badQuantity}
+                          value={batchQuantities[b.id] ?? ''}
+                          onChange={(e) => setBatchQuantities((q) => ({ ...q, [b.id]: e.target.value.replace(/\D/g, '') }))}
+                          className={cn(quantityInput, badQuantity && 'border-danger text-danger')}
+                        />
+                        шт.
+                      </label>
+                      {badQuantity ? (
+                        <p className="text-[11px] text-danger">Не меньше {minQuantity} шт. — столько уже продано, перемещено или в перемещении</p>
+                      ) : quantity === 0 ? (
+                        <p className="text-[11px] text-danger">Партия будет удалена из накладной</p>
+                      ) : null}
                       {firstOfCard && b.nameEditable && !draft && (
                         <button type="button" data-compact className={renameButton} onClick={() => setNameDrafts((all) => ({ ...all, [b.productId]: { brand: b.brand, name: b.name, category: b.category ?? '', barcode: b.barcode } }))}>
                           <Pencil className="w-3 h-3" />Изменить название и штрихкод
@@ -373,6 +473,12 @@ export const EditInvoiceModal: React.FC<EditInvoiceModalProps> = ({ invoice, onC
                   <p className="p-2 rounded-lg bg-warning/10 border border-warning/25 text-warning font-semibold flex items-start gap-1.5">
                     <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-px" />
                     Оплачено больше новой суммы: ${formatMoney(result.refund)} вернётся в Центральную кассу.
+                  </p>
+                )}
+                {result.empty && (
+                  <p className="p-2 rounded-lg bg-danger/10 border border-danger/25 text-danger font-semibold flex items-start gap-1.5">
+                    <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-px" />
+                    В накладной не останется товара — удалите накладную целиком.
                   </p>
                 )}
                 {changed && result.refund === 0 && result.diff > 0 && (

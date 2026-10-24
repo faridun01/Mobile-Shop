@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { codeChanges, groupInvoiceDevices, invoiceEditResult, parseUsd, renameChanges, specDraftOf, type InvoiceContents, type InvoiceContentDevice } from './invoiceEdit';
+import { codeChanges, groupInvoiceDevices, invoiceEditResult, parseQuantity, parseUsd, renameChanges, specDraftOf, type InvoiceContents, type InvoiceContentDevice } from './invoiceEdit';
 
 const device = (id: string, model: string, price: number, extra: Partial<InvoiceContentDevice> = {}): InvoiceContentDevice => ({
   id, brand: 'Samsung', model, ram: '8GB', storage: '256GB', color: 'Black', imei: `35${id}`, purchasePriceUsd: price,
@@ -54,6 +54,47 @@ describe('invoice price editing', () => {
     expect(invoiceEditResult(contents, { [a55.key]: '0' }, { b1: 'abc' }).invalid).toEqual([a55.key, 'b1']);
     expect(parseUsd('12,5')).toBe(12.5);
     expect(parseUsd('1.234')).toBeNull();
+  });
+});
+
+describe('taking goods received by mistake off the invoice', () => {
+  const withBlocks: InvoiceContents = {
+    ...contents,
+    devices: contents.devices.map((d) => ({ ...d, removeBlock: d.locked === 'SOLD' ? 'Уже продавался' : null })),
+    accessories: contents.accessories.map((b) => ({ ...b, quantityRemaining: 7, minQuantity: 3, locked: 'MOVED' as const })),
+  };
+
+  it('a removed device takes its price off and is not repriced', () => {
+    const [, x8d] = groupInvoiceDevices(withBlocks.devices);
+    const r = invoiceEditResult(withBlocks, { [x8d.key]: '350' }, {}, new Set(['4']));
+    expect(r.removeDeviceIds).toEqual(['4']);
+    expect(r.prices).toEqual([{ deviceId: '5', purchasePriceUsd: 350 }]);
+    // 2300 − 300 (removed) + 50 (the other X8d dearer).
+    expect(r).toMatchObject({ newTotal: 2050, debtAfter: 1050, empty: false });
+  });
+
+  it('a sold device is never removed', () => {
+    expect(invoiceEditResult(withBlocks, {}, {}, new Set(['1'])).removeDeviceIds).toEqual([]);
+  });
+
+  it('a batch quantity changes the total at its unit cost, not below what already left', () => {
+    expect(invoiceEditResult(withBlocks, {}, {}, new Set(), { b1: '8' })).toMatchObject({ newTotal: 2260, accessoryQuantities: [{ batchId: 'b1', quantity: 8 }] });
+    expect(invoiceEditResult(withBlocks, {}, {}, new Set(), { b1: '12' }).newTotal).toBe(2340);
+    expect(invoiceEditResult(withBlocks, {}, {}, new Set(), { b1: '2' }).invalid).toEqual(['qty:b1']);
+    expect(invoiceEditResult(withBlocks, {}, {}, new Set(), { b1: '' }).invalid).toEqual(['qty:b1']);
+    expect(parseQuantity('1.5')).toBeNull();
+  });
+
+  it('new quantity counts at the new unit cost', () => {
+    // 10 × $20 → 5 × $15: −$125.
+    expect(invoiceEditResult(contents, {}, { b1: '15' }, new Set(), { b1: '5' }).newTotal).toBe(2175);
+  });
+
+  it('removing everything is the invoice deletion, not an edit', () => {
+    const fresh: InvoiceContents = { ...contents, devices: contents.devices.slice(1) };
+    const all = new Set(fresh.devices.map((d) => d.id));
+    expect(invoiceEditResult(fresh, {}, {}, all, { b1: '0' }).empty).toBe(true);
+    expect(invoiceEditResult(fresh, {}, {}, all, { b1: '1' }).empty).toBe(false);
   });
 });
 

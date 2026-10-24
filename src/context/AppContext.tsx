@@ -201,6 +201,10 @@ interface AppContextType {
     accessoryNames?: { productId: string; brand: string; name: string; category: string; barcode?: string }[];
     /** IMEIs / SNs typed wrong at receipt (units not sold, repaired or being moved). */
     codes?: { deviceId: string; imei: string; imei2: string | null }[];
+    /** Devices received by mistake (never sold, repaired or being moved): they leave stock. */
+    removeDeviceIds?: string[];
+    /** An accessory batch's corrected quantity; 0 takes it off the invoice. */
+    accessoryQuantities?: { batchId: string; quantity: number }[];
   }) => Promise<{ success: boolean; message?: string; refundUsd?: number }>;
   deleteSupplierInvoice: (id: string) => Promise<{ success: boolean; message?: string; refundUsd?: number }>;
 

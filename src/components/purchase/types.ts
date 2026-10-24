@@ -1,3 +1,5 @@
+import { formatMoney } from '../../utils/money';
+
 /** What a receipt position holds: phones by IMEI, tablets by SN, accessories by barcode + quantity. */
 export type PurchaseCategory = 'PHONE' | 'TABLET' | 'ACCESSORY';
 
@@ -73,6 +75,14 @@ export interface PurchasePreviewData {
 /** All units an invoice received: its devices plus its accessory batches' quantities. */
 export const invoiceUnits = (inv: { devicesCount?: number; accessoryBatches?: { quantityReceived: number }[] }) =>
   (inv.devicesCount || 0) + (inv.accessoryBatches ?? []).reduce((sum, b) => sum + b.quantityReceived, 0);
+
+/** A model's purchase price per unit on an invoice, or its range when units were priced apart. */
+export const unitPriceLabel = (devices: { purchaseCostUsd: number }[]) => {
+  const prices = devices.map((d) => d.purchaseCostUsd);
+  const min = Math.min(...prices);
+  const max = Math.max(...prices);
+  return min === max ? `$${formatMoney(min)} / шт.` : `$${formatMoney(min)}–$${formatMoney(max)} / шт.`;
+};
 
 /** Units a preview position adds: its serialized items, or an accessory line's quantity. */
 export const previewUnits = (g: PurchasePreviewGroup) => (g.category === 'ACCESSORY' ? g.quantity || 0 : g.items.length);
