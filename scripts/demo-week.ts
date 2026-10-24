@@ -341,7 +341,7 @@ try {
       expenseFxUsd: w.periodExpenseFxUsd ?? 0, netProfitUsd: w.netProfitUsd,
     };
     const workbook = await buildComprehensiveReportWorkbook({ events: w.events, expenses, summary, generatedBy: 'Неделя' });
-    const control = workbook.getWorksheet('Итого')!.getCell('B17').value as { result?: number };
+    const control = workbook.getWorksheet('Итого')!.getCell('B16').value as { result?: number };
     check((control.result ?? 0) === 0, `${shop.name}: контроль Excel ≠ 0`);
     const file = path.resolve(`output/demo-week/otchet_${shop.id}.xlsx`);
     fs.mkdirSync(path.dirname(file), { recursive: true });

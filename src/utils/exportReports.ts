@@ -176,7 +176,6 @@ export function buildEventsReportTable(events: ReportEventRow[], cashBonusesUsd:
     'Сумма ($)',
     'Себестоимость ($)',
     'Прибыль ($)',
-    'в т.ч. удержано ($)',
   ];
 
   const rows: (string | number)[][] = events.map((event) => {
@@ -193,13 +192,12 @@ export function buildEventsReportTable(events: ReportEventRow[], cashBonusesUsd:
       Number(event.amountUsd).toFixed(2),
       Number(event.costUsd).toFixed(2),
       Number(event.profitUsd).toFixed(2),
-      Number(event.penaltyUsd).toFixed(2),
     ];
   });
 
   // Supplier cash bonuses are nobody's income: shown once for reference, never added to profit.
   if (cashBonusesUsd !== 0) {
-    rows.push(['', 'Бонусы поставщиков за период — справочно, не входят в прибыль', '', '', '', '', '', '', cashBonusesUsd.toFixed(2), '']);
+    rows.push(['', 'Бонусы поставщиков за период — справочно, не входят в прибыль', '', '', '', '', '', '', cashBonusesUsd.toFixed(2)]);
   }
 
   const totalsRow = [
@@ -210,7 +208,6 @@ export function buildEventsReportTable(events: ReportEventRow[], cashBonusesUsd:
     sumCents(events.map((e) => e.amountUsd)).toFixed(2),
     sumCents(events.map((e) => e.costUsd)).toFixed(2),
     sumCents(events.map((e) => e.profitUsd)).toFixed(2),
-    sumCents(events.map((e) => e.penaltyUsd)).toFixed(2),
   ];
 
   return { headers, rows, totalsRow };
@@ -347,15 +344,15 @@ export async function buildComprehensiveReportWorkbook({
   };
 
   // OPERATIONS: sales, exchanges and refunds, each a fact of its own day.
-  styleTitle(eventsSheet, 'L', 'Продажи, обмены и возвраты');
+  styleTitle(eventsSheet, 'J', 'Продажи, обмены и возвраты');
   eventsSheet.columns = [
     { width: 19 }, { width: 44 }, { width: 10 }, { width: 20 }, { width: 11 }, { width: 17 },
-    { width: 16 }, { width: 18 }, { width: 16 }, { width: 20 }, { width: 17 }, { width: 16 },
+    { width: 16 }, { width: 18 }, { width: 16 }, { width: 20 },
   ];
   const eventsHeader = eventsSheet.getRow(4);
   eventsHeader.values = [
     'Дата и время', 'Операция', '№ чека', 'Магазин', 'Курс', 'Сумма (TJS)', 'Сумма ($)',
-    'Себестоимость ($)', 'Прибыль ($)', 'Прибыль бонусных телефонов ($)', 'в т.ч. удержано (TJS)', 'в т.ч. удержано ($)',
+    'Себестоимость ($)', 'Прибыль ($)', 'Прибыль бонусных телефонов ($)',
   ];
   styleHeader(eventsHeader);
 
@@ -371,8 +368,6 @@ export async function buildComprehensiveReportWorkbook({
       Math.round(Number(event.costUsd) * 100) / 100,
       Math.round(Number(event.profitUsd) * 100) / 100,
       Math.round(Number(event.bonusUsd) * 100) / 100,
-      Math.round(Number(event.penaltyTjs) * 100) / 100,
-      Math.round(Number(event.penaltyUsd) * 100) / 100,
     ]);
     row.eachCell((cell, columnNumber) => {
       cell.font = { name: 'Calibri', size: 10, color: { argb: XLSX_DARK } };
@@ -381,11 +376,11 @@ export async function buildComprehensiveReportWorkbook({
     });
     row.getCell(1).numFmt = 'dd.mm.yyyy hh:mm';
     row.getCell(5).numFmt = RATE_FORMAT;
-    for (let column = 6; column <= 12; column += 1) row.getCell(column).numFmt = XLSX_MONEY_FORMAT;
+    for (let column = 6; column <= 10; column += 1) row.getCell(column).numFmt = XLSX_MONEY_FORMAT;
     if (event.kind === 'REFUND') row.getCell(2).font = { name: 'Calibri', size: 10, bold: true, color: { argb: XLSX_RED } };
     else if (event.exchangeReceiptNumber) row.getCell(2).font = { name: 'Calibri', size: 10, bold: true, color: { argb: XLSX_BLUE } };
   }
-  eventsSheet.autoFilter = { from: 'A4', to: 'L4' };
+  eventsSheet.autoFilter = { from: 'A4', to: 'J4' };
 
   const firstEventRow = 5;
   const lastEventRow = Math.max(firstEventRow, firstEventRow + events.length - 1);
@@ -398,10 +393,8 @@ export async function buildComprehensiveReportWorkbook({
   eventsTotalRow.getCell(8).value = eventSum('H', events.map((e) => e.costUsd));
   eventsTotalRow.getCell(9).value = eventSum('I', events.map((e) => e.profitUsd));
   eventsTotalRow.getCell(10).value = eventSum('J', events.map((e) => e.bonusUsd));
-  eventsTotalRow.getCell(11).value = eventSum('K', events.map((e) => e.penaltyTjs));
-  eventsTotalRow.getCell(12).value = eventSum('L', events.map((e) => e.penaltyUsd));
   styleTotalRow(eventsTotalRow);
-  for (let column = 6; column <= 12; column += 1) eventsTotalRow.getCell(column).numFmt = XLSX_MONEY_FORMAT;
+  for (let column = 6; column <= 10; column += 1) eventsTotalRow.getCell(column).numFmt = XLSX_MONEY_FORMAT;
 
   // EXPENSES: each at the dollars it was registered at on its own day.
   styleTitle(expensesSheet, 'K', 'Отчёт по расходам');
@@ -473,7 +466,6 @@ export async function buildComprehensiveReportWorkbook({
 
   const ops = (column: string) => `'Операции'!${column}${eventsTotalNumber}`;
   const salesProfitUsd = sumCents(events.map((e) => e.profitUsd));
-  const penaltiesUsd = sumCents(events.map((e) => e.penaltyUsd));
   const profitAfterReturns = Math.round((salesProfitUsd + summary.debtFxUsd + summary.cashSurplusUsd) * 100) / 100;
   const expensesUsd = sumCents(expenseUsd);
   const netUsd = Math.round((profitAfterReturns - expensesUsd + summary.expenseFxUsd) * 100) / 100;
@@ -484,18 +476,17 @@ export async function buildComprehensiveReportWorkbook({
     ['Выручка: продажи и обмены за вычетом выданного при возвратах', cellFormula(ops('G'), sumCents(events.map((e) => e.amountUsd)))], // 7
     ['Себестоимость', cellFormula(ops('H'), sumCents(events.map((e) => e.costUsd)))],                   // 8
     ['Прибыль от продаж и возвратов (без бонусных телефонов)', cellFormula(ops('I'), salesProfitUsd)], // 9
-    ['в т.ч. удержано при возвратах (уже в прибыли)', cellFormula(ops('L'), penaltiesUsd)],             // 10
-    ['Разница при погашении долгов (TJS по курсу дня оплаты)', summary.debtFxUsd],                     // 11
-    ['Излишки кассы при закрытии смен', summary.cashSurplusUsd],                                        // 12
-    ['Прибыль с учётом возвратов', cellFormula('B9+B11+B12', profitAfterReturns)],                      // 13
-    ['Расходы (по курсу дня регистрации)', cellFormula(`'Расходы'!K${expenseTotalRowNumber}`, expensesUsd)], // 14
-    ['Разница при оплате расходов позже', summary.expenseFxUsd],                                        // 15
+    ['Разница при погашении долгов (TJS по курсу дня оплаты)', summary.debtFxUsd],                     // 10
+    ['Излишки кассы при закрытии смен', summary.cashSurplusUsd],                                        // 11
+    ['Прибыль с учётом возвратов', cellFormula('B9+B10+B11', profitAfterReturns)],                      // 12
+    ['Расходы (по курсу дня регистрации)', cellFormula(`'Расходы'!K${expenseTotalRowNumber}`, expensesUsd)], // 13
+    ['Разница при оплате расходов позже', summary.expenseFxUsd],                                        // 14
   ];
   for (const values of rows) summarySheet.addRow(values);
 
-  const netProfitRow = summarySheet.addRow(['ЧИСТАЯ ПРИБЫЛЬ']);                                          // 16
+  const netProfitRow = summarySheet.addRow(['ЧИСТАЯ ПРИБЫЛЬ']);                                          // 15
   const netProfitRowNumber = netProfitRow.number;
-  netProfitRow.getCell(2).value = cellFormula('B13-B14+B15', netUsd);
+  netProfitRow.getCell(2).value = cellFormula('B12-B13+B14', netUsd);
   styleTotalRow(netProfitRow, netUsd >= 0 ? XLSX_GREEN : XLSX_RED);
 
   const checkRow = summarySheet.addRow(['Контроль: расхождение с итогом программы (должно быть 0)']);
@@ -525,7 +516,7 @@ export async function buildComprehensiveReportWorkbook({
     row.font = { color: { argb: XLSX_MUTED } };
   }
   const noteRowNumber = reference[reference.length - 1].number + 2;
-  summarySheet.getCell(`A${noteRowNumber}`).value = 'Каждая операция записана по курсу своего дня и не пересчитывается. Возврат отражён в день возврата отдельной строкой. Обмен — это две строки в день обмена: возврат старого чека (минус) и новый чек (плюс); прибыль старого телефона остаётся в дне продажи. Возврат уменьшает выручку только на сумму, выданную клиенту: удержанное остаётся в выручке и прибыли, колонка «в т.ч. удержано» лишь показывает его. Чистая прибыль = прибыль с учётом возвратов − расходы. Бонусы — справочно: это не доход, их деньги хранятся на Бонусном счёте.';
+  summarySheet.getCell(`A${noteRowNumber}`).value = 'Каждая операция записана по курсу своего дня и не пересчитывается. Возврат отражён в день возврата отдельной строкой. Обмен — это две строки в день обмена: возврат старого чека (минус) и новый чек (плюс); прибыль старого телефона остаётся в дне продажи. Возврат уменьшает выручку только на сумму, выданную клиенту: удержанное остаётся в выручке и прибыли. Чистая прибыль = прибыль с учётом возвратов − расходы. Бонусы — справочно: это не доход, их деньги хранятся на Бонусном счёте.';
   summarySheet.mergeCells(`A${noteRowNumber}:B${noteRowNumber}`);
   summarySheet.getCell(`A${noteRowNumber}`).font = { italic: true, size: 9, color: { argb: XLSX_MUTED } };
   summarySheet.getCell(`A${noteRowNumber}`).alignment = { wrapText: true, vertical: 'top' };

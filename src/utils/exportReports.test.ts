@@ -68,21 +68,20 @@ describe('comprehensive Excel report', () => {
     expect(operations.getCell('B6').value).toBe('Возврат (чек № 90)');
     expect(operations.getCell('F6').value).toBe(-1000);
     expect(operations.getCell('G6').value).toBe(-95.24);
-    // The withheld part is shown for reference; it is inside the row's profit.
-    expect(operations.getCell('K6').value).toBe(100);
-    expect(operations.getCell('L4').value).toBe('в т.ч. удержано ($)');
+    // The withheld part is inside the row's profit; there is no separate column for it.
+    expect(operations.getCell('J4').value).toBe('Прибыль бонусных телефонов ($)');
+    expect(operations.getCell('K4').value).toBeNull();
     // The expense keeps the dollars it was registered at.
     expect(workbook.getWorksheet('Расходы')?.getCell('K5').value).toBe(20);
 
     const summarySheet = workbook.getWorksheet('Итого')!;
     expect(summarySheet.getCell('B7').value).toMatchObject({ result: 24.76 });
-    // Profit of the rows (−0.24, withheld included) + debt rate difference 1.5 + surplus 2; the withheld 9.52 is not added again.
-    expect(summarySheet.getCell('B10').value).toMatchObject({ result: 9.52 });
-    expect(summarySheet.getCell('B13').value).toMatchObject({ formula: 'B9+B11+B12', result: 3.26 });
-    expect(summarySheet.getCell('B16').value).toMatchObject({ formula: 'B13-B14+B15', result: -15.79 });
+    // Profit of the rows (−0.24, withheld included) + debt rate difference 1.5 + surplus 2.
+    expect(summarySheet.getCell('B12').value).toMatchObject({ formula: 'B9+B10+B11', result: 3.26 });
+    expect(summarySheet.getCell('B15').value).toMatchObject({ formula: 'B12-B13+B14', result: -15.79 });
     // Control row against the program's total: 0 (ExcelJS drops a zero cached result).
-    const control = summarySheet.getCell('B17').value as { formula: string; result?: number };
-    expect(control.formula).toBe('ROUND(B16-(-15.79),2)');
+    const control = summarySheet.getCell('B16').value as { formula: string; result?: number };
+    expect(control.formula).toBe('ROUND(B15-(-15.79),2)');
     expect(control.result ?? 0).toBe(0);
 
     const serialized = await workbook.xlsx.writeBuffer();
@@ -91,7 +90,7 @@ describe('comprehensive Excel report', () => {
     const ExcelJS = (await import('exceljs')).default;
     const reopened = new ExcelJS.Workbook();
     await reopened.xlsx.load(serialized);
-    expect(reopened.getWorksheet('Итого')?.getCell('B16').value).toMatchObject({ result: -15.79 });
+    expect(reopened.getWorksheet('Итого')?.getCell('B15').value).toMatchObject({ result: -15.79 });
   }, 60_000);
 
   it('values an expense paid later at the dollars it was registered at', () => {

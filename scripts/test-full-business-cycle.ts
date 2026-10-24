@@ -233,10 +233,10 @@ await withDisposableApi('full_cycle', async ({ db, call, env, login, baseUrl }) 
   const xlsx = new ExcelJS.Workbook();
   await xlsx.xlsx.readFile(file);
   const result = (sheet: string, cell: string) => { const v = xlsx.getWorksheet(sheet)!.getCell(cell).value as any; return v && typeof v === 'object' && 'formula' in v ? (v.result ?? 0) : v; };
-  assert.equal(result('Итого', 'B16'), 276, 'Excel: чистая прибыль');
-  assert.equal(result('Итого', 'B17'), 0, 'Excel: контроль = 0');
+  assert.equal(result('Итого', 'B15'), 276, 'Excel: чистая прибыль');
+  assert.equal(result('Итого', 'B16'), 0, 'Excel: контроль = 0');
   assert.equal(result('Итого', 'B9'), rb.profitUsd, 'Excel: прибыль от продаж и возвратов');
-  assert.equal(result('Итого', 'B14'), 50, 'Excel: расходы');
+  assert.equal(result('Итого', 'B13'), 50, 'Excel: расходы');
   console.log(`   ${path.relative(process.cwd(), file)}: чистая прибыль $276, контрольная строка 0`);
 
   // ------------------------------------------------------------------ 11. Shift and registers
