@@ -15,6 +15,7 @@ import { NewRepairForm } from '../repair/NewRepairForm';
 import { IssueRepairModal } from '../repair/IssueRepairModal';
 import { ViewRepairModal } from '../repair/ViewRepairModal';
 import { useDeepLink } from '../../hooks/useDeepLink';
+import { deviceCodeProblem } from '../../utils/deviceCode';
 
 export const RepairPage: React.FC = () => {
   const dataRefreshRevision = useDataRefreshRevision();
@@ -359,6 +360,12 @@ export const RepairPage: React.FC = () => {
     if (isSubmitting) return;
     if (!clientName.trim() || !clientPhone.trim() || !deviceModel.trim() || !defectDescription.trim()) {
       setStatusMessage({ type: 'error', text: 'Заполните обязательные поля (ФИО клиента, Телефон, Модель, Описание поломки)' });
+      return;
+    }
+
+    const codeProblem = deviceCodeProblem(imei) ?? (imei2.trim() ? deviceCodeProblem(imei2) : null);
+    if (codeProblem) {
+      setStatusMessage({ type: 'error', text: `${codeProblem}. Или оставьте поле IMEI пустым, если его не видно.` });
       return;
     }
 

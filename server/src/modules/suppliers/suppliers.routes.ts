@@ -246,6 +246,10 @@ export function registerSupplierRoutes(app: Express) {
         })) : undefined,
         accessoryNames: Array.isArray(body.accessoryNames) ? body.accessoryNames.map((x: any) => ({
           productId: String(x?.productId ?? ''), brand: String(x?.brand ?? ''), name: String(x?.name ?? ''), category: String(x?.category ?? ''),
+          ...(x?.barcode == null ? {} : { barcode: String(x.barcode) }),
+        })) : undefined,
+        codes: Array.isArray(body.codes) ? body.codes.map((x: any) => ({
+          deviceId: String(x?.deviceId ?? ''), imei: String(x?.imei ?? ''), imei2: x?.imei2 == null ? null : String(x.imei2),
         })) : undefined,
       }, req.user!.userId);
       RealtimeSyncGateway.broadcast('INVENTORY_UPDATE', {});

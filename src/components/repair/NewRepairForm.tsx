@@ -1,6 +1,7 @@
 import React from 'react';
 import { Wrench, Search, Scan, Loader2 } from 'lucide-react';
 import { NewRepairFormProps } from './types';
+import { deviceCodeProblem } from '../../utils/deviceCode';
 
 export const NewRepairForm: React.FC<NewRepairFormProps> = ({
   onSubmit,
@@ -145,10 +146,13 @@ export const NewRepairForm: React.FC<NewRepairFormProps> = ({
                 type="text"
                 inputMode="numeric"
                 value={imei ?? ''}
-                onChange={(e) => setImei(e.target.value)}
+                onChange={(e) => setImei(e.target.value.replace(/\s+/g, ''))}
+                maxLength={64}
+                aria-invalid={Boolean(deviceCodeProblem(imei ?? ''))}
                 placeholder="354891100234561"
                 className="w-full min-w-0 h-9 rounded-xl bg-surface-raised border border-border px-3 text-fg text-xs font-mono placeholder:text-fg-subtle focus:border-accent focus:outline-none transition-colors"
               />
+              {deviceCodeProblem(imei ?? '') && <p className="mt-1 text-[11px] text-danger">{deviceCodeProblem(imei ?? '')}</p>}
             </div>
             <div className="min-w-0">
               <label className="block text-fg-subtle mb-1 text-[11px] font-semibold">
@@ -158,10 +162,13 @@ export const NewRepairForm: React.FC<NewRepairFormProps> = ({
                 type="text"
                 inputMode="numeric"
                 value={imei2 ?? ''}
-                onChange={(e) => setImei2(e.target.value)}
+                onChange={(e) => setImei2(e.target.value.replace(/\s+/g, ''))}
+                maxLength={64}
+                aria-invalid={Boolean(deviceCodeProblem(imei2 ?? ''))}
                 placeholder="354891100234562"
                 className="w-full min-w-0 h-9 rounded-xl bg-surface-raised border border-border px-3 text-fg text-xs font-mono placeholder:text-fg-subtle focus:border-accent focus:outline-none transition-colors"
               />
+              {deviceCodeProblem(imei2 ?? '') && <p className="mt-1 text-[11px] text-danger">{deviceCodeProblem(imei2 ?? '')}</p>}
             </div>
           </div>
 

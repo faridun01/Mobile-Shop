@@ -12,6 +12,8 @@ import { cancelTransaction, postTransaction } from '../finance/financial-transac
 import { allocateMoney } from '../../common/allocation';
 import { rememberPhones } from '../phone-catalog/phone-catalog.service';
 import { canonicalAccessoryCategory, linkTabletVariants } from '../catalog/catalog.service';
+import { normalizeBarcode } from '../catalog/purchase-items';
+import { isValidImei, isValidSerial, normalizeSerial, requireImei } from '../../common/device-code';
 import { syncStockAlerts } from '../stock-thresholds/stock-alerts';
 
 /** True if any of these devices has a sale, transfer, or repair record referencing it (hard FK, no cascade). */
@@ -154,7 +156,9 @@ async function recordSupplierAudit(tx: TransactionClient, actorId: string | unde
 }
 
 export interface DeviceSpecInput { deviceId: string; brand: string; model: string; ram?: string | null; storage: string; color: string }
-export interface AccessoryNameInput { productId: string; brand: string; name: string; category: string }
+export interface AccessoryNameInput { productId: string; brand: string; name: string; category: string; barcode?: string }
+/** A unit's IMEI 1/2 (a tablet's SN and additional SN) as corrected. */
+export interface DeviceCodeInput { deviceId: string; imei: string; imei2?: string | null }
 
 const specText = (value: unknown) => String(value ?? '').trim().replace(/\s+/g, ' ');
 const specLabel = (d: { brand: string; model: string; ram?: string | null; storage: string; color: string }) =>
@@ -188,8 +192,9 @@ async function productsOnOtherInvoices(tx: TransactionClient, invoiceId: string,
  * the tablet variants learn the right name. An accessory card is renamed only when this invoice
  * alone brought it in. Money does not move. Returns the changes for the audit log.
  */
-async function renameInvoiceItems(tx: TransactionClient, invoiceId: string, specs: DeviceSpecInput[], accessoryNames: AccessoryNameInput[]) {
+async function renameInvoiceItems(tx: TransactionClient, invoiceId: string, specs: DeviceSpecInput[], accessoryNames: AccessoryNameInput[], codes: DeviceCodeInput[] = []) {
   const renames = new Set<string>();
+  if (codes.length) for (const change of await recodeInvoiceDevices(tx, invoiceId, codes)) renames.add(change);
   if (specs.length) {
     const devices = await tx.device.findMany({ where: { purchaseInvoiceId: invoiceId } });
     const byId = new Map(devices.map((d) => [d.id, d]));
@@ -219,17 +224,82 @@ async function renameInvoiceItems(tx: TransactionClient, invoiceId: string, spec
     for (const entry of accessoryNames) {
       if (!own.has(entry.productId)) throw new Error('Аксессуар не относится к этой накладной');
       const product = await tx.accessoryProduct.findUniqueOrThrow({ where: { id: entry.productId } });
-      const next = { brand: specText(entry.brand), name: specText(entry.name), category: await canonicalAccessoryCategory(tx, specText(entry.category)) };
+      const barcode = entry.barcode === undefined ? product.barcode : normalizeBarcode(entry.barcode);
+      const next = { brand: specText(entry.brand), name: specText(entry.name), category: await canonicalAccessoryCategory(tx, specText(entry.category)), barcode };
       if (!next.name) throw new Error('Укажите название аксессуара');
       if (!next.category) throw new Error('Укажите категорию аксессуара');
-      if (next.brand === product.brand && next.name === product.name && next.category === product.category) continue;
-      if (shared.has(entry.productId)) throw new Error(`«${product.name}» (штрихкод ${product.barcode}) есть и в других приходах — его название здесь не меняется`);
+      if (!barcode) throw new Error('Укажите штрихкод аксессуара');
+      if (barcode.length > 64) throw new Error(`Штрихкод аксессуара слишком длинный: ${barcode}`);
+      if (next.brand === product.brand && next.name === product.name && next.category === product.category && barcode === product.barcode) continue;
+      if (shared.has(entry.productId)) throw new Error(`«${product.name}» (штрихкод ${product.barcode}) есть и в других приходах — его название и штрихкод здесь не меняются`);
+      if (barcode !== product.barcode) {
+        const taken = await tx.accessoryProduct.findUnique({ where: { barcode } });
+        if (taken) throw new Error(`Штрихкод ${barcode} уже у товара «${[taken.brand, taken.name].filter(Boolean).join(' ')}»`);
+      }
       await tx.accessoryProduct.update({ where: { id: product.id }, data: next });
-      renames.add(`${[product.brand, product.name].filter(Boolean).join(' ')} → ${[next.brand, next.name].filter(Boolean).join(' ')}`);
+      if (next.brand !== product.brand || next.name !== product.name || next.category !== product.category) {
+        renames.add(`${[product.brand, product.name].filter(Boolean).join(' ')} → ${[next.brand, next.name].filter(Boolean).join(' ')}`);
+      }
+      if (barcode !== product.barcode) renames.add(`штрихкод ${product.barcode} → ${barcode}`);
     }
   }
   return [...renames];
 }
+
+/**
+ * Fixes IMEIs (a tablet's SNs) typed wrong at receipt, by the receipt's own rules. A unit that was
+ * sold, repaired or is being moved keeps its code: its receipt, ticket or transfer names it. Codes
+ * stay unique across every device (both slots); codes swapped between two units of the invoice are
+ * written in two steps so they never collide. The IMEI catalog learns the right TAC.
+ */
+async function recodeInvoiceDevices(tx: TransactionClient, invoiceId: string, codes: DeviceCodeInput[]) {
+  const devices = await tx.device.findMany({ where: { purchaseInvoiceId: invoiceId } });
+  const byId = new Map(devices.map((d) => [d.id, d]));
+  const sold = await everSoldDevices(tx, devices.map((d) => d.id));
+  const repaired = new Set((await tx.repairTicket.findMany({ where: { deviceId: { in: devices.map((d) => d.id) } }, select: { deviceId: true } })).map((r) => r.deviceId));
+  const label = (d: { category: string }, slot: 1 | 2) => (d.category === 'TABLET' ? (slot === 1 ? 'SN' : 'Доп. SN') : slot === 1 ? 'IMEI' : 'IMEI 2');
+  const changed: { device: (typeof devices)[number]; imei: string; imei2: string | null }[] = [];
+  for (const entry of codes) {
+    const device = byId.get(entry.deviceId);
+    if (!device) throw new Error('Устройство не относится к этой накладной');
+    const tablet = device.category === 'TABLET';
+    const clean = (raw: unknown) => (tablet ? normalizeSerial(raw) : String(raw ?? '').replace(/\s+/g, ''));
+    const imei = clean(entry.imei);
+    const imei2 = clean(entry.imei2) || null;
+    const valid = (code: string) => (tablet ? isValidSerial(code) : isValidImei(code));
+    if (!valid(imei)) throw new Error(tablet ? `SN «${imei}» должен состоять из 4–64 букв и цифр` : `IMEI «${imei}» должен содержать ровно 15 цифр`);
+    if (imei2 && !valid(imei2)) throw new Error(tablet ? `Доп. SN «${imei2}» должен состоять из 4–64 букв и цифр` : `IMEI 2 «${imei2}» должен содержать ровно 15 цифр`);
+    if (imei2 === imei) throw new Error(`${label(device, 1)} и ${label(device, 2)} совпадают: ${imei}`);
+    if (imei === device.imei && imei2 === (device.imei2 || null)) continue;
+    const name = `${device.brand} ${device.model} (${label(device, 1)} ${device.imei})`;
+    if (sold.has(device.id)) throw new Error(`${name} уже продавался — его ${label(device, 1)} указан в чеке и не меняется`);
+    if (repaired.has(device.id) || device.status === 'IN_REPAIR') throw new Error(`${name} был в ремонте — его ${label(device, 1)} указан в квитанции и не меняется`);
+    if (device.status === 'TRANSFER_PENDING') throw new Error(`${name} в незавершённом перемещении — сначала подтвердите или отклоните его`);
+    changed.push({ device, imei, imei2 });
+  }
+  if (!changed.length) return [];
+  const newCodes = changed.flatMap((c) => [c.imei, c.imei2]).filter((c): c is string => Boolean(c));
+  if (new Set(newCodes).size !== newCodes.length) throw new Error('Один и тот же IMEI/SN указан дважды');
+  const changedIds = changed.map((c) => c.device.id);
+  const taken = await tx.device.findFirst({
+    where: { id: { notIn: changedIds }, OR: newCodes.flatMap((code) => [{ imei: code }, { imei2: code }]) },
+    select: { imei: true, imei2: true, category: true, brand: true, model: true },
+  });
+  if (taken) {
+    const code = newCodes.find((c) => c === taken.imei || c === taken.imei2) ?? taken.imei;
+    throw new Error(`${taken.category === 'TABLET' ? 'SN' : 'IMEI'} ${code} уже зарегистрирован (${taken.brand} ${taken.model})`);
+  }
+  // Two steps, so codes moved from one unit of the invoice to another never collide on the way.
+  for (const c of changed) await tx.device.update({ where: { id: c.device.id }, data: { imei: `RECODE-${c.device.id}`, imei2: null } });
+  for (const c of changed) await tx.device.update({ where: { id: c.device.id }, data: { imei: c.imei, imei2: c.imei2 } });
+  await rememberPhones(tx, changed.map((c) => ({ ...c.device, imei: c.imei, imei2: c.imei2 })));
+  return changed.map((c) => {
+    const before = [c.device.imei, c.device.imei2].filter(Boolean).join('/');
+    const after = [c.imei, c.imei2].filter(Boolean).join('/');
+    return `${c.device.brand} ${c.device.model}: ${label(c.device, 1)} ${before} → ${after}`;
+  });
+}
+
 
 export class SuppliersService {
   public static async create(input: { name: string; phone?: string; contactPerson?: string }, actorId?: string) {
@@ -497,11 +567,7 @@ export class SuppliersService {
       });
 
       if (input.bonusType === 'FREE_DEVICES' && input.freeDevices?.length) {
-        for (const d of input.freeDevices) {
-          if (!d.imei || !/^\d{15}$/.test(d.imei)) {
-            throw new Error(`IMEI бонусного устройства (${d.brand} ${d.model}) должен содержать ровно 15 цифр (получено: "${d.imei}")`);
-          }
-        }
+        for (const d of input.freeDevices) d.imei = requireImei(d.imei, `IMEI бонусного устройства (${d.brand} ${d.model})`);
         const imeis = input.freeDevices.map((d) => d.imei);
         const existing = await tx.device.findFirst({ where: { OR: imeis.flatMap((imei) => [{ imei }, { imei2: imei }]) } });
         if (existing) throw new Error(`IMEI ${existing.imei} уже зарегистрирован`);
@@ -622,12 +688,16 @@ export class SuppliersService {
           if (hasHistory) throw new Error('Нельзя редактировать: устройство уже продано, перемещено или отправлено в ремонт');
         }
 
-        const newImei = input.freeDevice.imei?.trim();
-        if (newImei && newImei !== bonusDevice.imei) {
+        // A typed IMEI is exactly 15 digits, both slots; neither may be another device's.
+        const newImei = input.freeDevice.imei?.trim() ? requireImei(input.freeDevice.imei) : undefined;
+        const newImei2 = input.freeDevice.imei2?.trim() ? requireImei(input.freeDevice.imei2, 'IMEI 2') : undefined;
+        if (newImei2 && newImei2 === (newImei ?? bonusDevice.imei)) throw new Error('IMEI 1 и IMEI 2 совпадают');
+        for (const code of [newImei !== bonusDevice.imei ? newImei : undefined, newImei2]) {
+          if (!code) continue;
           const existing = await tx.device.findFirst({
-            where: { AND: [{ id: { not: bonusDevice.deviceId ?? undefined } }, { OR: [{ imei: newImei }, { imei2: newImei }] }] },
+            where: { AND: [{ id: { not: bonusDevice.deviceId ?? undefined } }, { OR: [{ imei: code }, { imei2: code }] }] },
           });
-          if (existing) throw new Error(`IMEI ${newImei} уже зарегистрирован`);
+          if (existing) throw new Error(`IMEI ${code} уже зарегистрирован`);
         }
 
         const deviceUpdate: Record<string, string | null> = {};
@@ -637,7 +707,7 @@ export class SuppliersService {
         if (input.freeDevice.storage !== undefined) { deviceUpdate.storage = input.freeDevice.storage; bonusDeviceUpdate.storage = input.freeDevice.storage; }
         if (input.freeDevice.color !== undefined) { deviceUpdate.color = input.freeDevice.color; bonusDeviceUpdate.color = input.freeDevice.color; }
         if (newImei) { deviceUpdate.imei = newImei; bonusDeviceUpdate.imei = newImei; }
-        if (input.freeDevice.imei2 !== undefined) { deviceUpdate.imei2 = input.freeDevice.imei2.trim() || null; }
+        if (input.freeDevice.imei2 !== undefined) { deviceUpdate.imei2 = newImei2 ?? null; }
         if (input.campaignTitle !== undefined) deviceUpdate.bonusCampaign = input.campaignTitle.trim() || null;
 
         if (bonusDevice.deviceId && Object.keys(deviceUpdate).length > 0) {
@@ -827,6 +897,8 @@ export class SuppliersService {
       accessoryCosts?: { batchId: string; unitCostUsd: MoneyInput }[];
       /** A wrong brand, model or specs typed at receipt, fixed on the units not sold yet. */
       specs?: DeviceSpecInput[];
+      /** An IMEI or SN typed wrong at receipt, fixed on a unit not sold, repaired or being moved. */
+      codes?: DeviceCodeInput[];
       /** A wrong accessory card name: only for a card that only this invoice brought in. */
       accessoryNames?: AccessoryNameInput[];
     },
@@ -914,7 +986,7 @@ export class SuppliersService {
         }
       }
 
-      const renames = await renameInvoiceItems(tx, id, input.specs ?? [], input.accessoryNames ?? []);
+      const renames = await renameInvoiceItems(tx, id, input.specs ?? [], input.accessoryNames ?? [], input.codes ?? []);
 
       let refundUsd = D(0);
       if (!diff.isZero()) {

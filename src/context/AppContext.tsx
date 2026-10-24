@@ -198,7 +198,9 @@ interface AppContextType {
     accessoryCosts?: { batchId: string; unitCostUsd: number }[];
     /** Names typed wrong at receipt (units not sold yet; accessory cards of this invoice only). */
     specs?: { deviceId: string; brand: string; model: string; ram: string | null; storage: string; color: string }[];
-    accessoryNames?: { productId: string; brand: string; name: string; category: string }[];
+    accessoryNames?: { productId: string; brand: string; name: string; category: string; barcode?: string }[];
+    /** IMEIs / SNs typed wrong at receipt (units not sold, repaired or being moved). */
+    codes?: { deviceId: string; imei: string; imei2: string | null }[];
   }) => Promise<{ success: boolean; message?: string; refundUsd?: number }>;
   deleteSupplierInvoice: (id: string) => Promise<{ success: boolean; message?: string; refundUsd?: number }>;
 

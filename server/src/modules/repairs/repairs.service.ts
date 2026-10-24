@@ -1,4 +1,5 @@
 import { D, type MoneyInput } from '../../common/decimal';
+import { requireDeviceCode } from '../../common/device-code';
 import { prisma } from '../../prisma/prisma.service';
 import { resolveActor } from '../../common/actor';
 import { createExpense } from '../expenses/expenses.service';
@@ -29,6 +30,10 @@ interface CreateRepairInput {
 
 export class RepairsService {
   public static async create(input: CreateRepairInput) {
+    // A typed IMEI is exactly 15 digits (a tablet's SN has letters); "N/A" when the phone shows none.
+    if (input.imei !== 'N/A') input.imei = requireDeviceCode(input.imei, 'IMEI');
+    if (input.imei2) input.imei2 = requireDeviceCode(input.imei2, 'IMEI 2');
+    if (input.imei2 && input.imei2 === input.imei) throw new Error('IMEI 1 и IMEI 2 совпадают');
     if (input.estimatedCostTjs !== undefined) input.estimatedCostTjs = requireNonNegativeMoney(input.estimatedCostTjs, 'Предварительная стоимость');
     if (input.prepaymentTjs !== undefined && requireNonNegativeMoney(input.prepaymentTjs, 'Предоплата').gt(0)) {
       throw new Error('Приём предоплаты за ремонт не поддерживается');

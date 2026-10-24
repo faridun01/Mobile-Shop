@@ -200,6 +200,45 @@ await withDisposableApi('invoice_edit', async ({ db, call, env, login }) => {
   assert.match(renameLog.details, /названия: .*A5 .*→ .*A55/);
   console.log('PASS: a name typed wrong is fixed on unsold phones and on the invoice\'s own accessory card; receipts and money stay');
 
+  // 8. Codes typed wrong at receipt: IMEIs swapped between two phones, a tablet SN, an accessory
+  // barcode. A sold phone, a code another device has and a barcode another card has are refused.
+  // Then the unpaid invoice is deleted whole: only the supplier debt goes.
+  prev = await snap();
+  const f = ok(await call('POST', '/purchases', {
+    supplierId: supplier.id, invoiceNumber: 'INV-F',
+    groups: [
+      { brand: 'Honor', model: 'X9b', ram: '12GB', storage: '256GB', color: 'Black', purchasePriceUsd: 220, items: [40, 41].map((i) => ({ imei: imei(i) })) },
+      { category: 'TABLET', brand: 'Samsung', model: 'Tab A9', ram: '4GB', storage: '64GB', color: 'Gray', purchasePriceUsd: 150, items: [{ imei: 'R9TWAB001' }] },
+      { category: 'ACCESSORY', barcode: 'CASE-F', brand: 'Generic', name: 'Чехол X9b', accessoryCategory: 'Чехлы', quantity: 4, purchasePriceUsd: 2 },
+    ],
+  }), 'purchase F').invoice;
+  const [x1, x2] = await db.device.findMany({ where: { purchaseInvoiceId: f.id, category: 'PHONE' }, orderBy: { imei: 'asc' } });
+  const tab = await db.device.findFirstOrThrow({ where: { purchaseInvoiceId: f.id, category: 'TABLET' } });
+  const caseF = await db.accessoryProduct.findUniqueOrThrow({ where: { barcode: 'CASE-F' } });
+  refused(await call('PUT', `/supplier-invoices/${f.id}`, { codes: [{ deviceId: x1.id, imei: imei(0) }] }), /уже зарегистрирован/, 'an IMEI another phone has');
+  refused(await call('PUT', `/supplier-invoices/${f.id}`, { codes: [{ deviceId: x1.id, imei: '123' }] }), /ровно 15 цифр/, 'a short IMEI');
+  refused(await call('PUT', `/supplier-invoices/${d.id}`, { codes: [{ deviceId: soldA5.id, imei: imei(49) }] }), /уже продавался.*в чеке/, 'the IMEI of a sold phone');
+  refused(await call('PUT', `/supplier-invoices/${f.id}`, { accessoryNames: [{ productId: caseF.id, brand: 'Generic', name: 'Чехол X9b', category: 'Чехлы', barcode: 'CASE-D' }] }), /уже у товара/, 'a barcode another card has');
+  ok(await call('PUT', `/supplier-invoices/${f.id}`, {
+    codes: [{ deviceId: x1.id, imei: x2.imei, imei2: imei(42) }, { deviceId: x2.id, imei: x1.imei }, { deviceId: tab.id, imei: 'r9twab002' }],
+    accessoryNames: [{ productId: caseF.id, brand: 'Generic', name: 'Чехол X9b', category: 'Чехлы', barcode: 'case-f 2' }],
+  }), 'fix codes');
+  assert.deepEqual([(await db.device.findUniqueOrThrow({ where: { id: x1.id } })).imei, (await db.device.findUniqueOrThrow({ where: { id: x1.id } })).imei2], [x2.imei, imei(42)], 'the codes swapped');
+  assert.equal((await db.device.findUniqueOrThrow({ where: { id: x2.id } })).imei, x1.imei);
+  assert.equal((await db.device.findUniqueOrThrow({ where: { id: tab.id } })).imei, 'R9TWAB002', 'an SN is upper-cased');
+  assert.equal((await db.accessoryProduct.findUniqueOrThrow({ where: { id: caseF.id } })).barcode, 'CASE-F2');
+  const found = ok(await call('GET', `/devices?search=${imei(42)}`), 'find by the new IMEI 2');
+  assert((Array.isArray(found) ? found : found.items ?? found.devices ?? []).some((x: any) => x.id === x1.id), 'the phone is found by its new IMEI 2');
+  s = await snap(f.id);
+  assert.equal(s.total, 598, 'codes do not change money');
+  assert.equal(s.debt.minus(prev.debt), 598);
+  ok(await call('DELETE', `/supplier-invoices/${f.id}`), 'delete unpaid F');
+  s = await snap();
+  assert.equal(s.debt, prev.debt, 'deleting the unpaid invoice removes its debt');
+  assert.equal(s.cash, prev.cash, 'no money moves');
+  assert.equal(await db.device.count({ where: { purchaseInvoiceId: f.id } }), 0);
+  console.log('PASS: IMEIs (swapped too), a tablet SN and a barcode are fixed on unsold units; duplicates and sold phones refused; the unpaid invoice is deleted');
+
   // 6. Everything reconciles: owners, capital, customer debt.
   const audit = spawnSync(process.execPath, ['--import', 'tsx', 'scripts/check-owner-balances.ts'], { env, encoding: 'utf8', timeout: 60000 });
   assert.equal(audit.status, 0, audit.stdout + audit.stderr);

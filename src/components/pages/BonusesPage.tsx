@@ -31,6 +31,7 @@ import {
 import { MonthPicker } from '../ui/MonthPicker';
 import { currentBusinessMonth } from '../../utils/businessDate';
 import { DEFAULT_PHONE_COLORS_EN, normalizePhoneColor, formatPhoneColor, formatRam, formatStorage } from '../../utils/phoneSpecs';
+import { imeiDigits, imeiProblem } from '../../utils/deviceCode';
 
 interface BonusAccountBalance {
   balanceUsd: string;
@@ -333,8 +334,9 @@ export const BonusesPage: React.FC = () => {
         setStatus({ tone: 'error', text: 'Укажите память (ROM) подарочного устройства' });
         return;
       }
-      if (!bonusImei.trim()) {
-        setStatus({ tone: 'error', text: 'Укажите IMEI подарочного устройства' });
+      const createProblem = imeiProblem(bonusImei, true);
+      if (createProblem) {
+        setStatus({ tone: 'error', text: `${createProblem} — IMEI подарочного устройства` });
         return;
       }
     }
@@ -511,6 +513,11 @@ export const BonusesPage: React.FC = () => {
   const handleSaveEditBonus = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingBonus || isSubmitting) return;
+    const editProblem = editingBonus.bonusType === 'FREE_DEVICES' ? imeiProblem(editImei, true) : null;
+    if (editProblem) {
+      setStatus({ tone: 'error', text: `${editProblem} — IMEI подарочного устройства` });
+      return;
+    }
 
     setIsSubmitting(true);
     try {
@@ -1386,13 +1393,15 @@ export const BonusesPage: React.FC = () => {
                         type="text"
                         required
                         value={bonusImei}
-                        onChange={(e) => setBonusImei(e.target.value)}
+                        inputMode="numeric"
+                        aria-invalid={Boolean(bonusImei && imeiProblem(bonusImei))}
+                        onChange={(e) => setBonusImei(imeiDigits(e.target.value))}
                         placeholder="15-значный IMEI..."
                         className="flex-1 h-8 px-2 bg-surface-raised border border-border rounded-lg text-xs font-mono text-fg focus:outline-none focus:border-accent"
                       />
                       <button
                         type="button"
-                        onClick={() => openScanner((code) => setBonusImei(code.trim()))}
+                        onClick={() => openScanner((code) => setBonusImei(imeiDigits(code)))}
                         className="h-8 px-2.5 bg-surface-raised hover:bg-surface border border-border rounded-lg text-xs font-semibold text-fg flex items-center gap-1 cursor-pointer"
                         title="Сканировать IMEI"
                       >
@@ -1400,6 +1409,7 @@ export const BonusesPage: React.FC = () => {
                         <span className="hidden xs:inline">Сканер</span>
                       </button>
                     </div>
+                    {bonusImei && imeiProblem(bonusImei) && <p className="mt-0.5 text-[11px] text-danger">{imeiProblem(bonusImei)}</p>}
                   </div>
 
                   <div>
@@ -1614,9 +1624,12 @@ export const BonusesPage: React.FC = () => {
                       type="text"
                       required
                       value={editImei}
-                      onChange={(e) => setEditImei(e.target.value)}
+                      inputMode="numeric"
+                      aria-invalid={Boolean(imeiProblem(editImei, true))}
+                      onChange={(e) => setEditImei(imeiDigits(e.target.value))}
                       className="w-full h-8 rounded-lg bg-surface border border-border px-2.5 text-xs text-fg font-mono focus:border-accent focus:outline-none"
                     />
+                    {imeiProblem(editImei, true) && <p className="mt-0.5 text-[11px] text-danger">{imeiProblem(editImei, true)}</p>}
                   </div>
                 </div>
               )}

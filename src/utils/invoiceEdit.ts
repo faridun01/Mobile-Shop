@@ -1,5 +1,6 @@
 import { apiClient } from '../api/client';
 import { decimal, moneyNumber, sumMoney } from './money';
+import { isValidSerial, normalizeSerial } from './deviceCode';
 
 /** Why the invoice can't be deleted (something of it was sold or moved), or null when it can. */
 export async function invoiceDeleteBlock(invoiceId: string): Promise<string | null> {
@@ -163,7 +164,7 @@ export function invoiceEditResult(
 
 /** A model's name and specs as typed in the editor. */
 export interface DeviceSpecDraft { brand: string; model: string; ram: string; storage: string; color: string }
-export interface AccessoryNameDraft { brand: string; name: string; category: string }
+export interface AccessoryNameDraft { brand: string; name: string; category: string; barcode: string }
 
 export const specDraftOf = (g: PriceGroup): DeviceSpecDraft => ({ brand: g.brand, model: g.model, ram: g.ram ?? '', storage: g.storage, color: g.color });
 
@@ -181,7 +182,7 @@ export function renameChanges(
   nameDrafts: Record<string, AccessoryNameDraft>,
 ) {
   const specs: { deviceId: string; brand: string; model: string; ram: string | null; storage: string; color: string }[] = [];
-  const accessoryNames: { productId: string; brand: string; name: string; category: string }[] = [];
+  const accessoryNames: { productId: string; brand: string; name: string; category: string; barcode: string }[] = [];
   const invalid: string[] = [];
   for (const group of groups) {
     const draft = specDrafts[group.key];
@@ -199,10 +200,43 @@ export function renameChanges(
     const draft = nameDrafts[batch.productId];
     if (!draft || !batch.nameEditable || seen.has(batch.productId)) continue;
     seen.add(batch.productId);
-    const next = { brand: clean(draft.brand), name: clean(draft.name), category: clean(draft.category) };
-    if (!next.name || !next.category) { invalid.push(batch.productId); continue; }
-    if (next.brand === batch.brand && next.name === batch.name && next.category === (batch.category ?? '')) continue;
+    const next = { brand: clean(draft.brand), name: clean(draft.name), category: clean(draft.category), barcode: draft.barcode.replace(/\s+/g, '').toUpperCase() };
+    if (!next.name || !next.category || !next.barcode) { invalid.push(batch.productId); continue; }
+    if (next.brand === batch.brand && next.name === batch.name && next.category === (batch.category ?? '') && next.barcode === batch.barcode) continue;
     accessoryNames.push({ productId: batch.productId, ...next });
   }
   return { specs, accessoryNames, invalid };
+}
+
+/** A unit's codes as typed: IMEI 1/2, or a tablet's SN and additional SN. */
+export interface DeviceCodeDraft { imei: string; imei2: string }
+
+/**
+ * The code corrections to save, by the receipt's rules: an IMEI is 15 digits, an SN 4–64 letters
+ * and digits (upper-cased); the second code is optional, never the same as the first, and no code
+ * is typed twice. `invalid` lists the device ids to fix.
+ */
+export function codeChanges(devices: InvoiceContentDevice[], drafts: Record<string, DeviceCodeDraft>) {
+  const codes: { deviceId: string; imei: string; imei2: string | null }[] = [];
+  const invalid = new Set<string>();
+  const seen = new Map<string, string>();
+  for (const device of devices) {
+    const draft = drafts[device.id];
+    if (!draft) continue;
+    const tablet = device.category === 'TABLET';
+    const clean = (raw: string) => (tablet ? normalizeSerial(raw) : raw.replace(/\s+/g, ''));
+    const valid = (code: string) => (tablet ? isValidSerial(code) : /^\d{15}$/.test(code));
+    const imei = clean(draft.imei);
+    const imei2 = clean(draft.imei2) || null;
+    if (!valid(imei) || (imei2 !== null && (!valid(imei2) || imei2 === imei))) { invalid.add(device.id); continue; }
+    for (const code of [imei, imei2]) {
+      if (!code) continue;
+      const other = seen.get(code);
+      if (other) { invalid.add(device.id); invalid.add(other); }
+      seen.set(code, device.id);
+    }
+    if (imei === device.imei && imei2 === (device.imei2 || null)) continue;
+    codes.push({ deviceId: device.id, imei, imei2 });
+  }
+  return { codes: codes.filter((c) => !invalid.has(c.deviceId)), invalid: [...invalid] };
 }

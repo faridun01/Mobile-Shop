@@ -37,3 +37,22 @@ export function deviceCodeCandidates(raw: unknown): string[] {
   if (!compact) return [];
   return [...new Set([compact, compact.toUpperCase()])];
 }
+
+/** A typed IMEI with its spaces dropped: exactly 15 digits, or an error naming the field. */
+export function requireImei(raw: unknown, label = 'IMEI'): string {
+  const code = String(raw ?? '').replace(/\s+/g, '');
+  if (!isValidImei(code)) throw new Error(`${label} должен содержать ровно 15 цифр (получено: "${code}")`);
+  return code;
+}
+
+/**
+ * A code typed for a phone or a tablet: digits only are an IMEI and must be exactly 15; a code
+ * with letters is a tablet's SN (4–64 letters and digits, upper-cased).
+ */
+export function requireDeviceCode(raw: unknown, label = 'IMEI'): string {
+  const code = String(raw ?? '').replace(/\s+/g, '');
+  if (/^\d+$/.test(code)) return requireImei(code, label);
+  const serial = normalizeSerial(code);
+  if (!isValidSerial(serial)) throw new Error(`${label}: IMEI — ровно 15 цифр, SN планшета — 4–64 буквы и цифры (получено: "${code}")`);
+  return serial;
+}

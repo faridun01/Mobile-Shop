@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { AlertTriangle, Check, Lock, Package, Pencil, Receipt, Smartphone, X } from 'lucide-react';
+import { AlertTriangle, Barcode, Check, Lock, Package, Pencil, Receipt, Scan, Smartphone, X } from 'lucide-react';
 import type { SupplierInvoice } from '../../types';
 import { apiClient } from '../../api/client';
 import { Dialog } from '../ui/Dialog';
@@ -9,9 +9,11 @@ import { formatMoney } from '../../utils/money';
 import { formatPhoneColor, formatRam, formatStorage } from '../../utils/phoneSpecs';
 import { formatStoreName } from '../../utils/storeContext';
 import {
-  groupInvoiceDevices, invoiceEditResult, renameChanges, specDraftOf,
-  type AccessoryNameDraft, type DeviceSpecDraft, type InvoiceContents,
+  codeChanges, groupInvoiceDevices, invoiceEditResult, renameChanges, specDraftOf,
+  type AccessoryNameDraft, type DeviceCodeDraft, type DeviceSpecDraft, type InvoiceContents,
 } from '../../utils/invoiceEdit';
+import { deviceCodeLabel, imeiDigits, imeiProblem } from '../../utils/deviceCode';
+import { useAppFields } from '../../context/AppContext';
 
 export interface InvoiceSaveData {
   invoiceNumber: string;
@@ -20,7 +22,9 @@ export interface InvoiceSaveData {
   accessoryCosts: { batchId: string; unitCostUsd: number }[];
   /** Names typed wrong at receipt, fixed on the units not sold yet. */
   specs: { deviceId: string; brand: string; model: string; ram: string | null; storage: string; color: string }[];
-  accessoryNames: { productId: string; brand: string; name: string; category: string }[];
+  accessoryNames: { productId: string; brand: string; name: string; category: string; barcode: string }[];
+  /** IMEIs / SNs typed wrong at receipt, on units not sold, repaired or being moved. */
+  codes: { deviceId: string; imei: string; imei2: string | null }[];
 }
 
 interface EditInvoiceModalProps {
@@ -36,22 +40,41 @@ const nameInput = 'w-full h-9 px-2.5 rounded-lg bg-surface border border-border 
 const renameButton = 'inline-flex items-center gap-1 text-[11px] font-semibold text-accent hover:underline cursor-pointer hit-area-y';
 
 /** One labelled field of a name form. */
-const NameField: React.FC<{ label: string; value: string; onChange: (value: string) => void; placeholder?: string; invalid?: boolean; wide?: boolean }> = ({ label, value, onChange, placeholder, invalid, wide }) => (
-  <label className={cn('space-y-1 min-w-0', wide && 'col-span-2')}>
-    <span className="text-[11px] font-semibold text-fg-muted">{label}</span>
-    <input value={value} placeholder={placeholder} onChange={(e) => onChange(e.target.value)} className={cn(nameInput, invalid && !value.trim() && 'border-danger')} />
-  </label>
-);
+/** One labelled field of a name or code form; with `onScan`, a camera button beside it fills it. */
+const NameField: React.FC<{ label: string; value: string; onChange: (value: string) => void; placeholder?: string; invalid?: boolean; wide?: boolean; mono?: boolean; error?: boolean; inputMode?: 'numeric' | 'text'; maxLength?: number; problem?: string | null; onScan?: () => void }> = ({ label, value, onChange, placeholder, invalid, wide, mono, error, inputMode, maxLength, problem, onScan }) => {
+  const id = React.useId();
+  return (
+    <div className={cn('space-y-1 min-w-0', wide && 'col-span-2')}>
+      <label htmlFor={id} className="block text-[11px] font-semibold text-fg-muted">{label}</label>
+      <div className="flex gap-1.5">
+        <input id={id} value={value} placeholder={placeholder} inputMode={inputMode} maxLength={maxLength} aria-invalid={Boolean(problem || error)} onChange={(e) => onChange(e.target.value)} className={cn(nameInput, 'min-w-0', mono && 'font-mono', (error || problem || (invalid && !value.trim())) && 'border-danger text-danger')} />
+        {onScan && (
+          <button
+            type="button"
+            onClick={onScan}
+            className="h-9 w-9 flex items-center justify-center rounded-lg bg-accent/10 hover:bg-accent/20 border border-accent/25 text-accent cursor-pointer shrink-0"
+            title={`Сканировать: ${label}`}
+            aria-label={`Сканировать: ${label}`}
+          >
+            <Scan className="w-4 h-4" />
+          </button>
+        )}
+      </div>
+      {problem && <p className="text-[11px] text-danger">{problem}</p>}
+    </div>
+  );
+};
 
 /**
  * Edits a purchase invoice: its number, date and the purchase price of each model or accessory
  * batch still in stock (moved to a store or not). A sold phone keeps its price. A name typed wrong
  * at receipt is fixed on the units not sold yet, and on an accessory card only this invoice brought
- * in (a sold unit keeps its name on the receipt). The summary shows
+ * in (a sold unit keeps its name on the receipt); so is an IMEI / SN or an accessory barcode. The summary shows
  * what saving does: the change is owed to the supplier, or the part paid above the new total comes
  * back to the Central Cash.
  */
 export const EditInvoiceModal: React.FC<EditInvoiceModalProps> = ({ invoice, onClose, onSave, onSuccess, onError }) => {
+  const { openScanner } = useAppFields('openScanner');
   const [contents, setContents] = useState<InvoiceContents | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [number, setNumber] = useState('');
@@ -61,6 +84,9 @@ export const EditInvoiceModal: React.FC<EditInvoiceModalProps> = ({ invoice, onC
   // A name form is open for a model (group key) or an accessory card (product id) while it has a draft.
   const [specDrafts, setSpecDrafts] = useState<Record<string, DeviceSpecDraft>>({});
   const [nameDrafts, setNameDrafts] = useState<Record<string, AccessoryNameDraft>>({});
+  // A model's codes form is open (group key) with a draft per unit (device id).
+  const [codeGroups, setCodeGroups] = useState<Set<string>>(new Set());
+  const [codeDrafts, setCodeDrafts] = useState<Record<string, DeviceCodeDraft>>({});
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -84,6 +110,8 @@ export const EditInvoiceModal: React.FC<EditInvoiceModalProps> = ({ invoice, onC
         setBatchCosts(Object.fromEntries(normalized.accessories.map((b) => [b.id, String(b.unitCostUsd)])));
         setSpecDrafts({});
         setNameDrafts({});
+        setCodeGroups(new Set());
+        setCodeDrafts({});
       })
       .catch((e) => { if (!cancelled) setLoadError(e instanceof Error ? e.message : 'Не удалось загрузить накладную'); });
     return () => { cancelled = true; };
@@ -95,6 +123,17 @@ export const EditInvoiceModal: React.FC<EditInvoiceModalProps> = ({ invoice, onC
     () => renameChanges(groups, specDrafts, contents?.accessories ?? [], nameDrafts),
     [groups, specDrafts, contents, nameDrafts],
   );
+  const codes = useMemo(() => codeChanges(contents?.devices ?? [], codeDrafts), [contents, codeDrafts]);
+  const setCode = (deviceId: string, field: keyof DeviceCodeDraft, value: string) =>
+    setCodeDrafts((all) => ({ ...all, [deviceId]: { ...all[deviceId], [field]: value } }));
+  const openCodes = (key: string, units: { id: string; imei: string; imei2?: string | null }[]) => {
+    setCodeGroups((open) => new Set(open).add(key));
+    setCodeDrafts((all) => ({ ...all, ...Object.fromEntries(units.map((d) => [d.id, all[d.id] ?? { imei: d.imei, imei2: d.imei2 ?? '' }])) }));
+  };
+  const closeCodes = (key: string, units: { id: string }[]) => {
+    setCodeGroups((open) => { const next = new Set(open); next.delete(key); return next; });
+    setCodeDrafts((all) => { const next = { ...all }; for (const d of units) delete next[d.id]; return next; });
+  };
   const setSpec = (key: string, field: keyof DeviceSpecDraft, value: string) =>
     setSpecDrafts((all) => ({ ...all, [key]: { ...all[key], [field]: value } }));
   const setAccessoryName = (productId: string, field: keyof AccessoryNameDraft, value: string) =>
@@ -107,13 +146,14 @@ export const EditInvoiceModal: React.FC<EditInvoiceModalProps> = ({ invoice, onC
   const handleSave = async () => {
     if (!result || saving) return;
     if (result.invalid.length) { onError('Укажите корректные цены (больше нуля, до двух знаков после точки)'); return; }
-    if (renames.invalid.length) { onError('Заполните название: бренд, модель и характеристики (у аксессуара — название и категорию)'); return; }
+    if (renames.invalid.length) { onError('Заполните название: бренд, модель и характеристики (у аксессуара — название, категорию и штрихкод)'); return; }
+    if (codes.invalid.length) { onError('Проверьте коды: IMEI — ровно 15 цифр, SN — 4–64 буквы и цифры, без повторов'); return; }
     if (!number.trim()) { onError('Укажите номер накладной'); return; }
     setSaving(true);
     try {
       const res = await onSave(invoice.id, {
         invoiceNumber: number.trim(), date, prices: result.prices, accessoryCosts: result.accessoryCosts,
-        specs: renames.specs, accessoryNames: renames.accessoryNames,
+        specs: renames.specs, accessoryNames: renames.accessoryNames, codes: codes.codes,
       });
       if (res.success) {
         onSuccess(res.refundUsd ? `Накладная обновлена. $${formatMoney(res.refundUsd)} возвращено в Центральную кассу` : 'Накладная обновлена');
@@ -139,7 +179,7 @@ export const EditInvoiceModal: React.FC<EditInvoiceModalProps> = ({ invoice, onC
       footer={
         <div className="grid grid-cols-2 gap-2 w-full">
           <Button variant="secondary" fullWidth onClick={onClose} disabled={saving}>Отмена</Button>
-          <Button fullWidth leftIcon={Check} loading={saving} disabled={!contents || Boolean(result?.invalid.length) || renames.invalid.length > 0} onClick={handleSave}>
+          <Button fullWidth leftIcon={Check} loading={saving} disabled={!contents || Boolean(result?.invalid.length) || renames.invalid.length > 0 || codes.invalid.length > 0} onClick={handleSave}>
             Сохранить
           </Button>
         </div>
@@ -170,6 +210,8 @@ export const EditInvoiceModal: React.FC<EditInvoiceModalProps> = ({ invoice, onC
                 const bad = result?.invalid.includes(g.key);
                 const draft = specDrafts[g.key];
                 const isTablet = g.devices[0]?.category === 'TABLET';
+                const category = g.devices[0]?.category === 'TABLET' ? 'TABLET' as const : 'PHONE' as const;
+                const codesOpen = codeGroups.has(g.key);
                 return (
                   <div key={g.key} className="p-3 rounded-xl bg-surface-raised border border-border space-y-2.5">
                   <div className="flex items-center justify-between gap-3">
@@ -182,10 +224,19 @@ export const EditInvoiceModal: React.FC<EditInvoiceModalProps> = ({ invoice, onC
                       {g.soldCount > 0 && (
                         <p className="text-[11px] text-warning flex items-center gap-1"><Lock className="w-3 h-3" />Уже продавались {g.soldCount} шт. — их цена ${formatMoney(g.price)} не меняется</p>
                       )}
-                      {g.editable.length > 0 && !draft && (
-                        <button type="button" data-compact className={renameButton} onClick={() => setSpecDrafts((all) => ({ ...all, [g.key]: specDraftOf(g) }))}>
-                          <Pencil className="w-3 h-3" />Изменить название
-                        </button>
+                      {g.editable.length > 0 && (!draft || !codesOpen) && (
+                        <div className="flex flex-wrap gap-x-3 gap-y-1">
+                          {!draft && (
+                            <button type="button" data-compact className={renameButton} onClick={() => setSpecDrafts((all) => ({ ...all, [g.key]: specDraftOf(g) }))}>
+                              <Pencil className="w-3 h-3" />Изменить название
+                            </button>
+                          )}
+                          {!codesOpen && (
+                            <button type="button" data-compact className={renameButton} onClick={() => openCodes(g.key, g.editable)}>
+                              <Barcode className="w-3 h-3" />Изменить {deviceCodeLabel(category)}
+                            </button>
+                          )}
+                        </div>
                       )}
                     </div>
                     {g.isBonus ? (
@@ -221,6 +272,32 @@ export const EditInvoiceModal: React.FC<EditInvoiceModalProps> = ({ invoice, onC
                       </div>
                     </div>
                   )}
+                  {codesOpen && (
+                    <div className="pt-2.5 border-t border-border space-y-2">
+                      {g.editable.map((d) => (
+                        <div key={d.id} className="grid grid-cols-1 sm:grid-cols-2 gap-2 pb-2 border-b border-border/60 last:border-b-0 last:pb-0">
+                          <NameField label={deviceCodeLabel(category)} value={codeDrafts[d.id]?.imei ?? ''}
+                            onChange={(v) => setCode(d.id, 'imei', isTablet ? v : imeiDigits(v))}
+                            mono inputMode={isTablet ? 'text' : 'numeric'} maxLength={isTablet ? 64 : undefined} error={codes.invalid.includes(d.id)} invalid
+                            problem={isTablet ? null : imeiProblem(codeDrafts[d.id]?.imei ?? '', true)}
+                            onScan={() => openScanner((code) => setCode(d.id, 'imei', isTablet ? code : imeiDigits(code)), { mode: isTablet ? 'serial' : 'imei' })} />
+                          <NameField label={`${deviceCodeLabel(category, 2)} (если есть)`} value={codeDrafts[d.id]?.imei2 ?? ''}
+                            onChange={(v) => setCode(d.id, 'imei2', isTablet ? v : imeiDigits(v))}
+                            mono inputMode={isTablet ? 'text' : 'numeric'} maxLength={isTablet ? 64 : undefined} error={codes.invalid.includes(d.id)}
+                            problem={isTablet ? null : imeiProblem(codeDrafts[d.id]?.imei2 ?? '')}
+                            onScan={() => openScanner((code) => setCode(d.id, 'imei2', isTablet ? code : imeiDigits(code)), { mode: isTablet ? 'serial' : 'imei' })} />
+                        </div>
+                      ))}
+                      <div className="flex items-start justify-between gap-2">
+                        <p className="text-[11px] text-fg-subtle">
+                          {isTablet ? 'SN — 4–64 буквы и цифры.' : 'IMEI — ровно 15 цифр.'} Меняются только непроданные {g.editable.length} шт.{g.soldCount > 0 ? ' У проданных код остаётся в чеках.' : ''}
+                        </p>
+                        <button type="button" data-compact className={cn(renameButton, 'text-fg-muted shrink-0')} onClick={() => closeCodes(g.key, g.editable)}>
+                          <X className="w-3 h-3" />Отменить
+                        </button>
+                      </div>
+                    </div>
+                  )}
                   </div>
                 );
               })}
@@ -238,11 +315,11 @@ export const EditInvoiceModal: React.FC<EditInvoiceModalProps> = ({ invoice, onC
                   <div className="flex items-center justify-between gap-3">
                     <div className="min-w-0">
                       <p className="font-bold text-fg truncate">{[b.brand, b.name].filter(Boolean).join(' ')} <span className="font-normal text-fg-subtle">× {b.quantityReceived}</span></p>
-                      <p className="text-[11px] text-fg-subtle">{b.storeName ? `${formatStoreName(b.storeName)} · ` : ''}осталось {b.quantityRemaining} из {b.quantityReceived} шт.</p>
+                      <p className="text-[11px] text-fg-subtle">{b.storeName ? `${formatStoreName(b.storeName)} · ` : ''}осталось {b.quantityRemaining} из {b.quantityReceived} шт. · <span className="font-mono">{b.barcode}</span></p>
                       {b.locked && <p className="text-[11px] text-warning flex items-center gap-1"><Lock className="w-3 h-3" />Часть продана или перемещена — цена не меняется</p>}
                       {firstOfCard && b.nameEditable && !draft && (
-                        <button type="button" data-compact className={renameButton} onClick={() => setNameDrafts((all) => ({ ...all, [b.productId]: { brand: b.brand, name: b.name, category: b.category ?? '' } }))}>
-                          <Pencil className="w-3 h-3" />Изменить название
+                        <button type="button" data-compact className={renameButton} onClick={() => setNameDrafts((all) => ({ ...all, [b.productId]: { brand: b.brand, name: b.name, category: b.category ?? '', barcode: b.barcode } }))}>
+                          <Pencil className="w-3 h-3" />Изменить название и штрихкод
                         </button>
                       )}
                     </div>
@@ -264,9 +341,11 @@ export const EditInvoiceModal: React.FC<EditInvoiceModalProps> = ({ invoice, onC
                         <NameField label="Бренд" value={draft.brand} onChange={(v) => setAccessoryName(b.productId, 'brand', v)} />
                         <NameField label="Категория" value={draft.category} onChange={(v) => setAccessoryName(b.productId, 'category', v)} invalid />
                         <NameField label="Название" value={draft.name} onChange={(v) => setAccessoryName(b.productId, 'name', v)} invalid wide />
+                        <NameField label="Штрихкод" value={draft.barcode} onChange={(v) => setAccessoryName(b.productId, 'barcode', v)} invalid wide mono
+                          onScan={() => openScanner((code) => setAccessoryName(b.productId, 'barcode', code), { mode: 'code' })} />
                       </div>
                       <div className="flex items-start justify-between gap-2">
-                        <p className="text-[11px] text-fg-subtle">Карточка товара со штрихкодом {b.barcode}: новое название будет на складе и в новых продажах.</p>
+                        <p className="text-[11px] text-fg-subtle">Карточка товара со штрихкодом {b.barcode}: новое название и штрихкод будут на складе и в новых продажах; в прошлых чеках остаются прежние.</p>
                         <button type="button" data-compact className={cn(renameButton, 'text-fg-muted shrink-0')} onClick={() => closeDraft(setNameDrafts, b.productId)}>
                           <X className="w-3 h-3" />Отменить
                         </button>

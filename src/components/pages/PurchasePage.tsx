@@ -414,18 +414,18 @@ export const PurchasePage: React.FC = () => {
         const [imei1, imei2] = getImeiPair(g.items[itIdx].imei);
         const clean1 = imei1.replace(/\D/g, '');
         const clean2 = imei2.replace(/\D/g, '');
-        if (clean1.length > 0 && clean1.length < 15) {
+        if (clean1.length > 0 && clean1.length !== 15) {
           setStatusMessage({
             type: 'error',
-            text: `Позиция #${gIdx + 1}, устройство #${itIdx + 1}: IMEI 1 содержит только ${clean1.length} из 15 цифр. Введите ровно 15 цифр!`,
+            text: `Позиция #${gIdx + 1}, устройство #${itIdx + 1}: IMEI 1 содержит ${clean1.length} цифр. Введите ровно 15 цифр!`,
           });
           soundEffects.playError();
           return;
         }
-        if (clean2.length > 0 && clean2.length < 15) {
+        if (clean2.length > 0 && clean2.length !== 15) {
           setStatusMessage({
             type: 'error',
-            text: `Позиция #${gIdx + 1}, устройство #${itIdx + 1}: IMEI 2 содержит только ${clean2.length} из 15 цифр. Введите ровно 15 цифр!`,
+            text: `Позиция #${gIdx + 1}, устройство #${itIdx + 1}: IMEI 2 содержит ${clean2.length} цифр. Введите ровно 15 цифр!`,
           });
           soundEffects.playError();
           return;
@@ -554,18 +554,18 @@ export const PurchasePage: React.FC = () => {
           soundEffects.playError();
           return;
         }
-        if (c1.length < 15) {
+        if (c1.length !== 15) {
           setStatusMessage({
             type: 'error',
-            text: `Позиция #${groupIdx + 1}, устройство #${items.length}: IMEI 1 содержит только ${c1.length} цифр. Должно быть ровно 15 цифр!`,
+            text: `Позиция #${groupIdx + 1}, устройство #${items.length}: IMEI 1 содержит ${c1.length} цифр. Должно быть ровно 15 цифр!`,
           });
           soundEffects.playError();
           return;
         }
-        if (c2.length > 0 && c2.length < 15) {
+        if (c2.length > 0 && c2.length !== 15) {
           setStatusMessage({
             type: 'error',
-            text: `Позиция #${groupIdx + 1}, устройство #${items.length}: IMEI 2 содержит только ${c2.length} цифр. Должно быть ровно 15 цифр!`,
+            text: `Позиция #${groupIdx + 1}, устройство #${items.length}: IMEI 2 содержит ${c2.length} цифр. Должно быть ровно 15 цифр!`,
           });
           soundEffects.playError();
           return;
@@ -668,14 +668,14 @@ export const PurchasePage: React.FC = () => {
 
   const handleUpdateImei2 = (groupIdx: number, itemIdx: number, value: string) => {
     const [imei1] = getImeiPair(groups[groupIdx].items[itemIdx]?.imei || '');
-    const clean1 = imei1.replace(/\D/g, '').slice(0, 15);
-    const clean2 = value.replace(/\D/g, '').slice(0, 15);
+    const clean1 = imei1.replace(/\D/g, '');
+    const clean2 = value.replace(/\D/g, '');
     handleUpdateImei(groupIdx, itemIdx, clean2 ? `${clean1} / ${clean2}` : clean1);
   };
 
   const handleScanImei = (groupIdx: number, itemIdx: number) => {
     openScanner((scannedCode) => {
-      const clean = scannedCode.replace(/\D/g, '').slice(0, 15);
+      const clean = scannedCode.replace(/\D/g, '');
       if (clean.length !== 15) {
         setStatusMessage({
           type: 'error',
@@ -781,8 +781,9 @@ export const PurchasePage: React.FC = () => {
 
     tokens.forEach((token) => {
       const [p1, p2] = getImeiPair(token);
-      const c1 = p1.replace(/\D/g, '').slice(0, 15);
-      const c2 = p2 ? p2.replace(/\D/g, '').slice(0, 15) : '';
+      // A 16-digit token is not an IMEI: refused, never cut into a wrong one.
+      const c1 = p1.replace(/\D/g, '');
+      const c2 = p2 ? p2.replace(/\D/g, '') : '';
 
       if (c1.length === 15 && (!c2 || c2.length === 15)) {
         validNewItems.push({ imei: c2 ? `${c1} / ${c2}` : c1 });
@@ -860,8 +861,8 @@ export const PurchasePage: React.FC = () => {
       if ((g.category ?? 'PHONE') !== 'PHONE') continue;
       for (const it of g.items) {
         const [p1, p2] = getImeiPair(it.imei);
-        const c1 = p1.replace(/\D/g, '').slice(0, 15);
-        const c2 = p2 ? p2.replace(/\D/g, '').slice(0, 15) : '';
+        const c1 = p1.replace(/\D/g, '');
+        const c2 = p2 ? p2.replace(/\D/g, '') : '';
         if (c1.length === 15) list.push(c1);
         if (c2.length === 15) list.push(c2);
       }

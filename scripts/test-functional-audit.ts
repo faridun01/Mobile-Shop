@@ -148,7 +148,14 @@ try {
   const repairBase = { storeId: 'store-siyoma', imei: '350000000000098', brand: 'Audit', model: 'Repair', problemDescription: 'Test' };
   assert.equal((await api('POST', '/repairs', { ...repairBase, estimatedCostTjs: -1 })).status, 400);
   assert.equal((await api('POST', '/repairs', { ...repairBase, prepaymentTjs: 1 })).status, 400);
-  pass('repair rejects negative estimates and unsupported unbooked prepayment');
+  // A typed IMEI is exactly 15 digits: 14 or 16 are refused, so is a short second IMEI.
+  for (const imei of ['35000000000009', '3500000000000981']) {
+    const short = await api('POST', '/repairs', { ...repairBase, imei });
+    assert.equal(short.status, 400);
+    assert.match(String(short.data?.message), /ровно 15 цифр/);
+  }
+  assert.equal((await api('POST', '/repairs', { ...repairBase, imei2: '123' })).status, 400);
+  pass('repair rejects negative estimates, unbooked prepayment and an IMEI that is not 15 digits');
 
   await db.auditLog.createMany({ data: Array.from({ length: 501 }, (_, i) => ({ userId: 'user-admin', userName: 'Audit', userRole: 'ADMIN', action: 'AUDIT_TEST', details: String(i) })) });
   const seen = new Set<string>();

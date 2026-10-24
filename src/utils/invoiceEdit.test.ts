@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { groupInvoiceDevices, invoiceEditResult, parseUsd, renameChanges, specDraftOf, type InvoiceContents, type InvoiceContentDevice } from './invoiceEdit';
+import { codeChanges, groupInvoiceDevices, invoiceEditResult, parseUsd, renameChanges, specDraftOf, type InvoiceContents, type InvoiceContentDevice } from './invoiceEdit';
 
 const device = (id: string, model: string, price: number, extra: Partial<InvoiceContentDevice> = {}): InvoiceContentDevice => ({
   id, brand: 'Samsung', model, ram: '8GB', storage: '256GB', color: 'Black', imei: `35${id}`, purchasePriceUsd: price,
@@ -72,13 +72,37 @@ describe('fixing names typed wrong at receipt', () => {
     const groups = groupInvoiceDevices(contents.devices);
     const [a55] = groups;
     expect(renameChanges(groups, { [a55.key]: { ...specDraftOf(a55), ram: '' } }, contents.accessories, {}).invalid).toEqual([a55.key]);
-    expect(renameChanges(groups, {}, contents.accessories, { p1: { brand: '', name: '', category: 'Чехлы' } }).invalid).toEqual(['p1']);
+    expect(renameChanges(groups, {}, contents.accessories, { p1: { brand: '', name: '', category: 'Чехлы', barcode: 'C1' } }).invalid).toEqual(['p1']);
   });
 
   it('renames an accessory card this invoice brought in, not one other invoices share', () => {
-    const draft = { p1: { brand: 'Generic', name: 'Чехол A55', category: 'Чехлы' } };
-    expect(renameChanges([], {}, contents.accessories, draft).accessoryNames).toEqual([{ productId: 'p1', brand: 'Generic', name: 'Чехол A55', category: 'Чехлы' }]);
+    const draft = { p1: { brand: 'Generic', name: 'Чехол A55', category: 'Чехлы', barcode: ' c 1 ' } };
+    expect(renameChanges([], {}, contents.accessories, draft).accessoryNames).toEqual([{ productId: 'p1', brand: 'Generic', name: 'Чехол A55', category: 'Чехлы', barcode: 'C1' }]);
     const shared = contents.accessories.map((b) => ({ ...b, nameEditable: false }));
     expect(renameChanges([], {}, shared, draft).accessoryNames).toEqual([]);
+  });
+});
+
+describe('fixing IMEIs and serial numbers typed wrong at receipt', () => {
+  const phone = (id: string, imei: string, imei2: string | null = null) => device(id, 'A55', 500, { imei, imei2 });
+  const tablet = (id: string, imei: string) => device(id, 'Tab', 150, { imei, category: 'TABLET' });
+
+  it('saves only codes that changed, an SN upper-cased, an empty second code as none', () => {
+    const devices = [phone('a', '350000000000001'), phone('b', '350000000000002', '350000000000099'), tablet('t', 'R9TW001')];
+    const r = codeChanges(devices, {
+      a: { imei: '350000000000001', imei2: '' },
+      b: { imei: '35 0000 0000 0000 3', imei2: '' },
+      t: { imei: 'r9tw002', imei2: '' },
+    });
+    expect(r.invalid).toEqual([]);
+    expect(r.codes).toEqual([{ deviceId: 'b', imei: '350000000000003', imei2: null }, { deviceId: 't', imei: 'R9TW002', imei2: null }]);
+  });
+
+  it('lets two units swap codes but refuses a code typed twice or in the wrong format', () => {
+    const devices = [phone('a', '350000000000001'), phone('b', '350000000000002')];
+    expect(codeChanges(devices, { a: { imei: '350000000000002', imei2: '' }, b: { imei: '350000000000001', imei2: '' } }).codes).toHaveLength(2);
+    expect(codeChanges(devices, { a: { imei: '350000000000005', imei2: '' }, b: { imei: '350000000000005', imei2: '' } }).invalid.sort()).toEqual(['a', 'b']);
+    expect(codeChanges(devices, { a: { imei: '3500', imei2: '' } }).invalid).toEqual(['a']);
+    expect(codeChanges(devices, { a: { imei: '350000000000001', imei2: '350000000000001' } }).invalid).toEqual(['a']);
   });
 });

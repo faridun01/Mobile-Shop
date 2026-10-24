@@ -340,11 +340,12 @@ export const NewPurchaseForm: React.FC<NewPurchaseFormProps> = ({
                 <div className="space-y-1 font-mono">
                   {group.items.map((item, itemIdx) => {
                     const [imei1, imei2] = getImeiPair(item.imei);
-                    const clean1 = imei1.replace(/\D/g, '').slice(0, 15);
-                    const clean2 = imei2.replace(/\D/g, '').slice(0, 15);
-                    const is1Incomplete = clean1.length > 0 && clean1.length < 15;
+                    // Never cut to 15: 16 digits (an IMEISV) must show as wrong, not become a wrong IMEI.
+                    const clean1 = imei1.replace(/\D/g, '');
+                    const clean2 = imei2.replace(/\D/g, '');
+                    const is1Incomplete = clean1.length > 0 && clean1.length !== 15;
                     const is1Valid = clean1.length === 15;
-                    const is2Incomplete = clean2.length > 0 && clean2.length < 15;
+                    const is2Incomplete = clean2.length > 0 && clean2.length !== 15;
                     const is2Valid = clean2.length === 15;
 
                     const error1 = clean1.length === 15 ? imeiErrorsMap[clean1] : undefined;
@@ -369,11 +370,10 @@ export const NewPurchaseForm: React.FC<NewPurchaseFormProps> = ({
                               type="text"
                               inputMode="numeric"
                               pattern="\d{15}"
-                              maxLength={15}
                               required
                               value={clean1}
                               onChange={(e) => {
-                                const digits = e.target.value.replace(/\D/g, '').slice(0, 15);
+                                const digits = e.target.value.replace(/\D/g, '');
                                 onUpdateImei(groupIdx, itemIdx, clean2 ? `${digits} / ${clean2}` : digits);
                               }}
                               placeholder={`IMEI 1 #${itemIdx + 1} (15 цифр)`}
@@ -445,10 +445,9 @@ export const NewPurchaseForm: React.FC<NewPurchaseFormProps> = ({
                                 type="text"
                                 inputMode="numeric"
                                 pattern="\d{15}"
-                                maxLength={15}
                                 value={clean2}
                                 onChange={(e) => {
-                                  const digits = e.target.value.replace(/\D/g, '').slice(0, 15);
+                                  const digits = e.target.value.replace(/\D/g, '');
                                   onUpdateImei2(groupIdx, itemIdx, digits);
                                 }}
                                 placeholder="IMEI 2 (необязательно, 15 цифр)"
